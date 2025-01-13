@@ -1,10 +1,9 @@
 import React, {memo} from 'react';
 import {View, Text, StyleSheet, TouchableOpacity, Dimensions} from 'react-native';
+import { Balance } from '../components/common/Balance';
 
-// Get screen dimensions for responsive layout
 const {width} = Dimensions.get('window');
 
-// Memoize child components for performance
 const SquareButton = memo(({ onPress }: { onPress: () => void }) => (
   <TouchableOpacity style={styles.homeSquare} onPress={onPress} activeOpacity={0.7}>
     <Text style={styles.homeText}>home</Text>
@@ -20,6 +19,7 @@ const DigitalBarracks = memo(() => (
 export function TurfScreen({onNavigateToHackRig}: {onNavigateToHackRig: () => void}): React.JSX.Element {
   return (
     <View style={styles.container}>
+      <Balance style={styles.balance} />
       <View style={styles.row}>
         <DigitalBarracks />
         <SquareButton onPress={onNavigateToHackRig} />
@@ -38,7 +38,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    width: width * 0.8, // Use 80% of screen width
+    width: width * 0.8,
     paddingHorizontal: 20,
   },
   homeSquare: {
@@ -65,5 +65,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     paddingHorizontal: 10,
+  },
+  balance: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    zIndex: 1,
   },
 }); 
