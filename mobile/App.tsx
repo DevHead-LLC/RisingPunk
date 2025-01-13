@@ -17,6 +17,7 @@ import {
 import {TurfScreen} from './src/screens/TurfScreen';
 import {HomeScreen} from './src/screens/HomeScreen';
 import {HackMapScreen} from './src/screens/HackMapScreen';
+import { BalanceProvider } from './src/context/BalanceContext';
 
 type ScreenProps = {
   onJackIn: () => void;
@@ -88,9 +89,11 @@ function App(): React.JSX.Element {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {renderScreen()}
-    </SafeAreaView>
+    <BalanceProvider>
+      <SafeAreaView style={styles.container}>
+        {renderScreen()}
+      </SafeAreaView>
+    </BalanceProvider>
   );
 }
 
