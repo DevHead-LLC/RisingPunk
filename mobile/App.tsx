@@ -15,7 +15,8 @@ import {
   View,
 } from 'react-native';
 import {TurfScreen} from './src/screens/TurfScreen';
-import {HackRigScreen} from './src/screens/HackRigScreen';
+import {HomeScreen} from './src/screens/HomeScreen';
+import {HackMapScreen} from './src/screens/HackMapScreen';
 
 type ScreenProps = {
   onJackIn: () => void;
@@ -58,23 +59,37 @@ function LoginScreen({onJackIn}: ScreenProps): React.JSX.Element {
 
 function App(): React.JSX.Element {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentScreen, setCurrentScreen] = useState<'turf' | 'hackrig'>('turf');
+  const [currentScreen, setCurrentScreen] = useState<'turf' | 'home' | 'map'>('turf');
 
   const handleNavigateToHackRig = () => {
-    setCurrentScreen('hackrig');
+    setCurrentScreen('home');
+  };
+
+  const handleNavigateToMap = () => {
+    setCurrentScreen('map');
+  };
+
+  const renderScreen = () => {
+    if (!isLoggedIn) {
+      return <LoginScreen onJackIn={() => setIsLoggedIn(true)} />;
+    }
+    
+    switch (currentScreen) {
+      case 'turf':
+        return <TurfScreen onNavigateToHackRig={handleNavigateToHackRig} />;
+      case 'home':
+        return <HomeScreen 
+          onNavigateToMap={handleNavigateToMap} 
+          onClose={() => setCurrentScreen('turf')} 
+        />;
+      case 'map':
+        return <HackMapScreen onClose={() => setCurrentScreen('home')} />;
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {!isLoggedIn ? (
-        <LoginScreen onJackIn={() => setIsLoggedIn(true)} />
-      ) : (
-        currentScreen === 'turf' ? (
-          <TurfScreen onNavigateToHackRig={handleNavigateToHackRig} />
-        ) : (
-          <HackRigScreen />
-        )
-      )}
+      {renderScreen()}
     </SafeAreaView>
   );
 }
