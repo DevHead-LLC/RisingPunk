@@ -14,6 +14,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {TurfScreen} from './src/screens/TurfScreen';
+import {HackRigScreen} from './src/screens/HackRigScreen';
 
 type ScreenProps = {
   onJackIn: () => void;
@@ -54,25 +56,24 @@ function LoginScreen({onJackIn}: ScreenProps): React.JSX.Element {
   );
 }
 
-function TurfScreen(): React.JSX.Element {
-  return (
-    <View style={styles.container}>
-      <View style={styles.homeSquare}>
-        <Text style={styles.homeText}>home</Text>
-      </View>
-    </View>
-  );
-}
-
 function App(): React.JSX.Element {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentScreen, setCurrentScreen] = useState<'turf' | 'hackrig'>('turf');
+
+  const handleNavigateToHackRig = () => {
+    setCurrentScreen('hackrig');
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       {!isLoggedIn ? (
         <LoginScreen onJackIn={() => setIsLoggedIn(true)} />
       ) : (
-        <TurfScreen />
+        currentScreen === 'turf' ? (
+          <TurfScreen onNavigateToHackRig={handleNavigateToHackRig} />
+        ) : (
+          <HackRigScreen />
+        )
       )}
     </SafeAreaView>
   );
@@ -84,6 +85,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 50,
+    backgroundColor: '#000',
   },
   button: {
     backgroundColor: '#4a90e2',
@@ -95,30 +97,22 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  homeSquare: {
-    width: 100,
-    height: 100,
-    backgroundColor: '#e0e0e0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 5,
-  },
-  homeText: {
-    fontSize: 16,
-  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
+    color: '#fff',
   },
   input: {
     width: 300,
     height: 40,
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: '#4a90e2',
     borderRadius: 5,
     paddingHorizontal: 10,
     marginBottom: 10,
+    backgroundColor: '#fff',
+    color: '#000',
   },
   toggleButton: {
     marginTop: 20,
