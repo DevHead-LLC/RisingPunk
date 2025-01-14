@@ -1,10 +1,13 @@
-console.log('🔍 Initial ENV:', process.env.MONGODB_URI);
+console.log('Loading environment variables...');
+require('dotenv').config();
+console.log('Environment loaded. Connecting to MongoDB...');
 
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const User = require('./models/User');
 
 // Debug .env loading
 const envPath = path.resolve(process.cwd(), '.env');
@@ -18,8 +21,6 @@ try {
 } catch (err) {
   console.error('❌ Error reading .env file:', err);
 }
-
-require('dotenv').config();
 
 // Debug environment variables
 console.log('🔑 MONGODB_URI:', process.env.MONGODB_URI?.replace(/:([^@]+)@/, ':****@'));
@@ -70,6 +71,28 @@ app.get('/api/status', async (req, res) => {
     res.json(status);
   } catch (error) {
     console.error('❌ Status check error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update or add this route
+app.get('/api/profile', async (req, res) => {
+  try {
+    let user = await User.findOne({ username: 'Bert Toast' });
+    
+    if (!user) {
+      // Create default user if none exists
+      user = await User.create({
+        username: 'Bert Toast',
+        level: 1,
+        experience: { current: 1000, nextLevel: 1000 },
+        armyBonus: { strength: 0, defense: 0, speed: 0, health: 0 }
+      });
+    }
+    
+    res.json(user);
+  } catch (error) {
+    console.error('Profile fetch error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
