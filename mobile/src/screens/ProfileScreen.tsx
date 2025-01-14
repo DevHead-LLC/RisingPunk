@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,36 @@ import {
   ScrollView,
 } from 'react-native';
 
+interface UserProfile {
+  username: string;
+  level: number;
+  experience: {
+    current: number;
+    nextLevel: number;
+  };
+  armyBonus: {
+    strength: number;
+    defense: number;
+    speed: number;
+    health: number;
+  };
+}
+
 export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+
+  useEffect(() => {
+    // Static data that was working before
+    setProfile({
+      username: "Bert Toast",
+      level: 1,
+      experience: { current: 1000, nextLevel: 1000 },
+      armyBonus: { strength: 0, defense: 0, speed: 0, health: 0 }
+    });
+  }, []);
+
+  if (!profile) return <></>;
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -18,26 +47,44 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>Profile</Text>
         <View style={styles.profileCard}>
+          {/* User Info */}
           <Text style={styles.label}>Username</Text>
-          <Text style={styles.value}>CyberRunner</Text>
-          
-          <Text style={styles.label}>Reputation</Text>
-          <Text style={styles.value}>Rookie Hacker</Text>
-          
-          <Text style={styles.label}>Network Level</Text>
-          <Text style={styles.value}>1</Text>
+          <Text style={styles.value}>{profile.username}</Text>
 
-          <Text style={styles.sectionTitle}>Stats</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Total Bots</Text>
-              <Text style={styles.statValue}>0</Text>
+          {/* Level */}
+          <Text style={styles.label}>Level</Text>
+          <Text style={styles.value}>{profile.level}</Text>
+
+          {/* Experience */}
+          <Text style={styles.label}>Total EXP</Text>
+          <Text style={styles.value}>{profile.experience.current}</Text>
+
+          <Text style={styles.label}>EXP to Next Level</Text>
+          <Text style={styles.value}>{profile.experience.nextLevel}</Text>
+
+          {/* Army Bonuses */}
+          <Text style={styles.sectionTitle}>Army Bonuses</Text>
+          <View style={styles.statsContainer}>
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Strength</Text>
+                <Text style={styles.statValue}>+{profile.armyBonus.strength}</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Defense</Text>
+                <Text style={styles.statValue}>+{profile.armyBonus.defense}</Text>
+              </View>
             </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Successful Hacks</Text>
-              <Text style={styles.statValue}>0</Text>
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Speed</Text>
+                <Text style={styles.statValue}>+{profile.armyBonus.speed}</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Health</Text>
+                <Text style={styles.statValue}>+{profile.armyBonus.health}</Text>
+              </View>
             </View>
           </View>
         </View>
@@ -49,92 +96,74 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#1a1a1a',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
-  },
-  content: {
-    flex: 1,
     padding: 20,
-  },
-  title: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 20,
   },
   backButton: {
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20,
     backgroundColor: '#4a90e2',
+    borderRadius: 20,
   },
   backButtonText: {
     fontSize: 24,
-    fontWeight: 'bold',
     color: '#fff',
-  },
-  profileCard: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 10,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#2ecc71',
-  },
-  label: {
-    color: '#2ecc71',
-    fontSize: 14,
-    marginBottom: 5,
-  },
-  value: {
-    color: '#fff',
-    fontSize: 18,
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    color: '#2ecc71',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginTop: 10,
-    marginBottom: 15,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  statItem: {
-    width: '48%',
-    backgroundColor: '#000',
-    padding: 10,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: '#2ecc71',
-  },
-  statLabel: {
-    color: '#2ecc71',
-    fontSize: 12,
-    marginBottom: 5,
-  },
-  statValue: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     padding: 20,
-    paddingBottom: 40, // Extra padding at bottom for scroll space
+  },
+  profileCard: {
+    backgroundColor: '#222',
+    borderRadius: 10,
+    padding: 20,
+    marginBottom: 20,
+  },
+  label: {
+    color: '#2ecc71',
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  value: {
+    color: '#fff',
+    fontSize: 24,
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    color: '#2ecc71',
+    fontSize: 24,
+    marginBottom: 20,
+  },
+  statsContainer: {
+    width: '100%',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
+  statItem: {
+    width: '48%',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 8,
+    padding: 15,
+    borderWidth: 1,
+    borderColor: '#2ecc71',
+  },
+  statLabel: {
+    color: '#2ecc71',
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  statValue: {
+    color: '#fff',
+    fontSize: 24,
+    textAlign: 'center',
   },
 }); 
