@@ -17,7 +17,10 @@ import {
 import {TurfScreen} from './src/screens/TurfScreen';
 import {HomeScreen} from './src/screens/HomeScreen';
 import {HackMapScreen} from './src/screens/HackMapScreen';
+import {BotAssemblyScreen} from './src/screens/BotAssemblyScreen';
+import { DigitalBarracksScreen } from './src/screens/DigitalBarracksScreen';
 import { BalanceProvider } from './src/context/BalanceContext';
+import { BotsProvider } from './src/context/BotsContext';
 
 type ScreenProps = {
   onJackIn: () => void;
@@ -60,7 +63,7 @@ function LoginScreen({onJackIn}: ScreenProps): React.JSX.Element {
 
 function App(): React.JSX.Element {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentScreen, setCurrentScreen] = useState<'turf' | 'home' | 'map'>('turf');
+  const [currentScreen, setCurrentScreen] = useState<'turf' | 'home' | 'map' | 'botassembly' | 'barracks'>('turf');
 
   const handleNavigateToHackRig = () => {
     setCurrentScreen('home');
@@ -70,6 +73,14 @@ function App(): React.JSX.Element {
     setCurrentScreen('map');
   };
 
+  const handleNavigateToBotAssembly = () => {
+    setCurrentScreen('botassembly');
+  };
+
+  const handleNavigateToBarracks = () => {
+    setCurrentScreen('barracks');
+  };
+
   const renderScreen = () => {
     if (!isLoggedIn) {
       return <LoginScreen onJackIn={() => setIsLoggedIn(true)} />;
@@ -77,22 +88,32 @@ function App(): React.JSX.Element {
     
     switch (currentScreen) {
       case 'turf':
-        return <TurfScreen onNavigateToHackRig={handleNavigateToHackRig} />;
+        return <TurfScreen 
+          onNavigateToHackRig={handleNavigateToHackRig}
+          onNavigateToBarracks={handleNavigateToBarracks}
+        />;
       case 'home':
         return <HomeScreen 
-          onNavigateToMap={handleNavigateToMap} 
+          onNavigateToMap={handleNavigateToMap}
+          onNavigateToBotAssembly={handleNavigateToBotAssembly}
           onClose={() => setCurrentScreen('turf')} 
         />;
       case 'map':
         return <HackMapScreen onClose={() => setCurrentScreen('home')} />;
+      case 'botassembly':
+        return <BotAssemblyScreen onClose={() => setCurrentScreen('home')} />;
+      case 'barracks':
+        return <DigitalBarracksScreen onClose={() => setCurrentScreen('turf')} />;
     }
   };
 
   return (
     <BalanceProvider>
-      <SafeAreaView style={styles.container}>
-        {renderScreen()}
-      </SafeAreaView>
+      <BotsProvider>
+        <SafeAreaView style={styles.container}>
+          {renderScreen()}
+        </SafeAreaView>
+      </BotsProvider>
     </BalanceProvider>
   );
 }
