@@ -10,18 +10,24 @@ const SquareButton = memo(({ onPress }: { onPress: () => void }) => (
   </TouchableOpacity>
 ));
 
-const DigitalBarracks = memo(() => (
-  <View style={styles.barracksCircle}>
+const DigitalBarracks = memo(({ onPress }: { onPress: () => void }) => (
+  <TouchableOpacity style={styles.barracksCircle} onPress={onPress}>
     <Text style={styles.barracksText}>Digital Barracks</Text>
-  </View>
+  </TouchableOpacity>
 ));
 
-export function TurfScreen({onNavigateToHackRig}: {onNavigateToHackRig: () => void}): React.JSX.Element {
+export function TurfScreen({
+  onNavigateToHackRig,
+  onNavigateToBarracks
+}: {
+  onNavigateToHackRig: () => void;
+  onNavigateToBarracks: () => void;
+}): React.JSX.Element {
   return (
     <View style={styles.container}>
       <Balance style={styles.balance} />
       <View style={styles.row}>
-        <DigitalBarracks />
+        <DigitalBarracks onPress={onNavigateToBarracks} />
         <SquareButton onPress={onNavigateToHackRig} />
       </View>
     </View>
