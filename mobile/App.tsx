@@ -21,6 +21,7 @@ import {BotAssemblyScreen} from './src/screens/BotAssemblyScreen';
 import { DigitalBarracksScreen } from './src/screens/DigitalBarracksScreen';
 import { BalanceProvider } from './src/context/BalanceContext';
 import { BotsProvider } from './src/context/BotsContext';
+import { ProfileScreen } from './src/screens/ProfileScreen';
 
 type ScreenProps = {
   onJackIn: () => void;
@@ -63,7 +64,7 @@ function LoginScreen({onJackIn}: ScreenProps): React.JSX.Element {
 
 function App(): React.JSX.Element {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentScreen, setCurrentScreen] = useState<'turf' | 'home' | 'map' | 'botassembly' | 'barracks'>('turf');
+  const [currentScreen, setCurrentScreen] = useState<'turf' | 'home' | 'map' | 'botassembly' | 'barracks' | 'profile'>('turf');
 
   const handleNavigateToHackRig = () => {
     setCurrentScreen('home');
@@ -81,6 +82,10 @@ function App(): React.JSX.Element {
     setCurrentScreen('barracks');
   };
 
+  const handleNavigateToProfile = () => {
+    setCurrentScreen('profile');
+  };
+
   const renderScreen = () => {
     if (!isLoggedIn) {
       return <LoginScreen onJackIn={() => setIsLoggedIn(true)} />;
@@ -91,6 +96,7 @@ function App(): React.JSX.Element {
         return <TurfScreen 
           onNavigateToHackRig={handleNavigateToHackRig}
           onNavigateToBarracks={handleNavigateToBarracks}
+          onNavigateToProfile={handleNavigateToProfile}
         />;
       case 'home':
         return <HomeScreen 
@@ -104,6 +110,8 @@ function App(): React.JSX.Element {
         return <BotAssemblyScreen onClose={() => setCurrentScreen('home')} />;
       case 'barracks':
         return <DigitalBarracksScreen onClose={() => setCurrentScreen('turf')} />;
+      case 'profile':
+        return <ProfileScreen onClose={() => setCurrentScreen('turf')} />;
     }
   };
 
