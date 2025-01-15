@@ -31,7 +31,7 @@ export function LoginScreen({onJackIn}: LoginScreenProps): React.JSX.Element {
           <Text style={styles.titleBottom}>Punk</Text>
           <View style={styles.taglineContainer}>
             <Text style={styles.taglineText}>
-              Earn money... or be a <Text style={styles.punkText}>Punk</Text>
+              Earn money... or be a <Text style={styles.punkText}>Punk?!</Text>
             </Text>
           </View>
         </View>
