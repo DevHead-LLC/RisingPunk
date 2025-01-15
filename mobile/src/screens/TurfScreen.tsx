@@ -1,20 +1,11 @@
-import React, {memo} from 'react';
-import {View, Text, StyleSheet, TouchableOpacity, Dimensions} from 'react-native';
-import { Balance } from '../components/common/Balance';
-
-const {width} = Dimensions.get('window');
-
-const DigitalBarracks = memo(({ onPress }: { onPress: () => void }) => (
-  <TouchableOpacity style={styles.barracksCircle} onPress={onPress}>
-    <Text style={styles.barracksText}>Digital Barracks</Text>
-  </TouchableOpacity>
-));
-
-const SquareButton = memo(({ onPress }: { onPress: () => void }) => (
-  <TouchableOpacity style={styles.homeSquare} onPress={onPress}>
-    <Text style={styles.homeText}>home</Text>
-  </TouchableOpacity>
-));
+import React, {memo, useState} from 'react';
+import {View, StyleSheet, TouchableOpacity, Text} from 'react-native';
+import {Balance} from '../components/common/Balance';
+import {HomeScreen} from './HomeScreen';
+import {DigitalBarracksScreen} from './DigitalBarracksScreen';
+import {ProfileScreen} from './ProfileScreen';
+import {HackMapScreen} from './HackMapScreen';
+import {BotAssemblyScreen} from './BotAssemblyScreen';
 
 const ProfileSection = memo(({ onPress }: { onPress: () => void }) => (
   <TouchableOpacity style={styles.profileContainer} onPress={onPress}>
@@ -24,27 +15,60 @@ const ProfileSection = memo(({ onPress }: { onPress: () => void }) => (
   </TouchableOpacity>
 ));
 
-export function TurfScreen({
-  onNavigateToHackRig,
-  onNavigateToBarracks,
-  onNavigateToProfile,
-}: {
-  onNavigateToHackRig: () => void;
-  onNavigateToBarracks: () => void;
-  onNavigateToProfile: () => void;
-}): React.JSX.Element {
-  return (
-    <View style={styles.container}>
-      <Balance style={styles.balance} />
-      <View style={styles.content}>
-        <View style={styles.topRow}>
-          <DigitalBarracks onPress={onNavigateToBarracks} />
-          <SquareButton onPress={onNavigateToHackRig} />
-        </View>
-        <ProfileSection onPress={onNavigateToProfile} />
-      </View>
-    </View>
-  );
+const SquareButton = memo(({ onPress }: { onPress: () => void }) => (
+  <TouchableOpacity style={styles.homeSquare} onPress={onPress}>
+    <Text style={styles.homeText}>home</Text>
+  </TouchableOpacity>
+));
+
+const DigitalBarracks = memo(({ onPress }: { onPress: () => void }) => (
+  <TouchableOpacity style={styles.barracksCircle} onPress={onPress}>
+    <Text style={styles.barracksText}>Digital Barracks</Text>
+  </TouchableOpacity>
+));
+
+export function TurfScreen(): React.JSX.Element {
+  const [currentScreen, setCurrentScreen] = useState('turf');
+
+  const renderScreen = () => {
+    switch (currentScreen) {
+      case 'hackRig':
+        return <HomeScreen 
+          onClose={() => setCurrentScreen('turf')}
+          onNavigateToMap={() => setCurrentScreen('map')}
+          onNavigateToBotAssembly={() => setCurrentScreen('botAssembly')}
+        />;
+      case 'map':
+        return <HackMapScreen onClose={() => setCurrentScreen('hackRig')} />;
+      case 'botAssembly':
+        return <BotAssemblyScreen onClose={() => setCurrentScreen('hackRig')} />;
+      case 'barracks':
+        return <DigitalBarracksScreen onClose={() => setCurrentScreen('turf')} />;
+      case 'profile':
+        return <ProfileScreen onClose={() => setCurrentScreen('turf')} />;
+      default:
+        return (
+          <View style={styles.container}>
+            <Balance style={styles.balance} />
+            <View style={styles.content}>
+              <View style={styles.topRow}>
+                <DigitalBarracks 
+                  onPress={() => setCurrentScreen('barracks')} 
+                />
+                <SquareButton 
+                  onPress={() => setCurrentScreen('hackRig')} 
+                />
+              </View>
+              <ProfileSection 
+                onPress={() => setCurrentScreen('profile')} 
+              />
+            </View>
+          </View>
+        );
+    }
+  };
+
+  return renderScreen();
 }
 
 const styles = StyleSheet.create({

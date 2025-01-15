@@ -31,11 +31,7 @@ function App(): React.JSX.Element {
           {!isLoggedIn ? (
             <LoginScreen onJackIn={handleJackIn} />
           ) : (
-            <TurfScreen
-              onNavigateToHackRig={() => {}}
-              onNavigateToBarracks={() => {}}
-              onNavigateToProfile={() => {}}
-            />
+            <TurfScreen />
           )}
         </BotsProvider>
       </BalanceProvider>
