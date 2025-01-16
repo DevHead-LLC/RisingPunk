@@ -167,7 +167,7 @@ export function LoginScreen({onJackIn}: LoginScreenProps): React.JSX.Element {
           }}
         >
           <Text style={styles.toggleText}>
-            {formType === 'login' ? 'NEW_IDENTITY' : 'EXISTING_IDENTITY'}
+            {formType === 'login' ? 'NEW_IDENTITY (SIGN_UP)' : 'EXISTING_IDENTITY (SIGN_IN)'}
           </Text>
         </TouchableOpacity>
       </View>
