@@ -8,6 +8,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const User = require('./models/User');
+const authRoutes = require('./routes/auth');
 
 // Debug .env loading
 const envPath = path.resolve(process.cwd(), '.env');
@@ -33,23 +34,16 @@ app.use(express.json());
 
 // MongoDB connection - simplified to match mongosh
 mongoose.connect(process.env.MONGODB_URI, {
-  dbName: 'test',
+  dbName: 'RisingPunk',
   appName: 'mongosh+2.2.12'  // matching the working mongosh connection
 })
 .then(() => {
   console.log('✅ MongoDB connected successfully');
-  console.log('📦 Database:', mongoose.connection.name);
+  console.log('📦 Database:', mongoose.connection.db.databaseName);
   console.log('🔗 Connected to:', mongoose.connection.host);
 })
 .catch(err => {
-  console.error('❌ MongoDB connection error:', {
-    message: err.message,
-    code: err.code,
-    stack: err.stack
-  });
-  // Log the connection string (with password hidden)
-  const sanitizedUri = process.env.MONGODB_URI.replace(/:([^@]+)@/, ':****@');
-  console.log('🔍 Attempting connection to:', sanitizedUri);
+  console.error('❌ MongoDB connection error:', err);
   process.exit(1);
 });
 
@@ -94,6 +88,25 @@ app.get('/api/profile', async (req, res) => {
   } catch (error) {
     console.error('Profile fetch error:', error);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.use('/api/auth', authRoutes);
+
+// Add this route to verify database connection
+app.get('/api/dbcheck', async (req, res) => {
+  try {
+    const dbName = mongoose.connection.db.databaseName;
+    const collections = await mongoose.connection.db.listCollections().toArray();
+    const users = await mongoose.connection.db.collection('users').countDocuments();
+    
+    res.json({
+      database: dbName,
+      collections: collections.map(c => c.name),
+      userCount: users
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 

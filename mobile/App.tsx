@@ -5,37 +5,33 @@
  * @format
  */
 
-import React, {useState} from 'react';
+import React from 'react';
 import {SafeAreaView} from 'react-native';
 import {TurfScreen} from './src/screens/TurfScreen';
-import {HomeScreen} from './src/screens/HomeScreen';
-import {HackMapScreen} from './src/screens/HackMapScreen';
-import {BotAssemblyScreen} from './src/screens/BotAssemblyScreen';
-import {DigitalBarracksScreen} from './src/screens/DigitalBarracksScreen';
 import {BalanceProvider} from './src/context/BalanceContext';
 import {BotsProvider} from './src/context/BotsContext';
-import {ProfileScreen} from './src/screens/ProfileScreen';
 import {LoginScreen} from './src/screens/LoginScreen';
+import {AuthProvider, useAuth} from './src/context/AuthContext';
 
-function App(): React.JSX.Element {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-
-  const handleJackIn = () => {
-    setIsLoggedIn(true);
-  };
+function AppContent(): React.JSX.Element {
+  const {token} = useAuth();
 
   return (
     <SafeAreaView style={{flex: 1}}>
       <BalanceProvider>
         <BotsProvider>
-          {!isLoggedIn ? (
-            <LoginScreen onJackIn={handleJackIn} />
-          ) : (
-            <TurfScreen />
-          )}
+          {!token ? <LoginScreen /> : <TurfScreen />}
         </BotsProvider>
       </BalanceProvider>
     </SafeAreaView>
+  );
+}
+
+function App(): React.JSX.Element {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 
