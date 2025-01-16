@@ -13,14 +13,99 @@ type LoginScreenProps = {
   onJackIn: () => void;
 };
 
+type FormType = 'login' | 'register';
+
 export function LoginScreen({onJackIn}: LoginScreenProps): React.JSX.Element {
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [formType, setFormType] = useState<FormType>('login');
+  const [formData, setFormData] = useState({
+    email: '',
+    handle: '',
+    accessKey: '',
+  });
+
+  const handleInputChange = (field: string) => (value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const renderWelcomeMessage = () => (
+    <Text style={styles.welcomeText}>
+      {formType === 'login' ? 'WELCOME BACK!' : 'WELCOME!'}
+    </Text>
+  );
+
+  const renderLoginForm = () => (
+    <View style={styles.formContainer}>
+      <TextInput
+        style={[styles.input, styles.inputSpacing]}
+        placeholder="HANDLE"
+        placeholderTextColor={COLORS.text.placeholder}
+        value={formData.handle}
+        onChangeText={handleInputChange('handle')}
+      />
+      <View style={styles.inputCorner} />
+      
+      <TextInput
+        style={[styles.input, styles.inputSpacing]}
+        placeholder="ACCESS_KEY"
+        placeholderTextColor={COLORS.text.placeholder}
+        secureTextEntry
+        value={formData.accessKey}
+        onChangeText={handleInputChange('accessKey')}
+      />
+      <View style={styles.inputCorner} />
+
+      <TouchableOpacity style={styles.jackInButton} onPress={onJackIn}>
+        <Text style={styles.jackInText}>JACK_IN</Text>
+        <View style={styles.buttonCorner} />
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderRegisterForm = () => (
+    <View style={styles.formContainer}>
+      <TextInput
+        style={[styles.input, styles.inputSpacing]}
+        placeholder="ENTER_EMAIL"
+        placeholderTextColor={COLORS.text.placeholder}
+        value={formData.email}
+        onChangeText={handleInputChange('email')}
+        keyboardType="email-address"
+        autoCapitalize="none"
+      />
+      <View style={styles.inputCorner} />
+
+      <TextInput
+        style={[styles.input, styles.inputSpacing]}
+        placeholder="SELECT_HANDLE"
+        placeholderTextColor={COLORS.text.placeholder}
+        value={formData.handle}
+        onChangeText={handleInputChange('handle')}
+        autoCapitalize="none"
+      />
+      <View style={styles.inputCorner} />
+
+      <TextInput
+        style={[styles.input, styles.inputSpacing]}
+        placeholder="SET_ACCESS_KEY"
+        placeholderTextColor={COLORS.text.placeholder}
+        secureTextEntry
+        value={formData.accessKey}
+        onChangeText={handleInputChange('accessKey')}
+      />
+      <View style={styles.inputCorner} />
+
+      <TouchableOpacity 
+        style={[styles.jackInButton, styles.createButton]} 
+        onPress={onJackIn}
+      >
+        <Text style={styles.jackInText}>INITIALIZE</Text>
+        <View style={styles.buttonCorner} />
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
     <View style={styles.container}>
-      {/* Left Side */}
       <View style={styles.leftSide}>
         <View style={styles.titleContainer}>
           <View style={styles.titleWrapper}>
@@ -37,60 +122,17 @@ export function LoginScreen({onJackIn}: LoginScreenProps): React.JSX.Element {
         </View>
         <Text style={styles.versionText}>ALPHA_0.1.0</Text>
       </View>
-
-      {/* Right Side - Login Form */}
       <View style={styles.rightSide}>
-        <View style={styles.formBox}>
-          <View style={styles.formHeader}>
-            <Text style={styles.formTitle}>
-              {isSignUp ? '// New User' : '// Login'}
-            </Text>
-          </View>
-          
-          <View style={styles.inputsContainer}>
-            <View style={styles.inputWrapper}>
-              <TextInput
-                style={styles.input}
-                placeholder="HANDLE"
-                placeholderTextColor={COLORS.text.placeholder}
-                value={username}
-                onChangeText={setUsername}
-                autoCapitalize="none"
-              />
-              <View style={styles.inputCorner} />
-            </View>
-
-            <View style={styles.inputWrapper}>
-              <TextInput
-                style={styles.input}
-                placeholder="ACCESS_KEY"
-                placeholderTextColor={COLORS.text.placeholder}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-              />
-              <View style={styles.inputCorner} />
-            </View>
-
-            <TouchableOpacity 
-              style={styles.jackInButton} 
-              onPress={onJackIn}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.jackInText}>JACK_IN</Text>
-              <View style={styles.buttonCorner} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.toggleButton}
-              onPress={() => setIsSignUp(!isSignUp)}
-            >
-              <Text style={styles.toggleText}>
-                {isSignUp ? '[ return_to_login ]' : '[ create_account ]'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        {renderWelcomeMessage()}
+        {formType === 'login' ? renderLoginForm() : renderRegisterForm()}
+        <TouchableOpacity 
+          style={styles.toggleButton}
+          onPress={() => setFormType(prev => prev === 'login' ? 'register' : 'login')}
+        >
+          <Text style={styles.toggleText}>
+            {formType === 'login' ? 'NEW_IDENTITY' : 'EXISTING_IDENTITY'}
+          </Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -208,11 +250,30 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   toggleButton: {
-    alignItems: 'center',
-    marginTop: SIZING.spacing.md,
+    marginTop: SIZING.spacing.lg,
+    opacity: 0.7,
   },
   toggleText: {
-    color: COLORS.text.secondary,
+    color: COLORS.matrix,
     fontSize: SIZING.font.small,
+    letterSpacing: 1,
+  },
+  formContainer: {
+    width: '100%',
+    maxWidth: 320,
+  },
+  inputSpacing: {
+    marginBottom: SIZING.spacing.md,
+  },
+  createButton: {
+    marginTop: SIZING.spacing.sm,
+  },
+  welcomeText: {
+    color: COLORS.secondary,
+    fontSize: SIZING.font.h2,
+    fontWeight: '500',
+    marginBottom: SIZING.spacing.lg,
+    letterSpacing: 2,
+    opacity: 0.8,
   },
 }); 

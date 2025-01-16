@@ -30,16 +30,16 @@ type ThemeSizing = {
 };
 
 export const COLORS: ThemeColors = {
-  background: '#080C14',
-  primary: '#4FACFE',
-  secondary: '#2F5CFE',
-  accent: '#0C1219',
-  inputBg: '#101622',
-  buttonBg: '#1A2438',
+  background: '#0E0B16',
+  primary: '#A239CA',
+  secondary: '#4717F6',
+  accent: '#1A1625',
+  inputBg: '#201C2B',
+  buttonBg: '#2D2640',
   matrix: '#00FF41',
   text: {
-    primary: '#4FACFE',
-    secondary: '#2F5CFE',
+    primary: '#A239CA',
+    secondary: '#4717F6',
     accent: '#00FF41',
     placeholder: 'rgba(0, 255, 65, 0.4)',
   }
