@@ -65,27 +65,32 @@ export function LoginScreen({onJackIn}: LoginScreenProps): React.JSX.Element {
     </Text>
   );
 
+  const renderInputWithCorner = (
+    placeholder: string,
+    value: string,
+    onChangeText: (text: string) => void,
+    secureTextEntry?: boolean,
+    keyboardType?: 'email-address' | 'default'
+  ) => (
+    <View style={styles.inputWrapper}>
+      <TextInput
+        style={styles.input}
+        placeholder={placeholder}
+        placeholderTextColor={COLORS.text.placeholder}
+        value={value}
+        onChangeText={onChangeText}
+        secureTextEntry={secureTextEntry}
+        keyboardType={keyboardType}
+        autoCapitalize="none"
+      />
+      <View style={styles.inputCorner} />
+    </View>
+  );
+
   const renderLoginForm = () => (
     <View style={styles.formContainer}>
-      <TextInput
-        style={[styles.input, styles.inputSpacing]}
-        placeholder="HANDLE"
-        placeholderTextColor={COLORS.text.placeholder}
-        value={formData.handle}
-        onChangeText={handleInputChange('handle')}
-      />
-      <View style={styles.inputCorner} />
-      
-      <TextInput
-        style={[styles.input, styles.inputSpacing]}
-        placeholder="ACCESS_KEY"
-        placeholderTextColor={COLORS.text.placeholder}
-        secureTextEntry
-        value={formData.accessKey}
-        onChangeText={handleInputChange('accessKey')}
-      />
-      <View style={styles.inputCorner} />
-
+      {renderInputWithCorner('HANDLE', formData.handle, handleInputChange('handle'))}
+      {renderInputWithCorner('ACCESS_KEY', formData.accessKey, handleInputChange('accessKey'), true)}
       <TouchableOpacity style={styles.jackInButton} onPress={handleSubmit}>
         <Text style={styles.jackInText}>JACK_IN</Text>
         <View style={styles.buttonCorner} />
@@ -95,37 +100,9 @@ export function LoginScreen({onJackIn}: LoginScreenProps): React.JSX.Element {
 
   const renderRegisterForm = () => (
     <View style={styles.formContainer}>
-      <TextInput
-        style={[styles.input, styles.inputSpacing]}
-        placeholder="ENTER_EMAIL"
-        placeholderTextColor={COLORS.text.placeholder}
-        value={formData.email}
-        onChangeText={handleInputChange('email')}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-      <View style={styles.inputCorner} />
-
-      <TextInput
-        style={[styles.input, styles.inputSpacing]}
-        placeholder="SELECT_HANDLE"
-        placeholderTextColor={COLORS.text.placeholder}
-        value={formData.handle}
-        onChangeText={handleInputChange('handle')}
-        autoCapitalize="none"
-      />
-      <View style={styles.inputCorner} />
-
-      <TextInput
-        style={[styles.input, styles.inputSpacing]}
-        placeholder="SET_ACCESS_KEY"
-        placeholderTextColor={COLORS.text.placeholder}
-        secureTextEntry
-        value={formData.accessKey}
-        onChangeText={handleInputChange('accessKey')}
-      />
-      <View style={styles.inputCorner} />
-
+      {renderInputWithCorner('ENTER_EMAIL', formData.email, handleInputChange('email'), false, 'email-address')}
+      {renderInputWithCorner('SELECT_HANDLE', formData.handle, handleInputChange('handle'))}
+      {renderInputWithCorner('SET_ACCESS_KEY', formData.accessKey, handleInputChange('accessKey'), true)}
       <TouchableOpacity 
         style={[styles.jackInButton, styles.createButton]} 
         onPress={handleSubmit}
@@ -262,14 +239,16 @@ const styles = StyleSheet.create({
   },
   inputWrapper: {
     position: 'relative',
+    marginBottom: SIZING.spacing.sm,
+    width: '100%',
   },
   input: {
     ...styleGuide.inputField,
     height: 42,
-    marginBottom: SIZING.spacing.sm,
   },
   inputCorner: {
     ...styleGuide.cornerDecoration,
+    borderColor: COLORS.primary,
   },
   jackInButton: {
     height: 48,
