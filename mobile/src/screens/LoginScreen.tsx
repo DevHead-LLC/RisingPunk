@@ -8,14 +8,13 @@ import {
   Dimensions,
 } from 'react-native';
 import {COLORS, SIZING, styleGuide} from '../styles/theme';
-
-type LoginScreenProps = {
-  onJackIn: () => void;
-};
+import {useAuth} from '../context/AuthContext';
+import {api} from '../services/api';
 
 type FormType = 'login' | 'register';
 
-export function LoginScreen({onJackIn}: LoginScreenProps): React.JSX.Element {
+export function LoginScreen(): React.JSX.Element {
+  const { login } = useAuth();
   const [formType, setFormType] = useState<FormType>('login');
   const [formData, setFormData] = useState({
     email: '',
@@ -54,9 +53,26 @@ export function LoginScreen({onJackIn}: LoginScreenProps): React.JSX.Element {
     return true;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (validateForm()) {
-      onJackIn();
+      try {
+        if (formType === 'login') {
+          const response = await api.login({
+            handle: formData.handle,
+            accessKey: formData.accessKey,
+          });
+          await login(response.token, response.user);
+        } else {
+          const response = await api.register({
+            email: formData.email,
+            handle: formData.handle,
+            accessKey: formData.accessKey,
+          });
+          await login(response.token, response.user);
+        }
+      } catch (err) {
+        setError(`ACCESS_DENIED: ${err instanceof Error ? err.message : 'UNKNOWN_ERROR'}`);
+      }
     }
   };
 
