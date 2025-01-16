@@ -21,6 +21,7 @@ export function LoginScreen({onJackIn}: LoginScreenProps): React.JSX.Element {
     email: '',
     handle: '',
     accessKey: '',
+    verifyAccessKey: '',
   });
   const [error, setError] = useState<string>('');
 
@@ -33,7 +34,7 @@ export function LoginScreen({onJackIn}: LoginScreenProps): React.JSX.Element {
         return false;
       }
     } else {
-      if (!formData.email || !formData.handle || !formData.accessKey) {
+      if (!formData.email || !formData.handle || !formData.accessKey || !formData.verifyAccessKey) {
         setError('ACCESS_DENIED: ALL_FIELDS_REQUIRED');
         return false;
       }
@@ -43,6 +44,10 @@ export function LoginScreen({onJackIn}: LoginScreenProps): React.JSX.Element {
       }
       if (formData.accessKey.length < 6) {
         setError('ACCESS_DENIED: ACCESS_KEY_TOO_SHORT');
+        return false;
+      }
+      if (formData.accessKey !== formData.verifyAccessKey) {
+        setError('ACCESS_DENIED: ACCESS_KEYS_DO_NOT_MATCH');
         return false;
       }
     }
@@ -103,6 +108,7 @@ export function LoginScreen({onJackIn}: LoginScreenProps): React.JSX.Element {
       {renderInputWithCorner('ENTER_EMAIL', formData.email, handleInputChange('email'), false, 'email-address')}
       {renderInputWithCorner('SELECT_HANDLE', formData.handle, handleInputChange('handle'))}
       {renderInputWithCorner('SET_ACCESS_KEY', formData.accessKey, handleInputChange('accessKey'), true)}
+      {renderInputWithCorner('VERIFY_ACCESS_KEY', formData.verifyAccessKey, handleInputChange('verifyAccessKey'), true)}
       <TouchableOpacity 
         style={[styles.jackInButton, styles.createButton]} 
         onPress={handleSubmit}
@@ -140,7 +146,7 @@ export function LoginScreen({onJackIn}: LoginScreenProps): React.JSX.Element {
           onPress={() => {
             setFormType(prev => prev === 'login' ? 'register' : 'login');
             setError('');
-            setFormData({ email: '', handle: '', accessKey: '' });
+            setFormData({ email: '', handle: '', accessKey: '', verifyAccessKey: '' });
           }}
         >
           <Text style={styles.toggleText}>
