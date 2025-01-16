@@ -22,6 +22,38 @@ export function LoginScreen({onJackIn}: LoginScreenProps): React.JSX.Element {
     handle: '',
     accessKey: '',
   });
+  const [error, setError] = useState<string>('');
+
+  const validateForm = () => {
+    setError('');
+    
+    if (formType === 'login') {
+      if (!formData.handle || !formData.accessKey) {
+        setError('ACCESS_DENIED: CREDENTIALS_REQUIRED');
+        return false;
+      }
+    } else {
+      if (!formData.email || !formData.handle || !formData.accessKey) {
+        setError('ACCESS_DENIED: ALL_FIELDS_REQUIRED');
+        return false;
+      }
+      if (!formData.email.includes('@')) {
+        setError('ACCESS_DENIED: INVALID_EMAIL');
+        return false;
+      }
+      if (formData.accessKey.length < 6) {
+        setError('ACCESS_DENIED: ACCESS_KEY_TOO_SHORT');
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const handleSubmit = () => {
+    if (validateForm()) {
+      onJackIn();
+    }
+  };
 
   const handleInputChange = (field: string) => (value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -54,7 +86,7 @@ export function LoginScreen({onJackIn}: LoginScreenProps): React.JSX.Element {
       />
       <View style={styles.inputCorner} />
 
-      <TouchableOpacity style={styles.jackInButton} onPress={onJackIn}>
+      <TouchableOpacity style={styles.jackInButton} onPress={handleSubmit}>
         <Text style={styles.jackInText}>JACK_IN</Text>
         <View style={styles.buttonCorner} />
       </TouchableOpacity>
@@ -96,7 +128,7 @@ export function LoginScreen({onJackIn}: LoginScreenProps): React.JSX.Element {
 
       <TouchableOpacity 
         style={[styles.jackInButton, styles.createButton]} 
-        onPress={onJackIn}
+        onPress={handleSubmit}
       >
         <Text style={styles.jackInText}>INITIALIZE</Text>
         <View style={styles.buttonCorner} />
@@ -124,10 +156,15 @@ export function LoginScreen({onJackIn}: LoginScreenProps): React.JSX.Element {
       </View>
       <View style={styles.rightSide}>
         {renderWelcomeMessage()}
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
         {formType === 'login' ? renderLoginForm() : renderRegisterForm()}
         <TouchableOpacity 
           style={styles.toggleButton}
-          onPress={() => setFormType(prev => prev === 'login' ? 'register' : 'login')}
+          onPress={() => {
+            setFormType(prev => prev === 'login' ? 'register' : 'login');
+            setError('');
+            setFormData({ email: '', handle: '', accessKey: '' });
+          }}
         >
           <Text style={styles.toggleText}>
             {formType === 'login' ? 'NEW_IDENTITY' : 'EXISTING_IDENTITY'}
@@ -228,6 +265,8 @@ const styles = StyleSheet.create({
   },
   input: {
     ...styleGuide.inputField,
+    height: 42,
+    marginBottom: SIZING.spacing.sm,
   },
   inputCorner: {
     ...styleGuide.cornerDecoration,
@@ -250,7 +289,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   toggleButton: {
-    marginTop: SIZING.spacing.lg,
+    marginTop: SIZING.spacing.md,
     opacity: 0.7,
   },
   toggleText: {
@@ -261,19 +300,26 @@ const styles = StyleSheet.create({
   formContainer: {
     width: '100%',
     maxWidth: 320,
+    paddingHorizontal: SIZING.spacing.md,
   },
   inputSpacing: {
     marginBottom: SIZING.spacing.md,
   },
   createButton: {
-    marginTop: SIZING.spacing.sm,
+    marginTop: SIZING.spacing.xs,
   },
   welcomeText: {
     color: COLORS.secondary,
-    fontSize: SIZING.font.h2,
+    fontSize: SIZING.font.h2 - 2,
     fontWeight: '500',
-    marginBottom: SIZING.spacing.lg,
+    marginBottom: SIZING.spacing.md,
     letterSpacing: 2,
     opacity: 0.8,
+  },
+  errorText: {
+    color: '#FF0033',
+    fontSize: SIZING.font.small,
+    marginBottom: SIZING.spacing.sm,
+    letterSpacing: 1,
   },
 }); 
