@@ -9,6 +9,7 @@ const path = require('path');
 const fs = require('fs');
 const User = require('./models/User');
 const authRoutes = require('./routes/auth');
+const auth = require('./middleware/auth');
 
 // Debug .env loading
 const envPath = path.resolve(process.cwd(), '.env');
@@ -107,6 +108,30 @@ app.get('/api/dbcheck', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Add balance endpoint to existing routes
+app.get('/api/balance', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const now = new Date();
+    const secondsElapsed = (now - user.balance.lastUpdated) / 1000;
+    const accumulatedAmount = Math.floor(secondsElapsed * user.balance.ratePerSecond);
+    
+    user.balance.total += accumulatedAmount;
+    user.balance.lastUpdated = now;
+    await user.save();
+
+    res.json(user.balance);
+  } catch (error) {
+    console.error('Balance fetch error:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 

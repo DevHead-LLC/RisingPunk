@@ -50,6 +50,20 @@ const userSchema = new mongoose.Schema({
       type: Number,
       default: 0
     }
+  },
+  balance: {
+    total: {
+      type: Number,
+      default: 1000
+    },
+    ratePerSecond: {
+      type: Number,
+      default: 1
+    },
+    lastUpdated: {
+      type: Date,
+      default: Date.now
+    }
   }
 }, { 
   collection: 'users',  // Explicitly name the collection

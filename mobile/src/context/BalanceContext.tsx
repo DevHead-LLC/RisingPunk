@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
+import { API_URL } from '../services/api';
 
 type BalanceContextType = {
-  balance: number;
+  balance: number | null;
+  ratePerSecond: number;
   updateBalance: (newBalance: number) => void;
   addToBalance: (amount: number) => void;
   subtractFromBalance: (amount: number) => void;
@@ -10,47 +13,95 @@ type BalanceContextType = {
 const BalanceContext = createContext<BalanceContextType | undefined>(undefined);
 
 export function BalanceProvider({ children }: { children: React.ReactNode }) {
-  const [balance, setBalance] = useState(1000);
+  const { token } = useAuth();
+  const [balance, setBalance] = useState<number | null>(null);
+  const [ratePerSecond, setRatePerSecond] = useState(1);
+  const [lastSync, setLastSync] = useState<Date | null>(null);
 
+  // Fetch initial balance and set up polling
   useEffect(() => {
-    const INCOME_RATE = 10; // $10 every 10 seconds = $1/second
-    const INCOME_INTERVAL = 10000; // 10 seconds
+    if (!token) {
+      setBalance(null);
+      setLastSync(null);
+      return;
+    }
 
-    const incomeTimer = setInterval(() => {
-      setBalance(prev => prev + INCOME_RATE);
-    }, INCOME_INTERVAL);
+    const fetchBalance = async () => {
+      try {
+        const response = await fetch(`${API_URL}/balance`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
 
-    return () => clearInterval(incomeTimer);
-  }, []);
+        if (response.ok) {
+          const data = await response.json();
+          setBalance(data.total);
+          setRatePerSecond(data.ratePerSecond);
+          setLastSync(new Date());
+        }
+      } catch (error) {
+        console.error('Balance fetch error:', error);
+      }
+    };
 
-  const updateBalance = (newBalance: number) => {
+    // Initial fetch
+    fetchBalance();
+
+    // Poll every 10 seconds
+    const interval = setInterval(fetchBalance, 10000);
+
+    // Local updates every second for smooth UI
+    const localInterval = setInterval(() => {
+      setBalance(prev => prev !== null ? prev + ratePerSecond : prev);
+    }, 1000);
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(localInterval);
+    };
+  }, [token]);
+
+  // Reset state when logging out
+  useEffect(() => {
+    if (!token) {
+      setBalance(null);
+      setLastSync(null);
+    }
+  }, [token]);
+
+  const updateBalance = async (newBalance: number) => {
     setBalance(newBalance);
   };
 
-  const addToBalance = (amount: number) => {
-    setBalance(prev => prev + amount);
+  const addToBalance = async (amount: number) => {
+    setBalance(prev => prev !== null ? prev + amount : amount);
   };
 
-  const subtractFromBalance = (amount: number) => {
-    setBalance(prev => Math.max(0, prev - amount));
+  const subtractFromBalance = async (amount: number) => {
+    if (balance === null || balance < amount) {
+      throw new Error('Insufficient balance');
+    }
+    setBalance(prev => prev !== null ? prev - amount : 0);
   };
 
   return (
-    <BalanceContext.Provider value={{ 
-      balance, 
-      updateBalance, 
-      addToBalance, 
-      subtractFromBalance 
+    <BalanceContext.Provider value={{
+      balance,
+      ratePerSecond,
+      updateBalance,
+      addToBalance,
+      subtractFromBalance
     }}>
       {children}
     </BalanceContext.Provider>
   );
 }
 
-export function useBalance() {
+export const useBalance = () => {
   const context = useContext(BalanceContext);
   if (context === undefined) {
     throw new Error('useBalance must be used within a BalanceProvider');
   }
   return context;
-} 
+}; 
