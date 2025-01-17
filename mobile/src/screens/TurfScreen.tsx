@@ -1,5 +1,5 @@
 import React, {memo, useState} from 'react';
-import {View, StyleSheet, TouchableOpacity, Text} from 'react-native';
+import {View, StyleSheet, TouchableOpacity, Text, Image} from 'react-native';
 import {Balance} from '../components/common/Balance';
 import {HomeScreen} from './HomeScreen';
 import {DigitalBarracksScreen} from './DigitalBarracksScreen';
@@ -9,23 +9,36 @@ import {BotAssemblyScreen} from './BotAssemblyScreen';
 import {useAuth} from '../context/AuthContext';
 import {COLORS, SIZING} from '../styles/theme';
 
-const DigitalBarracks = memo(({ onPress }: { onPress: () => void }) => (
-  <TouchableOpacity style={styles.barracksCircle} onPress={onPress}>
-    <Text style={styles.barracksText}>Digital Barracks</Text>
-  </TouchableOpacity>
-));
+console.log('Home image:', require('../assets/images/home.png'));
+console.log('Barracks image:', require('../assets/images/digital-barracks.png'));
+console.log('Profile image:', require('../assets/images/profile.png'));
 
-const SquareButton = memo(({ onPress }: { onPress: () => void }) => (
-  <TouchableOpacity style={styles.homeSquare} onPress={onPress}>
-    <Text style={styles.homeText}>home</Text>
-  </TouchableOpacity>
-));
-
-const ProfileSection = memo(({ onPress }: { onPress: () => void }) => (
-  <TouchableOpacity style={styles.profileContainer} onPress={onPress}>
-    <View style={styles.profileDiamond}>
-      <Text style={styles.profileText}>Profile</Text>
+const TurfLocation = memo(({ 
+  onPress, 
+  icon, 
+  label, 
+  style,
+  isProfile 
+}: { 
+  onPress: () => void;
+  icon: any;
+  label: string;
+  style?: object;
+  isProfile?: boolean;
+}) => (
+  <TouchableOpacity 
+    style={[styles.location, style]} 
+    onPress={onPress}
+  >
+    <View style={isProfile ? styles.profileContainer : styles.iconContainer}>
+      <Image 
+        source={icon}
+        style={styles.locationIcon}
+      />
     </View>
+    <Text style={isProfile ? styles.profileLabel : styles.locationLabel}>
+      {label}
+    </Text>
   </TouchableOpacity>
 ));
 
@@ -56,12 +69,29 @@ export function TurfScreen(): React.JSX.Element {
             <TouchableOpacity style={styles.logoutButton} onPress={logout}>
               <Text style={styles.logoutText}>DISCONNECT</Text>
             </TouchableOpacity>
-            <View style={styles.content}>
-              <View style={styles.topRow}>
-                <DigitalBarracks onPress={() => setCurrentScreen('barracks')} />
-                <SquareButton onPress={() => setCurrentScreen('hackRig')} />
-              </View>
-              <ProfileSection onPress={() => setCurrentScreen('profile')} />
+            
+            <View style={styles.turfGrid}>
+              <TurfLocation
+                icon={require('../assets/images/home.png')}
+                label="HOME"
+                onPress={() => setCurrentScreen('hackRig')}
+                style={styles.homePosition}
+              />
+              
+              <TurfLocation
+                icon={require('../assets/images/digital-barracks.png')}
+                label="DIGITAL BARRACKS"
+                onPress={() => setCurrentScreen('barracks')}
+                style={styles.barracksPosition}
+              />
+              
+              <TurfLocation
+                icon={require('../assets/images/profile.png')}
+                label="PROFILE"
+                onPress={() => setCurrentScreen('profile')}
+                style={styles.profilePosition}
+                isProfile={true}
+              />
             </View>
           </View>
         );
@@ -75,110 +105,103 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+    zIndex: 1,
   },
-  balanceContainer: {
+  turfGrid: {
+    flex: 1,
+    position: 'relative',
+    zIndex: 2,
+  },
+  location: {
     position: 'absolute',
-    top: SIZING.spacing.md,
-    left: SIZING.spacing.md,
-    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     padding: SIZING.spacing.sm,
+    backgroundColor: 'transparent',
+    zIndex: 3,
+  },
+  iconContainer: {
+    width: 120,
+    height: 120,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: COLORS.matrix,
     borderRadius: 4,
+    padding: SIZING.spacing.xs,
+  },
+  locationIcon: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'contain',
+  },
+  locationLabel: {
+    color: COLORS.secondary,
+    fontSize: SIZING.font.body,
+    marginTop: SIZING.spacing.md,
+    letterSpacing: 2,
+    textAlign: 'center',
+    position: 'absolute',
+    bottom: -35,
+    width: 200,
+    left: -40,
+  },
+  homePosition: {
+    top: '35%',
+    left: '25%',
+    transform: [{translateX: -60}],
+  },
+  barracksPosition: {
+    top: '35%',
+    right: '25%',
+    transform: [{translateX: 60}],
+  },
+  profileContainer: {
+    width: 60,
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  profileIcon: {
+    width: 40,
+    height: 40,
+  },
+  profilePosition: {
+    top: SIZING.spacing.lg,
+    right: SIZING.spacing.lg,
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: COLORS.primary,
+    borderRadius: 4,
+    padding: SIZING.spacing.xs,
   },
-  balanceLabel: {
-    color: COLORS.text.secondary,
-    marginRight: SIZING.spacing.xs,
+  profileLabel: {
+    color: COLORS.primary,
     fontSize: SIZING.font.small,
-  },
-  balanceAmount: {
-    color: '#00ff00', // Cyberpunk green
-    fontSize: SIZING.font.small,
-    fontWeight: 'bold',
+    letterSpacing: 1,
+    position: 'absolute',
+    bottom: -30,
+    width: 80,
+    textAlign: 'center',
   },
   logoutButton: {
     position: 'absolute',
-    top: 20,
-    right: 20,
-    backgroundColor: '#1a1a1a',
+    bottom: SIZING.spacing.lg,
+    right: SIZING.spacing.lg,
+    backgroundColor: COLORS.accent,
     padding: SIZING.spacing.sm,
     borderRadius: 4,
     minWidth: 100,
     alignItems: 'center',
     zIndex: 1000,
     borderWidth: 1,
-    borderColor: '#4a90e2',
+    borderColor: COLORS.primary,
   },
   logoutText: {
-    color: '#4a90e2',
-    fontSize: 14,
+    color: COLORS.text.primary,
+    fontSize: SIZING.font.small,
     fontWeight: 'bold',
     letterSpacing: 1,
-  },
-  buttonCorner: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 8,
-    height: 8,
-    borderTopWidth: 2,
-    borderRightWidth: 2,
-    borderColor: COLORS.secondary,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    width: '100%',
-    paddingHorizontal: 20,
-  },
-  barracksCircle: {
-    width: 120,
-    height: 120,
-    backgroundColor: '#4a90e2',
-    borderRadius: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  barracksText: {
-    color: '#fff',
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  homeSquare: {
-    width: 100,
-    height: 100,
-    backgroundColor: '#e0e0e0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 5,
-  },
-  homeText: {
-    fontSize: 16,
-  },
-  profileContainer: {
-    justifyContent: 'center',
-  },
-  profileDiamond: {
-    width: 100,
-    height: 100,
-    backgroundColor: '#2ecc71',
-    transform: [{rotate: '45deg'}],
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  profileText: {
-    color: '#fff',
-    fontSize: 16,
-    transform: [{rotate: '-45deg'}],
-    textAlign: 'center',
   },
 }); 

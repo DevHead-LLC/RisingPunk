@@ -1,36 +1,42 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useBalance } from '../../context/BalanceContext';
+import { SIZING, COLORS } from '../../styles/theme';
 
-export function Balance({ style }: { style?: object }): React.JSX.Element {
+export const Balance = memo(() => {
   const { balance } = useBalance();
 
   return (
-    <View style={[styles.container, style]}>
-      <Text style={styles.label}>Credits:</Text>
-      <Text style={styles.amount}>{balance.toLocaleString()}</Text>
+    <View style={styles.balanceContainer}>
+      <Text style={styles.balanceLabel}>WALLET:</Text>
+      <Text style={styles.balanceAmount}>${balance}</Text>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
-  container: {
+  balanceContainer: {
+    position: 'absolute',
+    top: SIZING.spacing.lg,
+    left: SIZING.spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
-    padding: 8,
-    borderRadius: 5,
+    backgroundColor: COLORS.accent,
+    padding: SIZING.spacing.xs,
+    paddingHorizontal: SIZING.spacing.sm,
+    borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#4a90e2',
+    borderColor: COLORS.primary,
+    maxWidth: 180,
   },
-  label: {
-    color: '#4a90e2',
-    fontSize: 16,
-    marginRight: 8,
+  balanceLabel: {
+    color: COLORS.text.secondary,
+    marginRight: SIZING.spacing.xs,
+    fontSize: SIZING.font.small,
   },
-  amount: {
-    color: '#00ff00',
-    fontSize: 16,
+  balanceAmount: {
+    color: COLORS.matrix,
+    fontSize: SIZING.font.small,
     fontWeight: 'bold',
   },
 }); 
