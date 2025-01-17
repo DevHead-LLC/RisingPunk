@@ -87,25 +87,26 @@ export function TurfScreen(): React.JSX.Element {
         return (
           <View style={styles.container}>
             <Balance />
-            
             <View style={styles.scrollWrapper}>
               <ScrollView 
-                ref={horizontalScrollRef}
                 horizontal={true}
                 showsHorizontalScrollIndicator={false}
-                contentOffset={{ x: 1000, y: 0 }}
+                contentOffset={{ x: 670, y: 0 }}
               >
                 <ScrollView 
-                  ref={verticalScrollRef}
                   nestedScrollEnabled={true}
                   showsVerticalScrollIndicator={false}
                   contentOffset={{ x: 0, y: 0 }}
                 >
                   <View style={styles.scrollContent}>
-                    {/* Main grid background */}
-                    <View style={styles.gridBackground} />
+                    {/* Random diagonal lines */}
+                    <View style={styles.line1} />
+                    <View style={styles.line2} />
+                    <View style={styles.line3} />
+                    <View style={styles.thickLine1} />
+                    <View style={styles.thickLine2} />
                     
-                    {/* Locations container */}
+                    {/* Rest of your content */}
                     <View style={styles.digitalGround}>
                       <TurfLocation
                         icon={require('../assets/images/home.png')}
@@ -273,6 +274,10 @@ const styles = StyleSheet.create({
     width: 2000,
     height: 2000,
     position: 'relative',
+    backgroundColor: COLORS.background,
+    borderWidth: 3,
+    borderColor: 'rgba(71, 23, 246, 0.6)',
+    borderRadius: 8,
   },
   gridBackground: {
     position: 'absolute',
@@ -283,5 +288,50 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.matrix,
     opacity: 0.1,
+  },
+  line1: {
+    position: 'absolute',
+    width: '200%',
+    height: 1,
+    backgroundColor: 'rgba(0, 255, 65, 0.1)',
+    transform: [{ rotate: '45deg' }],
+    top: '20%',
+    left: '-50%',
+  },
+  line2: {
+    position: 'absolute',
+    width: '200%',
+    height: 1,
+    backgroundColor: 'rgba(0, 255, 65, 0.08)',
+    transform: [{ rotate: '-30deg' }],
+    top: '40%',
+    left: '-50%',
+  },
+  line3: {
+    position: 'absolute',
+    width: '200%',
+    height: 1,
+    backgroundColor: 'rgba(0, 255, 65, 0.12)',
+    transform: [{ rotate: '15deg' }],
+    top: '60%',
+    left: '-50%',
+  },
+  thickLine1: {
+    position: 'absolute',
+    width: '200%',
+    height: 3,
+    backgroundColor: 'rgba(0, 255, 65, 0.05)',
+    transform: [{ rotate: '-60deg' }],
+    top: '30%',
+    left: '-50%',
+  },
+  thickLine2: {
+    position: 'absolute',
+    width: '200%',
+    height: 4,
+    backgroundColor: 'rgba(0, 255, 65, 0.03)',
+    transform: [{ rotate: '75deg' }],
+    top: '70%',
+    left: '-50%',
   },
 }); 
