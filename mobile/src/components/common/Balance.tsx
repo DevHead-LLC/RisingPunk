@@ -1,15 +1,20 @@
-import React, { memo } from 'react';
+import React, { memo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useBalance } from '../../context/BalanceContext';
 import { SIZING, COLORS } from '../../styles/theme';
 
 export const Balance = memo(() => {
   const { balance } = useBalance();
+  const [displayBalance, setDisplayBalance] = useState<number | null>(null);
+
+  useEffect(() => {
+    setDisplayBalance(balance);
+  }, [balance]);
 
   return (
     <View style={styles.balanceContainer}>
       <Text style={styles.balanceLabel}>WALLET:</Text>
-      <Text style={styles.balanceAmount}>${balance ?? 0}</Text>
+      <Text style={styles.balanceAmount}>${displayBalance ?? 0}</Text>
     </View>
   );
 });

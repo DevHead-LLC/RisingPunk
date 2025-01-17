@@ -18,7 +18,6 @@ export function BalanceProvider({ children }: { children: React.ReactNode }) {
   const [ratePerSecond, setRatePerSecond] = useState(1);
   const [lastSync, setLastSync] = useState<Date | null>(null);
 
-  // Fetch initial balance and set up polling
   useEffect(() => {
     if (!token) {
       setBalance(null);
@@ -45,21 +44,10 @@ export function BalanceProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    // Initial fetch
     fetchBalance();
-
-    // Poll every 10 seconds
     const interval = setInterval(fetchBalance, 10000);
 
-    // Local updates every second for smooth UI
-    const localInterval = setInterval(() => {
-      setBalance(prev => prev !== null ? prev + ratePerSecond : prev);
-    }, 1000);
-
-    return () => {
-      clearInterval(interval);
-      clearInterval(localInterval);
-    };
+    return () => clearInterval(interval);
   }, [token]);
 
   // Reset state when logging out
