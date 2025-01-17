@@ -26,6 +26,7 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
     const qty = parseInt(quantity, 10);
     if (isNaN(qty) || qty <= 0) return;
     
+    if (!balance) return;
     const totalCost = BOT_COST * qty;
     if (totalCost > balance) return;
 
