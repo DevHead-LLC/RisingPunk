@@ -9,7 +9,7 @@ export const Balance = memo(() => {
   return (
     <View style={styles.balanceContainer}>
       <Text style={styles.balanceLabel}>WALLET:</Text>
-      <Text style={styles.balanceAmount}>${balance}</Text>
+      <Text style={styles.balanceAmount}>${balance ?? 0}</Text>
     </View>
   );
 });
