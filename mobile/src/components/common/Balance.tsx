@@ -28,6 +28,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.primary,
     maxWidth: 180,
+    zIndex: 9999,
   },
   balanceLabel: {
     color: COLORS.text.secondary,
