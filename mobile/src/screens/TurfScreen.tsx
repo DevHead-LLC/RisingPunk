@@ -91,39 +91,41 @@ export function TurfScreen(): React.JSX.Element {
               <ScrollView 
                 horizontal={true}
                 showsHorizontalScrollIndicator={false}
+                showsVerticalScrollIndicator={false}
                 contentOffset={{ x: 670, y: 0 }}
+                scrollEnabled={true}
+                maximumZoomScale={1}
+                minimumZoomScale={1}
+                bounces={false}
+                contentContainerStyle={{
+                  width: 2000,
+                  height: 2000,
+                }}
               >
-                <ScrollView 
-                  nestedScrollEnabled={true}
-                  showsVerticalScrollIndicator={false}
-                  contentOffset={{ x: 0, y: 0 }}
-                >
-                  <View style={styles.scrollContent}>
-                    {/* Random diagonal lines */}
-                    <View style={styles.line1} />
-                    <View style={styles.line2} />
-                    <View style={styles.line3} />
-                    <View style={styles.thickLine1} />
-                    <View style={styles.thickLine2} />
+                <View style={styles.scrollContent}>
+                  {/* Random diagonal lines */}
+                  <View style={styles.line1} />
+                  <View style={styles.line2} />
+                  <View style={styles.line3} />
+                  <View style={styles.thickLine1} />
+                  <View style={styles.thickLine2} />
+                  
+                  <View style={styles.digitalGround}>
+                    <TurfLocation
+                      icon={require('../assets/images/home.png')}
+                      label="HOME"
+                      onPress={() => setCurrentScreen('hackRig')}
+                      style={styles.homePosition}
+                    />
                     
-                    {/* Rest of your content */}
-                    <View style={styles.digitalGround}>
-                      <TurfLocation
-                        icon={require('../assets/images/home.png')}
-                        label="HOME"
-                        onPress={() => setCurrentScreen('hackRig')}
-                        style={styles.homePosition}
-                      />
-                      
-                      <TurfLocation
-                        icon={require('../assets/images/digital-barracks.png')}
-                        label="DIGITAL BARRACKS"
-                        onPress={() => setCurrentScreen('barracks')}
-                        style={styles.barracksPosition}
-                      />
-                    </View>
+                    <TurfLocation
+                      icon={require('../assets/images/digital-barracks.png')}
+                      label="DIGITAL BARRACKS"
+                      onPress={() => setCurrentScreen('barracks')}
+                      style={styles.barracksPosition}
+                    />
                   </View>
-                </ScrollView>
+                </View>
               </ScrollView>
             </View>
 
