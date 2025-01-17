@@ -1,5 +1,5 @@
-import React, {memo, useState} from 'react';
-import {View, StyleSheet, TouchableOpacity, Text, Image} from 'react-native';
+import React, {memo, useState, useRef, useEffect} from 'react';
+import {View, StyleSheet, TouchableOpacity, Text, Image, ScrollView} from 'react-native';
 import {Balance} from '../components/common/Balance';
 import {HomeScreen} from './HomeScreen';
 import {DigitalBarracksScreen} from './DigitalBarracksScreen';
@@ -45,6 +45,27 @@ const TurfLocation = memo(({
 export function TurfScreen(): React.JSX.Element {
   const [currentScreen, setCurrentScreen] = useState('turf');
   const {logout} = useAuth();
+  const horizontalScrollRef = useRef<ScrollView>(null);
+  const verticalScrollRef = useRef<ScrollView>(null);
+
+  // Center the view whenever we return to turf screen
+  useEffect(() => {
+    if (currentScreen === 'turf') {
+      // Center both scrollviews with a small delay to ensure proper rendering
+      setTimeout(() => {
+        horizontalScrollRef.current?.scrollTo({
+          x: 670, // Increased from 850 to 1000
+          y: 0,
+          animated: true
+        });
+        verticalScrollRef.current?.scrollTo({
+          x: 0,
+          y: 0, // Scroll to top since content is positioned there
+          animated: true
+        });
+      }, 100);
+    }
+  }, [currentScreen]);
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -66,35 +87,56 @@ export function TurfScreen(): React.JSX.Element {
         return (
           <View style={styles.container}>
             <Balance />
+            
+            <View style={styles.scrollWrapper}>
+              <ScrollView 
+                ref={horizontalScrollRef}
+                horizontal={true}
+                showsHorizontalScrollIndicator={false}
+                contentOffset={{ x: 1000, y: 0 }}
+              >
+                <ScrollView 
+                  ref={verticalScrollRef}
+                  nestedScrollEnabled={true}
+                  showsVerticalScrollIndicator={false}
+                  contentOffset={{ x: 0, y: 0 }}
+                >
+                  <View style={styles.scrollContent}>
+                    {/* Main grid background */}
+                    <View style={styles.gridBackground} />
+                    
+                    {/* Locations container */}
+                    <View style={styles.digitalGround}>
+                      <TurfLocation
+                        icon={require('../assets/images/home.png')}
+                        label="HOME"
+                        onPress={() => setCurrentScreen('hackRig')}
+                        style={styles.homePosition}
+                      />
+                      
+                      <TurfLocation
+                        icon={require('../assets/images/digital-barracks.png')}
+                        label="DIGITAL BARRACKS"
+                        onPress={() => setCurrentScreen('barracks')}
+                        style={styles.barracksPosition}
+                      />
+                    </View>
+                  </View>
+                </ScrollView>
+              </ScrollView>
+            </View>
+
+            <TurfLocation
+              icon={require('../assets/images/profile.png')}
+              label="PROFILE"
+              onPress={() => setCurrentScreen('profile')}
+              style={styles.profilePosition}
+              isProfile={true}
+            />
+            
             <TouchableOpacity style={styles.logoutButton} onPress={logout}>
               <Text style={styles.logoutText}>DISCONNECT</Text>
             </TouchableOpacity>
-            
-            <View style={styles.turfGrid}>
-              <View style={styles.digitalGround}>
-                <TurfLocation
-                  icon={require('../assets/images/home.png')}
-                  label="HOME"
-                  onPress={() => setCurrentScreen('hackRig')}
-                  style={styles.homePosition}
-                />
-                
-                <TurfLocation
-                  icon={require('../assets/images/digital-barracks.png')}
-                  label="DIGITAL BARRACKS"
-                  onPress={() => setCurrentScreen('barracks')}
-                  style={styles.barracksPosition}
-                />
-              </View>
-              
-              <TurfLocation
-                icon={require('../assets/images/profile.png')}
-                label="PROFILE"
-                onPress={() => setCurrentScreen('profile')}
-                style={styles.profilePosition}
-                isProfile={true}
-              />
-            </View>
           </View>
         );
     }
@@ -212,16 +254,34 @@ const styles = StyleSheet.create({
   },
   digitalGround: {
     position: 'absolute',
-    top: '40%',
-    left: '15%',
-    right: '15%',
+    top: 100,
+    left: '50%',
+    transform: [{translateX: -300}],
+    width: 600,
     height: 220,
     backgroundColor: 'rgba(0, 255, 65, 0.05)',
     borderWidth: 1,
     borderColor: 'rgba(0, 255, 65, 0.2)',
     borderRadius: 8,
     zIndex: 1,
-    justifyContent: 'space-evenly',
-    alignItems: 'center',
+  },
+  scrollWrapper: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  scrollContent: {
+    width: 2000,
+    height: 2000,
+    position: 'relative',
+  },
+  gridBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderWidth: 1,
+    borderColor: COLORS.matrix,
+    opacity: 0.1,
   },
 }); 
