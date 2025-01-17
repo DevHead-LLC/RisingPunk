@@ -71,19 +71,21 @@ export function TurfScreen(): React.JSX.Element {
             </TouchableOpacity>
             
             <View style={styles.turfGrid}>
-              <TurfLocation
-                icon={require('../assets/images/home.png')}
-                label="HOME"
-                onPress={() => setCurrentScreen('hackRig')}
-                style={styles.homePosition}
-              />
-              
-              <TurfLocation
-                icon={require('../assets/images/digital-barracks.png')}
-                label="DIGITAL BARRACKS"
-                onPress={() => setCurrentScreen('barracks')}
-                style={styles.barracksPosition}
-              />
+              <View style={styles.digitalGround}>
+                <TurfLocation
+                  icon={require('../assets/images/home.png')}
+                  label="HOME"
+                  onPress={() => setCurrentScreen('hackRig')}
+                  style={styles.homePosition}
+                />
+                
+                <TurfLocation
+                  icon={require('../assets/images/digital-barracks.png')}
+                  label="DIGITAL BARRACKS"
+                  onPress={() => setCurrentScreen('barracks')}
+                  style={styles.barracksPosition}
+                />
+              </View>
               
               <TurfLocation
                 icon={require('../assets/images/profile.png')}
@@ -138,23 +140,27 @@ const styles = StyleSheet.create({
   locationLabel: {
     color: COLORS.secondary,
     fontSize: SIZING.font.body,
-    marginTop: SIZING.spacing.md,
     letterSpacing: 2,
     textAlign: 'center',
     position: 'absolute',
-    bottom: -35,
+    top: '100%',
+    marginTop: 20,
     width: 200,
     left: -40,
   },
   homePosition: {
-    top: '35%',
+    position: 'absolute',
+    top: '50%',
     left: '25%',
-    transform: [{translateX: -60}],
+    transform: [{translateX: -60}, {translateY: -80}],
+    zIndex: 3,
   },
   barracksPosition: {
-    top: '35%',
+    position: 'absolute',
+    top: '50%',
     right: '25%',
-    transform: [{translateX: 60}],
+    transform: [{translateX: 60}, {translateY: -80}],
+    zIndex: 3,
   },
   profileContainer: {
     width: 60,
@@ -203,5 +209,19 @@ const styles = StyleSheet.create({
     fontSize: SIZING.font.small,
     fontWeight: 'bold',
     letterSpacing: 1,
+  },
+  digitalGround: {
+    position: 'absolute',
+    top: '40%',
+    left: '15%',
+    right: '15%',
+    height: 220,
+    backgroundColor: 'rgba(0, 255, 65, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 65, 0.2)',
+    borderRadius: 8,
+    zIndex: 1,
+    justifyContent: 'space-evenly',
+    alignItems: 'center',
   },
 }); 
