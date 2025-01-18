@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   SafeAreaView,
   ScrollView,
 } from 'react-native';
+import { CloseButton } from '../components/common/CloseButton';
+import { COLORS, SIZING } from '../styles/theme';
 
 interface UserProfile {
   username: string;
@@ -27,7 +28,6 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
-    // Static data that was working before
     setProfile({
       username: "Bert Toast",
       level: 1,
@@ -40,12 +40,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={onClose}>
-          <Text style={styles.backButtonText}>×</Text>
-        </TouchableOpacity>
-      </View>
-
+      <CloseButton onPress={onClose} />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.profileCard}>
           {/* User Info */}

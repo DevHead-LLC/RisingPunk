@@ -3,11 +3,11 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   SafeAreaView,
   ScrollView,
 } from 'react-native';
 import { Balance } from '../components/common/Balance';
+import { CloseButton } from '../components/common/CloseButton';
 import { useBots } from '../context/BotsContext';
 
 export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
@@ -26,11 +26,9 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
 
   return (
     <SafeAreaView style={styles.container}>
+      <CloseButton onPress={onClose} />
       <View style={styles.header}>
         <Balance />
-        <TouchableOpacity style={styles.backButton} onPress={onClose}>
-          <Text style={styles.backButtonText}>×</Text>
-        </TouchableOpacity>
       </View>
 
       <Text style={styles.title}>Digital Barracks</Text>
@@ -72,19 +70,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     marginVertical: 20,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 20,
-    backgroundColor: '#4a90e2',
-  },
-  backButtonText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
   },
   scrollContent: {
     flexGrow: 1,
