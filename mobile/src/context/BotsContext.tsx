@@ -24,8 +24,8 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
   const [selectedType, setSelectedType] = useState<BotType | null>(null);
   const [buildTimer, setBuildTimer] = useState<NodeJS.Timeout | null>(null);
 
-  const BOT_COST = 5;
-  const BUILD_TIME = 3000; // 3 seconds per bot
+  const BOT_COST = 1;
+  const BUILD_TIME = 1000; // 1 second per bot
 
   const startBuilding = (type: BotType, quantity: number) => {
     const totalCost = BOT_COST * quantity;
@@ -34,7 +34,6 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
     subtractFromBalance(totalCost);
     
     let botsBuilt = 0;
-    setBuildingProgress(0);
 
     // Clear any existing timer
     if (buildTimer) clearInterval(buildTimer);

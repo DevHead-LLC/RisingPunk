@@ -1,6 +1,7 @@
 import React, {memo} from 'react';
-import {View, Text, StyleSheet, TouchableOpacity, Image} from 'react-native';
+import {View, StyleSheet, TouchableOpacity, Image, Text} from 'react-native';
 import { COLORS, SIZING } from '../styles/theme';
+import { CloseButton } from '../components/common/CloseButton';
 
 const HackRigDisplay = memo(({ onPress }: { onPress: () => void }) => (
   <TouchableOpacity style={styles.moduleContainer} onPress={onPress}>
@@ -43,10 +44,7 @@ export function HomeScreen({
 }): React.JSX.Element {
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.backButton} onPress={onClose}>
-        <Text style={styles.backButtonText}>×</Text>
-      </TouchableOpacity>
-      
+      <CloseButton onPress={onClose} />
       <View style={styles.content}>
         <View style={styles.modulesGrid}>
           <HackRigDisplay onPress={onNavigateToMap} />
@@ -87,7 +85,7 @@ const styles = StyleSheet.create({
   imageContainer: {
     width: '100%',
     aspectRatio: 1.5,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: 4,
     marginBottom: SIZING.spacing.sm,
     borderWidth: 1,
@@ -113,24 +111,5 @@ const styles = StyleSheet.create({
     color: '#9C27B0',
     fontSize: SIZING.font.small,
     marginTop: SIZING.spacing.xs,
-  },
-  backButton: {
-    position: 'absolute',
-    top: SIZING.spacing.lg,
-    right: SIZING.spacing.lg,
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 22,
-    backgroundColor: '#b39ddb',
-    borderWidth: 2,
-    borderColor: COLORS.secondary,
-    zIndex: 1,
-  },
-  backButtonText: {
-    fontSize: 28,
-    color: COLORS.background,
-    marginTop: -2,
-  },
+  }
 }); 

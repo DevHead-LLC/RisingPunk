@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CloseButton } from '../components/common/CloseButton';
 import {
   View,
   Text,
@@ -18,7 +19,7 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
   const { botCounts, buildingProgress, selectedType, selectBotType, startBuilding } = useBots();
   const [quantity, setQuantity] = useState('1');
 
-  const BOT_COST = 5;
+  const BOT_COST = 1;
 
   const handleBuild = () => {
     if (!selectedType) return;
@@ -35,11 +36,10 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
 
   return (
     <SafeAreaView style={styles.container}>
+      <CloseButton onPress={onClose} />
       <View style={styles.header}>
         <Balance />
-        <TouchableOpacity style={styles.backButton} onPress={onClose}>
-          <Text style={styles.backButtonText}>×</Text>
-        </TouchableOpacity>
+        <Text style={styles.title}>BOT_ASSEMBLY</Text>
       </View>
       
       <View style={styles.content}>
@@ -102,10 +102,10 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 80,
     paddingBottom: 10,
   },
   content: {
@@ -117,6 +117,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 24,
     fontWeight: 'bold',
+    textAlign: 'center',
   },
   backButton: {
     width: 40,
