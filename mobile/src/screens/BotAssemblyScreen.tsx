@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { CloseButton } from '../components/common/CloseButton';
 import {
   View,
   Text,
@@ -7,12 +6,22 @@ import {
   TouchableOpacity,
   SafeAreaView,
   TextInput,
+  ScrollView,
 } from 'react-native';
 import { Balance } from '../components/common/Balance';
+import { CloseButton } from '../components/common/CloseButton';
 import { useBots } from '../context/BotsContext';
 import { useBalance } from '../context/BalanceContext';
+import { COLORS, SIZING } from '../styles/theme';
 
 type BotType = 'breacher' | 'guardian' | 'phreak';
+type BotLevel = 1 | 2 | 3 | 4;
+
+interface BotTypeCard {
+  type: BotType;
+  level: BotLevel;
+  available: boolean;
+}
 
 export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
   const { balance } = useBalance();
@@ -20,18 +29,39 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
   const [quantity, setQuantity] = useState('1');
 
   const BOT_COST = 1;
+  const BUILD_TIME = 1000; // 1 second per bot
 
   const handleBuild = () => {
     if (!selectedType) return;
-    
     const qty = parseInt(quantity, 10);
     if (isNaN(qty) || qty <= 0) return;
-    
     if (!balance) return;
     const totalCost = BOT_COST * qty;
     if (totalCost > balance) return;
-
     startBuilding(selectedType, qty);
+  };
+
+  const getBotDescription = (type: BotType) => ({
+    breacher: 'Fast-moving assault units, specialized in penetrating network defenses',  // Cavalry
+    guardian: 'Heavy defensive units, forming the backbone of your digital army', // Infantry
+    phreak: 'Long-range disruption specialists, attacking from network shadows'  // Range
+  })[type];
+
+  const formatTimeRemaining = (seconds: number) => {
+    if (seconds < 60) return `${seconds}s`;
+    
+    const days = Math.floor(seconds / (24 * 60 * 60));
+    const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
+    const minutes = Math.floor((seconds % (60 * 60)) / 60);
+    const remainingSeconds = seconds % 60;
+
+    let timeString = '';
+    if (days > 0) timeString += `${days}d `;
+    if (hours > 0) timeString += `${hours}h `;
+    if (minutes > 0) timeString += `${minutes}m `;
+    if (remainingSeconds > 0) timeString += `${remainingSeconds}s`;
+
+    return timeString.trim();
   };
 
   return (
@@ -41,55 +71,114 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
         <Balance />
         <Text style={styles.title}>BOT_ASSEMBLY</Text>
       </View>
-      
+
       <View style={styles.content}>
-        <View style={styles.botTypes}>
-          {(['breacher', 'guardian', 'phreak'] as BotType[]).map((type) => (
-            <TouchableOpacity
-              key={type}
-              style={[
-                styles.botTypeButton,
-                selectedType === type && styles.selectedBotType,
-              ]}
-              onPress={() => selectBotType(type)}
-            >
-              <Text style={styles.botTypeText}>
-                {type.charAt(0).toUpperCase() + type.slice(1)}
-              </Text>
-              <Text style={styles.botCount}>Owned: {botCounts[type]}</Text>
-            </TouchableOpacity>
+        {/* Left Side - Compact Bot Selection */}
+        <ScrollView style={styles.botSelection}>
+          {[1, 2, 3, 4].map((level) => (
+            <View key={level} style={styles.levelSection}>
+              <Text style={styles.levelTitle}>MARK {level}</Text>
+              <View style={styles.botGrid}>
+                {(['breacher', 'guardian', 'phreak'] as BotType[]).map((type) => (
+                  <TouchableOpacity
+                    key={`${type}-${level}`}
+                    style={[
+                      styles.botCard,
+                      level > 1 && styles.botCardLocked,
+                      selectedType === type && level === 1 && styles.botCardSelected,
+                    ]}
+                    onPress={() => level === 1 && selectBotType(type)}
+                    disabled={level > 1}
+                  >
+                    <View style={styles.botCardContent}>
+                      <Text style={styles.botType}>{type.toUpperCase()}</Text>
+                      {level === 1 ? (
+                        <Text style={styles.botCount}>
+                          Owned: {botCounts[type]}
+                        </Text>
+                      ) : (
+                        <Text style={styles.lockedText}>🔒 LOCKED</Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
           ))}
-        </View>
+        </ScrollView>
 
-        <View style={styles.buildControls}>
-          <TextInput
-            style={styles.input}
-            value={quantity}
-            onChangeText={setQuantity}
-            keyboardType="numeric"
-            placeholder="Quantity"
-            placeholderTextColor="#666"
-          />
-          <TouchableOpacity 
-            style={[
-              styles.buildButton,
-              (!selectedType || buildingProgress !== null) && styles.buildButtonDisabled
-            ]}
-            onPress={handleBuild}
-            disabled={!selectedType || buildingProgress !== null}
-          >
-            <Text style={styles.buildButtonText}>
-              Build ({BOT_COST * parseInt(quantity || '0')} credits)
+        {/* Right Side - Build Controls with Description */}
+        <View style={styles.buildSection}>
+          <Text style={styles.buildTitle}>BUILD CONTROLS</Text>
+          
+          {/* Selected Bot Info */}
+          <View style={styles.selectedBotInfo}>
+            <Text style={styles.selectedBot}>
+              {selectedType ? selectedType.toUpperCase() : 'NO BOT SELECTED'}
             </Text>
-          </TouchableOpacity>
-        </View>
-
-        {buildingProgress !== null && (
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${buildingProgress}%` }]} />
-            <Text style={styles.progressText}>{Math.round(buildingProgress)}%</Text>
+            {selectedType && (
+              <Text style={styles.botDescription}>
+                {getBotDescription(selectedType)}
+              </Text>
+            )}
           </View>
-        )}
+
+          {/* Build Controls Row */}
+          <View style={styles.buildControlsRow}>
+            <TextInput
+              style={styles.quantityInput}
+              value={quantity}
+              onChangeText={setQuantity}
+              keyboardType="numeric"
+              placeholder="Qty"
+              placeholderTextColor="rgba(255, 255, 255, 0.4)"
+              editable={buildingProgress === null}
+            />
+            <TouchableOpacity
+              style={[
+                styles.buildButton,
+                (!selectedType || buildingProgress !== null) && styles.buildButtonDisabled
+              ]}
+              onPress={handleBuild}
+              disabled={!selectedType || buildingProgress !== null}
+            >
+              <Text style={styles.buildButtonText}>BUILD</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Build Status */}
+          <View style={styles.buildStatus}>
+            <View style={styles.statusRow}>
+              <Text style={styles.statusLabel}>Type:</Text>
+              <Text style={styles.statusValue}>{selectedType || 'N/A'}</Text>
+            </View>
+            <View style={styles.statusRow}>
+              <Text style={styles.statusLabel}>Total Cost:</Text>
+              <Text style={styles.statusValue}>
+                {selectedType ? `${BOT_COST * parseInt(quantity || '0')} credits` : 'N/A'}
+              </Text>
+            </View>
+            <View style={styles.statusRow}>
+              <Text style={styles.statusLabel}>Time Remaining:</Text>
+              <Text style={styles.statusValue}>
+                {buildingProgress !== null 
+                  ? formatTimeRemaining(Math.ceil((100 - buildingProgress) / 100 * parseInt(quantity)) * (BUILD_TIME / 1000))
+                  : 'N/A'}
+              </Text>
+            </View>
+          </View>
+
+          {buildingProgress !== null && (
+            <View style={styles.progressBar}>
+              <View 
+                style={[
+                  styles.progressFill, 
+                  { width: `${buildingProgress}%` }
+                ]} 
+              />
+            </View>
+          )}
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -98,115 +187,226 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: COLORS.background,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+    height: 100,
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 80,
     paddingBottom: 10,
+  },
+  title: {
+    color: COLORS.text.primary,
+    fontSize: SIZING.font.h2,
+    fontWeight: 'bold',
+    letterSpacing: 2,
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  title: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 20,
-    backgroundColor: '#4a90e2',
-  },
-  backButtonText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  botTypes: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-    paddingHorizontal: 20,
-    marginBottom: 30,
   },
-  botTypeButton: {
-    padding: 15,
-    borderRadius: 8,
-    backgroundColor: '#2c3e50',
-    width: '30%',
-    alignItems: 'center',
+  botSelection: {
+    flex: 0.35,
+    padding: SIZING.spacing.lg,
   },
-  selectedBotType: {
-    backgroundColor: '#4a90e2',
+  levelSection: {
+    marginVertical: SIZING.spacing.md,
   },
-  botTypeText: {
-    color: '#fff',
-    fontSize: 16,
+  levelTitle: {
+    color: '#4717F6',
+    fontSize: SIZING.font.h2,
     fontWeight: 'bold',
+    marginBottom: SIZING.spacing.sm,
+    letterSpacing: 1,
+  },
+  botGrid: {
+    flexDirection: 'column',
+    gap: SIZING.spacing.sm,
+  },
+  botCard: {
+    width: '100%',
+    padding: SIZING.spacing.md,
+    backgroundColor: 'rgba(26, 77, 51, 0.3)',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 65, 0.4)',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SIZING.spacing.sm,
+  },
+  botCardLocked: {
+    opacity: 0.5,
+    backgroundColor: 'rgba(26, 77, 51, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  botCardSelected: {
+    backgroundColor: 'rgba(26, 77, 51, 0.6)',
+    borderColor: 'rgba(0, 255, 65, 0.8)',
+  },
+  botType: {
+    color: COLORS.text.primary,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.xs,
+  },
+  botDescription: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: SIZING.font.small,
+    marginBottom: SIZING.spacing.md,
   },
   botCount: {
-    color: '#aaa',
-    fontSize: 12,
-    marginTop: 5,
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: SIZING.font.small,
   },
-  buildControls: {
-    width: '80%',
-    alignItems: 'center',
+  buildSection: {
+    flex: 1.5,
+    padding: SIZING.spacing.lg,
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(0, 255, 65, 0.2)',
   },
-  input: {
-    width: '100%',
+  buildInfo: {
+    gap: SIZING.spacing.md,
+  },
+  buildTitle: {
+    color: '#4717F6',
+    fontSize: SIZING.font.h2,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.sm,
+  },
+  selectedBot: {
+    color: COLORS.text.primary,
+    fontSize: SIZING.font.body,
+    marginBottom: SIZING.spacing.xs,
+  },
+  quantityInput: {
+    flex: 1,
     height: 40,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 5,
+    backgroundColor: 'rgba(26, 77, 51, 0.3)',
+    borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#4a90e2',
-    color: '#fff',
+    borderColor: 'rgba(0, 255, 65, 0.4)',
+    color: COLORS.text.primary,
     textAlign: 'center',
-    marginBottom: 20,
+    fontSize: SIZING.font.body,
   },
   buildButton: {
-    backgroundColor: '#4a90e2',
-    padding: 15,
-    borderRadius: 5,
-    width: '100%',
+    width: 80,
+    height: 40,
+    backgroundColor: 'rgba(26, 77, 51, 0.3)',
+    justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 65, 0.4)',
   },
   buildButtonDisabled: {
-    backgroundColor: '#2c3e50',
+    opacity: 0.5,
+    backgroundColor: 'rgba(26, 77, 51, 0.4)',
   },
   buildButtonText: {
-    color: '#fff',
-    fontSize: 16,
+    color: COLORS.text.primary,
+    fontSize: SIZING.font.body,
     fontWeight: 'bold',
+    letterSpacing: 1,
+  },
+  progressTitle: {
+    color: COLORS.text.primary,
+    fontSize: SIZING.font.h2,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.sm,
+    letterSpacing: 1,
+  },
+  progressDetails: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: SIZING.font.body,
+    marginBottom: SIZING.spacing.sm,
   },
   progressBar: {
-    width: '80%',
-    height: 20,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 10,
-    marginTop: 20,
+    height: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 2,
     overflow: 'hidden',
+    marginVertical: SIZING.spacing.xs,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#4a90e2',
+    backgroundColor: 'rgba(0, 255, 65, 0.6)',
   },
   progressText: {
-    position: 'absolute',
-    width: '100%',
+    color: COLORS.text.primary,
+    fontSize: SIZING.font.small,
     textAlign: 'center',
-    color: '#fff',
-    fontSize: 12,
-    lineHeight: 20,
+  },
+  estimatedTime: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: SIZING.font.small,
+    textAlign: 'center',
+    marginTop: SIZING.spacing.xs,
+  },
+  inputDisabled: {
+    opacity: 0.5,
+  },
+  buildProgress: {
+    marginTop: SIZING.spacing.md,
+    padding: SIZING.spacing.sm,
+    backgroundColor: 'rgba(26, 77, 51, 0.2)',
+    borderRadius: 4,
+  },
+  selectedBotInfo: {
+    marginBottom: SIZING.spacing.sm,
+  },
+  buildControlsRow: {
+    flexDirection: 'row',
+    gap: SIZING.spacing.sm,
+    marginBottom: SIZING.spacing.xs,
+  },
+  costText: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: SIZING.font.small,
+    marginBottom: SIZING.spacing.md,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: SIZING.spacing.xs,
+  },
+  statusLabel: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: SIZING.font.small,
+  },
+  statusValue: {
+    color: COLORS.text.primary,
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+  },
+  buildStatus: {
+    backgroundColor: 'rgba(26, 77, 51, 0.1)',
+    borderRadius: 4,
+    padding: SIZING.spacing.sm,
+  },
+  fixedControls: {
+    padding: SIZING.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 255, 65, 0.1)',
+  },
+  statusScroll: {
+    flex: 1,
+    padding: SIZING.spacing.md,
+  },
+  buildScroll: {
+    flex: 1,
+    padding: SIZING.spacing.lg,
+  },
+  lockedText: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+  },
+  botCardContent: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
 }); 
