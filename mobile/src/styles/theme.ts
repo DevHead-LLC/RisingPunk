@@ -12,6 +12,7 @@ type ThemeColors = {
     accent: string;
     placeholder: string;
   };
+  error: string;
 };
 
 type ThemeSizing = {
@@ -20,6 +21,7 @@ type ThemeSizing = {
     h2: number;
     body: number;
     small: number;
+    large: number;
   };
   spacing: {
     xs: number;
@@ -42,7 +44,8 @@ export const COLORS: ThemeColors = {
     secondary: '#4717F6',
     accent: '#00FF41',
     placeholder: 'rgba(0, 255, 65, 0.4)',
-  }
+  },
+  error: '#ff4444'
 };
 
 export const SIZING: ThemeSizing = {
@@ -51,6 +54,7 @@ export const SIZING: ThemeSizing = {
     h2: 24,
     body: 16,
     small: 14,
+    large: 22,
   },
   spacing: {
     xs: 4,

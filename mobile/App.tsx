@@ -6,18 +6,19 @@
  */
 
 import React from 'react';
-import {SafeAreaView} from 'react-native';
-import {TurfScreen} from './src/screens/TurfScreen';
-import {BalanceProvider} from './src/context/BalanceContext';
-import {BotsProvider} from './src/context/BotsContext';
-import {LoginScreen} from './src/screens/LoginScreen';
-import {AuthProvider, useAuth} from './src/context/AuthContext';
+import { SafeAreaView } from 'react-native';
+import { TurfScreen } from './src/screens/TurfScreen';
+import { BalanceProvider } from './src/context/BalanceContext';
+import { BotsProvider } from './src/context/BotsContext';
+import { LoginScreen } from './src/screens/LoginScreen';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { ErrorBoundary } from './src/components/common/ErrorBoundary';
 
 function AppContent(): React.JSX.Element {
-  const {token} = useAuth();
+  const { token } = useAuth();
 
   return (
-    <SafeAreaView style={{flex: 1}}>
+    <SafeAreaView style={{ flex: 1 }}>
       <BalanceProvider>
         <BotsProvider>
           {!token ? <LoginScreen /> : <TurfScreen />}
@@ -29,9 +30,11 @@ function AppContent(): React.JSX.Element {
 
 function App(): React.JSX.Element {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 
