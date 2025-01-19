@@ -1,5 +1,5 @@
-import React, {memo, useState, useRef, useEffect} from 'react';
-import {View, StyleSheet, TouchableOpacity, Text, Image, ScrollView} from 'react-native';
+import React, {useState, useRef, useEffect} from 'react';
+import {View, StyleSheet, TouchableOpacity, Text, ScrollView} from 'react-native';
 import {Balance} from '../components/common/Balance';
 import {HomeScreen} from './HomeScreen';
 import {DigitalBarracksScreen} from './DigitalBarracksScreen';
@@ -11,39 +11,6 @@ import {COLORS, SIZING} from '../styles/theme';
 import {ProfileLocation} from '../components/turf/ProfileLocation';
 import {HomeLocation} from '../components/turf/HomeLocation';
 import {DigitalBarracksLocation} from '../components/turf/DigitalBarracksLocation';
-
-console.log('Home image:', require('../assets/images/home.png'));
-console.log('Barracks image:', require('../assets/images/digital-barracks.png'));
-console.log('Profile image:', require('../assets/images/profile.png'));
-
-const TurfLocation = memo(({ 
-  onPress, 
-  icon, 
-  label, 
-  style,
-  isProfile 
-}: { 
-  onPress: () => void;
-  icon: any;
-  label: string;
-  style?: object;
-  isProfile?: boolean;
-}) => (
-  <TouchableOpacity 
-    style={[styles.location, style]} 
-    onPress={onPress}
-  >
-    <View style={isProfile ? styles.profileContainer : styles.iconContainer}>
-      <Image 
-        source={icon}
-        style={styles.locationIcon}
-      />
-    </View>
-    <Text style={isProfile ? styles.profileLabel : styles.locationLabel}>
-      {label}
-    </Text>
-  </TouchableOpacity>
-));
 
 export function TurfScreen(): React.JSX.Element {
   const [currentScreen, setCurrentScreen] = useState('turf');
@@ -145,40 +112,6 @@ const styles = StyleSheet.create({
     flex: 1,
     position: 'relative',
     zIndex: 2,
-  },
-  location: {
-    position: 'absolute',
-    alignItems: 'center',
-    padding: SIZING.spacing.sm,
-    backgroundColor: 'transparent',
-    zIndex: 3,
-  },
-  iconContainer: {
-    width: 120,
-    height: 120,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: COLORS.matrix,
-    borderRadius: 4,
-    padding: SIZING.spacing.xs,
-  },
-  locationIcon: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'contain',
-  },
-  locationLabel: {
-    color: COLORS.secondary,
-    fontSize: SIZING.font.body,
-    letterSpacing: 2,
-    textAlign: 'center',
-    position: 'absolute',
-    top: '100%',
-    marginTop: 20,
-    width: 200,
-    left: -40,
   },
   homePosition: {
     position: 'absolute',
@@ -293,21 +226,5 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '75deg' }],
     top: '70%',
     left: '-50%',
-  },
-  profileContainer: {
-    width: 60,
-    height: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-  },
-  profileLabel: {
-    color: COLORS.primary,
-    fontSize: SIZING.font.small,
-    letterSpacing: 1,
-    position: 'absolute',
-    bottom: -30,
-    width: 80,
-    textAlign: 'center',
   },
 }); 
