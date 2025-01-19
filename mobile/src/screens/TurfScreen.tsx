@@ -8,6 +8,7 @@ import {HackMapScreen} from './HackMapScreen';
 import {BotAssemblyScreen} from './BotAssemblyScreen';
 import {useAuth} from '../context/AuthContext';
 import {COLORS, SIZING} from '../styles/theme';
+import {ProfileLocation} from '../components/turf/ProfileLocation';
 
 console.log('Home image:', require('../assets/images/home.png'));
 console.log('Barracks image:', require('../assets/images/digital-barracks.png'));
@@ -129,13 +130,7 @@ export function TurfScreen(): React.JSX.Element {
               </ScrollView>
             </View>
 
-            <TurfLocation
-              icon={require('../assets/images/profile.png')}
-              label="PROFILE"
-              onPress={() => setCurrentScreen('profile')}
-              style={styles.profilePosition}
-              isProfile={true}
-            />
+            <ProfileLocation onPress={() => setCurrentScreen('profile')} />
             
             <TouchableOpacity style={styles.logoutButton} onPress={logout}>
               <Text style={styles.logoutText}>DISCONNECT</Text>
@@ -206,35 +201,6 @@ const styles = StyleSheet.create({
     right: '25%',
     transform: [{translateX: 60}, {translateY: -80}],
     zIndex: 3,
-  },
-  profileContainer: {
-    width: 60,
-    height: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-  },
-  profileIcon: {
-    width: 40,
-    height: 40,
-  },
-  profilePosition: {
-    top: SIZING.spacing.lg,
-    right: SIZING.spacing.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    borderRadius: 4,
-    padding: SIZING.spacing.xs,
-  },
-  profileLabel: {
-    color: COLORS.primary,
-    fontSize: SIZING.font.small,
-    letterSpacing: 1,
-    position: 'absolute',
-    bottom: -30,
-    width: 80,
-    textAlign: 'center',
   },
   logoutButton: {
     position: 'absolute',
@@ -335,5 +301,21 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '75deg' }],
     top: '70%',
     left: '-50%',
+  },
+  profileContainer: {
+    width: 60,
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  profileLabel: {
+    color: COLORS.primary,
+    fontSize: SIZING.font.small,
+    letterSpacing: 1,
+    position: 'absolute',
+    bottom: -30,
+    width: 80,
+    textAlign: 'center',
   },
 }); 
