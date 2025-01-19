@@ -13,6 +13,7 @@ type ThemeColors = {
     placeholder: string;
   };
   error: string;
+  buttonDisabled: string;
 };
 
 type ThemeSizing = {
@@ -38,6 +39,7 @@ export const COLORS: ThemeColors = {
   accent: '#1A1625',
   inputBg: '#201C2B',
   buttonBg: '#2D2640',
+  buttonDisabled: 'rgba(0, 255, 65, 0.05)',
   matrix: '#00FF41',
   text: {
     primary: '#A239CA',
