@@ -12,8 +12,10 @@ jest.mock('react-native', () => ({
   Text: 'Text',
   TextInput: 'TextInput',
   TouchableOpacity: 'TouchableOpacity',
+  ScrollView: 'ScrollView',
   StyleSheet: {
     create: (styles) => styles,
+    flatten: (style) => style,
   },
   Platform: {
     select: jest.fn(),
@@ -21,6 +23,7 @@ jest.mock('react-native', () => ({
   Dimensions: {
     get: jest.fn().mockReturnValue({ width: 375, height: 812 }),
   },
+  Image: 'Image',
 }));
 
 // Mock vector icons
