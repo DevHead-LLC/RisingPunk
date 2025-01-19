@@ -1,4 +1,4 @@
-import React, {useState, useCallback, useEffect} from 'react';
+import React, {useState, useCallback, useEffect, useMemo} from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {useAuth} from '../context/AuthContext';
 import {api} from '../services/api';
 import { TitleSection } from '../components/auth/TitleSection';
 import { useDebounce } from '../hooks/useDebounce';
+import { useFormState } from '../hooks/useFormState';
 
 type FormType = 'login' | 'register';
 
@@ -24,7 +25,7 @@ export function LoginScreen(): React.JSX.Element {
     accessKey: '',
     verifyAccessKey: '',
   });
-  const [error, setError] = useState<string>('');
+  const { isLoading, error, setLoading, setError, clearError } = useFormState();
   const debouncedFormData = useDebounce(formData);
 
   useEffect(() => {
@@ -67,8 +68,10 @@ export function LoginScreen(): React.JSX.Element {
   }, []);
 
   const handleSubmit = useCallback(async () => {
+    clearError();
     if (validateForm()) {
       try {
+        setLoading(true);
         if (formType === 'login') {
           const response = await api.login({
             handle: formData.handle,
@@ -85,9 +88,24 @@ export function LoginScreen(): React.JSX.Element {
         }
       } catch (err) {
         setError(`ACCESS_DENIED: ${err instanceof Error ? err.message : 'UNKNOWN_ERROR'}`);
+      } finally {
+        setLoading(false);
       }
     }
-  }, [formType, formData, validateForm, login]);
+  }, [formType, formData, validateForm, login, clearError, setLoading, setError]);
+
+  const isFormValid = useMemo(() => {
+    if (formType === 'login') {
+      return formData.handle.trim().length > 0 && formData.accessKey.trim().length > 0;
+    }
+    return formData.email.trim().length > 0 && 
+           formData.handle.trim().length > 0 && 
+           formData.accessKey.trim().length > 0 && 
+           formData.verifyAccessKey.trim().length > 0;
+  }, [formType, formData]);
+
+  // Update button disabled state
+  const isSubmitDisabled = isLoading || !isFormValid;
 
   const toggleFormType = useCallback(() => {
     setFormType(prev => prev === 'login' ? 'register' : 'login');
@@ -127,7 +145,14 @@ export function LoginScreen(): React.JSX.Element {
     <View style={styles.formContainer}>
       {renderInputWithCorner('HANDLE', formData.handle, handleInputChange('handle'))}
       {renderInputWithCorner('ACCESS_KEY', formData.accessKey, handleInputChange('accessKey'), true)}
-      <TouchableOpacity style={styles.jackInButton} onPress={handleSubmit}>
+      <TouchableOpacity 
+        style={[
+          styles.jackInButton, 
+          isSubmitDisabled && styles.buttonDisabled
+        ]} 
+        onPress={handleSubmit}
+        disabled={isSubmitDisabled}
+      >
         <Text style={styles.jackInText}>JACK_IN</Text>
         <View style={styles.buttonCorner} />
       </TouchableOpacity>
@@ -141,8 +166,13 @@ export function LoginScreen(): React.JSX.Element {
       {renderInputWithCorner('SET_ACCESS_KEY', formData.accessKey, handleInputChange('accessKey'), true)}
       {renderInputWithCorner('VERIFY_ACCESS_KEY', formData.verifyAccessKey, handleInputChange('verifyAccessKey'), true)}
       <TouchableOpacity 
-        style={[styles.jackInButton, styles.createButton]} 
+        style={[
+          styles.jackInButton, 
+          styles.createButton,
+          isSubmitDisabled && styles.buttonDisabled
+        ]} 
         onPress={handleSubmit}
+        disabled={isSubmitDisabled}
       >
         <Text style={styles.jackInText}>INITIALIZE</Text>
         <View style={styles.buttonCorner} />
@@ -272,5 +302,8 @@ const styles = StyleSheet.create({
     fontSize: SIZING.font.small,
     marginBottom: SIZING.spacing.sm,
     letterSpacing: 1,
+  },
+  buttonDisabled: {
+    backgroundColor: COLORS.buttonDisabled,
   },
 }); 
