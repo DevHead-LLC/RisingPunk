@@ -33,26 +33,28 @@ export function TurfScreen(): React.JSX.Element {
     setCurrentScreen(screen);
   }, []);
 
-  // Center the view whenever we return to turf screen
+  const centerView = useCallback(() => {
+    setTimeout(() => {
+      horizontalScrollRef.current?.scrollTo({
+        x: 670,
+        y: 0,
+        animated: true
+      });
+      verticalScrollRef.current?.scrollTo({
+        x: 0,
+        y: 0,
+        animated: true
+      });
+    }, 100);
+  }, []);
+
   useEffect(() => {
     if (currentScreen === 'turf') {
-      // Center both scrollviews with a small delay to ensure proper rendering
-      setTimeout(() => {
-        horizontalScrollRef.current?.scrollTo({
-          x: 670,
-          y: 0,
-          animated: true
-        });
-        verticalScrollRef.current?.scrollTo({
-          x: 0,
-          y: 0,
-          animated: true
-        });
-      }, 100);
+      centerView();
     }
-  }, [currentScreen]);
+  }, [currentScreen, centerView]);
 
-  const renderScreen = () => {
+  const renderScreen = useCallback(() => {
     switch (currentScreen) {
       case 'hackRig':
         return <HomeScreen 
@@ -101,7 +103,7 @@ export function TurfScreen(): React.JSX.Element {
           </View>
         );
     }
-  };
+  }, [currentScreen, navigateToScreen, logout]);
 
   return renderScreen();
 }
