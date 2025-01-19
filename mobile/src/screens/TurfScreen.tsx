@@ -1,4 +1,4 @@
-import React, {useState, useRef, useEffect} from 'react';
+import React, {useState, useRef, useEffect, useCallback, memo} from 'react';
 import {View, StyleSheet, TouchableOpacity, Text, ScrollView} from 'react-native';
 import {Balance} from '../components/common/Balance';
 import {HomeScreen} from './HomeScreen';
@@ -13,11 +13,25 @@ import {HomeLocation} from '../components/turf/HomeLocation';
 import {DigitalBarracksLocation} from '../components/turf/DigitalBarracksLocation';
 import {DisconnectButton} from '../components/turf/DisconnectButton';
 
+const DiagonalLines = memo(() => (
+  <>
+    <View style={styles.line1} />
+    <View style={styles.line2} />
+    <View style={styles.line3} />
+    <View style={styles.thickLine1} />
+    <View style={styles.thickLine2} />
+  </>
+));
+
 export function TurfScreen(): React.JSX.Element {
   const [currentScreen, setCurrentScreen] = useState('turf');
   const {logout} = useAuth();
   const horizontalScrollRef = useRef<ScrollView>(null);
   const verticalScrollRef = useRef<ScrollView>(null);
+
+  const navigateToScreen = useCallback((screen: string) => {
+    setCurrentScreen(screen);
+  }, []);
 
   // Center the view whenever we return to turf screen
   useEffect(() => {
@@ -25,13 +39,13 @@ export function TurfScreen(): React.JSX.Element {
       // Center both scrollviews with a small delay to ensure proper rendering
       setTimeout(() => {
         horizontalScrollRef.current?.scrollTo({
-          x: 670, // Increased from 850 to 1000
+          x: 670,
           y: 0,
           animated: true
         });
         verticalScrollRef.current?.scrollTo({
           x: 0,
-          y: 0, // Scroll to top since content is positioned there
+          y: 0,
           animated: true
         });
       }, 100);
@@ -42,18 +56,18 @@ export function TurfScreen(): React.JSX.Element {
     switch (currentScreen) {
       case 'hackRig':
         return <HomeScreen 
-          onClose={() => setCurrentScreen('turf')}
-          onNavigateToMap={() => setCurrentScreen('map')}
-          onNavigateToBotAssembly={() => setCurrentScreen('botAssembly')}
+          onClose={() => navigateToScreen('turf')}
+          onNavigateToMap={() => navigateToScreen('map')}
+          onNavigateToBotAssembly={() => navigateToScreen('botAssembly')}
         />;
       case 'map':
-        return <HackMapScreen onClose={() => setCurrentScreen('hackRig')} />;
+        return <HackMapScreen onClose={() => navigateToScreen('hackRig')} />;
       case 'botAssembly':
-        return <BotAssemblyScreen onClose={() => setCurrentScreen('hackRig')} />;
+        return <BotAssemblyScreen onClose={() => navigateToScreen('hackRig')} />;
       case 'barracks':
-        return <DigitalBarracksScreen onClose={() => setCurrentScreen('turf')} />;
+        return <DigitalBarracksScreen onClose={() => navigateToScreen('turf')} />;
       case 'profile':
-        return <ProfileScreen onClose={() => setCurrentScreen('turf')} />;
+        return <ProfileScreen onClose={() => navigateToScreen('turf')} />;
       default:
         return (
           <View style={styles.container}>
@@ -74,24 +88,15 @@ export function TurfScreen(): React.JSX.Element {
                 }}
               >
                 <View style={styles.scrollContent}>
-                  {/* Random diagonal lines */}
-                  <View style={styles.line1} />
-                  <View style={styles.line2} />
-                  <View style={styles.line3} />
-                  <View style={styles.thickLine1} />
-                  <View style={styles.thickLine2} />
-                  
+                  <DiagonalLines />
                   <View style={styles.digitalGround}>
-                    <HomeLocation onPress={() => setCurrentScreen('hackRig')} />
-                    
-                    <DigitalBarracksLocation onPress={() => setCurrentScreen('barracks')} />
+                    <HomeLocation onPress={() => navigateToScreen('hackRig')} />
+                    <DigitalBarracksLocation onPress={() => navigateToScreen('barracks')} />
                   </View>
                 </View>
               </ScrollView>
             </View>
-
-            <ProfileLocation onPress={() => setCurrentScreen('profile')} />
-            
+            <ProfileLocation onPress={() => navigateToScreen('profile')} />
             <DisconnectButton onPress={logout} />
           </View>
         );
