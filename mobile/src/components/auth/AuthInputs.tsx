@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { View } from 'react-native';
 import { renderInputWithCorner } from '../../utils/renderInputWithCorner';
 
@@ -13,7 +13,11 @@ interface AuthInputsProps {
   handleInputChange: (field: string) => (value: string) => void;
 }
 
-export function AuthInputs({ formType, formData, handleInputChange }: AuthInputsProps) {
+export const AuthInputs = memo(function AuthInputs({ 
+  formType, 
+  formData, 
+  handleInputChange 
+}: AuthInputsProps) {
   if (formType === 'login') {
     return (
       <View>
@@ -31,4 +35,4 @@ export function AuthInputs({ formType, formData, handleInputChange }: AuthInputs
       {renderInputWithCorner('VERIFY_ACCESS_KEY', formData.verifyAccessKey, handleInputChange('verifyAccessKey'), true)}
     </View>
   );
-} 
+}); 

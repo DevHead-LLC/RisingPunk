@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useCallback, useEffect} from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {COLORS, SIZING, styleGuide} from '../styles/theme';
 import {useAuth} from '../context/AuthContext';
 import {api} from '../services/api';
 import { TitleSection } from '../components/auth/TitleSection';
+import { useDebounce } from '../hooks/useDebounce';
 
 type FormType = 'login' | 'register';
 
@@ -24,6 +25,13 @@ export function LoginScreen(): React.JSX.Element {
     verifyAccessKey: '',
   });
   const [error, setError] = useState<string>('');
+  const debouncedFormData = useDebounce(formData);
+
+  useEffect(() => {
+    if (debouncedFormData !== formData) {
+      validateForm();
+    }
+  }, [debouncedFormData]);
 
   const validateForm = () => {
     setError('');
@@ -54,7 +62,11 @@ export function LoginScreen(): React.JSX.Element {
     return true;
   };
 
-  const handleSubmit = async () => {
+  const handleInputChange = useCallback((field: string) => (value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  }, []);
+
+  const handleSubmit = useCallback(async () => {
     if (validateForm()) {
       try {
         if (formType === 'login') {
@@ -75,11 +87,13 @@ export function LoginScreen(): React.JSX.Element {
         setError(`ACCESS_DENIED: ${err instanceof Error ? err.message : 'UNKNOWN_ERROR'}`);
       }
     }
-  };
+  }, [formType, formData, validateForm, login]);
 
-  const handleInputChange = (field: string) => (value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
+  const toggleFormType = useCallback(() => {
+    setFormType(prev => prev === 'login' ? 'register' : 'login');
+    setError('');
+    setFormData({ email: '', handle: '', accessKey: '', verifyAccessKey: '' });
+  }, []);
 
   const renderWelcomeMessage = () => (
     <Text style={styles.welcomeText}>
@@ -147,11 +161,7 @@ export function LoginScreen(): React.JSX.Element {
         {formType === 'login' ? renderLoginForm() : renderRegisterForm()}
         <TouchableOpacity 
           style={styles.toggleButton}
-          onPress={() => {
-            setFormType(prev => prev === 'login' ? 'register' : 'login');
-            setError('');
-            setFormData({ email: '', handle: '', accessKey: '', verifyAccessKey: '' });
-          }}
+          onPress={toggleFormType}
         >
           <Text style={styles.toggleText}>
             {formType === 'login' ? 'NEW_IDENTITY (SIGN_UP)' : 'EXISTING_IDENTITY (SIGN_IN)'}
