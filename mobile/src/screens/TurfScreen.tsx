@@ -10,6 +10,7 @@ import {useAuth} from '../context/AuthContext';
 import {COLORS, SIZING} from '../styles/theme';
 import {ProfileLocation} from '../components/turf/ProfileLocation';
 import {HomeLocation} from '../components/turf/HomeLocation';
+import {DigitalBarracksLocation} from '../components/turf/DigitalBarracksLocation';
 
 console.log('Home image:', require('../assets/images/home.png'));
 console.log('Barracks image:', require('../assets/images/digital-barracks.png'));
@@ -115,12 +116,7 @@ export function TurfScreen(): React.JSX.Element {
                   <View style={styles.digitalGround}>
                     <HomeLocation onPress={() => setCurrentScreen('hackRig')} />
                     
-                    <TurfLocation
-                      icon={require('../assets/images/digital-barracks.png')}
-                      label="DIGITAL BARRACKS"
-                      onPress={() => setCurrentScreen('barracks')}
-                      style={styles.barracksPosition}
-                    />
+                    <DigitalBarracksLocation onPress={() => setCurrentScreen('barracks')} />
                   </View>
                 </View>
               </ScrollView>
