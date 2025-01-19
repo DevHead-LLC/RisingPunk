@@ -142,4 +142,22 @@ describe('LoginScreen', () => {
       expect.objectContaining({ backgroundColor: 'rgba(0, 255, 65, 0.05)' })
     );
   });
+
+  it('displays correct welcome message for login and register modes', () => {
+    const { getByText } = render(
+      <LoginScreen />,
+      { wrapper: mockAuthProvider }
+    );
+
+    // Initially in login mode
+    expect(getByText('WELCOME BACK!')).toBeTruthy();
+
+    // Switch to register mode
+    fireEvent.press(getByText('NEW_IDENTITY (SIGN_UP)'));
+    expect(getByText('WELCOME!')).toBeTruthy();
+
+    // Switch back to login mode
+    fireEvent.press(getByText('EXISTING_IDENTITY (SIGN_IN)'));
+    expect(getByText('WELCOME BACK!')).toBeTruthy();
+  });
 }); 
