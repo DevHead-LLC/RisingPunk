@@ -29,4 +29,18 @@ describe('App', () => {
     const { getByText } = render(<App />);
     expect(getByText('DIGITAL BARRACKS')).toBeTruthy();
   });
+
+  it('shows error boundary on crash', () => {
+    (useAuth as jest.Mock).mockImplementation(() => {
+      throw new Error('Test error');
+    });
+    const { getByText } = render(<App />);
+    expect(getByText('SYSTEM_ERROR')).toBeTruthy();
+  });
+
+  it('handles loading state', () => {
+    (useAuth as jest.Mock).mockReturnValue({ token: null, isLoading: true });
+    const result = render(<App />);
+    expect(result.toJSON()).toBeTruthy();
+  });
 });
