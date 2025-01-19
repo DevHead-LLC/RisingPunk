@@ -11,6 +11,7 @@ import {COLORS, SIZING} from '../styles/theme';
 import {ProfileLocation} from '../components/turf/ProfileLocation';
 import {HomeLocation} from '../components/turf/HomeLocation';
 import {DigitalBarracksLocation} from '../components/turf/DigitalBarracksLocation';
+import {DisconnectButton} from '../components/turf/DisconnectButton';
 
 export function TurfScreen(): React.JSX.Element {
   const [currentScreen, setCurrentScreen] = useState('turf');
@@ -91,9 +92,7 @@ export function TurfScreen(): React.JSX.Element {
 
             <ProfileLocation onPress={() => setCurrentScreen('profile')} />
             
-            <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-              <Text style={styles.logoutText}>DISCONNECT</Text>
-            </TouchableOpacity>
+            <DisconnectButton onPress={logout} />
           </View>
         );
     }
@@ -126,25 +125,6 @@ const styles = StyleSheet.create({
     right: '25%',
     transform: [{translateX: 60}, {translateY: -80}],
     zIndex: 3,
-  },
-  logoutButton: {
-    position: 'absolute',
-    bottom: SIZING.spacing.lg,
-    right: SIZING.spacing.lg,
-    backgroundColor: COLORS.accent,
-    padding: SIZING.spacing.sm,
-    borderRadius: 4,
-    minWidth: 100,
-    alignItems: 'center',
-    zIndex: 1000,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-  },
-  logoutText: {
-    color: COLORS.text.primary,
-    fontSize: SIZING.font.small,
-    fontWeight: 'bold',
-    letterSpacing: 1,
   },
   digitalGround: {
     position: 'absolute',
