@@ -1,4 +1,4 @@
-import React, {useState, useCallback, useEffect, useMemo} from 'react';
+import React, {useState, useCallback, useEffect, useMemo, memo} from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,35 @@ import { useDebounce } from '../hooks/useDebounce';
 import { useFormState } from '../hooks/useFormState';
 
 type FormType = 'login' | 'register';
+
+const WelcomeMessage = memo(function WelcomeMessage({ formType }: { formType: FormType }) {
+  return (
+    <Text style={styles.welcomeText}>
+      {formType === 'login' ? 'WELCOME BACK!' : 'WELCOME!'}
+    </Text>
+  );
+});
+
+const ToggleFormButton = memo(function ToggleFormButton({ 
+  formType, 
+  onPress 
+}: { 
+  formType: FormType;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity style={styles.toggleButton} onPress={onPress}>
+      <Text style={styles.toggleText}>
+        {formType === 'login' ? 'NEW_IDENTITY (SIGN_UP)' : 'EXISTING_IDENTITY (SIGN_IN)'}
+      </Text>
+    </TouchableOpacity>
+  );
+});
+
+const ErrorMessage = memo(function ErrorMessage({ error }: { error: string | null }) {
+  if (!error) return null;
+  return <Text style={styles.errorText}>{error}</Text>;
+});
 
 export function LoginScreen(): React.JSX.Element {
   const { login } = useAuth();
@@ -113,12 +142,6 @@ export function LoginScreen(): React.JSX.Element {
     setFormData({ email: '', handle: '', accessKey: '', verifyAccessKey: '' });
   }, []);
 
-  const renderWelcomeMessage = () => (
-    <Text style={styles.welcomeText}>
-      {formType === 'login' ? 'WELCOME BACK!' : 'WELCOME!'}
-    </Text>
-  );
-
   const renderInputWithCorner = (
     placeholder: string,
     value: string,
@@ -186,17 +209,10 @@ export function LoginScreen(): React.JSX.Element {
         <TitleSection />
       </View>
       <View style={styles.rightSide}>
-        {renderWelcomeMessage()}
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        <WelcomeMessage formType={formType} />
+        <ErrorMessage error={error} />
         {formType === 'login' ? renderLoginForm() : renderRegisterForm()}
-        <TouchableOpacity 
-          style={styles.toggleButton}
-          onPress={toggleFormType}
-        >
-          <Text style={styles.toggleText}>
-            {formType === 'login' ? 'NEW_IDENTITY (SIGN_UP)' : 'EXISTING_IDENTITY (SIGN_IN)'}
-          </Text>
-        </TouchableOpacity>
+        <ToggleFormButton formType={formType} onPress={toggleFormType} />
       </View>
     </View>
   );
