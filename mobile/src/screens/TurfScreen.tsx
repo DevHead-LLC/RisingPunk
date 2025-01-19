@@ -23,6 +23,34 @@ const DiagonalLines = memo(() => (
   </>
 ));
 
+const ScrollViewMemo = memo(function ScrollViewMemo({
+  children,
+  horizontalScrollRef
+}: {
+  children: React.ReactNode;
+  horizontalScrollRef: React.RefObject<ScrollView>;
+}) {
+  return (
+    <ScrollView 
+      ref={horizontalScrollRef}
+      horizontal={true}
+      showsHorizontalScrollIndicator={false}
+      showsVerticalScrollIndicator={false}
+      contentOffset={{ x: 670, y: 0 }}
+      scrollEnabled={true}
+      maximumZoomScale={1}
+      minimumZoomScale={1}
+      bounces={false}
+      contentContainerStyle={{
+        width: 2000,
+        height: 2000,
+      }}
+    >
+      {children}
+    </ScrollView>
+  );
+});
+
 export function TurfScreen(): React.JSX.Element {
   const [currentScreen, setCurrentScreen] = useState('turf');
   const {logout} = useAuth();
@@ -75,20 +103,7 @@ export function TurfScreen(): React.JSX.Element {
           <View style={styles.container}>
             <Balance />
             <View style={styles.scrollWrapper}>
-              <ScrollView 
-                horizontal={true}
-                showsHorizontalScrollIndicator={false}
-                showsVerticalScrollIndicator={false}
-                contentOffset={{ x: 670, y: 0 }}
-                scrollEnabled={true}
-                maximumZoomScale={1}
-                minimumZoomScale={1}
-                bounces={false}
-                contentContainerStyle={{
-                  width: 2000,
-                  height: 2000,
-                }}
-              >
+              <ScrollViewMemo horizontalScrollRef={horizontalScrollRef}>
                 <View style={styles.scrollContent}>
                   <DiagonalLines />
                   <View style={styles.digitalGround}>
@@ -96,7 +111,7 @@ export function TurfScreen(): React.JSX.Element {
                     <DigitalBarracksLocation onPress={() => navigateToScreen('barracks')} />
                   </View>
                 </View>
-              </ScrollView>
+              </ScrollViewMemo>
             </View>
             <ProfileLocation onPress={() => navigateToScreen('profile')} />
             <DisconnectButton onPress={logout} />
