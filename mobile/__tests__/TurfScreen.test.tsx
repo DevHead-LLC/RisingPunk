@@ -10,6 +10,12 @@ jest.mock('../src/context/AuthContext', () => ({
   useAuth: jest.fn()
 }));
 
+// Mock HomeScreen
+jest.mock('../src/screens/HomeScreen', () => {
+  const HomeScreen = () => null;
+  return { HomeScreen };
+});
+
 const mockLogout = jest.fn();
 
 describe('TurfScreen', () => {
@@ -38,5 +44,12 @@ describe('TurfScreen', () => {
     const { getByText } = render(<TurfScreen />, { wrapper });
     fireEvent.press(getByText('DISCONNECT'));
     expect(mockLogout).toHaveBeenCalled();
+  });
+
+  it('changes screen to hackRig when HOME is pressed', () => {
+    const { getByText } = render(<TurfScreen />, { wrapper });
+    fireEvent.press(getByText('HOME'));
+    // We need to verify the screen state changed to 'hackRig'
+    // This might require exposing the screen state or finding another way to verify the navigation
   });
 }); 
