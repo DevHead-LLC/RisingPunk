@@ -11,7 +11,6 @@ import {COLORS, SIZING} from '../styles/theme';
 import {ProfileLocation} from '../components/turf/ProfileLocation';
 import {HomeLocation} from '../components/turf/HomeLocation';
 import {DigitalBarracksLocation} from '../components/turf/DigitalBarracksLocation';
-import {DisconnectButton} from '../components/turf/DisconnectButton';
 
 const DiagonalLines = memo(() => (
   <>
@@ -114,11 +113,10 @@ export function TurfScreen(): React.JSX.Element {
               </ScrollViewMemo>
             </View>
             <ProfileLocation onPress={() => navigateToScreen('profile')} />
-            <DisconnectButton onPress={logout} />
           </View>
         );
     }
-  }, [currentScreen, navigateToScreen, logout]);
+  }, [currentScreen, navigateToScreen]);
 
   return renderScreen();
 }

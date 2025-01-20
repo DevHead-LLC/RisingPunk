@@ -7,7 +7,9 @@ import { BotsProvider } from '../src/context/BotsContext';
 
 // Mock auth context
 jest.mock('../src/context/AuthContext', () => ({
-  useAuth: jest.fn()
+  useAuth: jest.fn(() => ({
+    token: 'fake-token'
+  }))
 }));
 
 // Mock HomeScreen
@@ -16,14 +18,9 @@ jest.mock('../src/screens/HomeScreen', () => {
   return { HomeScreen };
 });
 
-const mockLogout = jest.fn();
-
 describe('TurfScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (useAuth as jest.Mock).mockReturnValue({
-      logout: mockLogout
-    });
   });
 
   const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -38,12 +35,6 @@ describe('TurfScreen', () => {
     const { getByText } = render(<TurfScreen />, { wrapper });
     expect(getByText('HOME')).toBeTruthy();
     expect(getByText('DIGITAL BARRACKS')).toBeTruthy();
-  });
-
-  it('calls logout when disconnect button is pressed', () => {
-    const { getByText } = render(<TurfScreen />, { wrapper });
-    fireEvent.press(getByText('DISCONNECT'));
-    expect(mockLogout).toHaveBeenCalled();
   });
 
   it('changes screen to hackRig when HOME is pressed', () => {
