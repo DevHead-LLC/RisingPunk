@@ -12,6 +12,7 @@ export const BuildProgressBar = React.memo(function BuildProgressBar({
   return (
     <View style={styles.progressBar}>
       <View 
+        testID="progress-fill"
         style={[
           styles.progressFill, 
           { width: `${progress}%` }
