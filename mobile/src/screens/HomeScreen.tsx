@@ -11,7 +11,7 @@ type HomeScreenProps = {
   onNavigateToBotAssembly: () => void;
 };
 
-export function HomeScreen({ 
+export const HomeScreen = memo(function HomeScreen({ 
   onClose, 
   onNavigateToMap,
   onNavigateToBotAssembly 
@@ -25,7 +25,7 @@ export function HomeScreen({
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {
