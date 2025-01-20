@@ -15,6 +15,8 @@ import { useBots } from '../context/BotsContext';
 import { useBalance } from '../context/BalanceContext';
 import { COLORS, SIZING } from '../styles/theme';
 import { LevelSection } from '../components/botAssembly/LevelSection';
+import { BuildProgressBar } from '../components/botAssembly/BuildProgressBar';
+import { BuildStatus } from '../components/botAssembly/BuildStatus';
 
 type BotType = 'breacher' | 'guardian' | 'phreak';
 type BotLevel = 1 | 2 | 3 | 4;
@@ -127,38 +129,14 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
           </View>
 
           {/* Build Status */}
-          <View style={styles.buildStatus}>
-            <View style={styles.statusRow}>
-              <Text style={styles.statusLabel}>Type:</Text>
-              <Text style={styles.statusValue}>{selectedType || 'N/A'}</Text>
-            </View>
-            <View style={styles.statusRow}>
-              <Text style={styles.statusLabel}>Total Cost:</Text>
-              <Text style={styles.statusValue}>
-                {selectedType ? `${BOT_COST * parseInt(quantity || '0')} credits` : 'N/A'}
-              </Text>
-            </View>
-            <View style={styles.statusRow}>
-              <Text style={styles.statusLabel}>Time Remaining:</Text>
-              <Text style={styles.statusValue}>
-                {buildingProgress !== null 
-                  ? formatTimeRemaining(
-                      Math.ceil((100 - buildingProgress) / 100 * parseInt(quantity)) * BUILD_TIME / 1000
-                    )
-                  : 'N/A'}
-              </Text>
-            </View>
-          </View>
+          <BuildStatus 
+            selectedType={selectedType}
+            quantity={quantity}
+            botCost={BOT_COST}
+          />
 
           {buildingProgress !== null && (
-            <View style={styles.progressBar}>
-              <View 
-                style={[
-                  styles.progressFill, 
-                  { width: `${buildingProgress}%` }
-                ]} 
-              />
-            </View>
+            <BuildProgressBar progress={buildingProgress} />
           )}
         </View>
       </View>
