@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { COLORS, SIZING } from '../../styles/theme';
 
 type BuildTimerProps = {
@@ -14,6 +14,8 @@ export const BuildTimer = React.memo(function BuildTimer({
   progress
 }: BuildTimerProps) {
   const [timeLeft, setTimeLeft] = useState<number>(0);
+
+  const botsBuilt = Math.floor((progress / 100) * quantity);
 
   useEffect(() => {
     const totalTime = quantity * buildTimePerUnit;
@@ -43,17 +45,35 @@ export const BuildTimer = React.memo(function BuildTimer({
   }, [timeLeft]);
 
   return (
-    <Text style={styles.timerText}>
-      {formattedTime}
-    </Text>
+    <View style={styles.container}>
+      <Text style={styles.progressText} numberOfLines={1}>
+        {`${botsBuilt}/${quantity}`}
+      </Text>
+      <Text style={styles.timerText} numberOfLines={1}>
+        {formattedTime}
+      </Text>
+    </View>
   );
 });
 
 const styles = StyleSheet.create({
-  timerText: {
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: SIZING.font.small,
-    textAlign: 'right',
+  container: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: SIZING.spacing.xs,
+  },
+  progressText: {
+    color: COLORS.text.primary,
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+    width: 60,
+  },
+  timerText: {
+    color: COLORS.text.primary,
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+    flex: 1,
+    textAlign: 'right',
   },
 }); 
