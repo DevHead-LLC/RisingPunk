@@ -10,9 +10,11 @@ import {
 } from 'react-native';
 import { Balance } from '../components/common/Balance';
 import { CloseButton } from '../components/common/CloseButton';
+import { BotTypeCard } from '../components/botAssembly/BotTypeCard';
 import { useBots } from '../context/BotsContext';
 import { useBalance } from '../context/BalanceContext';
 import { COLORS, SIZING } from '../styles/theme';
+import { LevelSection } from '../components/botAssembly/LevelSection';
 
 type BotType = 'breacher' | 'guardian' | 'phreak';
 type BotLevel = 1 | 2 | 3 | 4;
@@ -73,37 +75,15 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
       </View>
 
       <View style={styles.content}>
-        {/* Left Side - Compact Bot Selection */}
         <ScrollView style={styles.botSelection}>
           {[1, 2, 3, 4].map((level) => (
-            <View key={level} style={styles.levelSection}>
-              <Text style={styles.levelTitle}>MARK {level}</Text>
-              <View style={styles.botGrid}>
-                {(['breacher', 'guardian', 'phreak'] as BotType[]).map((type) => (
-                  <TouchableOpacity
-                    key={`${type}-${level}`}
-                    style={[
-                      styles.botCard,
-                      level > 1 && styles.botCardLocked,
-                      selectedType === type && level === 1 && styles.botCardSelected,
-                    ]}
-                    onPress={() => level === 1 && selectBotType(type)}
-                    disabled={level > 1}
-                  >
-                    <View style={styles.botCardContent}>
-                      <Text style={styles.botType}>{type.toUpperCase()}</Text>
-                      {level === 1 ? (
-                        <Text style={styles.botCount}>
-                          Owned: {botCounts[type]}
-                        </Text>
-                      ) : (
-                        <Text style={styles.lockedText}>🔒 LOCKED</Text>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
+            <LevelSection
+              key={level}
+              level={level}
+              selectedType={selectedType}
+              botCounts={botCounts}
+              onSelectBotType={selectBotType}
+            />
           ))}
         </ScrollView>
 
