@@ -18,6 +18,7 @@ import { LevelSection } from '../components/botAssembly/LevelSection';
 import { BuildProgressBar } from '../components/botAssembly/BuildProgressBar';
 import { BuildStatus } from '../components/botAssembly/BuildStatus';
 import { BuildControls } from '../components/botAssembly/BuildControls';
+import { BuildSection } from '../components/botAssembly/BuildSection';
 
 type BotType = 'breacher' | 'guardian' | 'phreak';
 type BotLevel = 1 | 2 | 3 | 4;
@@ -29,44 +30,15 @@ interface BotTypeCard {
 }
 
 export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
-  const { balance } = useBalance();
   const { botCounts, buildingProgress, selectedType, selectBotType, startBuilding } = useBots();
   const [quantity, setQuantity] = useState('1');
-
   const BOT_COST = 1;
-  const BUILD_TIME = 1000; // 1 second per bot
 
   const handleBuild = () => {
     if (!selectedType) return;
     const qty = parseInt(quantity, 10);
     if (isNaN(qty) || qty <= 0) return;
-    if (!balance) return;
-    const totalCost = BOT_COST * qty;
-    if (totalCost > balance) return;
     startBuilding(selectedType, qty);
-  };
-
-  const getBotDescription = (type: BotType) => ({
-    breacher: 'Fast-moving assault units, specialized in penetrating network defenses',  // Cavalry
-    guardian: 'Heavy defensive units, forming the backbone of your digital army', // Infantry
-    phreak: 'Long-range disruption specialists, attacking from network shadows'  // Range
-  })[type];
-
-  const formatTimeRemaining = (seconds: number) => {
-    if (!seconds || seconds <= 0) return '0s';
-    
-    const days = Math.floor(seconds / (24 * 60 * 60));
-    const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
-    const minutes = Math.floor((seconds % (60 * 60)) / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-
-    const parts = [];
-    if (days > 0) parts.push(`${days}d`);
-    if (hours > 0) parts.push(`${hours}h`);
-    if (minutes > 0) parts.push(`${minutes}m`);
-    if (remainingSeconds > 0) parts.push(`${remainingSeconds}s`);
-
-    return parts.length > 0 ? parts.join(' ') : '0s';
   };
 
   return (
@@ -89,42 +61,14 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
             />
           ))}
         </ScrollView>
-
-        {/* Right Side - Build Controls with Description */}
-        <View style={styles.buildSection}>
-          <Text style={styles.buildTitle}>BUILD CONTROLS</Text>
-          
-          {/* Selected Bot Info */}
-          <View style={styles.selectedBotInfo}>
-            <Text style={styles.selectedBot}>
-              {selectedType ? selectedType.toUpperCase() : 'NO BOT SELECTED'}
-            </Text>
-            {selectedType && (
-              <Text style={styles.botDescription}>
-                {getBotDescription(selectedType)}
-              </Text>
-            )}
-          </View>
-
-          <BuildControls
-            selectedType={selectedType}
-            buildingProgress={buildingProgress}
-            quantity={quantity}
-            onQuantityChange={setQuantity}
-            onBuild={handleBuild}
-          />
-
-          {/* Build Status */}
-          <BuildStatus 
-            selectedType={selectedType}
-            quantity={quantity}
-            botCost={BOT_COST}
-          />
-
-          {buildingProgress !== null && (
-            <BuildProgressBar progress={buildingProgress} />
-          )}
-        </View>
+        <BuildSection
+          selectedType={selectedType}
+          buildingProgress={buildingProgress}
+          quantity={quantity}
+          onQuantityChange={setQuantity}
+          onBuild={handleBuild}
+          botCost={BOT_COST}
+        />
       </View>
     </SafeAreaView>
   );
