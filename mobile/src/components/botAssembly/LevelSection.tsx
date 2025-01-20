@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
     marginBottom: SIZING.spacing.lg,
   },
   levelTitle: {
-    color: COLORS.text.primary,
+    color: '#4717F6',
     fontSize: SIZING.font.h2,
     fontWeight: 'bold',
     marginBottom: SIZING.spacing.md,
