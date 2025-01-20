@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Text, StyleSheet } from 'react-native';
 import { COLORS, SIZING } from '../../styles/theme';
 
@@ -27,8 +27,8 @@ export const BuildTimer = React.memo(function BuildTimer({
     return () => clearInterval(timer);
   }, [quantity, buildTimePerUnit, progress]);
 
-  const formatTime = (ms: number) => {
-    const seconds = Math.floor(ms / 1000);
+  const formattedTime = useMemo(() => {
+    const seconds = Math.floor(timeLeft / 1000);
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
@@ -40,11 +40,11 @@ export const BuildTimer = React.memo(function BuildTimer({
     parts.push(`${seconds % 60}s`);
 
     return `${parts.join(' ')} remaining`;
-  };
+  }, [timeLeft]);
 
   return (
     <Text style={styles.timerText}>
-      {formatTime(timeLeft)}
+      {formattedTime}
     </Text>
   );
 });
