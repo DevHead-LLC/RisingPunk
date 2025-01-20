@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { useBalance } from './BalanceContext';
 
 type BotType = 'breacher' | 'guardian' | 'phreak';
@@ -22,29 +22,33 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
   });
   const [buildingProgress, setBuildingProgress] = useState<number | null>(null);
   const [selectedType, setSelectedType] = useState<BotType | null>(null);
-  const [buildTimer, setBuildTimer] = useState<NodeJS.Timeout | null>(null);
+  const buildTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const BOT_COST = 1;
   const BUILD_TIME = 1000; // 1 second per bot
 
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (buildTimerRef.current) {
+        clearInterval(buildTimerRef.current);
+      }
+    };
+  }, []);
+
   const startBuilding = (type: BotType, quantity: number) => {
     try {
       const totalCost = BOT_COST * quantity;
-      
-      // Check if we can afford it
       subtractFromBalance(totalCost);
       
-      let botsBuilt = 0;
-
       // Clear any existing timer
-      if (buildTimer) {
-        clearInterval(buildTimer);
-        setBuildingProgress(null);
+      if (buildTimerRef.current) {
+        clearInterval(buildTimerRef.current);
       }
 
-      setBuildingProgress(0); // Set initial progress
+      let botsBuilt = 0;
+      setBuildingProgress(0);
       
-      // Start building process
       const timer = setInterval(() => {
         botsBuilt++;
         setBotCounts(prev => ({
@@ -55,17 +59,19 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
         if (botsBuilt === quantity) {
           clearInterval(timer);
           setBuildingProgress(null);
-          setBuildTimer(null);
+          buildTimerRef.current = null;
         } else {
           setBuildingProgress((botsBuilt / quantity) * 100);
         }
       }, BUILD_TIME);
 
-      setBuildTimer(timer);
+      buildTimerRef.current = timer;
     } catch (error) {
       console.error('Build error:', error);
       setBuildingProgress(null);
-      if (buildTimer) clearInterval(buildTimer);
+      if (buildTimerRef.current) {
+        clearInterval(buildTimerRef.current);
+      }
       throw new Error('Failed to start building');
     }
   };
