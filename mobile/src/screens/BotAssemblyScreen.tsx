@@ -17,6 +17,7 @@ import { COLORS, SIZING } from '../styles/theme';
 import { LevelSection } from '../components/botAssembly/LevelSection';
 import { BuildProgressBar } from '../components/botAssembly/BuildProgressBar';
 import { BuildStatus } from '../components/botAssembly/BuildStatus';
+import { BuildControls } from '../components/botAssembly/BuildControls';
 
 type BotType = 'breacher' | 'guardian' | 'phreak';
 type BotLevel = 1 | 2 | 3 | 4;
@@ -105,28 +106,13 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
             )}
           </View>
 
-          {/* Build Controls Row */}
-          <View style={styles.buildControlsRow}>
-            <TextInput
-              style={styles.quantityInput}
-              value={quantity}
-              onChangeText={setQuantity}
-              keyboardType="numeric"
-              placeholder="Qty"
-              placeholderTextColor="rgba(255, 255, 255, 0.4)"
-              editable={buildingProgress === null}
-            />
-            <TouchableOpacity
-              style={[
-                styles.buildButton,
-                (!selectedType || buildingProgress !== null) && styles.buildButtonDisabled
-              ]}
-              onPress={handleBuild}
-              disabled={!selectedType || buildingProgress !== null}
-            >
-              <Text style={styles.buildButtonText}>BUILD</Text>
-            </TouchableOpacity>
-          </View>
+          <BuildControls
+            selectedType={selectedType}
+            buildingProgress={buildingProgress}
+            quantity={quantity}
+            onQuantityChange={setQuantity}
+            onBuild={handleBuild}
+          />
 
           {/* Build Status */}
           <BuildStatus 
