@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import { BuildProgressBar } from '../components/botAssembly/BuildProgressBar';
 import { BuildStatus } from '../components/botAssembly/BuildStatus';
 import { BuildControls } from '../components/botAssembly/BuildControls';
 import { BuildSection } from '../components/botAssembly/BuildSection';
+import { BotAssemblyHeader } from '../components/botAssembly/BotAssemblyHeader';
 
 type BotType = 'breacher' | 'guardian' | 'phreak';
 type BotLevel = 1 | 2 | 3 | 4;
@@ -29,43 +30,48 @@ interface BotTypeCard {
   available: boolean;
 }
 
+const LEVELS = [1, 2, 3, 4];
+
 export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
   const { botCounts, buildingProgress, selectedType, selectBotType, startBuilding } = useBots();
   const [quantity, setQuantity] = useState('1');
   const BOT_COST = 1;
 
-  const handleBuild = () => {
+  const handleBuild = useCallback(() => {
     if (!selectedType) return;
     const qty = parseInt(quantity, 10);
     if (isNaN(qty) || qty <= 0) return;
     startBuilding(selectedType, qty);
-  };
+  }, [selectedType, quantity, startBuilding]);
+
+  const handleQuantityChange = useCallback((value: string) => {
+    setQuantity(value);
+  }, []);
+
+  const levelSections = useMemo(() => (
+    LEVELS.map((level) => (
+      <LevelSection
+        key={level}
+        level={level}
+        selectedType={selectedType}
+        botCounts={botCounts}
+        onSelectBotType={selectBotType}
+      />
+    ))
+  ), [selectedType, botCounts, selectBotType]);
 
   return (
     <SafeAreaView style={styles.container}>
-      <CloseButton onPress={onClose} />
-      <View style={styles.header}>
-        <Balance />
-        <Text style={styles.title}>BOT_ASSEMBLY</Text>
-      </View>
-
+      <BotAssemblyHeader onClose={onClose} />
       <View style={styles.content}>
         <ScrollView style={styles.botSelection}>
-          {[1, 2, 3, 4].map((level) => (
-            <LevelSection
-              key={level}
-              level={level}
-              selectedType={selectedType}
-              botCounts={botCounts}
-              onSelectBotType={selectBotType}
-            />
-          ))}
+          {levelSections}
         </ScrollView>
         <BuildSection
           selectedType={selectedType}
           buildingProgress={buildingProgress}
           quantity={quantity}
-          onQuantityChange={setQuantity}
+          onQuantityChange={handleQuantityChange}
           onBuild={handleBuild}
           botCost={BOT_COST}
         />
