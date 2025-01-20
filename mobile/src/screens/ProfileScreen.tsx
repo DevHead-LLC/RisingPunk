@@ -7,6 +7,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { CloseButton } from '../components/common/CloseButton';
+import { DisconnectButton } from '../components/turf/DisconnectButton';
+import { useAuth } from '../context/AuthContext';
 import { COLORS, SIZING } from '../styles/theme';
 
 interface UserProfile {
@@ -26,6 +28,7 @@ interface UserProfile {
 
 export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const { logout } = useAuth();
 
   useEffect(() => {
     setProfile({
@@ -84,6 +87,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
           </View>
         </View>
       </ScrollView>
+      <DisconnectButton onPress={logout} />
     </SafeAreaView>
   );
 }
