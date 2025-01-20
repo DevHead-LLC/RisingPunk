@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { COLORS, SIZING } from '../../styles/theme';
 import { BotType } from '../../types/bots';
+import { formatBalance } from '../../context/BalanceContext';
 
 type BuildStatusProps = {
   selectedType: BotType | null;
@@ -23,7 +24,7 @@ export const BuildStatus = React.memo(function BuildStatus({
       <View style={styles.statusRow}>
         <Text style={styles.statusLabel}>Total Cost:</Text>
         <Text style={styles.statusValue}>
-          {selectedType ? `${botCost * parseInt(quantity || '0')} credits` : 'N/A'}
+          {selectedType ? `$${formatBalance(botCost * parseInt(quantity || '0'))}` : 'N/A'}
         </Text>
       </View>
     </View>

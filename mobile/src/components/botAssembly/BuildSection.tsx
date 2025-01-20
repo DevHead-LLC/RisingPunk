@@ -6,6 +6,7 @@ import { BuildControls } from './BuildControls';
 import { BuildStatus } from './BuildStatus';
 import { BuildProgressBar } from './BuildProgressBar';
 import { BotDescription } from './BotDescription';
+import { BuildTimer } from './BuildTimer';
 
 type BuildSectionProps = {
   selectedType: BotType | null;
@@ -50,7 +51,14 @@ export const BuildSection = React.memo(function BuildSection({
       />
 
       {buildingProgress !== null && (
-        <BuildProgressBar progress={buildingProgress} />
+        <>
+          <BuildTimer 
+            quantity={parseInt(quantity) || 0}
+            buildTimePerUnit={1000}
+            progress={buildingProgress}
+          />
+          <BuildProgressBar progress={buildingProgress} />
+        </>
       )}
     </View>
   );
