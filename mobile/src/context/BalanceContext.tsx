@@ -12,6 +12,10 @@ type BalanceContextType = {
 
 const BalanceContext = createContext<BalanceContextType | undefined>(undefined);
 
+export function formatBalance(amount: number): string {
+  return amount.toLocaleString();
+}
+
 export function BalanceProvider({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
   const [balance, setBalance] = useState<number | null>(null);
