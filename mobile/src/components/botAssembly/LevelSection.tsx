@@ -2,22 +2,18 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { BotTypeCard } from './BotTypeCard';
 import { COLORS, SIZING } from '../../styles/theme';
-
-type BotType = 'breacher' | 'guardian' | 'phreak';
+import { useBots } from '../../context/BotsContext';
+import { BotType } from '../../types/bots';
 
 type LevelSectionProps = {
   level: number;
-  selectedType: BotType | null;
-  botCounts: Record<BotType, number>;
-  onSelectBotType: (type: BotType) => void;
 };
 
 export const LevelSection = React.memo(function LevelSection({
-  level,
-  selectedType,
-  botCounts,
-  onSelectBotType
+  level
 }: LevelSectionProps) {
+  const { botCounts, selectedType, setSelectedType } = useBots();
+
   return (
     <View style={styles.levelSection}>
       <Text style={styles.levelTitle}>MARK {level}</Text>
@@ -30,7 +26,7 @@ export const LevelSection = React.memo(function LevelSection({
             isLocked={level > 1}
             isSelected={selectedType === type && level === 1}
             count={botCounts[type]}
-            onPress={() => level === 1 && onSelectBotType(type)}
+            onPress={() => level === 1 && setSelectedType(type)}
           />
         ))}
       </View>
