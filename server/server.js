@@ -10,8 +10,6 @@ const fs = require('fs');
 const User = require('./models/User');
 const authRoutes = require('./routes/auth');
 const auth = require('./middleware/auth');
-const Army = require('./models/Army');
-const armyRoutes = require('./routes/armyRoutes');
 
 // Debug .env loading
 const envPath = path.resolve(process.cwd(), '.env');
@@ -49,9 +47,6 @@ mongoose.connect(process.env.MONGODB_URI, {
   console.error('❌ MongoDB connection error:', err);
   process.exit(1);
 });
-
-// Log that we're creating the Army model
-console.log('Creating Army model in database:', process.env.MONGODB_URI);
 
 // Basic test route
 app.get('/api/test', (req, res) => {
@@ -139,9 +134,6 @@ app.get('/api/balance', auth, async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
-
-// Add army routes
-app.use('/api/army', armyRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
