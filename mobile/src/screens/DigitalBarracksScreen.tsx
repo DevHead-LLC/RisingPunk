@@ -21,25 +21,26 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
 
   const testBotModel = async () => {
     try {
-      // Test POST endpoint
-      const response = await fetch(`${API_URL}/api/bots/test`, {
+      // Test build endpoint
+      const response = await fetch(`${API_URL}/api/bots/build`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({ type: 'breacher', quantity: 1 })
       });
       const data = await response.json();
-      console.log('Bot test response:', data);
+      console.log('Bot build response:', data);
 
-      // Get bot counts
+      // Get updated bot counts
       const countsResponse = await fetch(`${API_URL}/api/bots`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       const counts = await countsResponse.json();
-      console.log('Bot counts:', counts);
+      console.log('Updated bot counts:', counts);
     } catch (error) {
       console.error('Bot test error:', error);
     }
