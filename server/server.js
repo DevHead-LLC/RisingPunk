@@ -196,6 +196,29 @@ app.post('/api/bots/build', auth, async (req, res) => {
   }
 });
 
+app.post('/api/balance/deduct', auth, async (req, res) => {
+  try {
+    const { amount } = req.body;
+    const user = await User.findById(req.user._id);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (user.balance.total < amount) {
+      return res.status(400).json({ error: 'Insufficient balance' });
+    }
+
+    user.balance.total -= amount;
+    await user.save();
+
+    res.json(user.balance);
+  } catch (error) {
+    console.error('Balance deduction error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
