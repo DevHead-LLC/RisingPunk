@@ -161,6 +161,41 @@ app.get('/api/bots', auth, async (req, res) => {
   }
 });
 
+// Build bots endpoint
+app.post('/api/bots/build', auth, async (req, res) => {
+  try {
+    const { type, quantity } = req.body;
+    
+    // Validate input
+    if (!['breacher', 'guardian', 'phreak'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid bot type' });
+    }
+    
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      return res.status(400).json({ error: 'Invalid quantity' });
+    }
+
+    // First, ensure document exists
+    let bot = await Bot.findOne({ userId: req.user._id });
+    
+    if (!bot) {
+      bot = await Bot.create({
+        userId: req.user._id,
+        bots: { breacher: 0, guardian: 0, phreak: 0 }
+      });
+    }
+
+    // Then update the specific bot count
+    bot.bots[type] += quantity;
+    await bot.save();
+
+    res.json(bot.bots);
+  } catch (error) {
+    console.error('Bot build error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
