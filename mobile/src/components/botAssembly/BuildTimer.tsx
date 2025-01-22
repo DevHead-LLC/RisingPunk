@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { COLORS, SIZING } from '../../styles/theme';
+import { useBots } from '../../context/BotsContext';
 
 type BuildTimerProps = {
   quantity: number;
@@ -13,21 +14,27 @@ export const BuildTimer = React.memo(function BuildTimer({
   buildTimePerUnit,
   progress
 }: BuildTimerProps) {
+  const { buildStartTime, totalBuildQuantity } = useBots();
   const [timeLeft, setTimeLeft] = useState<number>(0);
 
-  const botsBuilt = Math.floor((progress / 100) * quantity);
+  const botsBuilt = Math.floor((progress / 100) * totalBuildQuantity);
 
   useEffect(() => {
-    const totalTime = quantity * buildTimePerUnit;
-    const remainingTime = totalTime * (1 - progress / 100);
-    setTimeLeft(Math.ceil(remainingTime));
+    if (!buildStartTime) return;
+    
+    const calculateTimeLeft = () => {
+      const now = new Date();
+      const elapsed = now.getTime() - buildStartTime.getTime();
+      const totalTime = totalBuildQuantity * buildTimePerUnit;
+      const remaining = Math.max(0, totalTime - elapsed);
+      setTimeLeft(remaining);
+    };
 
-    const timer = setInterval(() => {
-      setTimeLeft(prev => Math.max(0, prev - 1000));
-    }, 1000);
+    calculateTimeLeft();
+    const timer = setInterval(calculateTimeLeft, 1000);
 
     return () => clearInterval(timer);
-  }, [quantity, buildTimePerUnit, progress]);
+  }, [buildStartTime, totalBuildQuantity, buildTimePerUnit]);
 
   const formattedTime = useMemo(() => {
     const seconds = Math.floor(timeLeft / 1000);
@@ -47,7 +54,7 @@ export const BuildTimer = React.memo(function BuildTimer({
   return (
     <View style={styles.container}>
       <Text style={styles.progressText} numberOfLines={1}>
-        {`${botsBuilt}/${quantity}`}
+        {`${botsBuilt}/${totalBuildQuantity}`}
       </Text>
       <Text style={styles.timerText} numberOfLines={1}>
         {formattedTime}
