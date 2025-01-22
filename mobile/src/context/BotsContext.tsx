@@ -54,8 +54,29 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
   const startBuilding = async (type: BotType, quantity: number) => {
     try {
       const totalCost = BOT_COST * quantity;
-      subtractFromBalance(totalCost);
       
+      // Deduct balance on server first
+      const deductResponse = await fetch(`${API_URL}/api/balance/deduct`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ amount: totalCost })
+      });
+
+      // Log the response for debugging
+      console.log('Deduct response:', await deductResponse.clone().json());
+
+      if (!deductResponse.ok) {
+        const errorData = await deductResponse.json();
+        throw new Error(errorData.error || 'Failed to deduct balance');
+      }
+
+      // Update local balance after server confirms deduction
+      const balanceData = await deductResponse.json();
+      subtractFromBalance(totalCost);
+
       if (buildTimerRef.current) {
         clearInterval(buildTimerRef.current);
       }
@@ -88,7 +109,7 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
             setBuildingProgress((botsBuilt / quantity) * 100);
           }
         } catch (error) {
-          console.error('Build error:', error);
+          console.error('Build interval error:', error);
           clearInterval(timer);
           setBuildingProgress(null);
         }
@@ -96,12 +117,12 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
 
       buildTimerRef.current = timer;
     } catch (error) {
-      console.error('Build error:', error);
+      console.error('Build error details:', error);
       setBuildingProgress(null);
       if (buildTimerRef.current) {
         clearInterval(buildTimerRef.current);
       }
-      throw new Error('Failed to start building');
+      throw error;
     }
   };
 
