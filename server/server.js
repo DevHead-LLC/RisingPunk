@@ -10,6 +10,7 @@ const fs = require('fs');
 const User = require('./models/User');
 const authRoutes = require('./routes/auth');
 const auth = require('./middleware/auth');
+const Bot = require('./models/Bot');
 
 // Debug .env loading
 const envPath = path.resolve(process.cwd(), '.env');
@@ -132,6 +133,31 @@ app.get('/api/balance', auth, async (req, res) => {
   } catch (error) {
     console.error('Balance fetch error:', error);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Bot routes
+app.post('/api/bots/test', auth, async (req, res) => {
+  try {
+    const bot = await Bot.findOneAndUpdate(
+      { userId: req.user._id },
+      { $setOnInsert: { bots: { breacher: 0, guardian: 0, phreak: 0 } } },
+      { upsert: true, new: true }
+    );
+    res.json(bot);
+  } catch (error) {
+    console.error('Bot test error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/bots', auth, async (req, res) => {
+  try {
+    const bot = await Bot.findOne({ userId: req.user._id });
+    res.json(bot?.bots || { breacher: 0, guardian: 0, phreak: 0 });
+  } catch (error) {
+    console.error('Bot fetch error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
