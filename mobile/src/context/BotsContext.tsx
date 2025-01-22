@@ -11,6 +11,8 @@ type BotsContextType = {
   selectedType: BotType | null;
   startBuilding: (type: BotType, quantity: number) => void;
   selectBotType: (type: BotType) => void;
+  buildStartTime: Date | null;
+  totalBuildQuantity: number;
 };
 
 const BotsContext = createContext<BotsContextType | undefined>(undefined);
@@ -26,6 +28,8 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
   const [buildingProgress, setBuildingProgress] = useState<number | null>(null);
   const [selectedType, setSelectedType] = useState<BotType | null>(null);
   const buildTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [buildStartTime, setBuildStartTime] = useState<Date | null>(null);
+  const [totalBuildQuantity, setTotalBuildQuantity] = useState<number>(0);
 
   const BOT_COST = 1;
   const BUILD_TIME = 1000; // 1 second per bot
@@ -55,7 +59,6 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
     try {
       const totalCost = BOT_COST * quantity;
       
-      // Deduct balance on server first
       const deductResponse = await fetch(`${API_URL}/api/balance/deduct`, {
         method: 'POST',
         headers: {
@@ -65,15 +68,11 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ amount: totalCost })
       });
 
-      // Log the response for debugging
-      console.log('Deduct response:', await deductResponse.clone().json());
-
       if (!deductResponse.ok) {
         const errorData = await deductResponse.json();
         throw new Error(errorData.error || 'Failed to deduct balance');
       }
 
-      // Update local balance after server confirms deduction
       const balanceData = await deductResponse.json();
       subtractFromBalance(totalCost);
 
@@ -83,6 +82,8 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
 
       let botsBuilt = 0;
       setBuildingProgress(0);
+      setBuildStartTime(new Date());
+      setTotalBuildQuantity(quantity);
       
       const timer = setInterval(async () => {
         try {
@@ -104,6 +105,8 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
           if (botsBuilt === quantity) {
             clearInterval(timer);
             setBuildingProgress(null);
+            setBuildStartTime(null);
+            setTotalBuildQuantity(0);
             buildTimerRef.current = null;
           } else {
             setBuildingProgress((botsBuilt / quantity) * 100);
@@ -119,6 +122,8 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Build error details:', error);
       setBuildingProgress(null);
+      setBuildStartTime(null);
+      setTotalBuildQuantity(0);
       if (buildTimerRef.current) {
         clearInterval(buildTimerRef.current);
       }
@@ -137,6 +142,8 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
       selectedType,
       startBuilding,
       selectBotType,
+      buildStartTime,
+      totalBuildQuantity,
     }}>
       {children}
     </BotsContext.Provider>
