@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { useBalance } from './BalanceContext';
+import { useAuth } from './AuthContext';
+import { API_URL } from '../config';
 
 type BotType = 'breacher' | 'guardian' | 'phreak';
 
@@ -14,6 +16,7 @@ type BotsContextType = {
 const BotsContext = createContext<BotsContextType | undefined>(undefined);
 
 export function BotsProvider({ children }: { children: React.ReactNode }) {
+  const { token } = useAuth();
   const { subtractFromBalance } = useBalance();
   const [botCounts, setBotCounts] = useState<Record<BotType, number>>({
     breacher: 0,
@@ -27,21 +30,32 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
   const BOT_COST = 1;
   const BUILD_TIME = 1000; // 1 second per bot
 
-  // Cleanup timer on unmount
+  // Fetch initial bot counts
   useEffect(() => {
-    return () => {
-      if (buildTimerRef.current) {
-        clearInterval(buildTimerRef.current);
+    const fetchBots = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/bots`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const data = await response.json();
+        setBotCounts(data);
+      } catch (error) {
+        console.error('Failed to fetch bot counts:', error);
       }
     };
-  }, []);
+    
+    if (token) {
+      fetchBots();
+    }
+  }, [token]);
 
-  const startBuilding = (type: BotType, quantity: number) => {
+  const startBuilding = async (type: BotType, quantity: number) => {
     try {
       const totalCost = BOT_COST * quantity;
       subtractFromBalance(totalCost);
       
-      // Clear any existing timer
       if (buildTimerRef.current) {
         clearInterval(buildTimerRef.current);
       }
@@ -49,19 +63,34 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
       let botsBuilt = 0;
       setBuildingProgress(0);
       
-      const timer = setInterval(() => {
-        botsBuilt++;
-        setBotCounts(prev => ({
-          ...prev,
-          [type]: prev[type] + 1
-        }));
+      const timer = setInterval(async () => {
+        try {
+          const response = await fetch(`${API_URL}/api/bots/build`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ type, quantity: 1 })
+          });
+          
+          if (response.ok) {
+            const updatedCounts = await response.json();
+            setBotCounts(updatedCounts);
+            botsBuilt++;
+          }
 
-        if (botsBuilt === quantity) {
+          if (botsBuilt === quantity) {
+            clearInterval(timer);
+            setBuildingProgress(null);
+            buildTimerRef.current = null;
+          } else {
+            setBuildingProgress((botsBuilt / quantity) * 100);
+          }
+        } catch (error) {
+          console.error('Build error:', error);
           clearInterval(timer);
           setBuildingProgress(null);
-          buildTimerRef.current = null;
-        } else {
-          setBuildingProgress((botsBuilt / quantity) * 100);
         }
       }, BUILD_TIME);
 
