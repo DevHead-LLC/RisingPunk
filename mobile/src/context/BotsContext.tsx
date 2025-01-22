@@ -1,22 +1,21 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { updateBotCount, getArmyStatus, BotType, BotCounts } from '../services/api';
-import { useAuth } from './AuthContext';
+import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { useBalance } from './BalanceContext';
 
-interface BotsContextType {
-  botCounts: BotCounts;
+type BotType = 'breacher' | 'guardian' | 'phreak';
+
+type BotsContextType = {
+  botCounts: Record<BotType, number>;
   buildingProgress: number | null;
   selectedType: BotType | null;
-  startBuilding: (type: BotType, quantity: number) => Promise<void>;
-  setSelectedType: (type: BotType | null) => void;
-}
+  startBuilding: (type: BotType, quantity: number) => void;
+  selectBotType: (type: BotType) => void;
+};
 
-const BotsContext = createContext<BotsContextType | null>(null);
+const BotsContext = createContext<BotsContextType | undefined>(undefined);
 
 export function BotsProvider({ children }: { children: React.ReactNode }) {
-  const { token } = useAuth();
   const { subtractFromBalance } = useBalance();
-  const [botCounts, setBotCounts] = useState<BotCounts>({
+  const [botCounts, setBotCounts] = useState<Record<BotType, number>>({
     breacher: 0,
     guardian: 0,
     phreak: 0,
@@ -28,21 +27,21 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
   const BOT_COST = 1;
   const BUILD_TIME = 1000; // 1 second per bot
 
+  // Cleanup timer on unmount
   useEffect(() => {
-    if (token) {
-      getArmyStatus(token)
-        .then(setBotCounts)
-        .catch(console.error);
-    }
-  }, [token]);
+    return () => {
+      if (buildTimerRef.current) {
+        clearInterval(buildTimerRef.current);
+      }
+    };
+  }, []);
 
-  const startBuilding = async (type: BotType, quantity: number) => {
+  const startBuilding = (type: BotType, quantity: number) => {
     try {
-      if (!token) throw new Error('Not authenticated');
-      
       const totalCost = BOT_COST * quantity;
       subtractFromBalance(totalCost);
       
+      // Clear any existing timer
       if (buildTimerRef.current) {
         clearInterval(buildTimerRef.current);
       }
@@ -50,25 +49,19 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
       let botsBuilt = 0;
       setBuildingProgress(0);
       
-      const timer = setInterval(async () => {
-        try {
-          const updatedCounts = await updateBotCount(token, type, 1);
-          setBotCounts(updatedCounts);
-          
-          botsBuilt++;
-          const progress = (botsBuilt / quantity) * 100;
-          setBuildingProgress(progress);
+      const timer = setInterval(() => {
+        botsBuilt++;
+        setBotCounts(prev => ({
+          ...prev,
+          [type]: prev[type] + 1
+        }));
 
-          if (botsBuilt === quantity) {
-            clearInterval(timer);
-            setBuildingProgress(null);
-            buildTimerRef.current = null;
-          }
-        } catch (error) {
-          console.error('Failed to update bot count:', error);
+        if (botsBuilt === quantity) {
           clearInterval(timer);
           setBuildingProgress(null);
           buildTimerRef.current = null;
+        } else {
+          setBuildingProgress((botsBuilt / quantity) * 100);
         }
       }, BUILD_TIME);
 
@@ -76,20 +69,25 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Build error:', error);
       setBuildingProgress(null);
-      throw error;
+      if (buildTimerRef.current) {
+        clearInterval(buildTimerRef.current);
+      }
+      throw new Error('Failed to start building');
     }
   };
 
-  const value = {
-    botCounts,
-    buildingProgress,
-    selectedType,
-    startBuilding,
-    setSelectedType,
+  const selectBotType = (type: BotType) => {
+    setSelectedType(type);
   };
 
   return (
-    <BotsContext.Provider value={value}>
+    <BotsContext.Provider value={{
+      botCounts,
+      buildingProgress,
+      selectedType,
+      startBuilding,
+      selectBotType,
+    }}>
       {children}
     </BotsContext.Provider>
   );
@@ -97,7 +95,7 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
 
 export function useBots() {
   const context = useContext(BotsContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useBots must be used within a BotsProvider');
   }
   return context;

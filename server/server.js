@@ -10,8 +10,7 @@ const fs = require('fs');
 const User = require('./models/User');
 const authRoutes = require('./routes/auth');
 const auth = require('./middleware/auth');
-const Army = require('./models/Army');
-const armyRoutes = require('./routes/armyRoutes');
+const Bot = require('./models/Bot');
 
 // Debug .env loading
 const envPath = path.resolve(process.cwd(), '.env');
@@ -49,9 +48,6 @@ mongoose.connect(process.env.MONGODB_URI, {
   console.error('❌ MongoDB connection error:', err);
   process.exit(1);
 });
-
-// Log that we're creating the Army model
-console.log('Creating Army model in database:', process.env.MONGODB_URI);
 
 // Basic test route
 app.get('/api/test', (req, res) => {
@@ -140,8 +136,30 @@ app.get('/api/balance', auth, async (req, res) => {
   }
 });
 
-// Add army routes
-app.use('/api/army', armyRoutes);
+// Bot routes
+app.post('/api/bots/test', auth, async (req, res) => {
+  try {
+    const bot = await Bot.findOneAndUpdate(
+      { userId: req.user._id },
+      { $setOnInsert: { bots: { breacher: 0, guardian: 0, phreak: 0 } } },
+      { upsert: true, new: true }
+    );
+    res.json(bot);
+  } catch (error) {
+    console.error('Bot test error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/bots', auth, async (req, res) => {
+  try {
+    const bot = await Bot.findOne({ userId: req.user._id });
+    res.json(bot?.bots || { breacher: 0, guardian: 0, phreak: 0 });
+  } catch (error) {
+    console.error('Bot fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

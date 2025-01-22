@@ -15,7 +15,7 @@ const getBotDescription = (type: BotType) => ({
 
 export const BotDescription = React.memo(function BotDescription({ type }: BotDescriptionProps) {
   return (
-    <Text style={styles.botDescription} testID="bot-description">
+    <Text style={styles.botDescription}>
       {getBotDescription(type)}
     </Text>
   );

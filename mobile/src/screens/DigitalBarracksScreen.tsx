@@ -5,13 +5,45 @@ import {
   StyleSheet,
   SafeAreaView,
   ScrollView,
+  TouchableOpacity,
 } from 'react-native';
 import { Balance } from '../components/common/Balance';
 import { CloseButton } from '../components/common/CloseButton';
 import { useBots } from '../context/BotsContext';
+import { useAuth } from '../context/AuthContext';
+import { API_URL } from '../config';
+import { SIZING } from '../styles/theme';
+import { COLORS } from '../styles/theme';
 
 export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
   const { botCounts } = useBots();
+  const { token } = useAuth();
+
+  const testBotModel = async () => {
+    try {
+      // Test POST endpoint
+      const response = await fetch(`${API_URL}/api/bots/test`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      console.log('Bot test response:', data);
+
+      // Get bot counts
+      const countsResponse = await fetch(`${API_URL}/api/bots`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const counts = await countsResponse.json();
+      console.log('Bot counts:', counts);
+    } catch (error) {
+      console.error('Bot test error:', error);
+    }
+  };
 
   const BotStatCard = ({ type, count }: { type: string; count: number }) => (
     <View style={styles.statCard}>
@@ -30,6 +62,13 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
       <View style={styles.header}>
         <Balance />
       </View>
+
+      <TouchableOpacity 
+        style={styles.testButton} 
+        onPress={testBotModel}
+      >
+        <Text style={styles.testButtonText}>Test Bot Model</Text>
+      </TouchableOpacity>
 
       <Text style={styles.title}>Digital Barracks</Text>
       
@@ -132,5 +171,16 @@ const styles = StyleSheet.create({
     color: '#00ff00',
     fontSize: 24,
     fontWeight: 'bold',
+  },
+  testButton: {
+    backgroundColor: '#4717F6',
+    padding: SIZING.spacing.sm,
+    borderRadius: 4,
+    alignSelf: 'center',
+    marginVertical: SIZING.spacing.md,
+  },
+  testButtonText: {
+    color: COLORS.text.primary,
+    fontSize: SIZING.font.small,
   },
 }); 
