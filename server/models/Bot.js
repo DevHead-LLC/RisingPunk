@@ -34,7 +34,12 @@ const botSchema = new mongoose.Schema({
       min: 0
     },
     startedAt: Date,
-    completesAt: Date
+    completesAt: Date,
+    botsBuilt: {
+      type: Number,
+      default: 0,
+      min: 0
+    }
   }
 }, {
   timestamps: true
