@@ -2,7 +2,6 @@ import React from 'react';
 import { View, TextInput, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { COLORS, SIZING } from '../../styles/theme';
 import { BotType } from '../../types/bots';
-import { useAuth } from '../../context/AuthContext';
 
 type BuildControlsProps = {
   selectedType: BotType | null;
@@ -19,8 +18,6 @@ export const BuildControls = React.memo(function BuildControls({
   onQuantityChange,
   onBuild
 }: BuildControlsProps) {
-  const { token } = useAuth();
-
   return (
     <View style={styles.buildControlsRow}>
       <TextInput
@@ -41,14 +38,6 @@ export const BuildControls = React.memo(function BuildControls({
         disabled={!selectedType || buildingProgress !== null}
       >
         <Text style={styles.buildButtonText}>BUILD</Text>
-      </TouchableOpacity>
-      
-      {/* Temporary debug button */}
-      <TouchableOpacity
-        style={[styles.button, { backgroundColor: '#444' }]}
-        onPress={() => console.log('Token:', token)}
-      >
-        <Text style={styles.buttonText}>Show Token</Text>
       </TouchableOpacity>
     </View>
   );
@@ -96,21 +85,5 @@ const styles = StyleSheet.create({
     fontSize: SIZING.font.h2,
     fontWeight: 'bold',
     marginBottom: SIZING.spacing.sm,
-  },
-  button: {
-    width: 80,
-    height: 40,
-    backgroundColor: '#444',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 255, 65, 0.4)',
-  },
-  buttonText: {
-    color: COLORS.text.primary,
-    fontSize: SIZING.font.body,
-    fontWeight: 'bold',
-    letterSpacing: 1,
   },
 });
