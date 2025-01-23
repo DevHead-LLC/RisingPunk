@@ -219,68 +219,6 @@ app.post('/api/balance/deduct', auth, async (req, res) => {
   }
 });
 
-// Add this test endpoint
-app.post('/api/bots/test-build-queue', auth, async (req, res) => {
-  try {
-    let bot = await Bot.findOne({ userId: req.user._id });
-    if (!bot) {
-      bot = new Bot({ userId: req.user._id });
-    }
-
-    // Set up a test build queue
-    bot.buildQueue = {
-      type: 'breacher',
-      quantity: 5,
-      startedAt: new Date(),
-      completesAt: new Date(Date.now() + (5 * 1000)), // 5 seconds total
-      botsBuilt: 0
-    };
-
-    await bot.save();
-    res.json(bot);
-  } catch (error) {
-    console.error('Test build queue error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Add this GET endpoint for build state
-app.get('/api/bots/build-state', auth, async (req, res) => {
-  try {
-    console.log('Build state - Looking for user:', req.user._id);
-    const bot = await Bot.findOne({ userId: req.user._id });
-    console.log('Build state - Found bot:', bot ? 'Yes' : 'No');
-    
-    if (!bot?.buildQueue) {
-      console.log('Build state - No build queue found');
-      return res.json({ buildQueue: null });
-    }
-
-    console.log('Build state - Build queue exists:', bot.buildQueue);
-    // Calculate current progress
-    const now = new Date();
-    const startedAt = new Date(bot.buildQueue.startedAt);
-    const completesAt = new Date(bot.buildQueue.completesAt);
-    const totalTime = completesAt.getTime() - startedAt.getTime();
-    const elapsedTime = now.getTime() - startedAt.getTime();
-    const progress = Math.min((elapsedTime / totalTime) * 100, 100);
-
-    res.json({
-      buildQueue: {
-        type: bot.buildQueue.type,
-        quantity: bot.buildQueue.quantity,
-        botsBuilt: bot.buildQueue.botsBuilt,
-        startedAt: bot.buildQueue.startedAt,
-        completesAt: bot.buildQueue.completesAt,
-        progress
-      }
-    });
-  } catch (error) {
-    console.error('Build state check error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
