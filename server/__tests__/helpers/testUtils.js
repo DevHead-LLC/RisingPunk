@@ -7,6 +7,7 @@ let mongoServer;
 
 const setupTestDB = () => {
   beforeAll(async () => {
+    await mongoose.disconnect();
     mongoServer = await MongoMemoryServer.create();
     await mongoose.connect(mongoServer.getUri());
   });
