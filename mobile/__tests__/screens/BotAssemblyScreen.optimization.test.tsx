@@ -2,26 +2,17 @@ import React from 'react';
 import { render, fireEvent, act } from '@testing-library/react-native';
 import { BotAssemblyScreen } from '../../src/screens/BotAssemblyScreen';
 import { BotsContext } from '../../src/context/BotsContext';
+import { createMockBotsContext, createTestWrapper } from '../utils/testSetup';
+import { simulateBuildProcess, simulateBuildProgress } from '../utils/testActions';
+import { TEST_VALUES } from '../utils/testConstants';
+import { setupTestEnvironment } from '../utils/testConfig';
 
 describe('BotAssemblyScreen Build Optimization', () => {
   const mockOnClose = jest.fn();
-  const mockBotsContext = {
-    botCounts: { breacher: 0, guardian: 0, phreak: 0 },
-    buildingProgress: null as null | number,
-    selectedType: null as null | 'breacher' | 'guardian' | 'phreak',
-    startBuilding: jest.fn(),
-    selectBotType: jest.fn(),
-    buildStartTime: null as null | Date,
-    totalBuildQuantity: 0,
-    setBuildingProgress: jest.fn(),
-    setBotCounts: jest.fn()
-  };
+  const mockBotsContext = createMockBotsContext();
+  const wrapper = createTestWrapper(mockBotsContext);
 
-  const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <BotsContext.Provider value={mockBotsContext}>
-      {children}
-    </BotsContext.Provider>
-  );
+  setupTestEnvironment();
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -33,21 +24,16 @@ describe('BotAssemblyScreen Build Optimization', () => {
   });
 
   it('should batch bot count updates', async () => {
-    const { getByTestId, getByText } = render(
+    const utils = render(
       <BotAssemblyScreen onClose={mockOnClose} />,
       { wrapper }
     );
 
-    // Start large build
-    fireEvent.press(getByTestId('bot-card-breacher'));
-    fireEvent.changeText(getByTestId('quantity-input'), '100');
-    fireEvent.press(getByText('BUILD'));
+    await simulateBuildProcess(utils, 'breacher', '100');
 
     // Simulate rapid progress updates
     for (let i = 0; i < 100; i++) {
-      act(() => {
-        mockBotsContext.buildingProgress = i;
-      });
+      simulateBuildProgress(mockBotsContext, i);
     }
 
     // Should batch updates instead of calling for each progress change
@@ -67,7 +53,7 @@ describe('BotAssemblyScreen Build Optimization', () => {
       fireEvent.changeText(input, i.toString());
     }
 
-    jest.advanceTimersByTime(300); // Debounce delay
+    jest.advanceTimersByTime(TEST_VALUES.DEBOUNCE_DELAY);
 
     // Should only process final value
     expect(mockBotsContext.selectBotType).toHaveBeenCalledTimes(1);
@@ -77,23 +63,18 @@ describe('BotAssemblyScreen Build Optimization', () => {
     const renderCount = jest.fn();
     jest.spyOn(React, 'useEffect').mockImplementation(() => renderCount());
 
-    const { getByTestId, getByText } = render(
+    const utils = render(
       <BotAssemblyScreen onClose={mockOnClose} />,
       { wrapper }
     );
 
-    // Start large build
-    fireEvent.press(getByTestId('bot-card-breacher'));
-    fireEvent.changeText(getByTestId('quantity-input'), '1000');
-    fireEvent.press(getByText('BUILD'));
-
     const initialRenders = renderCount.mock.calls.length;
+
+    await simulateBuildProcess(utils, 'breacher', TEST_VALUES.LARGE_BUILD_QUANTITY.toString());
 
     // Simulate many progress updates
     for (let i = 0; i < 100; i++) {
-      act(() => {
-        mockBotsContext.buildingProgress = i;
-      });
+      simulateBuildProgress(mockBotsContext, i);
     }
 
     // Should use memo/callback optimizations to prevent excessive renders
