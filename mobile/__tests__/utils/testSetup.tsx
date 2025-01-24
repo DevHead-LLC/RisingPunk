@@ -1,6 +1,8 @@
 import React from 'react';
 import { BotsContext } from '../../src/context/BotsContext';
 import { BotType, BuildQueueItem, TestWrapperProps } from './testTypes';
+import { BalanceProvider } from '../../src/context/BalanceContext';
+import { BotsProvider } from '../../src/context/BotsContext';
 
 export interface MockBotsContextType {
   botCounts: { breacher: number; guardian: number; phreak: number };
@@ -33,12 +35,13 @@ export const createMockBotsContext = (overrides = {}): MockBotsContextType => ({
   ...overrides
 });
 
-export const createTestWrapper = (mockContext: MockBotsContextType) => 
-  ({ children }: TestWrapperProps) => (
-    <BotsContext.Provider value={mockContext}>
+export const wrapper = ({ children }: { children: React.ReactNode }) => (
+  <BalanceProvider initialBalance={1000}>
+    <BotsProvider>
       {children}
-    </BotsContext.Provider>
-  );
+    </BotsProvider>
+  </BalanceProvider>
+);
 
 export const setupTimers = () => {
   beforeEach(() => {

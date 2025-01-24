@@ -16,9 +16,14 @@ export function formatBalance(amount: number): string {
   return amount.toLocaleString();
 }
 
-export function BalanceProvider({ children }: { children: React.ReactNode }) {
+interface BalanceProviderProps {
+  children: React.ReactNode;
+  initialBalance?: number;
+}
+
+export const BalanceProvider = ({ children, initialBalance = 0 }: BalanceProviderProps) => {
   const { token } = useAuth();
-  const [balance, setBalance] = useState<number | null>(null);
+  const [balance, setBalance] = useState<number | null>(initialBalance);
   const [ratePerSecond, setRatePerSecond] = useState(1);
   const [lastSync, setLastSync] = useState<Date | null>(null);
 
@@ -88,7 +93,7 @@ export function BalanceProvider({ children }: { children: React.ReactNode }) {
       {children}
     </BalanceContext.Provider>
   );
-}
+};
 
 export const useBalance = () => {
   const context = useContext(BalanceContext);
