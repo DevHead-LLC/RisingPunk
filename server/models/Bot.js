@@ -4,8 +4,7 @@ const botSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    index: true
+    required: true
   },
   bots: {
     breacher: {
@@ -40,10 +39,7 @@ const botSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for quick lookups by userId
-botSchema.index({ userId: 1 });
-
-// Ensure one document per user
+// Ensure one document per user (this will handle both indexing and uniqueness)
 botSchema.index({ userId: 1 }, { unique: true });
 
 module.exports = mongoose.model('Bot', botSchema); 
