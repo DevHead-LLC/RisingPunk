@@ -15,7 +15,7 @@ type BotsContextType = {
   totalBuildQuantity: number;
 };
 
-const BotsContext = createContext<BotsContextType | undefined>(undefined);
+export const BotsContext = createContext<BotsContextType | undefined>(undefined);
 
 export function BotsProvider({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();

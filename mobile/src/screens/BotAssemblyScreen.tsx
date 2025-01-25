@@ -35,6 +35,7 @@ const LEVELS = [1, 2, 3, 4];
 export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
   const { botCounts, buildingProgress, selectedType, selectBotType, startBuilding } = useBots();
   const [quantity, setQuantity] = useState('1');
+  const { balance } = useBalance();
   const BOT_COST = 1;
 
   const handleBuild = useCallback(() => {
@@ -63,6 +64,7 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
   return (
     <SafeAreaView style={styles.container}>
       <BotAssemblyHeader onClose={onClose} />
+      <Balance />
       <View style={styles.content}>
         <ScrollView style={styles.botSelection}>
           {levelSections}
