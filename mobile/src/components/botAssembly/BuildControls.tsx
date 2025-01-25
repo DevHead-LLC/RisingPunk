@@ -86,4 +86,20 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: SIZING.spacing.sm,
   },
+  button: {
+    width: 80,
+    height: 40,
+    backgroundColor: '#444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 65, 0.4)',
+  },
+  buttonText: {
+    color: COLORS.text.primary,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+  },
 });
