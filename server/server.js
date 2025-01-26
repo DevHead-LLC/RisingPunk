@@ -170,9 +170,8 @@ app.post('/api/bots/build', auth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid build parameters' });
     }
 
-    const buildTimePerUnit = 1000; // 1 second per bot
+    const buildTimePerUnit = 1000;
     const totalBuildTime = quantity * buildTimePerUnit;
-    
     const startedAt = new Date().toISOString();
     const completesAt = new Date(Date.now() + totalBuildTime).toISOString();
 
@@ -195,11 +194,7 @@ app.post('/api/bots/build', auth, async (req, res) => {
     };
 
     await bot.save();
-
-    res.json({ 
-      buildQueue: bot.buildQueue,
-      bots: bot.bots 
-    });
+    res.json({ buildQueue: bot.buildQueue, bots: bot.bots });
 
   } catch (error) {
     console.error('Build error:', error);
