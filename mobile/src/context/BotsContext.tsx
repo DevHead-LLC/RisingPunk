@@ -83,7 +83,9 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
           setBotCounts(bots);
           setBuildQueue(serverQueue);
           setBuildStartTime(new Date(serverQueue.startedAt));
-          setSelectedType(serverQueue.type);
+          if (!selectedType) {
+            setSelectedType(serverQueue.type);
+          }
         } else {
           // Build complete or no active build
           setBuildingProgress(null);
@@ -91,13 +93,12 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
           setBuildQueue(null);
           setBuildStartTime(null);
           setBotCounts(bots);
-          setSelectedType(null);
         }
       }
     } catch (error) {
       console.error('Error polling build status:', error);
     }
-  }, [token]);
+  }, [token, selectedType]);
 
   // Set up polling when component mounts or when token changes
   useEffect(() => {
