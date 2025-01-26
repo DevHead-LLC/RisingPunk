@@ -13,6 +13,7 @@ type BalanceContextType = {
 const BalanceContext = createContext<BalanceContextType | undefined>(undefined);
 
 export function formatBalance(amount: number): string {
+  if (amount === undefined || amount === null) return '0';
   return amount.toLocaleString();
 }
 

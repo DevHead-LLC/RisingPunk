@@ -161,47 +161,48 @@ app.get('/api/bots', auth, async (req, res) => {
   }
 });
 
-// Build bots endpoint
+// Add this POST endpoint for starting builds
 app.post('/api/bots/build', auth, async (req, res) => {
   try {
-    const { type, quantity } = req.body;
+    const { type, quantity, totalCost } = req.body;
     
-    // Validate input
-    if (!['breacher', 'guardian', 'phreak'].includes(type)) {
-      return res.status(400).json({ error: 'Invalid bot type' });
-    }
-    
-    if (!Number.isInteger(quantity) || quantity < 1) {
-      return res.status(400).json({ error: 'Invalid quantity' });
+    if (!type || quantity <= 0) {
+      return res.status(400).json({ error: 'Invalid build parameters' });
     }
 
-    // Find or create bot document
+    const buildTimePerUnit = 1000; // 1 second per bot
+    const totalBuildTime = quantity * buildTimePerUnit;
+    
+    const startedAt = new Date().toISOString();
+    const completesAt = new Date(Date.now() + totalBuildTime).toISOString();
+
     let bot = await Bot.findOne({ userId: req.user._id });
+    
     if (!bot) {
-      bot = new Bot({ 
+      bot = new Bot({
         userId: req.user._id,
         bots: { breacher: 0, guardian: 0, phreak: 0 }
       });
     }
 
-    const BUILD_TIME_PER_BOT = 1000; // 1 second per bot (we can adjust this)
-    const totalBuildTime = BUILD_TIME_PER_BOT * quantity;
-
     bot.buildQueue = {
       type,
       quantity,
-      startedAt: new Date(),
-      completesAt: new Date(Date.now() + totalBuildTime),
+      totalCost,
+      startedAt,
+      completesAt,
       botsBuilt: 0
     };
 
     await bot.save();
+
     res.json({ 
       buildQueue: bot.buildQueue,
       bots: bot.bots 
     });
+
   } catch (error) {
-    console.error('Bot build error:', error);
+    console.error('Build error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -254,13 +255,16 @@ app.post('/api/bots/test-build-queue', auth, async (req, res) => {
   }
 });
 
-// Add this GET endpoint for build state
+// Update the build-state endpoint to properly handle completion
 app.get('/api/bots/build-state', auth, async (req, res) => {
   try {
     const bot = await Bot.findOne({ userId: req.user._id });
     
     if (!bot?.buildQueue) {
-      return res.json({ buildQueue: null });
+      return res.json({ 
+        buildQueue: null,
+        bots: bot?.bots || { breacher: 0, guardian: 0, phreak: 0 }
+      });
     }
 
     const now = new Date();
@@ -273,17 +277,36 @@ app.get('/api/bots/build-state', auth, async (req, res) => {
     // Calculate how many bots should be built based on progress
     const expectedBotsBuilt = Math.floor((progress / 100) * bot.buildQueue.quantity);
     
-    // Update botsBuilt if needed
+    // Update botsBuilt if needed and save to database
     if (expectedBotsBuilt > bot.buildQueue.botsBuilt) {
       bot.bots[bot.buildQueue.type] += (expectedBotsBuilt - bot.buildQueue.botsBuilt);
       bot.buildQueue.botsBuilt = expectedBotsBuilt;
       await bot.save();
     }
 
+    // If build is complete
+    if (progress >= 100) {
+      const finalType = bot.buildQueue.type;
+      const remainingBots = bot.buildQueue.quantity - bot.buildQueue.botsBuilt;
+      if (remainingBots > 0) {
+        bot.bots[finalType] += remainingBots;
+      }
+      bot.buildQueue = null;
+      await bot.save();
+
+      return res.json({
+        buildQueue: null,
+        bots: bot.bots
+      });
+    }
+
+    // Return current state with all buildQueue properties
     res.json({
       buildQueue: {
         ...bot.buildQueue.toObject(),
-        progress
+        progress,
+        type: bot.buildQueue.type,
+        totalCost: bot.buildQueue.totalCost  // Explicitly include totalCost
       },
       bots: bot.bots
     });

@@ -32,6 +32,10 @@ const botSchema = new mongoose.Schema({
       type: Number,
       min: 0
     },
+    totalCost: {
+      type: Number,
+      min: 0
+    },
     startedAt: Date,
     completesAt: Date,
     botsBuilt: {

@@ -19,13 +19,15 @@ export const BuildStatus = React.memo(function BuildStatus({
   const { buildQueue } = useBots();
   
   const calculateCost = () => {
-    if (buildQueue?.totalCost !== undefined) {
-      return formatBalance(buildQueue.totalCost);
+    // For active builds, use the stored totalCost
+    if (buildQueue?.totalCost) {
+      return buildQueue.totalCost;
     }
+    // For new builds, calculate from inputs
     if (selectedType && quantity) {
-      return formatBalance(botCost * (parseInt(quantity) || 0));
+      return botCost * (parseInt(quantity) || 0);
     }
-    return 'N/A';
+    return 0;
   };
   
   return (
@@ -37,7 +39,7 @@ export const BuildStatus = React.memo(function BuildStatus({
       <View style={styles.statusRow}>
         <Text style={styles.statusLabel}>Total Cost:</Text>
         <Text style={styles.statusValue}>
-          {`$${calculateCost()}`}
+          {`$${formatBalance(calculateCost())}`}
         </Text>
       </View>
     </View>
