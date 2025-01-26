@@ -13,6 +13,12 @@ type BotsContextType = {
   selectBotType: (type: BotType) => void;
   buildStartTime: Date | null;
   totalBuildQuantity: number;
+  buildQueue: {
+    type: BotType;
+    quantity: number;
+    totalCost: number;
+    progress: number;
+  } | null;
 };
 
 export const BotsContext = createContext<BotsContextType | undefined>(undefined);
@@ -30,6 +36,12 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
   const buildTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [buildStartTime, setBuildStartTime] = useState<Date | null>(null);
   const [totalBuildQuantity, setTotalBuildQuantity] = useState<number>(0);
+  const [buildQueue, setBuildQueue] = useState<{
+    type: BotType;
+    quantity: number;
+    totalCost: number;
+    progress: number;
+  } | null>(null);
 
   const BOT_COST = 1;
   const BUILD_TIME = 1000; // 1 second per bot
@@ -77,6 +89,14 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
       const { balance } = await deductResponse.json();
       subtractFromBalance(totalCost);
 
+      // Initialize buildQueue with totalCost before the build request
+      setBuildQueue({
+        type,
+        quantity,
+        totalCost,
+        progress: 0
+      });
+
       // Start the build process
       const buildResponse = await fetch(`${API_URL}/api/bots/build`, {
         method: 'POST',
@@ -84,10 +104,11 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ type, quantity })
+        body: JSON.stringify({ type, quantity, totalCost })
       });
 
       if (!buildResponse.ok) {
+        setBuildQueue(null);
         throw new Error('Failed to start build');
       }
 
@@ -100,16 +121,23 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
         });
 
         if (statusResponse.ok) {
-          const { buildQueue, bots } = await statusResponse.json();
-          if (buildQueue) {
-            setBuildingProgress(buildQueue.progress);
-            setTotalBuildQuantity(buildQueue.quantity);
+          const { buildQueue: serverQueue, bots } = await statusResponse.json();
+          if (serverQueue) {
+            setBuildingProgress(serverQueue.progress);
+            setTotalBuildQuantity(serverQueue.quantity);
             setBotCounts(bots);  // Use server-provided bot counts
+            
+            // Preserve totalCost when updating buildQueue
+            setBuildQueue(prevQueue => ({
+              ...serverQueue,
+              totalCost: prevQueue?.totalCost || 0
+            }));
 
-            if (buildQueue.progress >= 100) {
+            if (serverQueue.progress >= 100) {
               clearInterval(pollBuildStatus);
               setBuildingProgress(null);
               setTotalBuildQuantity(0);
+              setBuildQueue(null);
             }
           }
         }
@@ -120,6 +148,7 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
       console.error('Build error:', error);
       setBuildingProgress(null);
       setTotalBuildQuantity(0);
+      setBuildQueue(null);
       throw error;
     }
   };
@@ -137,6 +166,7 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
       selectBotType,
       buildStartTime,
       totalBuildQuantity,
+      buildQueue,
     }}>
       {children}
     </BotsContext.Provider>
