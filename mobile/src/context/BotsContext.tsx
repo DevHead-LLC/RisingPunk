@@ -59,6 +59,7 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
     try {
       const totalCost = BOT_COST * quantity;
       
+      // First deduct balance
       const deductResponse = await fetch(`${API_URL}/api/balance/deduct`, {
         method: 'POST',
         headers: {
@@ -73,60 +74,52 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
         throw new Error(errorData.error || 'Failed to deduct balance');
       }
 
-      const balanceData = await deductResponse.json();
+      const { balance } = await deductResponse.json();
       subtractFromBalance(totalCost);
 
-      if (buildTimerRef.current) {
-        clearInterval(buildTimerRef.current);
+      // Start the build process
+      const buildResponse = await fetch(`${API_URL}/api/bots/build`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ type, quantity })
+      });
+
+      if (!buildResponse.ok) {
+        throw new Error('Failed to start build');
       }
 
-      let botsBuilt = 0;
-      setBuildingProgress(0);
-      setBuildStartTime(new Date());
-      setTotalBuildQuantity(quantity);
-      
-      const timer = setInterval(async () => {
-        try {
-          const response = await fetch(`${API_URL}/api/bots/build`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ type, quantity: 1 })
-          });
-          
-          if (response.ok) {
-            const updatedCounts = await response.json();
-            setBotCounts(updatedCounts);
-            botsBuilt++;
+      // Set up polling for build status
+      const pollBuildStatus = setInterval(async () => {
+        const statusResponse = await fetch(`${API_URL}/api/bots/build-state`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
           }
+        });
 
-          if (botsBuilt === quantity) {
-            clearInterval(timer);
-            setBuildingProgress(null);
-            setBuildStartTime(null);
-            setTotalBuildQuantity(0);
-            buildTimerRef.current = null;
-          } else {
-            setBuildingProgress((botsBuilt / quantity) * 100);
+        if (statusResponse.ok) {
+          const { buildQueue, bots } = await statusResponse.json();
+          if (buildQueue) {
+            setBuildingProgress(buildQueue.progress);
+            setTotalBuildQuantity(buildQueue.quantity);
+            setBotCounts(bots);  // Use server-provided bot counts
+
+            if (buildQueue.progress >= 100) {
+              clearInterval(pollBuildStatus);
+              setBuildingProgress(null);
+              setTotalBuildQuantity(0);
+            }
           }
-        } catch (error) {
-          console.error('Build interval error:', error);
-          clearInterval(timer);
-          setBuildingProgress(null);
         }
-      }, BUILD_TIME);
+      }, 1000);
 
-      buildTimerRef.current = timer;
+      buildTimerRef.current = pollBuildStatus;
     } catch (error) {
-      console.error('Build error details:', error);
+      console.error('Build error:', error);
       setBuildingProgress(null);
-      setBuildStartTime(null);
       setTotalBuildQuantity(0);
-      if (buildTimerRef.current) {
-        clearInterval(buildTimerRef.current);
-      }
       throw error;
     }
   };

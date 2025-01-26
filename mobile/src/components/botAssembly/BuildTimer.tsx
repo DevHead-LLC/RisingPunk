@@ -20,12 +20,10 @@ export const BuildTimer = React.memo(function BuildTimer({
   const botsBuilt = Math.floor((progress / 100) * totalBuildQuantity);
 
   useEffect(() => {
-    if (!buildStartTime) return;
-    
     const calculateTimeLeft = () => {
-      const now = new Date();
-      const elapsed = now.getTime() - buildStartTime.getTime();
+      const now = Date.now();
       const totalTime = totalBuildQuantity * buildTimePerUnit;
+      const elapsed = (progress / 100) * totalTime;
       const remaining = Math.max(0, totalTime - elapsed);
       setTimeLeft(remaining);
     };
@@ -34,7 +32,7 @@ export const BuildTimer = React.memo(function BuildTimer({
     const timer = setInterval(calculateTimeLeft, 1000);
 
     return () => clearInterval(timer);
-  }, [buildStartTime, totalBuildQuantity, buildTimePerUnit]);
+  }, [totalBuildQuantity, buildTimePerUnit, progress]);
 
   const formattedTime = useMemo(() => {
     const seconds = Math.floor(timeLeft / 1000);

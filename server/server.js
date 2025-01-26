@@ -175,21 +175,31 @@ app.post('/api/bots/build', auth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid quantity' });
     }
 
-    // First, ensure document exists
+    // Find or create bot document
     let bot = await Bot.findOne({ userId: req.user._id });
-    
     if (!bot) {
-      bot = await Bot.create({
+      bot = new Bot({ 
         userId: req.user._id,
         bots: { breacher: 0, guardian: 0, phreak: 0 }
       });
     }
 
-    // Then update the specific bot count
-    bot.bots[type] += quantity;
-    await bot.save();
+    const BUILD_TIME_PER_BOT = 1000; // 1 second per bot (we can adjust this)
+    const totalBuildTime = BUILD_TIME_PER_BOT * quantity;
 
-    res.json(bot.bots);
+    bot.buildQueue = {
+      type,
+      quantity,
+      startedAt: new Date(),
+      completesAt: new Date(Date.now() + totalBuildTime),
+      botsBuilt: 0
+    };
+
+    await bot.save();
+    res.json({ 
+      buildQueue: bot.buildQueue,
+      bots: bot.bots 
+    });
   } catch (error) {
     console.error('Bot build error:', error);
     res.status(500).json({ error: error.message });
@@ -247,17 +257,12 @@ app.post('/api/bots/test-build-queue', auth, async (req, res) => {
 // Add this GET endpoint for build state
 app.get('/api/bots/build-state', auth, async (req, res) => {
   try {
-    console.log('Build state - Looking for user:', req.user._id);
     const bot = await Bot.findOne({ userId: req.user._id });
-    console.log('Build state - Found bot:', bot ? 'Yes' : 'No');
     
     if (!bot?.buildQueue) {
-      console.log('Build state - No build queue found');
       return res.json({ buildQueue: null });
     }
 
-    console.log('Build state - Build queue exists:', bot.buildQueue);
-    // Calculate current progress
     const now = new Date();
     const startedAt = new Date(bot.buildQueue.startedAt);
     const completesAt = new Date(bot.buildQueue.completesAt);
@@ -265,15 +270,22 @@ app.get('/api/bots/build-state', auth, async (req, res) => {
     const elapsedTime = now.getTime() - startedAt.getTime();
     const progress = Math.min((elapsedTime / totalTime) * 100, 100);
 
+    // Calculate how many bots should be built based on progress
+    const expectedBotsBuilt = Math.floor((progress / 100) * bot.buildQueue.quantity);
+    
+    // Update botsBuilt if needed
+    if (expectedBotsBuilt > bot.buildQueue.botsBuilt) {
+      bot.bots[bot.buildQueue.type] += (expectedBotsBuilt - bot.buildQueue.botsBuilt);
+      bot.buildQueue.botsBuilt = expectedBotsBuilt;
+      await bot.save();
+    }
+
     res.json({
       buildQueue: {
-        type: bot.buildQueue.type,
-        quantity: bot.buildQueue.quantity,
-        botsBuilt: bot.buildQueue.botsBuilt,
-        startedAt: bot.buildQueue.startedAt,
-        completesAt: bot.buildQueue.completesAt,
+        ...bot.buildQueue.toObject(),
         progress
-      }
+      },
+      bots: bot.bots
     });
   } catch (error) {
     console.error('Build state check error:', error);

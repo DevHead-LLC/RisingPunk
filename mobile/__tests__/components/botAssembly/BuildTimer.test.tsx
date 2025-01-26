@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { render, waitFor, act } from '@testing-library/react-native';
 import { BuildTimer } from '../../../src/components/botAssembly/BuildTimer';
 import { BotsContext } from '../../../src/context/BotsContext';
 
@@ -21,13 +21,56 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
   </BotsContext.Provider>
 );
 
+const fetchMock = jest.fn()
+  .mockImplementationOnce(() => Promise.resolve({
+    ok: true,
+    json: () => Promise.resolve({
+      buildQueue: {
+        progress: 40,
+        quantity: 5,
+        botsBuilt: 2
+      }
+    })
+  } as Response))
+  .mockImplementationOnce(() => Promise.reject(new Error('Network error')))
+  .mockImplementationOnce(() => Promise.resolve({
+    ok: true,
+    json: () => Promise.resolve({
+      buildQueue: {
+        progress: 60,
+        quantity: 5,
+        botsBuilt: 3
+      }
+    })
+  } as Response));
+
+global.fetch = fetchMock;
+
 describe('BuildTimer', () => {
   beforeEach(() => {
     jest.useFakeTimers();
+    const mockBuildState = {
+      buildQueue: {
+        type: 'breacher',
+        quantity: 5,
+        botsBuilt: 2,
+        startedAt: new Date(Date.now() - 2000),
+        completesAt: new Date(Date.now() + 3000),
+        progress: 40
+      }
+    };
+
+    jest.spyOn(global, 'fetch').mockImplementation(() => 
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(mockBuildState)
+      } as Response)
+    );
   });
 
   afterEach(() => {
     jest.useRealTimers();
+    jest.restoreAllMocks();
   });
 
   const defaultProps = {
@@ -105,5 +148,40 @@ describe('BuildTimer', () => {
     );
     expect(getByText('5/5')).toBeTruthy();
     expect(getByText('0s remaining')).toBeTruthy();
+  });
+
+  it('should display server-reported progress', async () => {
+    const mockBuildState = {
+      buildQueue: {
+        type: 'breacher',
+        quantity: 5,
+        botsBuilt: 2,
+        startedAt: new Date(Date.now() - 2000),
+        completesAt: new Date(Date.now() + 3000),
+        progress: 40
+      }
+    };
+
+    const { getByText } = render(<BuildTimer {...defaultProps} />);
+    await waitFor(() => {
+      expect(getByText('2/5')).toBeTruthy();
+    });
+  });
+
+  it('should handle disconnection and reconnection', async () => {
+    const { getByText } = render(<BuildTimer {...defaultProps} />);
+    
+    await waitFor(() => {
+      expect(getByText('2/5')).toBeTruthy();
+    });
+
+    // Force next polling interval
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
+
+    await waitFor(() => {
+      expect(getByText('3/5')).toBeTruthy();
+    });
   });
 }); 
