@@ -18,6 +18,8 @@ export const LevelSection = React.memo(function LevelSection({
   botCounts,
   onSelectBotType
 }: LevelSectionProps) {
+  const isLocked = level > 1; // Marks 2-4 are locked for now
+
   return (
     <View style={styles.levelSection}>
       <Text style={styles.levelTitle}>MARK {level}</Text>
@@ -27,10 +29,10 @@ export const LevelSection = React.memo(function LevelSection({
             key={`${type}-${level}`}
             type={type}
             level={level}
-            isLocked={level > 1}
-            isSelected={selectedType === type && level === 1}
+            isLocked={isLocked}
+            isSelected={!isLocked && selectedType === type}
             count={botCounts[type]}
-            onPress={() => level === 1 && onSelectBotType(type)}
+            onPress={() => !isLocked && onSelectBotType(type)}
           />
         ))}
       </View>
