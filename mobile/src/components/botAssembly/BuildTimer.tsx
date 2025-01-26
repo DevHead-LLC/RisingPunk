@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
     color: COLORS.text.primary,
     fontSize: SIZING.font.small,
     fontWeight: 'bold',
-    width: 60,
+    width: 100,
   },
   timerText: {
     color: COLORS.text.primary,
