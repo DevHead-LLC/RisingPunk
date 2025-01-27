@@ -5,6 +5,7 @@ import {
   StyleSheet,
   SafeAreaView,
   ScrollView,
+  TouchableOpacity,
 } from 'react-native';
 import { CloseButton } from '../components/common/CloseButton';
 import { DisconnectButton } from '../components/turf/DisconnectButton';
@@ -34,60 +35,60 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
     setProfile({
       username: "Bert Toast",
       level: 1,
-      experience: { current: 1000, nextLevel: 1000 },
+      experience: { current: 0, nextLevel: 1000 },
       armyBonus: { strength: 0, defense: 0, speed: 0, health: 0 }
     });
   }, []);
 
   if (!profile) return <></>;
 
+  const experiencePercentage = (profile.experience.current / profile.experience.nextLevel) * 100;
+
   return (
     <SafeAreaView style={styles.container}>
       <CloseButton onPress={onClose} />
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.profileCard}>
-          {/* User Info */}
-          <Text style={styles.label}>Username</Text>
-          <Text style={styles.value}>{profile.username}</Text>
-
-          {/* Level */}
-          <Text style={styles.label}>Level</Text>
-          <Text style={styles.value}>{profile.level}</Text>
-
-          {/* Experience */}
-          <Text style={styles.label}>Total EXP</Text>
-          <Text style={styles.value}>{profile.experience.current}</Text>
-
-          <Text style={styles.label}>EXP to Next Level</Text>
-          <Text style={styles.value}>{profile.experience.nextLevel}</Text>
-
-          {/* Army Bonuses */}
-          <Text style={styles.sectionTitle}>Army Bonuses</Text>
-          <View style={styles.statsContainer}>
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Strength</Text>
-                <Text style={styles.statValue}>+{profile.armyBonus.strength}</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Defense</Text>
-                <Text style={styles.statValue}>+{profile.armyBonus.defense}</Text>
-              </View>
-            </View>
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Speed</Text>
-                <Text style={styles.statValue}>+{profile.armyBonus.speed}</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Health</Text>
-                <Text style={styles.statValue}>+{profile.armyBonus.health}</Text>
-              </View>
-            </View>
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.header}>
+          <Text style={styles.username}>{profile.username}</Text>
+          <View style={styles.levelContainer}>
+            <Text style={styles.levelLabel}>LEVEL</Text>
+            <Text style={styles.levelValue}>{profile.level}</Text>
           </View>
         </View>
+
+        <View style={styles.experienceCard}>
+          <Text style={styles.sectionTitle}>EXPERIENCE</Text>
+          <View style={styles.experienceDetails}>
+            <View style={styles.expCurrentContainer}>
+              <Text style={styles.expLabel}>TOTAL XP</Text>
+              <Text style={styles.expValue}>0</Text>
+            </View>
+            <View style={styles.expProgressContainer}>
+              <Text style={styles.expLabel}>NEXT LEVEL</Text>
+              <Text style={styles.expProgress}>0 / 1000</Text>
+            </View>
+          </View>
+          <View style={styles.progressContainer}>
+            <View style={[styles.progressBar, { width: `${experiencePercentage}%` }]} />
+          </View>
+        </View>
+
+        <View style={styles.bonusCard}>
+          <Text style={styles.sectionTitle}>ARMY BONUSES</Text>
+          <View style={styles.bonusGrid}>
+            {Object.entries(profile.armyBonus).map(([stat, value]) => (
+              <View key={stat} style={styles.bonusItem}>
+                <Text style={styles.bonusLabel}>{stat.toUpperCase()}</Text>
+                <Text style={styles.bonusValue}>+{value}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <TouchableOpacity style={styles.disconnectButton} onPress={logout}>
+          <Text style={styles.disconnectText}>DISCONNECT</Text>
+        </TouchableOpacity>
       </ScrollView>
-      <DisconnectButton onPress={logout} />
     </SafeAreaView>
   );
 }
@@ -95,74 +96,126 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
-  },
-  header: {
-    padding: 20,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#4a90e2',
-    borderRadius: 20,
-  },
-  backButtonText: {
-    fontSize: 24,
-    color: '#fff',
+    backgroundColor: '#000',
   },
   scrollView: {
     flex: 1,
+    padding: SIZING.spacing.md,
   },
-  scrollContent: {
-    padding: 20,
+  header: {
+    alignItems: 'center',
+    marginVertical: SIZING.spacing.lg,
   },
-  profileCard: {
-    backgroundColor: '#222',
-    borderRadius: 10,
-    padding: 20,
-    marginBottom: 20,
+  username: {
+    color: '#4717F6',
+    fontSize: SIZING.font.h1,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.sm,
   },
-  label: {
-    color: '#2ecc71',
-    fontSize: 16,
-    marginBottom: 4,
+  levelContainer: {
+    alignItems: 'center',
   },
-  value: {
-    color: '#fff',
-    fontSize: 24,
-    marginBottom: 20,
+  levelLabel: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: SIZING.font.small,
   },
-  sectionTitle: {
-    color: '#2ecc71',
-    fontSize: 24,
-    marginBottom: 20,
+  levelValue: {
+    color: '#00FF41',
+    fontSize: SIZING.font.h2,
+    fontWeight: 'bold',
   },
-  statsContainer: {
-    width: '100%',
+  experienceCard: {
+    backgroundColor: 'rgba(26, 77, 51, 0.3)',
+    borderRadius: 8,
+    padding: SIZING.spacing.md,
+    marginBottom: SIZING.spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 65, 0.4)',
   },
-  statsRow: {
+  experienceDetails: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 15,
+    marginBottom: SIZING.spacing.md,
+    marginTop: SIZING.spacing.sm,
   },
-  statItem: {
-    width: '48%',
-    backgroundColor: '#1a1a1a',
+  expCurrentContainer: {
+    alignItems: 'center',
+  },
+  expProgressContainer: {
+    alignItems: 'center',
+  },
+  expLabel: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: SIZING.font.small,
+    marginBottom: SIZING.spacing.xs,
+  },
+  expValue: {
+    color: '#00FF41',
+    fontSize: SIZING.font.h2,
+    fontWeight: 'bold',
+  },
+  expProgress: {
+    color: '#00FF41',
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
+  progressContainer: {
+    height: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#00FF41',
+  },
+  bonusCard: {
+    backgroundColor: 'rgba(26, 77, 51, 0.3)',
     borderRadius: 8,
-    padding: 15,
+    padding: SIZING.spacing.md,
+    marginBottom: SIZING.spacing.lg,
     borderWidth: 1,
-    borderColor: '#2ecc71',
+    borderColor: 'rgba(0, 255, 65, 0.4)',
   },
-  statLabel: {
-    color: '#2ecc71',
-    fontSize: 16,
-    marginBottom: 8,
+  sectionTitle: {
+    color: '#4717F6',
+    fontSize: SIZING.font.h2,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.md,
   },
-  statValue: {
-    color: '#fff',
-    fontSize: 24,
-    textAlign: 'center',
+  bonusGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SIZING.spacing.sm,
+  },
+  bonusItem: {
+    width: '48%',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    borderRadius: 4,
+    padding: SIZING.spacing.md,
+    alignItems: 'center',
+  },
+  bonusLabel: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: SIZING.font.small,
+    marginBottom: SIZING.spacing.xs,
+  },
+  bonusValue: {
+    color: '#9C27B0',
+    fontSize: SIZING.font.h2,
+    fontWeight: 'bold',
+  },
+  disconnectButton: {
+    backgroundColor: 'rgba(255, 75, 75, 0.1)',
+    borderRadius: 4,
+    padding: SIZING.spacing.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 75, 75, 0.4)',
+  },
+  disconnectText: {
+    color: '#FF4B4B',
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
   },
 }); 
