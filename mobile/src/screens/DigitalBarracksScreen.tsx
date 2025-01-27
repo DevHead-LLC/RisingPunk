@@ -17,49 +17,92 @@ type MarkLevel = 1 | 2 | 3 | 4;
 type BotType = 'breacher' | 'guardian' | 'phreak';
 
 const BOT_CATEGORIES = {
-  breacher: { role: 'Infantry', stats: { health: 6, defense: 4, offense: 8, range: 2, speed: 7 } },
-  guardian: { role: 'Cavalry', stats: { health: 8, defense: 7, offense: 6, range: 3, speed: 5 } },
-  phreak: { role: 'Range', stats: { health: 4, defense: 3, offense: 7, range: 8, speed: 4 } }
+  guardian: { // Cavalry
+    role: 'Cavalry',
+    stats: {
+      health: 7,
+      speed: 9,
+      range: 4,
+      offense: 8,
+      defense: 6
+    },
+    advantage: 'Strong vs. Infantry, Weak vs. Ranged'
+  },
+  breacher: { // Infantry
+    role: 'Infantry',
+    stats: {
+      health: 9,
+      speed: 5,
+      range: 5,
+      offense: 7,
+      defense: 8
+    },
+    advantage: 'Strong vs. Ranged, Weak vs. Cavalry'
+  },
+  phreak: { // Ranged
+    role: 'Ranged',
+    stats: {
+      health: 6,
+      speed: 7,
+      range: 9,
+      offense: 6,
+      defense: 5
+    },
+    advantage: 'Strong vs. Cavalry, Weak vs. Infantry'
+  }
 };
 
 export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
   const { botCounts } = useBots();
   const [selectedMark, setSelectedMark] = useState<MarkLevel>(1);
-  const [selectedBot, setSelectedBot] = useState<BotType | null>(null);
 
-  const BotCard = ({ type }: { type: BotType }) => (
-    <TouchableOpacity 
-      style={[
-        styles.botCard,
-        selectedBot === type && styles.selectedBotCard
-      ]}
-      onPress={() => setSelectedBot(type)}
-    >
-      <View style={styles.botHeader}>
-        <Text style={styles.botName}>{type.toUpperCase()}</Text>
-        <Text style={styles.botRole}>{BOT_CATEGORIES[type].role}</Text>
-      </View>
-      
-      <View style={styles.botDetails}>
-        <View style={styles.countSection}>
-          <Text style={styles.countLabel}>Available:</Text>
-          <Text style={styles.countValue}>{botCounts[type]}</Text>
-          <Text style={styles.countLabel}>Deployed: 0</Text>
+  const BotCard = ({ type }: { type: BotType }) => {
+    const hackerLore = {
+      breacher: "IRL: Named after 'breach and clear' tactics used in early penetration testing, where security teams would methodically break through firewall layers.",
+      guardian: "IRL: Inspired by 'packet guardian' programs from the 1990s that network administrators used to monitor and filter suspicious traffic.",
+      phreak: "IRL: Based on 'phone phreakers' from the 1970s who used blue boxes to manipulate telephone systems and make free long-distance calls."
+    };
+
+    return (
+      <View style={styles.botCard}>
+        <View style={styles.botHeader}>
+          <Text style={styles.botName}>{type.toUpperCase()}</Text>
+          <Text style={styles.botRole}>{BOT_CATEGORIES[type].role}</Text>
         </View>
         
-        {selectedBot === type && (
-          <View style={styles.statsGrid}>
-            {Object.entries(BOT_CATEGORIES[type].stats).map(([stat, value]) => (
-              <View key={stat} style={styles.statItem}>
-                <Text style={styles.statLabel}>{stat.toUpperCase()}</Text>
-                <Text style={styles.statValue}>{value}</Text>
-              </View>
-            ))}
+        <View style={styles.botContent}>
+          <View style={styles.countRow}>
+            <Text style={styles.countLabel}>Available:</Text>
+            <Text style={styles.countValue}>{botCounts[type]}</Text>
+            <View style={styles.deployedContainer}>
+              <Text style={styles.countLabel}>Deployed: 0</Text>
+            </View>
           </View>
-        )}
+
+          <View style={styles.infoContainer}>
+            <View style={styles.loreContainer}>
+              <Text style={styles.hackerLore}>{hackerLore[type]}</Text>
+              <Text style={styles.advantageText}>{BOT_CATEGORIES[type].advantage}</Text>
+            </View>
+
+            <View style={styles.statsContainer}>
+              {Object.entries(BOT_CATEGORIES[type].stats).map(([stat, value]) => (
+                <View key={stat} style={styles.statRow}>
+                  <Text style={styles.statLabel}>
+                    {stat === 'range' ? 'ATTACK DISTANCE' :
+                     stat === 'offense' ? 'ATTACK POWER' :
+                     stat === 'defense' ? 'DEFENSE ABILITY' :
+                     stat.toUpperCase()}
+                  </Text>
+                  <Text style={styles.statValue}>{value}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
       </View>
-    </TouchableOpacity>
-  );
+    );
+  };
 
   const ArmyComposition = () => {
     const total = Object.values(botCounts).reduce((a, b) => a + b, 0);
@@ -236,69 +279,89 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   botCard: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 10,
-    padding: 15,
-    width: '100%',
-    marginBottom: 20,
+    backgroundColor: 'rgba(26, 77, 51, 0.3)',
+    borderRadius: 8,
+    padding: SIZING.spacing.sm,
+    marginBottom: SIZING.spacing.md,
     borderWidth: 1,
-    borderColor: '#4a90e2',
-  },
-  selectedBotCard: {
-    backgroundColor: '#4a90e2',
+    borderColor: 'rgba(0, 255, 65, 0.4)',
   },
   botHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: SIZING.spacing.xs,
   },
   botName: {
-    color: '#4a90e2',
-    fontSize: 18,
+    color: '#2196F3',
+    fontSize: SIZING.font.h2,
     fontWeight: 'bold',
   },
   botRole: {
-    color: '#fff',
-    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: SIZING.font.body,
   },
-  botDetails: {
-    borderTopWidth: 1,
-    borderTopColor: '#333',
-    paddingTop: 10,
+  botContent: {
+    gap: SIZING.spacing.xs,
   },
-  countSection: {
+  countRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 255, 65, 0.2)',
+    paddingBottom: SIZING.spacing.xs,
+  },
+  countLabel: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: SIZING.font.body,
+    marginRight: SIZING.spacing.sm,
+  },
+  countValue: {
+    color: '#00FF41',
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+    marginRight: SIZING.spacing.lg,
+  },
+  deployedContainer: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  infoContainer: {
+    flexDirection: 'row',
+    gap: SIZING.spacing.sm,
+  },
+  loreContainer: {
+    flex: 3,
+    justifyContent: 'center',
+  },
+  hackerLore: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: SIZING.font.small,
+    fontStyle: 'italic',
+    borderLeftWidth: 2,
+    borderLeftColor: '#4717F6',
+    paddingLeft: SIZING.spacing.xs,
+    marginBottom: SIZING.spacing.lg,
+  },
+  statsContainer: {
+    flex: 2,
+    gap: SIZING.spacing.sm,
+  },
+  statRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
-  },
-  countLabel: {
-    color: '#fff',
-    fontSize: 14,
-  },
-  countValue: {
-    color: '#00ff00',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: 10,
-  },
-  statItem: {
-    flexDirection: 'column',
-    alignItems: 'center',
   },
   statLabel: {
-    color: '#fff',
-    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: SIZING.font.small,
+    flex: 1,
   },
   statValue: {
-    color: '#00ff00',
-    fontSize: 18,
+    color: '#9C27B0',
+    fontSize: SIZING.font.body,
     fontWeight: 'bold',
+    marginLeft: SIZING.spacing.sm,
   },
   lockedText: {
     color: '#fff',
@@ -338,5 +401,11 @@ const styles = StyleSheet.create({
   legendText: {
     color: 'rgba(255, 255, 255, 0.6)',
     fontSize: SIZING.font.small,
+  },
+  advantageText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: SIZING.font.small,
+    fontStyle: 'italic',
+    paddingLeft: SIZING.spacing.xs,
   },
 }); 
