@@ -22,13 +22,27 @@ const GridCell = memo(({ x, y, content, onPress }: {
   content: EntityInfo | null;
   onPress: () => void;
 }) => (
-  <TouchableOpacity style={styles.cell} onPress={onPress}>
+  <TouchableOpacity 
+    style={[
+      styles.cell,
+      {
+        borderColor: 'rgba(0, 255, 65, 0.05)',
+        backgroundColor: (x + y) % 2 === 0 
+          ? 'rgba(26, 77, 51, 0.05)' 
+          : 'rgba(26, 77, 51, 0.02)'
+      }
+    ]} 
+    onPress={onPress}
+  >
     {content && (
-      <Icon 
-        name={content.type === 'player' ? 'account-circle' : 'desktop-tower-monitor'} 
-        size={30} 
-        color={content.type === 'player' ? '#00ff00' : '#ff0000'}
-      />
+      <View style={styles.entityContainer}>
+        <Icon 
+          name={content.type === 'player' ? 'account-circle' : 'desktop-tower-monitor'} 
+          size={40} 
+          color={content.type === 'player' ? '#00ff41' : '#ff4141'}
+        />
+        <View style={styles.entityPulse} />
+      </View>
     )}
   </TouchableOpacity>
 ));
@@ -139,6 +153,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   grid: {
+    backgroundColor: '#000',
     padding: 20,
   },
   row: {
@@ -148,10 +163,22 @@ const styles = StyleSheet.create({
     width: CELL_SIZE,
     height: CELL_SIZE,
     borderWidth: 1,
-    borderColor: '#2c3e50',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0a0a0a',
+  },
+  entityContainer: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  entityPulse: {
+    position: 'absolute',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(0, 255, 65, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 65, 0.2)',
   },
   backButton: {
     position: 'absolute',
@@ -174,28 +201,27 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 20,
     left: 20,
-    backgroundColor: '#1a1a1a',
-    padding: 10,
-    borderRadius: 5,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    padding: 15,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#4a90e2',
+    borderColor: '#00ff41',
     zIndex: 1,
-    minWidth: 200,
   },
   coordsText: {
-    color: '#fff',
-    fontSize: 16,
-    marginBottom: 4,
+    color: '#00ff41',
+    fontSize: 14,
+    fontFamily: 'monospace',
   },
   entityName: {
-    color: '#4a90e2',
+    color: '#00ff41',
     fontSize: 16,
     fontWeight: 'bold',
-    marginTop: 4,
+    marginTop: 8,
   },
   entityDetails: {
-    color: '#808080',
-    fontSize: 14,
-    marginTop: 2,
+    color: 'rgba(0, 255, 65, 0.7)',
+    fontSize: 12,
+    marginTop: 4,
   },
 }); 
