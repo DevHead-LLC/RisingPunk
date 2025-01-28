@@ -10,107 +10,193 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { CloseButton } from '../components/common/CloseButton';
 
-const GRID_SIZE = 20;
+const GRID_SIZE = 50;
 const CELL_SIZE = 60;
 const TOTAL_SIZE = GRID_SIZE * CELL_SIZE;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
-const GridCell = memo(({ x, y, content, onPress }: { 
-  x: number; 
-  y: number; 
-  content: EntityInfo | null;
-  onPress: () => void;
-}) => (
-  <TouchableOpacity 
-    style={[
-      styles.cell,
-      {
-        borderColor: 'rgba(0, 255, 65, 0.05)',
-        backgroundColor: (x + y) % 2 === 0 
-          ? 'rgba(26, 77, 51, 0.05)' 
-          : 'rgba(26, 77, 51, 0.02)'
-      }
-    ]} 
-    onPress={onPress}
-  >
-    {content && (
-      <View style={styles.entityContainer}>
-        <Icon 
-          name={content.type === 'player' ? 'account-circle' : 'desktop-tower-monitor'} 
-          size={40} 
-          color={content.type === 'player' ? '#00ff41' : '#ff4141'}
-        />
-        <View style={styles.entityPulse} />
-      </View>
-    )}
-  </TouchableOpacity>
-));
+type TerrainType = 'plain' | 'mountain' | 'water' | 'forest';
+type EntityType = 'empty' | 'player' | 'npc' | 'house';
 
-type EntityInfo = {
-  type: 'player' | 'npc' | null;
-  name: string;
-  details: string;
+const FRIENDLY_NAMES = [
+  'Alpha', 'Beta', 'Gamma', 'Delta', 'Echo', 'Foxtrot',
+  'Helix', 'Iris', 'Jupiter', 'Kilo', 'Lima', 'Matrix',
+  'Nova', 'Omega', 'Pulse', 'Quantum', 'Razor', 'Sigma'
+];
+
+const HOSTILE_NAMES = [
+  'Cipher', 'Shadow', 'Wraith', 'Phantom', 'Specter', 'Ghost',
+  'Virus', 'Trojan', 'Malware', 'Breach', 'Havoc', 'Chaos',
+  'Doom', 'Eclipse', 'Fang', 'Glitch', 'Hex', 'Inferno'
+];
+
+type CellData = {
+  terrain: TerrainType;
+  entity: EntityType;
+  owner?: 'player' | 'enemy';
+  name?: string;
 };
 
-export function HackMapScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
-  const [playerPos] = useState({ x: 10, y: 10 });
-  const [npcs] = useState([
-    { x: 8, y: 8, name: 'Terminal #127', details: 'Basic security terminal' },
-    { x: 12, y: 12, name: 'Node #445', details: 'High-security node' },
-    { x: 15, y: 7, name: 'Storage #892', details: 'Data storage unit' },
-  ]);
-  const [selectedInfo, setSelectedInfo] = useState<{
-    coords: string;
-    entity: EntityInfo | null;
-  } | null>(null);
-  
-  const scrollViewRef = useRef<ScrollView>(null);
+type GridData = CellData[][];
 
-  const getCellContent = (x: number, y: number): EntityInfo | null => {
-    if (playerPos.x === x && playerPos.y === y) {
-      return {
-        type: 'player',
-        name: 'You',
-        details: 'Your current position in the network',
-      };
-    }
-    
-    const npc = npcs.find(n => n.x === x && n.y === y);
-    if (npc) {
-      return {
-        type: 'npc',
-        name: npc.name,
-        details: npc.details,
-      };
-    }
-    
-    return null;
+const generateInitialGrid = (): GridData => {
+  const grid = Array(GRID_SIZE).fill(null).map(() =>
+    Array(GRID_SIZE).fill(null).map((): CellData => ({
+      terrain: Math.random() < 0.7 ? 'plain' : 
+               Math.random() < 0.5 ? 'forest' :
+               Math.random() < 0.5 ? 'mountain' : 'water',
+      entity: 'empty'
+    }))
+  );
+
+  // Add player at 0,0
+  grid[0][0] = {
+    ...grid[0][0],
+    terrain: 'plain', // Ensure player starts on plain terrain
+    entity: 'player',
+    owner: 'player',
+    name: 'YOU'
   };
 
-  const handleCellPress = (x: number, y: number) => {
-    const entity = getCellContent(x, y);
-    setSelectedInfo({
-      coords: `${x}, ${y}`,
-      entity,
-    });
+  const addEntities = (entityType: 'player' | 'npc', owner: 'player' | 'enemy', count: number) => {
+    const names = owner === 'player' ? FRIENDLY_NAMES : HOSTILE_NAMES;
+    let placed = 0;
+    while (placed < count) {
+      const x = Math.floor(Math.random() * GRID_SIZE);
+      const y = Math.floor(Math.random() * GRID_SIZE);
+      
+      // Skip if cell is already occupied or is the player's starting position
+      if (grid[y][x].entity !== 'empty' || (x === 0 && y === 0)) {
+        continue;
+      }
+
+      const name = names[Math.floor(Math.random() * names.length)];
+      grid[y][x] = {
+        ...grid[y][x],
+        entity: entityType,
+        owner: owner,
+        name: name
+      };
+      placed++;
+    }
+  };
+
+  // Add more entities
+  addEntities('player', 'player', 8);  // 8 friendly NPCs
+  addEntities('npc', 'enemy', 12);     // 12 hostile NPCs
+
+  return grid;
+};
+
+const CellContent = memo(({ data }: { data: CellData }) => {
+  return (
+    <View style={[styles.cellContent, getTerrainStyle(data.terrain)]}>
+      {getTerrainIcon(data.terrain)}
+      {data.entity !== 'empty' && (
+        <View style={styles.entityContainer}>
+          <Text style={[
+            styles.terrainSymbol,
+            data.name === 'YOU' ? styles.playerSymbol : 
+            data.owner === 'player' ? styles.friendlySymbol : 
+            styles.hostileSymbol
+          ]}>
+            {data.name === 'YOU' ? '⚡' : data.owner === 'player' ? '◉' : '⊗'}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+});
+
+export function HackMapScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
+  const [selectedCell, setSelectedCell] = useState<{x: number, y: number, info: CellData} | null>(null);
+  const [gridData] = useState<GridData>(generateInitialGrid);
+  const [isLegendExpanded, setIsLegendExpanded] = useState(true);
+  const scrollViewRef = useRef<ScrollView>(null);
+  
+  const handleCellPress = (x: number, y: number, cellData: CellData) => {
+    setSelectedCell({x, y, info: cellData});
+  };
+
+  const renderLegend = () => (
+    <View style={[styles.legend, !isLegendExpanded && styles.legendCollapsed]}>
+      <TouchableOpacity 
+        style={styles.legendTitleContainer}
+        onPress={() => setIsLegendExpanded(!isLegendExpanded)}
+      >
+        <Text style={styles.legendTitle}>
+          {isLegendExpanded ? 'MAP LEGEND [-]' : 'LEGEND [+]'}
+        </Text>
+      </TouchableOpacity>
+      {isLegendExpanded && (
+        <View style={styles.legendItems}>
+          <View style={styles.legendItem}>
+            <Text style={[styles.terrainSymbol, styles.forestSymbol]}>♣</Text>
+            <Text style={styles.legendText}>Forest</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <Text style={[styles.terrainSymbol, styles.waterSymbol]}>~</Text>
+            <Text style={styles.legendText}>Water</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <Text style={[styles.terrainSymbol, styles.mountainSymbol]}>▲</Text>
+            <Text style={styles.legendText}>Mountain</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <Text style={[styles.terrainSymbol, styles.friendlySymbol]}>◉</Text>
+            <Text style={styles.legendText}>Friendly</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <Text style={[styles.terrainSymbol, styles.hostileSymbol]}>⊗</Text>
+            <Text style={styles.legendText}>Hostile</Text>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+
+  const renderInfoPanel = () => {
+    if (!selectedCell) return null;
+    
+    return (
+      <View style={styles.infoPanel}>
+        <TouchableOpacity 
+          style={styles.infoPanelClose}
+          onPress={() => setSelectedCell(null)}
+        >
+          <Text style={styles.closeSymbol}>×</Text>
+        </TouchableOpacity>
+        <Text style={styles.coordsText}>
+          GRID: ({selectedCell.x}, {selectedCell.y})
+        </Text>
+        <Text style={styles.terrainText}>
+          TERRAIN: {selectedCell.info.terrain.toUpperCase()}
+        </Text>
+        {selectedCell.info.entity !== 'empty' && (
+          <>
+            <Text style={styles.entityText}>
+              ENTITY: {selectedCell.info.name || 'UNKNOWN'}
+            </Text>
+            <Text style={[
+              styles.statusText,
+              selectedCell.info.owner === 'player' ? styles.friendlyText : styles.hostileText
+            ]}>
+              STATUS: {selectedCell.info.owner === 'player' ? 'FRIENDLY' : 'HOSTILE'}
+            </Text>
+          </>
+        )}
+      </View>
+    );
   };
 
   return (
     <View style={styles.container}>
       <CloseButton onPress={onClose} />
       
-      {selectedInfo && (
-        <View style={styles.coordsDisplay}>
-          <Text style={styles.coordsText}>Location: {selectedInfo.coords}</Text>
-          {selectedInfo.entity && (
-            <>
-              <Text style={styles.entityName}>{selectedInfo.entity.name}</Text>
-              <Text style={styles.entityDetails}>{selectedInfo.entity.details}</Text>
-            </>
-          )}
-        </View>
-      )}
+      {renderLegend()}
+      
+      {renderInfoPanel()}
 
       <ScrollView
         ref={scrollViewRef}
@@ -125,16 +211,33 @@ export function HackMapScreen({ onClose }: { onClose: () => void }): React.JSX.E
         }}
       >
         <View style={styles.grid}>
-          {Array.from({ length: GRID_SIZE }).map((_, y) => (
+          {gridData.map((row, y) => (
             <View key={y} style={styles.row}>
-              {Array.from({ length: GRID_SIZE }).map((_, x) => (
-                <GridCell
+              {row.map((cell, x) => (
+                <TouchableOpacity
                   key={`${x}-${y}`}
-                  x={x}
-                  y={y}
-                  content={getCellContent(x, y)}
-                  onPress={() => handleCellPress(x, y)}
-                />
+                  style={[
+                    styles.cell,
+                    selectedCell?.x === x && selectedCell?.y === y && styles.selectedCell
+                  ]}
+                  onPress={() => handleCellPress(x, y, cell)}
+                >
+                  <View style={[styles.cellContent, getTerrainStyle(cell.terrain)]}>
+                    {getTerrainIcon(cell.terrain)}
+                    {cell.entity !== 'empty' && (
+                      <View style={styles.entityContainer}>
+                        <Text style={[
+                          styles.terrainSymbol,
+                          cell.name === 'YOU' ? styles.playerSymbol : 
+                          cell.owner === 'player' ? styles.friendlySymbol : 
+                          styles.hostileSymbol
+                        ]}>
+                          {cell.name === 'YOU' ? '⚡' : cell.owner === 'player' ? '◉' : '⊗'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
               ))}
             </View>
           ))}
@@ -144,17 +247,39 @@ export function HackMapScreen({ onClose }: { onClose: () => void }): React.JSX.E
   );
 }
 
+const getTerrainIcon = (terrain: TerrainType) => {
+  switch (terrain) {
+    case 'water':
+      return <Text style={[styles.terrainSymbol, styles.waterSymbol]}>~</Text>;
+    case 'mountain':
+      return <Text style={[styles.terrainSymbol, styles.mountainSymbol]}>▲</Text>;
+    case 'forest':
+      return <Text style={[styles.terrainSymbol, styles.forestSymbol]}>♣</Text>;
+    default:
+      return null;
+  }
+};
+
+const getTerrainStyle = (terrain: TerrainType) => {
+  switch (terrain) {
+    case 'water':
+      return styles.waterTerrain;
+    case 'mountain':
+      return styles.mountainTerrain;
+    case 'forest':
+      return styles.forestTerrain;
+    default:
+      return styles.plainTerrain;
+  }
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
   },
-  scrollContainer: {
-    flexGrow: 1,
-  },
   grid: {
-    backgroundColor: '#000',
-    padding: 20,
+    backgroundColor: 'rgba(26, 77, 51, 0.1)',
   },
   row: {
     flexDirection: 'row',
@@ -163,22 +288,36 @@ const styles = StyleSheet.create({
     width: CELL_SIZE,
     height: CELL_SIZE,
     borderWidth: 1,
+    borderColor: 'rgba(0, 255, 65, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(26, 77, 51, 0.02)',
   },
-  entityContainer: {
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  entityPulse: {
-    position: 'absolute',
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+  selectedCell: {
     backgroundColor: 'rgba(0, 255, 65, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 255, 65, 0.2)',
+    borderColor: 'rgba(0, 255, 65, 0.3)',
+  },
+  cellContent: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  plainTerrain: {
+    backgroundColor: 'rgba(26, 77, 51, 0.05)',
+    borderColor: 'rgba(0, 255, 65, 0.1)',
+  },
+  waterTerrain: {
+    backgroundColor: 'rgba(33, 150, 243, 0.1)',
+    borderColor: 'rgba(33, 150, 243, 0.2)',
+  },
+  mountainTerrain: {
+    backgroundColor: 'rgba(158, 158, 158, 0.1)',
+    borderColor: 'rgba(158, 158, 158, 0.2)',
+  },
+  forestTerrain: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderColor: 'rgba(76, 175, 80, 0.2)',
   },
   backButton: {
     position: 'absolute',
@@ -223,5 +362,130 @@ const styles = StyleSheet.create({
     color: 'rgba(0, 255, 65, 0.7)',
     fontSize: 12,
     marginTop: 4,
+  },
+  entityContainer: {
+    position: 'absolute',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    height: '100%',
+  },
+  playerEntity: {
+    backgroundColor: 'rgba(0, 255, 65, 0.1)',
+  },
+  enemyEntity: {
+    backgroundColor: 'rgba(255, 65, 65, 0.1)',
+  },
+  infoPanel: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -100 }, { translateY: -50 }],
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    padding: 15,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#00ff41',
+    zIndex: 2,
+    minWidth: 200,
+    paddingTop: 30,
+  },
+  terrainText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 14,
+    marginBottom: 5,
+  },
+  entityText: {
+    color: '#00ff41',
+    fontSize: 14,
+  },
+  legend: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    padding: 15,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#00ff41',
+    zIndex: 2,
+  },
+  legendCollapsed: {
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    padding: 10,
+  },
+  legendTitle: {
+    color: '#00ff41',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  legendItems: {
+    gap: 8,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  legendText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12,
+  },
+  statusText: {
+    fontSize: 14,
+    marginTop: 5,
+  },
+  friendlyText: {
+    color: '#00ff41',
+  },
+  hostileText: {
+    color: '#ff4141',
+  },
+  infoPanelClose: {
+    position: 'absolute',
+    top: 5,
+    right: 10,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 3,
+  },
+  legendTitleContainer: {
+    width: '100%',
+    padding: 5,
+  },
+  terrainSymbol: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  waterSymbol: {
+    color: 'rgba(33, 150, 243, 0.8)',
+  },
+  mountainSymbol: {
+    color: 'rgba(158, 158, 158, 0.8)',
+  },
+  forestSymbol: {
+    color: 'rgba(76, 175, 80, 0.8)',
+  },
+  friendlySymbol: {
+    color: '#00ff41',
+  },
+  hostileSymbol: {
+    color: '#ff4141',
+  },
+  closeSymbol: {
+    color: '#00ff41',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  entitySymbol: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  playerSymbol: {
+    color: '#00ffff',
+    fontSize: 24,
   },
 }); 
