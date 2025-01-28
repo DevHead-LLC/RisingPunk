@@ -1,15 +1,20 @@
-import React, {memo, useState} from 'react';
+import React, {memo, useState, useRef} from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { CloseButton } from '../components/common/CloseButton';
 
 const GRID_SIZE = 20;
 const CELL_SIZE = 60;
+const TOTAL_SIZE = GRID_SIZE * CELL_SIZE;
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 const GridCell = memo(({ x, y, content, onPress }: { 
   x: number; 
@@ -45,6 +50,8 @@ export function HackMapScreen({ onClose }: { onClose: () => void }): React.JSX.E
     coords: string;
     entity: EntityInfo | null;
   } | null>(null);
+  
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const getCellContent = (x: number, y: number): EntityInfo | null => {
     if (playerPos.x === x && playerPos.y === y) {
@@ -77,9 +84,7 @@ export function HackMapScreen({ onClose }: { onClose: () => void }): React.JSX.E
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.backButton} onPress={onClose}>
-        <Text style={styles.backButtonText}>×</Text>
-      </TouchableOpacity>
+      <CloseButton onPress={onClose} />
       
       {selectedInfo && (
         <View style={styles.coordsDisplay}>
@@ -93,31 +98,33 @@ export function HackMapScreen({ onClose }: { onClose: () => void }): React.JSX.E
         </View>
       )}
 
-      <ScrollView 
-        nestedScrollEnabled={true}
+      <ScrollView
+        ref={scrollViewRef}
+        horizontal={true}
+        directionalLockEnabled={false}
         showsHorizontalScrollIndicator={false}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        contentContainerStyle={{
+          width: TOTAL_SIZE,
+          height: TOTAL_SIZE,
+        }}
       >
-        <ScrollView 
-          horizontal={true}
-          showsHorizontalScrollIndicator={false}
-        >
-          <View style={styles.grid}>
-            {Array.from({ length: GRID_SIZE }).map((_, y) => (
-              <View key={y} style={styles.row}>
-                {Array.from({ length: GRID_SIZE }).map((_, x) => (
-                  <GridCell 
-                    key={`${x}-${y}`}
-                    x={x}
-                    y={y}
-                    content={getCellContent(x, y)}
-                    onPress={() => handleCellPress(x, y)}
-                  />
-                ))}
-              </View>
-            ))}
-          </View>
-        </ScrollView>
+        <View style={styles.grid}>
+          {Array.from({ length: GRID_SIZE }).map((_, y) => (
+            <View key={y} style={styles.row}>
+              {Array.from({ length: GRID_SIZE }).map((_, x) => (
+                <GridCell
+                  key={`${x}-${y}`}
+                  x={x}
+                  y={y}
+                  content={getCellContent(x, y)}
+                  onPress={() => handleCellPress(x, y)}
+                />
+              ))}
+            </View>
+          ))}
+        </View>
       </ScrollView>
     </View>
   );
