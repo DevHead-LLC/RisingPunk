@@ -41,24 +41,77 @@ type CellData = {
 type GridData = CellData[][];
 
 const generateInitialGrid = (): GridData => {
+  // Start with all plains
   const grid = Array(GRID_SIZE).fill(null).map(() =>
     Array(GRID_SIZE).fill(null).map((): CellData => ({
-      terrain: Math.random() < 0.7 ? 'plain' : 
-               Math.random() < 0.5 ? 'forest' :
-               Math.random() < 0.5 ? 'mountain' : 'water',
+      terrain: 'plain',
       entity: 'empty'
     }))
   );
 
+  // Generate forest clusters
+  for (let i = 0; i < 5; i++) {
+    const centerX = Math.floor(Math.random() * GRID_SIZE);
+    const centerY = Math.floor(Math.random() * GRID_SIZE);
+    const size = 3 + Math.floor(Math.random() * 4);
+
+    for (let dy = -size; dy <= size; dy++) {
+      for (let dx = -size; dx <= size; dx++) {
+        const x = centerX + dx;
+        const y = centerY + dy;
+        if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
+          if (Math.random() < 0.7 && (dx * dx + dy * dy <= size * size)) {
+            grid[y][x].terrain = 'forest';
+          }
+        }
+      }
+    }
+  }
+
+  // Generate mountain ranges
+  for (let i = 0; i < 3; i++) {
+    let x = Math.floor(Math.random() * GRID_SIZE);
+    let y = Math.floor(Math.random() * GRID_SIZE);
+    const length = 5 + Math.floor(Math.random() * 8);
+
+    for (let j = 0; j < length; j++) {
+      if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
+        grid[y][x].terrain = 'mountain';
+        // Add some random adjacent mountains
+        if (Math.random() < 0.4) {
+          const adjY = y + (Math.random() < 0.5 ? 1 : -1);
+          if (adjY >= 0 && adjY < GRID_SIZE) grid[adjY][x].terrain = 'mountain';
+        }
+      }
+      // Move in a general direction
+      x += Math.floor(Math.random() * 3) - 1;
+      y += Math.floor(Math.random() * 3) - 1;
+    }
+  }
+
+  // Generate rivers
+  for (let i = 0; i < 2; i++) {
+    let x = Math.floor(Math.random() * GRID_SIZE);
+    let y = 0;
+    while (y < GRID_SIZE) {
+      if (x >= 0 && x < GRID_SIZE) {
+        grid[y][x].terrain = 'water';
+      }
+      x += Math.floor(Math.random() * 3) - 1; // Meander left or right
+      x = Math.max(0, Math.min(x, GRID_SIZE - 1)); // Keep within bounds
+      y++;
+    }
+  }
+
   // Add player at 0,0
   grid[0][0] = {
-    ...grid[0][0],
-    terrain: 'plain', // Ensure player starts on plain terrain
+    terrain: 'plain',
     entity: 'player',
     owner: 'player',
     name: 'YOU'
   };
 
+  // Add other entities
   const addEntities = (entityType: 'player' | 'npc', owner: 'player' | 'enemy', count: number) => {
     const names = owner === 'player' ? FRIENDLY_NAMES : HOSTILE_NAMES;
     let placed = 0;
@@ -66,7 +119,6 @@ const generateInitialGrid = (): GridData => {
       const x = Math.floor(Math.random() * GRID_SIZE);
       const y = Math.floor(Math.random() * GRID_SIZE);
       
-      // Skip if cell is already occupied or is the player's starting position
       if (grid[y][x].entity !== 'empty' || (x === 0 && y === 0)) {
         continue;
       }
@@ -82,9 +134,8 @@ const generateInitialGrid = (): GridData => {
     }
   };
 
-  // Add more entities
-  addEntities('player', 'player', 8);  // 8 friendly NPCs
-  addEntities('npc', 'enemy', 12);     // 12 hostile NPCs
+  addEntities('player', 'player', 8);
+  addEntities('npc', 'enemy', 12);
 
   return grid;
 };
