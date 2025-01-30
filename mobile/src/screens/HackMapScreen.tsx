@@ -163,7 +163,7 @@ const CellContent = memo(({ data }: { data: CellData }) => {
 export function HackMapScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
   const [selectedCell, setSelectedCell] = useState<{x: number, y: number, info: CellData} | null>(null);
   const [gridData] = useState<GridData>(generateInitialGrid);
-  const [isLegendExpanded, setIsLegendExpanded] = useState(true);
+  const [isLegendExpanded, setIsLegendExpanded] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   
   const handleCellPress = (x: number, y: number, cellData: CellData) => {
