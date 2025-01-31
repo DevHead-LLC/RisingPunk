@@ -10,9 +10,10 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { CloseButton } from '../components/common/CloseButton';
 
-const GRID_SIZE = 50;
+const GRID_SIZE = 25;
 const CELL_SIZE = 60;
 const TOTAL_SIZE = GRID_SIZE * CELL_SIZE;
+const MARGIN_SIZE = 80;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -255,44 +256,48 @@ export function HackMapScreen({ onClose }: { onClose: () => void }): React.JSX.E
         directionalLockEnabled={false}
         showsHorizontalScrollIndicator={false}
         showsVerticalScrollIndicator={false}
-        scrollEventThrottle={16}
-        contentContainerStyle={{
-          width: TOTAL_SIZE,
-          height: TOTAL_SIZE,
-        }}
+        contentContainerStyle={styles.scrollContainer}
       >
-        <View style={styles.grid}>
-          {gridData.map((row, y) => (
-            <View key={y} style={styles.row}>
-              {row.map((cell, x) => (
-                <TouchableOpacity
-                  key={`${x}-${y}`}
-                  style={[
-                    styles.cell,
-                    selectedCell?.x === x && selectedCell?.y === y && styles.selectedCell
-                  ]}
-                  onPress={() => handleCellPress(x, y, cell)}
-                >
-                  <View style={[styles.cellContent, getTerrainStyle(cell.terrain)]}>
-                    {getTerrainIcon(cell.terrain)}
-                    {cell.entity !== 'empty' && (
-                      <View style={styles.entityContainer}>
-                        <Text style={[
-                          styles.terrainSymbol,
-                          cell.name === 'YOU' ? styles.playerSymbol : 
-                          cell.owner === 'player' ? styles.friendlySymbol : 
-                          styles.hostileSymbol
-                        ]}>
-                          {cell.name === 'YOU' ? '⚡' : cell.owner === 'player' ? '◉' : '⊗'}
-                        </Text>
+        <ScrollView
+          directionalLockEnabled={false}
+          showsHorizontalScrollIndicator={false}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.marginWrapper}>
+            <View style={styles.gridArea}>
+              {gridData.map((row, y) => (
+                <View key={y} style={styles.row}>
+                  {row.map((cell, x) => (
+                    <TouchableOpacity
+                      key={`${x}-${y}`}
+                      style={[
+                        styles.cell,
+                        selectedCell?.x === x && selectedCell?.y === y && styles.selectedCell
+                      ]}
+                      onPress={() => handleCellPress(x, y, cell)}
+                    >
+                      <View style={[styles.cellContent, getTerrainStyle(cell.terrain)]}>
+                        {getTerrainIcon(cell.terrain)}
+                        {cell.entity !== 'empty' && (
+                          <View style={styles.entityContainer}>
+                            <Text style={[
+                              styles.terrainSymbol,
+                              cell.name === 'YOU' ? styles.playerSymbol : 
+                              cell.owner === 'player' ? styles.friendlySymbol : 
+                              styles.hostileSymbol
+                            ]}>
+                              {cell.name === 'YOU' ? '⚡' : cell.owner === 'player' ? '◉' : '⊗'}
+                            </Text>
+                          </View>
+                        )}
                       </View>
-                    )}
-                  </View>
-                </TouchableOpacity>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               ))}
             </View>
-          ))}
-        </View>
+          </View>
+        </ScrollView>
       </ScrollView>
     </View>
   );
@@ -538,5 +543,21 @@ const styles = StyleSheet.create({
   playerSymbol: {
     color: '#00ffff',
     fontSize: 24,
+  },
+  marginWrapper: {
+    width: TOTAL_SIZE + (MARGIN_SIZE * 2),
+    height: TOTAL_SIZE + (MARGIN_SIZE * 2),
+    backgroundColor: 'rgba(139, 0, 0, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gridArea: {
+    width: TOTAL_SIZE,
+    height: TOTAL_SIZE,
+    backgroundColor: '#000',
+  },
+  scrollContainer: {
+    width: TOTAL_SIZE + (MARGIN_SIZE * 2),    // Exact width of grid + margins
+    height: TOTAL_SIZE + (MARGIN_SIZE * 2),   // Exact height of grid + margins
   },
 }); 
