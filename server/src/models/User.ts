@@ -1,10 +1,23 @@
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
+import mongoose, { Schema, Document } from 'mongoose';
+import bcrypt from 'bcryptjs';
 
 // Add this line for debugging
 console.log('Creating User model in database:', mongoose.connection.name);
 
-const userSchema = new mongoose.Schema({
+export interface IUser extends Document {
+  email: string;
+  handle: string;
+  hashedAccessKey: string;
+  level: number;
+  balance: {
+    total: number;
+    ratePerSecond: number;
+    lastUpdated: Date;
+  };
+  verifyAccessKey(accessKey: string): Promise<boolean>;
+}
+
+const userSchema = new Schema({
   email: {
     type: String,
     required: true,
@@ -71,7 +84,7 @@ const userSchema = new mongoose.Schema({
 });
 
 // Add password hashing middleware
-userSchema.pre('save', async function(next) {
+userSchema.pre('save', async function(this: IUser, next: Function) {
   if (this.isModified('hashedAccessKey')) {
     const salt = await bcrypt.genSalt(12);
     this.hashedAccessKey = await bcrypt.hash(this.hashedAccessKey, salt);
@@ -80,8 +93,8 @@ userSchema.pre('save', async function(next) {
 });
 
 // Add method to verify password
-userSchema.methods.verifyAccessKey = async function(accessKey) {
+userSchema.methods.verifyAccessKey = async function(accessKey: string): Promise<boolean> {
   return bcrypt.compare(accessKey, this.hashedAccessKey);
 };
 
-module.exports = mongoose.model('User', userSchema); 
+export const User = mongoose.model<IUser>('User', userSchema); 
