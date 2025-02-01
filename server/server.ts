@@ -7,10 +7,20 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const User = require('./models/User');
-const authRoutes = require('./routes/auth');
-const auth = require('./middleware/auth');
-const Bot = require('./models/Bot');
+import { User } from './src/models/User';
+import authRoutes from './src/routes/auth';
+import auth from './src/middleware/auth';
+const Bot = require('./src/models/Bot');
+import { Request, Response, NextFunction } from 'express';
+import { Error } from 'mongoose';
+
+declare global {
+  namespace Express {
+    interface Request {
+      user: { _id: string }
+    }
+  }
+} 
 
 // Debug .env loading
 const envPath = path.resolve(process.cwd(), '.env');
@@ -44,18 +54,18 @@ mongoose.connect(process.env.MONGODB_URI, {
   console.log('📦 Database:', mongoose.connection.db.databaseName);
   console.log('🔗 Connected to:', mongoose.connection.host);
 })
-.catch(err => {
+.catch((err: Error) => {
   console.error('❌ MongoDB connection error:', err);
   process.exit(1);
 });
 
 // Basic test route
-app.get('/api/test', (req, res) => {
+app.get('/api/test', (req: Request, res: Response) => {
   res.json({ message: 'Server is running' });
 });
 
 // Add test route with database status
-app.get('/api/status', async (req, res) => {
+app.get('/api/status', async (req: Request, res: Response) => {
   try {
     const dbState = mongoose.connection.readyState === 1;
     const status = {
@@ -65,14 +75,14 @@ app.get('/api/status', async (req, res) => {
     };
     console.log('📊 Status check:', status);
     res.json(status);
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Status check error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
 // Update or add this route
-app.get('/api/profile', async (req, res) => {
+app.get('/api/profile', async (req: Request, res: Response) => {
   try {
     let user = await User.findOne({ username: 'Bert Toast' });
     
@@ -87,7 +97,7 @@ app.get('/api/profile', async (req, res) => {
     }
     
     res.json(user);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Profile fetch error:', error);
     res.status(500).json({ error: 'Server error' });
   }
@@ -96,7 +106,7 @@ app.get('/api/profile', async (req, res) => {
 app.use('/api/auth', authRoutes);
 
 // Add this route to verify database connection
-app.get('/api/dbcheck', async (req, res) => {
+app.get('/api/dbcheck', async (req: Request, res: Response) => {
   try {
     const dbName = mongoose.connection.db.databaseName;
     const collections = await mongoose.connection.db.listCollections().toArray();
@@ -104,25 +114,26 @@ app.get('/api/dbcheck', async (req, res) => {
     
     res.json({
       database: dbName,
-      collections: collections.map(c => c.name),
+      collections: collections.map((c: any) => c.name),
       userCount: users
     });
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Add balance endpoint to existing routes
-app.get('/api/balance', auth, async (req, res) => {
+// Update the balance endpoint
+app.get('/api/balance', auth, async (req: Request, res: Response) => {
   try {
     const user = await User.findById(req.user._id);
     
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      res.status(404).json({ error: 'User not found' });
+      return;
     }
 
     const now = new Date();
-    const secondsElapsed = (now - user.balance.lastUpdated) / 1000;
+    const secondsElapsed = (now.getTime() - user.balance.lastUpdated.getTime()) / 1000;
     const accumulatedAmount = Math.floor(secondsElapsed * user.balance.ratePerSecond);
     
     user.balance.total += accumulatedAmount;
@@ -130,14 +141,14 @@ app.get('/api/balance', auth, async (req, res) => {
     await user.save();
 
     res.json(user.balance);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Balance fetch error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
 // Bot routes
-app.post('/api/bots/test', auth, async (req, res) => {
+app.post('/api/bots/test', auth, async (req: Request, res: Response) => {
   try {
     const bot = await Bot.findOneAndUpdate(
       { userId: req.user._id },
@@ -145,24 +156,24 @@ app.post('/api/bots/test', auth, async (req, res) => {
       { upsert: true, new: true }
     );
     res.json(bot);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Bot test error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.get('/api/bots', auth, async (req, res) => {
+app.get('/api/bots', auth, async (req: Request, res: Response) => {
   try {
     const bot = await Bot.findOne({ userId: req.user._id });
     res.json(bot?.bots || { breacher: 0, guardian: 0, phreak: 0 });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Bot fetch error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 // Add this POST endpoint for starting builds
-app.post('/api/bots/build', auth, async (req, res) => {
+app.post('/api/bots/build', auth, async (req: Request, res: Response) => {
   try {
     const { type, quantity, totalCost } = req.body;
     
@@ -196,13 +207,13 @@ app.post('/api/bots/build', auth, async (req, res) => {
     await bot.save();
     res.json({ buildQueue: bot.buildQueue, bots: bot.bots });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Build error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post('/api/balance/deduct', auth, async (req, res) => {
+app.post('/api/balance/deduct', auth, async (req: Request, res: Response) => {
   try {
     const { amount } = req.body;
     const user = await User.findById(req.user._id);
@@ -219,14 +230,14 @@ app.post('/api/balance/deduct', auth, async (req, res) => {
     await user.save();
 
     res.json(user.balance);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Balance deduction error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 // Add this test endpoint
-app.post('/api/bots/test-build-queue', auth, async (req, res) => {
+app.post('/api/bots/test-build-queue', auth, async (req: Request, res: Response) => {
   try {
     let bot = await Bot.findOne({ userId: req.user._id });
     if (!bot) {
@@ -244,14 +255,14 @@ app.post('/api/bots/test-build-queue', auth, async (req, res) => {
 
     await bot.save();
     res.json(bot);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Test build queue error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 // Update the build-state endpoint to properly handle completion
-app.get('/api/bots/build-state', auth, async (req, res) => {
+app.get('/api/bots/build-state', auth, async (req: Request, res: Response) => {
   try {
     const bot = await Bot.findOne({ userId: req.user._id });
     
@@ -305,7 +316,7 @@ app.get('/api/bots/build-state', auth, async (req, res) => {
       },
       bots: bot.bots
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Build state check error:', error);
     res.status(500).json({ error: error.message });
   }
@@ -314,4 +325,4 @@ app.get('/api/bots/build-state', auth, async (req, res) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-}); 
+});
