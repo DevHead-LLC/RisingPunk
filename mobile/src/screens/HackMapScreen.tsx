@@ -1,4 +1,4 @@
-import React, {memo, useState, useRef} from 'react';
+import React, {memo, useState, useRef, useEffect} from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,9 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { CloseButton } from '../components/common/CloseButton';
+import { API_URL } from '../config';
+import { useAuth } from '../context/AuthContext';
+import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
 const GRID_SIZE = 25;
 const CELL_SIZE = 60;
@@ -161,12 +164,63 @@ const CellContent = memo(({ data }: { data: CellData }) => {
   );
 });
 
-export function HackMapScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
+type Props = {
+  onClose: () => void;
+};
+
+export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
+  const [grid, setGrid] = useState<GridData>([]);
+  const [loading, setLoading] = useState(true);
+  const { token } = useAuth();
   const [selectedCell, setSelectedCell] = useState<{x: number, y: number, info: CellData} | null>(null);
-  const [gridData] = useState<GridData>(generateInitialGrid);
   const [isLegendExpanded, setIsLegendExpanded] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   
+  useEffect(() => {
+    const fetchMap = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/map/main`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch map');
+        
+        const mapData = await response.json();
+        
+        // Convert the 1D array to 2D grid
+        const newGrid: GridData = Array(GRID_SIZE).fill(null).map(() =>
+          Array(GRID_SIZE).fill(null).map((): CellData => ({
+            terrain: 'plain',
+            entity: 'empty'
+          }))
+        );
+
+        // Fill grid with server data
+        mapData.cells.forEach((cell: any) => {
+          newGrid[cell.y][cell.x] = {
+            terrain: cell.terrain,
+            entity: cell.isOccupied ? cell.occupiedBy : 'empty',
+            owner: cell.occupiedBy === 'player' ? 'player' : 
+                   cell.occupiedBy === 'npc' ? 'enemy' : undefined,
+            name: cell.entityName || ''
+          };
+        });
+
+        setGrid(newGrid);
+      } catch (error) {
+        console.error('Error fetching map:', error);
+        // Fallback to local generation if fetch fails
+        setGrid(generateInitialGrid());
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMap();
+  }, []); // Empty dependency array means this runs once on mount
+
   const handleCellPress = (x: number, y: number, cellData: CellData) => {
     setSelectedCell({x, y, info: cellData});
   };
@@ -242,6 +296,10 @@ export function HackMapScreen({ onClose }: { onClose: () => void }): React.JSX.E
     );
   };
 
+  if (loading) {
+    return <View style={styles.container}><LoadingSpinner /></View>;
+  }
+
   return (
     <View style={styles.container}>
       <CloseButton onPress={onClose} />
@@ -265,7 +323,7 @@ export function HackMapScreen({ onClose }: { onClose: () => void }): React.JSX.E
         >
           <View style={styles.marginWrapper}>
             <View style={styles.gridArea}>
-              {gridData.map((row, y) => (
+              {grid.map((row, y) => (
                 <View key={y} style={styles.row}>
                   {row.map((cell, x) => (
                     <TouchableOpacity
@@ -301,7 +359,7 @@ export function HackMapScreen({ onClose }: { onClose: () => void }): React.JSX.E
       </ScrollView>
     </View>
   );
-}
+};
 
 const getTerrainIcon = (terrain: TerrainType) => {
   switch (terrain) {
