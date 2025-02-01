@@ -13,6 +13,8 @@ import auth from './src/middleware/auth';
 const Bot = require('./src/models/Bot');
 import { Request, Response, NextFunction } from 'express';
 import { Error } from 'mongoose';
+import { MapService } from './src/services/MapService';
+import { Map } from './src/models/Map';
 
 declare global {
   namespace Express {
@@ -318,6 +320,31 @@ app.get('/api/bots/build-state', auth, async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Build state check error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+const mapService = new MapService();
+
+// Get map data
+app.get('/api/map/:name', async (req: Request, res: Response) => {
+  try {
+    console.log('Map request received for:', req.params.name);
+    let map = await Map.findOne({ name: req.params.name });
+    
+    if (!map) {
+      console.log('No map found, generating new one...');
+      map = await mapService.generateMap(req.params.name);
+    }
+    
+    // Debug entity data
+    const entities = map?.cells?.filter(cell => cell.isOccupied);
+    console.log('Entities in map:', entities?.length || 0);
+    console.log('Sample entity:', entities?.[0]);
+    
+    res.json(map);
+  } catch (error: any) {
+    console.error('Map fetch error:', error);
     res.status(500).json({ error: error.message });
   }
 });
