@@ -24,6 +24,11 @@ export const HackRigDisplay = memo(function HackRigDisplay({
           source={require('../../assets/images/hacker-rig.png')}
           style={styles.moduleImage}
         />
+        {disabled && (
+          <View style={styles.lockOverlay}>
+            <Text style={styles.lockText}>🔒</Text>
+          </View>
+        )}
       </View>
       <View style={styles.moduleTextContainer}>
         <Text style={[styles.moduleTitle, disabled && styles.textDisabled]}>HACK RIG</Text>
@@ -75,6 +80,20 @@ const styles = StyleSheet.create({
     color: '#9C27B0',
     fontSize: SIZING.font.small,
     marginTop: SIZING.spacing.xs,
+  },
+  lockOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 4,
+  },
+  lockText: {
+    fontSize: 32,
   },
   moduleDisabled: {
     opacity: 0.5,
