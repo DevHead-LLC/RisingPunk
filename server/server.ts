@@ -15,6 +15,7 @@ import { Request, Response, NextFunction } from 'express';
 import { Error } from 'mongoose';
 import { MapService } from './src/services/MapService';
 import { Map } from './src/models/Map';
+import userRoutes from './src/routes/userRoutes';
 
 declare global {
   namespace Express {
@@ -348,6 +349,8 @@ app.get('/api/map/:name', async (req: Request, res: Response) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+app.use('/api/users', userRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
