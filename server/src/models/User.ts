@@ -14,6 +14,9 @@ export interface IUser extends Document {
     ratePerSecond: number;
     lastUpdated: Date;
   };
+  unlockedFeatures: {
+    hackRig: boolean;
+  };
   verifyAccessKey(accessKey: string): Promise<boolean>;
 }
 
@@ -76,6 +79,12 @@ const userSchema = new Schema({
     lastUpdated: {
       type: Date,
       default: Date.now
+    }
+  },
+  unlockedFeatures: {
+    hackRig: {
+      type: Boolean,
+      default: false
     }
   }
 }, { 

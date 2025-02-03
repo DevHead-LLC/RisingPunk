@@ -1,6 +1,7 @@
 import React, {memo, useRef, useState} from 'react';
 import {View, StyleSheet, TouchableOpacity, Image, Text, Animated, Alert} from 'react-native';
 import { COLORS, SIZING } from '../../styles/theme';
+import { useAuth } from '../../context/AuthContext';
 
 type HackRigDisplayProps = {
   onPress: () => void;
@@ -11,8 +12,11 @@ export const HackRigDisplay = memo(function HackRigDisplay({
   onPress, 
   disabled = true 
 }: HackRigDisplayProps) {
+  const { user, unlockHackRig } = useAuth();
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  
+  const isLocked = !user?.unlockedFeatures?.hackRig;
 
   const startPulseAnimation = () => {
     Animated.loop(
@@ -29,6 +33,18 @@ export const HackRigDisplay = memo(function HackRigDisplay({
         }),
       ])
     ).start();
+  };
+
+  const handleExploit = async () => {
+    try {
+      await unlockHackRig();
+      setIsAlertOpen(false);
+      pulseAnim.stopAnimation();
+      pulseAnim.setValue(1);
+      onPress();
+    } catch (error) {
+      console.error('Failed to unlock hack rig:', error);
+    }
   };
 
   const handlePress = () => {
@@ -50,12 +66,7 @@ export const HackRigDisplay = memo(function HackRigDisplay({
         },
         {
           text: "EXECUTE EXPLOIT",
-          onPress: () => {
-            setIsAlertOpen(false);
-            pulseAnim.stopAnimation();
-            pulseAnim.setValue(1);
-            onPress();
-          },
+          onPress: handleExploit,
           style: "destructive"
         }
       ]
@@ -66,21 +77,21 @@ export const HackRigDisplay = memo(function HackRigDisplay({
     <Animated.View
       style={[
         styles.moduleContainer,
-        disabled && styles.moduleDisabled,
+        isLocked && styles.moduleDisabled,
         isAlertOpen && styles.warningBorder,
         { transform: [{ scale: pulseAnim }] }
       ]}
     >
       <TouchableOpacity 
         style={styles.touchable}
-        onPress={disabled ? handlePress : onPress}
+        onPress={isLocked ? handlePress : onPress}
       >
         <View style={styles.imageContainer}>
           <Image 
             source={require('../../assets/images/hacker-rig.png')}
             style={styles.moduleImage}
           />
-          {disabled && (
+          {isLocked && (
             <View style={styles.lockOverlay}>
               <Text style={styles.lockText}>🔒</Text>
             </View>

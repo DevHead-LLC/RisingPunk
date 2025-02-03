@@ -24,6 +24,9 @@ interface UserResponse {
     handle: string;
     email: string;
     level: number;
+    unlockedFeatures: {
+      hackRig: boolean;
+    };
   }
 }
 
@@ -72,7 +75,10 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
         user: {
           handle: user.handle,
           email: user.email,
-          level: user.level
+          level: user.level,
+          unlockedFeatures: {
+            hackRig: user.unlockedFeatures?.hackRig || false
+          }
         }
       });
 
@@ -115,7 +121,10 @@ router.post<{}, UserResponse | { error: string }, LoginRequest['body']>(
         user: {
           handle: user.handle,
           email: user.email,
-          level: user.level
+          level: user.level,
+          unlockedFeatures: {
+            hackRig: user.unlockedFeatures?.hackRig || false
+          }
         }
       });
 
