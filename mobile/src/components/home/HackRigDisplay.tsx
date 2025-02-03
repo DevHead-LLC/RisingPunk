@@ -4,11 +4,21 @@ import { COLORS, SIZING } from '../../styles/theme';
 
 type HackRigDisplayProps = {
   onPress: () => void;
+  disabled?: boolean;
 };
 
-export const HackRigDisplay = memo(function HackRigDisplay({ onPress }: HackRigDisplayProps) {
+export const HackRigDisplay = memo(function HackRigDisplay({ 
+  onPress, 
+  disabled = true 
+}: HackRigDisplayProps) {
   return (
-    <TouchableOpacity style={styles.moduleContainer} onPress={onPress}>
+    <TouchableOpacity 
+      style={[
+        styles.moduleContainer,
+        disabled && styles.moduleDisabled
+      ]} 
+      onPress={disabled ? undefined : onPress}
+    >
       <View style={styles.imageContainer}>
         <Image 
           source={require('../../assets/images/hacker-rig.png')}
@@ -16,8 +26,10 @@ export const HackRigDisplay = memo(function HackRigDisplay({ onPress }: HackRigD
         />
       </View>
       <View style={styles.moduleTextContainer}>
-        <Text style={styles.moduleTitle}>HACK RIG</Text>
-        <Text style={styles.moduleDescription}>Access the network</Text>
+        <Text style={[styles.moduleTitle, disabled && styles.textDisabled]}>HACK RIG</Text>
+        <Text style={[styles.moduleDescription, disabled && styles.textDisabled]}>
+          Access the network
+        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -63,5 +75,12 @@ const styles = StyleSheet.create({
     color: '#9C27B0',
     fontSize: SIZING.font.small,
     marginTop: SIZING.spacing.xs,
+  },
+  moduleDisabled: {
+    opacity: 0.5,
+    borderColor: COLORS.text.secondary,
+  },
+  textDisabled: {
+    color: COLORS.text.secondary,
   }
 }); 
