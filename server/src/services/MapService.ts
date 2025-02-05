@@ -43,11 +43,6 @@ export class MapService {
     // Add entities
     this.addEntities(cells);
 
-    // Debug log before saving
-    const entitiesBeforeSave = cells.filter(cell => cell.isOccupied);
-    console.log('Entities before save:', entitiesBeforeSave.length);
-    console.log('Sample entity before save:', entitiesBeforeSave[0]);
-
     // Create and save the map
     const map = new Map({
       name,
