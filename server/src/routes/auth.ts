@@ -94,11 +94,9 @@ router.post<{}, UserResponse | { error: string }, LoginRequest['body']>(
   '/login',
   async (req, res): Promise<void> => {
     try {
-      console.log('Login attempt in database:', mongoose.connection.name);
       const { handle, accessKey } = req.body;
       
       const user = await User.findOne({ handle });
-      console.log('User search result:', user ? 'Found' : 'Not found');
       if (!user) {
         res.status(401).json({ error: 'Authentication failed' });
         return;

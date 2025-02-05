@@ -23,23 +23,7 @@ declare global {
       user: { _id: string }
     }
   }
-} 
-
-// Debug .env loading
-const envPath = path.resolve(process.cwd(), '.env');
-console.log('📂 Current directory:', process.cwd());
-console.log('📂 .env path:', envPath);
-
-// Read and log .env file contents
-try {
-  const envContents = fs.readFileSync(envPath, 'utf8');
-  console.log('📄 .env file contents:', envContents);
-} catch (err) {
-  console.error('❌ Error reading .env file:', err);
 }
-
-// Debug environment variables
-console.log('🔑 MONGODB_URI:', process.env.MONGODB_URI?.replace(/:([^@]+)@/, ':****@'));
 
 const app = express();
 
@@ -76,7 +60,6 @@ app.get('/api/status', async (req: Request, res: Response) => {
       database: dbState ? '✅ Connected' : '❌ Disconnected',
       timestamp: new Date()
     };
-    console.log('📊 Status check:', status);
     res.json(status);
   } catch (error: any) {
     console.error('❌ Status check error:', error);
@@ -330,18 +313,11 @@ const mapService = new MapService();
 // Get map data
 app.get('/api/map/:name', async (req: Request, res: Response) => {
   try {
-    console.log('Map request received for:', req.params.name);
     let map = await Map.findOne({ name: req.params.name });
     
     if (!map) {
-      console.log('No map found, generating new one...');
       map = await mapService.generateMap(req.params.name);
     }
-    
-    // Debug entity data
-    const entities = map?.cells?.filter(cell => cell.isOccupied);
-    console.log('Entities in map:', entities?.length || 0);
-    console.log('Sample entity:', entities?.[0]);
     
     res.json(map);
   } catch (error: any) {

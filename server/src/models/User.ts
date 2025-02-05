@@ -1,9 +1,6 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import bcrypt from 'bcryptjs';
 
-// Add this line for debugging
-console.log('Creating User model in database:', mongoose.connection.name);
-
 export interface IUser extends Document {
   email: string;
   handle: string;
