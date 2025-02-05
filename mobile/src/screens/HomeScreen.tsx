@@ -9,18 +9,23 @@ type HomeScreenProps = {
   onClose: () => void;
   onNavigateToMap: () => void;
   onNavigateToBotAssembly: () => void;
+  onNavigateToBattle: () => void;
 };
 
 export const HomeScreen = memo(function HomeScreen({ 
   onClose, 
   onNavigateToMap,
-  onNavigateToBotAssembly 
+  onNavigateToBotAssembly,
+  onNavigateToBattle
 }: HomeScreenProps): React.JSX.Element {
   return (
     <View style={styles.container}>
       <CloseButton onPress={onClose} />
       <View style={styles.content}>
-        <HackRigDisplay onPress={onNavigateToMap} />
+        <HackRigDisplay 
+          onPress={onNavigateToMap} 
+          onNavigateToBattle={onNavigateToBattle}
+        />
         <BotAssembly onPress={onNavigateToBotAssembly} />
       </View>
     </View>

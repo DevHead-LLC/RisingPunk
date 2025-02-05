@@ -11,6 +11,7 @@ import {COLORS, SIZING} from '../styles/theme';
 import {ProfileLocation} from '../components/turf/ProfileLocation';
 import {HomeLocation} from '../components/turf/HomeLocation';
 import {DigitalBarracksLocation} from '../components/turf/DigitalBarracksLocation';
+import {BattlePreparationScreen} from './BattlePreparationScreen';
 
 const DiagonalLines = memo(() => (
   <>
@@ -88,7 +89,13 @@ export function TurfScreen(): React.JSX.Element {
           onClose={() => navigateToScreen('turf')}
           onNavigateToMap={() => navigateToScreen('map')}
           onNavigateToBotAssembly={() => navigateToScreen('botAssembly')}
+          onNavigateToBattle={() => navigateToScreen('battlePrep')}
         />;
+      case 'battlePrep':
+        return <BattlePreparationScreen onClose={() => {
+          navigateToScreen('turf');
+          setTimeout(() => navigateToScreen('hackRig'), 0);
+        }} />;
       case 'map':
         return <HackMapScreen onClose={() => navigateToScreen('hackRig')} />;
       case 'botAssembly':
