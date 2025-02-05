@@ -3,15 +3,12 @@ import {View, StyleSheet, TouchableOpacity, Image, Text, Animated, Alert} from '
 import { COLORS, SIZING } from '../../styles/theme';
 import { useAuth } from '../../context/AuthContext';
 
-type HackRigDisplayProps = {
+type Props = {
   onPress: () => void;
-  disabled?: boolean;
+  onNavigateToBattle: () => void;
 };
 
-export const HackRigDisplay = memo(function HackRigDisplay({ 
-  onPress, 
-  disabled = true 
-}: HackRigDisplayProps) {
+export const HackRigDisplay = ({ onPress, onNavigateToBattle }: Props) => {
   const { user, unlockHackRig } = useAuth();
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -41,9 +38,9 @@ export const HackRigDisplay = memo(function HackRigDisplay({
       setIsAlertOpen(false);
       pulseAnim.stopAnimation();
       pulseAnim.setValue(1);
-      onPress();
+      onNavigateToBattle();
     } catch (error) {
-      console.error('Failed to unlock hack rig:', error);
+      console.error('Failed to navigate to battle:', error);
     }
   };
 
@@ -104,7 +101,7 @@ export const HackRigDisplay = memo(function HackRigDisplay({
       </TouchableOpacity>
     </Animated.View>
   );
-});
+};
 
 const styles = StyleSheet.create({
   moduleContainer: {
