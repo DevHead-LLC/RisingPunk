@@ -45,7 +45,7 @@ export const BattlePreparationScreen = ({ onClose }: Props) => {
         {/* Friendly Forces Page */}
         <View style={styles.page}>
           <Text style={styles.pageTitle}>FRIENDLY FORCES</Text>
-          <View style={styles.formationContainer}>
+          <View style={styles.friendlyFormationContainer}>
             {/* Locked Battalions */}
             <View style={styles.battalionLines}>
               <View style={styles.battalionRow}>
@@ -89,7 +89,7 @@ export const BattlePreparationScreen = ({ onClose }: Props) => {
             </View>
 
             {/* Front line circles */}
-            <View style={styles.frontLine}>
+            <View style={styles.friendlyFrontLine}>
               <View style={[styles.circleSlot, styles.lockedSlot]}>
                 <Text style={styles.lockText}>🔒</Text>
               </View>
@@ -106,8 +106,8 @@ export const BattlePreparationScreen = ({ onClose }: Props) => {
         {/* Enemy Forces Page - Mirror of friendly forces */}
         <View style={styles.page}>
           <Text style={styles.pageTitle}>ENEMY FORCES</Text>
-          <View style={styles.formationContainer}>
-            <View style={styles.frontLine}>
+          <View style={styles.enemyFormationContainer}>
+            <View style={styles.enemyFrontLine}>
               <View style={[styles.circleSlot, styles.enemySlot]}>
                 <Text style={styles.enemyText}>???</Text>
               </View>
@@ -179,16 +179,27 @@ const styles = StyleSheet.create({
     marginBottom: SIZING.spacing.lg,
     fontFamily: 'monospace',
   },
-  formationContainer: {
+  friendlyFormationContainer: {
     flex: 1,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: SIZING.spacing.lg,
   },
-  frontLine: {
+  friendlyFrontLine: {
     marginLeft: SIZING.spacing.lg,
-    gap: SIZING.spacing.md,
+    gap: SIZING.spacing.lg,
+  },
+  enemyFormationContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SIZING.spacing.lg,
+  },
+  enemyFrontLine: {
+    marginRight: SIZING.spacing.lg,
+    gap: SIZING.spacing.lg,
   },
   battalionLines: {
     flexDirection: 'row',
