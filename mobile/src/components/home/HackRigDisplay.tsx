@@ -34,7 +34,6 @@ export const HackRigDisplay = ({ onPress, onNavigateToBattle }: Props) => {
 
   const handleExploit = async () => {
     try {
-      await unlockHackRig();
       setIsAlertOpen(false);
       pulseAnim.stopAnimation();
       pulseAnim.setValue(1);
@@ -48,6 +47,7 @@ export const HackRigDisplay = ({ onPress, onNavigateToBattle }: Props) => {
     setIsAlertOpen(true);
     startPulseAnimation();
 
+    // TODO: system alert is scary, redesign for in-game alert look for cyberpunk style
     Alert.alert(
       "System Breach Detected",
       "TESLA_GRID has root access to your system. Shell injection detected in Hack Rig kernel.\n\nInitiate countermeasures to regain control.",
