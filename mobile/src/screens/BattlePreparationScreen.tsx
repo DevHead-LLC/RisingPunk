@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Dimensions, TouchableOpacity } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, Dimensions, TouchableOpacity, Animated } from 'react-native';
 import { COLORS, SIZING } from '../styles/theme';
 import { CloseButton } from '../components/common/CloseButton';
 import { BattalionSlot } from '../components/battle/BattalionSlot';
@@ -12,6 +12,44 @@ type Props = {
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Run the animation sequence twice
+    Animated.sequence([
+      ...Array(2).fill(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 0,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+        ])
+      ),
+      // Finally set to a low, steady opacity
+      Animated.timing(pulseAnim, {
+        toValue: 0.3,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const swipeIndicatorStyle = {
+    opacity: pulseAnim,
+    transform: [{
+      translateX: pulseAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, -10]
+      })
+    }]
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <CloseButton onPress={onClose} />
@@ -28,6 +66,10 @@ export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
       >
         <View style={styles.screen}>
           <Text style={styles.subtitle}>[USER FORCES]</Text>
+          <Animated.View style={[styles.swipeIndicator, swipeIndicatorStyle]}>
+            <Text style={styles.swipeArrow}>⟶</Text>
+            <Text style={styles.swipeText}>ENEMY FORCES</Text>
+          </Animated.View>
           <View style={styles.battalionsContainer}>
             <View style={styles.battalionColumn}>
               <BattalionSlot name="E" isLocked />
@@ -136,5 +178,22 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(71, 23, 246, 0.4)',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 10,
+  },
+  swipeIndicator: {
+    alignSelf: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZING.spacing.xs,
+    paddingRight: SIZING.spacing.lg,
+    marginTop: -SIZING.spacing.lg, // Position it closer to top
+  },
+  swipeArrow: {
+    color: '#00FF41',
+    fontSize: 24,
+  },
+  swipeText: {
+    color: '#00FF41',
+    fontSize: 12,
+    letterSpacing: 1,
   },
 }); 
