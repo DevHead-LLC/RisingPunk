@@ -91,7 +91,32 @@ export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
           </View>
         </View>
         <View style={styles.screen}>
-          <View style={styles.enemyForces} />
+          <Text style={styles.subtitleEnemy}>[ENEMY FORCES]</Text>
+          <View style={styles.battalionsContainer}>
+            <View style={styles.circleColumnEnemy}>
+              <CircleSlot isEnemy />
+              <CircleSlot isEnemy />
+              <CircleSlot isEnemy />
+            </View>
+            <View style={styles.battalionColumn}>
+              <BattalionSlot 
+                name="A" 
+                isEnemy 
+              />
+              <BattalionSlot 
+                name="B" 
+                isEnemy 
+              />
+            </View>
+            <View style={styles.battalionColumn}>
+              <BattalionSlot name="C" isEnemy isLocked />
+              <BattalionSlot name="D" isEnemy isLocked />
+            </View>
+            <View style={styles.battalionColumn}>
+              <BattalionSlot name="E" isEnemy isLocked />
+              <BattalionSlot name="F" isEnemy isLocked />
+            </View>
+          </View>
         </View>
       </ScrollView>
 
@@ -139,7 +164,14 @@ const styles = StyleSheet.create({
   subtitle: {
     color: '#00FF41',
     fontSize: 24,
-    textAlign: 'center'
+    textAlign: 'center',
+    marginBottom: SIZING.spacing.sm,
+  },
+  subtitleEnemy: {
+    color: '#FF4141',
+    fontSize: 24,
+    textAlign: 'center',
+    marginBottom: SIZING.spacing.sm,
   },
   battalionsContainer: {
     flexDirection: 'row',
@@ -153,9 +185,15 @@ const styles = StyleSheet.create({
   },
   circleColumn: {
     marginLeft: SIZING.spacing.lg,
-    justifyContent: 'flex-start', // Align circles from top
-    gap: SIZING.spacing.md,
-    paddingTop: 4, // Fine-tune vertical alignment with battalions
+    justifyContent: 'flex-start',
+    gap: SIZING.spacing.xs,
+    paddingTop: 4,
+  },
+  circleColumnEnemy: {
+    marginRight: SIZING.spacing.lg,
+    justifyContent: 'flex-start',
+    gap: SIZING.spacing.xs,
+    paddingTop: 4,
   },
   enemyForces: {
     flex: 1,
