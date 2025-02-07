@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
 import { CloseButton } from '../components/common/CloseButton';
 import { COLORS, SIZING } from '../styles/theme';
 import { useAuth } from '../context/AuthContext';
-import BattalionSelectModal from '../components/battle/BattalionSelectModal';
 
 type Props = {
   onClose: () => void;
@@ -13,8 +12,6 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const BattlePreparationScreen = ({ onClose }: Props) => {
   const { unlockHackRig } = useAuth();
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedBattalion, setSelectedBattalion] = useState<'A' | 'B' | null>(null);
 
   const handleTempUnlock = async () => {
     try {
@@ -23,11 +20,6 @@ export const BattlePreparationScreen = ({ onClose }: Props) => {
     } catch (error) {
       console.error('Failed to unlock hack rig:', error);
     }
-  };
-
-  const handleBattalionPress = (battalion: 'A' | 'B') => {
-    setSelectedBattalion(battalion);
-    setModalVisible(true);
   };
 
   return (
@@ -84,17 +76,11 @@ export const BattlePreparationScreen = ({ onClose }: Props) => {
 
               {/* Active Battalions */}
               <View style={styles.battalionRow}>
-                <TouchableOpacity 
-                  style={[styles.slot, styles.activeSlot]}
-                  onPress={() => handleBattalionPress('A')}
-                >
+                <TouchableOpacity style={[styles.slot, styles.activeSlot]}>
                   <Text style={styles.slotText}>BATTALION A</Text>
                   <Text style={styles.deployText}>+ Deploy</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.slot, styles.activeSlot]}
-                  onPress={() => handleBattalionPress('B')}
-                >
+                <TouchableOpacity style={[styles.slot, styles.activeSlot]}>
                   <Text style={styles.slotText}>BATTALION B</Text>
                   <Text style={styles.typeText}>MK.I BREACHER</Text>
                   <Text style={styles.countText}>250</Text>
@@ -154,15 +140,6 @@ export const BattlePreparationScreen = ({ onClose }: Props) => {
       <TouchableOpacity style={styles.initiateButton}>
         <Text style={styles.initiateText}> EXECUTE BATTLE SEQUENCE_</Text>
       </TouchableOpacity>
-
-      <BattalionSelectModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        onConfirm={(type, quantity) => {
-          console.log(`Deploying ${quantity} ${type} to Battalion ${selectedBattalion}`);
-          setModalVisible(false);
-        }}
-      />
     </SafeAreaView>
   );
 };
