@@ -23,6 +23,21 @@ const botSchema = new mongoose.Schema({
       min: 0
     }
   },
+  battalionAssignments: [{
+    battalionId: String,
+    botType: {
+      type: String,
+      enum: ['breacher', 'guardian', 'phreak']
+    },
+    quantity: {
+      type: Number,
+      min: 0
+    },
+    markLevel: {
+      type: Number,
+      default: 1
+    }
+  }],
   buildQueue: {
     type: {
       type: String,

@@ -328,6 +328,43 @@ app.get('/api/map/:name', async (req: Request, res: Response) => {
 
 app.use('/api/users', userRoutes);
 
+app.post('/api/battalions/assign', auth, async (req: Request, res: Response) => {
+  try {
+    const { botType, quantity, battalionId } = req.body;
+    
+    const bot = await Bot.findOne({ userId: req.user._id });
+    if (!bot) {
+      return res.status(404).json({ error: 'Bot document not found' });
+    }
+
+    // Verify sufficient bots available
+    if (bot.bots[botType] < quantity) {
+      return res.status(400).json({ error: 'Insufficient bots available' });
+    }
+
+    // Update bot counts and add battalion assignment
+    bot.bots[botType] -= quantity;
+    
+    bot.battalionAssignments.push({
+      battalionId,
+      botType,
+      quantity,
+      markLevel: 1
+    });
+
+    await bot.save();
+
+    res.json({ 
+      success: true,
+      updatedBotCount: bot.bots[botType]
+    });
+
+  } catch (error: any) {
+    console.error('Battalion assignment error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

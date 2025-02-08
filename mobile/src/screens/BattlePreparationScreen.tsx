@@ -22,7 +22,7 @@ type BattalionDeployment = {
 };
 
 export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
-  const { botCounts } = useBots();
+  const { botCounts, assignToBattalion, getAvailableBots } = useBots();
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [selectedBattalion, setSelectedBattalion] = useState<string | null>(null);
@@ -69,16 +69,26 @@ export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
     setSelectorVisible(true);
   };
 
-  const handleBotAssignment = (data: { botType: string; quantity: number }) => {
-    if (selectedBattalion) {
+  const handleBotAssignment = async (data: { botType: BotType; quantity: number }) => {
+    if (!selectedBattalion) return;
+
+    try {
+      await assignToBattalion({
+        botType: data.botType,
+        quantity: data.quantity,
+        battalionId: selectedBattalion
+      });
+
       setAssignments(prev => ({
         ...prev,
         [selectedBattalion]: {
           botType: data.botType,
           quantity: data.quantity,
-          markLevel: 1, // Currently hardcoded to Mark I
+          markLevel: 1
         }
       }));
+    } catch (error) {
+      console.error('Failed to assign bots:', error);
     }
     setSelectorVisible(false);
   };
