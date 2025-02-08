@@ -1,9 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Dimensions, TouchableOpacity, Animated } from 'react-native';
 import { COLORS, SIZING } from '../styles/theme';
 import { CloseButton } from '../components/common/CloseButton';
 import { BattalionSlot } from '../components/battle/BattalionSlot';
 import { CircleSlot } from '../components/battle/CircleSlot';
+import { BattalionBotSelector } from '../components/battle/BattalionBotSelector';
+import { BotType } from '../types/bots';
 
 type Props = {
   onClose: () => void;
@@ -13,7 +15,9 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
   const pulseAnim = useRef(new Animated.Value(0)).current;
-
+  const [selectorVisible, setSelectorVisible] = useState(false);
+  const [selectedBattalion, setSelectedBattalion] = useState<string | null>(null);
+  
   useEffect(() => {
     // Run the animation sequence twice
     Animated.sequence([
@@ -50,6 +54,17 @@ export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
     }]
   };
 
+  const handleBattalionPress = (name: string) => {
+    setSelectedBattalion(name);
+    setSelectorVisible(true);
+  };
+
+  const handleBotDeployment = (data: { botType: BotType; quantity: number }) => {
+    // Handle deployment logic here
+    console.log(`Deploying ${data.quantity} ${data.botType}s to Battalion ${selectedBattalion}`);
+    setSelectorVisible(false);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <CloseButton onPress={onClose} />
@@ -80,8 +95,14 @@ export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
               <BattalionSlot name="D" isLocked />
             </View>
             <View style={styles.battalionColumn}>
-              <BattalionSlot name="A" />
-              <BattalionSlot name="B" />
+              <BattalionSlot 
+                name="A" 
+                onPress={() => handleBattalionPress('A')}
+              />
+              <BattalionSlot 
+                name="B" 
+                onPress={() => handleBattalionPress('B')}
+              />
             </View>
             <View style={styles.circleColumn}>
               <CircleSlot />
@@ -126,6 +147,18 @@ export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
       >
         <Text style={styles.executeText}>EXECUTE BATTLE SEQUENCE</Text>
       </TouchableOpacity>
+
+      <BattalionBotSelector
+        isVisible={selectorVisible}
+        onClose={() => setSelectorVisible(false)}
+        onSubmit={handleBotDeployment}
+        battalionName={selectedBattalion || ''}
+        availableBots={{
+          breacher: 0,
+          guardian: 0,
+          phreak: 0
+        }}
+      />
     </SafeAreaView>
   );
 });
