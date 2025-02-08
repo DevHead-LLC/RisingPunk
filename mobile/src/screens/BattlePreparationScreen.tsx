@@ -6,6 +6,7 @@ import { BattalionSlot } from '../components/battle/BattalionSlot';
 import { CircleSlot } from '../components/battle/CircleSlot';
 import { BattalionBotSelector } from '../components/battle/BattalionBotSelector';
 import { BotType } from '../types/bots';
+import { useBots } from '../context/BotsContext';
 
 type Props = {
   onClose: () => void;
@@ -13,10 +14,18 @@ type Props = {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+type BattalionDeployment = {
+  [battalion: string]: {
+    [botType in BotType]?: number;
+  };
+};
+
 export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
+  const { botCounts } = useBots();
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [selectedBattalion, setSelectedBattalion] = useState<string | null>(null);
+  const [deployments, setDeployments] = useState<BattalionDeployment>({});
   
   useEffect(() => {
     // Run the animation sequence twice
@@ -59,10 +68,30 @@ export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
     setSelectorVisible(true);
   };
 
+  const getAvailableBots = (type: BotType) => {
+    const deployed = Object.values(deployments)
+      .reduce((total, battalion) => total + (battalion[type] || 0), 0);
+    return botCounts[type] - deployed;
+  };
+
   const handleBotDeployment = (data: { botType: BotType; quantity: number }) => {
-    // Handle deployment logic here
-    console.log(`Deploying ${data.quantity} ${data.botType}s to Battalion ${selectedBattalion}`);
+    if (!selectedBattalion) return;
+    
+    setDeployments(prev => ({
+      ...prev,
+      [selectedBattalion]: {
+        ...prev[selectedBattalion],
+        [data.botType]: data.quantity
+      }
+    }));
     setSelectorVisible(false);
+  };
+
+  // Pass available counts accounting for already deployed bots
+  const availableBots = {
+    breacher: getAvailableBots('breacher'),
+    guardian: getAvailableBots('guardian'),
+    phreak: getAvailableBots('phreak')
   };
 
   return (
@@ -153,11 +182,7 @@ export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
         onClose={() => setSelectorVisible(false)}
         onSubmit={handleBotDeployment}
         battalionName={selectedBattalion || ''}
-        availableBots={{
-          breacher: 0,
-          guardian: 0,
-          phreak: 0
-        }}
+        availableBots={availableBots}
       />
     </SafeAreaView>
   );
