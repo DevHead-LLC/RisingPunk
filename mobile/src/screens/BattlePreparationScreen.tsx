@@ -5,6 +5,7 @@ import { CloseButton } from '../components/common/CloseButton';
 import { BattalionSlot } from '../components/battle/BattalionSlot';
 import { CircleSlot } from '../components/battle/CircleSlot';
 import { BattalionBotSelector } from '../components/battle/BattalionBotSelector';
+import { BattalionAssignment } from '../components/battle/BattalionSlot';
 import { BotType } from '../types/bots';
 import { useBots } from '../context/BotsContext';
 
@@ -25,7 +26,7 @@ export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [selectedBattalion, setSelectedBattalion] = useState<string | null>(null);
-  const [deployments, setDeployments] = useState<BattalionDeployment>({});
+  const [assignments, setAssignments] = useState<Record<string, BattalionAssignment>>({});
   
   useEffect(() => {
     // Run the animation sequence twice
@@ -68,30 +69,18 @@ export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
     setSelectorVisible(true);
   };
 
-  const getAvailableBots = (type: BotType) => {
-    const deployed = Object.values(deployments)
-      .reduce((total, battalion) => total + (battalion[type] || 0), 0);
-    return botCounts[type] - deployed;
-  };
-
-  const handleBotDeployment = (data: { botType: BotType; quantity: number }) => {
-    if (!selectedBattalion) return;
-    
-    setDeployments(prev => ({
-      ...prev,
-      [selectedBattalion]: {
-        ...prev[selectedBattalion],
-        [data.botType]: data.quantity
-      }
-    }));
+  const handleBotAssignment = (data: { botType: string; quantity: number }) => {
+    if (selectedBattalion) {
+      setAssignments(prev => ({
+        ...prev,
+        [selectedBattalion]: {
+          botType: data.botType,
+          quantity: data.quantity,
+          markLevel: 1, // Currently hardcoded to Mark I
+        }
+      }));
+    }
     setSelectorVisible(false);
-  };
-
-  // Pass available counts accounting for already deployed bots
-  const availableBots = {
-    breacher: getAvailableBots('breacher'),
-    guardian: getAvailableBots('guardian'),
-    phreak: getAvailableBots('phreak')
   };
 
   return (
@@ -127,10 +116,12 @@ export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
               <BattalionSlot 
                 name="A" 
                 onPress={() => handleBattalionPress('A')}
+                assignment={assignments['A']}
               />
               <BattalionSlot 
                 name="B" 
                 onPress={() => handleBattalionPress('B')}
+                assignment={assignments['B']}
               />
             </View>
             <View style={styles.circleColumn}>
@@ -180,9 +171,9 @@ export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
       <BattalionBotSelector
         isVisible={selectorVisible}
         onClose={() => setSelectorVisible(false)}
-        onSubmit={handleBotDeployment}
+        onSubmit={handleBotAssignment}
         battalionName={selectedBattalion || ''}
-        availableBots={availableBots}
+        availableBots={botCounts}
       />
     </SafeAreaView>
   );

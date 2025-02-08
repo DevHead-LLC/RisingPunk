@@ -2,18 +2,26 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { COLORS, SIZING } from '../../styles/theme';
 
+export type BattalionAssignment = {
+  botType: string;
+  markLevel: number;
+  quantity: number;
+} | null;
+
 type Props = {
   name: string;
   isLocked?: boolean;
   isEnemy?: boolean;
   onPress?: () => void;
+  assignment?: BattalionAssignment;
 };
 
 export const BattalionSlot = React.memo(({ 
   name, 
   isLocked = false,
   isEnemy = false,
-  onPress 
+  onPress,
+  assignment 
 }: Props) => {
   const slotStyle = [
     styles.slot,
@@ -40,15 +48,29 @@ export const BattalionSlot = React.memo(({
   const content = (
     <>
       <Text style={textStyle}>BATTALION {name}</Text>
-      {!isEnemy && <Text style={styles.deployText}>+ Deploy</Text>}
-      {isEnemy && !isLocked && <Text style={styles.scanErrorText}>[SCANNING ERROR]</Text>}
+      {!assignment ? (
+        !isEnemy && !isLocked && <Text style={styles.deployText}>+ Deploy</Text>
+      ) : (
+        <View style={styles.assignmentInfo}>
+          <Text style={styles.assignmentText}>
+            {assignment.botType.toUpperCase()} MK {toRomanNumeral(assignment.markLevel)}
+          </Text>
+          <Text style={styles.assignmentText}>
+            {assignment.quantity} ASSIGNED
+          </Text>
+        </View>
+      )}
     </>
   );
 
   return isEnemy ? (
     <View style={slotStyle}>{content}</View>
   ) : (
-    <TouchableOpacity style={slotStyle} onPress={onPress}>
+    <TouchableOpacity 
+      style={slotStyle}
+      onPress={onPress}
+      disabled={isLocked || isEnemy}
+    >
       {content}
     </TouchableOpacity>
   );
@@ -106,4 +128,19 @@ const styles = StyleSheet.create({
     fontSize: SIZING.font.small,
     marginTop: 4,
   },
-}); 
+  assignmentInfo: {
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  assignmentText: {
+    color: '#4717F6',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+});
+
+// Helper function for Roman numerals
+const toRomanNumeral = (num: number): string => {
+  const romanNumerals = ['I', 'II', 'III', 'IV'];
+  return romanNumerals[num - 1] || '';
+}; 
