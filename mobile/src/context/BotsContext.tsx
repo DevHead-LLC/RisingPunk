@@ -184,17 +184,40 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
     setSelectedType(type);
   };
 
-  const assignToBattalion = useCallback(({ botType, quantity, battalionId }: DeploymentUpdate) => {
-    setBotCounts(prev => ({
-      ...prev,
-      [botType]: prev[botType] - quantity
-    }));
-    
-    setDeployedCounts(prev => ({
-      ...prev,
-      [botType]: prev[botType] + quantity
-    }));
-  }, []);
+  const assignToBattalion = useCallback(async ({ botType, quantity, battalionId }: DeploymentUpdate) => {
+    try {
+      const response = await fetch(`${API_URL}/api/battalions/assign`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ botType, quantity, battalionId })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to assign bots');
+      }
+
+      const { updatedBotCount } = await response.json();
+
+      // Update local state with server response
+      setBotCounts(prev => ({
+        ...prev,
+        [botType]: updatedBotCount
+      }));
+      
+      setDeployedCounts(prev => ({
+        ...prev,
+        [botType]: prev[botType] + quantity
+      }));
+
+    } catch (error) {
+      console.error('Battalion assignment error:', error);
+      throw error;
+    }
+  }, [token]);
 
   const getAvailableBots = useCallback((botType: BotType) => {
     return botCounts[botType] - deployedCounts[botType];
