@@ -14,8 +14,15 @@ type BuildQueue = {
   completesAt: string;
 } | null;
 
+type DeploymentUpdate = {
+  botType: BotType;
+  quantity: number;
+  battalionId: string;
+};
+
 type BotsContextType = {
   botCounts: Record<BotType, number>;
+  deployedCounts: Record<BotType, number>;
   buildingProgress: number | null;
   selectedType: BotType | null;
   startBuilding: (type: BotType, quantity: number) => void;
@@ -23,6 +30,8 @@ type BotsContextType = {
   buildStartTime: Date | null;
   totalBuildQuantity: number;
   buildQueue: BuildQueue;
+  assignToBattalion: (update: DeploymentUpdate) => void;
+  getAvailableBots: (botType: BotType) => number;
 };
 
 export const BotsContext = createContext<BotsContextType | undefined>(undefined);
@@ -31,6 +40,11 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
   const { subtractFromBalance } = useBalance();
   const [botCounts, setBotCounts] = useState<Record<BotType, number>>({
+    breacher: 10,
+    guardian: 10,
+    phreak: 10,
+  });
+  const [deployedCounts, setDeployedCounts] = useState<Record<BotType, number>>({
     breacher: 0,
     guardian: 0,
     phreak: 0,
@@ -170,9 +184,28 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
     setSelectedType(type);
   };
 
+  const assignToBattalion = useCallback(({ botType, quantity, battalionId }: DeploymentUpdate) => {
+    setBotCounts(prev => ({
+      ...prev,
+      [botType]: prev[botType] - quantity
+    }));
+    
+    setDeployedCounts(prev => ({
+      ...prev,
+      [botType]: prev[botType] + quantity
+    }));
+  }, []);
+
+  const getAvailableBots = useCallback((botType: BotType) => {
+    return botCounts[botType] - deployedCounts[botType];
+  }, [botCounts, deployedCounts]);
+
   return (
     <BotsContext.Provider value={{
       botCounts,
+      deployedCounts,
+      assignToBattalion,
+      getAvailableBots,
       buildingProgress,
       selectedType,
       startBuilding,
