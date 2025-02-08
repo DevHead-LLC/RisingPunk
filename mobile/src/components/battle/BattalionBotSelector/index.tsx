@@ -74,18 +74,12 @@ export const BattalionBotSelector = React.memo(({
           )}
 
           <TouchableOpacity 
-            style={[
-              styles.deployButton, 
-              (!selectedType || quantity === 0) && styles.deployButtonDisabled
-            ]}
+            style={[styles.deployButton, !selectedType && styles.deployButtonDisabled]}
             onPress={handleSubmit}
             disabled={!selectedType || quantity === 0}
           >
-            <Text style={[
-              styles.deployButtonText, 
-              (!selectedType || quantity === 0) && styles.deployButtonTextDisabled
-            ]}>
-              DEPLOY BOTS
+            <Text style={[styles.deployButtonText, !selectedType && styles.deployButtonTextDisabled]}>
+              ASSIGN BOTS
             </Text>
           </TouchableOpacity>
         </View>
