@@ -195,19 +195,32 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ botType, quantity, battalionId })
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to assign bots');
-      }
+      const data = await response.json() as {
+        updatedBotCount: number;
+        previousAssignment: { botType: BotType; quantity: number } | null;
+        error?: string;
+      };
 
-      const { updatedBotCount } = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to assign bots');
+      }
 
       // Update local state with server response
       setBotCounts(prev => ({
         ...prev,
-        [botType]: updatedBotCount
+        [botType]: data.updatedBotCount
       }));
       
+      // If there was a previous assignment, subtract it first
+      if (data.previousAssignment) {
+        const { botType: prevBotType, quantity: prevQuantity } = data.previousAssignment;
+        setDeployedCounts(prev => ({
+          ...prev,
+          [prevBotType]: prev[prevBotType] - prevQuantity
+        }));
+      }
+      
+      // Then add the new assignment
       setDeployedCounts(prev => ({
         ...prev,
         [botType]: prev[botType] + quantity
