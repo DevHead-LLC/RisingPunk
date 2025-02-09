@@ -340,10 +340,12 @@ app.post('/api/battalions/assign', auth, async (req: Request, res: Response) => 
   try {
     const { botType, quantity, battalionId } = req.body;
     
-    const bot = await Bot.findOne({ userId: req.user._id });
-    if (!bot) {
-      return res.status(404).json({ error: 'Bot document not found' });
-    }
+    // Use findOneAndUpdate instead of findOne to handle concurrent updates
+    const bot = await Bot.findOneAndUpdate(
+      { userId: req.user._id },
+      {},
+      { new: true, upsert: true }
+    );
 
     // Find existing assignment for this battalion
     const existingAssignment = bot.battalionAssignments.find(
@@ -353,7 +355,6 @@ app.post('/api/battalions/assign', auth, async (req: Request, res: Response) => 
     // If exists, return those bots to the available pool first
     if (existingAssignment) {
       bot.bots[existingAssignment.botType] += existingAssignment.quantity;
-      // Remove the existing assignment
       bot.battalionAssignments = bot.battalionAssignments.filter(
         (assignment: { battalionId: string }) => assignment.battalionId !== battalionId
       );
@@ -366,14 +367,23 @@ app.post('/api/battalions/assign', auth, async (req: Request, res: Response) => 
 
     // Make the new assignment
     bot.bots[botType] -= quantity;
-    bot.battalionAssignments.push({
-      battalionId,
-      botType,
-      quantity,
-      markLevel: 1
-    });
+    if (quantity > 0) {
+      bot.battalionAssignments.push({
+        battalionId,
+        botType,
+        quantity,
+        markLevel: 1
+      });
+    }
 
-    await bot.save();
+    await Bot.findOneAndUpdate(
+      { userId: req.user._id },
+      { 
+        bots: bot.bots,
+        battalionAssignments: bot.battalionAssignments
+      },
+      { new: true }
+    );
 
     res.json({ 
       success: true,

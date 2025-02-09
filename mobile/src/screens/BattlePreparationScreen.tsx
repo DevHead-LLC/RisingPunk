@@ -98,19 +98,33 @@ export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
 
   useEffect(() => {
     return () => {
-      // Reset all battalion assignments
-      for (const [battalionId, assignment] of Object.entries(assignments)) {
-        if (assignment) {
-          void assignToBattalion({
-            botType: assignment.botType as BotType,
-            quantity: 0,
-            battalionId
-          });
-        }
-      }
+      // Reset local assignments state
       setAssignments({});
+      
+      // Reset server-side assignments for both battalions sequentially
+      const resetBattalions = async () => {
+        try {
+          // Reset battalion A first
+          await assignToBattalion({
+            botType: 'breacher',
+            quantity: 0,
+            battalionId: 'A'
+          });
+          
+          // Then reset battalion B
+          await assignToBattalion({
+            botType: 'breacher',
+            quantity: 0,
+            battalionId: 'B'
+          });
+        } catch (error) {
+          console.error('Failed to reset battalions:', error);
+        }
+      };
+      
+      void resetBattalions();
     };
-  }, []);
+  }, [assignToBattalion]);
 
   // Add this effect to fetch initial assignments
   useEffect(() => {
