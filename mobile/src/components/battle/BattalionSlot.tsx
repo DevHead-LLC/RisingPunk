@@ -60,6 +60,7 @@ export const BattalionSlot = React.memo(({
           </Text>
         </View>
       )}
+      {isEnemy && <Text style={styles.scanErrorText}>[scan error]</Text>}
     </>
   );
 

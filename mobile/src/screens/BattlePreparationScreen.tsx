@@ -246,7 +246,7 @@ export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
         style={styles.executeButton}
         onPress={() => console.log('Execute battle')}
       >
-        <Text style={styles.executeText}>EXECUTE BATTLE SEQUENCE</Text>
+        <Text style={styles.executeText}>DEPLOY PURGE</Text>
       </TouchableOpacity>
 
       <BattalionBotSelector
