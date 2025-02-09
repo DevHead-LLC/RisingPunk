@@ -337,14 +337,27 @@ app.post('/api/battalions/assign', auth, async (req: Request, res: Response) => 
       return res.status(404).json({ error: 'Bot document not found' });
     }
 
-    // Verify sufficient bots available
+    // Find existing assignment for this battalion
+    const existingAssignment = bot.battalionAssignments.find(
+      (assignment: { battalionId: string }) => assignment.battalionId === battalionId
+    );
+
+    // If exists, return those bots to the available pool first
+    if (existingAssignment) {
+      bot.bots[existingAssignment.botType] += existingAssignment.quantity;
+      // Remove the existing assignment
+      bot.battalionAssignments = bot.battalionAssignments.filter(
+        (assignment: { battalionId: string }) => assignment.battalionId !== battalionId
+      );
+    }
+
+    // Now verify sufficient bots available
     if (bot.bots[botType] < quantity) {
       return res.status(400).json({ error: 'Insufficient bots available' });
     }
 
-    // Update bot counts and add battalion assignment
+    // Make the new assignment
     bot.bots[botType] -= quantity;
-    
     bot.battalionAssignments.push({
       battalionId,
       botType,
@@ -356,7 +369,8 @@ app.post('/api/battalions/assign', auth, async (req: Request, res: Response) => 
 
     res.json({ 
       success: true,
-      updatedBotCount: bot.bots[botType]
+      updatedBotCount: bot.bots[botType],
+      previousAssignment: existingAssignment || null
     });
 
   } catch (error: any) {
