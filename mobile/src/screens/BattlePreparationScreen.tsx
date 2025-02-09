@@ -8,6 +8,8 @@ import { BattalionBotSelector } from '../components/battle/BattalionBotSelector'
 import { BattalionAssignment } from '../components/battle/BattalionSlot';
 import { BotType } from '../types/bots';
 import { useBots } from '../context/BotsContext';
+import { API_URL } from '../config';
+import { useAuth } from '../context/AuthContext';
 
 type Props = {
   onClose: () => void;
@@ -27,6 +29,7 @@ export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [selectedBattalion, setSelectedBattalion] = useState<string | null>(null);
   const [assignments, setAssignments] = useState<Record<string, BattalionAssignment>>({});
+  const { token } = useAuth();
   
   useEffect(() => {
     // Run the animation sequence twice
@@ -92,6 +95,52 @@ export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
     }
     setSelectorVisible(false);
   };
+
+  useEffect(() => {
+    return () => {
+      // Reset all battalion assignments
+      for (const [battalionId, assignment] of Object.entries(assignments)) {
+        if (assignment) {
+          void assignToBattalion({
+            botType: assignment.botType as BotType,
+            quantity: 0,
+            battalionId
+          });
+        }
+      }
+      setAssignments({});
+    };
+  }, []);
+
+  // Add this effect to fetch initial assignments
+  useEffect(() => {
+    const fetchAssignments = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/bots`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const data = await response.json();
+        
+        // Convert battalion assignments to our local format
+        const currentAssignments: Record<string, BattalionAssignment> = {};
+        data.battalionAssignments?.forEach((assignment: any) => {
+          currentAssignments[assignment.battalionId] = {
+            botType: assignment.botType,
+            quantity: assignment.quantity,
+            markLevel: assignment.markLevel
+          };
+        });
+        
+        setAssignments(currentAssignments);
+      } catch (error) {
+        console.error('Failed to fetch assignments:', error);
+      }
+    };
+    
+    fetchAssignments();
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
