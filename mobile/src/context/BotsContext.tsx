@@ -73,7 +73,7 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
         // Set bot counts from server
         setBotCounts(data.bots);
         
-        // Calculate deployed counts
+        // Calculate deployed counts from battalion assignments
         const deployedState = {
           breacher: 0,
           guardian: 0,
