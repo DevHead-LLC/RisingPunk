@@ -69,7 +69,25 @@ export function BotsProvider({ children }: { children: React.ReactNode }) {
           }
         });
         const data = await response.json();
-        setBotCounts(data);
+        
+        // Set bot counts from server
+        setBotCounts(data.bots);
+        
+        // Calculate deployed counts
+        const deployedState = {
+          breacher: 0,
+          guardian: 0,
+          phreak: 0
+        };
+        
+        // Sum up all battalion assignments
+        data.battalionAssignments?.forEach(
+          (assignment: { botType: BotType; quantity: number }) => {
+            deployedState[assignment.botType] += assignment.quantity;
+          }
+        );
+        
+        setDeployedCounts(deployedState);
       } catch (error) {
         console.error('Failed to fetch bot counts:', error);
       }

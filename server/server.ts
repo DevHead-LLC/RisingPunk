@@ -151,9 +151,17 @@ app.post('/api/bots/test', auth, async (req: Request, res: Response) => {
 app.get('/api/bots', auth, async (req: Request, res: Response) => {
   try {
     const bot = await Bot.findOne({ userId: req.user._id });
-    res.json(bot?.bots || { breacher: 0, guardian: 0, phreak: 0 });
+    if (!bot) {
+      return res.json({ 
+        bots: { breacher: 0, guardian: 0, phreak: 0 },
+        battalionAssignments: []
+      });
+    }
+    res.json({ 
+      bots: bot.bots,
+      battalionAssignments: bot.battalionAssignments
+    });
   } catch (error: any) {
-    console.error('Bot fetch error:', error);
     res.status(500).json({ error: error.message });
   }
 });
