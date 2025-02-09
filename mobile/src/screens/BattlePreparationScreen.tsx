@@ -130,6 +130,10 @@ export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
   useEffect(() => {
     const fetchAssignments = async () => {
       try {
+        // First reset all assignments to 0
+        setAssignments({});
+        
+        // Then fetch current state
         const response = await fetch(`${API_URL}/api/bots`, {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -137,24 +141,28 @@ export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
         });
         const data = await response.json();
         
-        // Convert battalion assignments to our local format
-        const currentAssignments: Record<string, BattalionAssignment> = {};
-        data.battalionAssignments?.forEach((assignment: any) => {
-          currentAssignments[assignment.battalionId] = {
-            botType: assignment.botType,
-            quantity: assignment.quantity,
-            markLevel: assignment.markLevel
-          };
-        });
-        
-        setAssignments(currentAssignments);
+        // If there are any existing assignments, clear them first
+        if (data.battalionAssignments?.length > 0) {
+          await Promise.all([
+            assignToBattalion({
+              botType: 'breacher',
+              quantity: 0,
+              battalionId: 'A'
+            }),
+            assignToBattalion({
+              botType: 'breacher',
+              quantity: 0,
+              battalionId: 'B'
+            })
+          ]);
+        }
       } catch (error) {
         console.error('Failed to fetch assignments:', error);
       }
     };
     
     fetchAssignments();
-  }, []);
+  }, [token, assignToBattalion]);
 
   return (
     <SafeAreaView style={styles.container}>
