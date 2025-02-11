@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import Svg, { Line } from 'react-native-svg';
 import { COLORS } from '../../styles/theme';
+import { DataStream } from './DataStream';
 
 type Props = {
   nodes: Array<{ x: number; y: number }>;
@@ -32,6 +33,16 @@ export const NetworkLines = React.memo(({ nodes, width, height }: Props) => {
           stroke={COLORS.primary}
           strokeWidth="1"
           opacity={0.3}
+        />
+      ))}
+      {connections.map(([from, to], index) => (
+        <DataStream
+          key={`stream-${index}`}
+          startX={nodes[from].x}
+          startY={nodes[from].y}
+          endX={nodes[to].x}
+          endY={nodes[to].y}
+          active={from < 3 || to < 3} // Active for user's side
         />
       ))}
     </Svg>
