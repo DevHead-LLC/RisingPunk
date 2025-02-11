@@ -12,6 +12,7 @@ import {ProfileLocation} from '../components/turf/ProfileLocation';
 import {HomeLocation} from '../components/turf/HomeLocation';
 import {DigitalBarracksLocation} from '../components/turf/DigitalBarracksLocation';
 import {BattlePreparationScreen} from './BattlePreparationScreen';
+import {BattleScreen} from './BattleScreen';
 
 const DiagonalLines = memo(() => (
   <>
@@ -92,10 +93,13 @@ export function TurfScreen(): React.JSX.Element {
           onNavigateToBattle={() => navigateToScreen('battlePrep')}
         />;
       case 'battlePrep':
-        return <BattlePreparationScreen onClose={() => {
-          navigateToScreen('turf');
-          setTimeout(() => navigateToScreen('hackRig'), 0);
-        }} />;
+        return <BattlePreparationScreen 
+          onClose={() => {
+            navigateToScreen('turf');
+            setTimeout(() => navigateToScreen('hackRig'), 0);
+          }}
+          onBattleStart={() => navigateToScreen('battle')}
+        />;
       case 'map':
         return <HackMapScreen onClose={() => navigateToScreen('hackRig')} />;
       case 'botAssembly':
@@ -104,6 +108,11 @@ export function TurfScreen(): React.JSX.Element {
         return <DigitalBarracksScreen onClose={() => navigateToScreen('turf')} />;
       case 'profile':
         return <ProfileScreen onClose={() => navigateToScreen('turf')} />;
+      case 'battle':
+        return <BattleScreen onClose={() => {
+          navigateToScreen('turf');
+          setTimeout(() => navigateToScreen('hackRig'), 0);
+        }} />;
       default:
         return (
           <View style={styles.container}>
