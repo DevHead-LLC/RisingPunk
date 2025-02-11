@@ -5,6 +5,7 @@ import { NetworkNode } from '../components/battle/NetworkNode';
 import { NetworkLines } from '../components/battle/NetworkLines';
 import { BattleHeader } from '../components/battle/BattleHeader';
 import { BattalionDeploymentZone } from '../components/battle/BattalionDeploymentZone';
+import { BattleResultsOverlay } from '../components/battle/BattleResultsOverlay';
 
 type Props = {
   onClose: () => void;
@@ -17,6 +18,9 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   const networkOpacity = useRef(new Animated.Value(0)).current;
   const [timeRemaining, setTimeRemaining] = useState(20);
   const timerRef = useRef<NodeJS.Timeout>();
+  const [battleComplete, setBattleComplete] = useState(false);
+  const [battleWinner, setBattleWinner] = useState<'user' | 'enemy' | null>(null);
+  const resultsOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Start battle animations
@@ -33,7 +37,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       setTimeRemaining(prev => {
         if (prev <= 1) {
           clearInterval(timerRef.current);
-          onBattleComplete?.('user'); // Temporary: Always declare user as winner
+          handleBattleComplete('user'); // Temporary: Always declare user as winner
           return 0;
         }
         return prev - 1;
@@ -46,6 +50,16 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       }
     };
   }, []);
+
+  const handleBattleComplete = (winner: 'user' | 'enemy') => {
+    setBattleComplete(true);
+    setBattleWinner(winner);
+    Animated.timing(resultsOpacity, {
+      toValue: 1,
+      duration: 1000,
+      useNativeDriver: true,
+    }).start();
+  };
 
   const nodes = [
     // Left side (user) nodes
@@ -104,6 +118,13 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
           { type: 'phreak', quantity: 3 }
         ]}
       />
+      {battleComplete && battleWinner && (
+        <BattleResultsOverlay
+          winner={battleWinner}
+          opacity={resultsOpacity}
+          onContinue={onClose}
+        />
+      )}
     </SafeAreaView>
   );
 });
