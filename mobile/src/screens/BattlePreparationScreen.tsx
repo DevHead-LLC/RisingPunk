@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
 
 type Props = {
   onClose: () => void;
+  onBattleStart: () => void;
 };
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -23,7 +24,7 @@ type BattalionDeployment = {
   };
 };
 
-export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
+export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: Props) => {
   const { botCounts, assignToBattalion, getAvailableBots } = useBots();
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const [selectorVisible, setSelectorVisible] = useState(false);
@@ -244,7 +245,7 @@ export const BattlePreparationScreen = React.memo(({ onClose }: Props) => {
 
       <TouchableOpacity 
         style={styles.executeButton}
-        onPress={() => console.log('Execute battle')}
+        onPress={onBattleStart}
       >
         <Text style={styles.executeText}>DEPLOY PURGE</Text>
       </TouchableOpacity>
