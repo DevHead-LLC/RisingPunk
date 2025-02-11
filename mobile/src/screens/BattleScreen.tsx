@@ -8,23 +8,43 @@ import { BattalionDeploymentZone } from '../components/battle/BattalionDeploymen
 
 type Props = {
   onClose: () => void;
+  onBattleComplete?: (winner: 'user' | 'enemy') => void;
 };
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-export const BattleScreen = React.memo(({ onClose }: Props) => {
+export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) => {
   const networkOpacity = useRef(new Animated.Value(0)).current;
   const [timeRemaining, setTimeRemaining] = useState(20);
+  const timerRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
+    // Start battle animations
     Animated.sequence([
-      // Fade in network
       Animated.timing(networkOpacity, {
         toValue: 1,
         duration: 1000,
         useNativeDriver: true,
       })
     ]).start();
+
+    // Start countdown timer
+    timerRef.current = setInterval(() => {
+      setTimeRemaining(prev => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current);
+          onBattleComplete?.('user'); // Temporary: Always declare user as winner
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
   }, []);
 
   const nodes = [
