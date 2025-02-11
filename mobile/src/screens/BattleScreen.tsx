@@ -1,8 +1,10 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, SafeAreaView, Dimensions, Animated } from 'react-native';
 import { COLORS, SIZING } from '../styles/theme';
 import { NetworkNode } from '../components/battle/NetworkNode';
 import { NetworkLines } from '../components/battle/NetworkLines';
+import { BattleHeader } from '../components/battle/BattleHeader';
+import { BattalionDeploymentZone } from '../components/battle/BattalionDeploymentZone';
 
 type Props = {
   onClose: () => void;
@@ -12,6 +14,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export const BattleScreen = React.memo(({ onClose }: Props) => {
   const networkOpacity = useRef(new Animated.Value(0)).current;
+  const [timeRemaining, setTimeRemaining] = useState(20);
 
   useEffect(() => {
     Animated.sequence([
@@ -43,6 +46,8 @@ export const BattleScreen = React.memo(({ onClose }: Props) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <BattleHeader timeRemaining={timeRemaining} />
+      
       <Animated.View 
         style={[
           styles.networkContainer,
@@ -63,6 +68,22 @@ export const BattleScreen = React.memo(({ onClose }: Props) => {
           />
         ))}
       </Animated.View>
+      <BattalionDeploymentZone
+        side="user"
+        battalions={[
+          { type: 'breacher', quantity: 5 },
+          { type: 'guardian', quantity: 3 },
+          { type: 'phreak', quantity: 4 }
+        ]}
+      />
+      <BattalionDeploymentZone
+        side="enemy"
+        battalions={[
+          { type: 'breacher', quantity: 4 },
+          { type: 'guardian', quantity: 4 },
+          { type: 'phreak', quantity: 3 }
+        ]}
+      />
     </SafeAreaView>
   );
 });
