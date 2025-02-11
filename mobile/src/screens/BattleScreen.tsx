@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, SafeAreaView, Dimensions, Animated } from 'react-native';
 import { COLORS, SIZING } from '../styles/theme';
 import { NetworkNode } from '../components/battle/NetworkNode';
+import { NetworkLines } from '../components/battle/NetworkLines';
 
 type Props = {
   onClose: () => void;
@@ -48,6 +49,11 @@ export const BattleScreen = React.memo(({ onClose }: Props) => {
           { opacity: networkOpacity }
         ]}
       >
+        <NetworkLines 
+          nodes={nodes}
+          width={SCREEN_WIDTH}
+          height={SCREEN_HEIGHT * 0.8}
+        />
         {nodes.map((node, index) => (
           <NetworkNode 
             key={index}
