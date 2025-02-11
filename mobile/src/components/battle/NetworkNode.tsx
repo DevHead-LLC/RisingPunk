@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated } from 'react-native';
 import { COLORS } from '../../styles/theme';
 
@@ -10,6 +10,25 @@ type Props = {
 };
 
 export const NetworkNode = React.memo(({ x, y, size = 12, isActive = false }: Props) => {
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const pulse = Animated.sequence([
+      Animated.timing(pulseAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+      Animated.timing(pulseAnim, {
+        toValue: 0,
+        duration: 1000,
+        useNativeDriver: true,
+      })
+    ]);
+
+    Animated.loop(pulse).start();
+  }, []);
+
   return (
     <View style={[
       styles.node,
@@ -21,7 +40,21 @@ export const NetworkNode = React.memo(({ x, y, size = 12, isActive = false }: Pr
         backgroundColor: isActive ? COLORS.primary : COLORS.secondary
       }
     ]}>
-      <View style={styles.pulse} />
+      <Animated.View style={[
+        styles.pulse,
+        {
+          opacity: pulseAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0.2, 0.5]
+          }),
+          transform: [{
+            scale: pulseAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [1, 1.3]
+            })
+          }]
+        }
+      ]} />
     </View>
   );
 });
@@ -34,12 +67,13 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 2,
   },
   pulse: {
-    width: '70%',
-    height: '70%',
+    width: '100%',
+    height: '100%',
     borderRadius: 999,
     backgroundColor: COLORS.primary,
-    opacity: 0.5,
+    position: 'absolute',
   }
 }); 
