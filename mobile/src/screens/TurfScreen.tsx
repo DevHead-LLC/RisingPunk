@@ -1,5 +1,5 @@
 import React, {useState, useRef, useEffect, useCallback, memo} from 'react';
-import {View, StyleSheet, TouchableOpacity, Text, ScrollView} from 'react-native';
+import {View, StyleSheet, TouchableOpacity, Text, ScrollView, Dimensions} from 'react-native';
 import {Balance} from '../components/common/Balance';
 import {HomeScreen} from './HomeScreen';
 import {DigitalBarracksScreen} from './DigitalBarracksScreen';
@@ -31,13 +31,17 @@ const ScrollViewMemo = memo(function ScrollViewMemo({
   children: React.ReactNode;
   horizontalScrollRef: React.RefObject<ScrollView>;
 }) {
+  const SCREEN_WIDTH = Dimensions.get('window').width;
+  const CONTENT_WIDTH = 2000;
+  const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+
   return (
     <ScrollView 
       ref={horizontalScrollRef}
       horizontal={true}
       showsHorizontalScrollIndicator={false}
       showsVerticalScrollIndicator={false}
-      contentOffset={{ x: 670, y: 0 }}
+      contentOffset={{ x: CENTER_X, y: 0 }}
       scrollEnabled={true}
       maximumZoomScale={1}
       minimumZoomScale={1}
@@ -63,25 +67,22 @@ export function TurfScreen(): React.JSX.Element {
   }, []);
 
   const centerView = useCallback(() => {
-    setTimeout(() => {
-      horizontalScrollRef.current?.scrollTo({
-        x: 670,
-        y: 0,
-        animated: true
-      });
-      verticalScrollRef.current?.scrollTo({
-        x: 0,
-        y: 0,
-        animated: true
-      });
-    }, 100);
+    const SCREEN_WIDTH = Dimensions.get('window').width;
+    const CONTENT_WIDTH = 2000;
+    const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+    
+    // Set initial scroll position without animation
+    horizontalScrollRef.current?.scrollTo({
+      x: CENTER_X,
+      y: 0,
+      animated: false
+    });
   }, []);
 
   useEffect(() => {
-    if (currentScreen === 'turf') {
-      centerView();
-    }
-  }, [currentScreen, centerView]);
+    // Center the view immediately when the screen mounts
+    centerView();
+  }, []); // Empty dependency array for mount-only execution
 
   const renderScreen = useCallback(() => {
     switch (currentScreen) {
@@ -165,8 +166,7 @@ const styles = StyleSheet.create({
   digitalGround: {
     position: 'absolute',
     top: 100,
-    left: '50%',
-    transform: [{translateX: -300}],
+    left: 700,
     width: 600,
     height: 220,
     backgroundColor: 'rgba(0, 255, 65, 0.05)',
