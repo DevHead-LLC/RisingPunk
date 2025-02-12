@@ -206,15 +206,17 @@ export const LoginScreen = () => {
 
   return (
     <ScreenContainer>
-      <View style={styles.container}>
-        <View style={styles.leftSide}>
-          <TitleSection />
-        </View>
-        <View style={styles.rightSide}>
-          <WelcomeMessage formType={formType} />
-          <ErrorMessage error={error} />
-          {formType === 'login' ? renderLoginForm() : renderRegisterForm()}
-          <ToggleFormButton formType={formType} onPress={toggleFormType} />
+      <View style={styles.content}>
+        <View style={styles.container}>
+          <View style={styles.leftSide}>
+            <TitleSection />
+          </View>
+          <View style={styles.rightSide}>
+            <WelcomeMessage formType={formType} />
+            <ErrorMessage error={error} />
+            {formType === 'login' ? renderLoginForm() : renderRegisterForm()}
+            <ToggleFormButton formType={formType} onPress={toggleFormType} />
+          </View>
         </View>
       </View>
     </ScreenContainer>
@@ -222,6 +224,13 @@ export const LoginScreen = () => {
 }
 
 const styles = StyleSheet.create({
+  content: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    maxWidth: SIZING.screen.width * 0.9,
+    alignSelf: 'center',
+  },
   container: {
     flex: 1,
     flexDirection: 'row',
@@ -238,6 +247,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingRight: '5%',
+  },
+  formContainer: {
+    width: '100%',
+    maxWidth: 320,
+    paddingHorizontal: SIZING.spacing.md,
   },
   formBox: {
     width: '80%',
@@ -296,11 +310,6 @@ const styles = StyleSheet.create({
     color: COLORS.matrix,
     fontSize: SIZING.font.small,
     letterSpacing: 1,
-  },
-  formContainer: {
-    width: '100%',
-    maxWidth: 320,
-    paddingHorizontal: SIZING.spacing.md,
   },
   inputSpacing: {
     marginBottom: SIZING.spacing.md,
