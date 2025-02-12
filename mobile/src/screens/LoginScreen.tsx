@@ -13,6 +13,7 @@ import {api} from '../services/api';
 import { TitleSection } from '../components/auth/TitleSection';
 import { useDebounce } from '../hooks/useDebounce';
 import { useFormState } from '../hooks/useFormState';
+import { ScreenContainer } from '../components/common/ScreenContainer';
 
 type FormType = 'login' | 'register';
 
@@ -45,7 +46,7 @@ const ErrorMessage = memo(function ErrorMessage({ error }: { error: string | nul
   return <Text style={styles.errorText}>{error}</Text>;
 });
 
-export function LoginScreen(): React.JSX.Element {
+export const LoginScreen = () => {
   const { login } = useAuth();
   const [formType, setFormType] = useState<FormType>('login');
   const [formData, setFormData] = useState({
@@ -204,17 +205,19 @@ export function LoginScreen(): React.JSX.Element {
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.leftSide}>
-        <TitleSection />
+    <ScreenContainer>
+      <View style={styles.container}>
+        <View style={styles.leftSide}>
+          <TitleSection />
+        </View>
+        <View style={styles.rightSide}>
+          <WelcomeMessage formType={formType} />
+          <ErrorMessage error={error} />
+          {formType === 'login' ? renderLoginForm() : renderRegisterForm()}
+          <ToggleFormButton formType={formType} onPress={toggleFormType} />
+        </View>
       </View>
-      <View style={styles.rightSide}>
-        <WelcomeMessage formType={formType} />
-        <ErrorMessage error={error} />
-        {formType === 'login' ? renderLoginForm() : renderRegisterForm()}
-        <ToggleFormButton formType={formType} onPress={toggleFormType} />
-      </View>
-    </View>
+    </ScreenContainer>
   );
 }
 

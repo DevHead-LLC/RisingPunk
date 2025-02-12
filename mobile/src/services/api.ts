@@ -6,6 +6,9 @@ export interface LoginResponse {
     handle: string;
     email: string;
     level: number;
+    unlockedFeatures: {
+      hackRig: boolean;
+    };
   };
 }
 
