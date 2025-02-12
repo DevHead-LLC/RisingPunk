@@ -218,7 +218,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
           {/* Enemy Forces Screen */}
           <View style={styles.screen}>
             <Text style={styles.subtitleEnemy}>[ENEMY FORCES]</Text>
-            <View style={styles.battalionsContainer}>
+            <View style={[styles.battalionsContainer, styles.battalionsContainerEnemy]}>
               <View style={styles.circleColumnEnemy}>
                 <CircleSlot isEnemy />
                 <CircleSlot isEnemy />
@@ -301,20 +301,27 @@ const styles = StyleSheet.create({
     fontSize: 24,
     marginBottom: SIZING.spacing.sm,
     marginTop: SIZING.spacing.sm * 6,
-    marginRight: SIZING.spacing.sm * 15,
+    marginRight: SIZING.spacing.sm * 14,
   },
   subtitleEnemy: {
     color: '#FF4141',
     fontSize: 24,
-    textAlign: 'center',
     marginBottom: SIZING.spacing.sm,
     marginTop: SIZING.spacing.sm * 5,
+    marginRight: SIZING.spacing.sm * 16,
   },
   battalionsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: SIZING.spacing.lg,
+  },
+  battalionsContainerEnemy: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: SIZING.spacing.lg,
+    marginLeft: -SIZING.spacing.lg * 10,
   },
   battalionColumn: {
     gap: SIZING.spacing.md,
