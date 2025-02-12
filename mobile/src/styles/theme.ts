@@ -1,3 +1,7 @@
+import { Dimensions } from 'react-native';
+
+const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window');
+
 type ThemeColors = {
   background: string;
   primary: string;
@@ -29,6 +33,14 @@ type ThemeSizing = {
     sm: number;
     md: number;
     lg: number;
+  };
+  screen: {
+    width: number;
+    height: number;
+    padding: {
+      horizontal: number;
+      vertical: number;
+    };
   };
 };
 
@@ -63,6 +75,14 @@ export const SIZING: ThemeSizing = {
     sm: 8,
     md: 16,
     lg: 24,
+  },
+  screen: {
+    width: WINDOW_WIDTH,
+    height: WINDOW_HEIGHT,
+    padding: {
+      horizontal: 20,
+      vertical: 10
+    }
   }
 };
 
