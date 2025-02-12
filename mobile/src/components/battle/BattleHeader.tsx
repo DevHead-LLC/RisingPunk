@@ -4,13 +4,18 @@ import { COLORS, SIZING } from '../../styles/theme';
 
 type Props = {
   timeRemaining?: number;
+  isCountdown?: boolean;
 };
 
-export const BattleHeader = React.memo(({ timeRemaining = 20 }: Props) => {
+export const BattleHeader = React.memo(({ timeRemaining = 0, isCountdown }: Props) => {
   return (
     <View style={styles.container}>
-      <Text style={styles.statusText}>SYSTEM BREACH IN PROGRESS</Text>
-      <Text style={styles.timerText}>{timeRemaining}s</Text>
+      <Text style={styles.statusText}>
+        {isCountdown ? 'BATTLE STARTING' : 'SYSTEM BREACH IN PROGRESS'}
+      </Text>
+      <Text style={styles.timerText}>
+        {isCountdown ? `${timeRemaining}` : `${timeRemaining}s`}
+      </Text>
     </View>
   );
 });
