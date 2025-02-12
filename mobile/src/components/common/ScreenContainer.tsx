@@ -1,6 +1,6 @@
 import React from 'react';
 import { SafeAreaView, View, StyleSheet } from 'react-native';
-import { COLORS, SIZING } from '../../styles/theme';
+import { COLORS } from '../../styles/theme';
 
 type Props = {
   children: React.ReactNode;
@@ -21,7 +21,6 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    paddingHorizontal: SIZING.screen.padding.horizontal,
-    paddingVertical: SIZING.screen.padding.vertical,
+    backgroundColor: COLORS.background,
   }
 }); 

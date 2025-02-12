@@ -6,7 +6,8 @@
  */
 
 import React from 'react';
-import { SafeAreaView } from 'react-native';
+import { View } from 'react-native';
+import { COLORS } from './src/styles/theme';
 import { TurfScreen } from './src/screens/TurfScreen';
 import { BalanceProvider } from './src/context/BalanceContext';
 import { BotsProvider } from './src/context/BotsContext';
@@ -18,13 +19,13 @@ function AppContent(): React.JSX.Element {
   const { token } = useAuth();
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
       <BalanceProvider>
         <BotsProvider>
           {!token ? <LoginScreen /> : <TurfScreen />}
         </BotsProvider>
       </BalanceProvider>
-    </SafeAreaView>
+    </View>
   );
 }
 

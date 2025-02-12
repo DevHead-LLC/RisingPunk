@@ -41,6 +41,7 @@ type ThemeSizing = {
       horizontal: number;
       vertical: number;
     };
+    maxContentWidth: number;
   };
 };
 
@@ -82,7 +83,8 @@ export const SIZING: ThemeSizing = {
     padding: {
       horizontal: 20,
       vertical: 10
-    }
+    },
+    maxContentWidth: 800
   }
 };
 
