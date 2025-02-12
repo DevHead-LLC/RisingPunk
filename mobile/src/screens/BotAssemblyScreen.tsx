@@ -64,7 +64,6 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
   return (
     <SafeAreaView style={styles.container}>
       <BotAssemblyHeader onClose={onClose} />
-      <Balance />
       <View style={styles.content}>
         <ScrollView style={styles.botSelection}>
           {levelSections}
