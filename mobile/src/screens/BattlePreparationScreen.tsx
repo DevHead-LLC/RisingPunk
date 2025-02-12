@@ -63,7 +63,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
     transform: [{
       translateX: pulseAnim.interpolate({
         inputRange: [0, 1],
-        outputRange: [0, -10]
+        outputRange: [0, -35]
       })
     }]
   };
@@ -173,75 +173,79 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
         <Text style={styles.title}>BATTLE PREPARATION</Text>
       </View>
 
-      <ScrollView 
-        horizontal 
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        style={styles.scrollView}
-      >
-        <View style={styles.screen}>
-          <Text style={styles.subtitle}>[USER FORCES]</Text>
-          <Animated.View style={[styles.swipeIndicator, swipeIndicatorStyle]}>
-            <Text style={styles.swipeArrow}>⟶</Text>
-            <Text style={styles.swipeText}>ENEMY FORCES</Text>
-          </Animated.View>
-          <View style={styles.battalionsContainer}>
-            <View style={styles.battalionColumn}>
-              <BattalionSlot name="E" isLocked />
-              <BattalionSlot name="F" isLocked />
-            </View>
-            <View style={styles.battalionColumn}>
-              <BattalionSlot name="C" isLocked />
-              <BattalionSlot name="D" isLocked />
-            </View>
-            <View style={styles.battalionColumn}>
-              <BattalionSlot 
-                name="A" 
-                onPress={() => handleBattalionPress('A')}
-                assignment={assignments['A']}
-              />
-              <BattalionSlot 
-                name="B" 
-                onPress={() => handleBattalionPress('B')}
-                assignment={assignments['B']}
-              />
-            </View>
-            <View style={styles.circleColumn}>
-              <CircleSlot />
-              <CircleSlot />
-              <CircleSlot />
-            </View>
-          </View>
-        </View>
-        <View style={styles.screen}>
-          <Text style={styles.subtitleEnemy}>[ENEMY FORCES]</Text>
-          <View style={styles.battalionsContainer}>
-            <View style={styles.circleColumnEnemy}>
-              <CircleSlot isEnemy />
-              <CircleSlot isEnemy />
-              <CircleSlot isEnemy />
-            </View>
-            <View style={styles.battalionColumn}>
-              <BattalionSlot 
-                name="A" 
-                isEnemy 
-              />
-              <BattalionSlot 
-                name="B" 
-                isEnemy 
-              />
-            </View>
-            <View style={styles.battalionColumn}>
-              <BattalionSlot name="C" isEnemy isLocked />
-              <BattalionSlot name="D" isEnemy isLocked />
-            </View>
-            <View style={styles.battalionColumn}>
-              <BattalionSlot name="E" isEnemy isLocked />
-              <BattalionSlot name="F" isEnemy isLocked />
+      <View style={styles.mainContainer}>
+        <ScrollView 
+          horizontal 
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+        >
+          {/* User Forces Screen */}
+          <View style={styles.screen}>
+            <Text style={styles.subtitle}>[USER FORCES]</Text>
+            <Animated.View style={[styles.swipeIndicator, swipeIndicatorStyle]}>
+              <Text style={styles.swipeArrow}>⟶</Text>
+              <Text style={styles.swipeText}>ENEMY FORCES</Text>
+            </Animated.View>
+            <View style={styles.battalionsContainer}>
+              <View style={styles.battalionColumn}>
+                <BattalionSlot name="E" isLocked />
+                <BattalionSlot name="F" isLocked />
+              </View>
+              <View style={styles.battalionColumn}>
+                <BattalionSlot name="C" isLocked />
+                <BattalionSlot name="D" isLocked />
+              </View>
+              <View style={styles.battalionColumn}>
+                <BattalionSlot 
+                  name="A" 
+                  onPress={() => handleBattalionPress('A')}
+                  assignment={assignments['A']}
+                />
+                <BattalionSlot 
+                  name="B" 
+                  onPress={() => handleBattalionPress('B')}
+                  assignment={assignments['B']}
+                />
+              </View>
+              <View style={styles.circleColumn}>
+                <CircleSlot />
+                <CircleSlot />
+                <CircleSlot />
+              </View>
             </View>
           </View>
-        </View>
-      </ScrollView>
+
+          {/* Enemy Forces Screen */}
+          <View style={styles.screen}>
+            <Text style={styles.subtitleEnemy}>[ENEMY FORCES]</Text>
+            <View style={styles.battalionsContainer}>
+              <View style={styles.circleColumnEnemy}>
+                <CircleSlot isEnemy />
+                <CircleSlot isEnemy />
+                <CircleSlot isEnemy />
+              </View>
+              <View style={styles.battalionColumn}>
+                <BattalionSlot 
+                  name="A" 
+                  isEnemy 
+                />
+                <BattalionSlot 
+                  name="B" 
+                  isEnemy 
+                />
+              </View>
+              <View style={styles.battalionColumn}>
+                <BattalionSlot name="C" isEnemy isLocked />
+                <BattalionSlot name="D" isEnemy isLocked />
+              </View>
+              <View style={styles.battalionColumn}>
+                <BattalionSlot name="E" isEnemy isLocked />
+                <BattalionSlot name="F" isEnemy isLocked />
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+      </View>
 
       <TouchableOpacity 
         style={styles.executeButton}
@@ -274,9 +278,9 @@ const styles = StyleSheet.create({
     zIndex: 1,
     alignItems: 'center',
   },
-  scrollView: {
+  mainContainer: {
     flex: 1,
-    marginTop: 40,
+    width: SCREEN_WIDTH,
   },
   screen: {
     width: SCREEN_WIDTH,
@@ -295,20 +299,21 @@ const styles = StyleSheet.create({
   subtitle: {
     color: '#00FF41',
     fontSize: 24,
-    textAlign: 'center',
     marginBottom: SIZING.spacing.sm,
+    marginTop: SIZING.spacing.sm * 6,
+    marginRight: SIZING.spacing.sm * 15,
   },
   subtitleEnemy: {
     color: '#FF4141',
     fontSize: 24,
     textAlign: 'center',
     marginBottom: SIZING.spacing.sm,
+    marginTop: SIZING.spacing.sm * 5,
   },
   battalionsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: SIZING.spacing.lg,
     gap: SIZING.spacing.lg,
   },
   battalionColumn: {
@@ -353,8 +358,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SIZING.spacing.xs,
-    paddingRight: SIZING.spacing.lg,
-    marginTop: -SIZING.spacing.lg, // Position it closer to top
+    paddingRight: SIZING.spacing.lg * 5,
+    marginTop: -SIZING.spacing.lg * 1.5, // Position it closer to top
   },
   swipeArrow: {
     color: '#00FF41',
