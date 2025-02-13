@@ -40,17 +40,20 @@ export const BattalionDeploymentZone = React.memo(({ side, battalions }: Props) 
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: SCREEN_HEIGHT * 0.2,
-    bottom: SCREEN_HEIGHT * 0.2,
+    height: SCREEN_HEIGHT * 0.65,
     width: 60,
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
   userZone: {
-    left: 16,
+    left: 0,
+    top: SCREEN_HEIGHT * 0.2,
+    bottom: SCREEN_HEIGHT * 0.1,
   },
   enemyZone: {
-    right: 16,
+    right: 0,
+    top: SCREEN_HEIGHT * 0.2,
+    bottom: SCREEN_HEIGHT * 0.1,
   },
   battalionContainer: {
     alignItems: 'center',
