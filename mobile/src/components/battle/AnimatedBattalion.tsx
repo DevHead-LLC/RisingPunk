@@ -40,8 +40,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 40,
     height: 40,
-    marginLeft: -20, // Center horizontally
-    marginTop: -20,  // Center vertically
   },
   battalion: {
     width: 40,
