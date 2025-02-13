@@ -65,19 +65,28 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       type: 'breacher',
       quantity: 4,
       nodeIndex: 6,
-      position: new Animated.ValueXY({ x: SCREEN_WIDTH * 0.85, y: SCREEN_HEIGHT * 0.3 })
+      position: new Animated.ValueXY({ 
+        x: SCREEN_WIDTH - 175,
+        y: SCREEN_HEIGHT * 0.2
+      })
     },
     {
       type: 'guardian',
       quantity: 4,
       nodeIndex: 7,
-      position: new Animated.ValueXY({ x: SCREEN_WIDTH * 0.85, y: SCREEN_HEIGHT * 0.5 })
+      position: new Animated.ValueXY({ 
+        x: SCREEN_WIDTH - 175,
+        y: SCREEN_HEIGHT * 0.475
+      })
     },
     {
       type: 'phreak',
       quantity: 3,
       nodeIndex: 8,
-      position: new Animated.ValueXY({ x: SCREEN_WIDTH * 0.85, y: SCREEN_HEIGHT * 0.7 })
+      position: new Animated.ValueXY({ 
+        x: SCREEN_WIDTH - 175,
+        y: SCREEN_HEIGHT * 0.75
+      })
     }
   ]);
 
