@@ -20,10 +20,13 @@ export const BattalionDeploymentZone = React.memo(({ side, battalions }: Props) 
     ]}>
       {battalions.map((battalion, index) => (
         <View key={index} style={styles.battalionContainer}>
-          <View style={[
-            styles.battalionIndicator,
-            styles[battalion.type]
-          ]}>
+          <View 
+            style={[
+              styles.battalionIndicator,
+              styles[battalion.type],
+              side === 'enemy' && styles.battalionIndicatorEnemy
+            ]}
+          >
             <Text style={[
               styles.quantityText,
               battalion.type === 'breacher' && styles.rotatedText
@@ -67,6 +70,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#4717F6',
+  },
+  battalionIndicatorEnemy: {
+    borderColor: '#FF4141',
   },
   breacher: {
     transform: [{ rotate: '45deg' }],
