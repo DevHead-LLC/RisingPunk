@@ -36,7 +36,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       quantity: 5,
       nodeIndex: 0,
       position: new Animated.ValueXY({ 
-        x: 10,
+        x: 0,
         y: SCREEN_HEIGHT * 0.2
       })
     },
@@ -45,7 +45,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       quantity: 3,
       nodeIndex: 1,
       position: new Animated.ValueXY({ 
-        x: 10,
+        x: 0,
         y: SCREEN_HEIGHT * 0.475
       })
     },
@@ -54,7 +54,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       quantity: 4,
       nodeIndex: 2,
       position: new Animated.ValueXY({ 
-        x: 10,
+        x: 0,
         y: SCREEN_HEIGHT * 0.75
       })
     }
@@ -66,7 +66,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       quantity: 4,
       nodeIndex: 6,
       position: new Animated.ValueXY({ 
-        x: SCREEN_WIDTH - 175,
+        x: SCREEN_WIDTH - 185,
         y: SCREEN_HEIGHT * 0.2
       })
     },
@@ -75,7 +75,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       quantity: 4,
       nodeIndex: 7,
       position: new Animated.ValueXY({ 
-        x: SCREEN_WIDTH - 175,
+        x: SCREEN_WIDTH - 185,
         y: SCREEN_HEIGHT * 0.475
       })
     },
@@ -84,7 +84,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       quantity: 3,
       nodeIndex: 8,
       position: new Animated.ValueXY({ 
-        x: SCREEN_WIDTH - 175,
+        x: SCREEN_WIDTH - 185,
         y: SCREEN_HEIGHT * 0.75
       })
     }
@@ -294,7 +294,5 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
   }
 }); 
