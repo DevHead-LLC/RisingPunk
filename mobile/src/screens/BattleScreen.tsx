@@ -36,7 +36,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       quantity: 5,
       nodeIndex: 0,
       position: new Animated.ValueXY({ 
-        x: 0,
+        x: 10,
         y: SCREEN_HEIGHT * 0.2
       })
     },
@@ -45,7 +45,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       quantity: 3,
       nodeIndex: 1,
       position: new Animated.ValueXY({ 
-        x: 0,
+        x: 10,
         y: SCREEN_HEIGHT * 0.475
       })
     },
@@ -54,7 +54,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       quantity: 4,
       nodeIndex: 2,
       position: new Animated.ValueXY({ 
-        x: 0,
+        x: 10,
         y: SCREEN_HEIGHT * 0.75
       })
     }
@@ -66,7 +66,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       quantity: 4,
       nodeIndex: 6,
       position: new Animated.ValueXY({ 
-        x: SCREEN_WIDTH - 185,
+        x: SCREEN_WIDTH - 175,
         y: SCREEN_HEIGHT * 0.2
       })
     },
@@ -75,7 +75,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       quantity: 4,
       nodeIndex: 7,
       position: new Animated.ValueXY({ 
-        x: SCREEN_WIDTH - 185,
+        x: SCREEN_WIDTH - 175,
         y: SCREEN_HEIGHT * 0.475
       })
     },
@@ -84,7 +84,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       quantity: 3,
       nodeIndex: 8,
       position: new Animated.ValueXY({ 
-        x: SCREEN_WIDTH - 185,
+        x: SCREEN_WIDTH - 175,
         y: SCREEN_HEIGHT * 0.75
       })
     }
@@ -165,19 +165,19 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
 
   const nodes = [
     // Left side (user) nodes
-    { x: SCREEN_WIDTH * 0.15, y: SCREEN_HEIGHT * 0.3 },
-    { x: SCREEN_WIDTH * 0.15, y: SCREEN_HEIGHT * 0.5 },
-    { x: SCREEN_WIDTH * 0.15, y: SCREEN_HEIGHT * 0.7 },
+    { x: SCREEN_WIDTH * 0.12, y: SCREEN_HEIGHT * 0.2 },     // Top
+    { x: SCREEN_WIDTH * 0.12, y: SCREEN_HEIGHT * 0.475 },   // Middle
+    { x: SCREEN_WIDTH * 0.12, y: SCREEN_HEIGHT * 0.75 },    // Bottom
     
     // Middle nodes
-    { x: SCREEN_WIDTH * 0.5, y: SCREEN_HEIGHT * 0.3 },
-    { x: SCREEN_WIDTH * 0.5, y: SCREEN_HEIGHT * 0.5 },
-    { x: SCREEN_WIDTH * 0.5, y: SCREEN_HEIGHT * 0.7 },
+    { x: SCREEN_WIDTH * 0.47, y: SCREEN_HEIGHT * 0.2 },     // Top
+    { x: SCREEN_WIDTH * 0.47, y: SCREEN_HEIGHT * 0.475 },   // Middle
+    { x: SCREEN_WIDTH * 0.47, y: SCREEN_HEIGHT * 0.75 },    // Bottom
     
     // Right side (enemy) nodes
-    { x: SCREEN_WIDTH * 0.85, y: SCREEN_HEIGHT * 0.3 },
-    { x: SCREEN_WIDTH * 0.85, y: SCREEN_HEIGHT * 0.5 },
-    { x: SCREEN_WIDTH * 0.85, y: SCREEN_HEIGHT * 0.7 },
+    { x: SCREEN_WIDTH * 0.82, y: SCREEN_HEIGHT * 0.2 },     // Top
+    { x: SCREEN_WIDTH * 0.82, y: SCREEN_HEIGHT * 0.475 },   // Middle
+    { x: SCREEN_WIDTH * 0.82, y: SCREEN_HEIGHT * 0.75 },    // Bottom
   ];
 
   // Movement animation function
