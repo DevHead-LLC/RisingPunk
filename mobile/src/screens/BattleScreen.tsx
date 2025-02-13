@@ -262,14 +262,20 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+    position: 'relative',
   },
   networkContainer: {
     flex: 1,
-    width: SCREEN_WIDTH,
+    width: '100%',
     height: SCREEN_HEIGHT * 0.8,
+    position: 'relative',
   },
   overlayContainer: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
     justifyContent: 'center',
     alignItems: 'center',
   }
