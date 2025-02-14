@@ -165,20 +165,22 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
 
   const nodes = [
     // Left side (user) nodes
-    { x: SCREEN_WIDTH * 0.12, y: SCREEN_HEIGHT * 0.2 },     // Top
-    { x: SCREEN_WIDTH * 0.12, y: SCREEN_HEIGHT * 0.475 },   // Middle
-    { x: SCREEN_WIDTH * 0.12, y: SCREEN_HEIGHT * 0.75 },    // Bottom
+    { x: SCREEN_WIDTH * 0.0347, y: SCREEN_HEIGHT * 0.25 },     // Top
+    { x: SCREEN_WIDTH * 0.0347, y: SCREEN_HEIGHT * 0.525 },   // Middle
+    { x: SCREEN_WIDTH * 0.0347, y: SCREEN_HEIGHT * 0.8 },    // Bottom
     
     // Middle nodes
-    { x: SCREEN_WIDTH * 0.47, y: SCREEN_HEIGHT * 0.2 },     // Top
-    { x: SCREEN_WIDTH * 0.47, y: SCREEN_HEIGHT * 0.475 },   // Middle
-    { x: SCREEN_WIDTH * 0.47, y: SCREEN_HEIGHT * 0.75 },    // Bottom
+    { x: SCREEN_WIDTH * 0.425, y: SCREEN_HEIGHT * 0.375 },      // Top
+    { x: SCREEN_WIDTH * 0.425, y: SCREEN_HEIGHT * 0.525 },    // Middle
+    { x: SCREEN_WIDTH * 0.425, y: SCREEN_HEIGHT * 0.675 },     // Bottom
     
     // Right side (enemy) nodes
-    { x: SCREEN_WIDTH * 0.82, y: SCREEN_HEIGHT * 0.2 },     // Top
-    { x: SCREEN_WIDTH * 0.82, y: SCREEN_HEIGHT * 0.475 },   // Middle
-    { x: SCREEN_WIDTH * 0.82, y: SCREEN_HEIGHT * 0.75 },    // Bottom
+    { x: SCREEN_WIDTH * 0.8225, y: SCREEN_HEIGHT * 0.25 },     // Top
+    { x: SCREEN_WIDTH * 0.8225, y: SCREEN_HEIGHT * 0.525 },   // Middle
+    { x: SCREEN_WIDTH * 0.8225, y: SCREEN_HEIGHT * 0.8 },    // Bottom
   ];
+
+  
 
   // Movement animation function
   const moveBattalion = (battalion: BattalionPosition, targetNode: number) => {
