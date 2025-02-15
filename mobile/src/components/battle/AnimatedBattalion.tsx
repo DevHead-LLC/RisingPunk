@@ -1,5 +1,6 @@
 import React from 'react';
 import { Animated, StyleSheet, View, Text } from 'react-native';
+import { BOT_CATEGORIES } from '../../screens/DigitalBarracksScreen';
 
 type Props = {
   type: 'breacher' | 'guardian' | 'phreak';
@@ -10,6 +11,9 @@ type Props = {
 };
 
 export const AnimatedBattalion = React.memo(({ type, quantity, position, isUser, health = 100 }: Props) => {
+  const rangeSize = BOT_CATEGORIES[type].stats.range * 30;
+  const offset = rangeSize / 2 - 10; // Half of range size minus half of battalion size (20/2)
+
   return (
     <Animated.View
       style={[
@@ -22,6 +26,20 @@ export const AnimatedBattalion = React.memo(({ type, quantity, position, isUser,
         }
       ]}
     >
+      {/* Attack Range Indicator */}
+      <View style={[
+        styles.rangeIndicator,
+        {
+          width: rangeSize,
+          height: rangeSize,
+          borderRadius: rangeSize / 2,
+          backgroundColor: isUser ? 'rgba(71, 23, 246, 0.05)' : 'rgba(255, 65, 65, 0.05)',
+          borderColor: isUser ? 'rgba(71, 23, 246, 0.1)' : 'rgba(255, 65, 65, 0.1)',
+          left: -offset,
+          top: -offset
+        }
+      ]} />
+
       <View style={styles.healthBarContainer}>
         <View style={[styles.healthBar, { width: `${health}%` }]} />
       </View>
@@ -90,5 +108,12 @@ const styles = StyleSheet.create({
   },
   rotatedText: {
     transform: [{ rotate: '-45deg' }]
-  }
+  },
+  rangeIndicator: {
+    position: 'absolute',
+    borderWidth: 1,
+    left: -15,
+    top: -15,
+    zIndex: -1,
+  },
 }); 
