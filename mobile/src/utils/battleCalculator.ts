@@ -62,4 +62,15 @@ const calculateBattalionPower = (battalion: Battalion) => {
   };
 
   return battalion.quantity * basePower[battalion.type];
+};
+
+export const checkRangeIntersection = (
+  position1: { x: number, y: number },
+  position2: { x: number, y: number },
+  range: number
+): boolean => {
+  const dx = position1.x - position2.x;
+  const dy = position1.y - position2.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  return distance <= range;
 }; 

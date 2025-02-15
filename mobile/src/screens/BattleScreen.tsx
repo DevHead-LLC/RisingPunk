@@ -9,6 +9,8 @@ import { BattleResultsOverlay } from '../components/battle/BattleResultsOverlay'
 import { AnimatedBattalion } from '../components/battle/AnimatedBattalion';
 import { CountdownOverlay } from '../components/battle/CountdownOverlay';
 
+import { BOT_CATEGORIES } from './DigitalBarracksScreen';
+import { checkRangeIntersection } from '../utils/battleCalculator';
 type Props = {
   onClose: () => void;
   onBattleComplete?: (winner: 'user' | 'enemy') => void;
@@ -21,6 +23,12 @@ interface BattalionPosition {
   quantity: number;
   nodeIndex: number;
   position: Animated.ValueXY;
+}
+
+interface BattleNode {
+  x: number;
+  y: number;
+  controlState: 'user' | 'enemy' | 'neutral';
 }
 
 export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) => {
@@ -97,6 +105,23 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   const [countdown, setCountdown] = useState(3);
   const countdownOpacity = useRef(new Animated.Value(1)).current;
 
+  const nodes: BattleNode[] = [
+    // Left side (user) nodes
+    { x: SCREEN_WIDTH * 0.0347, y: SCREEN_HEIGHT * 0.25, controlState: 'user' },     // 0
+    { x: SCREEN_WIDTH * 0.0347, y: SCREEN_HEIGHT * 0.525, controlState: 'user' },    // 1
+    { x: SCREEN_WIDTH * 0.0347, y: SCREEN_HEIGHT * 0.8, controlState: 'user' },      // 2
+    
+    // Middle nodes (neutral)
+    { x: SCREEN_WIDTH * 0.425, y: SCREEN_HEIGHT * 0.375, controlState: 'neutral' },  // 3
+    { x: SCREEN_WIDTH * 0.425, y: SCREEN_HEIGHT * 0.525, controlState: 'neutral' },  // 4
+    { x: SCREEN_WIDTH * 0.425, y: SCREEN_HEIGHT * 0.675, controlState: 'neutral' },  // 5
+    
+    // Right side (enemy) nodes
+    { x: SCREEN_WIDTH * 0.8225, y: SCREEN_HEIGHT * 0.25, controlState: 'enemy' },    // 6
+    { x: SCREEN_WIDTH * 0.8225, y: SCREEN_HEIGHT * 0.525, controlState: 'enemy' },   // 7
+    { x: SCREEN_WIDTH * 0.8225, y: SCREEN_HEIGHT * 0.8, controlState: 'enemy' },     // 8
+  ];
+
   useEffect(() => {
     // Show battlefield immediately
     networkOpacity.setValue(1);
@@ -152,11 +177,39 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
         
         const targetNodeIndex = availableNodes[Math.floor(Math.random() * availableNodes.length)];
         const targetNode = nodes[targetNodeIndex];
+        const startNode = nodes[battalion.nodeIndex];
+        const range = BOT_CATEGORIES[battalion.type].stats.range * 15;
+
+        const progress = new Animated.Value(0);
         
-        Animated.timing(battalion.position, {
-          toValue: { x: targetNode.x - 10, y: targetNode.y - 10 },
+        progress.addListener(({ value }) => {
+          const currentX = startNode.x + (targetNode.x - startNode.x) * value;
+          const currentY = startNode.y + (targetNode.y - startNode.y) * value;
+
+          const inRange = checkRangeIntersection(
+            { x: currentX, y: currentY },
+            { x: targetNode.x, y: targetNode.y },
+            range
+          );
+
+          if (inRange) {
+            battalion.position.setValue({ 
+              x: currentX - 10, 
+              y: currentY - 10 
+            });
+            progress.stopAnimation();
+          } else {
+            battalion.position.setValue({ 
+              x: currentX - 10, 
+              y: currentY - 10 
+            });
+          }
+        });
+
+        Animated.timing(progress, {
+          toValue: 1,
           duration: 2000,
-          useNativeDriver: true
+          useNativeDriver: false // Changed to false to allow smooth stopping
         }).start();
       });
 
@@ -164,18 +217,46 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       enemyBattalions.forEach(battalion => {
         let availableNodes: number[] = [];
         switch (battalion.nodeIndex) {
-          case 6: availableNodes = [3, 4]; break;    // Top right to middle
-          case 7: availableNodes = [3, 4, 5]; break; // Middle right to middle
-          case 8: availableNodes = [4, 5]; break;    // Bottom right to middle
+          case 6: availableNodes = [3, 4]; break;
+          case 7: availableNodes = [3, 4, 5]; break;
+          case 8: availableNodes = [4, 5]; break;
         }
         
         const targetNodeIndex = availableNodes[Math.floor(Math.random() * availableNodes.length)];
         const targetNode = nodes[targetNodeIndex];
+        const startNode = nodes[battalion.nodeIndex];
+        const range = BOT_CATEGORIES[battalion.type].stats.range * 15;
+
+        const progress = new Animated.Value(0);
         
-        Animated.timing(battalion.position, {
-          toValue: { x: targetNode.x - 10, y: targetNode.y - 10 },
+        progress.addListener(({ value }) => {
+          const currentX = startNode.x + (targetNode.x - startNode.x) * value;
+          const currentY = startNode.y + (targetNode.y - startNode.y) * value;
+
+          const inRange = checkRangeIntersection(
+            { x: currentX, y: currentY },
+            { x: targetNode.x, y: targetNode.y },
+            range
+          );
+
+          if (inRange) {
+            battalion.position.setValue({ 
+              x: currentX - 10, 
+              y: currentY - 10 
+            });
+            progress.stopAnimation();
+          } else {
+            battalion.position.setValue({ 
+              x: currentX - 10, 
+              y: currentY - 10 
+            });
+          }
+        });
+
+        Animated.timing(progress, {
+          toValue: 1,
           duration: 2000,
-          useNativeDriver: true
+          useNativeDriver: false // Changed to false to allow smooth stopping
         }).start();
       });
     }
@@ -204,25 +285,6 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       useNativeDriver: true,
     }).start();
   };
-
-  const nodes = [
-    // Left side (user) nodes
-    { x: SCREEN_WIDTH * 0.0347, y: SCREEN_HEIGHT * 0.25 },     // Top
-    { x: SCREEN_WIDTH * 0.0347, y: SCREEN_HEIGHT * 0.525 },   // Middle
-    { x: SCREEN_WIDTH * 0.0347, y: SCREEN_HEIGHT * 0.8 },    // Bottom
-    
-    // Middle nodes
-    { x: SCREEN_WIDTH * 0.425, y: SCREEN_HEIGHT * 0.375 },      // Top
-    { x: SCREEN_WIDTH * 0.425, y: SCREEN_HEIGHT * 0.525 },    // Middle
-    { x: SCREEN_WIDTH * 0.425, y: SCREEN_HEIGHT * 0.675 },     // Bottom
-    
-    // Right side (enemy) nodes
-    { x: SCREEN_WIDTH * 0.8225, y: SCREEN_HEIGHT * 0.25 },     // Top
-    { x: SCREEN_WIDTH * 0.8225, y: SCREEN_HEIGHT * 0.525 },   // Middle
-    { x: SCREEN_WIDTH * 0.8225, y: SCREEN_HEIGHT * 0.8 },    // Bottom
-  ];
-
-  
 
   // Movement animation function
   const moveBattalion = (battalion: BattalionPosition, targetNode: number) => {
@@ -321,19 +383,6 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
           ))}
         </Animated.View>
       </View>
-
-      {battleComplete && battleWinner && (
-        <BattleResultsOverlay
-          winner={battleWinner}
-          opacity={resultsOpacity}
-          onContinue={onClose}
-        />
-      )}
-
-      <CountdownOverlay 
-        countdown={countdown} 
-        opacity={countdownOpacity}
-      />
     </SafeAreaView>
   );
 });
@@ -342,19 +391,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-    position: 'relative',
   },
   networkContainer: {
     flex: 1,
-    width: '100%',
-    height: SCREEN_HEIGHT * 0.8,
     position: 'relative',
   },
   overlayContainer: {
     position: 'absolute',
     top: 0,
-    bottom: 0,
     left: 0,
     right: 0,
-  }
-}); 
+    bottom: 0,
+  },
+});
