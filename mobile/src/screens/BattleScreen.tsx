@@ -166,7 +166,6 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
 
   useEffect(() => {
     if (battleStarted) {
-      // User battalion movement
       userBattalions.forEach(battalion => {
         let availableNodes: number[] = [];
         switch (battalion.nodeIndex) {
@@ -179,41 +178,33 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
         const targetNode = nodes[targetNodeIndex];
         const startNode = nodes[battalion.nodeIndex];
         const range = BOT_CATEGORIES[battalion.type].stats.range * 15;
-
-        const progress = new Animated.Value(0);
         
-        progress.addListener(({ value }) => {
-          const currentX = startNode.x + (targetNode.x - startNode.x) * value;
-          const currentY = startNode.y + (targetNode.y - startNode.y) * value;
+        const anim = Animated.timing(battalion.position, {
+          toValue: { 
+            x: targetNode.x - 10, 
+            y: targetNode.y - 10 
+          },
+          duration: 2000,
+          useNativeDriver: true
+        });
 
+        const listener = battalion.position.addListener(({ x, y }) => {
           const inRange = checkRangeIntersection(
-            { x: currentX, y: currentY },
+            { x, y },
             { x: targetNode.x, y: targetNode.y },
             range
           );
 
           if (inRange) {
-            battalion.position.setValue({ 
-              x: currentX - 10, 
-              y: currentY - 10 
-            });
-            progress.stopAnimation();
-          } else {
-            battalion.position.setValue({ 
-              x: currentX - 10, 
-              y: currentY - 10 
-            });
+            anim.stop();
+            battalion.position.removeListener(listener);
           }
         });
 
-        Animated.timing(progress, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: false // Changed to false to allow smooth stopping
-        }).start();
+        anim.start();
       });
 
-      // Enemy battalion movement
+      // Similar for enemy battalions
       enemyBattalions.forEach(battalion => {
         let availableNodes: number[] = [];
         switch (battalion.nodeIndex) {
@@ -226,39 +217,36 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
         const targetNode = nodes[targetNodeIndex];
         const startNode = nodes[battalion.nodeIndex];
         const range = BOT_CATEGORIES[battalion.type].stats.range * 15;
-
-        const progress = new Animated.Value(0);
         
-        progress.addListener(({ value }) => {
-          const currentX = startNode.x + (targetNode.x - startNode.x) * value;
-          const currentY = startNode.y + (targetNode.y - startNode.y) * value;
+        const anim = Animated.timing(battalion.position, {
+          toValue: { 
+            x: targetNode.x - 10, 
+            y: targetNode.y - 10 
+          },
+          duration: 2000,
+          useNativeDriver: true
+        });
 
+        const enemyListener = battalion.position.addListener(({ x, y }) => {
           const inRange = checkRangeIntersection(
-            { x: currentX, y: currentY },
+            { x, y },
             { x: targetNode.x, y: targetNode.y },
             range
           );
 
           if (inRange) {
-            battalion.position.setValue({ 
-              x: currentX - 10, 
-              y: currentY - 10 
-            });
-            progress.stopAnimation();
-          } else {
-            battalion.position.setValue({ 
-              x: currentX - 10, 
-              y: currentY - 10 
-            });
+            anim.stop();
+            battalion.position.removeListener(enemyListener);
           }
         });
 
-        Animated.timing(progress, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: false // Changed to false to allow smooth stopping
-        }).start();
+        anim.start();
       });
+
+      return () => {
+        userBattalions.forEach(battalion => battalion.position.removeAllListeners());
+        enemyBattalions.forEach(battalion => battalion.position.removeAllListeners());
+      };
     }
   }, [battleStarted]);
 
