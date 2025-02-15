@@ -38,12 +38,12 @@ export const AnimatedBattalion = React.memo(({ type, quantity, position, isUser 
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    width: 40,
-    height: 40,
+    width: 20,
+    height: 20,
   },
   battalion: {
-    width: 40,
-    height: 40,
+    width: 20,
+    height: 20,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
