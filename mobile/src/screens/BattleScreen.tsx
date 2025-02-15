@@ -139,6 +139,30 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     return () => clearInterval(countdownTimer);
   }, []);
 
+  useEffect(() => {
+    if (battleStarted) {
+      // Move each user battalion to a middle node
+      userBattalions.forEach(battalion => {
+        // Get middle nodes (indices 3,4,5)
+        const middleNodes = [3, 4, 5];
+        const targetNodeIndex = middleNodes[Math.floor(Math.random() * middleNodes.length)];
+        
+        // Get exact coordinates from the existing nodes array
+        const targetNode = nodes[targetNodeIndex];
+        
+        // Adjust final position to center battalion on node
+        const targetX = targetNode.x - 10; // Half of battalion width (20px)
+        const targetY = targetNode.y - 10; // Half of battalion height (20px)
+
+        Animated.timing(battalion.position, {
+          toValue: { x: targetX, y: targetY },
+          duration: 2000,
+          useNativeDriver: true
+        }).start();
+      });
+    }
+  }, [battleStarted]);
+
   const startBattleTimer = () => {
     setTimeRemaining(20);
     timerRef.current = setInterval(() => {

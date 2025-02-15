@@ -15,8 +15,10 @@ export const AnimatedBattalion = React.memo(({ type, quantity, position, isUser,
       style={[
         styles.container,
         {
-          left: position.x,
-          top: position.y,
+          transform: [
+            { translateX: position.x },
+            { translateY: position.y }
+          ]
         }
       ]}
     >
