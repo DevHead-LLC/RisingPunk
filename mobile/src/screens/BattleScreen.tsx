@@ -35,8 +35,8 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   const networkOpacity = useRef(new Animated.Value(0)).current;
   const [timeRemaining, setTimeRemaining] = useState(20);
   const timerRef = useRef<NodeJS.Timeout>();
-  const [battleComplete, setBattleComplete] = useState(false);
-  const [battleWinner, setBattleWinner] = useState<'user' | 'enemy' | null>(null);
+  const [showResults, setShowResults] = useState(false);
+  const [battleWinner, setBattleWinner] = useState<'user' | 'enemy'>('user');
   const resultsOpacity = useRef(new Animated.Value(0)).current;
   const [userBattalions, setUserBattalions] = useState<BattalionPosition[]>([
     {
@@ -277,13 +277,14 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   };
 
   const handleBattleComplete = (winner: 'user' | 'enemy') => {
-    setBattleComplete(true);
     setBattleWinner(winner);
     Animated.timing(resultsOpacity, {
       toValue: 1,
-      duration: 1000,
+      duration: 500,
       useNativeDriver: true,
     }).start();
+    setShowResults(true);
+    onBattleComplete?.(winner);
   };
 
   // Movement animation function
@@ -383,6 +384,13 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
           ))}
         </Animated.View>
       </View>
+      {showResults && (
+        <BattleResultsOverlay
+          winner={battleWinner}
+          opacity={resultsOpacity}
+          onContinue={onClose}
+        />
+      )}
     </SafeAreaView>
   );
 });
