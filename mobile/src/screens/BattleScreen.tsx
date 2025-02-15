@@ -181,16 +181,21 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
         
         const anim = Animated.timing(battalion.position, {
           toValue: { 
-            x: targetNode.x - 10, 
-            y: targetNode.y - 10 
+            x: targetNode.x - 10,
+            y: targetNode.y - 10
           },
           duration: 2000,
           useNativeDriver: true
         });
 
         const listener = battalion.position.addListener(({ x, y }) => {
+          const battalionCenter = {
+            x: x + 10,
+            y: y + 10
+          };
+          
           const inRange = checkRangeIntersection(
-            { x, y },
+            battalionCenter,
             { x: targetNode.x, y: targetNode.y },
             range
           );
@@ -220,16 +225,21 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
         
         const anim = Animated.timing(battalion.position, {
           toValue: { 
-            x: targetNode.x - 10, 
-            y: targetNode.y - 10 
+            x: targetNode.x - 10,
+            y: targetNode.y - 10
           },
           duration: 2000,
           useNativeDriver: true
         });
 
         const enemyListener = battalion.position.addListener(({ x, y }) => {
+          const battalionCenter = {
+            x: x + 10,
+            y: y + 10
+          };
+          
           const inRange = checkRangeIntersection(
-            { x, y },
+            battalionCenter,
             { x: targetNode.x, y: targetNode.y },
             range
           );
