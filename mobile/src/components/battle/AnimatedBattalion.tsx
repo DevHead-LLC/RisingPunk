@@ -6,9 +6,10 @@ type Props = {
   quantity: number;
   position: Animated.ValueXY;
   isUser: boolean;
+  health?: number;
 };
 
-export const AnimatedBattalion = React.memo(({ type, quantity, position, isUser }: Props) => {
+export const AnimatedBattalion = React.memo(({ type, quantity, position, isUser, health = 100 }: Props) => {
   return (
     <Animated.View
       style={[
@@ -19,6 +20,10 @@ export const AnimatedBattalion = React.memo(({ type, quantity, position, isUser 
         }
       ]}
     >
+      <View style={styles.healthBarContainer}>
+        <View style={[styles.healthBar, { width: `${health}%` }]} />
+      </View>
+      
       <View style={[
         styles.battalion,
         styles[type],
@@ -40,6 +45,19 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 20,
     height: 20,
+  },
+  healthBarContainer: {
+    position: 'absolute',
+    top: -9,
+    width: '100%',
+    height: 2,
+    backgroundColor: '#333333',
+    borderRadius: 1,
+  },
+  healthBar: {
+    height: '100%',
+    backgroundColor: '#00FF00',
+    borderRadius: 1,
   },
   battalion: {
     width: 20,
