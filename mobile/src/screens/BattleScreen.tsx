@@ -141,31 +141,39 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
 
   useEffect(() => {
     if (battleStarted) {
+      // User battalion movement
       userBattalions.forEach(battalion => {
         let availableNodes: number[] = [];
-        
-        // Define valid moves based on starting position
         switch (battalion.nodeIndex) {
-          case 0: // Top left
-            availableNodes = [3, 4];
-            break;
-          case 1: // Middle left
-            availableNodes = [3, 4, 5];
-            break;
-          case 2: // Bottom left
-            availableNodes = [4, 5];
-            break;
+          case 0: availableNodes = [3, 4]; break;
+          case 1: availableNodes = [3, 4, 5]; break;
+          case 2: availableNodes = [4, 5]; break;
         }
         
         const targetNodeIndex = availableNodes[Math.floor(Math.random() * availableNodes.length)];
         const targetNode = nodes[targetNodeIndex];
         
-        // Adjust final position to center battalion on node
-        const targetX = targetNode.x - 10;
-        const targetY = targetNode.y - 10;
-
         Animated.timing(battalion.position, {
-          toValue: { x: targetX, y: targetY },
+          toValue: { x: targetNode.x - 10, y: targetNode.y - 10 },
+          duration: 2000,
+          useNativeDriver: true
+        }).start();
+      });
+
+      // Enemy battalion movement
+      enemyBattalions.forEach(battalion => {
+        let availableNodes: number[] = [];
+        switch (battalion.nodeIndex) {
+          case 6: availableNodes = [3, 4]; break;    // Top right to middle
+          case 7: availableNodes = [3, 4, 5]; break; // Middle right to middle
+          case 8: availableNodes = [4, 5]; break;    // Bottom right to middle
+        }
+        
+        const targetNodeIndex = availableNodes[Math.floor(Math.random() * availableNodes.length)];
+        const targetNode = nodes[targetNodeIndex];
+        
+        Animated.timing(battalion.position, {
+          toValue: { x: targetNode.x - 10, y: targetNode.y - 10 },
           duration: 2000,
           useNativeDriver: true
         }).start();
