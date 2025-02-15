@@ -16,7 +16,7 @@ import { COLORS } from '../styles/theme';
 type MarkLevel = 1 | 2 | 3 | 4;
 type BotType = 'breacher' | 'guardian' | 'phreak';
 
-const BOT_CATEGORIES = {
+export const BOT_CATEGORIES = {
   guardian: { // Cavalry
     role: 'Cavalry',
     stats: {
