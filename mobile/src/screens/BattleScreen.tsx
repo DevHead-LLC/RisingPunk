@@ -36,8 +36,8 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       quantity: 5,
       nodeIndex: 0,
       position: new Animated.ValueXY({ 
-        x: 10,
-        y: SCREEN_HEIGHT * 0.2
+        x: 20,
+        y: SCREEN_HEIGHT * 0.225
       })
     },
     {
@@ -45,8 +45,8 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       quantity: 3,
       nodeIndex: 1,
       position: new Animated.ValueXY({ 
-        x: 10,
-        y: SCREEN_HEIGHT * 0.475
+        x: 20,
+        y: SCREEN_HEIGHT * 0.5
       })
     },
     {
@@ -54,8 +54,8 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       quantity: 4,
       nodeIndex: 2,
       position: new Animated.ValueXY({ 
-        x: 10,
-        y: SCREEN_HEIGHT * 0.75
+        x: 20,
+        y: SCREEN_HEIGHT * 0.775
       })
     }
   ]);
@@ -66,8 +66,8 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       quantity: 4,
       nodeIndex: 6,
       position: new Animated.ValueXY({ 
-        x: SCREEN_WIDTH - 175,
-        y: SCREEN_HEIGHT * 0.2
+        x: SCREEN_WIDTH - 165,
+        y: SCREEN_HEIGHT * 0.225
       })
     },
     {
@@ -75,8 +75,8 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       quantity: 4,
       nodeIndex: 7,
       position: new Animated.ValueXY({ 
-        x: SCREEN_WIDTH - 175,
-        y: SCREEN_HEIGHT * 0.475
+        x: SCREEN_WIDTH - 165,
+        y: SCREEN_HEIGHT * 0.5
       })
     },
     {
@@ -84,8 +84,8 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       quantity: 3,
       nodeIndex: 8,
       position: new Animated.ValueXY({ 
-        x: SCREEN_WIDTH - 175,
-        y: SCREEN_HEIGHT * 0.75
+        x: SCREEN_WIDTH - 165,
+        y: SCREEN_HEIGHT * 0.775
       })
     }
   ]);
