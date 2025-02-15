@@ -141,18 +141,28 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
 
   useEffect(() => {
     if (battleStarted) {
-      // Move each user battalion to a middle node
       userBattalions.forEach(battalion => {
-        // Get middle nodes (indices 3,4,5)
-        const middleNodes = [3, 4, 5];
-        const targetNodeIndex = middleNodes[Math.floor(Math.random() * middleNodes.length)];
+        let availableNodes: number[] = [];
         
-        // Get exact coordinates from the existing nodes array
+        // Define valid moves based on starting position
+        switch (battalion.nodeIndex) {
+          case 0: // Top left
+            availableNodes = [3, 4];
+            break;
+          case 1: // Middle left
+            availableNodes = [3, 4, 5];
+            break;
+          case 2: // Bottom left
+            availableNodes = [4, 5];
+            break;
+        }
+        
+        const targetNodeIndex = availableNodes[Math.floor(Math.random() * availableNodes.length)];
         const targetNode = nodes[targetNodeIndex];
         
         // Adjust final position to center battalion on node
-        const targetX = targetNode.x - 10; // Half of battalion width (20px)
-        const targetY = targetNode.y - 10; // Half of battalion height (20px)
+        const targetX = targetNode.x - 10;
+        const targetY = targetNode.y - 10;
 
         Animated.timing(battalion.position, {
           toValue: { x: targetX, y: targetY },
@@ -216,6 +226,24 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       duration: 1000,
       useNativeDriver: true,
     });
+  };
+
+  const findAvailableNodes = (currentNodeIndex: number): number[] => {
+    // Get connections from NetworkLines
+    const connections = [
+      // Horizontal connections
+      [0, 3], [3, 6], // Top row
+      [1, 4], [4, 7], // Middle row
+      [2, 5], [5, 8], // Bottom row
+      // Diagonal connections
+      [0, 4], [1, 3], [1, 5], [2, 4],
+      [3, 7], [4, 6], [4, 8], [5, 7]
+    ];
+
+    // Find all connections that include our current node
+    return connections
+      .filter(([from, to]) => from === currentNodeIndex || to === currentNodeIndex)
+      .map(([from, to]) => from === currentNodeIndex ? to : from);
   };
 
   return (
