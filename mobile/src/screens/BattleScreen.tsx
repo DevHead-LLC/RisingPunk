@@ -345,6 +345,8 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
               x={node.x}
               y={node.y}
               isActive={controlledNodes.includes(index)}
+              controlState={node.controlState}
+              controlProgress={node.controlState === 'neutral' ? 0 : 100}
             />
           ))}
         </Animated.View>
