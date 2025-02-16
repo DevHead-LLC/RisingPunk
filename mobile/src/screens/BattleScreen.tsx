@@ -169,7 +169,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   useEffect(() => {
     if (battleStarted) {
       // Base duration for slowest speed (speed stat of 5)
-      const BASE_DURATION = 3000; // 3 seconds for base movement
+      const BASE_DURATION = 5000; // 3 seconds for base movement
       
       userBattalions.forEach(battalion => {
         let availableNodes: number[] = [];
@@ -326,6 +326,20 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     return connections
       .filter(([from, to]) => from === currentNodeIndex || to === currentNodeIndex)
       .map(([from, to]) => from === currentNodeIndex ? to : from);
+  };
+
+  const calculateMovementDuration = (startNode: BattleNode, targetNode: BattleNode, speedStat: number) => {
+    // Calculate distance between nodes
+    const dx = targetNode.x - startNode.x;
+    const dy = targetNode.y - startNode.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    // Base speed (pixels per millisecond) adjusted by speed stat
+    const baseSpeed = 0.1; // Adjust this value to tune overall movement speed
+    const speed = baseSpeed * (speedStat / 5); // Normalize by lowest speed stat
+    
+    // Calculate duration based on distance and speed
+    return distance / speed;
   };
 
   return (
