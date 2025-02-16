@@ -381,6 +381,14 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
             />
           ))}
         </Animated.View>
+
+        {/* Countdown Overlay */}
+        {countdown > 0 && (
+          <CountdownOverlay 
+            countdown={countdown}
+            opacity={countdownOpacity}
+          />
+        )}
       </View>
       {showResults && (
         <BattleResultsOverlay
