@@ -122,6 +122,8 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     { x: SCREEN_WIDTH * 0.8225, y: SCREEN_HEIGHT * 0.8, controlState: 'enemy' },     // 8
   ];
 
+  const battalionRefs = useRef<{[key: string]: { triggerAttackAnimation: () => void } | null}>({});
+
   useEffect(() => {
     // Show battlefield immediately
     networkOpacity.setValue(1);
@@ -210,6 +212,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
           if (inRange) {
             anim.stop();
             battalion.position.removeListener(listener);
+            battalionRefs.current[`user-${battalion.nodeIndex}`]?.triggerAttackAnimation();
           }
         });
 
@@ -376,6 +379,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
           {userBattalions.map((battalion, index) => (
             <AnimatedBattalion
               key={`user-${index}`}
+              ref={(el) => battalionRefs.current[`user-${index}`] = el}
               type={battalion.type}
               quantity={battalion.quantity}
               position={battalion.position}

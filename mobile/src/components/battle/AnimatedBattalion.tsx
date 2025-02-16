@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Animated, StyleSheet, View, Text } from 'react-native';
 import { BOT_CATEGORIES } from '../../screens/DigitalBarracksScreen';
 
@@ -8,11 +8,39 @@ type Props = {
   position: Animated.ValueXY;
   isUser: boolean;
   health?: number;
+  onAttackComplete?: () => void;
 };
 
-export const AnimatedBattalion = React.memo(({ type, quantity, position, isUser, health = 100 }: Props) => {
+type BattalionRef = {
+  triggerAttackAnimation: () => void;
+};
+
+export const AnimatedBattalion = React.forwardRef<BattalionRef, Props>(({ type, quantity, position, isUser, health = 100, onAttackComplete }: Props, ref) => {
   const rangeSize = BOT_CATEGORIES[type].stats.range * 30;
   const offset = rangeSize / 2 - 10; // Half of range size minus half of battalion size (20/2)
+  const attackFlash = useRef(new Animated.Value(0)).current;
+
+  const triggerAttackAnimation = () => {
+    Animated.sequence([
+      Animated.timing(attackFlash, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(attackFlash, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      })
+    ]).start(() => {
+      onAttackComplete?.();
+    });
+  };
+
+  // Expose the triggerAttackAnimation function via ref
+  React.useImperativeHandle(ref, () => ({
+    triggerAttackAnimation
+  }));
 
   return (
     <Animated.View
@@ -44,10 +72,16 @@ export const AnimatedBattalion = React.memo(({ type, quantity, position, isUser,
         <View style={[styles.healthBar, { width: `${health}%` }]} />
       </View>
       
-      <View style={[
+      <Animated.View style={[
         styles.battalion,
         styles[type],
-        isUser ? styles.userBattalion : styles.enemyBattalion
+        isUser ? styles.userBattalion : styles.enemyBattalion,
+        {
+          backgroundColor: attackFlash.interpolate({
+            inputRange: [0, 1],
+            outputRange: ['transparent', isUser ? '#4717F680' : '#FF414180']
+          })
+        }
       ]}>
         <Text style={[
           styles.quantityText,
@@ -55,7 +89,7 @@ export const AnimatedBattalion = React.memo(({ type, quantity, position, isUser,
         ]}>
           {quantity}
         </Text>
-      </View>
+      </Animated.View>
     </Animated.View>
   );
 });
