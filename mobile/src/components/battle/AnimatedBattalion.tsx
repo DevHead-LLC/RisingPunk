@@ -76,6 +76,12 @@ export const AnimatedBattalion = React.forwardRef<BattalionRef, Props>(({ type, 
         styles.battalion,
         styles[type],
         isUser ? styles.userBattalion : styles.enemyBattalion,
+        type === 'breacher' && {
+          transform: [
+            { rotate: '45deg' }
+          ],
+          overflow: 'hidden'
+        },
         {
           backgroundColor: attackFlash.interpolate({
             inputRange: [0, 1],
