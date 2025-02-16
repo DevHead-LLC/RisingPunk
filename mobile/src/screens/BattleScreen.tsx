@@ -166,6 +166,9 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
 
   useEffect(() => {
     if (battleStarted) {
+      // Base duration for slowest speed (speed stat of 5)
+      const BASE_DURATION = 3000; // 3 seconds for base movement
+      
       userBattalions.forEach(battalion => {
         let availableNodes: number[] = [];
         switch (battalion.nodeIndex) {
@@ -179,12 +182,16 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
         const startNode = nodes[battalion.nodeIndex];
         const range = BOT_CATEGORIES[battalion.type].stats.range * 15;
         
+        // Calculate duration based on speed stat
+        const speedStat = BOT_CATEGORIES[battalion.type].stats.speed;
+        const duration = BASE_DURATION * (5 / speedStat); // 5 is the lowest speed stat
+        
         const anim = Animated.timing(battalion.position, {
           toValue: { 
             x: targetNode.x - 10,
             y: targetNode.y - 10
           },
-          duration: 2000,
+          duration: duration,
           useNativeDriver: true
         });
 
@@ -209,7 +216,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
         anim.start();
       });
 
-      // Similar for enemy battalions
+      // Similar speed calculation for enemy battalions
       enemyBattalions.forEach(battalion => {
         let availableNodes: number[] = [];
         switch (battalion.nodeIndex) {
@@ -223,12 +230,15 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
         const startNode = nodes[battalion.nodeIndex];
         const range = BOT_CATEGORIES[battalion.type].stats.range * 15;
         
+        const speedStat = BOT_CATEGORIES[battalion.type].stats.speed;
+        const duration = BASE_DURATION * (5 / speedStat);
+        
         const anim = Animated.timing(battalion.position, {
           toValue: { 
             x: targetNode.x - 10,
             y: targetNode.y - 10
           },
-          duration: 2000,
+          duration: duration,
           useNativeDriver: true
         });
 
