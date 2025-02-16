@@ -260,6 +260,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
           if (inRange) {
             anim.stop();
             battalion.position.removeListener(enemyListener);
+            battalionRefs.current[`enemy-${battalion.nodeIndex}`]?.triggerAttackAnimation();
           }
         });
 
@@ -403,7 +404,8 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
           
           {enemyBattalions.map((battalion, index) => (
             <AnimatedBattalion
-              key={`enemy-${index}`}
+              key={`enemy-${battalion.nodeIndex}`}
+              ref={(el) => battalionRefs.current[`enemy-${battalion.nodeIndex}`] = el}
               type={battalion.type}
               quantity={battalion.quantity}
               position={battalion.position}
