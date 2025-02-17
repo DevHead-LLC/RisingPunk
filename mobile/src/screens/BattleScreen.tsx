@@ -123,6 +123,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   ];
 
   const battalionRefs = useRef<{[key: string]: { triggerAttackAnimation: () => void } | null}>({});
+  const attackIntervals = useRef<{ [key: string]: NodeJS.Timeout }>({});
 
   useEffect(() => {
     // Show battlefield immediately
@@ -212,7 +213,25 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
           if (inRange) {
             anim.stop();
             battalion.position.removeListener(listener);
-            battalionRefs.current[`user-${battalion.nodeIndex}`]?.triggerAttackAnimation();
+            
+            // Clear any existing attack interval for this battalion
+            if (attackIntervals.current[`user-${battalion.nodeIndex}`]) {
+              clearInterval(attackIntervals.current[`user-${battalion.nodeIndex}`]);
+            }
+
+            // Start continuous attack with a small initial delay
+            const attackSpeed = BOT_CATEGORIES[battalion.type].stats.speed;
+            const attackInterval = 2000 * (5 / attackSpeed); // Base 2 seconds, scaled by speed
+            
+            // Trigger first attack after 150ms
+            setTimeout(() => {
+              battalionRefs.current[`user-${battalion.nodeIndex}`]?.triggerAttackAnimation();
+              
+              // Then start the regular interval
+              attackIntervals.current[`user-${battalion.nodeIndex}`] = setInterval(() => {
+                battalionRefs.current[`user-${battalion.nodeIndex}`]?.triggerAttackAnimation();
+              }, attackInterval);
+            }, 150);
           }
         });
 
@@ -260,7 +279,25 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
           if (inRange) {
             anim.stop();
             battalion.position.removeListener(enemyListener);
-            battalionRefs.current[`enemy-${battalion.nodeIndex}`]?.triggerAttackAnimation();
+            
+            // Clear any existing attack interval
+            if (attackIntervals.current[`enemy-${battalion.nodeIndex}`]) {
+              clearInterval(attackIntervals.current[`enemy-${battalion.nodeIndex}`]);
+            }
+
+            // Start continuous attack with a small initial delay
+            const attackSpeed = BOT_CATEGORIES[battalion.type].stats.speed;
+            const attackInterval = 2000 * (5 / attackSpeed);
+            
+            // Trigger first attack after 150ms
+            setTimeout(() => {
+              battalionRefs.current[`enemy-${battalion.nodeIndex}`]?.triggerAttackAnimation();
+              
+              // Then start the regular interval
+              attackIntervals.current[`enemy-${battalion.nodeIndex}`] = setInterval(() => {
+                battalionRefs.current[`enemy-${battalion.nodeIndex}`]?.triggerAttackAnimation();
+              }, attackInterval);
+            }, 150);
           }
         });
 
@@ -268,6 +305,9 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       });
 
       return () => {
+        // Clear all intervals and listeners on cleanup
+        Object.values(attackIntervals.current).forEach(interval => clearInterval(interval));
+        attackIntervals.current = {};
         userBattalions.forEach(battalion => battalion.position.removeAllListeners());
         enemyBattalions.forEach(battalion => battalion.position.removeAllListeners());
       };
