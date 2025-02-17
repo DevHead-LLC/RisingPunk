@@ -11,8 +11,32 @@ type Props = {
   controlProgress?: number;
 };
 
-export const NetworkNode = React.memo(({ x, y, size = 12, isActive = false, controlState, controlProgress = 0 }: Props) => {
+type NodeRef = {
+  triggerDamageAnimation: () => void;
+};
+
+export const NetworkNode = React.forwardRef<NodeRef, Props>(({ x, y, size = 12, isActive = false, controlState, controlProgress = 0 }, ref) => {
   const pulseAnim = useRef(new Animated.Value(0)).current;
+  const damageFlash = useRef(new Animated.Value(0)).current;
+
+  const triggerDamageAnimation = () => {
+    Animated.sequence([
+      Animated.timing(damageFlash, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(damageFlash, {
+        toValue: 0,
+        duration: 100,
+        useNativeDriver: true,
+      })
+    ]).start();
+  };
+
+  React.useImperativeHandle(ref, () => ({
+    triggerDamageAnimation
+  }));
 
   useEffect(() => {
     const pulse = Animated.sequence([
@@ -42,9 +66,44 @@ export const NetworkNode = React.memo(({ x, y, size = 12, isActive = false, cont
         top: y - size/2,
         width: size,
         height: size,
-        backgroundColor: isActive ? COLORS.primary : COLORS.secondary
+        borderWidth: 2,
+        borderColor: COLORS.primary,
       }
     ]}>
+      {/* Base color layer */}
+      <Animated.View style={[
+        StyleSheet.absoluteFill,
+        {
+          backgroundColor: isActive ? COLORS.primary : COLORS.secondary,
+          borderRadius: 999,
+          zIndex: 1
+        }
+      ]} />
+      {/* Red flash overlay */}
+      <Animated.View style={[
+        StyleSheet.absoluteFill,
+        {
+          backgroundColor: damageFlash.interpolate({
+            inputRange: [0, 1],
+            outputRange: ['transparent', '#FF0000']
+          }),
+          borderRadius: 999,
+          zIndex: 2
+        }
+      ]} />
+      {/* White border flash overlay */}
+      <Animated.View style={[
+        StyleSheet.absoluteFill,
+        {
+          borderColor: '#FFFFFF',
+          borderWidth: 2,
+          opacity: damageFlash,
+          backgroundColor: 'transparent',
+          borderRadius: 999,
+          zIndex: 3
+        }
+      ]} />
+      
       <Animated.View style={[styles.pulse, {
         opacity: pulseAnim.interpolate({
           inputRange: [0, 1],
@@ -89,8 +148,6 @@ const styles = StyleSheet.create({
   node: {
     position: 'absolute',
     borderRadius: 999,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 2,

@@ -13,12 +13,14 @@ type Props = {
 
 type BattalionRef = {
   triggerAttackAnimation: () => void;
+  triggerDamageAnimation: () => void;
 };
 
 export const AnimatedBattalion = React.forwardRef<BattalionRef, Props>(({ type, quantity, position, isUser, health = 100, onAttackComplete }: Props, ref) => {
   const rangeSize = BOT_CATEGORIES[type].stats.range * 30;
   const offset = rangeSize / 2 - 10; // Half of range size minus half of battalion size (20/2)
   const attackFlash = useRef(new Animated.Value(0)).current;
+  const damageFlash = useRef(new Animated.Value(0)).current;
 
   const triggerAttackAnimation = () => {
     Animated.sequence([
@@ -37,9 +39,25 @@ export const AnimatedBattalion = React.forwardRef<BattalionRef, Props>(({ type, 
     });
   };
 
-  // Expose the triggerAttackAnimation function via ref
+  const triggerDamageAnimation = () => {
+    Animated.sequence([
+      Animated.timing(damageFlash, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: false,
+      }),
+      Animated.timing(damageFlash, {
+        toValue: 0,
+        duration: 100,
+        useNativeDriver: false,
+      })
+    ]).start();
+  };
+
+  // Expose the triggerAttackAnimation and triggerDamageAnimation functions via ref
   React.useImperativeHandle(ref, () => ({
-    triggerAttackAnimation
+    triggerAttackAnimation,
+    triggerDamageAnimation
   }));
 
   return (
@@ -72,7 +90,7 @@ export const AnimatedBattalion = React.forwardRef<BattalionRef, Props>(({ type, 
         <View style={[styles.healthBar, { width: `${health}%` }]} />
       </View>
       
-      <Animated.View style={[
+      <View style={[
         styles.battalion,
         styles[type],
         isUser ? styles.userBattalion : styles.enemyBattalion,
@@ -81,21 +99,58 @@ export const AnimatedBattalion = React.forwardRef<BattalionRef, Props>(({ type, 
             { rotate: '45deg' }
           ],
           overflow: 'hidden'
-        },
-        {
-          backgroundColor: attackFlash.interpolate({
-            inputRange: [0, 1],
-            outputRange: ['transparent', isUser ? '#4717F680' : '#FF414180']
-          })
         }
       ]}>
-        <Text style={[
-          styles.quantityText,
-          type === 'breacher' && styles.rotatedText
-        ]}>
+        {/* Base color layer */}
+        <View style={[
+          StyleSheet.absoluteFill,
+          {
+            backgroundColor: 'transparent',
+            borderRadius: type === 'breacher' ? 0 : type === 'guardian' ? 4 : 20,
+            zIndex: 1
+          }
+        ]} />
+        {/* Red flash overlay */}
+        <Animated.View style={[
+          StyleSheet.absoluteFill,
+          {
+            backgroundColor: Animated.add(
+              attackFlash.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 1]
+              }),
+              damageFlash.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 2]
+              })
+            ).interpolate({
+              inputRange: [0, 1, 2],
+              outputRange: [
+                'transparent',
+                isUser ? '#4717F680' : '#FF414180',
+                '#FF0000'
+              ]
+            }),
+            borderRadius: type === 'breacher' ? 0 : type === 'guardian' ? 4 : 20,
+            zIndex: 2
+          }
+        ]} />
+        {/* White border flash overlay */}
+        <Animated.View style={[
+          StyleSheet.absoluteFill,
+          {
+            borderColor: '#FFFFFF',
+            borderWidth: 2,
+            opacity: damageFlash,
+            backgroundColor: 'transparent',
+            borderRadius: type === 'breacher' ? 0 : type === 'guardian' ? 4 : 20,
+            zIndex: 3
+          }
+        ]} />
+        <Text style={[styles.quantityText, type === 'breacher' && styles.rotatedText, { zIndex: 4 }]}>
           {quantity}
         </Text>
-      </Animated.View>
+      </View>
     </Animated.View>
   );
 });
