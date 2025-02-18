@@ -161,8 +161,12 @@ export const NetworkNode = React.forwardRef<NodeRef, Props>(({ x, y, size = 12, 
       {/* Control Progress Bar - Only show for neutral nodes */}
       {controlState === 'neutral' && (
         <View style={[styles.progressBarContainer, {
-          width: size * 4, // Make bars wider
-          left: -(size * 1.5), // Center the bar
+          width: size * 4,
+          left: -(size * 1.6), // This centers it since width is 4x size and node is at center
+          top: -10,
+          position: 'absolute',
+          alignItems: 'center',
+          justifyContent: 'center',
         }]}>
           {/* Background bar */}
           <View style={styles.progressBarBackground} />
@@ -207,7 +211,7 @@ const styles = StyleSheet.create({
   },
   progressBarContainer: {
     position: 'absolute',
-    height: 6, // Slightly taller
+    height: 4, // Slightly taller
     top: -10,
     zIndex: 10,
     alignItems: 'center',
@@ -224,7 +228,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     height: '100%',
     borderRadius: 3,
-    transition: 'width 0.2s ease-out',
   },
   progressBarBorder: {
     position: 'absolute',
