@@ -29,6 +29,9 @@ interface BattleNode {
   x: number;
   y: number;
   controlState: 'user' | 'enemy' | 'neutral';
+  health?: number;
+  controlProgress?: number;
+  isLocked?: boolean;
 }
 
 export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) => {
@@ -105,7 +108,8 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   const [countdown, setCountdown] = useState(3);
   const countdownOpacity = useRef(new Animated.Value(1)).current;
 
-  const nodes: BattleNode[] = [
+  // Convert nodes from const to state
+  const [nodes, setNodes] = useState<BattleNode[]>([
     // Left side (user) nodes
     { x: SCREEN_WIDTH * 0.0347, y: SCREEN_HEIGHT * 0.25, controlState: 'user' },     // 0
     { x: SCREEN_WIDTH * 0.0347, y: SCREEN_HEIGHT * 0.525, controlState: 'user' },    // 1
@@ -120,7 +124,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     { x: SCREEN_WIDTH * 0.8225, y: SCREEN_HEIGHT * 0.25, controlState: 'enemy' },    // 6
     { x: SCREEN_WIDTH * 0.8225, y: SCREEN_HEIGHT * 0.525, controlState: 'enemy' },   // 7
     { x: SCREEN_WIDTH * 0.8225, y: SCREEN_HEIGHT * 0.8, controlState: 'enemy' },     // 8
-  ];
+  ]);
 
   const battalionRefs = useRef<{[key: string]: { triggerAttackAnimation: () => void } | null}>({});
   const attackIntervals = useRef<{ [key: string]: NodeJS.Timeout }>({});
@@ -226,19 +230,24 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
             
             // Trigger first attack after 150ms
             setTimeout(() => {
-              // First trigger the battalion attack
               battalionRefs.current[`user-${battalion.nodeIndex}`]?.triggerAttackAnimation();
               
-              // Wait for attack animation to be mostly complete before showing damage
+              // Calculate damage with quantity
+              const attackPower = BOT_CATEGORIES[battalion.type].stats.offense;
+              const totalDamage = attackPower * battalion.quantity;
+              
+              // Apply damage after attack animation
               setTimeout(() => {
                 nodeRefs.current[targetNodeIndex]?.triggerDamageAnimation();
-              }, 100); // This delay ensures attack is visible first
+                nodeRefs.current[targetNodeIndex]?.applyDamage(totalDamage, true);
+              }, 100);
               
-              // Then start the regular interval with the same sequencing
+              // Same for the interval
               attackIntervals.current[`user-${battalion.nodeIndex}`] = setInterval(() => {
                 battalionRefs.current[`user-${battalion.nodeIndex}`]?.triggerAttackAnimation();
                 setTimeout(() => {
                   nodeRefs.current[targetNodeIndex]?.triggerDamageAnimation();
+                  nodeRefs.current[targetNodeIndex]?.applyDamage(totalDamage, true);
                 }, 100);
               }, attackInterval);
             }, 150);
@@ -302,14 +311,22 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
             // Trigger first attack after 150ms
             setTimeout(() => {
               battalionRefs.current[`enemy-${battalion.nodeIndex}`]?.triggerAttackAnimation();
+              
+              // Calculate damage with quantity
+              const attackPower = BOT_CATEGORIES[battalion.type].stats.offense;
+              const totalDamage = attackPower * battalion.quantity;
+              
+              // Apply damage after attack animation
               setTimeout(() => {
                 nodeRefs.current[targetNodeIndex]?.triggerDamageAnimation();
+                nodeRefs.current[targetNodeIndex]?.applyDamage(totalDamage, false);
               }, 100);
               
               attackIntervals.current[`enemy-${battalion.nodeIndex}`] = setInterval(() => {
                 battalionRefs.current[`enemy-${battalion.nodeIndex}`]?.triggerAttackAnimation();
                 setTimeout(() => {
                   nodeRefs.current[targetNodeIndex]?.triggerDamageAnimation();
+                  nodeRefs.current[targetNodeIndex]?.applyDamage(totalDamage, false);
                 }, 100);
               }, attackInterval);
             }, 150);
@@ -398,6 +415,54 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     return distance / speed;
   };
 
+  // Add this function to calculate total army health
+  const calculateTotalArmyHealth = () => {
+    let total = 0;
+    
+    userBattalions.forEach(battalion => {
+      total += BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity;
+    });
+    
+    enemyBattalions.forEach(battalion => {
+      total += BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity;
+    });
+    
+    return Math.floor(total * 0.75); // 75% of total army health
+  };
+
+  // Modify the countdown effect to initialize node health
+  useEffect(() => {
+    if (countdown === 3) {
+      const nodeHealth = calculateTotalArmyHealth();
+      // Initialize neutral nodes with health and control progress
+      setNodes(prevNodes => prevNodes.map(node => ({
+        ...node,
+        health: node.controlState === 'neutral' ? nodeHealth : undefined,
+        controlProgress: node.controlState === 'neutral' ? 0 : undefined,
+        isLocked: false
+      })));
+    }
+  }, [countdown]);
+
+  const handleNodeControlChange = (nodeIndex: number, newState: 'user' | 'enemy') => {
+    setNodes(prevNodes => {
+      const updatedNodes = [...prevNodes];
+      updatedNodes[nodeIndex] = {
+        ...updatedNodes[nodeIndex],
+        controlState: newState,
+        isLocked: true
+      };
+      return updatedNodes;
+    });
+
+    // Update controlled nodes array if user captured
+    if (newState === 'user') {
+      setControlledNodes(prev => [...prev, nodeIndex]);
+    } else if (newState === 'enemy') {
+      setControlledNodes(prev => prev.filter(n => n !== nodeIndex));
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <BattleHeader 
@@ -420,7 +485,10 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
               y={node.y}
               isActive={controlledNodes.includes(index)}
               controlState={node.controlState}
-              controlProgress={node.controlState === 'neutral' ? 0 : 100}
+              health={node.health}
+              controlProgress={node.controlProgress}
+              isLocked={node.isLocked}
+              onControlStateChange={(newState) => handleNodeControlChange(index, newState)}
             />
           ))}
         </Animated.View>
