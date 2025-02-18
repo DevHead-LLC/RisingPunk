@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
+import { View, StyleSheet, Animated, Text } from 'react-native';
 import { COLORS } from '../../styles/theme';
 
 type Props = {
@@ -20,7 +20,8 @@ export const NetworkNode = React.forwardRef<NodeRef, Props>(({ x, y, size = 12, 
   const damageFlash = useRef(new Animated.Value(0)).current;
 
   const triggerDamageAnimation = () => {
-    Animated.sequence([
+    // Create two separate animations for center and border
+    const centerFlash = Animated.sequence([
       Animated.timing(damageFlash, {
         toValue: 1,
         duration: 100,
@@ -28,10 +29,26 @@ export const NetworkNode = React.forwardRef<NodeRef, Props>(({ x, y, size = 12, 
       }),
       Animated.timing(damageFlash, {
         toValue: 0,
-        duration: 100,
+        duration: 150,
         useNativeDriver: true,
       })
-    ]).start();
+    ]);
+
+    const borderPulse = Animated.sequence([
+      Animated.timing(pulseAnim, {
+        toValue: 1.5, // Increased pulse scale
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(pulseAnim, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      })
+    ]);
+
+    // Run both animations together
+    Animated.parallel([centerFlash, borderPulse]).start();
   };
 
   React.useImperativeHandle(ref, () => ({
@@ -85,7 +102,7 @@ export const NetworkNode = React.forwardRef<NodeRef, Props>(({ x, y, size = 12, 
         {
           backgroundColor: damageFlash.interpolate({
             inputRange: [0, 1],
-            outputRange: ['transparent', '#FF0000']
+            outputRange: ['transparent', '#FF000099'] // Semi-transparent red
           }),
           borderRadius: 999,
           zIndex: 2
@@ -117,29 +134,34 @@ export const NetworkNode = React.forwardRef<NodeRef, Props>(({ x, y, size = 12, 
         }]
       }]} />
       
-      {/* Control Progress Bar */}
-      <View style={[
-        styles.progressBarContainer,
-        {
-          width: barWidth,
-          height: barHeight,
-          left: -((barWidth - size) / 1.75),
-          top: (size - barHeight) / 2.75,
-          transform: [{ translateX: 0 }, { translateY: 0 }] // Ensure no additional offsets
-        }
-      ]}>
+      {/* Control Progress Bar - Only show for neutral nodes */}
+      {controlState === 'neutral' && (
         <View style={[
-          styles.progressBar,
+          styles.progressBarContainer,
           {
-            width: `${controlProgress}%`,
-            backgroundColor: controlState === 'user' 
-              ? '#4717F6' 
-              : controlState === 'enemy' 
-                ? '#FF4141' 
-                : '#333333'
+            width: barWidth,
+            height: 16, // Taller to accommodate text
+            left: -((barWidth - size) / 1.75),
+            top: -(size + 8), // Position above the node
+            backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent background
+            borderWidth: 1,
+            borderColor: 'rgba(255, 255, 255, 0.3)',
           }
-        ]} />
-      </View>
+        ]}>
+          <View style={[
+            styles.progressBar,
+            {
+              width: `${Math.abs(controlProgress)}%`,
+              backgroundColor: controlProgress > 0 
+                ? 'rgba(71, 23, 246, 0.8)' // User color
+                : 'rgba(255, 65, 65, 0.8)', // Enemy color
+            }
+          ]} />
+          <Text style={styles.progressText}>
+            {`${Math.abs(controlProgress)}%`}
+          </Text>
+        </View>
+      )}
     </View>
   );
 });
@@ -161,13 +183,25 @@ const styles = StyleSheet.create({
   },
   progressBarContainer: {
     position: 'absolute',
-    backgroundColor: '#333333',
-    borderRadius: 1,
+    borderRadius: 4,
     overflow: 'hidden',
-    alignSelf: 'center', // Help with horizontal centering
+    alignSelf: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
   },
   progressBar: {
+    position: 'absolute',
     height: '100%',
-    borderRadius: 1,
+    borderRadius: 3,
+  },
+  progressText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+    zIndex: 11,
   }
 }); 
