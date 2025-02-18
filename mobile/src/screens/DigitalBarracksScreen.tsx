@@ -20,7 +20,7 @@ export const BOT_CATEGORIES = {
   guardian: { // Cavalry
     role: 'Cavalry',
     stats: {
-      health: 7,
+      health: 14,
       speed: 9,
       range: 4,
       offense: 8,
@@ -31,7 +31,7 @@ export const BOT_CATEGORIES = {
   breacher: { // Infantry
     role: 'Infantry',
     stats: {
-      health: 9,
+      health: 18,
       speed: 5,
       range: 5,
       offense: 7,
@@ -42,7 +42,7 @@ export const BOT_CATEGORIES = {
   phreak: { // Ranged
     role: 'Ranged',
     stats: {
-      health: 6,
+      health: 12,
       speed: 7,
       range: 9,
       offense: 6,
