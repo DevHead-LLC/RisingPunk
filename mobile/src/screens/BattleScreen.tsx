@@ -124,6 +124,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
 
   const battalionRefs = useRef<{[key: string]: { triggerAttackAnimation: () => void } | null}>({});
   const attackIntervals = useRef<{ [key: string]: NodeJS.Timeout }>({});
+  const nodeRefs = useRef<{[key: string]: { triggerDamageAnimation: () => void } | null}>({});
 
   useEffect(() => {
     // Show battlefield immediately
@@ -225,11 +226,20 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
             
             // Trigger first attack after 150ms
             setTimeout(() => {
+              // First trigger the battalion attack
               battalionRefs.current[`user-${battalion.nodeIndex}`]?.triggerAttackAnimation();
               
-              // Then start the regular interval
+              // Wait for attack animation to be mostly complete before showing damage
+              setTimeout(() => {
+                nodeRefs.current[targetNodeIndex]?.triggerDamageAnimation();
+              }, 100); // This delay ensures attack is visible first
+              
+              // Then start the regular interval with the same sequencing
               attackIntervals.current[`user-${battalion.nodeIndex}`] = setInterval(() => {
                 battalionRefs.current[`user-${battalion.nodeIndex}`]?.triggerAttackAnimation();
+                setTimeout(() => {
+                  nodeRefs.current[targetNodeIndex]?.triggerDamageAnimation();
+                }, 100);
               }, attackInterval);
             }, 150);
           }
@@ -292,10 +302,15 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
             // Trigger first attack after 150ms
             setTimeout(() => {
               battalionRefs.current[`enemy-${battalion.nodeIndex}`]?.triggerAttackAnimation();
+              setTimeout(() => {
+                nodeRefs.current[targetNodeIndex]?.triggerDamageAnimation();
+              }, 100);
               
-              // Then start the regular interval
               attackIntervals.current[`enemy-${battalion.nodeIndex}`] = setInterval(() => {
                 battalionRefs.current[`enemy-${battalion.nodeIndex}`]?.triggerAttackAnimation();
+                setTimeout(() => {
+                  nodeRefs.current[targetNodeIndex]?.triggerDamageAnimation();
+                }, 100);
               }, attackInterval);
             }, 150);
           }
@@ -400,6 +415,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
           {nodes.map((node, index) => (
             <NetworkNode 
               key={index}
+              ref={(el) => nodeRefs.current[index] = el}
               x={node.x}
               y={node.y}
               isActive={controlledNodes.includes(index)}
