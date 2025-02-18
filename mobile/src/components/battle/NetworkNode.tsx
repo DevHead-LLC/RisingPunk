@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Animated, Text } from 'react-native';
 import { COLORS } from '../../styles/theme';
 
@@ -8,14 +8,19 @@ type Props = {
   size?: number;
   isActive?: boolean;
   controlState: 'user' | 'enemy' | 'neutral';
+  health?: number;
   controlProgress?: number;
+  isLocked?: boolean;
+  onControlStateChange?: (newState: 'user' | 'enemy') => void;
 };
 
 type NodeRef = {
   triggerDamageAnimation: () => void;
+  applyDamage: (damage: number, isUser: boolean) => void;
 };
 
-export const NetworkNode = React.forwardRef<NodeRef, Props>(({ x, y, size = 12, isActive = false, controlState, controlProgress = 0 }, ref) => {
+export const NetworkNode = React.forwardRef<NodeRef, Props>(({ x, y, size = 12, isActive = false, controlState, health, controlProgress = 0, isLocked = false, onControlStateChange }, ref) => {
+  const [currentProgress, setCurrentProgress] = useState(controlProgress);
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const damageFlash = useRef(new Animated.Value(0)).current;
 
@@ -51,8 +56,27 @@ export const NetworkNode = React.forwardRef<NodeRef, Props>(({ x, y, size = 12, 
     Animated.parallel([centerFlash, borderPulse]).start();
   };
 
+  const applyDamage = (damage: number, isUser: boolean) => {
+    if (isLocked || controlState !== 'neutral') return;
+    
+    // Calculate control progress change based on damage relative to health
+    const progressChange = (damage / (health || 1)) * 100;
+    const newProgress = currentProgress + (isUser ? progressChange : -progressChange);
+    
+    // Check for capture
+    if (Math.abs(newProgress) >= 100) {
+      const newState = newProgress > 0 ? 'user' : 'enemy';
+      onControlStateChange?.(newState);
+      return;
+    }
+    
+    // Update progress
+    setCurrentProgress(newProgress);
+  };
+
   React.useImperativeHandle(ref, () => ({
-    triggerDamageAnimation
+    triggerDamageAnimation,
+    applyDamage
   }));
 
   useEffect(() => {
@@ -136,30 +160,30 @@ export const NetworkNode = React.forwardRef<NodeRef, Props>(({ x, y, size = 12, 
       
       {/* Control Progress Bar - Only show for neutral nodes */}
       {controlState === 'neutral' && (
-        <View style={[
-          styles.progressBarContainer,
-          {
-            width: barWidth,
-            height: 16, // Taller to accommodate text
-            left: -((barWidth - size) / 1.75),
-            top: -(size + 8), // Position above the node
-            backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent background
-            borderWidth: 1,
-            borderColor: 'rgba(255, 255, 255, 0.3)',
-          }
-        ]}>
-          <View style={[
-            styles.progressBar,
-            {
-              width: `${Math.abs(controlProgress)}%`,
-              backgroundColor: controlProgress > 0 
-                ? 'rgba(71, 23, 246, 0.8)' // User color
-                : 'rgba(255, 65, 65, 0.8)', // Enemy color
-            }
-          ]} />
-          <Text style={styles.progressText}>
-            {`${Math.abs(controlProgress)}%`}
-          </Text>
+        <View style={[styles.progressBarContainer, {
+          width: size * 4, // Make bars wider
+          left: -(size * 1.5), // Center the bar
+        }]}>
+          {/* Background bar */}
+          <View style={styles.progressBarBackground} />
+          
+          {/* Progress fill */}
+          <Animated.View 
+            style={[
+              styles.progressBarFill,
+              {
+                width: `${Math.abs(currentProgress)}%`,
+                left: currentProgress < 0 ? 'auto' : 0,
+                right: currentProgress < 0 ? 0 : 'auto',
+                backgroundColor: currentProgress > 0 
+                  ? 'rgba(71, 23, 246, 0.9)' // Brighter user color
+                  : 'rgba(255, 65, 65, 0.9)', // Brighter enemy color
+              }
+            ]} 
+          />
+          
+          {/* Bar border overlay */}
+          <View style={styles.progressBarBorder} />
         </View>
       )}
     </View>
@@ -183,16 +207,33 @@ const styles = StyleSheet.create({
   },
   progressBarContainer: {
     position: 'absolute',
-    borderRadius: 4,
-    overflow: 'hidden',
-    alignSelf: 'center',
-    justifyContent: 'center',
+    height: 6, // Slightly taller
+    top: -10,
     zIndex: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  progressBar: {
+  progressBarBackground: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)', // Darker background
+    borderRadius: 3,
+  },
+  progressBarFill: {
     position: 'absolute',
     height: '100%',
     borderRadius: 3,
+    transition: 'width 0.2s ease-out',
+  },
+  progressBarBorder: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    borderRadius: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)', // Subtle border
+    backgroundColor: 'transparent',
   },
   progressText: {
     color: '#FFFFFF',
