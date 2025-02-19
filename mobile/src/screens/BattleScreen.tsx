@@ -238,17 +238,33 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
               
               // Apply damage after attack animation
               setTimeout(() => {
-                nodeRefs.current[targetNodeIndex]?.triggerDamageAnimation();
-                nodeRefs.current[targetNodeIndex]?.applyDamage(totalDamage, true);
+                const nodeRef = nodeRefs.current[targetNodeIndex];
+                if (nodeRef) {
+                  nodeRef.triggerDamageAnimation();
+                  const damageApplied = nodeRef.applyDamage(totalDamage, true);
+                  // If damage wasn't applied (node is captured/locked), clear the interval
+                  if (!damageApplied) {
+                    clearInterval(attackIntervals.current[`user-${battalion.nodeIndex}`]);
+                    delete attackIntervals.current[`user-${battalion.nodeIndex}`];
+                  }
+                }
               }, 100);
               
               // Same for the interval
-              attackIntervals.current[`user-${battalion.nodeIndex}`] = setInterval(() => {
-                battalionRefs.current[`user-${battalion.nodeIndex}`]?.triggerAttackAnimation();
-                setTimeout(() => {
-                  nodeRefs.current[targetNodeIndex]?.triggerDamageAnimation();
-                  nodeRefs.current[targetNodeIndex]?.applyDamage(totalDamage, true);
-                }, 100);
+              attackIntervals.current[`user-${battalion.nodeIndex}-${targetNodeIndex}`] = setInterval(() => {
+                const nodeRef = nodeRefs.current[targetNodeIndex];
+                if (nodeRef) {
+                  battalionRefs.current[`user-${battalion.nodeIndex}`]?.triggerAttackAnimation();
+                  setTimeout(() => {
+                    nodeRef.triggerDamageAnimation();
+                    const damageApplied = nodeRef.applyDamage(totalDamage, true);
+                    // If damage wasn't applied (node is captured/locked), clear the interval
+                    if (!damageApplied) {
+                      clearInterval(attackIntervals.current[`user-${battalion.nodeIndex}-${targetNodeIndex}`]);
+                      delete attackIntervals.current[`user-${battalion.nodeIndex}-${targetNodeIndex}`];
+                    }
+                  }, 100);
+                }
               }, attackInterval);
             }, 150);
           }
@@ -318,16 +334,32 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
               
               // Apply damage after attack animation
               setTimeout(() => {
-                nodeRefs.current[targetNodeIndex]?.triggerDamageAnimation();
-                nodeRefs.current[targetNodeIndex]?.applyDamage(totalDamage, false);
+                const nodeRef = nodeRefs.current[targetNodeIndex];
+                if (nodeRef) {
+                  nodeRef.triggerDamageAnimation();
+                  const damageApplied = nodeRef.applyDamage(totalDamage, false);
+                  // If damage wasn't applied (node is captured/locked), clear the interval
+                  if (!damageApplied) {
+                    clearInterval(attackIntervals.current[`enemy-${battalion.nodeIndex}`]);
+                    delete attackIntervals.current[`enemy-${battalion.nodeIndex}`];
+                  }
+                }
               }, 100);
               
-              attackIntervals.current[`enemy-${battalion.nodeIndex}`] = setInterval(() => {
-                battalionRefs.current[`enemy-${battalion.nodeIndex}`]?.triggerAttackAnimation();
-                setTimeout(() => {
-                  nodeRefs.current[targetNodeIndex]?.triggerDamageAnimation();
-                  nodeRefs.current[targetNodeIndex]?.applyDamage(totalDamage, false);
-                }, 100);
+              attackIntervals.current[`enemy-${battalion.nodeIndex}-${targetNodeIndex}`] = setInterval(() => {
+                const nodeRef = nodeRefs.current[targetNodeIndex];
+                if (nodeRef) {
+                  battalionRefs.current[`enemy-${battalion.nodeIndex}`]?.triggerAttackAnimation();
+                  setTimeout(() => {
+                    nodeRef.triggerDamageAnimation();
+                    const damageApplied = nodeRef.applyDamage(totalDamage, false);
+                    // If damage wasn't applied (node is captured/locked), clear the interval
+                    if (!damageApplied) {
+                      clearInterval(attackIntervals.current[`enemy-${battalion.nodeIndex}-${targetNodeIndex}`]);
+                      delete attackIntervals.current[`enemy-${battalion.nodeIndex}-${targetNodeIndex}`];
+                    }
+                  }, 100);
+                }
               }, attackInterval);
             }, 150);
           }
@@ -455,7 +487,16 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       return updatedNodes;
     });
 
-    // Update controlled nodes array if user captured
+    // Stop only battalions attacking this specific node
+    Object.entries(attackIntervals.current).forEach(([battalionKey, interval]) => {
+      // Extract target node from the key (format: "user-battalionIndex-targetNode" or "enemy-battalionIndex-targetNode")
+      const [side, , targetNode] = battalionKey.split('-');
+      if (parseInt(targetNode) === nodeIndex) {
+        clearInterval(interval);
+        delete attackIntervals.current[battalionKey];
+      }
+    });
+
     if (newState === 'user') {
       setControlledNodes(prev => [...prev, nodeIndex]);
     } else if (newState === 'enemy') {
