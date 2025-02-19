@@ -108,14 +108,22 @@ export const NetworkNode = React.forwardRef<NodeRef, Props>(({ x, y, size = 12, 
         width: size,
         height: size,
         borderWidth: 2,
-        borderColor: COLORS.primary,
+        borderColor: controlState === 'user'
+          ? '#4717F6'  // User blue border
+          : controlState === 'enemy'
+          ? '#FF4141'  // Enemy red border
+          : COLORS.primary,  // Neutral border
       }
     ]}>
       {/* Base color layer */}
       <Animated.View style={[
         StyleSheet.absoluteFill,
         {
-          backgroundColor: isActive ? COLORS.primary : COLORS.secondary,
+          backgroundColor: controlState === 'user' 
+            ? 'rgba(71, 23, 246, 0.9)'  // User blue
+            : controlState === 'enemy'
+            ? 'rgba(255, 65, 65, 0.9)'  // Enemy red
+            : COLORS.secondary,          // Neutral color
           borderRadius: 999,
           zIndex: 1
         }
