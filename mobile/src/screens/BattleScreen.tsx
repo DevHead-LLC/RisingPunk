@@ -128,7 +128,10 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
 
   const battalionRefs = useRef<{[key: string]: { triggerAttackAnimation: () => void } | null}>({});
   const attackIntervals = useRef<{ [key: string]: NodeJS.Timeout }>({});
-  const nodeRefs = useRef<{[key: string]: { triggerDamageAnimation: () => void } | null}>({});
+  const nodeRefs = useRef<{[key: string]: {
+    triggerDamageAnimation: () => void;
+    applyDamage: (damage: number, isUser: boolean) => boolean;
+  } | null}>({});
 
   useEffect(() => {
     // Show battlefield immediately
