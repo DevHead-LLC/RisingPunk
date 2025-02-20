@@ -480,54 +480,72 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   }, [countdown]);
 
   const handleNodeControlChange = (nodeIndex: number, newState: 'user' | 'enemy') => {
-    console.log(`[Node Control] Node ${nodeIndex} captured by ${newState}`);
-    console.log('[Node Control] Current attack intervals:', Object.keys(attackIntervals.current));
+    console.log(`[Node Capture] Node ${nodeIndex} captured by ${newState}`);
 
-    // Step 1: Update node state
-    setNodes(prevNodes => {
-      const updatedNodes = [...prevNodes];
-      updatedNodes[nodeIndex] = {
-        ...updatedNodes[nodeIndex],
-        controlState: newState,
-        isLocked: true
-      };
-      return updatedNodes;
-    });
+    // Find all battalions targeting this node
+    const affectedBattalions: Array<{
+      key: string;
+      interval: NodeJS.Timeout;
+      side: 'user' | 'enemy';
+      battalionIndex: string;
+    }> = [];
 
-    // Step 2: Find and clear affected battalion intervals
     Object.entries(attackIntervals.current).forEach(([battalionKey, interval]) => {
       const [side, battalionIndexStr, targetNode] = battalionKey.split('-');
-      console.log(`[Battalion Check] Checking ${battalionKey} against node ${nodeIndex}`);
-      
       if (parseInt(targetNode) === nodeIndex) {
-        console.log(`[Battalion Retarget] Starting retarget for ${side} battalion ${battalionIndexStr}`);
-        clearInterval(interval);
-        delete attackIntervals.current[battalionKey];
-        
-        // Step 3: Find the actual battalion
-        const battalion = side === 'user' 
-          ? userBattalions.find(b => b.nodeIndex.toString() === battalionIndexStr)
-          : enemyBattalions.find(b => b.nodeIndex.toString() === battalionIndexStr);
-        
-        if (battalion) {
-          console.log(`[Battalion Retarget] Found battalion:`, battalion);
-          // Step 4: Find new targets
-          const targets = findAvailableTargets(battalion, side === 'user');
-          console.log(`[Battalion Retarget] Available targets:`, targets);
+        console.log(`[Battalion Affected] ${side} battalion ${battalionIndexStr} was targeting node ${nodeIndex}`);
+        affectedBattalions.push({
+          key: battalionKey,
+          interval,
+          side: side as 'user' | 'enemy',
+          battalionIndex: battalionIndexStr
+        });
+      }
+    });
+
+    // Clear attack intervals for affected battalions
+    affectedBattalions.forEach(({ key, interval, side, battalionIndex }) => {
+      console.log(`[Battalion Reset] Clearing attack interval for ${side}-${battalionIndex}`);
+      clearInterval(interval);
+      delete attackIntervals.current[key];
+
+      // Get battalion reference
+      const battalion = side === 'user'
+        ? userBattalions.find(b => b.nodeIndex.toString() === battalionIndex)
+        : enemyBattalions.find(b => b.nodeIndex.toString() === battalionIndex);
+
+      if (battalion) {
+        // Find new target
+        const targets = findAvailableTargets(battalion, side === 'user');
+        console.log(`[Battalion Retarget] ${side}-${battalionIndex} found ${targets.length} potential targets`);
+
+        if (targets.length > 0) {
+          // For now, just pick the first available target
+          const newTarget = targets[0];
+          console.log(`[Battalion Movement] ${side}-${battalionIndex} moving to node ${newTarget}`);
           
-          if (targets.length > 0) {
-            // Step 5: Move to new target
-            console.log(`[Battalion Retarget] Moving to target ${targets[0]}`);
-            moveBattalionAlongPath(battalion, targets[0], side === 'user');
-          }
+          // Move battalion to new target
+          moveBattalionAlongPath(battalion, newTarget, side === 'user');
+        } else {
+          console.log(`[Battalion Status] ${side}-${battalionIndex} has no available targets`);
         }
       }
     });
 
-    // Step 6: Update controlled nodes tracking
+    // Update node control state
+    setNodes(prev => {
+      const updated = [...prev];
+      updated[nodeIndex] = {
+        ...updated[nodeIndex],
+        controlState: newState,
+        isLocked: true
+      };
+      return updated;
+    });
+
     if (newState === 'user') {
       setControlledNodes(prev => [...prev, nodeIndex]);
-    } else if (newState === 'enemy') {
+    } else {
       setControlledNodes(prev => prev.filter(n => n !== nodeIndex));
     }
   };
