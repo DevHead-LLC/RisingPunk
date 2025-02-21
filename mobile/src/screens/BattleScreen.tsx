@@ -41,6 +41,13 @@ interface BattalionTarget {
   intervalKey: string;
 }
 
+type BattleTarget = {
+  type: 'node' | 'battalion';
+  index: number;
+  distance: number;
+  position: { x: number; y: number };
+};
+
 // Add this constant after the interfaces and before the component
 const NETWORK_CONNECTIONS = [
   // Horizontal connections
@@ -501,20 +508,29 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   }, [countdown]);
 
   // Add these utility functions at component level
-  const findAvailableTargets = (
-    battalion: BattalionPosition, 
-    isUser: boolean
-  ): number[] => {
-    // Find all neutral, uncaptured nodes
-    const availableNodes = nodes.reduce((acc: number[], node, index) => {
-      if (node.controlState === 'neutral' && !node.isLocked) {
-        acc.push(index);
-      }
-      return acc;
-    }, []);
+  const getAnimatedPosition = (position: Animated.ValueXY) => {
+    const layout = position.getLayout();
+    return {
+      x: layout.left,
+      y: layout.top
+    };
+  };
 
-    console.log(`[Target Search] ${isUser ? 'User' : 'Enemy'} battalion ${battalion.nodeIndex} found ${availableNodes.length} available targets`);
-    return availableNodes;
+  const findAvailableTargets = (battalion: BattalionPosition, isUser: boolean): BattleTarget[] => {
+    const range = BOT_CATEGORIES[battalion.type].stats.range;
+    const currentPos = getAnimatedPosition(battalion.position);
+    
+    return nodes
+      .map((node, index) => ({
+        type: 'node' as const,
+        index,
+        distance: Math.sqrt(
+          Math.pow(Number(node.x) - Number(currentPos.x), 2) + 
+          Math.pow(Number(node.y) - Number(currentPos.y), 2)
+        ),
+        position: { x: node.x, y: node.y }
+      }))
+      .filter(target => target.distance <= range);
   };
 
   const handleNodeControlChange = (nodeIndex: number, newState: 'user' | 'enemy') => {
@@ -568,7 +584,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       if (availableTargets.length > 0) {
         const newTarget = availableTargets[0]; // For now, just take first available
         console.log(`[Retarget] ${key} moving to new target ${newTarget}`);
-        moveBattalionAlongPath(battalion, newTarget, isUser);
+        moveBattalionAlongPath(battalion, newTarget.index, isUser);
       } else {
         console.log(`[Hold] ${key} has no available targets and will hold position`);
       }
@@ -662,6 +678,15 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       attackIntervals.current = {};
     };
   }, []);
+
+  // IMPORTANT: Handle battalion retargeting
+  const findNewTarget = (battalion: BattalionPosition, isUser: boolean) => {
+    const availableTargets = findAvailableTargets(battalion, isUser);
+    if (availableTargets.length > 0) {
+      const target = availableTargets[0];
+      moveBattalionAlongPath(battalion, target.index, isUser);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
