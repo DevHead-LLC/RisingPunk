@@ -13,6 +13,7 @@ import { BOT_CATEGORIES } from './DigitalBarracksScreen';
 import { checkRangeIntersection } from '../utils/battleCalculator';
 import { useBattleMovement } from '../hooks/useBattleMovement';
 import { BattleNode, BattalionPosition } from '../types/battle';
+import { useBattleInitialization } from '../hooks/useBattleInitialization';
 
 type Props = {
   onClose: () => void;
@@ -52,65 +53,17 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   const [showResults, setShowResults] = useState(false);
   const [battleWinner, setBattleWinner] = useState<'user' | 'enemy'>('user');
   const resultsOpacity = useRef(new Animated.Value(0)).current;
-  const [userBattalions, setUserBattalions] = useState<BattalionPosition[]>([
-    {
-      type: 'breacher',
-      quantity: 5,
-      nodeIndex: 0,
-      position: new Animated.ValueXY({ 
-        x: 20,
-        y: SCREEN_HEIGHT * 0.225
-      })
-    },
-    {
-      type: 'guardian',
-      quantity: 3,
-      nodeIndex: 1,
-      position: new Animated.ValueXY({ 
-        x: 20,
-        y: SCREEN_HEIGHT * 0.5
-      })
-    },
-    {
-      type: 'phreak',
-      quantity: 4,
-      nodeIndex: 2,
-      position: new Animated.ValueXY({ 
-        x: 20,
-        y: SCREEN_HEIGHT * 0.775
-      })
-    }
-  ]);
-
-  const [enemyBattalions, setEnemyBattalions] = useState<BattalionPosition[]>([
-    {
-      type: 'breacher',
-      quantity: 4,
-      nodeIndex: 6,
-      position: new Animated.ValueXY({ 
-        x: SCREEN_WIDTH - 165,
-        y: SCREEN_HEIGHT * 0.225
-      })
-    },
-    {
-      type: 'guardian',
-      quantity: 4,
-      nodeIndex: 7,
-      position: new Animated.ValueXY({ 
-        x: SCREEN_WIDTH - 165,
-        y: SCREEN_HEIGHT * 0.5
-      })
-    },
-    {
-      type: 'phreak',
-      quantity: 3,
-      nodeIndex: 8,
-      position: new Animated.ValueXY({ 
-        x: SCREEN_WIDTH - 165,
-        y: SCREEN_HEIGHT * 0.775
-      })
-    }
-  ]);
+  
+  // Replace the old initialization with our new hook
+  const {
+    nodes,
+    setNodes,
+    userBattalions,
+    setUserBattalions,
+    enemyBattalions,
+    setEnemyBattalions,
+    calculateInitialHealth,
+  } = useBattleInitialization();
 
   const [battleStarted, setBattleStarted] = useState(false);
   const deploymentOpacity = useRef(new Animated.Value(1)).current;
@@ -118,24 +71,6 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   const [controlledNodes, setControlledNodes] = useState<number[]>([0, 1, 2]); // User starts controlling left nodes
   const [countdown, setCountdown] = useState(3);
   const countdownOpacity = useRef(new Animated.Value(1)).current;
-
-  // Convert nodes from const to state
-  const [nodes, setNodes] = useState<BattleNode[]>([
-    // Left side (user) nodes
-    { x: SCREEN_WIDTH * 0.0347, y: SCREEN_HEIGHT * 0.25, controlState: 'user' },     // 0
-    { x: SCREEN_WIDTH * 0.0347, y: SCREEN_HEIGHT * 0.525, controlState: 'user' },    // 1
-    { x: SCREEN_WIDTH * 0.0347, y: SCREEN_HEIGHT * 0.8, controlState: 'user' },      // 2
-    
-    // Middle nodes (neutral)
-    { x: SCREEN_WIDTH * 0.425, y: SCREEN_HEIGHT * 0.375, controlState: 'neutral' },  // 3
-    { x: SCREEN_WIDTH * 0.425, y: SCREEN_HEIGHT * 0.525, controlState: 'neutral' },  // 4
-    { x: SCREEN_WIDTH * 0.425, y: SCREEN_HEIGHT * 0.675, controlState: 'neutral' },  // 5
-    
-    // Right side (enemy) nodes
-    { x: SCREEN_WIDTH * 0.8225, y: SCREEN_HEIGHT * 0.25, controlState: 'enemy' },    // 6
-    { x: SCREEN_WIDTH * 0.8225, y: SCREEN_HEIGHT * 0.525, controlState: 'enemy' },   // 7
-    { x: SCREEN_WIDTH * 0.8225, y: SCREEN_HEIGHT * 0.8, controlState: 'enemy' },     // 8
-  ]);
 
   const battalionRefs = useRef<{ [key: string]: any }>({});
   const attackIntervals = useRef<{ [key: string]: NodeJS.Timeout }>({});
