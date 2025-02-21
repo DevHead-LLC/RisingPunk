@@ -6,7 +6,7 @@
 import { useCallback, useState } from 'react';
 import { Animated } from 'react-native';
 
-type BattlePhase = 
+export type BattlePhase = 
   | 'initializing'  // Initial setup
   | 'deployment'    // Unit placement
   | 'countdown'     // Pre-battle countdown
