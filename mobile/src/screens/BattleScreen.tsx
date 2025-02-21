@@ -11,6 +11,7 @@ import { CountdownOverlay } from '../components/battle/CountdownOverlay';
 
 import { BOT_CATEGORIES } from './DigitalBarracksScreen';
 import { checkRangeIntersection } from '../utils/battleCalculator';
+
 type Props = {
   onClose: () => void;
   onBattleComplete?: (winner: 'user' | 'enemy') => void;
@@ -33,6 +34,23 @@ interface BattleNode {
   controlProgress?: number;
   isLocked?: boolean;
 }
+
+interface BattalionTarget {
+  nodeIndex: number;
+  type: 'node' | 'battalion';
+  intervalKey: string;
+}
+
+// Add this constant after the interfaces and before the component
+const NETWORK_CONNECTIONS = [
+  // Horizontal connections
+  [0, 3], [3, 6], // Top row
+  [1, 4], [4, 7], // Middle row
+  [2, 5], [5, 8], // Bottom row
+  // Diagonal connections
+  [0, 4], [1, 3], [1, 5], [2, 4],
+  [3, 7], [4, 6], [4, 8], [5, 7]
+];
 
 export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) => {
   const networkOpacity = useRef(new Animated.Value(0)).current;
@@ -126,12 +144,15 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     { x: SCREEN_WIDTH * 0.8225, y: SCREEN_HEIGHT * 0.8, controlState: 'enemy' },     // 8
   ]);
 
-  const battalionRefs = useRef<{[key: string]: { triggerAttackAnimation: () => void } | null}>({});
+  const battalionRefs = useRef<{ [key: string]: any }>({});
   const attackIntervals = useRef<{ [key: string]: NodeJS.Timeout }>({});
   const nodeRefs = useRef<{[key: string]: {
     triggerDamageAnimation: () => void;
     applyDamage: (damage: number, isUser: boolean) => boolean;
   } | null}>({});
+
+  // Add this to track battalion targets
+  const battalionTargets = useRef<{[key: string]: BattalionTarget}>({}).current;
 
   useEffect(() => {
     // Show battlefield immediately
@@ -481,8 +502,16 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
 
   const handleNodeControlChange = (nodeIndex: number, newState: 'user' | 'enemy') => {
     console.log(`[Node Capture] Node ${nodeIndex} captured by ${newState}`);
+    console.log(`[Attack Intervals] Current intervals:`, Object.keys(attackIntervals.current));
+    
+    // Log all battalion positions before processing
+    console.log(`[Battalion Status] Before processing:`, {
+      user: userBattalions.map(b => ({ index: b.nodeIndex, target: Object.keys(attackIntervals.current)
+        .find(key => key.startsWith('user-' + b.nodeIndex))?.split('-')[2] })),
+      enemy: enemyBattalions.map(b => ({ index: b.nodeIndex, target: Object.keys(attackIntervals.current)
+        .find(key => key.startsWith('enemy-' + b.nodeIndex))?.split('-')[2] }))
+    });
 
-    // Find all battalions targeting this node
     const affectedBattalions: Array<{
       key: string;
       interval: NodeJS.Timeout;
@@ -490,10 +519,13 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       battalionIndex: string;
     }> = [];
 
+    // Find affected battalions
     Object.entries(attackIntervals.current).forEach(([battalionKey, interval]) => {
       const [side, battalionIndexStr, targetNode] = battalionKey.split('-');
-      if (parseInt(targetNode) === nodeIndex) {
-        console.log(`[Battalion Affected] ${side} battalion ${battalionIndexStr} was targeting node ${nodeIndex}`);
+      const targetNodeNum = parseInt(targetNode);
+      
+      if (targetNodeNum === nodeIndex) {
+        console.log(`[Battalion Detection] Found ${side}-${battalionIndexStr} targeting node ${nodeIndex}`);
         affectedBattalions.push({
           key: battalionKey,
           interval,
@@ -503,32 +535,28 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       }
     });
 
-    // Clear attack intervals for affected battalions
+    // Process affected battalions
+    console.log(`[Processing] Found ${affectedBattalions.length} battalions to process`);
+    
     affectedBattalions.forEach(({ key, interval, side, battalionIndex }) => {
-      console.log(`[Battalion Reset] Clearing attack interval for ${side}-${battalionIndex}`);
       clearInterval(interval);
       delete attackIntervals.current[key];
 
-      // Get battalion reference
       const battalion = side === 'user'
         ? userBattalions.find(b => b.nodeIndex.toString() === battalionIndex)
         : enemyBattalions.find(b => b.nodeIndex.toString() === battalionIndex);
 
-      if (battalion) {
-        // Find new target
-        const targets = findAvailableTargets(battalion, side === 'user');
-        console.log(`[Battalion Retarget] ${side}-${battalionIndex} found ${targets.length} potential targets`);
+      if (!battalion) {
+        console.log(`[Error] Could not find ${side} battalion ${battalionIndex}`);
+        return;
+      }
 
-        if (targets.length > 0) {
-          // For now, just pick the first available target
-          const newTarget = targets[0];
-          console.log(`[Battalion Movement] ${side}-${battalionIndex} moving to node ${newTarget}`);
-          
-          // Move battalion to new target
-          moveBattalionAlongPath(battalion, newTarget, side === 'user');
-        } else {
-          console.log(`[Battalion Status] ${side}-${battalionIndex} has no available targets`);
-        }
+      const targets = findAvailableTargets(battalion, side === 'user');
+      if (targets.length > 0) {
+        console.log(`[Retarget] ${side}-${battalionIndex} moving to ${targets[0]}`);
+        moveBattalionAlongPath(battalion, targets[0], side === 'user');
+      } else {
+        console.log(`[Retarget] ${side}-${battalionIndex} has no valid targets`);
       }
     });
 
@@ -551,22 +579,17 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   };
 
   // Add this function to BattleScreen component
-  const findAvailableTargets = (battalion: BattalionPosition, isUser: boolean): number[] => {
-    console.log(`[Target Search] Finding targets for ${isUser ? 'user' : 'enemy'} battalion at node ${battalion.nodeIndex}`);
+  const findAvailableTargets = (
+    battalion: BattalionPosition, 
+    isUser: boolean,
+    currentUserBattalions: BattalionPosition[] = userBattalions,
+    currentEnemyBattalions: BattalionPosition[] = enemyBattalions
+  ): number[] => {
+    const battalionKey = `${isUser ? 'user' : 'enemy'}-${battalion.nodeIndex}`;
+    console.log(`[Target Search] Finding targets for ${battalionKey} from node ${battalion.nodeIndex}`);
     
-    // Define valid connections for pathfinding
-    const connections = [
-      // Horizontal connections
-      [0, 3], [3, 6], // Top row
-      [1, 4], [4, 7], // Middle row
-      [2, 5], [5, 8], // Bottom row
-      // Diagonal connections
-      [0, 4], [1, 3], [1, 5], [2, 4],
-      [3, 7], [4, 6], [4, 8], [5, 7]
-    ];
-
-    // Find nodes that can be reached from current position
-    const reachableNodes = connections.reduce((acc: number[], [from, to]) => {
+    // Get reachable nodes through network
+    const reachableNodes = NETWORK_CONNECTIONS.reduce((acc: number[], [from, to]) => {
       if (from === battalion.nodeIndex && !nodes[to].isLocked) {
         acc.push(to);
       } else if (to === battalion.nodeIndex && !nodes[from].isLocked) {
@@ -575,20 +598,52 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       return acc;
     }, []);
 
-    console.log(`[Target Search] Reachable nodes from ${battalion.nodeIndex}:`, reachableNodes);
+    console.log(`[Pathfinding] Reachable nodes:`, reachableNodes);
 
-    // Filter for valid targets (enemy nodes for user, user nodes for enemy)
-    const validTargets = reachableNodes.filter(nodeIndex => {
+    // Filter out nodes that shouldn't be targeted
+    const validNodes = reachableNodes.filter(nodeIndex => {
       const node = nodes[nodeIndex];
-      if (isUser) {
-        return node.controlState === 'enemy' || node.controlState === 'neutral';
-      } else {
-        return node.controlState === 'user' || node.controlState === 'neutral';
+      
+      // Don't target friendly nodes
+      if (node.controlState === (isUser ? 'user' : 'enemy')) {
+        return false;
       }
+
+      // Don't target locked nodes
+      if (node.isLocked) {
+        return false;
+      }
+
+      return true;
     });
 
-    console.log(`[Target Search] Valid targets:`, validTargets);
-    return validTargets;
+    // Prioritize targets within valid nodes
+    const enemyBattalions = validNodes.filter(nodeIndex => {
+      const opposingForces = isUser ? currentEnemyBattalions : currentUserBattalions;
+      return opposingForces.some(b => b.nodeIndex === nodeIndex);
+    });
+
+    const neutralNodes = validNodes.filter(nodeIndex => 
+      nodes[nodeIndex].controlState === 'neutral'
+    );
+
+    const enemyNodes = validNodes.filter(nodeIndex => 
+      nodes[nodeIndex].controlState === (isUser ? 'enemy' : 'user')
+    );
+
+    // Prioritize: enemy battalions > neutral nodes > enemy controlled nodes
+    const prioritizedTargets = [...new Set([...enemyBattalions, ...neutralNodes, ...enemyNodes])];
+    
+    console.log(`[Target Selection] ${battalionKey} filtered targets:`, {
+      reachable: reachableNodes.length,
+      valid: validNodes.length,
+      enemyBattalions,
+      neutralNodes,
+      enemyNodes,
+      final: prioritizedTargets
+    });
+
+    return prioritizedTargets;
   };
 
   // Update the moveBattalionAlongPath function
@@ -597,53 +652,79 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     targetNodeIndex: number,
     isUser: boolean
   ) => {
-    // Clear existing intervals...
+    const battalionKey = `${isUser ? 'user' : 'enemy'}-${battalion.nodeIndex}`;
+    console.log(`[Movement] ${battalionKey} starting movement to node ${targetNodeIndex}`);
 
-    const targetNode = nodes[targetNodeIndex];
-    console.log(`[Battalion Movement] ${isUser ? 'User' : 'Enemy'} battalion ${battalion.nodeIndex} moving to node ${targetNodeIndex}`);
-
-    // Adjust target position to account for battalion size (20x20)
-    const targetPosition = {
-      x: targetNode.x - 10, // Center the 20x20 battalion on the node
-      y: targetNode.y - 10
+    // Track the new target
+    battalionTargets[battalionKey] = {
+      nodeIndex: targetNodeIndex,
+      type: nodes[targetNodeIndex].controlState === 'neutral' ? 'node' : 'battalion',
+      intervalKey: `${battalionKey}-${targetNodeIndex}`
     };
 
-    const startNode = nodes[battalion.nodeIndex];
-    const distance = Math.sqrt(
-      Math.pow(targetPosition.x - startNode.x, 2) + 
-      Math.pow(targetPosition.y - startNode.y, 2)
-    );
+    const targetNode = nodes[targetNodeIndex];
+    const range = BOT_CATEGORIES[battalion.type].stats.range * 15;
     
+    // Calculate direction vector from battalion to target
+    const startNode = nodes[battalion.nodeIndex];
+    const dx = targetNode.x - startNode.x;
+    const dy = targetNode.y - startNode.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    // Normalize direction vector
+    const dirX = dx / distance;
+    const dirY = dy / distance;
+    
+    // Calculate position at range distance from target
+    const rangePosition = {
+      x: targetNode.x - (dirX * range) - 10, // -10 to center the battalion
+      y: targetNode.y - (dirY * range) - 10
+    };
+
+    console.log(`[Range Movement] Battalion range: ${range}, Distance to target: ${distance}`);
+    console.log(`[Range Movement] Stop position calculated:`, rangePosition);
+
     const speed = BOT_CATEGORIES[battalion.type].stats.speed;
-    const duration = (distance / speed) * 100;
+    const movementDuration = (distance / speed) * 100;
 
-    console.log(`[Battalion Movement] Duration: ${duration}ms, Speed: ${speed}, Distance: ${distance}`);
-
-    // Update animation to use exact target position
+    // Start movement animation
     Animated.timing(battalion.position, {
-      toValue: targetPosition,
-      duration,
+      toValue: rangePosition,
+      duration: movementDuration,
       useNativeDriver: true
     }).start(() => {
-      console.log(`[Battalion Movement] Animation complete for battalion ${battalion.nodeIndex}`);
+      console.log(`[Range Movement] Battalion ${battalion.nodeIndex} reached range position`);
       
-      // Ensure exact position after animation
-      battalion.position.setValue(targetPosition);
+      // Update battalion state BEFORE setting up new attack interval
+      const newBattalion = { ...battalion, nodeIndex: targetNodeIndex };
       
-      // Update battalion state
       if (isUser) {
         setUserBattalions(prev => prev.map(b => 
-          b.nodeIndex === battalion.nodeIndex 
-            ? { ...b, nodeIndex: targetNodeIndex, position: battalion.position }
-            : b
+          b.nodeIndex === battalion.nodeIndex ? newBattalion : b
         ));
       } else {
         setEnemyBattalions(prev => prev.map(b => 
-          b.nodeIndex === battalion.nodeIndex 
-            ? { ...b, nodeIndex: targetNodeIndex, position: battalion.position }
-            : b
+          b.nodeIndex === battalion.nodeIndex ? newBattalion : b
         ));
       }
+
+      // Use the new nodeIndex for the attack interval key
+      const attackSpeed = BOT_CATEGORIES[battalion.type].stats.speed;
+      
+      console.log(`[Attack Setup] Creating attack interval for ${battalionKey} (moved from ${battalion.nodeIndex})`);
+      
+      const attackInterval = setInterval(() => {
+        const nodeRef = nodeRefs.current[targetNodeIndex];
+        const battalionRef = battalionRefs.current[`${isUser ? 'user' : 'enemy'}-${battalion.nodeIndex}`];
+        
+        if (nodeRef && battalionRef) {
+          const damage = BOT_CATEGORIES[battalion.type].stats.offense * battalion.quantity;
+          battalionRef.triggerAttackAnimation();
+          nodeRef.applyDamage(damage, isUser);
+        }
+      }, 2000 * (5 / attackSpeed));
+
+      attackIntervals.current[battalionKey] = attackInterval;
     });
   };
 
@@ -709,8 +790,8 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
         <Animated.View style={[styles.overlayContainer, { opacity: battalionOpacity }]}>
           {userBattalions.map((battalion, index) => (
             <AnimatedBattalion
-              key={`user-${battalion.type}-${battalion.nodeIndex}`}
-              ref={(el) => battalionRefs.current[`user-${battalion.nodeIndex}`] = el}
+              key={`user-${index}`}
+              ref={el => battalionRefs.current[`user-${battalion.nodeIndex}`] = el}
               type={battalion.type}
               quantity={battalion.quantity}
               position={battalion.position}
@@ -720,8 +801,8 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
           
           {enemyBattalions.map((battalion, index) => (
             <AnimatedBattalion
-              key={`enemy-${battalion.type}-${battalion.nodeIndex}`}
-              ref={(el) => battalionRefs.current[`enemy-${battalion.nodeIndex}`] = el}
+              key={`enemy-${index}`}
+              ref={el => battalionRefs.current[`enemy-${battalion.nodeIndex}`] = el}
               type={battalion.type}
               quantity={battalion.quantity}
               position={battalion.position}
