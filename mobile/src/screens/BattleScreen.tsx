@@ -581,85 +581,77 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     targetNodeIndex: number,
     isUser: boolean
   ) => {
+    // IMPORTANT: Keep this comment - tracks battalion movement and attack setup
     const battalionKey = `${isUser ? 'user' : 'enemy'}-${battalion.nodeIndex}`;
-    const newIntervalKey = `${battalionKey}-${targetNodeIndex}`;
-    console.log(`[Movement] ${battalionKey} starting movement to node ${targetNodeIndex}`);
-
-    // Clear any existing attack interval for this battalion
-    Object.keys(attackIntervals.current).forEach(key => {
-      if (key.startsWith(battalionKey)) {
-        console.log(`[Cleanup] Clearing existing attack interval for ${key}`);
-        clearInterval(attackIntervals.current[key]);
-        delete attackIntervals.current[key];
-      }
-    });
-
-    // Track the new target
-    battalionTargets[battalionKey] = {
-      nodeIndex: targetNodeIndex,
-      type: nodes[targetNodeIndex].controlState === 'neutral' ? 'node' : 'battalion',
-      intervalKey: newIntervalKey
-    };
-
     const targetNode = nodes[targetNodeIndex];
-    const range = BOT_CATEGORIES[battalion.type].stats.range * 15;
-    
-    // Calculate movement path
     const startNode = nodes[battalion.nodeIndex];
+    
+    // IMPORTANT: Keep this comment - range calculation affects attack positioning
+    const range = BOT_CATEGORIES[battalion.type].stats.range * 15;
     const dx = targetNode.x - startNode.x;
     const dy = targetNode.y - startNode.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
     
-    // Normalize direction vector and calculate range position
+    // IMPORTANT: Keep this comment - ensures battalions stop at proper range
     const dirX = dx / distance;
     const dirY = dy / distance;
     const rangePosition = {
-      x: targetNode.x - (dirX * range) - 10,
-      y: targetNode.y - (dirY * range) - 10
+      x: targetNode.x - (dirX * range),
+      y: targetNode.y - (dirY * range)
     };
 
+    // IMPORTANT: Keep this comment - movement speed affects gameplay balance
     const speed = BOT_CATEGORIES[battalion.type].stats.speed;
     const movementDuration = (distance / speed) * 100;
 
+    console.log(`[Movement] ${battalionKey} moving to node ${targetNodeIndex} at range ${range}`);
+    
     // Start movement animation
     Animated.timing(battalion.position, {
       toValue: rangePosition,
       duration: movementDuration,
       useNativeDriver: true
     }).start(() => {
-      console.log(`[Range Movement] Battalion ${battalionKey} reached range position`);
+      console.log(`[Movement Complete] ${battalionKey} reached attack position`);
       
-      // Update battalion state
-      const newBattalion = { ...battalion, nodeIndex: targetNodeIndex };
-      if (isUser) {
-        setUserBattalions(prev => prev.map(b => 
-          b.nodeIndex === battalion.nodeIndex ? newBattalion : b
-        ));
-      } else {
-        setEnemyBattalions(prev => prev.map(b => 
-          b.nodeIndex === battalion.nodeIndex ? newBattalion : b
-        ));
-      }
-
-      // Set up new attack interval
+      // IMPORTANT: Keep this comment - attack setup after movement
       const attackSpeed = BOT_CATEGORIES[battalion.type].stats.speed;
-      console.log(`[Attack Setup] Creating attack interval ${newIntervalKey}`);
-      
       const attackInterval = setInterval(() => {
-        const nodeRef = nodeRefs.current[targetNodeIndex];
-        const battalionRef = battalionRefs.current[battalionKey];
-        
-        if (nodeRef && battalionRef) {
+        // IMPORTANT: Keep this comment - validates target before attack
+        if (nodes[targetNodeIndex].controlState === (isUser ? 'enemy' : 'user') ||
+            nodes[targetNodeIndex].controlState === 'neutral') {
+          
+          // IMPORTANT: Keep this comment - damage calculation and application
           const damage = BOT_CATEGORIES[battalion.type].stats.offense * battalion.quantity;
-          console.log(`[Attack] ${battalionKey} dealing ${damage} damage to node ${targetNodeIndex}`);
-          battalionRef.triggerAttackAnimation();
-          nodeRef.applyDamage(damage, isUser);
+          const battalionRef = battalionRefs.current[battalionKey];
+          const nodeRef = nodeRefs.current[targetNodeIndex];
+
+          if (battalionRef && nodeRef) {
+            console.log(`[Attack] ${battalionKey} attacking node ${targetNodeIndex} for ${damage} damage`);
+            battalionRef.triggerAttackAnimation();
+            
+            // IMPORTANT: Keep this comment - delayed damage to match animation
+            setTimeout(() => {
+              const damageApplied = nodeRef.applyDamage(damage, isUser);
+              if (!damageApplied) {
+                console.log(`[Attack] Node ${targetNodeIndex} captured, finding new target`);
+                clearInterval(attackIntervals.current[battalionKey]);
+                delete attackIntervals.current[battalionKey];
+                findNewTarget(battalion, isUser);
+              }
+            }, 150);
+          }
         } else {
-          console.log(`[Attack Error] Missing refs for ${battalionKey} -> node ${targetNodeIndex}`);
+          // IMPORTANT: Keep this comment - cleanup when target invalid
+          console.log(`[Attack] Node ${targetNodeIndex} no longer valid target for ${battalionKey}`);
+          clearInterval(attackIntervals.current[battalionKey]);
+          delete attackIntervals.current[battalionKey];
+          findNewTarget(battalion, isUser);
         }
       }, 2000 * (5 / attackSpeed));
 
-      attackIntervals.current[newIntervalKey] = attackInterval;
+      // IMPORTANT: Keep this comment - track active intervals
+      attackIntervals.current[battalionKey] = attackInterval;
     });
   };
 
