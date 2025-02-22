@@ -2,24 +2,6 @@ import { Dimensions } from 'react-native';
 
 const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window');
 
-type ThemeColors = {
-  background: string;
-  primary: string;
-  secondary: string;
-  accent: string;
-  inputBg: string;
-  buttonBg: string;
-  matrix: string;
-  text: {
-    primary: string;
-    secondary: string;
-    accent: string;
-    placeholder: string;
-  };
-  error: string;
-  buttonDisabled: string;
-};
-
 type ThemeSizing = {
   font: {
     h1: number;
@@ -45,7 +27,7 @@ type ThemeSizing = {
   };
 };
 
-export const COLORS: ThemeColors = {
+export const COLORS = {
   background: '#0E0B16',
   primary: '#A239CA',
   secondary: '#4717F6',
@@ -60,7 +42,8 @@ export const COLORS: ThemeColors = {
     accent: '#00FF41',
     placeholder: 'rgba(0, 255, 65, 0.4)',
   },
-  error: '#ff4444'
+  error: '#ff4444',
+  neutral: '#666666'
 };
 
 export const SIZING: ThemeSizing = {
@@ -113,4 +96,6 @@ export const styleGuide = {
     borderRightWidth: 1,
     borderColor: COLORS.primary,
   }
-}; 
+};
+
+export type ThemeColors = typeof COLORS; 
