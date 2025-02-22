@@ -12,6 +12,7 @@ import { BattleNode, BattalionPosition } from '../types/battle';
 import { BattlePhase } from '../hooks/useBattleStateMachine';
 import { NodeVisual } from './battle/NodeVisual';
 import { BattleNetwork } from './battle/BattleNetwork';
+import { BattalionVisual } from './battle/BattalionVisual';
 
 type Props = {
   phase: BattlePhase;
@@ -59,7 +60,20 @@ export const BattleUI = React.memo(({
 
       {/* Battalions Layer */}
       <Animated.View style={[styles.battalionsLayer, { opacity: battalionOpacity }]}>
-        {/* Battalions rendered here */}
+        {userBattalions.map((battalion, index) => (
+          <BattalionVisual
+            key={`user-${index}`}
+            battalion={battalion}
+            isUser={true}
+          />
+        ))}
+        {enemyBattalions.map((battalion, index) => (
+          <BattalionVisual
+            key={`enemy-${index}`}
+            battalion={battalion}
+            isUser={false}
+          />
+        ))}
       </Animated.View>
 
       {/* Countdown Overlay */}
