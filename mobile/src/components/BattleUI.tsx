@@ -11,6 +11,7 @@ import { View, StyleSheet, Animated } from 'react-native';
 import { BattleNode, BattalionPosition } from '../types/battle';
 import { BattlePhase } from '../hooks/useBattleStateMachine';
 import { NodeVisual } from './battle/NodeVisual';
+import { BattleNetwork } from './battle/BattleNetwork';
 
 type Props = {
   phase: BattlePhase;
@@ -42,7 +43,7 @@ export const BattleUI = React.memo(({
     <View style={styles.container}>
       {/* Network Layer */}
       <Animated.View style={[styles.networkLayer, { opacity: networkOpacity }]}>
-        {/* Network connections rendered here */}
+        <BattleNetwork nodes={nodes} phase={phase} />
       </Animated.View>
 
       {/* Nodes Layer */}
