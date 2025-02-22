@@ -15,14 +15,11 @@ import { COLORS } from '../../styles/theme';
 type Props = {
   battalion: BattalionPosition;
   isUser: boolean;
-  opacity?: Animated.Value;
+  opacity?: number | Animated.Value;
 };
 
-export const BattalionVisual = React.memo(({ battalion, isUser, opacity = 1 }: Props) => {
+export const BattalionVisual = React.memo(({ battalion, isUser, opacity = new Animated.Value(1) }: Props) => {
   // IMPORTANT: Keep transform calculations for smooth animations
-  const translateX = battalion.position.x;
-  const translateY = battalion.position.y;
-
   return (
     <Animated.View style={[
       styles.battalion,
@@ -30,8 +27,8 @@ export const BattalionVisual = React.memo(({ battalion, isUser, opacity = 1 }: P
         backgroundColor: isUser ? COLORS.primary : COLORS.error,
         opacity,
         transform: [
-          { translateX },
-          { translateY }
+          { translateX: battalion.position.x },
+          { translateY: battalion.position.y }
         ]
       }
     ]}>
