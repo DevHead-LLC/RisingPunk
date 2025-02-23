@@ -9,10 +9,10 @@ import { BattleResultsOverlay } from '../components/battle/BattleResultsOverlay'
 import { AnimatedBattalion } from '../components/battle/AnimatedBattalion';
 import { CountdownOverlay } from '../components/battle/CountdownOverlay';
 import { useBattleAnimations } from '../hooks/useBattleAnimations';
+import { useBattleMovementAndAttacks } from '../hooks/useBattleMovementAndAttacks';
 
 import { BOT_CATEGORIES } from './DigitalBarracksScreen';
 import { checkRangeIntersection } from '../utils/battleCalculator';
-import { useBattleMovement } from '../hooks/useBattleMovement';
 import { BattleNode, BattalionPosition } from '../types/battle';
 import { useBattleInitialization } from '../hooks/useBattleInitialization';
 
@@ -48,7 +48,6 @@ const NETWORK_CONNECTIONS = [
 ];
 
 export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) => {
-  // IMPORTANT: Replace individual animation refs with the hook
   const {
     networkOpacity,
     deploymentOpacity,
@@ -60,7 +59,6 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     showNetwork,
   } = useBattleAnimations();
 
-  // IMPORTANT: Restore battle initialization
   const {
     nodes,
     setNodes,
@@ -79,22 +77,18 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   const [controlledNodes, setControlledNodes] = useState<number[]>([0, 1, 2]); // User starts controlling left nodes
   const [countdown, setCountdown] = useState(3);
 
-  const battalionRefs = useRef<{ [key: string]: any }>({});
-  const attackIntervals = useRef<{ [key: string]: NodeJS.Timeout }>({});
-  const nodeRefs = useRef<{[key: string]: {
-    triggerDamageAnimation: () => void;
-    applyDamage: (damage: number, isUser: boolean) => boolean;
-  } | null}>({});
-
-  // Add this to track battalion targets
-  const battalionTargets = useRef<{[key: string]: BattalionTarget}>({}).current;
-
+  // IMPORTANT: Use the new battle movement and attacks hook
   const {
-    getAnimatedPosition,
-    findAvailableTargets,
-    calculateMovementDuration,
-    moveBattalionAlongPath
-  } = useBattleMovement(nodes, battalionRefs, attackIntervals, nodeRefs);
+    battalionRefs,
+    nodeRefs,
+    attackIntervals,
+    findNewTarget,
+  } = useBattleMovementAndAttacks(
+    battleStarted,
+    nodes,
+    userBattalions,
+    enemyBattalions,
+  );
 
   useEffect(() => {
     // Show battlefield immediately using the new hook
@@ -117,212 +111,6 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     return () => clearInterval(countdownTimer);
   }, []);
 
-  useEffect(() => {
-    if (battleStarted) {
-      // Base duration for slowest speed (speed stat of 5)
-      const BASE_DURATION = 5000; // 3 seconds for base movement
-      
-      userBattalions.forEach(battalion => {
-        let availableNodes: number[] = [];
-        switch (battalion.nodeIndex) {
-          case 0: availableNodes = [3, 4]; break;
-          case 1: availableNodes = [3, 4, 5]; break;
-          case 2: availableNodes = [4, 5]; break;
-        }
-        
-        const targetNodeIndex = availableNodes[Math.floor(Math.random() * availableNodes.length)];
-        const targetNode = nodes[targetNodeIndex];
-        const startNode = nodes[battalion.nodeIndex];
-        const range = BOT_CATEGORIES[battalion.type].stats.range * 15;
-        
-        // Calculate duration based on speed stat
-        const speedStat = BOT_CATEGORIES[battalion.type].stats.speed;
-        const duration = BASE_DURATION * (5 / speedStat); // 5 is the lowest speed stat
-        
-        const anim = Animated.timing(battalion.position, {
-          toValue: { 
-            x: targetNode.x - 10,
-            y: targetNode.y - 10
-          },
-          duration: duration,
-          useNativeDriver: true
-        });
-
-        const listener = battalion.position.addListener(({ x, y }) => {
-          const battalionCenter = {
-            x: x + 10,
-            y: y + 10
-          };
-          
-          const inRange = checkRangeIntersection(
-            battalionCenter,
-            { x: targetNode.x, y: targetNode.y },
-            range
-          );
-
-          if (inRange) {
-            anim.stop();
-            battalion.position.removeListener(listener);
-            
-            // Clear any existing attack interval for this battalion
-            if (attackIntervals.current[`user-${battalion.nodeIndex}`]) {
-              clearInterval(attackIntervals.current[`user-${battalion.nodeIndex}`]);
-            }
-
-            // Start continuous attack with a small initial delay
-            const attackSpeed = BOT_CATEGORIES[battalion.type].stats.speed;
-            const attackInterval = 2000 * (5 / attackSpeed); // Base 2 seconds, scaled by speed
-            
-            // Trigger first attack after 150ms
-            setTimeout(() => {
-              battalionRefs.current[`user-${battalion.nodeIndex}`]?.triggerAttackAnimation();
-              
-              // Calculate damage with quantity
-              const attackPower = BOT_CATEGORIES[battalion.type].stats.offense;
-              const totalDamage = attackPower * battalion.quantity;
-              
-              // Apply damage after attack animation
-              setTimeout(() => {
-                const nodeRef = nodeRefs.current[targetNodeIndex];
-                if (nodeRef) {
-                  nodeRef.triggerDamageAnimation();
-                  const damageApplied = nodeRef.applyDamage(totalDamage, true);
-                  // If damage wasn't applied (node is captured/locked), clear the interval
-                  if (!damageApplied) {
-                    clearInterval(attackIntervals.current[`user-${battalion.nodeIndex}`]);
-                    delete attackIntervals.current[`user-${battalion.nodeIndex}`];
-                  }
-                }
-              }, 100);
-              
-              // Same for the interval
-              attackIntervals.current[`user-${battalion.nodeIndex}-${targetNodeIndex}`] = setInterval(() => {
-                const nodeRef = nodeRefs.current[targetNodeIndex];
-                if (nodeRef) {
-                  battalionRefs.current[`user-${battalion.nodeIndex}`]?.triggerAttackAnimation();
-                  setTimeout(() => {
-                    nodeRef.triggerDamageAnimation();
-                    const damageApplied = nodeRef.applyDamage(totalDamage, true);
-                    // If damage wasn't applied (node is captured/locked), clear the interval
-                    if (!damageApplied) {
-                      clearInterval(attackIntervals.current[`user-${battalion.nodeIndex}-${targetNodeIndex}`]);
-                      delete attackIntervals.current[`user-${battalion.nodeIndex}-${targetNodeIndex}`];
-                    }
-                  }, 100);
-                }
-              }, attackInterval);
-            }, 150);
-          }
-        });
-
-        anim.start();
-      });
-
-      // Similar speed calculation for enemy battalions
-      enemyBattalions.forEach(battalion => {
-        let availableNodes: number[] = [];
-        switch (battalion.nodeIndex) {
-          case 6: availableNodes = [3, 4]; break;
-          case 7: availableNodes = [3, 4, 5]; break;
-          case 8: availableNodes = [4, 5]; break;
-        }
-        
-        const targetNodeIndex = availableNodes[Math.floor(Math.random() * availableNodes.length)];
-        const targetNode = nodes[targetNodeIndex];
-        const startNode = nodes[battalion.nodeIndex];
-        const range = BOT_CATEGORIES[battalion.type].stats.range * 15;
-        
-        const speedStat = BOT_CATEGORIES[battalion.type].stats.speed;
-        const duration = BASE_DURATION * (5 / speedStat);
-        
-        const anim = Animated.timing(battalion.position, {
-          toValue: { 
-            x: targetNode.x - 10,
-            y: targetNode.y - 10
-          },
-          duration: duration,
-          useNativeDriver: true
-        });
-
-        const enemyListener = battalion.position.addListener(({ x, y }) => {
-          const battalionCenter = {
-            x: x + 10,
-            y: y + 10
-          };
-          
-          const inRange = checkRangeIntersection(
-            battalionCenter,
-            { x: targetNode.x, y: targetNode.y },
-            range
-          );
-
-          if (inRange) {
-            anim.stop();
-            battalion.position.removeListener(enemyListener);
-            
-            // Clear any existing attack interval
-            if (attackIntervals.current[`enemy-${battalion.nodeIndex}`]) {
-              clearInterval(attackIntervals.current[`enemy-${battalion.nodeIndex}`]);
-            }
-
-            // Start continuous attack with a small initial delay
-            const attackSpeed = BOT_CATEGORIES[battalion.type].stats.speed;
-            const attackInterval = 2000 * (5 / attackSpeed);
-            
-            // Trigger first attack after 150ms
-            setTimeout(() => {
-              battalionRefs.current[`enemy-${battalion.nodeIndex}`]?.triggerAttackAnimation();
-              
-              // Calculate damage with quantity
-              const attackPower = BOT_CATEGORIES[battalion.type].stats.offense;
-              const totalDamage = attackPower * battalion.quantity;
-              
-              // Apply damage after attack animation
-              setTimeout(() => {
-                const nodeRef = nodeRefs.current[targetNodeIndex];
-                if (nodeRef) {
-                  nodeRef.triggerDamageAnimation();
-                  const damageApplied = nodeRef.applyDamage(totalDamage, false);
-                  // If damage wasn't applied (node is captured/locked), clear the interval
-                  if (!damageApplied) {
-                    clearInterval(attackIntervals.current[`enemy-${battalion.nodeIndex}`]);
-                    delete attackIntervals.current[`enemy-${battalion.nodeIndex}`];
-                  }
-                }
-              }, 100);
-              
-              attackIntervals.current[`enemy-${battalion.nodeIndex}-${targetNodeIndex}`] = setInterval(() => {
-                const nodeRef = nodeRefs.current[targetNodeIndex];
-                if (nodeRef) {
-                  battalionRefs.current[`enemy-${battalion.nodeIndex}`]?.triggerAttackAnimation();
-                  setTimeout(() => {
-                    nodeRef.triggerDamageAnimation();
-                    const damageApplied = nodeRef.applyDamage(totalDamage, false);
-                    // If damage wasn't applied (node is captured/locked), clear the interval
-                    if (!damageApplied) {
-                      clearInterval(attackIntervals.current[`enemy-${battalion.nodeIndex}-${targetNodeIndex}`]);
-                      delete attackIntervals.current[`enemy-${battalion.nodeIndex}-${targetNodeIndex}`];
-                    }
-                  }, 100);
-                }
-              }, attackInterval);
-            }, 150);
-          }
-        });
-
-        anim.start();
-      });
-
-      return () => {
-        // Clear all intervals and listeners on cleanup
-        Object.values(attackIntervals.current).forEach(interval => clearInterval(interval));
-        attackIntervals.current = {};
-        userBattalions.forEach(battalion => battalion.position.removeAllListeners());
-        enemyBattalions.forEach(battalion => battalion.position.removeAllListeners());
-      };
-    }
-  }, [battleStarted]);
-
   const startBattleTimer = () => {
     setTimeRemaining(20);
     timerRef.current = setInterval(() => {
@@ -343,36 +131,6 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       setShowResults(true);
       onBattleComplete?.(winner);
     });
-  };
-
-  // Movement animation function
-  const moveBattalion = (battalion: BattalionPosition, targetNode: number) => {
-    const targetX = nodes[targetNode].x;
-    const targetY = nodes[targetNode].y;
-
-    return Animated.timing(battalion.position, {
-      toValue: { x: targetX, y: targetY },
-      duration: 1000,
-      useNativeDriver: true,
-    });
-  };
-
-  const findAvailableNodes = (currentNodeIndex: number): number[] => {
-    // Get connections from NetworkLines
-    const connections = [
-      // Horizontal connections
-      [0, 3], [3, 6], // Top row
-      [1, 4], [4, 7], // Middle row
-      [2, 5], [5, 8], // Bottom row
-      // Diagonal connections
-      [0, 4], [1, 3], [1, 5], [2, 4],
-      [3, 7], [4, 6], [4, 8], [5, 7]
-    ];
-
-    // Find all connections that include our current node
-    return connections
-      .filter(([from, to]) => from === currentNodeIndex || to === currentNodeIndex)
-      .map(([from, to]) => from === currentNodeIndex ? to : from);
   };
 
   // Add this function to calculate total army health
@@ -449,16 +207,8 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
         return;
       }
 
-      // Find new target
-      const availableTargets = findAvailableTargets(battalion, isUser);
-      
-      if (availableTargets.length > 0) {
-        const newTarget = availableTargets[0]; // For now, just take first available
-        console.log(`[Retarget] ${key} moving to new target ${newTarget}`);
-        moveBattalionAlongPath(battalion, newTarget.index, isUser);
-      } else {
-        console.log(`[Hold] ${key} has no available targets and will hold position`);
-      }
+      // Find new target using the hook's function
+      findNewTarget(battalion, isUser);
     });
   };
 
@@ -469,15 +219,6 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       attackIntervals.current = {};
     };
   }, []);
-
-  // IMPORTANT: Handle battalion retargeting
-  const findNewTarget = (battalion: BattalionPosition, isUser: boolean) => {
-    const availableTargets = findAvailableTargets(battalion, isUser);
-    if (availableTargets.length > 0) {
-      const target = availableTargets[0];
-      moveBattalionAlongPath(battalion, target.index, isUser);
-    }
-  };
 
   return (
     <SafeAreaView style={styles.container}>
