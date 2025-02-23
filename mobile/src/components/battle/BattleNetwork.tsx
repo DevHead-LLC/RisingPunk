@@ -8,10 +8,10 @@
  */
 
 import React, { useMemo } from 'react';
-import { View, StyleSheet } from 'react-native';
-import Svg, { Line } from 'react-native-svg';
+import { View, StyleSheet, Animated } from 'react-native';
+import { NetworkNode } from './NetworkNode';
+import { NetworkLines } from './NetworkLines';
 import { BattleNode } from '../../types/battle';
-import { BattlePhase } from '../../hooks/useBattleStateMachine';
 import { COLORS } from '../../styles/theme';
 
 // IMPORTANT: Keep network topology configuration here
@@ -26,50 +26,50 @@ const NETWORK_CONNECTIONS = [
 
 type Props = {
   nodes: BattleNode[];
-  phase: BattlePhase;
+  controlledNodes: number[];
+  opacity: Animated.Value;
+  width: number;
+  height: number;
+  onNodeControlChange: (nodeIndex: number, newState: 'user' | 'enemy') => void;
+  nodeRefs: React.MutableRefObject<{
+    [key: string]: {
+      triggerDamageAnimation: () => void;
+      applyDamage: (damage: number, isUser: boolean) => boolean;
+    } | null;
+  }>;
 };
 
-export const BattleNetwork = React.memo(({ nodes, phase }: Props) => {
-  /**
-   * @function getLineColor
-   * @description Determines line color based on connected nodes' control states
-   * @important DO NOT DELETE - Critical for network visualization
-   */
-  const getLineColor = (fromNode: BattleNode, toNode: BattleNode) => {
-    if (fromNode.controlState === toNode.controlState) {
-      return fromNode.controlState === 'user' ? COLORS.primary :
-             fromNode.controlState === 'enemy' ? COLORS.error :
-             COLORS.neutral;
-    }
-    return COLORS.neutral;
-  };
-
-  // Memoize network lines to prevent unnecessary recalculations
-  const networkLines = useMemo(() => 
-    NETWORK_CONNECTIONS.map(([fromIdx, toIdx], index) => {
-      const fromNode = nodes[fromIdx];
-      const toNode = nodes[toIdx];
-      
-      return (
-        <Line
-          key={`line-${index}`}
-          x1={fromNode.x}
-          y1={fromNode.y}
-          x2={toNode.x}
-          y2={toNode.y}
-          stroke={getLineColor(fromNode, toNode)}
-          strokeWidth={2}
-          opacity={['deployment', 'initializing', 'countdown'].includes(phase) ? 0.3 : 1}
-        />
-      );
-    }), [nodes, phase]);
-
+export const BattleNetwork = React.memo(({ 
+  nodes,
+  controlledNodes,
+  opacity,
+  width,
+  height,
+  onNodeControlChange,
+  nodeRefs
+}: Props) => {
   return (
-    <View style={styles.container}>
-      <Svg style={StyleSheet.absoluteFill}>
-        {networkLines}
-      </Svg>
-    </View>
+    <Animated.View style={[styles.container, { opacity }]}>
+      <NetworkLines 
+        nodes={nodes}
+        width={width}
+        height={height}
+      />
+      {nodes.map((node, index) => (
+        <NetworkNode 
+          key={index}
+          ref={(el) => nodeRefs.current[index] = el}
+          x={node.x}
+          y={node.y}
+          isActive={controlledNodes.includes(index)}
+          controlState={node.controlState}
+          health={node.health}
+          controlProgress={node.controlProgress}
+          isLocked={node.isLocked}
+          onControlStateChange={(newState) => onNodeControlChange(index, newState)}
+        />
+      ))}
+    </Animated.View>
   );
 });
 

@@ -1,12 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, SafeAreaView, Dimensions, Animated } from 'react-native';
 import { COLORS, SIZING } from '../styles/theme';
-import { NetworkNode } from '../components/battle/NetworkNode';
-import { NetworkLines } from '../components/battle/NetworkLines';
+import { BattleNetwork } from '../components/battle/BattleNetwork';
 import { BattleHeader } from '../components/battle/BattleHeader';
-import { BattalionDeploymentZone } from '../components/battle/BattalionDeploymentZone';
+import { BattleUnits } from '../components/battle/BattleUnits';
 import { BattleResultsOverlay } from '../components/battle/BattleResultsOverlay';
-import { AnimatedBattalion } from '../components/battle/AnimatedBattalion';
 import { CountdownOverlay } from '../components/battle/CountdownOverlay';
 import { useBattleAnimations } from '../hooks/useBattleAnimations';
 import { useBattleMovementAndAttacks } from '../hooks/useBattleMovementAndAttacks';
@@ -228,72 +226,23 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       />
       
       <View style={styles.networkContainer}>
-        <Animated.View style={{ opacity: networkOpacity }}>
-          <NetworkLines 
-            nodes={nodes}
-            width={SCREEN_WIDTH}
-            height={SCREEN_HEIGHT * 0.8}
-          />
-          {nodes.map((node, index) => (
-            <NetworkNode 
-              key={index}
-              ref={(el) => nodeRefs.current[index] = el}
-              x={node.x}
-              y={node.y}
-              isActive={controlledNodes.includes(index)}
-              controlState={node.controlState}
-              health={node.health}
-              controlProgress={node.controlProgress}
-              isLocked={node.isLocked}
-              onControlStateChange={(newState) => handleNodeControlChange(index, newState)}
-            />
-          ))}
-        </Animated.View>
+        <BattleNetwork
+          nodes={nodes}
+          controlledNodes={controlledNodes}
+          opacity={networkOpacity}
+          width={SCREEN_WIDTH}
+          height={SCREEN_HEIGHT * 0.8}
+          onNodeControlChange={handleNodeControlChange}
+          nodeRefs={nodeRefs}
+        />
 
-        {/* Deployment zones */}
-        <Animated.View style={[styles.overlayContainer, { opacity: deploymentOpacity }]}>
-          <BattalionDeploymentZone
-            side="user"
-            battalions={[
-              { type: 'breacher', quantity: 5 },
-              { type: 'guardian', quantity: 3 },
-              { type: 'phreak', quantity: 4 }
-            ]}
-          />
-          <BattalionDeploymentZone
-            side="enemy"
-            battalions={[
-              { type: 'breacher', quantity: 4 },
-              { type: 'guardian', quantity: 4 },
-              { type: 'phreak', quantity: 3 }
-            ]}
-          />
-        </Animated.View>
-
-        {/* Animated battalions */}
-        <Animated.View style={[styles.overlayContainer, { opacity: battalionOpacity }]}>
-          {userBattalions.map((battalion, index) => (
-            <AnimatedBattalion
-              key={`user-${index}`}
-              ref={el => battalionRefs.current[`user-${battalion.nodeIndex}`] = el}
-              type={battalion.type}
-              quantity={battalion.quantity}
-              position={battalion.position}
-              isUser={true}
-            />
-          ))}
-          
-          {enemyBattalions.map((battalion, index) => (
-            <AnimatedBattalion
-              key={`enemy-${index}`}
-              ref={el => battalionRefs.current[`enemy-${battalion.nodeIndex}`] = el}
-              type={battalion.type}
-              quantity={battalion.quantity}
-              position={battalion.position}
-              isUser={false}
-            />
-          ))}
-        </Animated.View>
+        <BattleUnits
+          deploymentOpacity={deploymentOpacity}
+          battalionOpacity={battalionOpacity}
+          userBattalions={userBattalions}
+          enemyBattalions={enemyBattalions}
+          battalionRefs={battalionRefs}
+        />
 
         {/* Countdown Overlay */}
         {countdown > 0 && (
