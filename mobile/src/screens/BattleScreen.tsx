@@ -4,8 +4,7 @@ import { COLORS, SIZING } from '../styles/theme';
 import { BattleNetwork } from '../components/battle/BattleNetwork';
 import { BattleHeader } from '../components/battle/BattleHeader';
 import { BattleUnits } from '../components/battle/BattleUnits';
-import { BattleResultsOverlay } from '../components/battle/BattleResultsOverlay';
-import { CountdownOverlay } from '../components/battle/CountdownOverlay';
+import { BattleOverlays } from '../components/battle/BattleOverlays';
 import { useBattleAnimations } from '../hooks/useBattleAnimations';
 import { useBattleMovementAndAttacks } from '../hooks/useBattleMovementAndAttacks';
 
@@ -244,21 +243,15 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
           battalionRefs={battalionRefs}
         />
 
-        {/* Countdown Overlay */}
-        {countdown > 0 && (
-          <CountdownOverlay 
-            countdown={countdown}
-            opacity={countdownOpacity}
-          />
-        )}
-      </View>
-      {showResults && (
-        <BattleResultsOverlay
-          winner={battleWinner}
-          opacity={resultsOpacity}
-          onContinue={onClose}
+        <BattleOverlays
+          countdown={countdown}
+          showResults={showResults}
+          battleWinner={battleWinner}
+          countdownOpacity={countdownOpacity}
+          resultsOpacity={resultsOpacity}
+          onClose={onClose}
         />
-      )}
+      </View>
     </SafeAreaView>
   );
 });
