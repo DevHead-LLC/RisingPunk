@@ -73,6 +73,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   const [battleStarted, setBattleStarted] = useState(false);
   const [controlledNodes, setControlledNodes] = useState<number[]>([0, 1, 2]); // User starts controlling left nodes
   const [countdown, setCountdown] = useState(3);
+  const battleInitializedRef = useRef(false);
 
   // IMPORTANT: Use the new battle movement and attacks hook
   const {
@@ -87,7 +88,10 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     enemyBattalions,
   );
 
-  useEffect(() => {
+  const initializeBattle = () => {
+    if (battleInitializedRef.current) return;
+    battleInitializedRef.current = true;
+
     // Show battlefield immediately using the new hook
     showNetwork();
     
@@ -106,6 +110,10 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     }, 1000);
 
     return () => clearInterval(countdownTimer);
+  };
+
+  useEffect(() => {
+    initializeBattle();
   }, []);
 
   const startBattleTimer = () => {
@@ -149,63 +157,138 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   useEffect(() => {
     if (countdown === 3) {
       const nodeHealth = calculateTotalArmyHealth();
-      // Initialize neutral nodes with health and control progress
+      // Initialize all nodes with health and control progress
       setNodes(prevNodes => prevNodes.map(node => ({
         ...node,
-        health: node.controlState === 'neutral' ? nodeHealth : undefined,
-        controlProgress: node.controlState === 'neutral' ? 0 : undefined,
-        isLocked: false
+        health: nodeHealth,
+        controlProgress: node.controlState === 'neutral' ? 0 : 
+                        node.controlState === 'user' ? 100 : -100,
+        isLocked: node.controlState !== 'neutral'
       })));
     }
   }, [countdown]);
 
   const handleNodeControlChange = (nodeIndex: number, newState: 'user' | 'enemy') => {
-    console.log(`[Node Capture] Node ${nodeIndex} captured by ${newState}`);
+    console.log(`[Battle] Node ${nodeIndex} captured by ${newState}`);
 
-    // Update node state
+    // Find only battalions that were targeting this specific node
+    const affectedBattalions = Object.entries(attackIntervals.current)
+      .filter(([key]) => {
+        const parts = key.split('-');
+        if (parts.length !== 3) return false;
+        const [side, battalionIndex, targetNode] = parts;
+        return side && battalionIndex && targetNode && 
+               ['user', 'enemy'].includes(side) &&
+               parseInt(targetNode) === nodeIndex;
+      })
+      .map(([key, interval]) => {
+        const [side, battalionIndex] = key.split('-');
+        return {
+          key,
+          interval,
+          isUser: side === 'user',
+          battalionIndex: parseInt(battalionIndex)
+        };
+      });
+
+    // Also check for battalions that are currently moving to this node
+    const movingUserBattalions = userBattalions
+      .filter(b => b.targetNode === nodeIndex)
+      .map(b => ({
+        key: `user-${b.nodeIndex}-${nodeIndex}`,
+        interval: null,
+        isUser: true,
+        battalionIndex: b.nodeIndex
+      }));
+
+    const movingEnemyBattalions = enemyBattalions
+      .filter(b => b.targetNode === nodeIndex)
+      .map(b => ({
+        key: `enemy-${b.nodeIndex}-${nodeIndex}`,
+        interval: null,
+        isUser: false,
+        battalionIndex: b.nodeIndex
+      }));
+
+    // Combine all battalions that were targeting this node
+    const allAffectedBattalions = [
+      ...affectedBattalions,
+      ...movingUserBattalions,
+      ...movingEnemyBattalions
+    ];
+
+    if (allAffectedBattalions.length > 0) {
+      console.log(`[Battle] Retargeting ${allAffectedBattalions.length} battalions from captured node ${nodeIndex}`);
+    }
+
+    // Clear attack intervals for battalions that were attacking this node
+    allAffectedBattalions.forEach(({ key, interval }) => {
+      if (interval) {
+        console.log(`[Battle] Clearing attack interval for ${key}`);
+        clearInterval(interval);
+        delete attackIntervals.current[key];
+      }
+    });
+
+    // Update node control state
+    setControlledNodes(prev => {
+      const newControlled = newState === 'user' 
+        ? [...prev, nodeIndex]
+        : prev.filter(n => n !== nodeIndex);
+      return newControlled;
+    });
+
     setNodes(prev => {
       const updated = [...prev];
       updated[nodeIndex] = {
         ...updated[nodeIndex],
         controlState: newState,
-        isLocked: true
+        controlProgress: newState === 'user' ? 100 : -100,
+        isLocked: true, // Lock the node once captured
+        health: updated[nodeIndex].health // Preserve current health
       };
       return updated;
     });
 
-    // Find all battalions targeting this node
-    const affectedBattalions = Object.entries(attackIntervals.current)
-      .filter(([key]) => {
-        const [_, __, targetNode] = key.split('-');
-        return parseInt(targetNode) === nodeIndex;
-      })
-      .map(([key, interval]) => ({
-        key,
-        interval,
-        isUser: key.startsWith('user'),
-        battalionIndex: parseInt(key.split('-')[1])
-      }));
+    // Clear target nodes for affected battalions
+    setUserBattalions(prev => {
+      const updated = [...prev];
+      allAffectedBattalions
+        .filter(b => b.isUser)
+        .forEach(({ battalionIndex }) => {
+          const battalion = updated.find(b => b.nodeIndex === battalionIndex);
+          if (battalion) {
+            console.log(`[Battle] Clearing target for user battalion at node ${battalionIndex}`);
+            battalion.targetNode = undefined;
+          }
+        });
+      return updated;
+    });
 
-    console.log(`[Retarget] Found ${affectedBattalions.length} battalions targeting node ${nodeIndex}`);
+    setEnemyBattalions(prev => {
+      const updated = [...prev];
+      allAffectedBattalions
+        .filter(b => !b.isUser)
+        .forEach(({ battalionIndex }) => {
+          const battalion = updated.find(b => b.nodeIndex === battalionIndex);
+          if (battalion) {
+            console.log(`[Battle] Clearing target for enemy battalion at node ${battalionIndex}`);
+            battalion.targetNode = undefined;
+          }
+        });
+      return updated;
+    });
 
-    // Process each affected battalion
-    affectedBattalions.forEach(({ key, interval, isUser, battalionIndex }) => {
-      // Clear current attack interval
-      clearInterval(interval);
-      delete attackIntervals.current[key];
-
-      // Find battalion reference
-      const battalion = isUser 
-        ? userBattalions.find(b => b.nodeIndex === battalionIndex)
-        : enemyBattalions.find(b => b.nodeIndex === battalionIndex);
-
-      if (!battalion) {
-        console.log(`[Error] Could not find ${isUser ? 'user' : 'enemy'} battalion ${battalionIndex}`);
-        return;
-      }
-
-      // Find new target using the hook's function
-      findNewTarget(battalion, isUser);
+    // Queue finding new targets after state updates
+    requestAnimationFrame(() => {
+      allAffectedBattalions.forEach(({ isUser, battalionIndex }) => {
+        const battalions = isUser ? userBattalions : enemyBattalions;
+        const battalion = battalions.find(b => b.nodeIndex === battalionIndex);
+        if (battalion) {
+          console.log(`[Battle] Finding new target for ${isUser ? 'user' : 'enemy'} battalion at node ${battalionIndex}`);
+          findNewTarget(battalion, isUser);
+        }
+      });
     });
   };
 

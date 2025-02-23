@@ -7,6 +7,7 @@ export type BattalionPosition = {
   quantity: number;
   nodeIndex: number;
   position: Animated.ValueXY;
+  targetNode?: number;
 };
 
 export type BattleTarget = {

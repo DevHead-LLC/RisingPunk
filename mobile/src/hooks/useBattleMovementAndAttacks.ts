@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated } from 'react-native';
 import { BOT_CATEGORIES } from '../screens/DigitalBarracksScreen';
 import { checkRangeIntersection } from '../utils/battleCalculator';
@@ -33,6 +33,9 @@ export const useBattleMovementAndAttacks = (
   const battalionRefs = useRef<BattalionRefs>({});
   const attackIntervals = useRef<AttackIntervals>({});
   const nodeRefs = useRef<NodeRefs>({});
+  const battleInitializedRef = useRef(false);
+  const battalionsRef = useRef({ user: userBattalions, enemy: enemyBattalions });
+  const nodesRef = useRef(nodes);
 
   const {
     getAnimatedPosition,
@@ -41,14 +44,33 @@ export const useBattleMovementAndAttacks = (
     moveBattalionAlongPath
   } = useBattleMovement(nodes, battalionRefs, attackIntervals, nodeRefs);
 
+  // Update refs when battalions change
+  useEffect(() => {
+    battalionsRef.current = { user: userBattalions, enemy: enemyBattalions };
+  }, [userBattalions, enemyBattalions]);
+
+  // Update nodes ref when nodes change
+  useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
+
   // IMPORTANT: Handle battalion movement and attacks
   useEffect(() => {
-    if (battleStarted) {
+    if (battleStarted && !battleInitializedRef.current) {
+      battleInitializedRef.current = true;
+      console.log('[Battle] Starting battle with battalions:', {
+        user: battalionsRef.current.user.map(b => ({ node: b.nodeIndex, type: b.type })),
+        enemy: battalionsRef.current.enemy.map(b => ({ node: b.nodeIndex, type: b.type }))
+      });
+
       // Base duration for slowest speed (speed stat of 5)
       const BASE_DURATION = 5000; // 3 seconds for base movement
       
       // Handle user battalions
-      userBattalions.forEach(battalion => {
+      battalionsRef.current.user.forEach(battalion => {
+        if (__DEV__) {
+          console.log(`[Battalion Setup] Setting up user battalion at node ${battalion.nodeIndex}`);
+        }
         let availableNodes: number[] = [];
         switch (battalion.nodeIndex) {
           case 0: availableNodes = [3, 4]; break;
@@ -57,7 +79,10 @@ export const useBattleMovementAndAttacks = (
         }
         
         const targetNodeIndex = availableNodes[Math.floor(Math.random() * availableNodes.length)];
-        const targetNode = nodes[targetNodeIndex];
+        if (__DEV__) {
+          console.log(`[Battalion Setup] User battalion ${battalion.nodeIndex} targeting node ${targetNodeIndex}`);
+        }
+        const targetNode = nodesRef.current[targetNodeIndex];
         const range = BOT_CATEGORIES[battalion.type].stats.range * 15;
         
         // Calculate duration based on speed stat
@@ -86,41 +111,50 @@ export const useBattleMovementAndAttacks = (
           );
 
           if (inRange) {
+            if (__DEV__) {
+              console.log(`[Attack Setup] User battalion ${battalion.nodeIndex} in range of node ${targetNodeIndex}`);
+            }
             anim.stop();
             battalion.position.removeListener(listener);
             
             // Clear any existing attack interval
-            if (attackIntervals.current[`user-${battalion.nodeIndex}`]) {
-              clearInterval(attackIntervals.current[`user-${battalion.nodeIndex}`]);
+            const existingKey = `user-${battalion.nodeIndex}-${targetNodeIndex}`;
+            if (attackIntervals.current[existingKey]) {
+              if (__DEV__) {
+                console.log(`[Attack Setup] Clearing existing interval for ${existingKey}`);
+              }
+              clearInterval(attackIntervals.current[existingKey]);
             }
 
-            // Start continuous attack with a small initial delay
+            // Set up new attack interval
             const attackSpeed = BOT_CATEGORIES[battalion.type].stats.speed;
             const attackInterval = 2000 * (5 / attackSpeed);
             
-            // Trigger first attack after 150ms
             setTimeout(() => {
               battalionRefs.current[`user-${battalion.nodeIndex}`]?.triggerAttackAnimation();
               
-              // Calculate damage with quantity
               const attackPower = BOT_CATEGORIES[battalion.type].stats.offense;
               const totalDamage = attackPower * battalion.quantity;
               
-              // Apply damage after attack animation
               setTimeout(() => {
                 const nodeRef = nodeRefs.current[targetNodeIndex];
                 if (nodeRef) {
                   nodeRef.triggerDamageAnimation();
                   const damageApplied = nodeRef.applyDamage(totalDamage, true);
                   if (!damageApplied) {
-                    clearInterval(attackIntervals.current[`user-${battalion.nodeIndex}`]);
-                    delete attackIntervals.current[`user-${battalion.nodeIndex}`];
+                    if (__DEV__) {
+                      console.log(`[Attack] Initial damage not applied, clearing interval ${existingKey}`);
+                    }
+                    clearInterval(attackIntervals.current[existingKey]);
+                    delete attackIntervals.current[existingKey];
                   }
                 }
               }, 100);
               
-              // Set up continuous attack interval
-              attackIntervals.current[`user-${battalion.nodeIndex}-${targetNodeIndex}`] = setInterval(() => {
+              attackIntervals.current[existingKey] = setInterval(() => {
+                if (__DEV__) {
+                  console.log(`[Attack] Battalion ${existingKey} attacking`);
+                }
                 const nodeRef = nodeRefs.current[targetNodeIndex];
                 if (nodeRef) {
                   battalionRefs.current[`user-${battalion.nodeIndex}`]?.triggerAttackAnimation();
@@ -128,12 +162,19 @@ export const useBattleMovementAndAttacks = (
                     nodeRef.triggerDamageAnimation();
                     const damageApplied = nodeRef.applyDamage(totalDamage, true);
                     if (!damageApplied) {
-                      clearInterval(attackIntervals.current[`user-${battalion.nodeIndex}-${targetNodeIndex}`]);
-                      delete attackIntervals.current[`user-${battalion.nodeIndex}-${targetNodeIndex}`];
+                      if (__DEV__) {
+                        console.log(`[Attack] Damage not applied, clearing interval ${existingKey}`);
+                      }
+                      clearInterval(attackIntervals.current[existingKey]);
+                      delete attackIntervals.current[existingKey];
                     }
                   }, 100);
                 }
               }, attackInterval);
+
+              if (__DEV__) {
+                console.log('[Attack Intervals] Current intervals:', Object.keys(attackIntervals.current));
+              }
             }, 150);
           }
         });
@@ -141,8 +182,11 @@ export const useBattleMovementAndAttacks = (
         anim.start();
       });
 
-      // Handle enemy battalions
-      enemyBattalions.forEach(battalion => {
+      // Handle enemy battalions with similar logic
+      battalionsRef.current.enemy.forEach(battalion => {
+        if (__DEV__) {
+          console.log(`[Battalion Setup] Setting up enemy battalion at node ${battalion.nodeIndex}`);
+        }
         let availableNodes: number[] = [];
         switch (battalion.nodeIndex) {
           case 6: availableNodes = [3, 4]; break;
@@ -151,7 +195,7 @@ export const useBattleMovementAndAttacks = (
         }
         
         const targetNodeIndex = availableNodes[Math.floor(Math.random() * availableNodes.length)];
-        const targetNode = nodes[targetNodeIndex];
+        const targetNode = nodesRef.current[targetNodeIndex];
         const range = BOT_CATEGORIES[battalion.type].stats.range * 15;
         
         const speedStat = BOT_CATEGORIES[battalion.type].stats.speed;
@@ -182,8 +226,9 @@ export const useBattleMovementAndAttacks = (
             anim.stop();
             battalion.position.removeListener(enemyListener);
             
-            if (attackIntervals.current[`enemy-${battalion.nodeIndex}`]) {
-              clearInterval(attackIntervals.current[`enemy-${battalion.nodeIndex}`]);
+            const existingKey = `enemy-${battalion.nodeIndex}-${targetNodeIndex}`;
+            if (attackIntervals.current[existingKey]) {
+              clearInterval(attackIntervals.current[existingKey]);
             }
 
             const attackSpeed = BOT_CATEGORIES[battalion.type].stats.speed;
@@ -201,13 +246,13 @@ export const useBattleMovementAndAttacks = (
                   nodeRef.triggerDamageAnimation();
                   const damageApplied = nodeRef.applyDamage(totalDamage, false);
                   if (!damageApplied) {
-                    clearInterval(attackIntervals.current[`enemy-${battalion.nodeIndex}`]);
-                    delete attackIntervals.current[`enemy-${battalion.nodeIndex}`];
+                    clearInterval(attackIntervals.current[existingKey]);
+                    delete attackIntervals.current[existingKey];
                   }
                 }
               }, 100);
               
-              attackIntervals.current[`enemy-${battalion.nodeIndex}-${targetNodeIndex}`] = setInterval(() => {
+              attackIntervals.current[existingKey] = setInterval(() => {
                 const nodeRef = nodeRefs.current[targetNodeIndex];
                 if (nodeRef) {
                   battalionRefs.current[`enemy-${battalion.nodeIndex}`]?.triggerAttackAnimation();
@@ -215,8 +260,8 @@ export const useBattleMovementAndAttacks = (
                     nodeRef.triggerDamageAnimation();
                     const damageApplied = nodeRef.applyDamage(totalDamage, false);
                     if (!damageApplied) {
-                      clearInterval(attackIntervals.current[`enemy-${battalion.nodeIndex}-${targetNodeIndex}`]);
-                      delete attackIntervals.current[`enemy-${battalion.nodeIndex}-${targetNodeIndex}`];
+                      clearInterval(attackIntervals.current[existingKey]);
+                      delete attackIntervals.current[existingKey];
                     }
                   }, 100);
                 }
@@ -229,20 +274,26 @@ export const useBattleMovementAndAttacks = (
       });
 
       return () => {
-        // Clear all intervals and listeners on cleanup
         Object.values(attackIntervals.current).forEach(interval => clearInterval(interval));
         attackIntervals.current = {};
-        userBattalions.forEach(battalion => battalion.position.removeAllListeners());
-        enemyBattalions.forEach(battalion => battalion.position.removeAllListeners());
+        battalionsRef.current.user.forEach(battalion => battalion.position.removeAllListeners());
+        battalionsRef.current.enemy.forEach(battalion => battalion.position.removeAllListeners());
+        battleInitializedRef.current = false;
       };
     }
-  }, [battleStarted, nodes, userBattalions, enemyBattalions]);
+  }, [battleStarted]); // Only depend on battleStarted
 
   // IMPORTANT: Handle finding new targets for battalions
   const findNewTarget = (battalion: BattalionPosition, isUser: boolean) => {
+    if (__DEV__) {
+      console.log(`[Retarget] Finding new target for ${isUser ? 'user' : 'enemy'} battalion at node ${battalion.nodeIndex}`);
+    }
     const availableTargets = findAvailableTargets(battalion, isUser);
     if (availableTargets.length > 0) {
       const target = availableTargets[0];
+      if (__DEV__) {
+        console.log(`[Retarget] Moving to node ${target.index}`);
+      }
       moveBattalionAlongPath(battalion, target.index, isUser);
     }
   };
