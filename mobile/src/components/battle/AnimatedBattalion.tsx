@@ -11,17 +11,28 @@ type Props = {
   onAttackComplete?: () => void;
 };
 
-type BattalionRef = {
+// IMPORTANT: Export the ref type for use in other components
+export type BattalionRef = {
   triggerAttackAnimation: () => void;
-  triggerDamageAnimation: () => void;
-};
+} | null;
 
-export const AnimatedBattalion = React.forwardRef<BattalionRef, Props>(({ type, quantity, position, isUser, health = 100, onAttackComplete }: Props, ref) => {
+// IMPORTANT: Use forwardRef to properly type the ref
+export const AnimatedBattalion = React.memo(React.forwardRef<BattalionRef, Props>((props, ref) => {
+  const {
+    type,
+    quantity,
+    position,
+    isUser,
+    health,
+    onAttackComplete,
+  } = props;
+
   const rangeSize = BOT_CATEGORIES[type].stats.range * 30;
   const offset = rangeSize / 2 - 10; // Half of range size minus half of battalion size (20/2)
   const attackFlash = useRef(new Animated.Value(0)).current;
   const damageFlash = useRef(new Animated.Value(0)).current;
 
+  // Implementation of triggerAttackAnimation
   const triggerAttackAnimation = () => {
     Animated.sequence([
       Animated.timing(attackFlash, {
@@ -54,10 +65,9 @@ export const AnimatedBattalion = React.forwardRef<BattalionRef, Props>(({ type, 
     ]).start();
   };
 
-  // Expose the triggerAttackAnimation and triggerDamageAnimation functions via ref
+  // Expose the triggerAttackAnimation method via ref
   React.useImperativeHandle(ref, () => ({
     triggerAttackAnimation,
-    triggerDamageAnimation
   }));
 
   return (
@@ -67,9 +77,9 @@ export const AnimatedBattalion = React.forwardRef<BattalionRef, Props>(({ type, 
         {
           transform: [
             { translateX: position.x },
-            { translateY: position.y }
-          ]
-        }
+            { translateY: position.y },
+          ],
+        },
       ]}
     >
       {/* Attack Range Indicator */}
@@ -153,7 +163,7 @@ export const AnimatedBattalion = React.forwardRef<BattalionRef, Props>(({ type, 
       </View>
     </Animated.View>
   );
-});
+}));
 
 const styles = StyleSheet.create({
   container: {
