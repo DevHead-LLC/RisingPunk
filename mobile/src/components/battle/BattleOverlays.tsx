@@ -1,5 +1,5 @@
 import React from 'react';
-import { Animated } from 'react-native';
+import { Animated, StyleSheet, View } from 'react-native';
 import { CountdownOverlay } from './CountdownOverlay';
 import { BattleResultsOverlay } from './BattleResultsOverlay';
 
@@ -21,7 +21,7 @@ export const BattleOverlays = React.memo(({
   onClose,
 }: Props) => {
   return (
-    <>
+    <View style={styles.container}>
       {/* Countdown Overlay */}
       {countdown > 0 && (
         <CountdownOverlay 
@@ -38,6 +38,17 @@ export const BattleOverlays = React.memo(({
           onContinue={onClose}
         />
       )}
-    </>
+    </View>
   );
+});
+
+const styles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 10, // Ensure overlays appear above network and units
+  },
 }); 

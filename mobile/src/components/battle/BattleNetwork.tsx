@@ -76,6 +76,6 @@ export const BattleNetwork = React.memo(({
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 1
+    zIndex: 1 // Network should be at the bottom of the stack
   }
 }); 
