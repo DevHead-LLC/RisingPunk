@@ -8,6 +8,7 @@ import { BattalionDeploymentZone } from '../components/battle/BattalionDeploymen
 import { BattleResultsOverlay } from '../components/battle/BattleResultsOverlay';
 import { AnimatedBattalion } from '../components/battle/AnimatedBattalion';
 import { CountdownOverlay } from '../components/battle/CountdownOverlay';
+import { useBattleAnimations } from '../hooks/useBattleAnimations';
 
 import { BOT_CATEGORIES } from './DigitalBarracksScreen';
 import { checkRangeIntersection } from '../utils/battleCalculator';
@@ -47,14 +48,19 @@ const NETWORK_CONNECTIONS = [
 ];
 
 export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) => {
-  const networkOpacity = useRef(new Animated.Value(0)).current;
-  const [timeRemaining, setTimeRemaining] = useState(20);
-  const timerRef = useRef<NodeJS.Timeout>();
-  const [showResults, setShowResults] = useState(false);
-  const [battleWinner, setBattleWinner] = useState<'user' | 'enemy'>('user');
-  const resultsOpacity = useRef(new Animated.Value(0)).current;
-  
-  // Replace the old initialization with our new hook
+  // IMPORTANT: Replace individual animation refs with the hook
+  const {
+    networkOpacity,
+    deploymentOpacity,
+    battalionOpacity,
+    countdownOpacity,
+    resultsOpacity,
+    startBattleTransition,
+    showBattleResults,
+    showNetwork,
+  } = useBattleAnimations();
+
+  // IMPORTANT: Restore battle initialization
   const {
     nodes,
     setNodes,
@@ -65,12 +71,13 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     calculateInitialHealth,
   } = useBattleInitialization();
 
+  const [timeRemaining, setTimeRemaining] = useState(20);
+  const timerRef = useRef<NodeJS.Timeout>();
+  const [showResults, setShowResults] = useState(false);
+  const [battleWinner, setBattleWinner] = useState<'user' | 'enemy'>('user');
   const [battleStarted, setBattleStarted] = useState(false);
-  const deploymentOpacity = useRef(new Animated.Value(1)).current;
-  const battalionOpacity = useRef(new Animated.Value(0)).current;
   const [controlledNodes, setControlledNodes] = useState<number[]>([0, 1, 2]); // User starts controlling left nodes
   const [countdown, setCountdown] = useState(3);
-  const countdownOpacity = useRef(new Animated.Value(1)).current;
 
   const battalionRefs = useRef<{ [key: string]: any }>({});
   const attackIntervals = useRef<{ [key: string]: NodeJS.Timeout }>({});
@@ -90,36 +97,15 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   } = useBattleMovement(nodes, battalionRefs, attackIntervals, nodeRefs);
 
   useEffect(() => {
-    // Show battlefield immediately
-    networkOpacity.setValue(1);
+    // Show battlefield immediately using the new hook
+    showNetwork();
     
     // Initial countdown
     const countdownTimer = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 2) { // Start transition on 1
           clearInterval(countdownTimer);
-          // Coordinate all animations
-          Animated.parallel([
-            // Fade out countdown
-            Animated.timing(countdownOpacity, {
-              toValue: 0,
-              duration: 500,
-              useNativeDriver: true,
-            }),
-            // Transition battalions
-            Animated.parallel([
-              Animated.timing(deploymentOpacity, {
-                toValue: 0,
-                duration: 1000,
-                useNativeDriver: true,
-              }),
-              Animated.timing(battalionOpacity, {
-                toValue: 1,
-                duration: 1000,
-                useNativeDriver: true,
-              })
-            ])
-          ]).start(() => {
+          startBattleTransition(() => {
             setBattleStarted(true);
             startBattleTimer();
           });
@@ -353,13 +339,10 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
 
   const handleBattleComplete = (winner: 'user' | 'enemy') => {
     setBattleWinner(winner);
-    Animated.timing(resultsOpacity, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
-    setShowResults(true);
-    onBattleComplete?.(winner);
+    showBattleResults(() => {
+      setShowResults(true);
+      onBattleComplete?.(winner);
+    });
   };
 
   // Movement animation function
