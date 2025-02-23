@@ -57,25 +57,19 @@ export const NetworkNode = React.forwardRef<NodeRef, Props>(({ x, y, size = 12, 
   };
 
   const applyDamage = (damage: number, isUser: boolean) => {
-    // Return early if node is locked or already captured
-    if (isLocked || controlState !== 'neutral') {
-      return false; // Return false to indicate damage was not applied
-    }
+    if (isLocked) return false;
     
-    // Calculate control progress change based on damage relative to health
     const progressChange = (damage / (health || 1)) * 100;
     const newProgress = currentProgress + (isUser ? progressChange : -progressChange);
     
-    // Check for capture
     if (Math.abs(newProgress) >= 100) {
       const newState = newProgress > 0 ? 'user' : 'enemy';
       onControlStateChange?.(newState);
-      return true; // Return true to indicate node was captured
+      return false;
     }
     
-    // Update progress
     setCurrentProgress(newProgress);
-    return true; // Return true to indicate damage was applied
+    return true;
   };
 
   React.useImperativeHandle(ref, () => ({
