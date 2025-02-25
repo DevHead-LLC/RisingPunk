@@ -288,13 +288,28 @@ export const useBattleMovementAndAttacks = (
     if (__DEV__) {
       console.log(`[Retarget] Finding new target for ${isUser ? 'user' : 'enemy'} battalion at node ${battalion.nodeIndex}`);
     }
-    const availableTargets = findAvailableTargets(battalion, isUser);
-    if (availableTargets.length > 0) {
-      const target = availableTargets[0];
+    
+    const targets = findAvailableTargets(
+      battalion,
+      isUser,
+      battalionsRef.current.user,
+      battalionsRef.current.enemy
+    );
+    
+    if (targets.length > 0) {
+      const target = targets[0];
       if (__DEV__) {
-        console.log(`[Retarget] Moving to node ${target.index}`);
+        console.log(`[Retarget] Moving battalion to ${target.type} ${target.index}`);
       }
-      moveBattalionAlongPath(battalion, target.index, isUser);
+      moveBattalionAlongPath(
+        battalion,
+        target,
+        isUser,
+        battalionsRef.current.user,
+        battalionsRef.current.enemy
+      );
+    } else {
+      console.log(`[Retarget] No valid targets found for battalion at node ${battalion.nodeIndex}`);
     }
   };
 
