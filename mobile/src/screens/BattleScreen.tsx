@@ -86,6 +86,8 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     nodes,
     userBattalions,
     enemyBattalions,
+    setUserBattalions,
+    setEnemyBattalions,
   );
 
   const initializeBattle = () => {

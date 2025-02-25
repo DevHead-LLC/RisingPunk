@@ -8,6 +8,8 @@ export type BattalionPosition = {
   nodeIndex: number;
   position: Animated.ValueXY;
   targetNode?: number;
+  targetType?: 'node' | 'battalion';
+  currentHealth: number;
 };
 
 export type BattleTarget = {

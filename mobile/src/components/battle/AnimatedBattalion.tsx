@@ -14,6 +14,7 @@ type Props = {
 // IMPORTANT: Export the ref type for use in other components
 export type BattalionRef = {
   triggerAttackAnimation: () => void;
+  triggerDamageAnimation: () => void;
 } | null;
 
 // IMPORTANT: Use forwardRef to properly type the ref
@@ -26,6 +27,10 @@ export const AnimatedBattalion = React.memo(React.forwardRef<BattalionRef, Props
     health,
     onAttackComplete,
   } = props;
+
+  // Force re-render when health changes
+  const healthPercentage = Math.max(0, Math.min(100, health || 100));
+  console.log(`[Health] Battalion health update: ${healthPercentage}%`);
 
   const rangeSize = BOT_CATEGORIES[type].stats.range * 30;
   const offset = rangeSize / 2 - 10; // Half of range size minus half of battalion size (20/2)
@@ -68,6 +73,7 @@ export const AnimatedBattalion = React.memo(React.forwardRef<BattalionRef, Props
   // Expose the triggerAttackAnimation method via ref
   React.useImperativeHandle(ref, () => ({
     triggerAttackAnimation,
+    triggerDamageAnimation,
   }));
 
   return (
@@ -97,7 +103,13 @@ export const AnimatedBattalion = React.memo(React.forwardRef<BattalionRef, Props
       ]} />
 
       <View style={styles.healthBarContainer}>
-        <View style={[styles.healthBar, { width: `${health}%` }]} />
+        <View style={[
+          styles.healthBar, 
+          { 
+            width: `${healthPercentage}%`,
+            backgroundColor: isUser ? '#47F729' : '#FF4141'
+          }
+        ]} />
       </View>
       
       <View style={[
@@ -163,26 +175,44 @@ export const AnimatedBattalion = React.memo(React.forwardRef<BattalionRef, Props
       </View>
     </Animated.View>
   );
-}));
+}), (prevProps, nextProps) => {
+  // Only re-render if these props change
+  const propsEqual = prevProps.quantity === nextProps.quantity &&
+         prevProps.health === nextProps.health &&
+         prevProps.isUser === nextProps.isUser &&
+         prevProps.type === nextProps.type;
+  
+  // Always update if health changes
+  if (prevProps.health !== nextProps.health) {
+    console.log(`[Health] Re-rendering due to health change: ${prevProps.health}% -> ${nextProps.health}%`);
+    return false;
+  }
+  
+  return propsEqual && prevProps.position === nextProps.position;
+});
 
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
     width: 20,
     height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   healthBarContainer: {
     position: 'absolute',
-    top: -9,
-    width: '100%',
-    height: 2,
-    backgroundColor: '#333333',
-    borderRadius: 1,
+    top: -8,
+    left: -15,
+    width: 50,
+    height: 4,
+    backgroundColor: '#333',
+    borderRadius: 2,
+    overflow: 'hidden',
   },
   healthBar: {
     height: '100%',
-    backgroundColor: '#00FF00',
-    borderRadius: 1,
+    backgroundColor: '#47F729',
+    borderRadius: 2,
   },
   battalion: {
     width: 20,

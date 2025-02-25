@@ -28,6 +28,8 @@ export const useBattleMovementAndAttacks = (
   nodes: BattleNode[],
   userBattalions: BattalionPosition[],
   enemyBattalions: BattalionPosition[],
+  setUserBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
+  setEnemyBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
 ) => {
   // IMPORTANT: Keep refs for animations and intervals
   const battalionRefs = useRef<BattalionRefs>({});
@@ -42,7 +44,7 @@ export const useBattleMovementAndAttacks = (
     findAvailableTargets,
     calculateMovementDuration,
     moveBattalionAlongPath
-  } = useBattleMovement(nodes, battalionRefs, attackIntervals, nodeRefs);
+  } = useBattleMovement(nodes, battalionRefs, attackIntervals, nodeRefs, setUserBattalions, setEnemyBattalions);
 
   // Update refs when battalions change
   useEffect(() => {
