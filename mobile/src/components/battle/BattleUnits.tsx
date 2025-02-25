@@ -1,8 +1,9 @@
 import React from 'react';
-import { Animated, StyleSheet } from 'react-native';
+import { Animated, StyleSheet, View } from 'react-native';
 import { BattalionDeploymentZone } from './BattalionDeploymentZone';
 import { AnimatedBattalion } from './AnimatedBattalion';
 import { BattalionPosition } from '../../types/battle';
+import { BOT_CATEGORIES } from '../../screens/DigitalBarracksScreen';
 
 type Props = {
   deploymentOpacity: Animated.Value;
@@ -45,30 +46,44 @@ export const BattleUnits = React.memo(({
         />
       </Animated.View>
 
-      {/* Animated battalions */}
-      <Animated.View style={[styles.overlayContainer, { opacity: battalionOpacity }]}>
-        {userBattalions.map((battalion, index) => (
-          <AnimatedBattalion
-            key={`user-${index}`}
-            ref={el => battalionRefs.current[`user-${battalion.nodeIndex}`] = el}
-            type={battalion.type}
-            quantity={battalion.quantity}
-            position={battalion.position}
-            isUser={true}
-          />
-        ))}
-        
-        {enemyBattalions.map((battalion, index) => (
-          <AnimatedBattalion
-            key={`enemy-${index}`}
-            ref={el => battalionRefs.current[`enemy-${battalion.nodeIndex}`] = el}
-            type={battalion.type}
-            quantity={battalion.quantity}
-            position={battalion.position}
-            isUser={false}
-          />
-        ))}
-      </Animated.View>
+      {/* Animated battalions - Split into two views */}
+      <View style={styles.overlayContainer}>
+        <Animated.View style={{ opacity: battalionOpacity }}>
+          {userBattalions.map((battalion, index) => {
+            const healthPercent = battalion.currentHealth !== undefined ? 
+              (battalion.currentHealth / (BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity)) * 100 : 100;
+            console.log(`[Health] Calculating user battalion ${index} health: ${healthPercent}% (${battalion.currentHealth}/${BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity})`);
+            return (
+              <AnimatedBattalion
+                key={`user-${index}`}
+                ref={el => battalionRefs.current[`user-${battalion.nodeIndex}`] = el}
+                type={battalion.type}
+                quantity={battalion.quantity}
+                position={battalion.position}
+                isUser={true}
+                health={healthPercent}
+              />
+            );
+          })}
+          
+          {enemyBattalions.map((battalion, index) => {
+            const healthPercent = battalion.currentHealth !== undefined ? 
+              (battalion.currentHealth / (BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity)) * 100 : 100;
+            console.log(`[Health] Calculating enemy battalion ${index} health: ${healthPercent}% (${battalion.currentHealth}/${BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity})`);
+            return (
+              <AnimatedBattalion
+                key={`enemy-${index}`}
+                ref={el => battalionRefs.current[`enemy-${battalion.nodeIndex}`] = el}
+                type={battalion.type}
+                quantity={battalion.quantity}
+                position={battalion.position}
+                isUser={false}
+                health={healthPercent}
+              />
+            );
+          })}
+        </Animated.View>
+      </View>
     </>
   );
 });

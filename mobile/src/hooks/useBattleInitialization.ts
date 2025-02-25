@@ -38,19 +38,22 @@ export const useBattleInitialization = () => {
       type: 'breacher', 
       quantity: 5, 
       nodeIndex: 0, 
-      position: new Animated.ValueXY({ x: 20, y: SCREEN_HEIGHT * 0.225 }) 
+      position: new Animated.ValueXY({ x: 20, y: SCREEN_HEIGHT * 0.225 }),
+      currentHealth: BOT_CATEGORIES['breacher'].stats.health * 5
     },
     { 
       type: 'guardian', 
       quantity: 3, 
       nodeIndex: 1, 
-      position: new Animated.ValueXY({ x: 20, y: SCREEN_HEIGHT * 0.5 }) 
+      position: new Animated.ValueXY({ x: 20, y: SCREEN_HEIGHT * 0.5 }),
+      currentHealth: BOT_CATEGORIES['guardian'].stats.health * 3
     },
     { 
       type: 'phreak', 
       quantity: 4, 
       nodeIndex: 2, 
-      position: new Animated.ValueXY({ x: 20, y: SCREEN_HEIGHT * 0.775 }) 
+      position: new Animated.ValueXY({ x: 20, y: SCREEN_HEIGHT * 0.775 }),
+      currentHealth: BOT_CATEGORIES['phreak'].stats.health * 4
     }
   ]);
 
@@ -59,19 +62,22 @@ export const useBattleInitialization = () => {
       type: 'breacher', 
       quantity: 4, 
       nodeIndex: 6, 
-      position: new Animated.ValueXY({ x: SCREEN_WIDTH - 165, y: SCREEN_HEIGHT * 0.225 }) 
+      position: new Animated.ValueXY({ x: SCREEN_WIDTH - 165, y: SCREEN_HEIGHT * 0.225 }),
+      currentHealth: BOT_CATEGORIES['breacher'].stats.health * 4
     },
     { 
       type: 'guardian', 
       quantity: 4, 
       nodeIndex: 7, 
-      position: new Animated.ValueXY({ x: SCREEN_WIDTH - 165, y: SCREEN_HEIGHT * 0.5 }) 
+      position: new Animated.ValueXY({ x: SCREEN_WIDTH - 165, y: SCREEN_HEIGHT * 0.5 }),
+      currentHealth: BOT_CATEGORIES['guardian'].stats.health * 4
     },
     { 
       type: 'phreak', 
       quantity: 3, 
       nodeIndex: 8, 
-      position: new Animated.ValueXY({ x: SCREEN_WIDTH - 165, y: SCREEN_HEIGHT * 0.775 }) 
+      position: new Animated.ValueXY({ x: SCREEN_WIDTH - 165, y: SCREEN_HEIGHT * 0.775 }),
+      currentHealth: BOT_CATEGORIES['phreak'].stats.health * 3
     }
   ]);
 

@@ -15,9 +15,23 @@ const NETWORK_CONNECTIONS = [
 // IMPORTANT: Keep movement logic centralized in this hook
 export const useBattleMovement = (
   nodes: BattleNode[],
-  battalionRefs: React.MutableRefObject<{ [key: string]: any }>,
-  attackIntervals: React.MutableRefObject<{ [key: string]: NodeJS.Timeout }>,
-  nodeRefs: React.MutableRefObject<{[key: string]: any}>
+  battalionRefs: React.MutableRefObject<{
+    [key: string]: {
+      triggerAttackAnimation: () => void;
+      triggerDamageAnimation: () => void;
+    } | null;
+  }>,
+  attackIntervals: React.MutableRefObject<{
+    [key: string]: NodeJS.Timeout;
+  }>,
+  nodeRefs: React.MutableRefObject<{
+    [key: string]: {
+      triggerDamageAnimation: () => void;
+      applyDamage: (damage: number, isUser: boolean) => boolean;
+    } | null;
+  }>,
+  setUserBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
+  setEnemyBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
 ) => {
   // Get connected nodes following network topology
   const getConnectedNodes = useCallback((nodeIndex: number): number[] => {
@@ -32,8 +46,8 @@ export const useBattleMovement = (
   // IMPORTANT: Keep position calculation separate from movement logic
   const getAnimatedPosition = useCallback((position: Animated.ValueXY) => {
     return {
-      x: position.x._value || 0,
-      y: position.y._value || 0
+      x: (position.x as any)._value || 0,
+      y: (position.y as any)._value || 0
     };
   }, []);
 
@@ -188,6 +202,34 @@ export const useBattleMovement = (
     // For both nodes and battalions, move until we're at attack range
     const moveDistance = Math.max(0, distance - range);
     
+    // ADDED: If moveDistance is 0 and we're already at the target position, don't attempt movement
+    if (moveDistance === 0 && Math.abs(dx) < 0.1 && Math.abs(dy) < 0.1) {
+      console.log(`[Movement] ${battalionId} already at optimal position, skipping movement`);
+      
+      // Set up attacks immediately since we're already in position
+      if (battalion.quantity <= 0) {
+        console.log(`[Combat] ${battalionId} is defeated, cannot initiate combat`);
+        return;
+      }
+
+      if (target.type === 'battalion') {
+        const enemyBatts = isUser ? enemyBattalions : userBattalions;
+        const enemyBattalion = enemyBatts![target.index];
+        if (!enemyBattalion || enemyBattalion.quantity <= 0) {
+          console.log(`[Combat] ${battalionId}: Target battalion ${target.index} no longer valid, finding new target`);
+          const newTargets = findAvailableTargets(battalion, isUser, userBattalions!, enemyBattalions!);
+          if (newTargets.length > 0) {
+            console.log(`[Retarget] ${battalionId} found new target: ${newTargets[0].type} ${newTargets[0].index}`);
+            moveBattalionAlongPath(battalion, newTargets[0], isUser, userBattalions, enemyBattalions);
+          }
+          return;
+        }
+        console.log(`[Combat] ${battalionId} in range of target battalion ${target.index}, initiating combat`);
+        setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
+      }
+      return;
+    }
+
     const rangePosition = {
       x: currentPos.x + (directionX * moveDistance),
       y: currentPos.y + (directionY * moveDistance)
@@ -203,12 +245,6 @@ export const useBattleMovement = (
       }
     });
 
-    // If within attack range of battalion target, start attacking while moving
-    if (target.type === 'battalion' && distance <= range) {
-      console.log(`[Attack] ${battalionId} in range of target while moving, starting attacks`);
-      setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
-    }
-
     // Calculate movement duration based on distance to travel
     const speed = BOT_CATEGORIES[battalion.type].stats.speed;
     const movementDuration = (moveDistance / speed) * 70;
@@ -220,28 +256,65 @@ export const useBattleMovement = (
       useNativeDriver: true
     }).start(({ finished }) => {
       if (finished) {
-        console.log(`[Movement] ${battalionId} reached position for ${target.type} ${target.index}`);
+        console.log(`[Movement] ${battalionId} reached target position for ${target.type} ${target.index}`);
         
         // Don't set up attacks if this battalion is defeated
         if (battalion.quantity <= 0) {
-          console.log(`[Attack] ${battalionId} is defeated, cannot attack`);
+          console.log(`[Combat] ${battalionId} is defeated, cannot initiate combat`);
           return;
         }
 
         // For nodes, verify target is still valid and set up attacks
         if (target.type === 'node') {
           const node = nodes[target.index];
+          console.log(`[Node Status] Node ${target.index} control state: ${node.controlState}`);
+          
           if (node.controlState !== 'neutral') {
-            console.log(`[Attack] ${battalionId}: Node ${target.index} is no longer neutral, finding new target`);
+            console.log(`[Node Status] Node ${target.index} is no longer neutral`);
+            console.log(`[Retarget] ${battalionId} searching for new target due to node ${target.index} being captured`);
             const newTargets = findAvailableTargets(battalion, isUser, userBattalions!, enemyBattalions!);
             if (newTargets.length > 0) {
+              console.log(`[Retarget] ${battalionId} found new target: ${newTargets[0].type} ${newTargets[0].index}`);
+              moveBattalionAlongPath(battalion, newTargets[0], isUser, userBattalions, enemyBattalions);
+            } else {
+              console.log(`[Combat End] ${battalionId} found no valid targets, battle may be over`);
+            }
+            return;
+          }
+          console.log(`[Node Combat] ${battalionId} setting up attacks on neutral node ${target.index}`);
+          setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
+        } else if (target.type === 'battalion') {
+          // For battalions, check if target is still valid and in range
+          const enemyBatts = isUser ? enemyBattalions : userBattalions;
+          const enemyBattalion = enemyBatts![target.index];
+          
+          if (!enemyBattalion || enemyBattalion.quantity <= 0) {
+            console.log(`[Combat] ${battalionId}: Target battalion ${target.index} no longer valid, finding new target`);
+            const newTargets = findAvailableTargets(battalion, isUser, userBattalions!, enemyBattalions!);
+            if (newTargets.length > 0) {
+              console.log(`[Retarget] ${battalionId} found new target: ${newTargets[0].type} ${newTargets[0].index}`);
               moveBattalionAlongPath(battalion, newTargets[0], isUser, userBattalions, enemyBattalions);
             }
             return;
           }
-          setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
+
+          // Calculate current distance to target
+          const enemyPos = getAnimatedPosition(enemyBattalion.position);
+          const distance = Math.sqrt(
+            Math.pow(enemyPos.x - currentPos.x, 2) + 
+            Math.pow(enemyPos.y - currentPos.y, 2)
+          );
+          
+          const range = BOT_CATEGORIES[battalion.type].stats.range * 15;
+          if (distance <= range) {
+            console.log(`[Combat] ${battalionId} in range of target battalion ${target.index}, initiating combat`);
+            setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
+          } else {
+            console.log(`[Combat] ${battalionId} not in range of target battalion ${target.index}, adjusting position`);
+            const newTarget = { ...target, position: enemyPos };
+            moveBattalionAlongPath(battalion, newTarget, isUser, userBattalions, enemyBattalions);
+          }
         }
-        // For battalions, we're already attacking if in range, no need to set up again
       }
     });
   }, [nodes]);
@@ -255,10 +328,25 @@ export const useBattleMovement = (
     userBattalions?: BattalionPosition[],
     enemyBattalions?: BattalionPosition[]
   ) => {
+    // Early exit if battalion is already destroyed
+    if (battalion.quantity <= 0) {
+      console.log(`[Combat Setup] ${battalionId} is destroyed, cannot setup attacks`);
+      return;
+    }
+
     const attackSpeed = BOT_CATEGORIES[battalion.type].stats.speed;
     const attackInterval = 2000 * (5 / attackSpeed);
     console.log(`[Attack] ${battalionId} setting up attacks every ${attackInterval}ms`);
     
+    // Clear any existing intervals for this battalion
+    Object.keys(attackIntervals.current).forEach(key => {
+      if (key.startsWith(battalionId)) {
+        console.log(`[Combat Setup] Clearing existing interval ${key}`);
+        clearInterval(attackIntervals.current[key]);
+        delete attackIntervals.current[key];
+      }
+    });
+
     setTimeout(() => {
       const attackPower = BOT_CATEGORIES[battalion.type].stats.offense;
       const totalDamage = attackPower * battalion.quantity;
@@ -267,30 +355,45 @@ export const useBattleMovement = (
       if (target.type === 'node') {
         const nodeRef = nodeRefs.current[target.index];
         if (nodeRef) {
-          console.log(`[Attack] ${battalionId} initiating node attack sequence on node ${target.index}`);
+          console.log(`[Node Combat] ${battalionId} initiating attack on node ${target.index}`);
+          console.log(`[Node Combat] Attack power: ${totalDamage}`);
           battalionRefs.current[battalionId]?.triggerAttackAnimation();
           
           // Initial attack
           setTimeout(() => {
             nodeRef.triggerDamageAnimation();
+            console.log(`[Node Combat] Applying initial damage of ${totalDamage} to node ${target.index}`);
             const damageApplied = nodeRef.applyDamage(totalDamage, isUser);
-            console.log(`[Attack] ${battalionId} initial node attack ${damageApplied ? 'successful' : 'failed'}`);
-            if (!damageApplied) return;
+            if (damageApplied) {
+              console.log(`[Node Combat] Initial damage successfully applied to node ${target.index}`);
+            } else {
+              console.log(`[Node Combat] Failed to apply initial damage to node ${target.index}`);
+            }
           }, 100);
 
           // Recurring attacks
           const intervalKey = `${battalionId}-${target.index}`;
+          console.log(`[Node Combat] Setting up recurring attacks for ${battalionId} on node ${target.index}`);
           attackIntervals.current[intervalKey] = setInterval(() => {
-            console.log(`[Attack] ${battalionId} executing attack on node ${target.index}`);
+            console.log(`[Node Combat] ${battalionId} executing recurring attack on node ${target.index}`);
             battalionRefs.current[battalionId]?.triggerAttackAnimation();
             
             setTimeout(() => {
               nodeRef.triggerDamageAnimation();
+              console.log(`[Node Combat] Attempting to apply ${totalDamage} damage to node ${target.index}`);
               const damageApplied = nodeRef.applyDamage(totalDamage, isUser);
               if (!damageApplied) {
-                console.log(`[Attack] ${battalionId} attack failed - node ${target.index} no longer valid target`);
+                console.log(`[Node Combat] Node ${target.index} no longer valid target, clearing interval`);
                 clearInterval(attackIntervals.current[intervalKey]);
                 delete attackIntervals.current[intervalKey];
+                
+                // Retarget the battalion
+                console.log(`[Node Combat] Finding new target for ${battalionId}`);
+                const newTargets = findAvailableTargets(battalion, isUser, userBattalions!, enemyBattalions!);
+                if (newTargets.length > 0) {
+                  console.log(`[Node Combat] New target found for ${battalionId}, initiating movement`);
+                  moveBattalionAlongPath(battalion, newTargets[0], isUser, userBattalions, enemyBattalions);
+                }
               }
             }, 100);
           }, attackInterval);
@@ -299,39 +402,248 @@ export const useBattleMovement = (
         // Battalion vs battalion combat
         const enemyBatts = isUser ? enemyBattalions : userBattalions;
         if (!enemyBatts || !enemyBatts[target.index]) {
-          console.log(`[Attack] ${battalionId}: Enemy battalion ${target.index} not found`);
+          console.log(`[Combat Error] ${battalionId}: Enemy battalion ${target.index} not found`);
           return;
         }
 
         const enemyBattalion = enemyBatts[target.index];
         const enemyId = `${!isUser ? 'user' : 'enemy'}-${enemyBattalion.type}-${enemyBattalion.nodeIndex}`;
-        console.log(`[Attack] ${battalionId} initiating battalion combat with ${enemyId}`);
+        
+        // Verify both battalions are still alive before starting combat
+        if (battalion.quantity <= 0 || enemyBattalion.quantity <= 0) {
+          console.log(`[Combat Setup] One or both battalions destroyed, cannot start combat`);
+          return;
+        }
+
+        console.log(`\n[Combat Start] ====== Battle between ${battalionId} and ${enemyId} ======`);
+        console.log(`[Combat Stats] Attacker: ${battalionId}`);
+        console.log(`  Type: ${battalion.type}`);
+        console.log(`  Quantity: ${battalion.quantity}`);
+        console.log(`  Attack Power: ${BOT_CATEGORIES[battalion.type].stats.offense}`);
+        console.log(`[Combat Stats] Defender: ${enemyId}`);
+        console.log(`  Type: ${enemyBattalion.type}`);
+        console.log(`  Quantity: ${enemyBattalion.quantity}`);
+        console.log(`  Health Per Unit: ${BOT_CATEGORIES[enemyBattalion.type].stats.health}`);
+        
+        // Calculate max health based on type and quantity
+        if (typeof enemyBattalion.currentHealth === 'undefined') {
+          const healthPerUnit = BOT_CATEGORIES[enemyBattalion.type].stats.health;
+          enemyBattalion.currentHealth = healthPerUnit * enemyBattalion.quantity;
+          console.log(`[Health Init] ${enemyId} initial health calculated: ${enemyBattalion.currentHealth} (${healthPerUnit} per unit * ${enemyBattalion.quantity} units)`);
+        }
         
         // Initial attack
         battalionRefs.current[battalionId]?.triggerAttackAnimation();
+        
         setTimeout(() => {
+          // Verify target is still alive before applying damage
+          const targetBatts = isUser ? enemyBattalions : userBattalions;
+          if (!targetBatts || targetBatts[target.index].quantity <= 0) {
+            console.log(`[Combat] ${enemyId} already destroyed, skipping damage`);
+            return;
+          }
+
           battalionRefs.current[enemyId]?.triggerDamageAnimation();
-          enemyBattalion.quantity = Math.max(0, enemyBattalion.quantity - totalDamage);
-          console.log(`[Attack] ${battalionId} dealt ${totalDamage} damage to ${enemyId}, remaining quantity: ${enemyBattalion.quantity}`);
+          
+          // Apply damage using the latest health value
+          if (isUser) {
+            setEnemyBattalions(prevBatts => {
+              const latestHealth = prevBatts[target.index].currentHealth;
+              if (latestHealth <= 0) {
+                console.log(`[Combat] ${enemyId} already at 0 health, skipping damage`);
+                return prevBatts;
+              }
+
+              const healthPerUnit = BOT_CATEGORIES[enemyBattalion.type].stats.health;
+              const newHealth = Math.max(0, latestHealth - totalDamage);
+              const newQuantity = Math.ceil(newHealth / healthPerUnit);
+              
+              console.log(`[Battle Damage] ${battalionId} dealing ${totalDamage} damage to ${enemyId}. Health: ${latestHealth} -> ${newHealth}`);
+
+              const updatedBatts = prevBatts.map((batt, idx) => {
+                if (idx === target.index) {
+                  return {
+                    ...batt,
+                    currentHealth: newHealth,
+                    quantity: newQuantity
+                  };
+                }
+                return batt;
+              });
+
+              // If battalion is destroyed, clear all its attack intervals
+              if (newHealth <= 0) {
+                console.log(`[Battalion Destroyed] ${enemyId} has been destroyed`);
+                Object.keys(attackIntervals.current).forEach(key => {
+                  if (key.includes(enemyId)) {
+                    console.log(`[Combat End] Clearing attack interval ${key}`);
+                    clearInterval(attackIntervals.current[key]);
+                    delete attackIntervals.current[key];
+                  }
+                });
+              }
+              
+              return updatedBatts;
+            });
+          } else {
+            setUserBattalions(prevBatts => {
+              const latestHealth = prevBatts[target.index].currentHealth;
+              if (latestHealth <= 0) {
+                console.log(`[Combat] ${enemyId} already at 0 health, skipping damage`);
+                return prevBatts;
+              }
+
+              const healthPerUnit = BOT_CATEGORIES[enemyBattalion.type].stats.health;
+              const newHealth = Math.max(0, latestHealth - totalDamage);
+              const newQuantity = Math.ceil(newHealth / healthPerUnit);
+              
+              console.log(`[Battle Damage] ${battalionId} dealing ${totalDamage} damage to ${enemyId}. Health: ${latestHealth} -> ${newHealth}`);
+
+              const updatedBatts = prevBatts.map((batt, idx) => {
+                if (idx === target.index) {
+                  return {
+                    ...batt,
+                    currentHealth: newHealth,
+                    quantity: newQuantity
+                  };
+                }
+                return batt;
+              });
+
+              // If battalion is destroyed, clear all its attack intervals
+              if (newHealth <= 0) {
+                console.log(`[Battalion Destroyed] ${enemyId} has been destroyed`);
+                Object.keys(attackIntervals.current).forEach(key => {
+                  if (key.includes(enemyId)) {
+                    console.log(`[Combat End] Clearing attack interval ${key}`);
+                    clearInterval(attackIntervals.current[key]);
+                    delete attackIntervals.current[key];
+                  }
+                });
+              }
+              
+              return updatedBatts;
+            });
+          }
         }, 100);
 
-        // Recurring attacks
+        // Set up recurring attacks
         const intervalKey = `${battalionId}-${enemyId}`;
+        console.log(`[Combat Setup] Setting up recurring attacks for ${battalionId} against ${enemyId} with interval ${attackInterval}ms`);
+        
         attackIntervals.current[intervalKey] = setInterval(() => {
+          // Verify both battalions are still alive before executing attack
+          if (battalion.quantity <= 0) {
+            console.log(`[Combat] ${battalionId} destroyed, clearing attack interval`);
+            clearInterval(attackIntervals.current[intervalKey]);
+            delete attackIntervals.current[intervalKey];
+            return;
+          }
+
+          const targetBatts = isUser ? enemyBattalions : userBattalions;
+          if (!targetBatts || targetBatts[target.index].quantity <= 0) {
+            console.log(`[Combat] ${enemyId} destroyed, finding new target for ${battalionId}`);
+            clearInterval(attackIntervals.current[intervalKey]);
+            delete attackIntervals.current[intervalKey];
+            
+            const newTargets = findAvailableTargets(battalion, isUser, userBattalions!, enemyBattalions!);
+            if (newTargets.length > 0) {
+              console.log(`[Retarget] Moving to new target: ${newTargets[0].type} ${newTargets[0].index}`);
+              moveBattalionAlongPath(battalion, newTargets[0], isUser, userBattalions, enemyBattalions);
+            }
+            return;
+          }
+
           console.log(`[Attack] ${battalionId} executing attack on ${enemyId}`);
           battalionRefs.current[battalionId]?.triggerAttackAnimation();
           
           setTimeout(() => {
-            if (enemyBattalion.quantity <= 0) {
-              console.log(`[Attack] ${battalionId}: Enemy ${enemyId} defeated, clearing interval`);
-              clearInterval(attackIntervals.current[intervalKey]);
-              delete attackIntervals.current[intervalKey];
-              return;
-            }
-            
             battalionRefs.current[enemyId]?.triggerDamageAnimation();
-            enemyBattalion.quantity = Math.max(0, enemyBattalion.quantity - totalDamage);
-            console.log(`[Attack] ${battalionId} dealt ${totalDamage} damage to ${enemyId}, remaining quantity: ${enemyBattalion.quantity}`);
+            
+            // Calculate and apply damage
+            const attackPower = BOT_CATEGORIES[battalion.type].stats.offense;
+            const totalDamage = attackPower * battalion.quantity;
+            
+            // Get latest health from state by using a callback to ensure we have the most recent value
+            if (isUser) {
+              setEnemyBattalions(prevBatts => {
+                const latestHealth = prevBatts[target.index].currentHealth;
+                const healthPerUnit = BOT_CATEGORIES[enemyBattalion.type].stats.health;
+                const newHealth = Math.max(0, latestHealth - totalDamage);
+                const newQuantity = Math.ceil(newHealth / healthPerUnit);
+                
+                console.log(`[Battle Damage] ${battalionId} dealing ${totalDamage} damage to ${enemyId}. Health: ${latestHealth} -> ${newHealth}`);
+
+                // Create new array with updated health
+                const updatedBatts = prevBatts.map((batt, idx) => {
+                  if (idx === target.index) {
+                    return {
+                      ...batt,
+                      currentHealth: newHealth,
+                      quantity: newQuantity
+                    };
+                  }
+                  return batt;
+                });
+                
+                console.log(`[Battalion Update] ${enemyId} new state:`, updatedBatts[target.index]);
+                return updatedBatts;
+              });
+            } else {
+              setUserBattalions(prevBatts => {
+                const latestHealth = prevBatts[target.index].currentHealth;
+                const healthPerUnit = BOT_CATEGORIES[enemyBattalion.type].stats.health;
+                const newHealth = Math.max(0, latestHealth - totalDamage);
+                const newQuantity = Math.ceil(newHealth / healthPerUnit);
+                
+                console.log(`[Battle Damage] ${battalionId} dealing ${totalDamage} damage to ${enemyId}. Health: ${latestHealth} -> ${newHealth}`);
+
+                // Create new array with updated health
+                const updatedBatts = prevBatts.map((batt, idx) => {
+                  if (idx === target.index) {
+                    return {
+                      ...batt,
+                      currentHealth: newHealth,
+                      quantity: newQuantity
+                    };
+                  }
+                  return batt;
+                });
+                
+                console.log(`[Battalion Update] ${enemyId} new state:`, updatedBatts[target.index]);
+                return updatedBatts;
+              });
+            }
+
+            // Trigger damage animation
+            battalionRefs.current[enemyId]?.triggerDamageAnimation();
+
+            // Check if battalion is destroyed using the latest health
+            if (isUser) {
+              setEnemyBattalions(prevBatts => {
+                const currentHealth = prevBatts[target.index].currentHealth;
+                console.log(`[Health Check] ${enemyId} health check: ${currentHealth}`);
+                if (currentHealth <= 0) {
+                  console.log(`[Battalion Destroyed] ${enemyId} has been destroyed`);
+                  console.log(`[Combat End] Clearing attack interval ${intervalKey}`);
+                  clearInterval(attackIntervals.current[intervalKey]);
+                  delete attackIntervals.current[intervalKey];
+                }
+                return prevBatts;
+              });
+            } else {
+              setUserBattalions(prevBatts => {
+                const currentHealth = prevBatts[target.index].currentHealth;
+                console.log(`[Health Check] ${enemyId} health check: ${currentHealth}`);
+                if (currentHealth <= 0) {
+                  console.log(`[Battalion Destroyed] ${enemyId} has been destroyed`);
+                  console.log(`[Combat End] Clearing attack interval ${intervalKey}`);
+                  clearInterval(attackIntervals.current[intervalKey]);
+                  delete attackIntervals.current[intervalKey];
+                }
+                return prevBatts;
+              });
+            }
           }, 100);
         }, attackInterval);
       }
