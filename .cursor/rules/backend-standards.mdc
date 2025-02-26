@@ -1,0 +1,84 @@
+---
+description: Outlines API architecture, database design, and server-side implementation requirements.
+globs: 
+alwaysApply: false
+---
+# Backend Development Standards
+
+## API Architecture
+### Structure
+- RESTful endpoints
+- GraphQL when needed for complex data
+- Clear route organization
+- Versioned API paths
+
+### Security
+```typescript
+// Example security middleware
+const securityMiddleware = {
+  rateLimit,
+  helmet,
+  cors: {
+    origin: process.env.ALLOWED_ORIGINS,
+    credentials: true
+  }
+};
+```
+
+## Authentication
+- JWT for stateless auth
+- Secure token storage
+- Refresh token rotation
+- Rate limiting on auth routes
+
+## Database (MongoDB)
+### Schema Design
+```typescript
+// Example schema with types
+interface UserSchema {
+  _id: ObjectId;
+  username: string;
+  email: string;
+  passwordHash: string;
+  lastLogin: Date;
+}
+```
+
+### Best Practices
+- Use Mongoose with TypeScript
+- Implement proper indexing
+- Maintain data validation
+- Handle errors gracefully
+
+## Error Handling
+```typescript
+// Centralized error handling
+class AppError extends Error {
+  constructor(
+    public statusCode: number,
+    public message: string,
+    public isOperational = true
+  ) {
+    super(message);
+  }
+}
+```
+
+## Performance
+- Implement caching strategy
+- Optimize database queries
+- Use connection pooling
+- Monitor response times
+
+## Logging
+### Development
+- Request/response logging
+- Performance metrics
+- Error stack traces
+- Query execution times
+
+### Production
+- Critical error alerts
+- Performance monitoring
+- Security incidents
+- Resource utilization

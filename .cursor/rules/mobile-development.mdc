@@ -1,0 +1,74 @@
+---
+description: Specifies iOS-specific development standards and optimizations for the mobile app.
+globs: 
+alwaysApply: false
+---
+# Mobile Development Standards
+
+## Platform Specifics
+- Target Platform: iOS (iPhone 16 Pro)
+- Development: React Native CLI (not Expo)
+- Future Support: All iOS devices and viewport sizes
+
+## UI/UX Standards
+### Visual Design
+- Implement cyberpunk theme consistently
+- Use approved color palette
+- Maintain visual hierarchy
+- Ensure readable typography
+
+### Styling
+```typescript
+// Use StyleSheet.create for optimal performance
+const styles = StyleSheet.create({
+  container: {
+    // Add comments for complex styles
+  }
+});
+```
+
+### Responsive Design
+- Use relative units (%, flex) over fixed pixels
+- Implement safe area handling
+- Support dynamic text sizes
+- Test on multiple device sizes
+
+## Performance Optimization
+### List Rendering
+```typescript
+<FlatList
+  removeClippedSubviews={true}
+  maxToRenderPerBatch={10}
+  windowSize={5}
+  getItemLayout={(data, index) => ({
+    length: ITEM_HEIGHT,
+    offset: ITEM_HEIGHT * index,
+    index,
+  })}
+/>
+```
+
+### Asset Management
+- Use react-native-fast-image for images
+- Implement vector icons efficiently
+- Optimize asset loading and caching
+- Implement proper cleanup
+
+## Logging Strategy
+### Development
+- Log important state changes
+- Track performance metrics
+- Monitor animation frames
+- Debug network requests
+
+### Production
+- Remove development-only logs
+- Maintain critical error logging
+- Track key user interactions
+- Monitor performance metrics
+
+## Animation Guidelines
+- Use native driver when possible
+- Implement smooth transitions
+- Optimize gesture handling
+- Maintain 60fps target

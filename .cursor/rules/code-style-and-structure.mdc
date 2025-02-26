@@ -1,0 +1,55 @@
+---
+description: Defines core TypeScript coding standards and project organization patterns for consistent development.
+globs: 
+alwaysApply: false
+---
+# Code Style and Structure Guidelines
+
+## TypeScript Standards
+- Use TypeScript across all projects (mobile, web, server)
+- Enable strict typing in tsconfig.json
+- Avoid `any` type - use precise types instead
+- Leverage type inference where it adds clarity
+
+## Project Organization
+- Organize by feature/domain
+- Group related components, hooks, utilities, and styles
+- Maintain clear import/export patterns
+- Keep directory structure semantic and flat where possible
+
+## Component Architecture
+- Use functional components with hooks
+- Implement React.memo() for static prop components
+- Break down complex components into smaller, focused pieces
+- Keep component files under 300 lines when possible
+
+## Naming Conventions
+- Components: PascalCase (UserProfile, BattleScreen)
+- Variables/Functions: camelCase (isFetchingData, handleUserInput)
+- Directories: lowercase-with-hyphens (user-profile, battle-screen)
+- Types/Interfaces: PascalCase with clear suffixes (UserState, BattleProps)
+
+## Documentation Standards
+### Comments
+- Preserve existing comments unless outdated
+- Add clear, concise explanations for complex logic
+- Include "IMPORTANT:" prefix for critical notes
+- Use "NOTE:" prefix for implementation details
+
+### Code Documentation
+```typescript
+/**
+ * @component ComponentName
+ * @description Brief description of purpose
+ * 
+ * @important Critical information about usage
+ * @dependencies List key dependencies
+ * @maintainer Notes for maintainers
+ */
+```
+
+## Performance Guidelines
+- Optimize render cycles
+- Implement proper cleanup in useEffect
+- Use appropriate memoization (useMemo, useCallback)
+- Profile and optimize heavy computations

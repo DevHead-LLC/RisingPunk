@@ -1,0 +1,74 @@
+---
+description: This outlines the way the user will expect the application to function during battle phase - Battle Screen
+globs: 
+alwaysApply: false
+---
+# Battle System Architecture
+
+## Core Principles
+- Focus on iterative development
+- Maintain clear separation of battle phases
+- Preserve real-time combat mechanics
+- Ensure smooth animations and transitions
+
+## Battle Flow
+
+### 1. Pre-Battle Phase (3 seconds)
+- Display countdown overlay
+- Show deployment zones
+- Animate network nodes and connection lines
+- Initialize battalion health and positions
+
+### 2. Active Battle Phase (20 seconds)
+- Display battle timer at screen top
+- Show battalion stats (health/quantity)
+- Maintain animated network visualization
+
+### 3. Combat Mechanics
+
+#### Battalion Behavior
+- Movement
+  - Speed scaled by battalion speed stat
+  - Follow network connection lines
+  - Stop at attack range from target
+  - Smooth animation transitions
+
+- Combat
+  - Attack power based on type and quantity
+  - Health scaled by type and quantity
+  - Damage triggers visual feedback
+  - Destroyed battalions removed from field
+
+#### Targeting System
+- Initial Target Selection
+  - Battalions target nearest node/enemy
+  - Movement follows network paths
+  - Attack range based on battalion type
+
+- Retargeting Logic
+  - Triggers when current target destroyed/captured
+  - Prioritizes nearest valid target
+  - Considers both nodes and enemy battalions
+  - Immediately begins movement to new target
+
+#### Node Control
+- Node Health: 75% of total battalion health combined
+- Control States
+  - Enemy (Red)
+  - Neutral (Purple)
+  - User (Blue)
+- Progress visualization during capture
+- Affects battalion pathfinding
+
+### 4. Victory Conditions
+- All enemy battalions destroyed
+- Most nodes controlled at timer end
+- Least battalion losses at timer end
+
+## Technical Requirements
+- Efficient pathfinding along network
+- Smooth animation transitions
+- Real-time combat calculations
+- Responsive retargeting system
+- Accurate health/damage tracking
+- Synchronized visual feedback
