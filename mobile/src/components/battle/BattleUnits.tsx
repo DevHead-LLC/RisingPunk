@@ -49,7 +49,7 @@ export const BattleUnits = React.memo(({
       {/* Animated battalions - Split into two views */}
       <View style={styles.overlayContainer}>
         <Animated.View style={{ opacity: battalionOpacity }}>
-          {userBattalions.map((battalion, index) => {
+          {userBattalions.filter(battalion => battalion.quantity > 0).map((battalion, index) => {
             const healthPercent = battalion.currentHealth !== undefined ? 
               (battalion.currentHealth / (BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity)) * 100 : 100;
             console.log(`[Health] Calculating user battalion ${index} health: ${healthPercent}% (${battalion.currentHealth}/${BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity})`);
@@ -66,7 +66,7 @@ export const BattleUnits = React.memo(({
             );
           })}
           
-          {enemyBattalions.map((battalion, index) => {
+          {enemyBattalions.filter(battalion => battalion.quantity > 0).map((battalion, index) => {
             const healthPercent = battalion.currentHealth !== undefined ? 
               (battalion.currentHealth / (BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity)) * 100 : 100;
             console.log(`[Health] Calculating enemy battalion ${index} health: ${healthPercent}% (${battalion.currentHealth}/${BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity})`);
