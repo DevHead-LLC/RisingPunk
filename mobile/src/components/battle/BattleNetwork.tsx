@@ -12,6 +12,7 @@ import { View, StyleSheet, Animated } from 'react-native';
 import { NetworkNode } from './NetworkNode';
 import { NetworkLines } from './NetworkLines';
 import { BattleNode } from '../../types/battle';
+import { BattlePhase } from '../../hooks/useBattleStateMachine';
 import { COLORS } from '../../styles/theme';
 
 // IMPORTANT: Keep network topology configuration here
@@ -37,6 +38,7 @@ type Props = {
       applyDamage: (damage: number, isUser: boolean) => boolean;
     } | null;
   }>;
+  phase: BattlePhase;
 };
 
 export const BattleNetwork = React.memo(({ 
@@ -46,7 +48,8 @@ export const BattleNetwork = React.memo(({
   width,
   height,
   onNodeControlChange,
-  nodeRefs
+  nodeRefs,
+  phase
 }: Props) => {
   return (
     <Animated.View style={[styles.container, { opacity }]}>

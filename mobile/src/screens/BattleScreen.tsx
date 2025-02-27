@@ -7,6 +7,7 @@ import { BattleUnits } from '../components/battle/BattleUnits';
 import { BattleOverlays } from '../components/battle/BattleOverlays';
 import { useBattleAnimations } from '../hooks/useBattleAnimations';
 import { useBattleMovementAndAttacks } from '../hooks/useBattleMovementAndAttacks';
+import { BattlePhase } from '../hooks/useBattleStateMachine';
 
 import { BOT_CATEGORIES } from './DigitalBarracksScreen';
 import { checkRangeIntersection } from '../utils/battleCalculator';
@@ -171,8 +172,6 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   }, [countdown]);
 
   const handleNodeControlChange = (nodeIndex: number, newState: 'user' | 'enemy') => {
-    console.log(`[Battle] Node ${nodeIndex} captured by ${newState}`);
-
     // Find only battalions that were targeting this specific node
     const affectedBattalions = Object.entries(attackIntervals.current)
       .filter(([key]) => {
@@ -219,14 +218,14 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       ...movingEnemyBattalions
     ];
 
+    // Only log retargeting if there are affected battalions
     if (allAffectedBattalions.length > 0) {
-      console.log(`[Battle] Retargeting ${allAffectedBattalions.length} battalions from captured node ${nodeIndex}`);
+      console.log(`[Battle] Retargeting ${allAffectedBattalions.length} battalions from node ${nodeIndex}`);
     }
 
     // Clear attack intervals for battalions that were attacking this node
     allAffectedBattalions.forEach(({ key, interval }) => {
       if (interval) {
-        console.log(`[Battle] Clearing attack interval for ${key}`);
         clearInterval(interval);
         delete attackIntervals.current[key];
       }
@@ -260,7 +259,6 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
         .forEach(({ battalionIndex }) => {
           const battalion = updated.find(b => b.nodeIndex === battalionIndex);
           if (battalion) {
-            console.log(`[Battle] Clearing target for user battalion at node ${battalionIndex}`);
             battalion.targetNode = undefined;
           }
         });
@@ -274,7 +272,6 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
         .forEach(({ battalionIndex }) => {
           const battalion = updated.find(b => b.nodeIndex === battalionIndex);
           if (battalion) {
-            console.log(`[Battle] Clearing target for enemy battalion at node ${battalionIndex}`);
             battalion.targetNode = undefined;
           }
         });
@@ -287,7 +284,6 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
         const battalions = isUser ? userBattalions : enemyBattalions;
         const battalion = battalions.find(b => b.nodeIndex === battalionIndex);
         if (battalion) {
-          console.log(`[Battle] Finding new target for ${isUser ? 'user' : 'enemy'} battalion at node ${battalionIndex}`);
           findNewTarget(battalion, isUser);
         }
       });
@@ -318,6 +314,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
           height={SCREEN_HEIGHT * 0.8}
           onNodeControlChange={handleNodeControlChange}
           nodeRefs={nodeRefs}
+          phase={battleStarted ? 'active' : 'deployment'}
         />
 
         <BattleUnits

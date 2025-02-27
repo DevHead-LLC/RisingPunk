@@ -52,7 +52,10 @@ export const BattleUnits = React.memo(({
           {userBattalions.filter(battalion => battalion.quantity > 0).map((battalion, index) => {
             const healthPercent = battalion.currentHealth !== undefined ? 
               (battalion.currentHealth / (BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity)) * 100 : 100;
-            console.log(`[Health] Calculating user battalion ${index} health: ${healthPercent}% (${battalion.currentHealth}/${BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity})`);
+            // Only log significant health changes (>10%)
+            if (healthPercent <= 90 || healthPercent <= 50 || healthPercent <= 25) {
+              console.log(`[Health] User battalion ${index} at critical health: ${healthPercent}%`);
+            }
             return (
               <AnimatedBattalion
                 key={`user-${index}`}
@@ -69,7 +72,10 @@ export const BattleUnits = React.memo(({
           {enemyBattalions.filter(battalion => battalion.quantity > 0).map((battalion, index) => {
             const healthPercent = battalion.currentHealth !== undefined ? 
               (battalion.currentHealth / (BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity)) * 100 : 100;
-            console.log(`[Health] Calculating enemy battalion ${index} health: ${healthPercent}% (${battalion.currentHealth}/${BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity})`);
+            // Only log significant health changes (>10%)
+            if (healthPercent <= 90 || healthPercent <= 50 || healthPercent <= 25) {
+              console.log(`[Health] Enemy battalion ${index} at critical health: ${healthPercent}%`);
+            }
             return (
               <AnimatedBattalion
                 key={`enemy-${index}`}

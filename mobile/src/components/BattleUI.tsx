@@ -7,7 +7,7 @@
  */
 
 import React from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
+import { View, StyleSheet, Animated, Dimensions } from 'react-native';
 import { BattleNode, BattalionPosition } from '../types/battle';
 import { BattlePhase } from '../hooks/useBattleStateMachine';
 import { NodeVisual } from './battle/NodeVisual';
@@ -26,6 +26,12 @@ type Props = {
   networkOpacity: Animated.Value;
   countdownOpacity: Animated.Value;
   resultsOpacity: Animated.Value;
+  nodeRefs: React.MutableRefObject<{
+    [key: string]: {
+      triggerDamageAnimation: () => void;
+      applyDamage: (damage: number, isUser: boolean) => boolean;
+    } | null;
+  }>;
 };
 
 export const BattleUI = React.memo(({
@@ -38,13 +44,27 @@ export const BattleUI = React.memo(({
   battalionOpacity,
   networkOpacity,
   countdownOpacity,
-  resultsOpacity
+  resultsOpacity,
+  nodeRefs
 }: Props) => {
   return (
     <View style={styles.container}>
       {/* Network Layer */}
       <Animated.View style={[styles.networkLayer, { opacity: networkOpacity }]}>
-        <BattleNetwork nodes={nodes} phase={phase} />
+        <BattleNetwork 
+          nodes={nodes}
+          phase={phase}
+          controlledNodes={nodes.reduce((acc, node, i) => 
+            node.controlState !== 'neutral' ? [...acc, i] : acc, [] as number[]
+          )}
+          opacity={networkOpacity}
+          width={Dimensions.get('window').width}
+          height={Dimensions.get('window').height}
+          onNodeControlChange={(nodeIndex, newState) => {
+            // Handle node control changes if needed
+          }}
+          nodeRefs={nodeRefs}
+        />
       </Animated.View>
 
       {/* Nodes Layer */}
