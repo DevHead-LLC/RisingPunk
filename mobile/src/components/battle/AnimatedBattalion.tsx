@@ -30,7 +30,12 @@ export const AnimatedBattalion = React.memo(React.forwardRef<BattalionRef, Props
 
   // Force re-render when health changes
   const healthPercentage = Math.max(0, Math.min(100, health || 100));
-  console.log(`[Health] Battalion health update: ${healthPercentage}%`);
+  const battalionId = `${isUser ? 'user' : 'enemy'}-${type}`;
+  
+  // Only log critical health (25% or less)
+  if (healthPercentage <= 25) {
+    console.log(`[Health] ${battalionId} critical: ${healthPercentage}%`);
+  }
 
   const rangeSize = BOT_CATEGORIES[type].stats.range * 30;
   const offset = rangeSize / 2 - 10; // Half of range size minus half of battalion size (20/2)
@@ -182,9 +187,14 @@ export const AnimatedBattalion = React.memo(React.forwardRef<BattalionRef, Props
          prevProps.isUser === nextProps.isUser &&
          prevProps.type === nextProps.type;
   
-  // Always update if health changes
+  // Only log significant health changes (>25%) with battalion identification
   if (prevProps.health !== nextProps.health) {
-    console.log(`[Health] Re-rendering due to health change: ${prevProps.health}% -> ${nextProps.health}%`);
+    const prevHealth = prevProps.health || 100;
+    const nextHealth = nextProps.health || 100;
+    const battalionId = `${nextProps.isUser ? 'user' : 'enemy'}-${nextProps.type}`;
+    if (Math.abs(prevHealth - nextHealth) >= 25) {
+      console.log(`[Health] ${battalionId} health changed: ${prevHealth}% → ${nextHealth}%`);
+    }
     return false;
   }
   

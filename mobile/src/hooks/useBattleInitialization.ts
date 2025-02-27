@@ -60,24 +60,24 @@ export const useBattleInitialization = () => {
   const [enemyBattalions, setEnemyBattalions] = useState<BattalionPosition[]>([
     { 
       type: 'breacher', 
-      quantity: 4, 
+      quantity: 8,
       nodeIndex: 6, 
       position: new Animated.ValueXY({ x: SCREEN_WIDTH - 165, y: SCREEN_HEIGHT * 0.225 }),
-      currentHealth: BOT_CATEGORIES['breacher'].stats.health * 4
+      currentHealth: BOT_CATEGORIES['breacher'].stats.health * 8
     },
     { 
       type: 'guardian', 
-      quantity: 4, 
+      quantity: 7,
       nodeIndex: 7, 
       position: new Animated.ValueXY({ x: SCREEN_WIDTH - 165, y: SCREEN_HEIGHT * 0.5 }),
-      currentHealth: BOT_CATEGORIES['guardian'].stats.health * 4
+      currentHealth: BOT_CATEGORIES['guardian'].stats.health * 7
     },
     { 
       type: 'phreak', 
-      quantity: 3, 
+      quantity: 6,
       nodeIndex: 8, 
       position: new Animated.ValueXY({ x: SCREEN_WIDTH - 165, y: SCREEN_HEIGHT * 0.775 }),
-      currentHealth: BOT_CATEGORIES['phreak'].stats.health * 3
+      currentHealth: BOT_CATEGORIES['phreak'].stats.health * 6
     }
   ]);
 

@@ -5,11 +5,19 @@ alwaysApply: false
 ---
 # Battle System Architecture
 
+## Core Development Principle
+CRITICAL: Always implement changes with minimal scope and maximum focus. When fixing bugs or adding features:
+- Only modify what is absolutely necessary to achieve the current goal
+- Avoid scope creep and unnecessary "improvements"
+- Stay focused on the immediate task
+- Do not get sidetracked by unrelated issues unless specifically requested
+- Keep logging minimal and focused on current development goal - never verbose unless absolutely necessary
+
 ## Core Principles
-- Focus on iterative development
-- Maintain clear separation of battle phases
-- Preserve real-time combat mechanics
-- Ensure smooth animations and transitions
+- Focus on proximity-based targeting and combat
+- Maintain fluid, dynamic battalion movement
+- Ensure simultaneous damage processing
+- Support multi-battalion engagement
 
 ## Battle Flow
 
@@ -23,52 +31,61 @@ alwaysApply: false
 - Display battle timer at screen top
 - Show battalion stats (health/quantity)
 - Maintain animated network visualization
+- Continue until victory conditions met or timer expires
 
 ### 3. Combat Mechanics
 
-#### Battalion Behavior
-- Movement
-  - Speed scaled by battalion speed stat
-  - Follow network connection lines
-  - Stop at attack range from target
-  - Smooth animation transitions
-
-- Combat
-  - Attack power based on type and quantity
-  - Health scaled by type and quantity
-  - Damage triggers visual feedback
-  - Destroyed battalions removed from field
+#### Battalion Movement
+- Stop when any valid target (node/battalion) is in range
+- Maintain position while target remains in range
+- Follow moving targets until back in range
+- Allow stacking of friendly battalions
+- Movement not restricted to initial network lines
 
 #### Targeting System
-- Initial Target Selection
-  - Battalions target nearest node/enemy
-  - Movement follows network paths
-  - Attack range based on battalion type
+Core Rules:
+- Always target nearest available enemy or node
+- No maximum limit on battalions per target
+- All battalion types follow same targeting rules
+- Retarget only when:
+  1. Current target destroyed/captured
+  2. A closer target becomes available
+  3. Current target moves out of range
 
-- Retargeting Logic
-  - Triggers when current target destroyed/captured
-  - Prioritizes nearest valid target
-  - Considers both nodes and enemy battalions
-  - Immediately begins movement to new target
+#### Combat Processing
+- Damage Application:
+  - Process damage simultaneously when battalions are in range
+  - No damage modifiers for multiple attackers
+  - Continue until target health reaches 0
+  - Prevent damage processing after health depleted
+
+- Target Elimination:
+  - Battalions: Remove when health reaches 0
+  - Nodes: Change control state when capture threshold met
+  - Immediately stop damage processing on eliminated targets
 
 #### Node Control
 - Node Health: 75% of total battalion health combined
-- Control States
+- Control States:
   - Enemy (Red)
   - Neutral (Purple)
   - User (Blue)
-- Progress visualization during capture
-- Affects battalion pathfinding
+- Capture occurs when damage threshold met
+- Multiple battalions can attack same node
 
 ### 4. Victory Conditions
-- All enemy battalions destroyed
-- Most nodes controlled at timer end
-- Least battalion losses at timer end
+Battle ends when either:
+- All enemy battalions destroyed AND all nodes captured
+- 20-second timer expires
+- Winner determined by:
+  1. Complete elimination/capture
+  2. Most nodes controlled at timer end
+  3. Most surviving battalions at timer end
 
 ## Technical Requirements
-- Efficient pathfinding along network
-- Smooth animation transitions
-- Real-time combat calculations
-- Responsive retargeting system
-- Accurate health/damage tracking
-- Synchronized visual feedback
+- Efficient proximity-based target detection
+- Smooth target following mechanics
+- Simultaneous damage processing
+- Immediate target state updates
+- Support for multi-battalion stacking
+- Accurate battle timer management
