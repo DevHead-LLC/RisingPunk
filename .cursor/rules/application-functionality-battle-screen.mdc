@@ -5,19 +5,37 @@ alwaysApply: false
 ---
 # Battle System Architecture
 
-## Core Development Principle
-CRITICAL: Always implement changes with minimal scope and maximum focus. When fixing bugs or adding features:
-- Only modify what is absolutely necessary to achieve the current goal
-- Avoid scope creep and unnecessary "improvements"
-- Stay focused on the immediate task
-- Do not get sidetracked by unrelated issues unless specifically requested
-- Keep logging minimal and focused on current development goal - never verbose unless absolutely necessary
-
 ## Core Principles
-- Focus on proximity-based targeting and combat
-- Maintain fluid, dynamic battalion movement
-- Ensure simultaneous damage processing
-- Support multi-battalion engagement
+- Focus on iterative development
+- Maintain clear separation of battle phases
+- Preserve real-time combat mechanics
+- Ensure smooth animations and transitions
+
+## Development Guidelines
+CRITICAL: Maintain simplicity and focus in all battle system changes:
+- Only implement what directly supports core gameplay
+- Avoid complexity that doesn't serve gameplay goals
+- Keep state management clear and centralized
+- Maintain clear logging for debugging
+
+### State Management Principles
+- Maintain single source of truth for battalion states
+- Avoid nested state updates
+- Keep state transitions clear and traceable
+- Use direct updates over complex callbacks
+
+### Logging Standards
+Logging must be precise and actionable:
+- Always include the acting entity (battalion/node) ID
+- Include state transitions and their reasons
+- Group under consistent prefixes ([Battle], [Combat], [Target])
+- Avoid redundant logs of the same event
+
+Example log formats:
+- Targeting: "[Battle] {battalionId} targeting {targetType} {targetId}"
+- State Change: "[Battle] {nodeId} state changed from {oldState} to {newState}"
+- Combat: "[Battle] {attackerId} dealing {damage} damage to {targetId}"
+- Retargeting: "[Battle] {battalionId} retargeting from {oldTarget} - {reason}"
 
 ## Battle Flow
 
@@ -28,64 +46,271 @@ CRITICAL: Always implement changes with minimal scope and maximum focus. When fi
 - Initialize battalion health and positions
 
 ### 2. Active Battle Phase (20 seconds)
-- Display battle timer at screen top
-- Show battalion stats (health/quantity)
-- Maintain animated network visualization
-- Continue until victory conditions met or timer expires
+- Battle Timer
+  - Simple 20-second countdown display
+  - Located at screen top
+  - No intermediate warnings
+  - Continuous countdown until completion
+- Maintain Active Combat
+  - Show battalion stats (health/quantity)
+  - Maintain animated network visualization
+  - Continue all combat mechanics until timer end
 
-### 3. Combat Mechanics
+### 3. Results Phase
+- Results Overlay
+  - Display immediately at timer end
+  - Show final point totals for both parties
+  - Indicate victor based on loss calculations
+  - Display tiebreaker results if applicable
 
-#### Battalion Movement
-- Stop when any valid target (node/battalion) is in range
-- Maintain position while target remains in range
-- Follow moving targets until back in range
-- Allow stacking of friendly battalions
-- Movement not restricted to initial network lines
+### Combat Mechanics
+
+#### Battalion Behavior
+- Movement
+  - Speed scaled by battalion speed stat
+  - Follow network connection lines
+  - Stop at attack range from target
+  - Smooth animation transitions
+
+- Combat
+  - Attack power based on type and quantity
+  - Health scaled by type and quantity
+  - Damage triggers visual feedback
+  - Destroyed battalions removed from field
 
 #### Targeting System
-Core Rules:
-- Always target nearest available enemy or node
-- No maximum limit on battalions per target
-- All battalion types follow same targeting rules
-- Retarget only when:
-  1. Current target destroyed/captured
-  2. A closer target becomes available
-  3. Current target moves out of range
+- Initial Target Selection
+  - Primary: Always target neutral nodes first
+  - Secondary: Enemy battalions (if no neutral nodes)
+  - Guardians only target nodes
+  - Target closest valid option in range
 
-#### Combat Processing
-- Damage Application:
-  - Process damage simultaneously when battalions are in range
-  - No damage modifiers for multiple attackers
-  - Continue until target health reaches 0
-  - Prevent damage processing after health depleted
-
-- Target Elimination:
-  - Battalions: Remove when health reaches 0
-  - Nodes: Change control state when capture threshold met
-  - Immediately stop damage processing on eliminated targets
+- Retargeting Logic (Simplified)
+  - Only retarget when:
+    1. Current target is destroyed
+    2. Node is captured (no longer neutral)
+  - No retargeting for distance optimization
+  - Immediate movement to new target when needed
 
 #### Node Control
 - Node Health: 75% of total battalion health combined
-- Control States:
+- Control States
   - Enemy (Red)
   - Neutral (Purple)
   - User (Blue)
-- Capture occurs when damage threshold met
-- Multiple battalions can attack same node
+- Progress visualization during capture
+- Affects battalion pathfinding
+
+#### Node Capture Mechanics
+- Multi-Battalion Capture System
+  - Each battalion's damage contributes to their party's capture progress
+  - Multiple battalions can attack simultaneously
+  - Each attack must trigger distinct animations and damage calculations
+  - Final capture credited to attacking party (user/enemy), not individual battalion
+  - Track and calculate opposing forces (user vs enemy battalions) separately
+
+#### Combat Visualization
+- Battalion Identification
+  - Visual type indicators (B: Breacher, G: Guardian, P: Phreak)
+  - Unique battalion IDs for tracking and logging
+  - Clear party affiliation (user/enemy) indicators
+- Attack Sequence
+  - Individual attack animations for each battalion
+  - Corresponding damage response from target
+  - Visual distinction between user and enemy attacks
+  - Clear capture progress indication
+
+### Visual Feedback System
+#### Node Feedback
+- Health Visualization
+  - Clear health bar display
+  - Capture progress indicator
+  - Color-coded control state (Red/Purple/Blue)
+  - Smooth health transitions
+- Combat Effects
+  - Receive damage flash animation
+  - Capture progress visual feedback
+  - Party-based capture indication
+  - Clear visual state transitions
+
+#### Battalion Feedback
+- Health System
+  - Total health = Bot type base health × quantity
+  - Health bar reflects current state
+  - Visual quantity indicator
+  - Clear damage state representation
+- Combat Animations
+  - Attack initiation flash
+  - Target damage response flash
+  - Movement during targeting/retargeting
+  - Range indication at attack position
+
+#### Combat Range Visualization
+- Attack Range
+  - Visual indication of attack range
+  - Clear stop position at range edge
+  - Battalion-to-target connection indicator
+  - Range-based positioning feedback
+
+#### Attack Sequence Flow
+1. Movement Phase
+   - Clear path visualization
+   - Smooth movement to range edge
+   - Stop at attack range
+   - Position stabilization
+
+2. Attack Phase
+   - Attacker animation flash
+   - Target response animation
+   - Health/state updates
+   - Multiple battalion coordination
+
+3. State Updates
+   - Health bar updates
+   - Capture progress updates
+   - Battalion state changes
+   - Visual state synchronization
+
+#### Combat Tracking
+- Attack Registration
+  - Log each battalion's attacks separately
+  - Track damage contribution by party
+  - Monitor simultaneous attacks from multiple sources
+  - Maintain clear attack order and timing
+- State Management
+  - Track current node control progress
+  - Monitor attacking battalions and their parties
+  - Record damage contributions by party
+  - Update control state based on cumulative party damage
 
 ### 4. Victory Conditions
-Battle ends when either:
-- All enemy battalions destroyed AND all nodes captured
-- 20-second timer expires
-- Winner determined by:
-  1. Complete elimination/capture
-  2. Most nodes controlled at timer end
-  3. Most surviving battalions at timer end
+#### Scoring System
+- Mark-Based Point Values
+  - Mark 1: 1 point per bot
+  - Mark 2: 2 points per bot
+  - Mark 3: 4 points per bot
+  - Mark 4: 8 points per bot
+- Point Calculation
+  - Track losses per battalion
+  - Sum total points based on mark values
+  - Bot type does not affect point value
+  - Lower total = better performance
+
+#### Victory Determination
+- Primary Victory Condition
+  - Party with lowest total loss points wins
+  - Track running point totals during battle
+  - Update loss calculations in real-time
+- Tiebreaker Rule
+  - In case of equal point losses
+  - Defending party retains one bot
+  - Defending party declared victor
+
+#### Loss Tracking
+- Battalion Loss Monitoring
+  - Track quantity changes per battalion
+  - Calculate point value based on mark
+  - Maintain running total per party
+  - Log all loss events
+
+### Node Strategic Effects
+#### Network Multiplier System
+- Node Control Benefits
+  - Applies multiplier to connected lines
+  - Affects both incoming/outgoing connections
+  - Controlled by capturing party
+- Battalion Stat Boosts
+  - Small stat increase when:
+    1. Attacking from controlled line
+    2. Defending on controlled line
+  - Applies to controlling party's battalions only
+- Future Strategic Value
+  - Not tied to victory conditions
+  - Provides tactical advantage
+  - Influences battle positioning
+  - Affects combat effectiveness
+
+## Implementation Focus
+1. State Management
+   - Clear battalion state tracking
+   - Direct state updates
+   - Avoid nested state changes
+
+2. Combat Logic
+   - Simple damage calculations
+   - Clear health tracking
+   - Straightforward capture mechanics
+
+3. Movement System
+   - Direct pathfinding
+   - Simple range calculations
+   - Clear movement animations
+
+4. Error Prevention
+   - Validate state before updates
+   - Clear error logging
+   - Simple recovery paths
 
 ## Technical Requirements
-- Efficient proximity-based target detection
-- Smooth target following mechanics
-- Simultaneous damage processing
-- Immediate target state updates
-- Support for multi-battalion stacking
-- Accurate battle timer management
+- Efficient pathfinding along network
+- Smooth animation transitions
+  - Use native driver for animations where possible
+  - Maintain 60fps performance target
+  - Implement proper cleanup on unmount
+- Real-time combat calculations
+  - Follow platform-agnostic state patterns
+  - Maintain direct, predictable updates
+  - Avoid nested state mutations
+- Responsive retargeting system
+- Accurate health/damage tracking
+- Synchronized visual feedback
+
+## Movement System
+### Network-Based Movement
+- Pathfinding Priority
+  1. Follow network connection lines between nodes
+  2. Calculate optimal path to target using network topology
+  3. Fallback to direct path if performance impact is too high
+  - Performance monitoring to ensure smooth gameplay
+
+### Movement Animation
+- Visual Requirements
+  - Smooth transitions along network paths
+  - Clear indication of battalion movement state
+  - Consistent animation speed based on battalion type
+  - Proper cleanup of animation resources
+
+### Movement Synchronization
+- State Coordination
+  - Sync movement state with combat actions
+  - Coordinate multiple battalion movements
+  - Handle interrupted movements (retargeting)
+  - Maintain performance during mass movement
+
+### Performance Thresholds
+- Movement Optimization
+  - Monitor frame rate during pathfinding
+  - Track animation performance metrics
+  - Implement fallback strategies if needed
+  - Balance visual quality with performance
+
+## Performance Guidelines
+1. Animation Optimization
+   - Prefer native-driven animations
+   - Batch animation updates
+   - Minimize JS bridge traffic
+   - Clean up animations properly
+
+2. State Management
+   - Use platform-agnostic patterns
+   - Maintain direct state updates
+   - Follow unified data flow
+   - Keep state transitions atomic
+
+3. Error Handling
+   - Follow backend error standards
+   - Maintain clear error boundaries
+   - Log errors consistently
+   - Recover gracefully from failures
+
+Remember: Any change that doesn't directly support these core mechanics should be carefully evaluated before implementation.
