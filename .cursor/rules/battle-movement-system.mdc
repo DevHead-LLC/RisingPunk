@@ -1,0 +1,71 @@
+---
+description: "Specifies movement rules, network line restrictions, pathfinding requirements, and position calculations for battalion movement."
+globs: 
+alwaysApply: false
+---
+# Battle Movement System
+
+## Network Line Restrictions
+### Initial Line Assignment
+- Battalions are assigned to specific network lines at battle start
+- Line assignments are fixed throughout the battle
+- Battalions cannot move between lines
+
+### Movement Constraints
+- Horizontal movement only along assigned network lines
+- No diagonal or vertical movement between lines
+- Must maintain connection to network at all times
+
+## Movement Mechanics
+### Pathfinding Priority
+1. Follow network connection lines between nodes
+2. Calculate optimal path to target using network topology
+3. Stay within assigned network line
+4. Maintain proper attack range from target
+
+### Position Calculation
+- Calculate distance from battalion to target
+- Determine optimal attack position
+- Account for battalion type and range
+- Avoid collision with other battalions
+
+## Movement Animation
+### Visual Requirements
+- Smooth transitions along network paths
+- Clear indication of battalion movement state
+- Consistent animation speed based on battalion type
+- Proper cleanup of animation resources
+
+### Animation Standards
+- Use native driver for animations where possible
+- Maintain 60fps performance target
+- Implement proper cleanup on unmount
+- Batch animation updates to reduce overhead
+
+## Movement Synchronization
+### State Coordination
+- Sync movement state with combat actions
+- Coordinate multiple battalion movements
+- Handle interrupted movements (retargeting)
+- Maintain performance during mass movement
+
+### Real-time Updates
+- Track battalion positions in real-time
+- Update visual indicators smoothly
+- Handle collision avoidance
+- Manage animation transitions
+
+## Performance Optimization
+### Resource Management
+- Monitor frame rate during pathfinding
+- Track animation performance metrics
+- Implement fallback strategies if needed
+- Balance visual quality with performance
+
+### Technical Requirements
+- Efficient pathfinding along network
+- Smooth animation transitions
+- Real-time position tracking
+- Proper resource cleanup
+
+Remember: Movement must strictly adhere to network line restrictions while maintaining smooth gameplay experience. 

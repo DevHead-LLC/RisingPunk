@@ -1,0 +1,89 @@
+---
+description: "Defines fundamental battle system mechanics including combat calculations, health systems, battle phases, and victory conditions."
+globs: 
+alwaysApply: false
+---
+# Battle Core Mechanics
+
+## Core Principles
+- Iterative development approach
+- Clear separation of battle phases
+- Maintain simplicity in battle system changes
+- Focus on core functionality first
+
+## Development Guidelines
+1. State Management
+   - Single source of truth for battalion states
+   - Direct state updates without nesting
+   - Clear state transitions
+   - Atomic operations
+
+2. Combat Logic
+   - Simple damage calculations
+   - Clear health tracking
+   - Straightforward capture mechanics
+
+3. Error Prevention
+   - Validate state before updates
+   - Clear error logging
+   - Simple recovery paths
+
+## Battle Flow
+### Pre-Battle Phase (3 seconds)
+- Battalion placement validation
+- Initial state setup
+- Network line assignments
+- Resource allocation
+- Display countdown overlay
+- Show deployment zones
+- Animate network nodes and connection lines
+
+### Active Battle Phase (20 seconds)
+- Battle Timer
+  - Simple 20-second countdown display
+  - Located at screen top
+  - No intermediate warnings
+  - Continuous countdown until completion
+- Turn-based combat system
+- Clear action sequence
+- State updates after each action
+- Real-time feedback
+
+### Results Phase
+- Victory condition checking
+- Score calculation
+- Battle summary generation
+- State cleanup
+
+## Victory Conditions
+### Scoring System
+- Mark-Based Point Values
+  - Mark 1: 1 point per bot
+  - Mark 2: 2 points per bot
+  - Mark 3: 4 points per bot
+  - Mark 4: 8 points per bot
+- Bot type does not affect point value
+- Lower total = better performance
+
+### Victory Determination
+- Track losses for both sides
+- Calculate total loss points
+- Determine winner based on:
+  1. Node control majority
+  2. Lower loss points
+  3. Time-based tiebreaker
+
+## Performance Standards
+1. State Updates
+   - Atomic operations
+   - Direct state transitions
+   - Clear update patterns
+   - Performance monitoring
+
+2. Error Handling
+   - Follow backend error standards
+   - Maintain clear error boundaries
+   - Log errors consistently
+   - Recover gracefully from failures
+
+Remember: Changes must directly support these core mechanics and maintain system integrity. 
