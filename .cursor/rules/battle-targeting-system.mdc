@@ -1,0 +1,84 @@
+---
+description: "Details targeting logic, attack range calculations, and retargeting rules for different battalion types during combat."
+globs: 
+alwaysApply: false
+---
+# Battle Targeting System
+
+## Initial Target Selection
+### Priority Order
+1. Neutral nodes within network line
+2. Enemy battalions within range
+3. Defensive positions (Guardians only)
+
+### Line Restrictions
+- Battalions can only target within their assigned network line
+- No targeting across different network lines
+- Must respect initial line assignments throughout battle
+
+## Battalion-Specific Targeting
+### Guardian Targeting
+- Prioritize maintaining control of current node
+- Target neutral nodes for capture
+- Defend nearest controlled node if no neutral targets
+- Do not attempt to recapture enemy nodes
+
+### Breacher/Phreak Targeting
+- Prioritize capturing neutral nodes
+- Avoid targeting recently captured nodes
+- Target enemy battalions if no neutral nodes available
+- Sort potential targets by distance
+
+## Combat Range
+### Range Calculation
+- Calculate from battalion center to target center
+- Position at edge of attack range
+- Account for target size and type
+- Maintain minimum safe distance
+
+### Attack Positioning
+- Calculate optimal attack position
+- Stay within network line constraints
+- Account for other battalions' positions
+- Update position if target moves
+
+## Retargeting Logic
+### Trigger Conditions
+- Current target destroyed
+- Node captured
+- Target moves out of range
+- Better target becomes available
+
+### Retargeting Rules
+- Respect network line restrictions
+- Follow battalion-specific priorities
+- Avoid ping-pong targeting
+- Consider cooldown periods
+
+## Combat Sequence
+### Attack Initiation
+- Verify target is in range
+- Check line of sight
+- Validate attack permissions
+- Start attack animation
+
+### Combat Flow
+- Calculate damage
+- Apply effects
+- Update health states
+- Trigger visual feedback
+
+## Performance Considerations
+### Optimization
+- Efficient target validation
+- Quick range calculations
+- Smooth targeting transitions
+- Proper resource management
+
+### Error Handling
+- Handle invalid targets
+- Manage targeting failures
+- Log targeting issues
+- Implement fallback logic
+
+Remember: Targeting must respect network line restrictions and battalion-specific priorities while maintaining system performance. 

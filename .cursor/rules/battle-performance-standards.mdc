@@ -1,0 +1,101 @@
+---
+description: Outlines performance requirements, error handling, logging standards, and optimization guidelines for the battle system.
+globs: 
+alwaysApply: false
+---
+# Battle Performance Standards
+
+## Animation Performance
+### Frame Rate Requirements
+- Maintain 60fps target
+- Monitor performance metrics
+- Implement fallback strategies
+- Handle performance degradation
+
+### Animation Optimization
+- Use native drivers
+- Batch updates
+- Minimize bridge traffic
+- Proper cleanup
+
+## State Management
+### Update Efficiency
+- Atomic operations
+- Direct state updates
+- Clear state transitions
+- Performance monitoring
+
+### Resource Management
+- Memory usage optimization
+- CPU utilization
+- Battery impact
+- Network efficiency
+
+## Error Handling
+### Error Types
+- State inconsistencies
+- Animation failures
+- Network issues
+- Resource limitations
+
+### Recovery Strategies
+- Graceful degradation
+- State recovery
+- User feedback
+- System stability
+
+## Logging Standards
+### Performance Logging
+- Frame rate tracking
+- Resource utilization
+- State update timing
+- Error frequency
+
+### Debug Information
+- Clear error messages
+- State snapshots
+- Performance metrics
+- System health
+
+### Battle Event Logging
+- Always include acting entity (battalion/node) ID
+- Include state transitions and their reasons
+- Group under consistent prefixes:
+  - [Battle] for general battle events
+  - [Combat] for combat actions
+  - [Target] for targeting events
+- Avoid redundant logs of the same event
+
+Example log formats:
+- Targeting: "[Battle] {battalionId} targeting {targetType} {targetId}"
+- State Change: "[Battle] {nodeId} state changed from {oldState} to {newState}"
+- Combat: "[Battle] {attackerId} dealing {damage} damage to {targetId}"
+- Retargeting: "[Battle] {battalionId} retargeting from {oldTarget} - {reason}"
+
+## Technical Requirements
+### Platform Optimization
+- Cross-platform compatibility
+- Platform-specific optimizations
+- Resource efficiency
+- Performance profiling
+
+### Code Standards
+- Clean architecture
+- Efficient algorithms
+- Resource management
+- Error boundaries
+
+## Testing Requirements
+### Performance Testing
+- Load testing
+- Stress testing
+- Memory profiling
+- CPU profiling
+
+### Quality Assurance
+- Automated testing
+- Manual verification
+- Performance benchmarks
+- Error simulation
+
+Remember: Performance and stability are critical for maintaining game quality. 

@@ -1,0 +1,103 @@
+---
+description: Specifies all visual feedback requirements including animations, indicators, and state representations for battalions and nodes.
+globs: 
+alwaysApply: false
+---
+# Battle Visual Feedback System
+
+## Combat Visualization
+### Health Display
+- Clear health bar visualization
+- Smooth health updates
+- Color-coded status indicators
+- Damage number popups
+
+### Combat Effects
+- Attack animations
+- Damage effects
+- Capture progress indicators
+- Status effect visualization
+
+## Movement Feedback
+### Battalion Movement
+- Smooth movement animations
+- Clear direction indicators
+- Path visualization
+- Speed indicators
+
+### Position Updates
+- Real-time position tracking
+- Network line adherence
+- Range indicators
+- Collision avoidance visualization
+
+## State Indicators
+### Battalion Status
+- Type Indicators
+  - Breacher: "B" tag in top-left corner (must be outside rotated container)
+  - Guardian: "G" tag in top-left corner
+  - Phreak: "P" tag in top-left corner
+  - Tag styling:
+    - Dark background (rgba(0, 0, 0, 0.7))
+    - White text
+    - Small font size (8pt)
+    - Bold weight
+    - Rounded corners
+  - Position: Consistent top-left placement for all types
+  - Always visible during battle
+  - IMPORTANT: For breachers, type tag and mark indicators must be rendered outside the rotated diamond shape to prevent clipping
+- Mark Indicators
+  - Display format: "Mk{number}" in top-right corner
+  - Must remain visible even for rotated breacher units
+  - Same styling as type indicators
+- Current target indication
+- Attack range visualization
+- Health status
+- Special effects (if any)
+
+### Node Status
+- Control state indication
+- Capture progress
+- Network connection visualization
+- Valid target highlighting
+
+## Animation Standards
+### Performance Requirements
+- Maintain 60fps target
+- Use native driver where possible
+- Batch animation updates
+- Proper cleanup on unmount
+
+### Visual Quality
+- Smooth transitions
+- Clear state changes
+- Consistent style
+- Professional appearance
+
+## Feedback Timing
+### Combat Sequence
+- Attack initiation
+- Damage application
+- Health updates
+- Effect cleanup
+
+### State Changes
+- Immediate feedback
+- Clear transitions
+- Status updates
+- Error indicators
+
+## Technical Implementation
+### Animation System
+- Use platform-native animations
+- Implement proper cleanup
+- Handle state transitions
+- Manage resources efficiently
+
+### Performance Optimization
+- Monitor frame rates
+- Track animation metrics
+- Implement fallbacks
+- Balance quality and performance
+
+Remember: Visual feedback must be clear and performant while maintaining professional game feel. 

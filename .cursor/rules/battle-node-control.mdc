@@ -1,0 +1,86 @@
+---
+description: Defines node control mechanics, capture systems, strategic network effects, and victory point contributions.
+globs: 
+alwaysApply: false
+---
+# Battle Node Control System
+
+## Node States
+### Control States
+- Neutral (uncaptured)
+- User controlled
+- Enemy controlled
+- Contested (during capture)
+
+### Network Effects
+- Connection strength between nodes
+- Control zone influence
+- Strategic value calculation
+- Network line assignment
+
+## Capture Mechanics
+### Capture Process
+- Initiation requirements
+- Progress calculation
+- Interruption handling
+- Completion conditions
+
+### Battalion Effects
+- Guardian capture bonus
+- Breacher capture speed
+- Phreak special effects
+- Multiple battalion stacking
+
+## Strategic Elements
+### Node Importance
+- Network position value
+- Control zone impact
+- Resource generation
+- Strategic positioning
+
+### Control Benefits
+- Resource generation
+- Network strengthening
+- Strategic advantages
+- Victory point contribution
+
+## Network Lines
+### Line Assignment
+- Fixed battalion assignments
+- Movement restrictions
+- Targeting limitations
+- Strategic implications
+
+### Line Control
+- Node connectivity
+- Control zone spread
+- Network strength
+- Strategic value
+
+## Performance Aspects
+### State Management
+- Efficient updates
+- Clear transitions
+- Resource tracking
+- Error handling
+
+### Technical Requirements
+- Real-time updates
+- State synchronization
+- Performance optimization
+- Resource efficiency
+
+## Victory Impact
+### Control Points
+- Node value calculation
+- Control duration tracking
+- Strategic positioning
+- Victory contribution
+
+### Network Effects
+- Control zone spread
+- Resource generation
+- Strategic advantages
+- Victory conditions
+
+Remember: Node control is fundamental to battle strategy and victory conditions. 
