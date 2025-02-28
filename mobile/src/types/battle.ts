@@ -2,15 +2,15 @@ import { Animated } from 'react-native';
 
 // IMPORTANT: Shared types for battle system
 // DO NOT DELETE - Used across multiple battle components
-export type BattalionPosition = {
+export interface BattalionPosition {
   type: 'breacher' | 'guardian' | 'phreak';
-  quantity: number;
   nodeIndex: number;
-  position: Animated.ValueXY;
+  position: any; // Animated.ValueXY
+  quantity: number;
+  currentHealth?: number;
   targetNode?: number;
-  targetType?: 'node' | 'battalion';
-  currentHealth: number;
-};
+  mark: number;
+}
 
 export type BattleTarget = {
   type: 'node' | 'battalion';
