@@ -1,0 +1,137 @@
+---
+description: "Defines project structure, development workflow, and tracks implementation progress across the RisingPunk ecosystem."
+globs: ["**/*"]
+alwaysApply: true
+---
+// IMPORTANT: When working with any section of this file, ALWAYS review ALL "Implementation of" and "Referenced by" 
+// connections to ensure full context and maintain consistency across the codebase.
+
+# Project Structure
+
+## Directory Organization
+```
+RisingPunk/
+├── mobile/               # React Native application
+│   ├── src/             # Application source code
+│   │   ├── components/  # Reusable UI components
+│   │   ├── screens/     # Screen components
+│   │   ├── contexts/    # React contexts
+│   │   ├── utils/       # Utility functions
+│   │   ├── hooks/       # Custom React hooks
+│   │   ├── assets/      # Images, fonts, etc.
+│   │   └── __tests__/   # Test files mirror src structure
+│   └── package.json     # Mobile dependencies
+├── server/              # Express/MongoDB backend
+│   ├── src/            
+│   │   ├── models/      # Mongoose models
+│   │   ├── routes/      # API routes
+│   │   ├── controllers/ # Business logic
+│   │   └── __tests__/   # Server tests
+│   └── package.json     # Server dependencies
+└── README.md           # Project documentation
+```
+
+## Testing Strategy
+- Tests live alongside source code in mobile/src/__tests__/
+- Run tests from mobile/ directory:
+  ```bash
+  cd mobile
+  npm test           # Run all tests
+  npm run test:watch # Watch mode
+  ```
+
+## Development Guidelines
+1. Code Organization:
+   - Feature-first organization
+   - Co-locate tests with source
+   - Maintain clear dependencies
+   - Follow React Native best practices
+
+2. Design Principles:
+   - Prioritize user experience
+   - Maintain performance targets
+   - Follow cyberpunk aesthetic
+   - Support educational goals
+
+3. Color Scheme:
+   - Primary: #00ff00 (Matrix green)
+   - Secondary: #ff00ff (Neon purple)
+   - Background: #1a1a1a (Dark gray)
+   - Accent: #00ffff (Cyan)
+   - Warning: #ff0000 (Red)
+
+# Implementation Progress
+
+## Current Focus
+[IN_PROGRESS] Battle System Core
+- Location: mobile/src/
+- Status: Implementing state management
+- Next: Battalion positioning system
+- Dependencies: battle-core-mechanics.mdc
+
+## Completed Features
+- [DONE] Project Structure Setup
+- [DONE] Color Scheme Definition
+- [DONE] Basic Navigation
+
+## Pending Features
+1. Battle System
+   - State Management ⬅ Current Task
+   - Battalion Movement
+   - Combat Resolution
+   - Node Control
+   - Victory Conditions
+
+2. Financial Education
+   - Investment Mechanics
+   - Resource Management
+   - Progress Tracking
+   - Educational Content
+
+## Recent Updates
+1. [2024-03-XX] Established project structure
+   - Defined directory organization
+   - Set up testing framework
+   - Created development guidelines
+
+2. [2024-03-XX] Initialized battle system
+   - Created core mechanics documentation
+   - Defined state management approach
+   - Set up performance monitoring
+
+# Development Workflow
+
+## MVP Approach
+1. Core Functionality First
+   - Essential features only
+   - Clear user value
+   - Testable outcomes
+
+2. Iterative Enhancement
+   - Regular testing
+   - Performance validation
+   - User feedback integration
+
+3. Educational Integration
+   - Clear learning objectives
+   - Engaging mechanics
+   - Measurable outcomes
+
+## Quality Gates
+1. Feature Complete:
+   - Core functionality works
+   - Tests pass
+   - Meets performance targets
+   - Follows design guidelines
+
+2. Production Ready:
+   - Full test coverage
+   - Performance optimized
+   - Documentation complete
+   - User feedback addressed
+
+Remember: Always check this file when:
+1. Starting new features
+2. Creating new files
+3. Implementing tests
+4. Making architectural decisions 
