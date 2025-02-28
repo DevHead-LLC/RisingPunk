@@ -3,70 +3,268 @@ description: "Details targeting logic, attack range calculations, and retargetin
 globs: 
 alwaysApply: false
 ---
+// IMPORTANT: When working with any section of this file, ALWAYS review ALL "Implementation of" and "Referenced by" 
+// connections to ensure full context and maintain consistency across the codebase.
+
 # Battle Targeting System
 
+## Core Principles
+// Implementation of:
+// - @battle-core-mechanics.mdc#Combat-Logic#Universal-Targeting-Rules
+// - @battle-state-persistence.mdc#Frontend-vs-Backend-Balance
+
+// Referenced by:
+// - @battle-movement-system.mdc#Movement-Mechanics#Target-Selection
+// - @battle-node-control.mdc#Network-Effects#Strategic-Impact
+
+1. Proximity is the ONLY targeting factor
+2. No type-specific preferences ever
+3. Closest valid target is always selected
+4. Target changes only when proximity changes
+
+## Stats Reference
+// Implementation of:
+// - @DigitalBarracksScreen.tsx#BOT_CATEGORIES
+// - @battle-core-mechanics.mdc#Combat-Logic#Battalion-Stats
+
+Battalion stats are defined in @DigitalBarracksScreen.tsx and include:
+- Guardian: range: 4, speed: 9
+- Phreak: range: 9, speed: 7
+- Breacher: range: 5, speed: 5
+
+These stats affect HOW battalions engage (range, speed) but NEVER WHO they target.
+
+## State Management
+// Implementation of:
+// - @battle-state-persistence.mdc#Frontend-vs-Backend-Balance
+// - @battle-performance-standards.mdc#State-Management#Update-Efficiency
+
+Frontend (Real-time):
+- Target selection logic
+- Range checking
+- Movement calculations
+- Visual feedback
+
+Backend (Synchronized every 1s):
+- Position validation
+- Health/damage tracking
+- Combat resolution
+- State persistence
+
 ## Initial Target Selection
+// Implementation of:
+// - @battle-core-mechanics.mdc#Battle-Flow#Pre-Battle-Phase
+// - @battle-node-control.mdc#Initial-Setup#Node-States
+
+// Referenced by:
+// - @battle-movement-system.mdc#Initial-Deployment#Target-Selection
+// - @battle-visual-feedback.mdc#Pre-Battle#Target-Indicators
+
 ### Priority Order
-1. Neutral nodes within network line
-2. Enemy battalions within range
-3. Defensive positions (Guardians only)
+1. Random available node:
+   - Neutral nodes within initial restrictions
+   - Must follow initial node targeting rules
 
 ### Line Restrictions
-- Battalions can only target within their assigned network line
-- No targeting across different network lines
-- Must respect initial line assignments throughout battle
+// Implementation of:
+// - @battle-core-mechanics.mdc#Battle-Flow#Pre-Battle-Phase
+// - @battle-movement-system.mdc#Network-Structure#Initial-Node-Control
 
-## Battalion-Specific Targeting
-### Guardian Targeting
-- Prioritize maintaining control of current node
-- Target neutral nodes for capture
-- Defend nearest controlled node if no neutral targets
-- Do not attempt to recapture enemy nodes
+// Referenced by:
+// - @battle-node-control.mdc#Network-Effects#Network-Connectivity
+// - @battle-visual-feedback.mdc#Network-Display#Line-Visualization
 
-### Breacher/Phreak Targeting
-- Prioritize capturing neutral nodes
-- Avoid targeting recently captured nodes
-- Target enemy battalions if no neutral nodes available
-- Sort potential targets by distance
+- Initial attack restrictions:
+  - Node 0 battalions: Can target nodes 3, 4
+  - Node 1 battalions: Can target nodes 3, 4, 5
+  - Node 2 battalions: Can target nodes 4, 5
+- After initial attack:
+  - Can target any node reachable via network lines
+  - Must stay on network lines when moving
+  - Must reach nodes to change direction
+
+## Target Selection Rules
+// Implementation of:
+// - @battle-core-mechanics.mdc#Combat-Logic#Universal-Targeting-Rules
+// - @battle-state-persistence.mdc#Frontend-vs-Backend-Balance
+
+### Universal Targeting Priority
+// Referenced by:
+// - @battle-movement-system.mdc#Movement-Mechanics#Target-Approach
+// - @battle-node-control.mdc#Network-Effects#Strategic-Impact
+
+- ALWAYS target nearest available entity:
+  - Enemy battalions OR non-captured nodes
+  - NO distinction between target types
+  - ONLY factor is distance to target
+  - Must be reachable via network lines
+- Target changes ONLY when:
+  - Current target is destroyed/captured
+  - A different target becomes closer
+  - Current target moves out of reach
 
 ## Combat Range
+// Implementation of:
+// - @battle-core-mechanics.mdc#Combat-Logic#Battalion-Stats
+// - @DigitalBarracksScreen.tsx#BOT_CATEGORIES
+
 ### Range Calculation
+// Referenced by:
+// - @battle-movement-system.mdc#Attack-Range-Behavior#Range-Requirements
+// - @battle-visual-feedback.mdc#Combat-Effects#Range-Indicators
+
+- Use range values from @DigitalBarracksScreen.tsx
 - Calculate from battalion center to target center
-- Position at edge of attack range
-- Account for target size and type
-- Maintain minimum safe distance
+- Stop when attack range edge reaches target
+- Update position on global 1-second timer
 
 ### Attack Positioning
-- Calculate optimal attack position
-- Stay within network line constraints
-- Account for other battalions' positions
-- Update position if target moves
+// Implementation of:
+// - @battle-movement-system.mdc#Movement-Mechanics#Attack-Range-Behavior
+// - @battle-state-persistence.mdc#Update-Frequency
+
+// Referenced by:
+// - @battle-visual-feedback.mdc#Combat-Effects#Position-Feedback
+// - @battle-node-control.mdc#Network-Effects#Strategic-Impact
+
+- Move to range edge if target beyond range
+- Stay in current position if target within range
+- Must reach nodes to change movement direction
+- Update position only if target moves out of range
 
 ## Retargeting Logic
+// Implementation of:
+// - @battle-core-mechanics.mdc#Combat-Logic#Universal-Targeting-Rules
+// - @battle-performance-standards.mdc#Combat-State-Updates
+
 ### Trigger Conditions
+// Referenced by:
+// - @battle-movement-system.mdc#Movement-Updates#Retargeting
+// - @battle-visual-feedback.mdc#Combat-Effects#Target-Change
+
 - Current target destroyed
 - Node captured
 - Target moves out of range
-- Better target becomes available
+- Better target becomes available (based on proximity)
+
+### Target Acquisition
+// Implementation of:
+// - @battle-core-mechanics.mdc#Combat-Logic#Battalion-Combat
+// - @battle-state-persistence.mdc#When-to-Persist
+
+- Check if potential target within current range
+- If within range, begin attacking immediately
+- If beyond range, calculate path via network lines
+- Account for required node stops when pathfinding
+
+### Retargeting Priority
+// Referenced by:
+// - @battle-movement-system.mdc#Movement-Mechanics#Path-Priority
+// - @battle-node-control.mdc#Network-Effects#Strategic-Impact
+
+1. Nearest available target, regardless of type:
+   - Enemy battalions
+   - Non-captured nodes
+2. Distance calculation:
+   - Measured from battalion center to target center
+   - Must be reachable via network lines
+   - Must be within attack range
 
 ### Retargeting Rules
-- Respect network line restrictions
-- Follow battalion-specific priorities
-- Avoid ping-pong targeting
-- Consider cooldown periods
+// Implementation of:
+// - @battle-core-mechanics.mdc#Combat-Logic#Universal-Targeting-Rules
+// - @battle-performance-standards.mdc#Combat-State-Updates
+
+- ALWAYS select nearest valid target
+- Must be reachable via network lines
+- Clear visual indication of new target selection
+- Begin attacks immediately if in range
+
+### Retargeting Logging
+// Implementation of:
+// - @battle-performance-standards.mdc#Logging-Standards#Battle-Event-Logging
+// - @battle-state-persistence.mdc#Development-Strategy
+
+Format: "[Target] {side}.{type}.{battalionId} -> {action}"
+Examples:
+- "[Target] User.Breacher.5 -> Retargeting"
+- "[Target] User.Breacher.5 -> Selected node 7 (nearest)"
+- "[Target] User.Breacher.5 -> No valid targets"
 
 ## Combat Sequence
 ### Attack Initiation
+// Implementation of:
+// - @battle-core-mechanics.mdc#Combat-Logic#Damage-Calculation
+// - @battle-node-control.mdc#Capture-System#State-Updates
+
+// Referenced by:
+// - @battle-visual-feedback.mdc#Combat-Effects#Attack-Animation
+// - @battle-movement-system.mdc#Attack-Range-Behavior#Range-Updates
+
 - Verify target is in range
 - Check line of sight
 - Validate attack permissions
 - Start attack animation
 
 ### Combat Flow
-- Calculate damage
-- Apply effects
-- Update health states
-- Trigger visual feedback
+// Implementation of:
+// - @battle-core-mechanics.mdc#Combat-Logic#Control-Progress
+// - @battle-state-persistence.mdc#When-to-Persist
+
+// Referenced by:
+// - @battle-visual-feedback.mdc#Combat-Effects#Control-Feedback
+// - @battle-movement-system.mdc#State-Synchronization#Update-Process
+
+Frontend Flow:
+- Target selection (proximity-based only)
+- Movement calculation
+- Range validation
+- Animation triggers
+
+Backend Flow (1s updates):
+- Position validation
+- Damage calculation
+- Health updates
+- State persistence
+
+Node Control:
+- Apply damage to neutral nodes
+- Update control progress for attacking side
+- Check capture threshold status
+- Handle opposing side's control damage
+- Trigger capture state changes
+
+Battalion Combat:
+- Calculate total attack: base_offense * battalion_quantity
+- Apply defense reduction: damage = total_attack * (1 - target_defense/100)
+- Ensure minimum damage of 1 point
+- Update target battalion's total health
+- Check for battalion destruction
+- Update visual feedback and state
+
+### Damage Application
+// Implementation of:
+// - @battle-core-mechanics.mdc#Damage-Calculation#Node-Control-Damage
+// - @battle-node-control.mdc#Capture-System#Control-Progress
+
+// Referenced by:
+// - @battle-visual-feedback.mdc#Combat-Effects#Damage-Feedback
+// - @battle-movement-system.mdc#Attack-Range-Behavior#Combat-Updates
+
+Node Control Damage:
+- Track damage contribution to node control
+- Account for existing control progress
+- Update capture threshold progress
+- Trigger state changes on capture
+- Synchronize with global timer
+
+Battalion Damage:
+- Calculate total attack based on quantity
+- Apply percentage-based defense reduction
+- Ensure minimum damage of 1
+- Update total health (base_health * quantity)
+- Track health percentage for visual feedback
+- Trigger destruction at 0 total health
 
 ## Performance Considerations
 ### Optimization
@@ -80,5 +278,25 @@ alwaysApply: false
 - Manage targeting failures
 - Log targeting issues
 - Implement fallback logic
+
+## Development Approach
+### System Stability
+- Preserve working targeting behaviors when making changes
+- Test changes in isolation before integration
+- Maintain existing targeting priorities and rules
+- Document any behavioral changes
+
+### Improvement Process
+1. Identify specific targeting issue to address
+2. Verify current behavior before making changes
+3. Make minimal necessary modifications
+4. Validate changes don't break existing functionality
+5. Update documentation with new behaviors
+
+### Clarification Requirements
+- Seek user input on unclear targeting behaviors
+- Verify expected battalion behavior patterns
+- Confirm priority changes before implementation
+- Document confirmed behavioral requirements
 
 Remember: Targeting must respect network line restrictions and battalion-specific priorities while maintaining system performance. 

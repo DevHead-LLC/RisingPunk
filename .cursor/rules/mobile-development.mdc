@@ -3,6 +3,9 @@ description: Specifies iOS-specific development standards and optimizations for 
 globs: 
 alwaysApply: false
 ---
+// IMPORTANT: When working with any section of this file, ALWAYS review ALL "Implementation of" and "Referenced by" 
+// connections to ensure full context and maintain consistency across the codebase.
+
 # Mobile Development Standards
 
 ## Platform Specifics

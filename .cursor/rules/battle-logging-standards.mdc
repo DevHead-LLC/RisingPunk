@@ -1,0 +1,219 @@
+---
+description: "Defines logging standards, event tracking requirements, and debug output guidelines for the battle system to ensure consistent and actionable logging across all battle components."
+globs: ["src/**/*.tsx", "src/**/*.ts"]
+alwaysApply: true
+---
+// IMPORTANT: When working with any section of this file, ALWAYS review ALL "Implementation of" and "Referenced by" 
+// connections to ensure full context and maintain consistency across the codebase.
+//
+// IMPORTANT: When moving content between files:
+// 1. Always create the new file immediately
+// 2. Update all cross-references in both files
+// 3. Ensure no functionality is lost in the transition
+// 4. Add appropriate implementation notes for the new location
+
+# Battle Logging Standards
+
+## Development Philosophy
+// Implementation of:
+// - @battle-core-mechanics.mdc#Error-Prevention#Logging
+// - @battle-performance-standards.mdc#Error-Handling#Recovery-Strategies
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Combat-Flow#Debug-Output
+// - @battle-movement-system.mdc#Error-Prevention#Logging
+// - @battle-node-control.mdc#State-Updates#Debug-Information
+
+### Core Principles
+- Keep logs minimal and targeted to current development goals
+  - Use DEBUG level for development-only logs
+  - Use INFO for important state changes
+  - Use WARN for recoverable issues
+  - Use ERROR for critical problems
+- Focus on actionable information
+  - Include relevant state data
+  - Add stack traces for errors
+  - Log timing for performance issues
+- Always identify the acting entity
+  - Use consistent entity identifiers
+  - Include parent-child relationships
+  - Track interaction chains
+- Remove obsolete logs
+  - Regular log review process
+  - Clean up resolved issues
+  - Archive historical data
+
+## Battle Event Logging
+// Implementation of:
+// - @battle-targeting-system.mdc#Retargeting-Logging
+// - @battle-core-mechanics.mdc#Combat-Logic#Damage-Calculation
+// - @battle-movement-system.mdc#Movement-Logging#Standards
+
+// Referenced by:
+// - @battle-node-control.mdc#State-Updates#Logging
+// - @battle-visual-feedback.mdc#Debug-Logging#Standards
+// - @battle-performance-standards.mdc#Error-Handling#Error-Types
+
+### Essential Events
+1. Targeting Events:
+   ```typescript
+   // Format: [Target] {side}.{type}.{battalionId} -> {action}
+   logger.debug('[Target] red.guardian.b1 -> selecting_target', {
+     currentTarget: targetId,
+     distance: calculatedDistance,
+     validTargets: availableTargets.length
+   });
+   ```
+   - Log retargeting attempts
+     - Previous target
+     - New target selection
+     - Reason for change
+   - Track target distances
+     - Current distance
+     - Range thresholds
+     - Movement impact
+   - Record targeting failures
+     - Invalid targets
+     - Range issues
+     - State conflicts
+
+2. Combat Events:
+   ```typescript
+   // Format: [Combat] {side}.{type}.{battalionId} hits {targetId}
+   logger.info('[Combat] blue.phreak.b2 hits red.guardian.b1', {
+     rawDamage: baseOffense * quantity,
+     defenseReduction: 1 - defense/100,
+     finalDamage: calculatedDamage,
+     targetHealth: {before: oldHealth, after: newHealth}
+   });
+   ```
+   - Track damage calculations
+     - Raw damage values
+     - Defense reductions
+     - Final damage dealt
+   - Monitor health changes
+     - Previous health
+     - New health
+     - Health percentage
+   - Log combat stats
+     - Attack frequency
+     - Hit/miss ratio
+     - Critical hits
+
+3. State Changes:
+   ```typescript
+   // Format: [State] {side}.{type}.{battalionId}: {oldState} -> {newState}
+   logger.info('[State] red.breacher.b3: moving -> attacking', {
+     reason: 'target_in_range',
+     position: {x: 120, y: 350},
+     targetId: 'blue.guardian.b1',
+     healthPercent: 75
+   });
+   ```
+   - Log state transitions
+     - Previous state
+     - New state
+     - Transition reason
+   - Track position updates
+     - Old position
+     - New position
+     - Movement path
+   - Monitor health status
+     - Current percentage
+     - Recent changes
+     - Critical thresholds
+
+4. Error Events:
+   ```typescript
+   // Format: [Error] {side}.{type}.{battalionId}: {errorType} - {message}
+   logger.error('[Error] blue.phreak.b4: calculation_error - invalid_defense', {
+     error: err,
+     state: currentState,
+     context: {
+       target: targetId,
+       combat: combatState,
+       performance: perfMetrics
+     }
+   });
+   ```
+   - Log calculation errors
+     - Error type
+     - Stack trace
+     - State context
+   - Track state conflicts
+     - Invalid transitions
+     - State mismatches
+     - Recovery attempts
+   - Monitor performance
+     - Frame rate drops
+     - Memory issues
+     - Network latency
+
+## Implementation Guidelines
+// Implementation of:
+// - @battle-performance-standards.mdc#Error-Handling
+// - @battle-core-mechanics.mdc#State-Management#Logging
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Debug-Output
+// - @battle-movement-system.mdc#Logging-Implementation
+
+### Development Focus
+- Implement contextual logging
+  ```typescript
+  const battleLogger = createLogger('battle', {
+    level: process.env.NODE_ENV === 'development' ? 'debug' : 'info',
+    format: combine(
+      timestamp(),
+      battleContext(),
+      json()
+    )
+  });
+  ```
+- Use structured logging
+  - JSON format
+  - Consistent fields
+  - Proper timestamps
+- Enable log filtering
+  - By battalion
+  - By event type
+  - By severity
+
+### Log Management
+- Implement log rotation
+  ```typescript
+  const rotatingLogger = createLogger('battle-rotating', {
+    maxFiles: '14d',
+    maxSize: '20m',
+    compress: true
+  });
+  ```
+- Set retention policies
+  - Keep 14 days
+  - Compress old logs
+  - Archive important data
+- Monitor log volume
+  - Track size growth
+  - Set size limits
+  - Implement cleanup
+
+### Performance Impact
+- Minimize logging overhead
+  ```typescript
+  if (logger.isDebugEnabled()) {
+    logger.debug('[Performance] Expensive calculation result', {
+      result: expensiveCalculation(),
+      context: gatherContext()
+    });
+  }
+  ```
+- Implement log buffering
+  - Batch similar events
+  - Use async logging
+  - Prevent I/O blocking
+- Monitor resource usage
+  - Track memory impact
+  - Measure CPU usage
+  - Check disk space
+
+Remember: Logging should provide clear debugging value without impacting game performance. Regular review and cleanup of logging statements is essential. 

@@ -1,0 +1,178 @@
+---
+description: "Defines animation timing, performance requirements, and implementation standards for all battle system visual effects and state transitions."
+globs: ["src/**/*.tsx", "src/**/*.ts"]
+alwaysApply: true
+---
+# Battle Animation Standards
+// IMPORTANT: When working with any section of this file, ALWAYS review ALL "Implementation of" and "Referenced by" 
+// connections to ensure full context and maintain consistency across the codebase.
+//
+// IMPORTANT: When moving content between files:
+// 1. Always create the new file immediately
+// 2. Update all cross-references in both files
+// 3. Ensure no functionality is lost in the transition
+// 4. Add appropriate implementation notes for the new location
+
+## Core Timing Principles
+// Implementation of:
+// - @battle-core-mechanics.mdc#State-Management#Update-Frequency
+// - @battle-performance-standards.mdc#Core-Requirements#Visual-Feedback
+// - @battle-state-persistence.mdc#Frontend-vs-Backend-Balance
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Combat-Sequence#Frontend-Flow
+// - @battle-movement-system.mdc#Movement-Feedback#Visual-Updates
+// - @battle-visual-feedback.mdc#Combat-Effects#Animation-Timing
+// - @battle-node-control.mdc#Capture-System#Visual-Feedback
+
+1. Update Timing Hierarchy:
+   - Real-time (60fps): Animations, movement, visual effects
+     - Use requestAnimationFrame for smooth updates
+     - Implement RAF fallback for background tabs
+   - Speed-based: Attack animations (per battalion speed stat)
+     - Duration = 1000ms / speed stat
+     - Use Animated.timing with proper easing
+   - Global timer (1s): Health, damage, state synchronization
+     - Align with backend update cycle
+     - Buffer state changes for smooth transitions
+
+2. Animation Quality Standards:
+   - Smooth transitions for all state changes
+   - Consistent visual language
+   - Professional game-like effects
+   - Clear feedback chain
+
+## Technical Requirements
+// Implementation of:
+// - @battle-state-persistence.mdc#Frontend-Performance
+// - @battle-performance-standards.mdc#Animation-Performance
+// - @battle-core-mechanics.mdc#Performance-Standards
+
+// Referenced by:
+// - @battle-movement-system.mdc#Performance#Animation-Requirements
+// - @battle-visual-feedback.mdc#Performance-Standards
+// - @battle-targeting-system.mdc#Performance-Considerations#Optimization
+
+### Performance Targets
+- 60fps baseline for all animations
+  - Monitor using Performance.now()
+  - Log drops below 55fps
+  - Implement low-quality mode triggers
+- Native driver utilization required
+  - Use for all transform animations
+  - Fallback gracefully for unsupported props
+- Batched state updates
+  - Group related visual changes
+  - Use requestAnimationFrame for batching
+- Proper cleanup handling
+  - Clear all animation subscriptions
+  - Remove listeners on unmount
+- Memory management
+  - Cache and reuse Animated.Value
+  - Clear interpolation refs
+- Error recovery
+  - Reset animations on failure
+  - Maintain visual consistency
+
+### Animation Types
+// Implementation of:
+// - @battle-visual-feedback.mdc#Combat-Effects
+// - @battle-movement-system.mdc#Movement-Animation
+// - @battle-node-control.mdc#Capture-System#Visual-Feedback
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Combat-Sequence#Attack-Initiation
+// - @battle-core-mechanics.mdc#Combat-Logic#Battalion-Combat
+// - @battle-state-persistence.mdc#Frontend-vs-Backend-Balance
+
+1. Combat Animations:
+   - Attack animations sync with speed stat
+     - Duration = 1000ms / speed
+     - Use spring for impact
+   - Damage number popups (1s fade)
+     - Scale + fade combination
+     - Stagger multiple hits
+   - Health bar transitions (60fps)
+     - Smooth color interpolation
+     - Buffer rapid changes
+   - Status effect overlays
+     - Use composition for multiple effects
+     - Clear z-index hierarchy
+
+2. Movement Animations:
+   - Position interpolation (60fps)
+     - Use matrix transforms
+     - Implement path following
+   - Path preview transitions
+     - Fade in/out with timing
+     - Show valid/invalid states
+   - Range indicator updates
+     - Real-time circle scaling
+     - Efficient circle drawing
+   - Network line snapping
+     - Smooth bezier transitions
+     - Handle direction changes
+
+3. State Change Animations:
+   - Node capture transitions
+     - Color morphing
+     - Particle effects
+   - Battalion state updates
+     - Health color shifts
+     - Status indicator changes
+   - Victory point indicators
+     - Score popups
+     - Contribution highlights
+   - Error state feedback
+     - Clear visual warnings
+     - Recovery animations
+
+## Resource Management
+// Implementation of:
+// - @battle-performance-standards.mdc#Resource-Management
+// - @battle-state-persistence.mdc#Frontend-Performance
+// - @battle-core-mechanics.mdc#Performance-Standards#Error-Handling
+
+// Referenced by:
+// - @battle-movement-system.mdc#Performance#Resource-Usage
+// - @battle-visual-feedback.mdc#Technical-Implementation
+// - @battle-targeting-system.mdc#Performance-Considerations#Optimization
+
+### Optimization Guidelines
+- Use React Native Animated API
+  - Prefer useNativeDriver
+  - Batch with Animated.parallel
+  - Share Animated.Value when possible
+- Implement proper cleanup
+  - Clear all subscriptions
+  - Reset Animated.Value
+  - Remove listeners
+- Batch similar animations
+  - Group state updates
+  - Use composition
+- Cache common animations
+  - Reuse Animated.Value
+  - Share interpolation configs
+- Minimize JS bridge usage
+  - Use native-only props
+  - Batch bridge updates
+
+### Monitoring Requirements
+- Track frame rates
+  - Log below 55fps
+  - Monitor duration
+  - Track cause of drops
+- Monitor memory usage
+  - Watch animation objects
+  - Track value sharing
+- Log animation errors
+  - Capture stack traces
+  - Record state at failure
+- Performance profiling
+  - Regular profiling runs
+  - Track heavy animations
+- Resource cleanup verification
+  - Validate unmount cleanup
+  - Check memory after battles
+
+Remember: All animations must maintain 60fps while respecting the global state management system. Proper cleanup and resource management are critical for sustained performance. 
