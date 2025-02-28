@@ -3,84 +3,146 @@ description: Defines node control mechanics, capture systems, strategic network 
 globs: 
 alwaysApply: false
 ---
+// IMPORTANT: When working with any section of this file, ALWAYS review ALL "Implementation of" and "Referenced by" 
+// connections to ensure full context and maintain consistency across the codebase.
+
 # Battle Node Control System
 
-## Node States
+## Node States and Control
+// Implementation of:
+// - @battle-core-mechanics.mdc#Pre-Battle-Phase#Initial-state-setup
+// - @battle-movement-system.mdc#Network-Structure#Initial-Node-Control
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Initial-Target-Selection#Priority-Order
+// - @battle-visual-feedback.mdc#Node-Status#Control-State-Indication
+
 ### Control States
 - Neutral (uncaptured)
 - User controlled
 - Enemy controlled
 - Contested (during capture)
 
-### Network Effects
-- Connection strength between nodes
-- Control zone influence
-- Strategic value calculation
-- Network line assignment
+### Initial Setup
+// Implementation of:
+// - @battle-core-mechanics.mdc#Pre-Battle-Phase#Initial-Node-Restrictions
+// - @battle-movement-system.mdc#Network-Structure#Initial-Node-Control
 
-## Capture Mechanics
-### Capture Process
-- Initiation requirements
-- Progress calculation
-- Interruption handling
-- Completion conditions
+// Referenced by:
+// - @battle-targeting-system.mdc#Initial-Target-Selection#Line-Restrictions
+// - @battle-visual-feedback.mdc#Pre-Battle#Node-Display
 
-### Battalion Effects
-- Guardian capture bonus
-- Breacher capture speed
-- Phreak special effects
-- Multiple battalion stacking
+- User nodes (0, 1, 2): Permanent ownership
+- Neutral nodes (3, 4, 5): Can be captured
+- Enemy nodes (6, 7, 8): Permanent ownership
 
-## Strategic Elements
-### Node Importance
-- Network position value
-- Control zone impact
-- Resource generation
-- Strategic positioning
+## Capture System
+// Implementation of:
+// - @battle-core-mechanics.mdc#Combat-Logic#Universal-Capture-Mechanics
+// - @battle-targeting-system.mdc#Combat-Range#Range-Calculation
+// - @battle-core-mechanics.mdc#Combat-Logic#Damage-Calculation
 
-### Control Benefits
-- Resource generation
-- Network strengthening
-- Strategic advantages
-- Victory point contribution
+// Referenced by:
+// - @battle-movement-system.mdc#Attack-Range-Behavior#Range-Requirements
+// - @battle-visual-feedback.mdc#Combat-Effects#Node-Control-Indicators
+// - @battle-targeting-system.mdc#Combat-Sequence#Damage-Application
 
-## Network Lines
-### Line Assignment
-- Fixed battalion assignments
-- Movement restrictions
-- Targeting limitations
-- Strategic implications
+### Capture Requirements
+- Total capture threshold = total battalion health for all armies * 0.75
+- Battalion must be within attack range to deal damage
+- Damage dealt contributes to side's control progress
+- Target must be neutral node (3, 4, 5)
 
-### Line Control
-- Node connectivity
-- Control zone spread
-- Network strength
-- Strategic value
+### Control Progress
+// Implementation of:
+// - @battle-performance-standards.mdc#State-Updates#Damage-Tracking
+// - @battle-core-mechanics.mdc#Combat-Logic#Control-Progress
 
-## Performance Aspects
-### State Management
-- Efficient updates
-- Clear transitions
-- Resource tracking
-- Error handling
+// Referenced by:
+// - @battle-targeting-system.mdc#Combat-Sequence#State-Updates
+// - @battle-visual-feedback.mdc#Node-Status#Control-Progress
 
-### Technical Requirements
-- Real-time updates
-- State synchronization
-- Performance optimization
-- Resource efficiency
+Capture Mechanics:
+- Each side accumulates control through damage dealt
+- To capture a node with existing enemy control:
+  1. Must deal enough damage to reach total capture threshold
+  2. Must also overcome enemy's accumulated control damage
+- Example:
+  - Capture threshold: 1000 damage (based on total army health)
+  - User deals 400 damage
+  - Enemy must now deal 1400 damage to capture (1000 + 400)
+  - Or user can complete capture with 600 more damage
 
-## Victory Impact
+### State Updates
+// Implementation of:
+// - @battle-performance-standards.mdc#State-Updates#Combat-State
+// - @battle-core-mechanics.mdc#Combat-Logic#Damage-Application
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Combat-Sequence#Node-Control
+// - @battle-visual-feedback.mdc#Combat-Effects#Control-Feedback
+
+- Track damage dealt by each side
+- Update control progress with each hit
+- Trigger capture when threshold reached
+- Synchronize with combat system timer
+
+## Network Effects
+// Implementation of:
+// - @battle-movement-system.mdc#Network-Structure#Network-Lines
+// - @battle-core-mechanics.mdc#Active-Battle-Phase#Network-Line-Movement
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Target-Selection-Rules#Universal-Targeting-Priority
+// - @battle-movement-system.mdc#Movement-Constraints#Network-Lines
+
+### Strategic Impact
+- Controls valid movement paths
+- Affects target accessibility
+- Influences strategic positioning
+- Determines victory point value
+
+### Network Connectivity
+// Implementation of:
+// - @battle-movement-system.mdc#Network-Structure#Line-Properties
+// - @battle-core-mechanics.mdc#Active-Battle-Phase#Network-Line-Movement
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Target-Selection-Rules#Line-Restrictions
+// - @battle-visual-feedback.mdc#Network-Display#Line-Visualization
+
+- Adjacent node connections only
+- Movement requires network line
+- Capture affects network access
+- Strategic path availability
+
+## Victory Conditions
+// Implementation of:
+// - @battle-core-mechanics.mdc#Victory-Conditions#Victory-Determination
+// - @battle-performance-standards.mdc#Victory-Calculation#Scoring-Rules
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Combat-Sequence#Battle-End
+// - @battle-visual-feedback.mdc#Results-Display#Victory-Screen
+
 ### Control Points
-- Node value calculation
-- Control duration tracking
-- Strategic positioning
-- Victory contribution
+- Node ownership determines points
+- Simple majority for victory
+- Strategic node positioning value
+- Continuous point calculation
 
-### Network Effects
-- Control zone spread
-- Resource generation
-- Strategic advantages
-- Victory conditions
+### Battle Resolution
+// Implementation of:
+// - @battle-core-mechanics.mdc#Results-Phase#Victory-Screen
+// - @battle-performance-standards.mdc#State-Management#Battle-Completion
+
+// Referenced by:
+// - @battle-visual-feedback.mdc#Results-Display#Winner-Declaration
+// - @battle-targeting-system.mdc#Combat-Sequence#Battle-End
+
+- Final node ownership check
+- Victory point tallying
+- Winner determination
+- Battle state cleanup
 
 Remember: Node control is fundamental to battle strategy and victory conditions. 

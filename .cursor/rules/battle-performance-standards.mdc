@@ -1,101 +1,288 @@
 ---
-description: Outlines performance requirements, error handling, logging standards, and optimization guidelines for the battle system.
-globs: 
-alwaysApply: false
+description: "Outlines performance requirements, error handling, logging standards, and optimization guidelines for the battle system."
+globs: ["src/**/*.tsx", "src/**/*.ts"]
+alwaysApply: true
 ---
+// IMPORTANT: When working with any section of this file, ALWAYS review ALL "Implementation of" and "Referenced by" 
+// connections to ensure full context and maintain consistency across the codebase.
+//
+// IMPORTANT: When moving content between files:
+// 1. Always create the new file immediately
+// 2. Update all cross-references in both files
+// 3. Ensure no functionality is lost in the transition
+// 4. Add appropriate implementation notes for the new location
+
 # Battle Performance Standards
 
+## Core Requirements
+// Implementation of:
+// - @battle-core-mechanics.mdc#Performance-Standards
+// - @battle-animation-standards.mdc#Technical-Requirements
+
+### Visual Feedback
+- Frame rate: 60fps target
+  - Monitor drops below 55fps
+  - Log duration and cause
+  - Implement quality scaling
+- Animation smoothness
+  - Use native drivers
+  - Batch updates
+  - Monitor bridge usage
+
+### State Management
+- Update frequency: 1/second
+  - Synchronized global timer
+  - Batched state changes
+  - Buffered transitions
+- Memory efficiency
+  - Cache common values
+  - Clear unused resources
+  - Monitor heap usage
+
+## Combat Performance
+// Implementation of:
+// - @battle-core-mechanics.mdc#Combat-Logic#Combat-Calculations
+// - @battle-targeting-system.mdc#Combat-Sequence#Damage-Application
+// - @battle-core-mechanics.mdc#State-Management#Combat-State
+
+// Referenced by:
+// - @battle-movement-system.mdc#Performance#Combat-Updates
+// - @battle-node-control.mdc#Capture-System#State-Updates
+// - @battle-targeting-system.mdc#Performance-Considerations#Optimization
+
+### Calculation Optimization
+// Implementation of:
+// - @battle-core-mechanics.mdc#Combat-Logic#Battalion-Combat
+// - @battle-targeting-system.mdc#Combat-Flow#Battalion-Combat
+
+// Referenced by:
+// - @battle-node-control.mdc#Capture-System#Control-Progress
+// - @battle-movement-system.mdc#Attack-Range-Behavior#Combat-Updates
+
+- Batch damage calculations per update cycle
+  - Group by battalion type
+  - Pre-calculate modifiers
+  - Cache common results
+- Cache battalion stats
+  - Total health = base_health * quantity
+  - Total attack = base_offense * quantity
+  - Defense multiplier = (1 - defense/100)
+- Pre-calculate common values
+  - Defense multipliers
+  - Range thresholds
+  - Capture requirements
+- Optimize range checks
+  - Use squared distances
+  - Cache distance calculations
+  - Update only when needed
+- Minimize floating-point operations
+  - Use integer math when possible
+  - Round at display time only
+  - Maintain precision internally
+
+### Combat State Updates
+// Implementation of:
+// - @battle-core-mechanics.mdc#State-Management#Update-Process
+// - @battle-targeting-system.mdc#Combat-Sequence#State-Updates
+
+// Referenced by:
+// - @battle-node-control.mdc#State-Updates#Control-Progress
+// - @battle-movement-system.mdc#State-Synchronization#Update-Process
+
+- Update frequency: 1/second for consistency
+  - Synchronized global timer
+  - Buffer rapid changes
+  - Smooth visual transitions
+- Batch combat resolutions
+  - Group by battalion
+  - Order by priority
+  - Handle dependencies
+- Prioritize critical state changes
+  - Health updates
+  - Position validation
+  - Control progress
+  - Victory conditions
+- Optimize health/damage calculations
+  - Use integer math
+  - Cache common values
+  - Batch updates
+
 ## Animation Performance
+// Implementation of:
+// - @battle-animation-standards.mdc#Technical-Requirements#Performance-Targets
+// - @battle-core-mechanics.mdc#Performance-Standards
+
+// Referenced by:
+// - @battle-visual-feedback.mdc#Performance-Standards
+// - @battle-movement-system.mdc#Performance#Animation-Requirements
+
 ### Frame Rate Requirements
+// Implementation of:
+// - @battle-visual-feedback.mdc#Animation-Standards#Frame-Rate
+// - @battle-movement-system.mdc#Movement-Animation#Frame-Rate
+
 - Maintain 60fps target
+  - Monitor using Performance.now()
+  - Log drops below 55fps
+  - Track cause of drops
 - Monitor performance metrics
+  - Frame timing
+  - JS thread usage
+  - Bridge traffic
 - Implement fallback strategies
+  - Reduce animation complexity
+  - Skip non-critical effects
+  - Cache heavy calculations
 - Handle performance degradation
+  - Scale quality automatically
+  - Notify development team
+  - Log performance data
 
 ### Animation Optimization
+// Referenced by:
+// - @battle-visual-feedback.mdc#Combat-Effects#Performance
+// - @battle-movement-system.mdc#Movement-Animation#Optimization
+
 - Use native drivers
+  - Transform animations
+  - Opacity changes
+  - Position updates
 - Batch updates
+  - Group state changes
+  - Use requestAnimationFrame
+  - Share Animated.Value
 - Minimize bridge traffic
-- Proper cleanup
+  - Use native-only props
+  - Batch JS updates
+  - Cache calculations
 
 ## State Management
+// Implementation of:
+// - @battle-core-mechanics.mdc#State-Management#Core-State-Principles
+// - @battle-targeting-system.mdc#Combat-Sequence#Combat-Flow
+// - @battle-node-control.mdc#State-Updates#Control-Progress
+
+// Referenced by:
+// - @battle-movement-system.mdc#State-Synchronization#Update-Process
+// - @battle-visual-feedback.mdc#State-Changes#Performance
+
 ### Update Efficiency
-- Atomic operations
-- Direct state updates
+// Implementation of:
+// - @battle-core-mechanics.mdc#State-Management#Update-Process
+// - @battle-targeting-system.mdc#Combat-Sequence#State-Updates
+
+- Atomic operations for combat calculations
+  - Validate inputs
+  - Handle edge cases
+  - Maintain consistency
+- Batch related state updates:
+  - Health changes
+    - Calculate total changes
+    - Apply in single update
+    - Buffer visual updates
+  - Damage applications
+    - Group by battalion
+    - Apply defense once
+    - Cache results
+  - Control progress
+    - Track accumulated damage
+    - Update threshold checks
+    - Trigger state changes
+  - Position updates
+    - Validate movements
+    - Update pathfinding
+    - Sync animations
 - Clear state transitions
+  - Define valid states
+  - Handle all edges
+  - Log transitions
 - Performance monitoring
+  - Track update timing
+  - Monitor memory usage
+  - Log anomalies
 
 ### Resource Management
-- Memory usage optimization
-- CPU utilization
-- Battery impact
+// Implementation of:
+// - @battle-core-mechanics.mdc#Performance-Standards#Resource-Management
+// - @battle-targeting-system.mdc#Performance-Considerations#Optimization
+
+- Cache battalion stats:
+  - Total health (base_health * quantity)
+  - Total attack (base_offense * quantity)
+  - Defense multipliers (1 - defense/100)
+- CPU utilization optimization
+  - Batch calculations
+  - Use worker threads
+  - Optimize hot paths
+- Battery impact reduction
+  - Minimize updates
+  - Use efficient algorithms
+  - Batch operations
 - Network efficiency
+  - Compress updates
+  - Batch transmissions
+  - Cache responses
 
 ## Error Handling
+// Implementation of:
+// - @battle-core-mechanics.mdc#Error-Prevention
+// - @battle-targeting-system.mdc#Error-Handling
+// - @battle-movement-system.mdc#Error-Prevention#Recovery-Steps
+
+// Referenced by:
+// - @battle-node-control.mdc#State-Updates#Error-Handling
+// - @battle-visual-feedback.mdc#Error-Display#Feedback
+
 ### Error Types
+// Implementation of:
+// - @battle-core-mechanics.mdc#Error-Prevention#Error-Types
+// - @battle-targeting-system.mdc#Error-Handling#Error-Categories
+
+- Combat calculation errors
+  - Invalid inputs
+  - Overflow conditions
+  - Division by zero
 - State inconsistencies
+  - Invalid transitions
+  - Missing dependencies
+  - Race conditions
 - Animation failures
+  - Frame drops
+  - Memory issues
+  - Cleanup failures
 - Network issues
+  - Connection loss
+  - Update failures
+  - Sync errors
 - Resource limitations
+  - Memory pressure
+  - CPU constraints
+  - Battery issues
 
 ### Recovery Strategies
-- Graceful degradation
-- State recovery
-- User feedback
-- System stability
+// Referenced by:
+// - @battle-targeting-system.mdc#Error-Handling#Recovery
+// - @battle-movement-system.mdc#Error-Prevention#Fallback
 
-## Logging Standards
-### Performance Logging
-- Frame rate tracking
-- Resource utilization
-- State update timing
-- Error frequency
+- Validate damage calculations
+  - Check inputs
+  - Handle edge cases
+  - Log anomalies
+- Ensure minimum damage of 1
+  - Floor at 1
+  - Log reductions
+  - Track frequency
+- Maintain state consistency
+  - Validate transitions
+  - Handle race conditions
+  - Recover gracefully
+- Provide user feedback
+  - Clear indicators
+  - Status updates
+  - Error messages
+- Preserve system stability
+  - Graceful degradation
+  - State recovery
+  - Performance scaling
 
-### Debug Information
-- Clear error messages
-- State snapshots
-- Performance metrics
-- System health
-
-### Battle Event Logging
-- Always include acting entity (battalion/node) ID
-- Include state transitions and their reasons
-- Group under consistent prefixes:
-  - [Battle] for general battle events
-  - [Combat] for combat actions
-  - [Target] for targeting events
-- Avoid redundant logs of the same event
-
-Example log formats:
-- Targeting: "[Battle] {battalionId} targeting {targetType} {targetId}"
-- State Change: "[Battle] {nodeId} state changed from {oldState} to {newState}"
-- Combat: "[Battle] {attackerId} dealing {damage} damage to {targetId}"
-- Retargeting: "[Battle] {battalionId} retargeting from {oldTarget} - {reason}"
-
-## Technical Requirements
-### Platform Optimization
-- Cross-platform compatibility
-- Platform-specific optimizations
-- Resource efficiency
-- Performance profiling
-
-### Code Standards
-- Clean architecture
-- Efficient algorithms
-- Resource management
-- Error boundaries
-
-## Testing Requirements
-### Performance Testing
-- Load testing
-- Stress testing
-- Memory profiling
-- CPU profiling
-
-### Quality Assurance
-- Automated testing
-- Manual verification
-- Performance benchmarks
-- Error simulation
-
-Remember: Performance and stability are critical for maintaining game quality. 
+Remember: Performance and stability are critical for maintaining game quality. Monitor, optimize, and maintain clear error boundaries. 

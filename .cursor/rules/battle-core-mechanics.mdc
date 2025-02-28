@@ -1,27 +1,241 @@
 ---
 description: "Defines fundamental battle system mechanics including combat calculations, health systems, battle phases, and victory conditions."
-globs: 
-alwaysApply: false
+globs: ["src/**/*.tsx", "src/**/*.ts"]
+alwaysApply: true
 ---
+// IMPORTANT: When working with any section of this file, ALWAYS review ALL "Implementation of" and "Referenced by" 
+// connections to ensure full context and maintain consistency across the codebase.
+//
+// IMPORTANT: When moving content between files:
+// 1. Always create the new file immediately
+// 2. Update all cross-references in both files
+// 3. Ensure no functionality is lost in the transition
+// 4. Add appropriate implementation notes for the new location
+
+# Progress Tracking
+// This section tracks implementation status and dependencies.
+// Update this section when implementing features or making significant changes.
+// Format: [Status] Feature Name - Dependencies > Implementation Details
+
+## Implementation Strategy
+// Defines our approach to building the battle system efficiently and reliably
+
+### MVP Phases
+1. Core State Management (Current Focus)
+   - Battle context implementation
+   - State machine for battle phases
+   - Performance monitoring hooks
+   - Basic state persistence
+   - Unit tests for state transitions
+
+2. Basic Combat System
+   - Battalion positioning
+   - Target selection
+   - Damage calculations
+   - Health tracking
+   - Unit tests for combat math
+
+3. Visual Feedback Loop
+   - Basic animations
+   - Health/damage indicators
+   - Position updates
+   - Performance profiling
+   - Visual regression tests
+
+4. Network Integration
+   - State synchronization
+   - Optimistic updates where safe
+   - Fallback handling
+   - Integration tests
+
+5. Polish & Optimization
+   - Animation refinements
+   - Performance tuning
+   - Edge case handling
+   - Full system tests
+
+### Development Guidelines
+- Each feature must:
+  - Have unit tests
+  - Meet performance targets
+  - Handle edge cases
+  - Support future scaling
+  - Work across device sizes
+
+- Performance Requirements:
+  - Target 60fps animations
+  - Support up to 18 battalions
+  - Handle 50k bots per battalion
+  - Work on iPhone 16 Pro (initial)
+  - Design for universal support
+
+- Testing Strategy:
+  - Jest + React Native Testing Library
+  - Performance benchmarks
+  - Visual regression tests
+  - Integration tests
+  - Edge case coverage
+
+### Quality Gates
+- Feature Complete:
+  - Core functionality works
+  - Basic tests pass
+  - No known bugs
+  - Meets MVP requirements
+
+- Production Ready:
+  - Performance targets met
+  - Full test coverage
+  - Edge cases handled
+  - Clean error handling
+  - Smooth animations
+
+## Core Systems Status
+- [DONE] Battalion Stats System
+  - Dependencies: None
+  - Location: @DigitalBarracksScreen.tsx
+  - Validation: Unit tests confirm correct stat calculations
+  - Notes: Base stats are fixed per unit type
+
+- [DONE] Combat Calculations
+  - Dependencies: Battalion Stats
+  - Location: Backend only
+  - Validation: Damage formulas tested
+  - Notes: Includes minimum damage rule
+
+- [DONE] Targeting Rules
+  - Dependencies: None
+  - Location: Frontend targeting logic
+  - Validation: Proximity-based targeting verified
+  - Notes: No type-specific preferences
+
+## In Progress
+- [IN_PROGRESS] State Management
+  - Dependencies: Combat Calculations, Battalion Stats
+  - Blocking: None
+  - Next Steps: Implement state persistence
+  - Notes: Frontend/backend responsibilities defined
+
+- [IN_PROGRESS] Visual Feedback
+  - Dependencies: State Management, Combat Calculations
+  - Blocking: Animation timing implementation
+  - Next Steps: Integrate with state updates
+  - Notes: Performance requirements defined
+
+## Pending Implementation
+- [PENDING] Network Integration
+  - Dependencies: State Management
+  - Blocking: State persistence completion
+  - Notes: Will handle state sync
+
+- [PENDING] Victory Conditions
+  - Dependencies: Node Control, Combat System
+  - Blocking: Node control implementation
+  - Notes: Point calculation defined
+
+## Recent Changes
+// List most recent changes first, with dependencies and impacts
+1. [2024-03-XX] Added state management split between frontend/backend
+   - Impact: Clarified responsibilities
+   - Dependencies: Updated in all related files
+   - Validation: Cross-referenced in standards
+
+2. [2024-03-XX] Implemented core combat calculations
+   - Impact: Defined damage formulas
+   - Dependencies: Battalion stats system
+   - Validation: Unit tests added
+
+## Integration Points
+// Critical areas where multiple systems interact
+1. Combat Resolution
+   - Systems: Stats > Calculations > State > Visual
+   - Status: Partially implemented
+   - Notes: State updates working, visuals pending
+
+2. Movement and Targeting
+   - Systems: Pathfinding > State > Animation
+   - Status: Design complete
+   - Notes: Ready for implementation
+
+3. Node Control
+   - Systems: Combat > State > Victory
+   - Status: Pending
+   - Notes: Depends on state management
+
+Remember: Update this section when implementing features to maintain clear dependency chains and prevent regressions.
+
 # Battle Core Mechanics
 
 ## Core Principles
-- Iterative development approach
-- Clear separation of battle phases
-- Maintain simplicity in battle system changes
-- Focus on core functionality first
+// Implementation of:
+// - @code-style-and-structure.mdc#Cross-Reference-Standards#Reference-Requirements
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Development-Approach#System-Stability
+// - @battle-node-control.mdc#Core-Rules#Principles
 
 ## Development Guidelines
 1. State Management
-   - Single source of truth for battalion states
-   - Direct state updates without nesting
-   - Clear state transitions
-   - Atomic operations
+   // Referenced by:
+   // - @battle-targeting-system.mdc#Combat-Sequence#Combat-Flow
+   // - @battle-movement-system.mdc#Movement-Updates#State-Changes
 
 2. Combat Logic
-   - Simple damage calculations
-   - Clear health tracking
-   - Straightforward capture mechanics
+   // Implementation of:
+   // - @battle-targeting-system.mdc#Combat-Sequence#Attack-Initiation
+   // - @battle-targeting-system.mdc#Combat-Range#Range-Calculation
+   // - @DigitalBarracksScreen.tsx#BOT_CATEGORIES
+   
+   // Referenced by:
+   // - @battle-targeting-system.mdc#Retargeting-Logic#Target-Acquisition
+   // - @battle-movement-system.mdc#Attack-Range-Behavior#Range-Updates
+   
+   - Battalion Stats (from @DigitalBarracksScreen.tsx):
+     - Fixed Per-Unit Stats:
+       - Guardian: {speed: 9, range: 4, offense: 8, defense: 6, health: 14}
+       - Phreak: {speed: 7, range: 9, offense: 6, defense: 5, health: 12}
+       - Breacher: {speed: 5, range: 5, offense: 7, defense: 8, health: 18}
+     
+     - Scaling Stats (Backend Calculated):
+       - Total Health = base_health * battalion_quantity
+       - Total Attack = base_offense * battalion_quantity
+       
+     - Fixed Stats (Frontend Used):
+       - Movement Speed = base_speed (unchanged by quantity)
+       - Attack Range = base_range (unchanged by quantity)
+       - Defense = base_defense (as % damage reduction)
+     
+     - Combat Calculations (Backend Only):
+       - Incoming Damage = attacker_total_attack * (1 - defender_defense/100)
+       - Minimum Damage = 1 (ensure damage is never reduced to 0)
+       - Attack Frequency = 1/base_speed attacks per second
+       - Range Check = target_distance <= base_range
+
+   - Universal targeting rules:
+     - ONLY factor is proximity to target
+     - NO type-specific targeting preferences
+     - Must be reachable via network lines
+     - Target changes ONLY when proximity changes
+
+   - State Management:
+     Frontend Handles:
+     - Target selection (proximity-based)
+     - Movement calculation
+     - Range checking
+     - Visual feedback
+     
+     Backend Handles (1s updates):
+     - Combat calculations
+     - Health tracking
+     - Damage resolution
+     - State persistence
+
+   - Health tracking per battalion
+   - Universal capture mechanics:
+     - Capture threshold = total battalion health * 0.75
+     - Damage accumulates towards control
+     - Must overcome enemy control damage
+     - All battalion types deal equal node damage
 
 3. Error Prevention
    - Validate state before updates
@@ -29,61 +243,222 @@ alwaysApply: false
    - Simple recovery paths
 
 ## Battle Flow
+// Implementation of:
+// - @battle-performance-standards.mdc#State-Management#Phase-Transitions
+// - @battle-visual-feedback.mdc#Battle-States#Phase-Indicators
+
 ### Pre-Battle Phase (3 seconds)
+// Implementation of:
+// - @battle-movement-system.mdc#Initial-Deployment#Placement-Rules
+// - @battle-visual-feedback.mdc#Pre-Battle#Countdown-Display
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Initial-Target-Selection#Priority-Order
+// - @battle-node-control.mdc#Initial-State#Node-Ownership
+
 - Battalion placement validation
 - Initial state setup
-- Network line assignments
-- Resource allocation
+- Initial Node Restrictions:
+  - Node 0 battalions: Can target nodes 3, 4
+  - Node 1 battalions: Can target nodes 3, 4, 5
+  - Node 2 battalions: Can target nodes 4, 5
 - Display countdown overlay
 - Show deployment zones
 - Animate network nodes and connection lines
 
 ### Active Battle Phase (20 seconds)
+// Implementation of:
+// - @battle-performance-standards.mdc#State-Updates#Battle-Timer
+// - @battle-movement-system.mdc#Movement-Rules#Network-Lines
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Combat-Sequence#Attack-Initiation
+// - @battle-visual-feedback.mdc#Combat-Feedback#State-Updates
+
 - Battle Timer
   - Simple 20-second countdown display
   - Located at screen top
   - No intermediate warnings
   - Continuous countdown until completion
-- Turn-based combat system
-- Clear action sequence
-- State updates after each action
-- Real-time feedback
+- Network Line Movement:
+  - Battalions must stay on network lines when moving
+  - Can traverse any connected network line to reach target
+  - No restrictions on which lines can be used after initial attack
+- Combat System:
+  - Attack frequency determined solely by speed stat
+  - Target selection based purely on proximity
+  - State updates every 1 second for consistency
+  - Visual updates synchronized with state timer
+  - Begin attacks immediately when in range
+  - Capture mechanics identical for all types
+- Real-time feedback with batched updates
 
 ### Results Phase
-- Victory condition checking
-- Score calculation
-- Battle summary generation
-- State cleanup
+// Implementation of:
+// - @battle-performance-standards.mdc#State-Management#Battle-Completion
+// - @battle-visual-feedback.mdc#Results-Display#Victory-Screen
+
+// Referenced by:
+// - @battle-node-control.mdc#Victory-Conditions#Final-State
+// - @battle-targeting-system.mdc#Combat-Sequence#Battle-End
 
 ## Victory Conditions
+// Implementation of:
+// - @battle-performance-standards.mdc#Victory-Calculation#Scoring-Rules
+// - @battle-node-control.mdc#Victory-Requirements#Control-Points
+
+### Loss Tracking
+// Implementation of:
+// - @battle-performance-standards.mdc#State-Management#Loss-Recording
+// - @battle-visual-feedback.mdc#Combat-Feedback#Loss-Indicators
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Combat-Sequence#Health-Updates
+// - @battle-movement-system.mdc#Battalion-State#Destruction
+
 ### Scoring System
-- Mark-Based Point Values
-  - Mark 1: 1 point per bot
-  - Mark 2: 2 points per bot
-  - Mark 3: 4 points per bot
-  - Mark 4: 8 points per bot
-- Bot type does not affect point value
-- Lower total = better performance
+// Implementation of:
+// - @battle-performance-standards.mdc#Victory-Calculation#Point-Values
+
+// Referenced by:
+// - @battle-visual-feedback.mdc#Results-Display#Score-Summary
+// - @battle-node-control.mdc#Victory-Conditions#Point-Calculation
 
 ### Victory Determination
-- Track losses for both sides
-- Calculate total loss points
-- Determine winner based on:
-  1. Node control majority
-  2. Lower loss points
-  3. Time-based tiebreaker
+// Implementation of:
+// - @battle-performance-standards.mdc#Victory-Calculation#Winner-Selection
+// - @battle-node-control.mdc#Victory-Requirements#Victory-Rules
+
+// Referenced by:
+// - @battle-visual-feedback.mdc#Results-Display#Winner-Declaration
+// - @battle-targeting-system.mdc#Combat-Sequence#Battle-End
+
+### Node Control
+// Implementation of:
+// - @battle-node-control.mdc#Control-Mechanics#Capture-Rules
+// - @battle-performance-standards.mdc#Victory-Calculation#Node-Majority
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Target-Selection-Rules#Node-Priority
+// - @battle-movement-system.mdc#Movement-Rules#Node-Access
 
 ## Performance Standards
+// Implementation of:
+// - @battle-performance-standards.mdc#Core-Requirements#State-Management
+// - @code-style-and-structure.mdc#Performance-Guidelines#Optimization
+
 1. State Updates
-   - Atomic operations
-   - Direct state transitions
-   - Clear update patterns
-   - Performance monitoring
+   // Referenced by:
+   // - @battle-targeting-system.mdc#Performance-Considerations#Optimization
+   // - @battle-movement-system.mdc#Performance#State-Changes
 
 2. Error Handling
-   - Follow backend error standards
-   - Maintain clear error boundaries
-   - Log errors consistently
-   - Recover gracefully from failures
+   // Referenced by:
+   // - @battle-targeting-system.mdc#Error-Handling#Fallback-Logic
+   // - @battle-movement-system.mdc#Error-Prevention#Recovery-Steps
 
-Remember: Changes must directly support these core mechanics and maintain system integrity. 
+Remember: Changes must directly support these core mechanics and maintain system integrity.
+
+## State Management
+// Implementation of:
+// - @code-style-and-structure.mdc#Performance-Guidelines#State-Management
+// - @battle-performance-standards.mdc#Core-Requirements#State-Control
+
+### Core State Principles
+Single Source of Truth:
+- Centralized state management
+- Clear ownership of state updates
+- Predictable state transitions
+- Atomic state operations
+
+Update Frequency:
+- Global 1-second update timer
+- Batch related state changes
+- Optimize update scheduling
+- Handle state dependencies
+
+State Categories:
+1. Battle State:
+   - Phase tracking
+   - Timer management
+   - Victory conditions
+   - Node ownership
+
+2. Battalion State:
+   - Position tracking
+   - Health/status
+   - Target information
+   - Movement paths
+
+3. Combat State:
+   - Attack calculations
+   - Damage resolution
+   - Range checking
+   - Collision detection
+
+### State Updates
+Update Process:
+- Validate state changes
+- Batch related updates
+- Maintain consistency
+- Handle edge cases
+
+Error Handling:
+- Validate state transitions
+- Recover from failures
+- Log state errors
+- Maintain fallback states
+
+### State Synchronization
+Timing Requirements:
+- Sync with global timer
+- Handle network delays
+- Manage animation states
+- Coordinate multiple updates
+
+Performance Optimization:
+- Minimize state updates
+- Batch similar changes
+- Optimize calculations
+- Monitor update frequency
+
+Remember: Changes must directly support these core mechanics and maintain system integrity.
+
+### Damage Calculation
+// Implementation of:
+// - @battle-node-control.mdc#Capture-System#Control-Progress
+// - @battle-performance-standards.mdc#State-Updates#Combat-State
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Combat-Sequence#Damage-Application
+// - @battle-visual-feedback.mdc#Combat-Effects#Control-Feedback
+
+Node Control Damage:
+- Calculate total army health at battle start
+- Set capture threshold at 75% of total health
+- Track accumulated damage per side
+- Apply damage immediately on hits
+- Update control status after each hit
+
+Battalion Combat:
+- Calculate total attack power = base_offense * battalion_quantity
+- Apply defense reduction: damage = attack * (1 - defense/100)
+- Ensure minimum damage of 1 point
+- Track individual battalion total health (base_health * quantity)
+- Apply damage after defense calculation
+- Trigger destruction at 0 total health
+
+### Control Progress
+// Implementation of:
+// - @battle-node-control.mdc#Capture-System#Control-Progress
+// - @battle-performance-standards.mdc#State-Updates#Damage-Tracking
+
+// Referenced by:
+// - @battle-visual-feedback.mdc#Node-Status#Control-Progress
+// - @battle-targeting-system.mdc#Combat-Sequence#Node-Control
+
+- Track damage dealt to nodes by each side
+- Compare against capture threshold
+- Account for opposing side's control
+- Trigger capture state changes
+- Update network effects on capture 
