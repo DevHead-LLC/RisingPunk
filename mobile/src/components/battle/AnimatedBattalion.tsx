@@ -8,7 +8,9 @@ type Props = {
   position: Animated.ValueXY;
   isUser: boolean;
   health?: number;
+  mark?: number;
   onAttackComplete?: () => void;
+  onTargetBattalion?: (targetBattalion: any) => void;
 };
 
 // IMPORTANT: Export the ref type for use in other components
@@ -25,12 +27,14 @@ export const AnimatedBattalion = React.memo(React.forwardRef<BattalionRef, Props
     position,
     isUser,
     health,
+    mark = 1,
     onAttackComplete,
+    onTargetBattalion,
   } = props;
 
   // Force re-render when health changes
   const healthPercentage = Math.max(0, Math.min(100, health || 100));
-  const battalionId = `${isUser ? 'user' : 'enemy'}-${type}`;
+  const battalionId = `${isUser ? 'user' : 'enemy'}-${type}-mk${mark}`;
   
   // Only log critical health (25% or less)
   if (healthPercentage <= 25) {
@@ -107,6 +111,7 @@ export const AnimatedBattalion = React.memo(React.forwardRef<BattalionRef, Props
         }
       ]} />
 
+      {/* Health Bar */}
       <View style={styles.healthBarContainer}>
         <View style={[
           styles.healthBar, 
@@ -116,15 +121,25 @@ export const AnimatedBattalion = React.memo(React.forwardRef<BattalionRef, Props
           }
         ]} />
       </View>
+
+      {/* Type tag - Moved outside battalion container */}
+      <View style={styles.typeTagContainer}>
+        <Text style={styles.typeTagText}>
+          {type === 'breacher' ? 'B' : type === 'guardian' ? 'G' : 'P'}
+        </Text>
+      </View>
+
+      {/* Mark indicator - Moved outside battalion container */}
+      <View style={styles.markContainer}>
+        <Text style={styles.markText}>Mk{mark}</Text>
+      </View>
       
       <View style={[
         styles.battalion,
         styles[type],
         isUser ? styles.userBattalion : styles.enemyBattalion,
         type === 'breacher' && {
-          transform: [
-            { rotate: '45deg' }
-          ],
+          transform: [{ rotate: '45deg' }],
           overflow: 'hidden'
         }
       ]}>
@@ -137,6 +152,7 @@ export const AnimatedBattalion = React.memo(React.forwardRef<BattalionRef, Props
             zIndex: 1
           }
         ]} />
+
         {/* Red flash overlay */}
         <Animated.View style={[
           StyleSheet.absoluteFill,
@@ -185,13 +201,14 @@ export const AnimatedBattalion = React.memo(React.forwardRef<BattalionRef, Props
   const propsEqual = prevProps.quantity === nextProps.quantity &&
          prevProps.health === nextProps.health &&
          prevProps.isUser === nextProps.isUser &&
-         prevProps.type === nextProps.type;
+         prevProps.type === nextProps.type &&
+         prevProps.mark === nextProps.mark;
   
   // Only log significant health changes (>25%) with battalion identification
   if (prevProps.health !== nextProps.health) {
     const prevHealth = prevProps.health || 100;
     const nextHealth = nextProps.health || 100;
-    const battalionId = `${nextProps.isUser ? 'user' : 'enemy'}-${nextProps.type}`;
+    const battalionId = `${nextProps.isUser ? 'user' : 'enemy'}-${nextProps.type}-mk${nextProps.mark || 1}`;
     if (Math.abs(prevHealth - nextHealth) >= 25) {
       console.log(`[Health] ${battalionId} health changed: ${prevHealth}% → ${nextHealth}%`);
     }
@@ -208,6 +225,7 @@ const styles = StyleSheet.create({
     height: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 10
   },
   healthBarContainer: {
     position: 'absolute',
@@ -218,6 +236,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#333',
     borderRadius: 2,
     overflow: 'hidden',
+    zIndex: 11
   },
   healthBar: {
     height: '100%',
@@ -260,5 +279,33 @@ const styles = StyleSheet.create({
     left: -15,
     top: -15,
     zIndex: -1,
+  },
+  markContainer: {
+    position: 'absolute',
+    top: -15,
+    right: -15,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 4,
+    padding: 2,
+    zIndex: 12
+  },
+  markText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: 'bold',
+  },
+  typeTagContainer: {
+    position: 'absolute',
+    top: -15,
+    left: -15,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 4,
+    padding: 2,
+    zIndex: 12
+  },
+  typeTagText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: 'bold',
   },
 }); 

@@ -45,6 +45,21 @@ const NETWORK_CONNECTIONS = [
   [3, 7], [4, 6], [4, 8], [5, 7]
 ];
 
+interface BattalionLosses {
+  quantity: number;
+  mark: number;
+}
+
+interface BattleLossTracker {
+  user: { [battalionId: string]: BattalionLosses };
+  enemy: { [battalionId: string]: BattalionLosses };
+}
+
+const calculateLossPoints = (losses: BattalionLosses) => {
+  // Mark values: Mark 1 = 1pt, Mark 2 = 2pts, Mark 3 = 4pts, Mark 4 = 8pts
+  return losses.quantity * Math.pow(2, losses.mark - 1);
+};
+
 export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) => {
   const {
     networkOpacity,
@@ -75,6 +90,26 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   const [controlledNodes, setControlledNodes] = useState<number[]>([0, 1, 2]); // User starts controlling left nodes
   const [countdown, setCountdown] = useState(3);
   const battleInitializedRef = useRef(false);
+  const [battleLosses, setBattleLosses] = useState<BattleLossTracker>({
+    user: {},
+    enemy: {}
+  });
+
+  const recordBattalionLoss = (
+    side: 'user' | 'enemy',
+    battalionId: string,
+    quantity: number,
+    mark: number
+  ) => {
+    setBattleLosses(prev => {
+      const newLosses = { ...prev };
+      if (!newLosses[side][battalionId]) {
+        newLosses[side][battalionId] = { quantity: 0, mark };
+      }
+      newLosses[side][battalionId].quantity += quantity;
+      return newLosses;
+    });
+  };
 
   // IMPORTANT: Use the new battle movement and attacks hook
   const {
@@ -82,6 +117,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     nodeRefs,
     attackIntervals,
     findNewTarget,
+    setupAttacks
   } = useBattleMovementAndAttacks(
     battleStarted,
     nodes,
@@ -89,6 +125,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     enemyBattalions,
     setUserBattalions,
     setEnemyBattalions,
+    recordBattalionLoss
   );
 
   const initializeBattle = () => {
@@ -125,7 +162,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       setTimeRemaining(prev => {
         if (prev <= 1) {
           clearInterval(timerRef.current);
-          handleBattleComplete('user');
+          handleBattleComplete();
           return 0;
         }
         return prev - 1;
@@ -133,7 +170,27 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     }, 1000);
   };
 
-  const handleBattleComplete = (winner: 'user' | 'enemy') => {
+  const calculateTotalLossPoints = (side: 'user' | 'enemy'): number => {
+    return Object.values(battleLosses[side]).reduce((total, loss) => {
+      return total + calculateLossPoints(loss);
+    }, 0);
+  };
+
+  const determineVictor = () => {
+    const userPoints = calculateTotalLossPoints('user');
+    const enemyPoints = calculateTotalLossPoints('enemy');
+    
+    console.log(`[Battle] Final Loss Points - User: ${userPoints}, Enemy: ${enemyPoints}`);
+    
+    if (userPoints === enemyPoints) {
+      // Defending party wins ties
+      return 'enemy';
+    }
+    return userPoints < enemyPoints ? 'user' : 'enemy';
+  };
+
+  const handleBattleComplete = () => {
+    const winner = determineVictor();
     setBattleWinner(winner);
     showBattleResults(() => {
       setShowResults(true);
@@ -141,25 +198,22 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     });
   };
 
-  // Add this function to calculate total army health
-  const calculateTotalArmyHealth = () => {
-    let total = 0;
-    
-    userBattalions.forEach(battalion => {
-      total += BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity;
-    });
-    
-    enemyBattalions.forEach(battalion => {
-      total += BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity;
-    });
-    
-    return Math.floor(total * 0.75); // 75% of total army health
-  };
-
   // Modify the countdown effect to initialize node health
   useEffect(() => {
     if (countdown === 3) {
-      const nodeHealth = calculateTotalArmyHealth();
+      // Calculate total army health (75% of combined battalion health)
+      const calculateNodeHealth = () => {
+        let total = 0;
+        userBattalions.forEach(battalion => {
+          total += BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity;
+        });
+        enemyBattalions.forEach(battalion => {
+          total += BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity;
+        });
+        return Math.floor(total * 0.75); // 75% of total army health
+      };
+
+      const nodeHealth = calculateNodeHealth();
       // Initialize all nodes with health and control progress
       setNodes(prevNodes => prevNodes.map(node => ({
         ...node,
@@ -169,7 +223,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
         isLocked: node.controlState !== 'neutral'
       })));
     }
-  }, [countdown]);
+  }, [countdown, userBattalions, enemyBattalions]);
 
   const handleNodeControlChange = (nodeIndex: number, newState: 'user' | 'enemy') => {
     // Find only battalions that were targeting this specific node
@@ -300,9 +354,9 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
 
   return (
     <SafeAreaView style={styles.container}>
-      <BattleHeader 
-        timeRemaining={battleStarted ? timeRemaining : 20} 
-        isCountdown={false}
+      <BattleHeader
+        timeRemaining={timeRemaining}
+        opacity={battalionOpacity}
       />
       
       <View style={styles.networkContainer}>
@@ -323,6 +377,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
           userBattalions={userBattalions}
           enemyBattalions={enemyBattalions}
           battalionRefs={battalionRefs}
+          setupAttacks={setupAttacks}
         />
 
         <BattleOverlays
@@ -332,6 +387,8 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
           countdownOpacity={countdownOpacity}
           resultsOpacity={resultsOpacity}
           onClose={onClose}
+          userLossPoints={calculateTotalLossPoints('user')}
+          enemyLossPoints={calculateTotalLossPoints('enemy')}
         />
       </View>
     </SafeAreaView>

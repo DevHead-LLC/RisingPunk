@@ -1,22 +1,23 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import { COLORS, SIZING } from '../../styles/theme';
 
 type Props = {
   timeRemaining?: number;
   isCountdown?: boolean;
+  opacity?: Animated.Value;
 };
 
-export const BattleHeader = React.memo(({ timeRemaining = 0, isCountdown }: Props) => {
+export const BattleHeader = React.memo(({ timeRemaining = 0, isCountdown, opacity }: Props) => {
   return (
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, opacity && { opacity }]}>
       <Text style={styles.statusText}>
         {isCountdown ? 'BATTLE STARTING' : 'SYSTEM BREACH IN PROGRESS'}
       </Text>
       <Text style={styles.timerText}>
         {isCountdown ? `${timeRemaining}` : `${timeRemaining}s`}
       </Text>
-    </View>
+    </Animated.View>
   );
 });
 

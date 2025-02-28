@@ -111,7 +111,23 @@ Example log formats:
 
 #### Combat Visualization
 - Battalion Identification
-  - Visual type indicators (B: Breacher, G: Guardian, P: Phreak)
+  - Type Indicators
+    - Breacher: "B" tag in top-left corner (must be outside rotated container)
+    - Guardian: "G" tag in top-left corner
+    - Phreak: "P" tag in top-left corner
+    - Tag styling:
+      - Dark background (rgba(0, 0, 0, 0.7))
+      - White text
+      - Small font size (8pt)
+      - Bold weight
+      - Rounded corners
+    - Position: Consistent top-left placement for all types
+    - Always visible during battle
+    - IMPORTANT: For breachers, type tag and mark indicators must be rendered outside the rotated diamond shape to prevent clipping
+  - Mark Indicators
+    - Display format: "Mk{number}" in top-right corner
+    - Must remain visible even for rotated breacher units
+    - Same styling as type indicators
   - Unique battalion IDs for tracking and logging
   - Clear party affiliation (user/enemy) indicators
 - Attack Sequence

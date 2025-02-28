@@ -10,6 +10,8 @@ type Props = {
   countdownOpacity: Animated.Value;
   resultsOpacity: Animated.Value;
   onClose: () => void;
+  userLossPoints?: number;
+  enemyLossPoints?: number;
 };
 
 export const BattleOverlays = React.memo(({
@@ -19,6 +21,8 @@ export const BattleOverlays = React.memo(({
   countdownOpacity,
   resultsOpacity,
   onClose,
+  userLossPoints = 0,
+  enemyLossPoints = 0,
 }: Props) => {
   return (
     <View style={styles.container}>
@@ -36,6 +40,8 @@ export const BattleOverlays = React.memo(({
           winner={battleWinner}
           opacity={resultsOpacity}
           onContinue={onClose}
+          userLossPoints={userLossPoints}
+          enemyLossPoints={enemyLossPoints}
         />
       )}
     </View>
