@@ -2,7 +2,7 @@
 // Tests core movement rules and speed calculations
 
 import { BattalionType, Position } from '../../../src/battle/core/types';
-import { calculateMovementSpeed, validateMovementPath, calculatePathDistance, calculateAttackPosition, validateInitialMovement } from '../../../src/battle/core/BattleCalculations';
+import { calculateMovementSpeed, validateMovementPath, calculatePathDistance, calculateAttackPosition, validateInitialMovement, findPath, isHorizontalOrVertical } from '../../../src/battle/core/BattleCalculations';
 
 describe('Movement System', () => {
   // Test basic movement speeds per battalion type
@@ -209,6 +209,70 @@ describe('Movement System', () => {
       expect(() => {
         validateInitialMovement(1, 9);
       }).toThrow('Invalid node index');
+    });
+  });
+
+  // Test pathfinding between nodes
+  describe('Pathfinding', () => {
+    const nodePositions: Position[] = [
+      { x: 0, y: 0 },   // Node 0 (user)
+      { x: 10, y: 0 },  // Node 1 (user)
+      { x: 20, y: 0 },  // Node 2 (user)
+      { x: 0, y: 10 },  // Node 3 (neutral)
+      { x: 10, y: 10 }, // Node 4 (neutral)
+      { x: 20, y: 10 }, // Node 5 (neutral)
+      { x: 0, y: 20 },  // Node 6 (enemy)
+      { x: 10, y: 20 }, // Node 7 (enemy)
+      { x: 20, y: 20 }  // Node 8 (enemy)
+    ];
+
+    it('should find direct path between adjacent nodes', () => {
+      const startNode = 0; // Node 0
+      const endNode = 3;   // Node 3 (directly connected)
+      
+      const path = findPath(startNode, endNode);
+      
+      expect(path).toEqual([
+        nodePositions[0], // Start at Node 0
+        nodePositions[3]  // Direct path to Node 3
+      ]);
+    });
+
+    it('should find path through intermediate node', () => {
+      const startNode = 0;  // Node 0
+      const endNode = 4;    // Node 4 (requires going through Node 1 or Node 3)
+      
+      const path = findPath(startNode, endNode);
+      
+      // Verify path length and valid connections
+      expect(path.length).toBe(3); // Start -> Intermediate -> End
+      expect(isHorizontalOrVertical(path[0], path[1])).toBe(true);
+      expect(isHorizontalOrVertical(path[1], path[2])).toBe(true);
+      expect(path[0]).toEqual(nodePositions[0]); // Start at Node 0
+      expect(path[2]).toEqual(nodePositions[4]); // End at Node 4
+    });
+
+    it('should throw error for unreachable nodes', () => {
+      expect(() => {
+        findPath(0, 8); // No valid path from Node 0 to Node 8
+      }).toThrow('No valid path available between nodes');
+    });
+
+    it('should find longer path through multiple nodes', () => {
+      const startNode = 0;  // Node 0
+      const endNode = 5;    // Node 5 (requires multiple hops)
+      
+      const path = findPath(startNode, endNode);
+      
+      // Verify path properties
+      expect(path.length).toBeGreaterThan(2); // Must have intermediate nodes
+      expect(path[0]).toEqual(nodePositions[0]); // Start at Node 0
+      expect(path[path.length - 1]).toEqual(nodePositions[5]); // End at Node 5
+      
+      // Verify each step follows network lines
+      for (let i = 0; i < path.length - 1; i++) {
+        expect(isHorizontalOrVertical(path[i], path[i + 1])).toBe(true);
+      }
     });
   });
 }); 

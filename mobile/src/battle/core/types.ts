@@ -65,8 +65,16 @@ export enum NodeOwnership {
   Enemy = 'Enemy'
 }
 
+export interface NodeControlState {
+  ownership: NodeOwnership;
+  userDamage: number;
+  enemyDamage: number;
+  captureThreshold: number;
+}
+
 // Node information
 export interface NodeInfo {
   position: Position;
   ownership: NodeOwnership;
+  controlState?: NodeControlState;
 } 

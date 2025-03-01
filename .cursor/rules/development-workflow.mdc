@@ -15,24 +15,81 @@ alwaysApply: false
    - Make decisions based on rules
    - No unnecessary questions
    - Test after each meaningful change
+   - Take initiative and be decisive
+   - Minimize user interaction for standard decisions
 
-2. Implementation Order
+2. Rule-Based Decision Making
+   - Start by checking @project-structure.mdc for current focus
+   - Review @testing-standards.mdc for test requirements
+   - Check relevant battle system rules for specific requirements
+   - Make decisions based on established standards
+   - Document decisions and their rule basis
+   - Update rule statuses after implementation
+
+3. Implementation Order
    - Write minimal test
    - Run test (expect failure)
    - Implement minimal code
    - Run test (ensure pass)
-   - Refactor if needed
+   - Update rule statuses
    - Move to next requirement
 
-3. Decision Making
-   - Reference rules first
-   - Choose most direct path
-   - Implement immediately
-   - Validate through tests
-   - Move forward systematically
+4. Rule Status Updates
+   Required Updates:
+   - @project-structure.mdc: Overall progress and feature status
+   - @testing-standards.mdc: Test coverage and status
+   - Relevant battle system rules: Implementation details and cross-references
+   
+   Update Process:
+   1. Identify affected rules through cross-references
+   2. Update status markers ([DONE], [IN_PROGRESS], etc.)
+   3. Add implementation notes and cross-references
+   4. Document completion criteria
+   5. Update dependent rule statuses
 
-4. When Stuck
+5. When Stuck
    - Check rule documentation
    - Review current status
    - Make minimal fix
-   - Validate and continue 
+   - Validate and continue
+
+## Status Tracking Workflow
+1. Before Implementation:
+   - Check @project-structure.mdc for current focus
+   - Review relevant battle system rules
+   - Note cross-references and dependencies
+   - Identify affected test files
+
+2. During Implementation:
+   - Follow test-first development
+   - Document rule implementations
+   - Track cross-references
+   - Update status markers
+
+3. After Implementation:
+   - Update all affected rule files
+   - Mark completed features
+   - Document cross-impacts
+   - Update test status
+
+4. Documentation Updates
+   Required Files:
+   - @project-structure.mdc
+   - @testing-standards.mdc
+   - All referenced battle system rules
+   - Any rules with "Referenced by" connections
+
+   Update Types:
+   - Status markers
+   - Implementation notes
+   - Cross-references
+   - Completion criteria
+   - Dependencies
+   - Recent changes
+
+Remember:
+1. Always check @project-structure.mdc first
+2. Follow @testing-standards.mdc for implementation
+3. Update ALL relevant battle system rules
+4. Be decisive and minimize unnecessary questions
+5. Document all decisions and their rule basis
