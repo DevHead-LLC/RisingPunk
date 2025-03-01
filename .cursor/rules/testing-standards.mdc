@@ -7,7 +7,6 @@ alwaysApply: false
 // connections to ensure full context and maintain consistency across the codebase.
 
 # Testing Standards
-Description: "Defines testing requirements, mocking standards, and implementation guidelines for consistent and reliable testing across the RisingPunk ecosystem."
 
 ## Core Testing Principles
 // Implementation of:
@@ -18,182 +17,105 @@ Description: "Defines testing requirements, mocking standards, and implementatio
 // - @battle-core-mechanics.mdc#Quality-Gates
 // - @battle-performance-standards.mdc#Error-Handling
 
+### Test Focus Priority
+1. Game Logic First:
+   - Battle mechanics and calculations
+   - State transitions and game rules
+   - Victory conditions
+   - Core gameplay features
+   
+2. Framework/Platform Testing:
+   - Minimize React Native specific tests
+   - Only test UI when critical to gameplay
+   - Defer animation/visual tests until core works
+   - Trust framework's own testing
+
 ### Test Organization
 1. File Structure:
    - Tests mirror source structure in `__tests__` directory
-   - Co-locate test helpers with relevant tests
-   - Keep setup files at root of test directory
-   - Group related test utilities
+   - Group tests by game feature
+   - Keep setup minimal and focused
+   - Separate game logic from UI tests
 
 2. Naming Conventions:
-   - Test files: `ComponentName.test.tsx`
-   - Test utilities: `ComponentName.test.utils.ts`
-   - Mock files: `__mocks__/moduleName.ts`
-   - Setup files: `setup.js` or `setupTests.js`
+   - Test files: `FeatureName.test.ts` for logic
+   - Test files: `Component.test.tsx` only if needed
+   - Utilities: `feature.test.utils.ts`
 
-3. Progressive Testing Strategy:
-   - Start with minimal test infrastructure
-   - Focus on core functionality first
-   - Add complexity only when needed
-   - Avoid premature optimization
-   - Keep mocks simple and focused
-   - Expand coverage gradually
-
-4. Mocking Guidelines:
-   Priority Order:
-   1. Core functionality only
-   2. Essential React Native components
-   3. Basic animation support
-   4. Required platform features
+### Testing Strategy
+1. Game Logic Testing:
+   - Pure functions for calculations
+   - State management for game rules
+   - Battalion interactions
+   - Node control mechanics
    
-   Avoid Early:
-   - Complex animation mocks
-   - Full platform feature sets
-   - Edge case handling
-   - Comprehensive error simulation
+2. Integration Points:
+   - Core game loop
+   - State to UI updates
+   - Critical user interactions
+   - Network synchronization
 
-### React Native Testing Setup
-// Implementation of:
-// - @project-structure.mdc#Testing-Strategy#Test-Setup
-// - @battle-performance-standards.mdc#Error-Handling#Testing
+3. UI Testing (Minimal):
+   - Only test game-critical interactions
+   - Focus on user -> game state flow
+   - Skip purely visual tests
+   - Trust React Native components
 
-1. Initial Setup - Keep Minimal:
+### Mocking Guidelines
+1. Essential Mocks Only:
    ```javascript
-   module.exports = {
-     preset: 'react-native',
-     setupFiles: ['<rootDir>/src/__tests__/setup.js'],
-     testEnvironment: 'jsdom',
-     moduleNameMapper: {
-       '^@/(.*)$': '<rootDir>/src/$1'
-     }
-   };
-   ```
-
-2. Essential Mocks Only:
-   ```javascript
-   // Basic React Native component mocks
-   const mockComponent = (name) => {
-     return function(props) {
-       return React.createElement('view', { ...props, testID: name });
-     };
-   };
-
-   // Core component mocks
+   // Basic React Native mocks - keep minimal
    jest.mock('react-native', () => ({
-     View: mockComponent('View'),
-     Text: mockComponent('Text'),
-     TouchableOpacity: mockComponent('TouchableOpacity'),
+     View: 'View',
+     Text: 'Text',
      Animated: {
-       View: mockComponent('AnimatedView'),
-       Value: function(value) {
-         this.value = value;
-         this.setValue = jest.fn();
-       },
-       timing: () => ({ start: jest.fn() })
+       Value: function(v) { this.value = v },
+       View: 'Animated.View'
      }
    }));
    ```
 
-3. Expand Only When Needed:
-   - Add mocks as required by tests
-   - Document why each mock is needed
-   - Remove unused mocks
-   - Keep setup file clean and focused
+2. Game Logic Mocks:
+   - Mock network calls
+   - Mock timers for game loop
+   - Mock randomness for predictability
+   - Keep battle calculations pure
 
-### Component Testing Standards
-// Implementation of:
-// - @battle-core-mechanics.mdc#Quality-Gates#Testing
-// - @battle-animation-standards.mdc#Technical-Requirements#Testing
-
-1. Required Test Cases:
-   - Basic rendering
-   - Props validation
-   - User interactions
-   - State changes
-   - Error boundaries
-   - Animation triggers
-   - Style applications
-
-2. Animation Testing:
-   - Mock Animated.Value for synchronous tests
-   - Verify animation triggers
-   - Test style interpolations
-   - Check transform applications
-   - Validate cleanup
-
-3. Style Testing:
-   - Verify base styles
-   - Test conditional styles
-   - Check dynamic calculations
-   - Validate theme compliance
-   - Test responsive behavior
-
-### Performance Testing
-// Implementation of:
-// - @battle-performance-standards.mdc#Core-Requirements#Testing
-// - @battle-animation-standards.mdc#Performance-Targets#Validation
-
-1. Animation Performance:
-   - Monitor frame rate impact
-   - Test native driver usage
-   - Verify cleanup handling
-   - Validate memory impact
-
-2. Resource Management:
-   - Test cleanup functions
-   - Verify subscription handling
-   - Check memory leaks
-   - Monitor re-render counts
-
-### Error Handling
-// Implementation of:
-// - @battle-core-mechanics.mdc#Error-Prevention#Testing
-// - @battle-performance-standards.mdc#Error-Handling#Validation
-
-1. Error Cases:
-   - Invalid props
-   - Missing dependencies
-   - Animation failures
-   - State conflicts
-   - Network issues
-
-2. Recovery Testing:
-   - Error boundary behavior
-   - Fallback rendering
-   - State recovery
-   - Animation reset
+3. Avoid Mocking:
+   - React Native internals
+   - Animation details
+   - Visual styling
+   - Framework features
 
 ## Quality Gates
 // Implementation of:
 // - @project-structure.mdc#Quality-Gates
 // - @battle-core-mechanics.mdc#Development-Guidelines#Testing
 
-### Test Coverage Requirements
+### MVP Testing Requirements
+1. Must Test:
+   - Core battle mechanics
+   - State management
+   - Critical user flows
+   - Victory conditions
+
+2. Can Skip Initially:
+   - Animation details
+   - Visual polish
+   - Edge cases
+   - Performance optimization
+
+### Test Coverage Goals
 1. MVP Phase:
-   - Critical paths: 100%
-   - Business logic: 95%
-   - UI components: 90%
-   - Utilities: 85%
+   - Game Logic: 90%
+   - State Management: 90%
+   - UI Components: Only critical paths
+   - Utils: Core functions only
 
 2. Production Phase:
-   - Critical paths: 100%
-   - Business logic: 98%
-   - UI components: 95%
-   - Utilities: 90%
+   - Game Logic: 95%
+   - State Management: 95%
+   - UI Components: 80%
+   - Utils: 85%
 
-### Test Quality Metrics
-1. Required Aspects:
-   - Meaningful assertions
-   - Edge case coverage
-   - Error handling
-   - Performance impact
-   - Memory management
-
-2. Code Quality:
-   - No duplicate tests
-   - Clear descriptions
-   - Proper mocking
-   - Efficient setup
-   - Clean teardown
-
-Remember: These standards ensure consistent, reliable testing across the codebase. Update this document as new testing patterns and requirements emerge. 
+Remember: Focus on testing game mechanics and rules first. UI and visual details can be tested later when core gameplay is solid. 
