@@ -5,21 +5,29 @@ import { BattleService } from '../../../src/services/BattleService';
 import { BattleState, BattalionState, NodeState } from '../../../src/battle/core/BattleStateManager';
 import { Position } from '../../../src/battle/core/types';
 import { BattlePhase } from '../../../src/battle/core/BattleContext';
+import { BattlePerformanceMonitor } from '../../../src/battle/core/BattlePerformanceMonitor';
 
-let mockTimerId = 1;
+// Mock BattlePerformanceMonitor
+const mockRecordNetworkLatency = jest.fn();
+jest.mock('../../../src/battle/core/BattlePerformanceMonitor', () => ({
+  BattlePerformanceMonitor: {
+    getInstance: jest.fn(() => ({
+      recordNetworkLatency: mockRecordNetworkLatency,
+      startMonitoring: jest.fn(),
+      stopMonitoring: jest.fn()
+    }))
+  }
+}));
 
-// Create mock setInterval function
-const createMockInterval = () => {
-  const mock = jest.fn().mockImplementation((callback: Function) => {
-    setTimeout(callback, 0);
-    return mockTimerId++;
-  });
-  return Object.assign(mock, { __promisify__: jest.fn() }) as unknown as typeof global.setInterval;
-};
+// Mock interval type
+interface MockInterval extends jest.Mock {
+  __promisify__: jest.Mock;
+}
 
 describe('Battle Network Integration', () => {
   let battleService: BattleService;
   const mockBattleId = 'test-battle-123';
+  let callbacks: Function[] = [];
 
   const mockBattalion: BattalionState = {
     id: 'battalion-1',
@@ -42,8 +50,13 @@ describe('Battle Network Integration', () => {
   beforeEach(() => {
     battleService = BattleService.getInstance();
     jest.useFakeTimers();
-    mockTimerId = 1;
-    global.setInterval = createMockInterval();
+    callbacks = [];
+    const mockInterval = jest.fn((callback) => {
+      callbacks.push(callback);
+      return callbacks.length;
+    }) as MockInterval;
+    mockInterval.__promisify__ = jest.fn();
+    global.setInterval = mockInterval as unknown as typeof global.setInterval;
     global.clearInterval = jest.fn();
   });
 
@@ -51,7 +64,17 @@ describe('Battle Network Integration', () => {
     battleService.stopSync();
     jest.clearAllMocks();
     jest.useRealTimers();
+    callbacks = [];
   });
+
+  // Helper to trigger interval callbacks
+  const triggerIntervals = async () => {
+    for (const callback of callbacks) {
+      callback();
+      await Promise.resolve(); // Wait for fetch
+      await Promise.resolve(); // Wait for state transformation
+    }
+  };
 
   describe('State Synchronization', () => {
     it('should start sync with correct interval', () => {
@@ -74,16 +97,13 @@ describe('Battle Network Integration', () => {
         lastUpdated: new Date().toISOString()
       };
 
-      // Mock successful sync
-      global.fetch = jest.fn().mockResolvedValueOnce({
+      global.fetch = jest.fn().mockResolvedValue({
         ok: true,
         json: () => Promise.resolve(mockState)
       });
 
       battleService.startSync(mockBattleId, onUpdate, onError);
-      await jest.runAllTimersAsync();
-      await Promise.resolve(); // Wait for fetch
-      await Promise.resolve(); // Wait for state transformation
+      await triggerIntervals();
 
       expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({
         phase: BattlePhase.ACTIVE_BATTLE,
@@ -98,12 +118,10 @@ describe('Battle Network Integration', () => {
       const onUpdate = jest.fn();
       const onError = jest.fn();
 
-      // Mock network failure
-      global.fetch = jest.fn().mockRejectedValueOnce(new Error('Network error'));
+      global.fetch = jest.fn().mockRejectedValue(new Error('Network error'));
 
       battleService.startSync(mockBattleId, onUpdate, onError);
-      await jest.runAllTimersAsync();
-      await Promise.resolve(); // Wait for fetch
+      await triggerIntervals();
 
       expect(onError).toHaveBeenCalledWith(expect.stringContaining('Sync attempt 1 failed'));
       expect(onUpdate).not.toHaveBeenCalled();
@@ -120,18 +138,12 @@ describe('Battle Network Integration', () => {
         throw new Error('Network error');
       });
 
-      // Mock setInterval to call the callback multiple times
-      const mockInterval = (createMockInterval() as unknown as jest.Mock).mockImplementation(callback => {
-        for (let i = 0; i < 4; i++) {
-          setTimeout(callback, 0);
-        }
-        return mockTimerId++;
-      });
-      global.setInterval = mockInterval as unknown as typeof global.setInterval;
-
       battleService.startSync(mockBattleId, onUpdate, onError);
-      await jest.runAllTimersAsync();
-      await Promise.resolve(); // Wait for fetch
+      
+      // Trigger 4 intervals (initial + 3 retries)
+      for (let i = 0; i < 4; i++) {
+        await triggerIntervals();
+      }
 
       expect(retryCount).toBe(4); // Initial try + 3 retries
       expect(onError).toHaveBeenCalledWith(expect.stringContaining('Sync failed after 3 retries'));
@@ -204,30 +216,25 @@ describe('Battle Network Integration', () => {
       let callCount = 0;
 
       // Mock successful responses
-      global.fetch = jest.fn().mockImplementation(async () => ({
-        ok: true,
-        json: () => Promise.resolve({
-          phase: BattlePhase.ACTIVE_BATTLE,
-          timeRemaining: 15,
-          battalions: { [mockBattalion.id]: mockBattalion },
-          nodes: { [mockNode.id]: mockNode }
-        })
-      }));
-
-      // Mock setInterval to call the callback 5 times
-      const mockInterval = (createMockInterval() as unknown as jest.Mock).mockImplementation(callback => {
-        for (let i = 0; i < 5; i++) {
-          setTimeout(callback, 0);
-          callCount++;
-        }
-        return mockTimerId++;
+      global.fetch = jest.fn().mockImplementation(async () => {
+        callCount++;
+        return {
+          ok: true,
+          json: () => Promise.resolve({
+            phase: BattlePhase.ACTIVE_BATTLE,
+            timeRemaining: 15,
+            battalions: { [mockBattalion.id]: mockBattalion },
+            nodes: { [mockNode.id]: mockNode }
+          })
+        };
       });
-      global.setInterval = mockInterval as unknown as typeof global.setInterval;
 
       battleService.startSync(mockBattleId, onUpdate, onError);
-      await jest.runAllTimersAsync();
-      await Promise.resolve(); // Wait for fetch
-      await Promise.resolve(); // Wait for state transformation
+      
+      // Trigger 5 intervals
+      for (let i = 0; i < 5; i++) {
+        await triggerIntervals();
+      }
 
       expect(callCount).toBe(5);
       expect(onUpdate).toHaveBeenCalledTimes(5);
@@ -264,6 +271,147 @@ describe('Battle Network Integration', () => {
 
       expect(results.every(r => r.success)).toBe(true);
       expect(fetch).toHaveBeenCalledTimes(10);
+    });
+
+    it('should monitor network latency', async () => {
+      const onUpdate = jest.fn();
+      const onError = jest.fn();
+
+      // Mock successful response with delay
+      global.fetch = jest.fn().mockImplementation(async () => {
+        mockRecordNetworkLatency(50); // Record 50ms latency
+        return {
+          ok: true,
+          json: () => Promise.resolve({
+            phase: BattlePhase.ACTIVE_BATTLE,
+            timeRemaining: 15,
+            battalions: { [mockBattalion.id]: mockBattalion },
+            nodes: { [mockNode.id]: mockNode },
+            updateId: 1,
+            lastUpdated: new Date().toISOString()
+          })
+        };
+      });
+
+      battleService.startSync(mockBattleId, onUpdate, onError);
+      await triggerIntervals();
+
+      expect(mockRecordNetworkLatency).toHaveBeenCalledWith(50);
+      expect(onUpdate).toHaveBeenCalled();
+      expect(onError).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('State Validation', () => {
+    it('should validate state structure before sync', async () => {
+      const onUpdate = jest.fn();
+      const onError = jest.fn();
+
+      // Mock successful sync with invalid state structure
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          phase: 'INVALID_PHASE',
+          timeRemaining: 'not a number',
+          battalions: null,
+          nodes: undefined
+        })
+      });
+
+      battleService.startSync(mockBattleId, onUpdate, onError);
+      await triggerIntervals();
+
+      expect(onError).toHaveBeenCalledWith(expect.stringContaining('Sync attempt 1 failed'));
+      expect(onUpdate).not.toHaveBeenCalled();
+    });
+
+    it('should handle missing required fields', async () => {
+      const onUpdate = jest.fn();
+      const onError = jest.fn();
+
+      // Mock response with invalid state
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({
+          // Missing most required fields
+          phase: BattlePhase.ACTIVE_BATTLE
+        })
+      });
+
+      battleService.startSync(mockBattleId, onUpdate, onError);
+      await triggerIntervals();
+      await Promise.resolve(); // Wait for validation
+
+      expect(onError).toHaveBeenCalledWith(expect.stringContaining('Sync attempt 1 failed'));
+      expect(onUpdate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Error Recovery', () => {
+    it('should recover sync after temporary network failure', async () => {
+      const onUpdate = jest.fn();
+      const onError = jest.fn();
+      let failureCount = 0;
+
+      // Mock alternating failures and successes
+      global.fetch = jest.fn().mockImplementation(async () => {
+        failureCount++;
+        if (failureCount % 2 === 1) {
+          throw new Error('Network error');
+        }
+        return {
+          ok: true,
+          json: () => Promise.resolve({
+            phase: BattlePhase.ACTIVE_BATTLE,
+            timeRemaining: 15,
+            battalions: { [mockBattalion.id]: mockBattalion },
+            nodes: { [mockNode.id]: mockNode }
+          })
+        };
+      });
+
+      battleService.startSync(mockBattleId, onUpdate, onError);
+      
+      // Trigger 5 intervals
+      for (let i = 0; i < 5; i++) {
+        await triggerIntervals();
+      }
+
+      expect(onError).toHaveBeenCalledTimes(3); // Should have 3 failures
+      expect(onUpdate).toHaveBeenCalledTimes(2); // Should have 2 successful updates
+      expect(failureCount).toBe(5);
+    });
+
+    it('should maintain state consistency during recovery', async () => {
+      const onUpdate = jest.fn();
+      const onError = jest.fn();
+      let updateId = 0;
+
+      global.fetch = jest.fn().mockImplementation(async () => ({
+        ok: true,
+        json: () => {
+          updateId++;
+          return Promise.resolve({
+            phase: BattlePhase.ACTIVE_BATTLE,
+            timeRemaining: 15,
+            battalions: { [mockBattalion.id]: mockBattalion },
+            nodes: { [mockNode.id]: mockNode },
+            updateId,
+            lastUpdated: new Date().toISOString()
+          });
+        }
+      }));
+
+      battleService.startSync(mockBattleId, onUpdate, onError);
+      
+      // Trigger 5 updates
+      for (let i = 0; i < 5; i++) {
+        await triggerIntervals();
+      }
+
+      expect(onUpdate).toHaveBeenCalledTimes(5);
+      const updates = onUpdate.mock.calls.map(call => call[0].updateId);
+      expect(updates).toEqual([1, 2, 3, 4, 5]);
     });
   });
 }); 

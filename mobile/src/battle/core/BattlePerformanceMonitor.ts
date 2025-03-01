@@ -17,11 +17,13 @@ interface PerformanceMetrics {
   memoryUsage: number;
   jsThreadUsage: number;
   lastUpdated: Date;
+  loadTime?: number;
+  networkLatency?: number;
 }
 
 interface PerformanceLog {
   timestamp: Date;
-  type: 'frame_drop' | 'memory_warning' | 'error';
+  type: 'frame_drop' | 'memory_warning' | 'error' | 'load_time' | 'network_latency';
   details: {
     value: number;
     threshold: number;
@@ -42,13 +44,16 @@ export class BattlePerformanceMonitor {
   private lastMemoryWarning: number;
   private lastMemoryCheck: number;
   private lastFrameCheck: number;
+  private loadStartTime: number;
 
   private constructor() {
     this.metrics = {
       frameRate: 60,
       memoryUsage: 0,
       jsThreadUsage: 0,
-      lastUpdated: new Date()
+      lastUpdated: new Date(),
+      loadTime: 0,
+      networkLatency: 0
     };
     this.logs = [];
     this.frameRateInterval = null;
@@ -60,6 +65,7 @@ export class BattlePerformanceMonitor {
     this.lastMemoryWarning = 0;
     this.lastMemoryCheck = 0;
     this.lastFrameCheck = 0;
+    this.loadStartTime = performance.now();
   }
 
   public static getInstance(): BattlePerformanceMonitor {
@@ -198,6 +204,41 @@ export class BattlePerformanceMonitor {
     this.subscribers.forEach(callback => callback(metrics));
   }
 
+  public recordLoadComplete(): void {
+    const loadTime = performance.now() - this.loadStartTime;
+    this.metrics.loadTime = loadTime;
+    
+    if (loadTime > 1000) { // 1 second threshold
+      this.logs.push({
+        timestamp: new Date(),
+        type: 'load_time',
+        details: {
+          value: loadTime,
+          threshold: 1000,
+          cause: 'Slow load time detected'
+        }
+      });
+    }
+    this.notifySubscribers();
+  }
+
+  public recordNetworkLatency(latency: number): void {
+    this.metrics.networkLatency = latency;
+    
+    if (latency > 200) { // 200ms threshold
+      this.logs.push({
+        timestamp: new Date(),
+        type: 'network_latency',
+        details: {
+          value: latency,
+          threshold: 200,
+          cause: 'High network latency'
+        }
+      });
+    }
+    this.notifySubscribers();
+  }
+
   public cleanup(): void {
     this.stopMonitoring();
     this.subscribers.clear();
@@ -205,11 +246,14 @@ export class BattlePerformanceMonitor {
     this.lastMemoryWarning = 0;
     this.lastMemoryCheck = 0;
     this.lastFrameCheck = 0;
+    this.loadStartTime = performance.now();
     this.metrics = {
       frameRate: 60,
       memoryUsage: 0,
       jsThreadUsage: 0,
-      lastUpdated: new Date()
+      lastUpdated: new Date(),
+      loadTime: 0,
+      networkLatency: 0
     };
   }
 } 
