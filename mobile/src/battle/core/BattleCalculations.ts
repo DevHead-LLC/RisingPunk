@@ -51,10 +51,11 @@ export function calculateCombatDamage({
     throw new Error('Battalion quantity must be positive');
   }
 
+  // Calculate total attack first
   const totalAttack = BASE_STATS[attackerType].offense * attackerQuantity;
   const defenseMultiplier = 1 - (BASE_STATS[defenderType].defense / 100);
   
-  // Calculate damage and round down as per battle-core-mechanics rule
+  // Apply defense reduction and round down
   const damage = Math.floor(totalAttack * defenseMultiplier);
   
   // Ensure minimum damage of 1 as per battle-core-mechanics rule

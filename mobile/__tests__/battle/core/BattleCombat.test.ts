@@ -47,8 +47,12 @@ describe('Battle Combat System', () => {
         defenderQuantity: 1
       });
 
+      // Guardian offense = 8
+      // Phreak defense = 5 (5% reduction)
+      // Single attacker: Math.floor(8 * 0.95) = 7
+      // Multiple attackers: Math.floor((8 * 3) * 0.95) = Math.floor(24 * 0.95) = 22
       expect(multipleAttackers).toBeGreaterThan(singleAttacker);
-      expect(multipleAttackers).toBe(singleAttacker * 3);
+      expect(multipleAttackers).toBe(22);
     });
 
     it('should ensure minimum damage of 1', () => {
