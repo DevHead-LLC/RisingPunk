@@ -56,4 +56,17 @@ export interface AttackPositionParams {
   attackerType: BattalionType;
   attackerPosition: Position;
   targetPosition: Position;
+}
+
+// Node ownership types
+export enum NodeOwnership {
+  User = 'User',
+  Neutral = 'Neutral',
+  Enemy = 'Enemy'
+}
+
+// Node information
+export interface NodeInfo {
+  position: Position;
+  ownership: NodeOwnership;
 } 
