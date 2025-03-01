@@ -2,10 +2,12 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "*": ["src/*"]
+      "@/*": ["src/*"]
     },
     "esModuleInterop": true,
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "jsx": "react-native",
+    "target": "es2017"
   },
   "include": ["src/**/*", "__tests__/**/*"]
 }
