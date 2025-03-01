@@ -209,7 +209,15 @@ RisingPunk/
 - [DONE] Basic Navigation
 - [DONE] Battle System Core Components
   - [DONE] Battalion Stats System
+    - Fixed per-unit stats ✓
+    - Scaling stats ✓
+    - Frontend-only stats ✓
+    - Type safety ✓
   - [DONE] Combat Calculations
+    - Attack calculation ✓
+    - Defense reduction ✓
+    - Minimum damage ✓
+    - Input validation ✓
   - [DONE] Targeting System
   - [IN_PROGRESS] Movement System
     - [DONE] Core Movement Properties
