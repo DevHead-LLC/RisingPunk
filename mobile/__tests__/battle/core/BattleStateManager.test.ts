@@ -332,5 +332,34 @@ describe('BattleStateManager', () => {
       // Should still have only one call from the valid transition
       expect(mockBattleService.updateState).toHaveBeenCalledTimes(1);
     });
+
+    test('should handle server state updates with proper node typing', () => {
+      manager.initializeBattle(mockBattleId);
+      
+      const mockServerState: BattleState = {
+        phase: BattlePhase.ACTIVE_BATTLE,
+        timeRemaining: 15,
+        battalions: new Map(),
+        nodes: new Map([[1, {
+          id: 1,
+          position: { x: 10, y: 10 },
+          controllingTeam: 'user' as 'user' | 'enemy' | null,
+          controlProgress: 50,
+          health: 100
+        }]]),
+        updateId: 1,
+        lastUpdated: new Date()
+      };
+
+      // Get the stored callback and call it with transformed state
+      const onUpdate = (mockBattleService.startSync as any).mockOnUpdate;
+      onUpdate(mockServerState);
+
+      const state = manager.getState();
+      const node = state.nodes.get(1);
+      expect(node).toBeDefined();
+      expect(node?.controllingTeam).toBe('user');
+      expect(node?.controlProgress).toBe(50);
+    });
   });
 }); 
