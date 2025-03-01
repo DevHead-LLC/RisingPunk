@@ -1,7 +1,7 @@
 // Implementation of @battle-core-mechanics.mdc#Combat-Logic#Battalion-Stats
 // Core calculations for the battalion stats system
 
-import { BattalionType, BattalionStats, CombatCalculationParams, Position, TargetInfo, TargetingParams, TargetingResult, AttackPositionParams } from './types';
+import { BattalionType, BattalionStats, CombatCalculationParams, Position, TargetInfo, TargetingParams, TargetingResult, AttackPositionParams, NodeOwnership, NodeInfo } from './types';
 
 // Fixed stats per unit type as defined in @battle-core-mechanics.mdc
 const BASE_STATS: Record<BattalionType, BattalionStats> = {
@@ -216,4 +216,44 @@ export function calculateAttackPosition(params: AttackPositionParams): Position 
     x: Math.round(attackerPosition.x + dx * scale),
     y: Math.round(attackerPosition.y + dy * scale)
   };
+}
+
+// Implementation of @battle-movement-system.mdc#Network-Structure#Initial-Node-Control
+// Define node ownership and valid initial movements
+const NODES: NodeInfo[] = [
+  { position: { x: 0, y: 0 }, ownership: NodeOwnership.User },    // Node 0
+  { position: { x: 10, y: 0 }, ownership: NodeOwnership.User },   // Node 1
+  { position: { x: 20, y: 0 }, ownership: NodeOwnership.User },   // Node 2
+  { position: { x: 0, y: 10 }, ownership: NodeOwnership.Neutral }, // Node 3
+  { position: { x: 10, y: 10 }, ownership: NodeOwnership.Neutral }, // Node 4
+  { position: { x: 20, y: 10 }, ownership: NodeOwnership.Neutral }, // Node 5
+  { position: { x: 0, y: 20 }, ownership: NodeOwnership.Enemy },   // Node 6
+  { position: { x: 10, y: 20 }, ownership: NodeOwnership.Enemy },  // Node 7
+  { position: { x: 20, y: 20 }, ownership: NodeOwnership.Enemy }   // Node 8
+];
+
+// Valid initial movements from each user node
+const VALID_INITIAL_MOVES: Record<number, number[]> = {
+  0: [3, 4],       // Node 0 can target nodes 3 and 4
+  1: [3, 4, 5],    // Node 1 can target nodes 3, 4, and 5
+  2: [4, 5]        // Node 2 can target nodes 4 and 5
+};
+
+export function validateInitialMovement(fromNodeIndex: number, toNodeIndex: number): void {
+  // Validate node indices
+  if (fromNodeIndex < 0 || fromNodeIndex >= NODES.length || 
+      toNodeIndex < 0 || toNodeIndex >= NODES.length) {
+    throw new Error('Invalid node index');
+  }
+
+  // Validate target node is neutral
+  if (NODES[toNodeIndex].ownership !== NodeOwnership.Neutral) {
+    throw new Error('Invalid initial movement: Can only target neutral nodes');
+  }
+
+  // Check if movement is valid for the starting node
+  const validTargets = VALID_INITIAL_MOVES[fromNodeIndex];
+  if (!validTargets || !validTargets.includes(toNodeIndex)) {
+    throw new Error('Invalid initial movement: Target node not accessible');
+  }
 } 

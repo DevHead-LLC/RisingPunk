@@ -182,19 +182,27 @@ RisingPunk/
   - [DONE] Battalion Stats System
   - [DONE] Combat Calculations
   - [DONE] Targeting System
+  - [IN_PROGRESS] Movement System
+    - [DONE] Core Movement Properties
+    - [DONE] Network Movement
+    - [DONE] Attack Range Positioning
+    - [DONE] Initial Node Restrictions
+    - [PENDING] Pathfinding
 
 ## Pending Features
 1. Battle System
-   - [PENDING] Movement System ⬅ Current Task
+   - [IN_PROGRESS] Movement System
+     - Next: Implement pathfinding between nodes
    - [PENDING] Node Control
    - [PENDING] Victory Conditions
 
 ## Recent Updates
-1. [2024-03-XX] Completed Core Battle Systems
-   - Implemented and tested Battalion Stats
-   - Implemented and tested Combat Calculations
-   - Implemented and tested Targeting System
-   - Ready to proceed with Movement System
+1. [2024-03-XX] Movement System Progress
+   - Implemented core movement properties
+   - Added network movement validation
+   - Added attack range positioning
+   - Added initial node restrictions
+   - Ready for pathfinding implementation
 
 # Development Workflow
 
