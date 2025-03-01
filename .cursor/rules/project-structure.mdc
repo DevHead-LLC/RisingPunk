@@ -178,21 +178,23 @@ RisingPunk/
 - [DONE] Project Structure Setup
 - [DONE] Color Scheme Definition
 - [DONE] Basic Navigation
+- [DONE] Battle System Core Components
+  - [DONE] Battalion Stats System
+  - [DONE] Combat Calculations
+  - [DONE] Targeting System
 
 ## Pending Features
 1. Battle System
-   - [IN_PROGRESS] Battalion Stats ⬅ Current Task
-   - [PENDING] Combat Calculations
-   - [PENDING] Targeting System
-   - [PENDING] Movement System
+   - [PENDING] Movement System ⬅ Current Task
    - [PENDING] Node Control
    - [PENDING] Victory Conditions
 
 ## Recent Updates
-1. [2024-03-XX] Reset Battle System Implementation
-   - Cleared previous test implementations
-   - Established systematic test-first approach
-   - Starting with minimal Battalion Stats tests
+1. [2024-03-XX] Completed Core Battle Systems
+   - Implemented and tested Battalion Stats
+   - Implemented and tested Combat Calculations
+   - Implemented and tested Targeting System
+   - Ready to proceed with Movement System
 
 # Development Workflow
 
