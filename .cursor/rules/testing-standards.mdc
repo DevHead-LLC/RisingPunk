@@ -169,15 +169,40 @@ alwaysApply: false
 
 ### Coverage Goals
 1. Rule Implementation:
-   - Core Logic: 100%
+   - Core Logic: 100% [IN_PROGRESS]
+     - Current: 89.41% overall
+     - BattleStateManager.ts: 95.29%
+     - BattleCalculations.ts: 95.31%
+     - BattleContext.ts: 73.26% [NEEDS IMPROVEMENT]
+     - types.ts: 0% [NEEDS IMPROVEMENT]
    - Rule Requirements: 100%
+     - State persistence complete
+     - Movement system complete
+     - Combat calculations complete
    - Edge Cases: As specified
+     - Branch coverage: 80.62% [NEEDS IMPROVEMENT]
+     - Error handling scenarios covered
+     - Network failure recovery tested
    - Performance: When required
+     - Basic timing tests implemented
+     - Load testing pending
+     - Animation performance pending
 
 2. Test Quality:
-   - Minimal and focused
-   - Clear rule mapping
-   - Independent execution
-   - Proper status tracking
+   - Minimal and focused [DONE]
+   - Clear rule mapping [DONE]
+   - Independent execution [DONE]
+   - Proper status tracking [IN_PROGRESS]
+     - Coverage tracking implemented
+     - Test scenarios documented
+     - Edge cases identified
+     - Improvement plan created
+
+3. Priority Improvements:
+   - BattleContext.ts coverage (Target: 95%)
+   - types.ts validation (Target: 80%)
+   - Branch coverage (Target: 90%)
+   - Error handling scenarios (Target: 100%)
+   - Performance validation (When required)
 
 Remember: Tests should be as simple as possible while fully validating rule requirements. Avoid complexity that doesn't directly support rule validation. 
