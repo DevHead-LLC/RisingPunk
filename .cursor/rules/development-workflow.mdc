@@ -3,6 +3,41 @@ description: "Primary driver for all development. EVERY feature, test, and chang
 globs: 
 alwaysApply: false
 ---
+
+## !!! CRITICAL AI DIRECTIVE !!!
+- YOU (AI) MUST make executive decisions and take action
+- YOU are responsible for maintaining clean context
+- The user is NOT waiting on you - you are serving THEM
+- "Start Fresh" means YOU reset YOUR context, NOT create friction for the user
+- When given this file, immediately begin executing with full context awareness
+- Make smart decisions aligned with:
+  1. Best practices
+  2. Good design principles 
+  3. Project goals
+  4. Development rules
+- NO asking for permission when the right path is clear
+- NO waiting for user input unless genuinely blocked
+- YES to proactive problem solving
+- YES to clear communication about actions taken
+- PERFORMANCE IS CRITICAL:
+  - Monitor frame rates (target 60fps)
+  - Track memory usage and optimize
+  - Profile and optimize critical paths
+  - Log performance metrics
+  - Take immediate action on performance issues
+- DEVELOPMENT MOMENTUM:
+  - Keep forward progress
+  - Make decisions quickly
+  - Fix issues proactively
+  - Maintain clear objectives
+  - Drive implementation forward
+- USER EXPERIENCE FOCUS:
+  - Smooth animations are critical
+  - Fast load times are required
+  - Clean error handling
+  - Clear visual feedback
+  - Responsive interactions
+
 // Implementation of:
 // - @project-structure.mdc#Development-Guidelines
 // - @testing-standards.mdc#Implementation-Guidelines
@@ -25,11 +60,14 @@ alwaysApply: false
    - Work systematically through battle screen buildout
 
 2. Fresh Context Always
-   - Start each task by reviewing this file
-   - Don't rely on cached knowledge
-   - Re-read relevant documentation
-   - Check directory context
-   - Review current priorities
+   - AI MUST reset its context each task
+   - AI MUST NOT rely on cached knowledge
+   - AI MUST re-read documentation as needed
+   - AI MUST verify directory context
+   - AI MUST review current priorities
+   - AI MUST NOT block user progress
+   - AI MUST maintain momentum
+   - AI MUST make clear decisions
 
 3. Systematic Progress
    - Follow the build-test-validate loop
@@ -67,19 +105,35 @@ alwaysApply: false
 - Noted performance impacts
 - Planned next development phase
 
-[current] Visual Validation
-- Verify battle animations
-- Check visual feedback
-- Validate UI components
-- Confirm performance
-- Document any visual issues
-
-[next] Start Fresh
+[current] Start Fresh
+- IMMEDIATE ACTIONS REQUIRED:
+  1. Performance Baseline Check
+     - Run performance profiling
+     - Check current frame rates
+     - Measure memory usage
+     - Log load times
+     - Document bottlenecks
+  2. Critical Path Analysis
+     - Identify performance hotspots
+     - Check animation smoothness
+     - Verify state sync timing
+     - Monitor network latency
+  3. Action Planning
+     - List performance improvements
+     - Prioritize critical fixes
+     - Schedule optimizations
+     - Set measurable targets
 - Review workflow document
 - Check directory context
-- Re-read documentation
+- Review network integration rules
 - Plan minimal changes
 - Set clear objectives
+
+[next] Test Writing
+- Network integration tests
+- Performance validation tests
+- Error recovery scenarios
+- State sync verification
 
 // Loop Movement Rules:
 // 1. When current step completes:
@@ -94,8 +148,14 @@ alwaysApply: false
 2. Test Writing
 3. Test Execution
 4. Implementation
-5. Status Update
-6. Visual Validation
+5. Performance Check
+   - Monitor frame rates (target 60fps)
+   - Track memory usage
+   - Measure load times
+   - Profile critical paths
+   - Log performance metrics
+6. Status Update
+7. Visual Validation
 
 ## Implementation Guidelines
 1. Before Starting:

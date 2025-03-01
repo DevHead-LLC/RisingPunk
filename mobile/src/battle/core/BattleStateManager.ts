@@ -4,6 +4,7 @@
 import { BattlePhase } from './BattleContext';
 import { Position, NodeOwnership } from './types';
 import { BattleService } from '../../services/BattleService';
+import { BattlePerformanceMonitor } from './BattlePerformanceMonitor';
 
 export interface BattleState {
   phase: BattlePhase;
@@ -46,12 +47,15 @@ export class BattleStateManager {
   private battleId: string | null = null;
   private battleService: BattleService;
   private syncEnabled: boolean = false;
+  private performanceMonitor: BattlePerformanceMonitor;
 
   constructor() {
     this.state = this.createInitialState();
     this.subscribers = new Set();
     this.updateTimer = null;
     this.battleService = BattleService.getInstance();
+    this.performanceMonitor = BattlePerformanceMonitor.getInstance();
+    this.performanceMonitor.startMonitoring();
   }
 
   private createInitialState(): BattleState {
@@ -124,85 +128,99 @@ export class BattleStateManager {
 
   // Update state with validation and sync
   public async updateState(update: StateUpdate): Promise<void> {
+    const startTime = performance.now();
     const newState = {
       ...this.state,
       battalions: new Map(this.state.battalions),
       nodes: new Map(this.state.nodes)
     };
+
     let hasChanges = false;
 
-    // Update phase if provided
-    if (update.phaseUpdate) {
-      if (this.isValidPhaseTransition(this.state.phase, update.phaseUpdate)) {
-        newState.phase = update.phaseUpdate;
-        hasChanges = true;
-      }
-    }
-
-    // Update time if provided
-    if (update.timeUpdate !== undefined) {
-      newState.timeRemaining = Math.max(0, update.timeUpdate);
-      hasChanges = true;
-    }
-
-    // Update battalions
-    if (update.battalionUpdates) {
-      update.battalionUpdates.forEach(battalionUpdate => {
-        if (!battalionUpdate.id) return;
-
-        const currentBattalion = this.state.battalions.get(battalionUpdate.id);
-        if (currentBattalion) {
-          newState.battalions.set(battalionUpdate.id, {
-            ...currentBattalion,
-            ...battalionUpdate
-          });
-        } else {
-          // Only add new battalion if it has all required fields
-          if (this.isValidBattalionState(battalionUpdate as BattalionState)) {
-            newState.battalions.set(battalionUpdate.id, battalionUpdate as BattalionState);
-          }
-        }
-        hasChanges = true;
-      });
-    }
-
-    // Update nodes
-    if (update.nodeUpdates) {
-      update.nodeUpdates.forEach(nodeUpdate => {
-        if (nodeUpdate.id === undefined) return;
-
-        const currentNode = this.state.nodes.get(nodeUpdate.id);
-        if (currentNode) {
-          newState.nodes.set(nodeUpdate.id, {
-            ...currentNode,
-            ...nodeUpdate
-          });
-        } else {
-          // Only add new node if it has all required fields
-          if (this.isValidNodeState(nodeUpdate as NodeState)) {
-            newState.nodes.set(nodeUpdate.id, nodeUpdate as NodeState);
-          }
-        }
-        hasChanges = true;
-      });
-    }
-
-    // Only update if there are changes
-    if (hasChanges) {
-      newState.updateId++;
-      newState.lastUpdated = new Date();
-      this.state = newState;
-      this.notifySubscribers();
-
-      // Sync with backend if enabled
-      if (this.syncEnabled && this.battleId) {
-        try {
-          await this.battleService.updateState(this.battleId, this.state);
-        } catch (error) {
-          console.error('Failed to sync state update:', error);
-          // Continue with local state if sync fails
+    try {
+      // Update phase if provided
+      if (update.phaseUpdate) {
+        if (this.isValidPhaseTransition(this.state.phase, update.phaseUpdate)) {
+          newState.phase = update.phaseUpdate;
+          hasChanges = true;
         }
       }
+
+      // Update time if provided
+      if (update.timeUpdate !== undefined) {
+        newState.timeRemaining = Math.max(0, update.timeUpdate);
+        hasChanges = true;
+      }
+
+      // Update battalions
+      if (update.battalionUpdates) {
+        update.battalionUpdates.forEach(battalionUpdate => {
+          if (!battalionUpdate.id) return;
+
+          const currentBattalion = this.state.battalions.get(battalionUpdate.id);
+          if (currentBattalion) {
+            newState.battalions.set(battalionUpdate.id, {
+              ...currentBattalion,
+              ...battalionUpdate
+            });
+          } else {
+            // Only add new battalion if it has all required fields
+            if (this.isValidBattalionState(battalionUpdate as BattalionState)) {
+              newState.battalions.set(battalionUpdate.id, battalionUpdate as BattalionState);
+            }
+          }
+          hasChanges = true;
+        });
+      }
+
+      // Update nodes
+      if (update.nodeUpdates) {
+        update.nodeUpdates.forEach(nodeUpdate => {
+          if (nodeUpdate.id === undefined) return;
+
+          const currentNode = this.state.nodes.get(nodeUpdate.id);
+          if (currentNode) {
+            newState.nodes.set(nodeUpdate.id, {
+              ...currentNode,
+              ...nodeUpdate
+            });
+          } else {
+            // Only add new node if it has all required fields
+            if (this.isValidNodeState(nodeUpdate as NodeState)) {
+              newState.nodes.set(nodeUpdate.id, nodeUpdate as NodeState);
+            }
+          }
+          hasChanges = true;
+        });
+      }
+
+      // Only update if there are changes
+      if (hasChanges) {
+        newState.updateId++;
+        newState.lastUpdated = new Date();
+        this.state = newState;
+        this.notifySubscribers();
+
+        // Sync with backend if enabled
+        if (this.syncEnabled && this.battleId) {
+          try {
+            await this.battleService.updateState(this.battleId, this.state);
+          } catch (error) {
+            console.error('Failed to sync state update:', error);
+            // Continue with local state if sync fails
+          }
+        }
+      }
+
+      // Record performance metrics
+      const endTime = performance.now();
+      const jsThreadUsage = (endTime - startTime) / 16.67; // 16.67ms is one frame at 60fps
+      this.performanceMonitor.recordJSThreadUsage(jsThreadUsage);
+      this.performanceMonitor.recordFrame();
+
+    } catch (error) {
+      console.error('Error during state update:', error);
+      throw error;
     }
   }
 
@@ -270,6 +288,7 @@ export class BattleStateManager {
   // Clean up resources
   public cleanup(): void {
     this.subscribers.clear();
+    this.performanceMonitor.cleanup();
     this.reset();
   }
 } 
