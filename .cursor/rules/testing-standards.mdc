@@ -8,6 +8,29 @@ alwaysApply: false
 
 # Testing Standards
 
+## CRITICAL: Directory Context
+// MANDATORY: MUST BE VALIDATED BEFORE ANY TEST OPERATIONS
+1. Directory Validation:
+   ```bash
+   pwd  # REQUIRED before ANY file operations
+   ```
+   - ALWAYS verify test directory context
+   - NEVER assume directory location
+   - ABORT if directory is incorrect
+   - RE-VALIDATE after any directory changes
+
+2. Test Directory Structure:
+   - Must operate in correct workspace
+   - Must validate before file operations
+   - Must maintain directory context
+   - Must document directory requirements
+
+3. Common Test Directory Errors:
+   - Wrong test directory level
+   - Incorrect workspace root
+   - Mixed test contexts
+   - Invalid file paths
+
 ## Core Testing Principles
 // Implementation of:
 // - @project-structure.mdc#Rule-System
@@ -114,12 +137,35 @@ alwaysApply: false
    - Minimal, focused tests
    - Clear status tracking
    - Independent execution
+   - Full test suite validation after individual success
 
 2. Must Not Have:
    - Unnecessary complexity
    - Unrelated test coverage
    - Cross-test dependencies
    - Duplicate rule testing
+
+### Test Validation Process
+1. Individual Test Phase:
+   - Run specific test file
+   - Validate all tests pass
+   - Fix any failures
+   - Document changes
+
+2. Comprehensive Test Phase:
+   - Run entire test suite
+   - Verify no regressions
+   - Check for side effects
+   - Update status tracking
+
+3. Test Commands:
+   ```bash
+   # Individual test
+   npm test -- path/to/test.ts
+   
+   # Full test suite validation
+   npm test
+   ```
 
 ### Coverage Goals
 1. Rule Implementation:

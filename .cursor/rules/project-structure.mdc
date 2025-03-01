@@ -8,6 +8,35 @@ alwaysApply: true
 
 # Project Structure
 
+## CRITICAL: Directory Context
+// MANDATORY: MUST BE VALIDATED BEFORE ANY FILE OPERATIONS
+1. Directory Validation:
+   ```bash
+   pwd  # REQUIRED before ANY file operations
+   ```
+   Workspace Root Requirements:
+   - MUST be: /Users/robertthiel/DevHead_LLC/RisingPunk
+   - VERIFY before ANY file operations
+   - ABORT if incorrect
+   - RE-VALIDATE after directory changes
+
+2. Directory Context Rules:
+   - NEVER trust cached directory information
+   - ALWAYS verify current location
+   - VALIDATE before creating/modifying files
+   - MAINTAIN workspace root context
+
+3. Common Directory Errors:
+   - Operating in wrong subdirectory
+   - Cached directory assumptions
+   - Mixed workspace contexts
+   - Invalid file paths
+
+4. Critical Paths:
+   - /.cursor/rules/         # Rule documentation
+   - /mobile/               # React Native app
+   - /server/              # Backend services
+
 ## Directory Organization
 ```
 RisingPunk/
