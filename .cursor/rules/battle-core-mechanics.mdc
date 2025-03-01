@@ -18,6 +18,8 @@ alwaysApply: true
 
 ### Battle System MVP Phases
 [IN_PROGRESS] 1. Core State Management
+   - [DONE] Movement System implementation
+   - [DONE] Node Control System implementation
    - [PENDING] Battle context implementation
    - [PENDING] State machine for battle phases
    - [PENDING] Performance monitoring hooks
@@ -100,11 +102,17 @@ alwaysApply: true
   - Validation: Damage formulas tested
   - Notes: Includes minimum damage rule
 
-- [DONE] Targeting Rules
+- [DONE] Movement System
   - Dependencies: None
-  - Location: Frontend targeting logic
-  - Validation: Proximity-based targeting verified
-  - Notes: No type-specific preferences
+  - Location: BattleCalculations.ts
+  - Validation: All movement tests passing
+  - Notes: Includes pathfinding and network effects
+
+- [DONE] Node Control System
+  - Dependencies: None
+  - Location: BattleCalculations.ts
+  - Validation: All control tests passing
+  - Notes: Includes victory conditions
 
 ## In Progress
 - [IN_PROGRESS] State Management
@@ -132,15 +140,26 @@ alwaysApply: true
 
 ## Recent Changes
 // List most recent changes first, with dependencies and impacts
-1. [2024-03-XX] Added state management split between frontend/backend
-   - Impact: Clarified responsibilities
-   - Dependencies: Updated in all related files
-   - Validation: Cross-referenced in standards
+1. [2024-03-XX] Completed Node Control System
+   - Impact: Full node control mechanics implemented
+   - Dependencies: Movement System
+   - Validation: All tests passing
+   - Features:
+     - Node ownership mechanics
+     - Capture mechanics
+     - Strategic effects
+     - Victory point contributions
 
-2. [2024-03-XX] Implemented core combat calculations
-   - Impact: Defined damage formulas
-   - Dependencies: Battalion stats system
-   - Validation: Unit tests added
+2. [2024-03-XX] Completed Movement System
+   - Impact: Full movement mechanics implemented
+   - Dependencies: None
+   - Validation: All tests passing
+   - Features:
+     - Core movement properties
+     - Network movement
+     - Attack range positioning
+     - Node restrictions
+     - Pathfinding
 
 ## Integration Points
 // Critical areas where multiple systems interact

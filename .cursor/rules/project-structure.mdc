@@ -187,7 +187,7 @@ RisingPunk/
     - [DONE] Network Movement
     - [DONE] Attack Range Positioning
     - [DONE] Initial Node Restrictions
-    - [PENDING] Pathfinding
+    - [DONE] Pathfinding
 
 ## Pending Features
 1. Battle System
@@ -197,12 +197,20 @@ RisingPunk/
    - [PENDING] Victory Conditions
 
 ## Recent Updates
-1. [2024-03-XX] Movement System Progress
+1. [2024-03-XX] Node Control System Completed
+   - Implemented node ownership mechanics
+   - Added capture threshold calculations
+   - Added control progress tracking
+   - Implemented network effects and strategic connectivity
+   - Added victory point calculations and battle resolution
+   - All tests passing
+
+2. [2024-03-XX] Movement System Progress
    - Implemented core movement properties
    - Added network movement validation
    - Added attack range positioning
    - Added initial node restrictions
-   - Ready for pathfinding implementation
+   - Completed pathfinding implementation
 
 # Development Workflow
 
@@ -240,3 +248,20 @@ Remember: Always check this file when:
 2. Creating new files
 3. Implementing tests
 4. Making architectural decisions 
+
+# RisingPunk Project Structure
+
+## Battle System [IN_PROGRESS]
+
+### Movement System [COMPLETE]
+- Core movement properties ✓
+- Network movement ✓
+- Attack range positioning ✓
+- Initial node restrictions ✓
+- Pathfinding ✓
+
+### Node Control System [COMPLETE]
+- Node ownership mechanics ✓
+- Capture mechanics ✓
+- Strategic effects ✓
+- Victory point contributions ✓

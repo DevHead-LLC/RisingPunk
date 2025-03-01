@@ -1,7 +1,7 @@
 // Implementation of @battle-core-mechanics.mdc#Combat-Logic#Battalion-Stats
 // Core calculations for the battalion stats system
 
-import { BattalionType, BattalionStats, CombatCalculationParams, Position, TargetInfo, TargetingParams, TargetingResult, AttackPositionParams, NodeOwnership, NodeInfo } from './types';
+import { BattalionType, BattalionStats, CombatCalculationParams, Position, TargetInfo, TargetingParams, TargetingResult, AttackPositionParams, NodeOwnership, NodeInfo, NodeControlState } from './types';
 
 // Fixed stats per unit type as defined in @battle-core-mechanics.mdc
 const BASE_STATS: Record<BattalionType, BattalionStats> = {
@@ -141,7 +141,7 @@ function isValidPosition(position: Position): boolean {
   return typeof position.x === 'number' && typeof position.y === 'number';
 }
 
-function isHorizontalOrVertical(start: Position, end: Position): boolean {
+export function isHorizontalOrVertical(start: Position, end: Position): boolean {
   // Movement must be either horizontal (same y) or vertical (same x)
   return start.x === end.x || start.y === end.y;
 }
@@ -220,7 +220,7 @@ export function calculateAttackPosition(params: AttackPositionParams): Position 
 
 // Implementation of @battle-movement-system.mdc#Network-Structure#Initial-Node-Control
 // Define node ownership and valid initial movements
-const NODES: NodeInfo[] = [
+export const NODES: NodeInfo[] = [
   { position: { x: 0, y: 0 }, ownership: NodeOwnership.User },    // Node 0
   { position: { x: 10, y: 0 }, ownership: NodeOwnership.User },   // Node 1
   { position: { x: 20, y: 0 }, ownership: NodeOwnership.User },   // Node 2
@@ -256,4 +256,311 @@ export function validateInitialMovement(fromNodeIndex: number, toNodeIndex: numb
   if (!validTargets || !validTargets.includes(toNodeIndex)) {
     throw new Error('Invalid initial movement: Target node not accessible');
   }
+}
+
+// Implementation of @battle-movement-system.mdc#Pathfinding
+interface PathNode {
+  index: number;
+  previous: number | null;
+}
+
+function findShortestPath(fromIndex: number, toIndex: number): number[] {
+  const visited = new Set<number>();
+  const queue: PathNode[] = [{ index: fromIndex, previous: null }];
+  const previousNode = new Map<number, number>();
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    
+    if (current.index === toIndex) {
+      // Reconstruct path
+      const path: number[] = [];
+      let nodeIndex = toIndex;
+      while (nodeIndex !== fromIndex) {
+        path.unshift(nodeIndex);
+        nodeIndex = previousNode.get(nodeIndex)!;
+      }
+      path.unshift(fromIndex);
+      return path;
+    }
+
+    if (!visited.has(current.index)) {
+      visited.add(current.index);
+      const adjacent = getAdjacentNodes(current.index);
+      
+      for (const nextIndex of adjacent) {
+        if (!visited.has(nextIndex)) {
+          previousNode.set(nextIndex, current.index);
+          queue.push({ index: nextIndex, previous: current.index });
+        }
+      }
+    }
+  }
+
+  throw new Error('No valid path available between nodes');
+}
+
+export function findPath(fromNodeIndex: number, toNodeIndex: number): Position[] {
+  // Validate node indices
+  if (fromNodeIndex < 0 || fromNodeIndex >= NODES.length || 
+      toNodeIndex < 0 || toNodeIndex >= NODES.length) {
+    throw new Error('Invalid node index');
+  }
+
+  // Check if target node is reachable
+  const fromNode = NODES[fromNodeIndex];
+  const toNode = NODES[toNodeIndex];
+
+  // Enemy nodes are not reachable
+  if (toNode.ownership === NodeOwnership.Enemy) {
+    throw new Error('No valid path available between nodes');
+  }
+
+  // Find the shortest path through the network
+  const nodeIndices = findShortestPath(fromNodeIndex, toNodeIndex);
+  
+  // Convert node indices to positions
+  return nodeIndices.map(index => NODES[index].position);
+}
+
+function getAdjacentNodes(nodeIndex: number): number[] {
+  const node = NODES[nodeIndex];
+  const adjacent: number[] = [];
+
+  // Check all nodes for adjacency
+  NODES.forEach((otherNode, index) => {
+    if (index !== nodeIndex) {
+      const isAdjacent = 
+        (node.position.x === otherNode.position.x && Math.abs(node.position.y - otherNode.position.y) === 10) ||
+        (node.position.y === otherNode.position.y && Math.abs(node.position.x - otherNode.position.x) === 10);
+      if (isAdjacent) {
+        adjacent.push(index);
+      }
+    }
+  });
+
+  return adjacent;
+}
+
+// Implementation of @battle-node-control.mdc#Node-States-and-Control
+export function getNodeOwnership(nodeIndex: number): NodeOwnership {
+  // Validate node index
+  if (nodeIndex < 0 || nodeIndex >= NODES.length) {
+    throw new Error('Invalid node index');
+  }
+
+  return NODES[nodeIndex].ownership;
+}
+
+// Implementation of @battle-node-control.mdc#Capture-System#Capture-Requirements
+export function calculateCaptureThreshold(totalArmyHealth: number): number {
+  if (totalArmyHealth <= 0) {
+    throw new Error('Invalid total health');
+  }
+
+  // Capture threshold is 75% of total army health
+  return Math.floor(totalArmyHealth * 0.75);
+}
+
+/**
+ * Updates the control state of a node based on damage dealt
+ * Implementation of @battle-node-control.mdc#Capture-System#Control-Progress
+ */
+export function updateNodeControl(
+  nodeIndex: number,
+  userDamage: number,
+  enemyDamage: number,
+  captureThreshold: number
+): NodeControlState {
+  if (nodeIndex < 0 || nodeIndex >= NODES.length) {
+    throw new Error('Invalid node index');
+  }
+
+  const node = NODES[nodeIndex];
+  
+  // Initialize control state if it doesn't exist
+  if (!node.controlState) {
+    node.controlState = {
+      ownership: node.ownership,
+      userDamage: 0,
+      enemyDamage: 0,
+      captureThreshold
+    };
+  }
+
+  const currentState = node.controlState;
+  currentState.userDamage = userDamage;
+  currentState.enemyDamage = enemyDamage;
+  currentState.captureThreshold = captureThreshold;
+
+  // Check for node capture
+  if (userDamage >= captureThreshold && userDamage > enemyDamage) {
+    node.ownership = NodeOwnership.User;
+    currentState.ownership = NodeOwnership.User;
+  } else if (enemyDamage >= captureThreshold && enemyDamage > userDamage) {
+    node.ownership = NodeOwnership.Enemy;
+    currentState.ownership = NodeOwnership.Enemy;
+  }
+
+  return currentState;
+}
+
+/**
+ * Validates if a direct network line exists between two nodes
+ * Implementation of @battle-node-control.mdc#Network-Effects#Network-Connectivity
+ */
+export function validateNetworkLine(fromNodeIndex: number, toNodeIndex: number): boolean {
+  if (fromNodeIndex < 0 || fromNodeIndex >= NODES.length || 
+      toNodeIndex < 0 || toNodeIndex >= NODES.length) {
+    throw new Error('Invalid node index');
+  }
+
+  const fromNode = NODES[fromNodeIndex];
+  const toNode = NODES[toNodeIndex];
+
+  // Nodes are adjacent if they share an x or y coordinate and are 10 units apart
+  const dx = Math.abs(fromNode.position.x - toNode.position.x);
+  const dy = Math.abs(fromNode.position.y - toNode.position.y);
+  
+  return (dx === 0 && dy === 10) || (dy === 0 && dx === 10);
+}
+
+/**
+ * Gets all nodes that are directly connected to the given node
+ * Implementation of @battle-node-control.mdc#Network-Effects#Network-Connectivity
+ */
+export function getConnectedNodes(nodeIndex: number): number[] {
+  if (nodeIndex < 0 || nodeIndex >= NODES.length) {
+    throw new Error('Invalid node index');
+  }
+
+  const connectedNodes: number[] = [];
+  
+  // Check all nodes for valid network lines
+  for (let i = 0; i < NODES.length; i++) {
+    if (i !== nodeIndex && validateNetworkLine(nodeIndex, i)) {
+      connectedNodes.push(i);
+    }
+  }
+
+  return connectedNodes;
+}
+
+/**
+ * Checks if a target node is accessible from a source node based on ownership
+ * Implementation of @battle-node-control.mdc#Network-Effects#Strategic-Impact
+ */
+export function isNodeAccessible(fromNodeIndex: number, toNodeIndex: number): boolean {
+  if (fromNodeIndex < 0 || fromNodeIndex >= NODES.length || 
+      toNodeIndex < 0 || toNodeIndex >= NODES.length) {
+    throw new Error('Invalid node index');
+  }
+
+  const fromNode = NODES[fromNodeIndex];
+  const toNode = NODES[toNodeIndex];
+
+  // Must have a valid network line
+  if (!validateNetworkLine(fromNodeIndex, toNodeIndex)) {
+    return false;
+  }
+
+  // Enemy nodes are not accessible from user nodes and vice versa
+  if ((fromNode.ownership === NodeOwnership.User && toNode.ownership === NodeOwnership.Enemy) ||
+      (fromNode.ownership === NodeOwnership.Enemy && toNode.ownership === NodeOwnership.User)) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Represents the current victory points for each side
+ */
+export interface VictoryPoints {
+  user: number;
+  enemy: number;
+  neutral: number;
+}
+
+/**
+ * Represents the battle resolution result
+ */
+export interface BattleResult {
+  winner: NodeOwnership;
+  points: VictoryPoints;
+}
+
+/**
+ * Calculates current victory points for each side based on node ownership
+ * Implementation of @battle-node-control.mdc#Victory-Conditions#Control-Points
+ */
+export function calculateVictoryPoints(): VictoryPoints {
+  const points: VictoryPoints = {
+    user: 0,
+    enemy: 0,
+    neutral: 0
+  };
+
+  // Count nodes owned by each side
+  NODES.forEach(node => {
+    switch (node.ownership) {
+      case NodeOwnership.User:
+        points.user++;
+        break;
+      case NodeOwnership.Enemy:
+        points.enemy++;
+        break;
+      case NodeOwnership.Neutral:
+        points.neutral++;
+        break;
+    }
+  });
+
+  return points;
+}
+
+/**
+ * Resets the battle state to initial conditions
+ * Implementation of @battle-node-control.mdc#Victory-Conditions#Battle-Resolution
+ */
+export function resetBattleState(): void {
+  // Reset node ownership to initial state
+  NODES.forEach((node, index) => {
+    if (index <= 2) {
+      node.ownership = NodeOwnership.User;
+    } else if (index >= 6) {
+      node.ownership = NodeOwnership.Enemy;
+    } else {
+      node.ownership = NodeOwnership.Neutral;
+    }
+
+    // Reset control state
+    if (node.controlState) {
+      node.controlState.userDamage = 0;
+      node.controlState.enemyDamage = 0;
+    }
+  });
+}
+
+/**
+ * Determines the battle winner based on node control majority
+ * Implementation of @battle-node-control.mdc#Victory-Conditions#Victory-Determination
+ */
+export function resolveBattle(): BattleResult {
+  const points = calculateVictoryPoints();
+  
+  // Determine winner based on majority control
+  let winner: NodeOwnership;
+  if (points.user > points.enemy) {
+    winner = NodeOwnership.User;
+  } else if (points.enemy > points.user) {
+    winner = NodeOwnership.Enemy;
+  } else {
+    winner = NodeOwnership.Neutral; // Tie scenario
+  }
+
+  return {
+    winner,
+    points
+  };
 } 
