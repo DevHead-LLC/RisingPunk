@@ -11,15 +11,42 @@ alwaysApply: true
 ## Directory Organization
 ```
 RisingPunk/
+├── .cursor/              # Project rules and standards
+│   └── rules/           # Core rule documentation
+│       ├── battle/      # Battle system rules
+│       │   ├── battle-core-mechanics.mdc     [IN_PROGRESS]
+│       │   ├── battle-movement-system.mdc    [IN_PROGRESS]
+│       │   ├── battle-targeting-system.mdc   [PENDING]
+│       │   ├── battle-node-control.mdc       [PENDING]
+│       │   ├── battle-animation-standards.mdc[PENDING]
+│       │   ├── battle-visual-feedback.mdc    [PENDING]
+│       │   ├── battle-performance-standards.mdc [PENDING]
+│       │   ├── battle-logging-standards.mdc  [PENDING]
+│       │   └── battle-state-persistence.mdc  [PENDING]
+│       ├── testing-standards.mdc
+│       ├── project-structure.mdc
+│       ├── code-style-and-structure.mdc
+│       ├── backend-standards.mdc
+│       ├── mobile-development.mdc
+│       └── cross-platform-integration.mdc
 ├── mobile/               # React Native application
 │   ├── src/             # Application source code
+│   │   ├── battle/      # Battle system implementation
+│   │   │   └── core/   # Core mechanics implementation
+│   │   │       ├── types.ts
+│   │   │       └── BattleCalculations.ts
 │   │   ├── components/  # Reusable UI components
 │   │   ├── screens/     # Screen components
 │   │   ├── contexts/    # React contexts
 │   │   ├── utils/       # Utility functions
 │   │   ├── hooks/       # Custom React hooks
-│   │   ├── assets/      # Images, fonts, etc.
-│   │   └── __tests__/   # Test files mirror src structure
+│   │   └── assets/      # Images, fonts, etc.
+│   ├── __tests__/       # Mobile-specific tests
+│   │   └── battle/      # Battle system tests
+│   │       ├── core/
+│   │       │   ├── BattleCoreStats.test.ts  [PENDING]
+│   │       │   └── BattleCombat.test.ts     [PENDING]
+│   │       └── README.md
 │   └── package.json     # Mobile dependencies
 ├── server/              # Express/MongoDB backend
 │   ├── src/            
@@ -31,14 +58,72 @@ RisingPunk/
 └── README.md           # Project documentation
 ```
 
+## Rule System
+// IMPORTANT: The .cursor/rules directory is the source of truth for all implementation standards
+// Each rule file defines specific requirements and tracks implementation status
+
+### Rule File Structure
+1. Status Tracking Format:
+   - [DONE] - Feature fully implemented and tested
+   - [IN_PROGRESS] - Currently being implemented
+   - [PENDING] - Not yet started
+   - [BLOCKED] - Waiting on dependencies
+
+2. Rule-Test Connection:
+   - Each rule maps to specific test files
+   - Tests must be minimal and focused
+   - Tests should not affect other system components
+   - Implementation follows rule requirements exactly
+
+3. Cross-Reference Format:
+   ```
+   // Implementation of:
+   // - @rule-file.mdc#Section-Name
+   
+   // Referenced by:
+   // - @other-rule.mdc#Section-Name
+   ```
+
+### Rule Implementation Strategy
+1. Core Principles:
+   - Start with rule documentation
+   - Write minimal, focused tests
+   - Implement core functionality
+   - Track status rigorously
+
+2. Test Implementation:
+   - Tests mirror rule structure
+   - Each test maps to specific rule section
+   - Keep tests simple and focused
+   - Avoid unnecessary complexity
+
+3. Status Updates:
+   - Update status in rule files
+   - Track dependencies between rules
+   - Note cross-rule impacts
+   - Document completion criteria
+
 ## Testing Strategy
-- Tests live alongside source code in mobile/src/__tests__/
-- Run tests from mobile/ directory:
-  ```bash
-  cd mobile
-  npm test           # Run all tests
-  npm run test:watch # Watch mode
-  ```
+// Implementation of @testing-standards.mdc#Core-Testing-Principles
+
+1. Test Organization:
+   - Tests mirror source structure
+   - Each test maps to specific rules
+   - Maintain clear rule references
+   - Track test coverage per rule
+
+2. Test Implementation:
+   - Write minimal, focused tests
+   - Test only what's needed
+   - Avoid unnecessary complexity
+   - Maintain rule compliance
+
+3. Test Execution:
+   ```bash
+   cd mobile
+   npm test           # Run all tests
+   npm run test:watch # Watch mode
+   ```
 
 ## Development Guidelines
 1. Code Organization:
@@ -77,17 +162,17 @@ RisingPunk/
 # Implementation Progress
 
 ## Current Focus
-[IN_PROGRESS] Battle System Core
-- Location: mobile/src/
-- Status: Implementing state management
-- Next: Battalion positioning system
-- Dependencies: battle-core-mechanics.mdc
+[IN_PROGRESS] Battle System Core - Test First Implementation
+- Location: mobile/src/battle/core/
+- Status: Starting fresh with systematic test implementation
+- Current: Setting up Battalion Stats System test structure
+- Next: Implement minimal passing test for Battalion Stats
+- Dependencies: None
 - Implementation Strategy:
-  1. Basic state management only
-  2. Core combat mechanics
-  3. Essential visual feedback
-  4. Minimal test coverage first
-  5. Expand features iteratively
+  1. Write minimal test for single Battalion Stats requirement
+  2. Implement only code needed to pass that test
+  3. Repeat for each core requirement
+  4. Move to next system only when current is complete
 
 ## Completed Features
 - [DONE] Project Structure Setup
@@ -96,28 +181,18 @@ RisingPunk/
 
 ## Pending Features
 1. Battle System
-   - State Management ⬅ Current Task
-   - Battalion Movement
-   - Combat Resolution
-   - Node Control
-   - Victory Conditions
-
-2. Financial Education
-   - Investment Mechanics
-   - Resource Management
-   - Progress Tracking
-   - Educational Content
+   - [IN_PROGRESS] Battalion Stats ⬅ Current Task
+   - [PENDING] Combat Calculations
+   - [PENDING] Targeting System
+   - [PENDING] Movement System
+   - [PENDING] Node Control
+   - [PENDING] Victory Conditions
 
 ## Recent Updates
-1. [2024-03-XX] Established project structure
-   - Defined directory organization
-   - Set up testing framework
-   - Created development guidelines
-
-2. [2024-03-XX] Initialized battle system
-   - Created core mechanics documentation
-   - Defined state management approach
-   - Set up performance monitoring
+1. [2024-03-XX] Reset Battle System Implementation
+   - Cleared previous test implementations
+   - Established systematic test-first approach
+   - Starting with minimal Battalion Stats tests
 
 # Development Workflow
 
