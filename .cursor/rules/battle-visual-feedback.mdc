@@ -3,6 +3,30 @@ description: Specifies all visual feedback requirements including animations, in
 globs: 
 alwaysApply: false
 ---
+
+## Progress Tracking
+[previous] Health Display System
+- ✓ Health bar visualization
+- ✓ Color indicators
+- ✓ Total health display
+- ✓ Smooth transitions
+
+[current] Combat Effects
+- ⟳ Attack animations
+- ⟳ Damage visualization
+- ⧖ Node control feedback
+
+[next] Node Visualization
+- ⧖ Control state display
+- ⧖ Network visualization
+- ⧖ Strategic connections
+
+// Legend:
+// ✓ = Complete
+// ⟳ = In Progress
+// ⧖ = Pending
+// ✗ = Blocked
+
 // IMPORTANT: When working with any section of this file, ALWAYS review ALL "Implementation of" and "Referenced by" 
 // connections to ensure full context and maintain consistency across the codebase.
 

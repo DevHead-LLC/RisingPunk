@@ -13,6 +13,7 @@ import { BattlePhase } from '../hooks/useBattleStateMachine';
 import { NodeVisual } from './battle/NodeVisual';
 import { BattleNetwork } from './battle/BattleNetwork';
 import { BattalionVisual } from './battle/BattalionVisual';
+import { RangeIndicator } from './battle/RangeIndicator';
 
 type Props = {
   phase: BattlePhase;
@@ -67,6 +68,26 @@ export const BattleUI = React.memo(({
         />
       </Animated.View>
 
+      {/* Range Layer */}
+      <View style={styles.rangeLayer}>
+        {userBattalions.map((battalion, index) => (
+          <RangeIndicator
+            key={`user-range-${index}`}
+            battalion={battalion}
+            isUser={true}
+            opacity={battalionOpacity}
+          />
+        ))}
+        {enemyBattalions.map((battalion, index) => (
+          <RangeIndicator
+            key={`enemy-range-${index}`}
+            battalion={battalion}
+            isUser={false}
+            opacity={battalionOpacity}
+          />
+        ))}
+      </View>
+
       {/* Nodes Layer */}
       <View style={styles.nodesLayer}>
         {nodes.map((node, index) => (
@@ -116,13 +137,17 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 1
   },
-  nodesLayer: {
+  rangeLayer: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 2
   },
-  battalionsLayer: {
+  nodesLayer: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 3
+  },
+  battalionsLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 4
   },
   countdown: {
     position: 'absolute',
@@ -130,6 +155,6 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     fontSize: 48,
     color: '#fff',
-    zIndex: 4
+    zIndex: 5
   }
 }); 
