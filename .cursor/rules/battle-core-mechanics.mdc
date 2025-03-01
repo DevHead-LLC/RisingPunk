@@ -140,7 +140,30 @@ alwaysApply: true
 
 ## Recent Changes
 // List most recent changes first, with dependencies and impacts
-1. [2024-03-XX] Completed Node Control System
+1. [2024-03-01] Combat Calculations Completed
+   - Impact: Full combat mechanics implemented
+   - Dependencies: Battalion Stats System
+   - Validation: All tests passing
+   - Features:
+     - Total attack calculation (base_offense * quantity)
+     - Defense reduction (1 - defense/100)
+     - Minimum damage rule (floor 1)
+     - Rounding behavior standardized
+     - Input validation
+     - Error handling
+
+2. [2024-03-01] Battalion Stats System Completed
+   - Impact: Core stats system implemented
+   - Dependencies: None
+   - Validation: All tests passing
+   - Features:
+     - Fixed per-unit stats defined
+     - Scaling stats implemented
+     - Frontend-only stats separated
+     - Stats calculation validated
+     - Type safety enforced
+
+3. [2024-03-XX] Node Control System Completed
    - Impact: Full node control mechanics implemented
    - Dependencies: Movement System
    - Validation: All tests passing
@@ -149,17 +172,6 @@ alwaysApply: true
      - Capture mechanics
      - Strategic effects
      - Victory point contributions
-
-2. [2024-03-XX] Completed Movement System
-   - Impact: Full movement mechanics implemented
-   - Dependencies: None
-   - Validation: All tests passing
-   - Features:
-     - Core movement properties
-     - Network movement
-     - Attack range positioning
-     - Node restrictions
-     - Pathfinding
 
 ## Integration Points
 // Critical areas where multiple systems interact
