@@ -162,4 +162,73 @@ describe('BattlePerformanceMonitor', () => {
       expect(monitor.getLogs()).toHaveLength(0);
     });
   });
+
+  describe('Load Time Monitoring', () => {
+    let nowMock: number;
+
+    beforeEach(() => {
+      nowMock = 1000;
+      jest.spyOn(performance, 'now').mockImplementation(() => nowMock);
+      const monitor = BattlePerformanceMonitor.getInstance();
+      monitor.cleanup(); // Reset the monitor state
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('should track load time correctly', () => {
+      const monitor = BattlePerformanceMonitor.getInstance();
+      monitor.startMonitoring();
+      
+      // Simulate time passing
+      nowMock = 2500;
+      
+      monitor.recordLoadComplete();
+      const metrics = monitor.getMetrics();
+      
+      expect(metrics.loadTime).toBe(1500);
+      expect(monitor.getLogs()).toContainEqual(
+        expect.objectContaining({
+          type: 'load_time',
+          details: expect.objectContaining({
+            value: 1500,
+            threshold: 1000
+          })
+        })
+      );
+    });
+  });
+
+  describe('Network Latency Monitoring', () => {
+    it('should track network latency correctly', () => {
+      const monitor = BattlePerformanceMonitor.getInstance();
+      monitor.startMonitoring();
+      
+      monitor.recordNetworkLatency(250); // Above threshold
+      const metrics = monitor.getMetrics();
+      
+      expect(metrics.networkLatency).toBe(250);
+      expect(monitor.getLogs()).toContainEqual(
+        expect.objectContaining({
+          type: 'network_latency',
+          details: expect.objectContaining({
+            value: 250,
+            threshold: 200
+          })
+        })
+      );
+    });
+
+    it('should not log normal network latency', () => {
+      const monitor = BattlePerformanceMonitor.getInstance();
+      monitor.startMonitoring();
+      
+      const initialLogCount = monitor.getLogs().length;
+      monitor.recordNetworkLatency(150); // Below threshold
+      
+      expect(monitor.getLogs().length).toBe(initialLogCount);
+      expect(monitor.getMetrics().networkLatency).toBe(150);
+    });
+  });
 }); 
