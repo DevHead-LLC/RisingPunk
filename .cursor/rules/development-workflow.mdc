@@ -53,23 +53,26 @@ alwaysApply: false
 // MANDATORY: FOLLOW IN ORDER
 // Status tracking is ONLY for battle-*.mdc files using [done], [in progress], [pending]
 
-[previous] Step 1: Start Fresh
-- Directory validated
-- Workflow file reviewed
-- Current state identified: Critical Hit System Implementation
-- Relevant battle-*.mdc files checked
+[previous] Test Verification
+- Ran existing combat test suite
+- Verified tests against rules
+- Fixed damage calculation discrepancies
+- Confirmed all tests passing
+- Documented implementation details
 
-[current] Step 2: Test Writing
-- Writing BattleCriticalHits.test.ts
-  - Critical hit calculation test
-  - Critical hit chance test
-  - Critical hit effects test
-  - Critical hit animation test
+[current] Test Execution
+- Execute full test suite
+- Document test results
+- Update test coverage report
+- Verify edge cases
+- Ensure consistent behavior
 
-[next] Step 3: Test Execution
-- Run the new tests (should fail first)
-- Document test failures
-- Plan implementation approach
+[next] Status Update
+- Update battle-core-mechanics.mdc
+- Document implementation details
+- Track test coverage metrics
+- Note any performance impacts
+- Plan next development phase
 
 // Loop Movement Rules:
 // 1. When current step completes:
