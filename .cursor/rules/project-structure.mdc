@@ -53,7 +53,21 @@ RisingPunk/
    - Follow cyberpunk aesthetic
    - Support educational goals
 
-3. Color Scheme:
+3. Anti-Patterns to Avoid:
+   - Over-engineering solutions before MVP
+   - Implementing edge cases too early
+   - Complex test infrastructure before core functionality
+   - Handling all possible scenarios before basics work
+
+4. MVP Development Focus:
+   - Start with minimal viable implementation
+   - Add complexity only when needed
+   - Validate core functionality first
+   - Expand test coverage gradually
+   - Defer edge case handling
+   - Keep infrastructure simple until required
+
+5. Color Scheme:
    - Primary: #00ff00 (Matrix green)
    - Secondary: #ff00ff (Neon purple)
    - Background: #1a1a1a (Dark gray)
@@ -68,6 +82,12 @@ RisingPunk/
 - Status: Implementing state management
 - Next: Battalion positioning system
 - Dependencies: battle-core-mechanics.mdc
+- Implementation Strategy:
+  1. Basic state management only
+  2. Core combat mechanics
+  3. Essential visual feedback
+  4. Minimal test coverage first
+  5. Expand features iteratively
 
 ## Completed Features
 - [DONE] Project Structure Setup
