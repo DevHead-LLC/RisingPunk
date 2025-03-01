@@ -1,0 +1,199 @@
+---
+description: "Defines testing requirements, mocking standards, and implementation guidelines for consistent and reliable testing across the RisingPunk ecosystem."
+globs: 
+alwaysApply: false
+---
+// IMPORTANT: When working with any section of this file, ALWAYS review ALL "Implementation of" and "Referenced by" 
+// connections to ensure full context and maintain consistency across the codebase.
+
+# Testing Standards
+Description: "Defines testing requirements, mocking standards, and implementation guidelines for consistent and reliable testing across the RisingPunk ecosystem."
+
+## Core Testing Principles
+// Implementation of:
+// - @project-structure.mdc#Testing-Strategy
+// - @code-style-and-structure.mdc#Testing-Guidelines
+
+// Referenced by:
+// - @battle-core-mechanics.mdc#Quality-Gates
+// - @battle-performance-standards.mdc#Error-Handling
+
+### Test Organization
+1. File Structure:
+   - Tests mirror source structure in `__tests__` directory
+   - Co-locate test helpers with relevant tests
+   - Keep setup files at root of test directory
+   - Group related test utilities
+
+2. Naming Conventions:
+   - Test files: `ComponentName.test.tsx`
+   - Test utilities: `ComponentName.test.utils.ts`
+   - Mock files: `__mocks__/moduleName.ts`
+   - Setup files: `setup.js` or `setupTests.js`
+
+3. Progressive Testing Strategy:
+   - Start with minimal test infrastructure
+   - Focus on core functionality first
+   - Add complexity only when needed
+   - Avoid premature optimization
+   - Keep mocks simple and focused
+   - Expand coverage gradually
+
+4. Mocking Guidelines:
+   Priority Order:
+   1. Core functionality only
+   2. Essential React Native components
+   3. Basic animation support
+   4. Required platform features
+   
+   Avoid Early:
+   - Complex animation mocks
+   - Full platform feature sets
+   - Edge case handling
+   - Comprehensive error simulation
+
+### React Native Testing Setup
+// Implementation of:
+// - @project-structure.mdc#Testing-Strategy#Test-Setup
+// - @battle-performance-standards.mdc#Error-Handling#Testing
+
+1. Initial Setup - Keep Minimal:
+   ```javascript
+   module.exports = {
+     preset: 'react-native',
+     setupFiles: ['<rootDir>/src/__tests__/setup.js'],
+     testEnvironment: 'jsdom',
+     moduleNameMapper: {
+       '^@/(.*)$': '<rootDir>/src/$1'
+     }
+   };
+   ```
+
+2. Essential Mocks Only:
+   ```javascript
+   // Basic React Native component mocks
+   const mockComponent = (name) => {
+     return function(props) {
+       return React.createElement('view', { ...props, testID: name });
+     };
+   };
+
+   // Core component mocks
+   jest.mock('react-native', () => ({
+     View: mockComponent('View'),
+     Text: mockComponent('Text'),
+     TouchableOpacity: mockComponent('TouchableOpacity'),
+     Animated: {
+       View: mockComponent('AnimatedView'),
+       Value: function(value) {
+         this.value = value;
+         this.setValue = jest.fn();
+       },
+       timing: () => ({ start: jest.fn() })
+     }
+   }));
+   ```
+
+3. Expand Only When Needed:
+   - Add mocks as required by tests
+   - Document why each mock is needed
+   - Remove unused mocks
+   - Keep setup file clean and focused
+
+### Component Testing Standards
+// Implementation of:
+// - @battle-core-mechanics.mdc#Quality-Gates#Testing
+// - @battle-animation-standards.mdc#Technical-Requirements#Testing
+
+1. Required Test Cases:
+   - Basic rendering
+   - Props validation
+   - User interactions
+   - State changes
+   - Error boundaries
+   - Animation triggers
+   - Style applications
+
+2. Animation Testing:
+   - Mock Animated.Value for synchronous tests
+   - Verify animation triggers
+   - Test style interpolations
+   - Check transform applications
+   - Validate cleanup
+
+3. Style Testing:
+   - Verify base styles
+   - Test conditional styles
+   - Check dynamic calculations
+   - Validate theme compliance
+   - Test responsive behavior
+
+### Performance Testing
+// Implementation of:
+// - @battle-performance-standards.mdc#Core-Requirements#Testing
+// - @battle-animation-standards.mdc#Performance-Targets#Validation
+
+1. Animation Performance:
+   - Monitor frame rate impact
+   - Test native driver usage
+   - Verify cleanup handling
+   - Validate memory impact
+
+2. Resource Management:
+   - Test cleanup functions
+   - Verify subscription handling
+   - Check memory leaks
+   - Monitor re-render counts
+
+### Error Handling
+// Implementation of:
+// - @battle-core-mechanics.mdc#Error-Prevention#Testing
+// - @battle-performance-standards.mdc#Error-Handling#Validation
+
+1. Error Cases:
+   - Invalid props
+   - Missing dependencies
+   - Animation failures
+   - State conflicts
+   - Network issues
+
+2. Recovery Testing:
+   - Error boundary behavior
+   - Fallback rendering
+   - State recovery
+   - Animation reset
+
+## Quality Gates
+// Implementation of:
+// - @project-structure.mdc#Quality-Gates
+// - @battle-core-mechanics.mdc#Development-Guidelines#Testing
+
+### Test Coverage Requirements
+1. MVP Phase:
+   - Critical paths: 100%
+   - Business logic: 95%
+   - UI components: 90%
+   - Utilities: 85%
+
+2. Production Phase:
+   - Critical paths: 100%
+   - Business logic: 98%
+   - UI components: 95%
+   - Utilities: 90%
+
+### Test Quality Metrics
+1. Required Aspects:
+   - Meaningful assertions
+   - Edge case coverage
+   - Error handling
+   - Performance impact
+   - Memory management
+
+2. Code Quality:
+   - No duplicate tests
+   - Clear descriptions
+   - Proper mocking
+   - Efficient setup
+   - Clean teardown
+
+Remember: These standards ensure consistent, reliable testing across the codebase. Update this document as new testing patterns and requirements emerge. 
