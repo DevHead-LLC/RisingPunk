@@ -5,12 +5,6 @@ alwaysApply: true
 ---
 // IMPORTANT: When working with any section of this file, ALWAYS review ALL "Implementation of" and "Referenced by" 
 // connections to ensure full context and maintain consistency across the codebase.
-//
-// IMPORTANT: When moving content between files:
-// 1. Always create the new file immediately
-// 2. Update all cross-references in both files
-// 3. Ensure no functionality is lost in the transition
-// 4. Add appropriate implementation notes for the new location
 
 # Progress Tracking
 // This section tracks implementation status and dependencies.
@@ -18,77 +12,80 @@ alwaysApply: true
 // Format: [Status] Feature Name - Dependencies > Implementation Details
 
 ## Implementation Strategy
-// Defines our approach to building the battle system efficiently and reliably
+// Implementation of:
+// - @project-structure.mdc#Current-Focus
+// - @testing-standards.mdc#Core-Testing-Principles
 
-### MVP Phases
-1. Core State Management (Current Focus)
-   - Battle context implementation
-   - State machine for battle phases
-   - Performance monitoring hooks
-   - Basic state persistence
-   - Unit tests for state transitions
+### Battle System MVP Phases
+[IN_PROGRESS] 1. Core State Management
+   - [PENDING] Battle context implementation
+   - [PENDING] State machine for battle phases
+   - [PENDING] Performance monitoring hooks
+   - [PENDING] Basic state persistence
+   - [PENDING] Unit tests for state transitions
 
-2. Basic Combat System
-   - Battalion positioning
-   - Target selection
-   - Damage calculations
-   - Health tracking
-   - Unit tests for combat math
+[PENDING] 2. Basic Combat System
+   - [PENDING] Battalion positioning
+   - [PENDING] Target selection
+   - [PENDING] Damage calculations
+   - [PENDING] Health tracking
+   - [PENDING] Unit tests for combat math
 
-3. Visual Feedback Loop
-   - Basic animations
-   - Health/damage indicators
-   - Position updates
-   - Performance profiling
-   - Visual regression tests
+[PENDING] 3. Visual Feedback Loop
+   - [PENDING] Basic animations
+   - [PENDING] Health/damage indicators
+   - [PENDING] Position updates
+   - [PENDING] Performance profiling
+   - [PENDING] Visual regression tests
 
-4. Network Integration
-   - State synchronization
-   - Optimistic updates where safe
-   - Fallback handling
-   - Integration tests
+[PENDING] 4. Network Integration
+   - [PENDING] State synchronization
+   - [PENDING] Optimistic updates where safe
+   - [PENDING] Fallback handling
+   - [PENDING] Integration tests
 
-5. Polish & Optimization
-   - Animation refinements
-   - Performance tuning
-   - Edge case handling
-   - Full system tests
+[PENDING] 5. Polish & Optimization
+   - [PENDING] Animation refinements
+   - [PENDING] Performance tuning
+   - [PENDING] Edge case handling
+   - [PENDING] Full system tests
 
-### Development Guidelines
-- Each feature must:
-  - Have unit tests
-  - Meet performance targets
-  - Handle edge cases
-  - Support future scaling
-  - Work across device sizes
+### Battle-Specific Requirements
+// Implementation of:
+// - @battle-performance-standards.mdc#Core-Requirements
+// - @battle-animation-standards.mdc#Technical-Requirements
 
-- Performance Requirements:
-  - Target 60fps animations
-  - Support up to 18 battalions
-  - Handle 50k bots per battalion
-  - Work on iPhone 16 Pro (initial)
-  - Design for universal support
+1. Performance Requirements:
+   - [PENDING] Target 60fps animations
+   - [PENDING] Support up to 18 battalions
+   - [PENDING] Handle 50k bots per battalion
+   - [PENDING] Work on iPhone 16 Pro (initial)
+   - [PENDING] Design for universal support
 
-- Testing Strategy:
-  - Jest + React Native Testing Library
-  - Performance benchmarks
-  - Visual regression tests
-  - Integration tests
-  - Edge case coverage
+2. Testing Requirements:
+   - [PENDING] Unit tests for all battle mechanics
+   - [PENDING] Performance benchmarks for animations
+   - [PENDING] Visual regression tests for UI
+   - [PENDING] Integration tests for battle flow
+   - [PENDING] Edge case coverage for combat
 
-### Quality Gates
-- Feature Complete:
-  - Core functionality works
-  - Basic tests pass
-  - No known bugs
-  - Meets MVP requirements
+### Battle Quality Gates
+// Implementation of:
+// - @project-structure.mdc#Quality-Gates
+// - @battle-performance-standards.mdc#Core-Requirements
 
-- Production Ready:
-  - Performance targets met
-  - Full test coverage
-  - Edge cases handled
-  - Clean error handling
-  - Smooth animations
+1. Battle Feature Complete:
+   - [PENDING] Core battle mechanics work
+   - [PENDING] All rule tests pass
+   - [PENDING] No known combat bugs
+   - [PENDING] Meets battle MVP requirements
+
+2. Battle Production Ready:
+   - [PENDING] Battle performance targets met
+   - [PENDING] Full battle test coverage
+   - [PENDING] Edge cases handled
+   - [PENDING] Clean error handling
+   - [PENDING] Smooth battle animations
 
 ## Core Systems Status
 - [DONE] Battalion Stats System

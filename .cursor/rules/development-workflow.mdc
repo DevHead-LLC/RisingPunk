@@ -1,0 +1,38 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+// Implementation of:
+// - @project-structure.mdc#Development-Guidelines
+// - @testing-standards.mdc#Implementation-Guidelines
+
+# Development Workflow Standards
+
+## Core Principles
+1. Maintain Forward Progress
+   - Always move towards current goal
+   - Make decisions based on rules
+   - No unnecessary questions
+   - Test after each meaningful change
+
+2. Implementation Order
+   - Write minimal test
+   - Run test (expect failure)
+   - Implement minimal code
+   - Run test (ensure pass)
+   - Refactor if needed
+   - Move to next requirement
+
+3. Decision Making
+   - Reference rules first
+   - Choose most direct path
+   - Implement immediately
+   - Validate through tests
+   - Move forward systematically
+
+4. When Stuck
+   - Check rule documentation
+   - Review current status
+   - Make minimal fix
+   - Validate and continue 

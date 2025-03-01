@@ -10,112 +10,128 @@ alwaysApply: false
 
 ## Core Testing Principles
 // Implementation of:
-// - @project-structure.mdc#Testing-Strategy
+// - @project-structure.mdc#Rule-System
 // - @code-style-and-structure.mdc#Testing-Guidelines
 
 // Referenced by:
 // - @battle-core-mechanics.mdc#Quality-Gates
 // - @battle-performance-standards.mdc#Error-Handling
 
+### Rule-Test Mapping
+// IMPORTANT: Tests must be minimal and focused, affecting only the specific functionality being tested
+
+1. Test File Organization:
+   ```
+   mobile/src/__tests__/battle/
+   ├── core/              # @battle-core-mechanics.mdc tests
+   │   ├── BattleCoreStats.test.ts
+   │   └── BattleState.test.ts
+   ├── movement/         # @battle-movement-system.mdc tests
+   ├── targeting/        # @battle-targeting-system.mdc tests
+   └── README.md        # Test status tracking
+   ```
+
+2. Test Implementation:
+   ```typescript
+   // Implementation of @battle-core-mechanics.mdc#Combat-Logic#Battalion-Stats
+   describe('Battalion Stats System', () => {
+     it('should calculate correct stats', () => {
+       // Minimal test focusing only on stats calculation
+       const stats = calculateBattalionStats(BattalionType.Guardian, 1);
+       expect(stats).toEqual({
+         speed: 9,
+         range: 4,
+         // ... only test required properties
+       });
+     });
+   });
+   ```
+
+3. Status Tracking:
+   - [DONE] - Tests written and passing
+   - [IN_PROGRESS] - Tests being implemented
+   - [PENDING] - Tests not started
+   - [BLOCKED] - Waiting on dependencies
+
 ### Test Focus Priority
-1. Game Logic First:
-   - Battle mechanics and calculations
-   - State transitions and game rules
-   - Victory conditions
-   - Core gameplay features
-   
-2. Framework/Platform Testing:
-   - Minimize React Native specific tests
-   - Only test UI when critical to gameplay
-   - Defer animation/visual tests until core works
-   - Trust framework's own testing
+1. Rule Implementation:
+   - Test only what the rule requires
+   - Keep tests minimal and focused
+   - Avoid testing unrelated features
+   - Document rule connections
+
+2. Cross-Rule Testing:
+   - Identify shared requirements
+   - Test common functionality once
+   - Reference all related rules
+   - Maintain test independence
 
 ### Test Organization
 1. File Structure:
-   - Tests mirror source structure in `__tests__` directory
-   - Group tests by game feature
+   - Tests mirror rule organization
+   - Group by battle system component
    - Keep setup minimal and focused
-   - Separate game logic from UI tests
+   - Document rule references
 
 2. Naming Conventions:
-   - Test files: `FeatureName.test.ts` for logic
-   - Test files: `Component.test.tsx` only if needed
-   - Utilities: `feature.test.utils.ts`
+   - Test files: `FeatureName.test.ts`
+   - Rule reference in comments
+   - Clear test descriptions
+   - Status tracking in README
 
-### Testing Strategy
-1. Game Logic Testing:
-   - Pure functions for calculations
-   - State management for game rules
-   - Battalion interactions
-   - Node control mechanics
-   
-2. Integration Points:
-   - Core game loop
-   - State to UI updates
-   - Critical user interactions
-   - Network synchronization
+## Implementation Guidelines
+// Implementation of @project-structure.mdc#Rule-Implementation-Strategy
 
-3. UI Testing (Minimal):
-   - Only test game-critical interactions
-   - Focus on user -> game state flow
-   - Skip purely visual tests
-   - Trust React Native components
-
-### Mocking Guidelines
-1. Essential Mocks Only:
-   ```javascript
-   // Basic React Native mocks - keep minimal
-   jest.mock('react-native', () => ({
-     View: 'View',
-     Text: 'Text',
-     Animated: {
-       Value: function(v) { this.value = v },
-       View: 'Animated.View'
-     }
-   }));
+1. Test First Development:
+   ```typescript
+   // Implementation of @battle-core-mechanics.mdc#Combat-Logic
+   describe('Combat Calculations', () => {
+     // Document rule requirements
+     // Write minimal test
+     // Implement only what's needed
+     // Track completion status
+   });
    ```
 
-2. Game Logic Mocks:
-   - Mock network calls
-   - Mock timers for game loop
-   - Mock randomness for predictability
-   - Keep battle calculations pure
+2. Test Scope:
+   - Test only rule requirements
+   - No unnecessary coverage
+   - Clear rule references
+   - Status documentation
 
-3. Avoid Mocking:
-   - React Native internals
-   - Animation details
-   - Visual styling
-   - Framework features
+3. Test Independence:
+   - Tests don't affect each other
+   - Minimal shared setup
+   - Clean state between tests
+   - Focused assertions
 
 ## Quality Gates
-// Implementation of:
-// - @project-structure.mdc#Quality-Gates
-// - @battle-core-mechanics.mdc#Development-Guidelines#Testing
+// Implementation of @project-structure.mdc#Quality-Gates
 
-### MVP Testing Requirements
-1. Must Test:
-   - Core battle mechanics
-   - State management
-   - Critical user flows
-   - Victory conditions
+### Test Requirements
+1. Must Have:
+   - Rule reference comments
+   - Minimal, focused tests
+   - Clear status tracking
+   - Independent execution
 
-2. Can Skip Initially:
-   - Animation details
-   - Visual polish
-   - Edge cases
-   - Performance optimization
+2. Must Not Have:
+   - Unnecessary complexity
+   - Unrelated test coverage
+   - Cross-test dependencies
+   - Duplicate rule testing
 
-### Test Coverage Goals
-1. MVP Phase:
-   - Game Logic: 90%
-   - State Management: 90%
-   - UI Components: Only critical paths
-   - Utils: Core functions only
+### Coverage Goals
+1. Rule Implementation:
+   - Core Logic: 100%
+   - Rule Requirements: 100%
+   - Edge Cases: As specified
+   - Performance: When required
 
-2. Production Phase:
-   - Game Logic: 95%
-   - State Management: 95%
-   - UI Components: 80%
-   - Utils: 85%
+2. Test Quality:
+   - Minimal and focused
+   - Clear rule mapping
+   - Independent execution
+   - Proper status tracking
 
-Remember: Focus on testing game mechanics and rules first. UI and visual details can be tested later when core gameplay is solid. 
+Remember: Tests should be as simple as possible while fully validating rule requirements. Avoid complexity that doesn't directly support rule validation. 
