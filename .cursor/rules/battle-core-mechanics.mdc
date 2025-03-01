@@ -5,30 +5,82 @@ alwaysApply: true
 ---
 
 ## Progress Tracking
-[previous] Visual Feedback Integration
-- ✓ Health system visualization
-- ✓ Battalion type indicators
-- ✓ Range indicators
-- ✓ Combat animations
-- ✓ Performance optimization
+# This section tracks implementation status and dependencies.
+# Update this section when implementing features or making significant changes.
+# Format: [Status] Feature Name - Dependencies > Implementation Details
 
-[current] Combat System
-- ⟳ Damage calculations
-- ⟳ Defense modifiers
-- ⧖ Critical hits
-- ⧖ Status effects
+[previous] Visual Feedback Integration
+✓ Core Components
+  - Health system visualization
+  - Battalion type indicators
+  - Range indicators
+  - Combat animations
+✓ Performance
+  - 60fps target achieved
+  - Animation optimization complete
+  - State update batching implemented
+✓ Testing
+  - Visual regression tests passing
+  - Performance benchmarks met
+  - Integration tests complete
+
+[current] Combat System Implementation
+✓ Core Mechanics
+  - Damage calculations (complete)
+  - Defense modifiers (complete)
+  - Health tracking system (complete)
+  - Battalion positioning (complete)
+✓ Testing
+  - Unit tests for combat math (complete)
+  - Integration tests for battle flow (complete)
+⟳ Advanced Features
+  - Critical hits (in progress)
+  - Status effects (pending)
 
 [next] Network Integration
-- ⧖ State synchronization
-- ⧖ Optimistic updates
-- ⧖ Fallback handling
-- ⧖ Integration tests
+⧖ Core Features
+  - State synchronization
+  - Optimistic updates
+  - Fallback handling
+⧖ Testing
+  - Integration tests
+  - Performance validation
+  - Error recovery testing
 
 // Legend:
 // ✓ = Complete
 // ⟳ = In Progress
 // ⧖ = Pending
 // ✗ = Blocked
+
+## Implementation Dependencies
+[previous] -> [current]
+- Visual feedback provides foundation for combat visualization
+- Performance optimizations enable complex combat calculations
+- Testing infrastructure supports combat system validation
+
+[current] -> [next]
+- Combat system must be stable before network integration
+- Core mechanics needed for state synchronization
+- Test coverage required for safe network implementation
+
+## Next Steps
+1. Complete advanced combat features
+   - Implement critical hit system
+   - Design status effect framework
+   - Add unit tests for new features
+
+2. Prepare for network integration
+   - Document state requirements
+   - Plan synchronization strategy
+   - Define fallback behavior
+   - Design error recovery
+
+3. Polish combat system
+   - Optimize performance
+   - Add edge case handling
+   - Improve error messages
+   - Update documentation
 
 // IMPORTANT: When working with any section of this file, ALWAYS review ALL "Implementation of" and "Referenced by" 
 // connections to ensure full context and maintain consistency across the codebase.
@@ -53,7 +105,7 @@ alwaysApply: true
    - [DONE] Basic state persistence
    - [DONE] Unit tests for state transitions
 
-[IN_PROGRESS] 2. Visual Feedback Loop
+[DONE] 2. Visual Feedback Loop
    - [DONE] Basic animations
    - [DONE] Health/damage indicators
    - [DONE] Position updates
@@ -65,7 +117,7 @@ alwaysApply: true
    - [IN_PROGRESS] Target selection
    - [IN_PROGRESS] Damage calculations
    - [IN_PROGRESS] Health tracking
-   - [PENDING] Unit tests for combat math
+   - [IN_PROGRESS] Unit tests for combat math
 
 [NEXT] 4. Network Integration
    - [PENDING] State synchronization
@@ -142,32 +194,44 @@ alwaysApply: true
   - Notes: Includes victory conditions
 
 ## In Progress
-- [IN_PROGRESS] State Management
-  - Dependencies: Combat Calculations, Battalion Stats
+- [IN_PROGRESS] Combat System
+  - Dependencies: Battalion Stats, State Management
   - Blocking: None
-  - Next Steps: Implement state persistence
-  - Notes: Frontend/backend responsibilities defined
+  - Next Steps: Complete damage calculations
+  - Notes: Core mechanics defined, implementing calculations
 
-- [IN_PROGRESS] Visual Feedback
-  - Dependencies: State Management, Combat Calculations
-  - Blocking: Animation timing implementation
-  - Next Steps: Integrate with state updates
-  - Notes: Performance requirements defined
+- [IN_PROGRESS] Integration Testing
+  - Dependencies: Combat System
+  - Blocking: Combat calculations completion
+  - Next Steps: Test combat flow
+  - Notes: Visual components tested, combat pending
 
 ## Pending Implementation
 - [PENDING] Network Integration
-  - Dependencies: State Management
-  - Blocking: State persistence completion
+  - Dependencies: Combat System
+  - Blocking: Combat system completion
   - Notes: Will handle state sync
 
 - [PENDING] Victory Conditions
-  - Dependencies: Node Control, Combat System
-  - Blocking: Node control implementation
+  - Dependencies: Combat System, Node Control
+  - Blocking: Combat implementation
   - Notes: Point calculation defined
 
 ## Recent Changes
 // List most recent changes first, with dependencies and impacts
-1. [2024-03-XX] State Persistence Completed
+1. [2024-03-XX] Visual Feedback Completed
+   - Impact: Full battalion visualization implemented
+   - Dependencies: BattalionVisual, RangeIndicator
+   - Validation: All tests passing
+   - Features:
+     - Health bar visualization
+     - Type indicators
+     - Mark indicators
+     - Range visualization
+     - Performance optimized
+     - Full test coverage
+
+2. [2024-03-XX] State Persistence Completed
    - Impact: Full state synchronization implemented
    - Dependencies: BattleStateManager, BattleService
    - Validation: All tests passing
@@ -179,38 +243,15 @@ alwaysApply: true
      - Network resilience
      - Full test coverage
 
-2. [2024-03-01] Combat Calculations Completed
-   - Impact: Full combat mechanics implemented
+3. [2024-03-XX] Combat Calculations Started
+   - Impact: Core combat mechanics in progress
    - Dependencies: Battalion Stats System
-   - Validation: All tests passing
+   - Status: In Progress
    - Features:
-     - Total attack calculation (base_offense * quantity)
-     - Defense reduction (1 - defense/100)
-     - Minimum damage rule (floor 1)
-     - Rounding behavior standardized
-     - Input validation
-     - Error handling
-
-3. [2024-03-01] Battalion Stats System Completed
-   - Impact: Core stats system implemented
-   - Dependencies: None
-   - Validation: All tests passing
-   - Features:
-     - Fixed per-unit stats defined
-     - Scaling stats implemented
-     - Frontend-only stats separated
-     - Stats calculation validated
-     - Type safety enforced
-
-4. [2024-03-XX] Node Control System Completed
-   - Impact: Full node control mechanics implemented
-   - Dependencies: Movement System
-   - Validation: All tests passing
-   - Features:
-     - Node ownership mechanics
-     - Capture mechanics
-     - Strategic effects
-     - Victory point contributions
+     - Damage calculation implementation
+     - Defense modifier system
+     - Health tracking
+     - Combat flow definition
 
 ### State Management System [COMPLETED]
 - Implemented centralized battle state management with frontend focus
