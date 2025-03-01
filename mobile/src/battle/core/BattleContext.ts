@@ -198,8 +198,8 @@ function updateBattalionState(
   current: BattalionState | undefined
 ): BattalionState {
   if (!current) {
-    // For new battalions, only require health
-    if (typeof battalionUpdate.health !== 'number') {
+    // For new battalions, health is required
+    if (battalionUpdate.health === undefined || typeof battalionUpdate.health !== 'number') {
       throw new BattleStateError(
         'Invalid battalion health value',
         { update: battalionUpdate }
@@ -319,7 +319,8 @@ export function updateBattleState(
           // Re-throw validation errors
           if (error instanceof BattleStateError && (
             error.message.includes('Missing required fields') ||
-            error.message.includes('health cannot be negative')
+            error.message.includes('health cannot be negative') ||
+            error.message.includes('Invalid battalion health value')
           )) {
             throw error;
           }
@@ -341,7 +342,11 @@ export function updateBattleState(
             newState.nodes.set(nodeUpdate.id, { ...current });
           }
           // Re-throw validation errors
-          if (error instanceof BattleStateError && error.message.includes('Missing required fields')) {
+          if (error instanceof BattleStateError && (
+            error.message.includes('Missing required fields') ||
+            error.message.includes('health cannot be negative') ||
+            error.message.includes('Invalid battalion health value')
+          )) {
             throw error;
           }
         }
@@ -372,7 +377,8 @@ export function updateBattleState(
       error.message.includes('phase transition') ||
       error.message.includes('Time cannot move backwards') ||
       error.message.includes('Missing required fields') ||
-      error.message.includes('health cannot be negative')
+      error.message.includes('health cannot be negative') ||
+      error.message.includes('Invalid battalion health value')
     )) {
       throw error;
     }
