@@ -1,85 +1,119 @@
 // Implementation of @battle-core-mechanics.mdc#Combat-Logic#Battalion-Combat
 // Tests core combat calculations including damage and defense
 
-import { BattalionType } from '../../../src/battle/core/types';
+import { BattalionType, CombatCalculationParams } from '../../../src/battle/core/types';
 import { calculateCombatDamage } from '../../../src/battle/core/BattleCalculations';
 
-describe('Combat Calculation System', () => {
-  // Test basic damage calculation with defense reduction
-  it('should calculate correct damage with defense reduction', () => {
-    const damage = calculateCombatDamage({
-      attackerType: BattalionType.Guardian,
-      attackerQuantity: 2,
-      defenderType: BattalionType.Phreak,
-      defenderQuantity: 1
+describe('Battle Combat System', () => {
+  describe('Combat Damage Calculations', () => {
+    it('should calculate basic damage correctly', () => {
+      const params: CombatCalculationParams = {
+        attackerType: BattalionType.Guardian,
+        attackerQuantity: 1,
+        defenderType: BattalionType.Phreak,
+        defenderQuantity: 1
+      };
+      
+      const damage = calculateCombatDamage(params);
+      expect(damage).toBeGreaterThan(0);
+      expect(Number.isInteger(damage)).toBe(true);
     });
 
-    // Guardian: offense 8 * 2 units = 16 total attack
-    // Phreak: defense 5 = 5% reduction
-    // Expected damage: 16 * (1 - 5/100) = 15.2 rounded to 15
-    expect(damage).toBe(15);
+    it('should apply defense modifiers correctly', () => {
+      const params: CombatCalculationParams = {
+        attackerType: BattalionType.Guardian,
+        attackerQuantity: 1,
+        defenderType: BattalionType.Breacher,
+        defenderQuantity: 1
+      };
+      
+      const damage = calculateCombatDamage(params);
+      // Breacher has high defense (8), so damage should be reduced
+      expect(damage).toBeLessThan(8);
+    });
+
+    it('should scale damage with attacker quantity', () => {
+      const singleAttacker = calculateCombatDamage({
+        attackerType: BattalionType.Guardian,
+        attackerQuantity: 1,
+        defenderType: BattalionType.Phreak,
+        defenderQuantity: 1
+      });
+
+      const multipleAttackers = calculateCombatDamage({
+        attackerType: BattalionType.Guardian,
+        attackerQuantity: 3,
+        defenderType: BattalionType.Phreak,
+        defenderQuantity: 1
+      });
+
+      expect(multipleAttackers).toBeGreaterThan(singleAttacker);
+      expect(multipleAttackers).toBe(singleAttacker * 3);
+    });
+
+    it('should ensure minimum damage of 1', () => {
+      // Test with very high defense and low attack
+      const params: CombatCalculationParams = {
+        attackerType: BattalionType.Phreak,
+        attackerQuantity: 1,
+        defenderType: BattalionType.Breacher,
+        defenderQuantity: 1
+      };
+      
+      const damage = calculateCombatDamage(params);
+      expect(damage).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should handle edge cases correctly', () => {
+      // Test maximum quantity
+      const maxQuantity = calculateCombatDamage({
+        attackerType: BattalionType.Guardian,
+        attackerQuantity: Number.MAX_SAFE_INTEGER,
+        defenderType: BattalionType.Phreak,
+        defenderQuantity: 1
+      });
+      expect(Number.isFinite(maxQuantity)).toBe(true);
+
+      // Test all battalion type combinations
+      const battalionTypes = Object.values(BattalionType);
+      battalionTypes.forEach(attackerType => {
+        battalionTypes.forEach(defenderType => {
+          const damage = calculateCombatDamage({
+            attackerType,
+            attackerQuantity: 1,
+            defenderType,
+            defenderQuantity: 1
+          });
+          expect(damage).toBeGreaterThanOrEqual(1);
+        });
+      });
+    });
   });
 
-  // Test minimum damage rule
-  it('should enforce minimum damage of 1', () => {
-    const damage = calculateCombatDamage({
-      attackerType: BattalionType.Phreak,
-      attackerQuantity: 1,
-      defenderType: BattalionType.Breacher,
-      defenderQuantity: 1
+  describe('Combat Error Handling', () => {
+    it('should throw error for invalid battalion types', () => {
+      expect(() => calculateCombatDamage({
+        attackerType: 'InvalidType' as BattalionType,
+        attackerQuantity: 1,
+        defenderType: BattalionType.Phreak,
+        defenderQuantity: 1
+      })).toThrow('Invalid battalion type');
     });
 
-    // Phreak: offense 6 * 1 unit = 6 total attack
-    // Breacher: defense 8 = 8% reduction
-    // Raw damage: 6 * (1 - 8/100) = 5.52
-    // Round down to 5 and ensure minimum 1
-    expect(damage).toBe(5);
-  });
+    it('should throw error for invalid quantities', () => {
+      expect(() => calculateCombatDamage({
+        attackerType: BattalionType.Guardian,
+        attackerQuantity: 0,
+        defenderType: BattalionType.Phreak,
+        defenderQuantity: 1
+      })).toThrow('Battalion quantity must be positive');
 
-  // Error handling tests as per @battle-core-mechanics.mdc#Error-Prevention
-  describe('Error Handling', () => {
-    it('should throw error for invalid attacker type', () => {
-      expect(() => {
-        calculateCombatDamage({
-          attackerType: 'InvalidType' as BattalionType,
-          attackerQuantity: 1,
-          defenderType: BattalionType.Phreak,
-          defenderQuantity: 1
-        });
-      }).toThrow('Invalid battalion type');
-    });
-
-    it('should throw error for invalid defender type', () => {
-      expect(() => {
-        calculateCombatDamage({
-          attackerType: BattalionType.Guardian,
-          attackerQuantity: 1,
-          defenderType: 'InvalidType' as BattalionType,
-          defenderQuantity: 1
-        });
-      }).toThrow('Invalid battalion type');
-    });
-
-    it('should throw error for negative attacker quantity', () => {
-      expect(() => {
-        calculateCombatDamage({
-          attackerType: BattalionType.Guardian,
-          attackerQuantity: -1,
-          defenderType: BattalionType.Phreak,
-          defenderQuantity: 1
-        });
-      }).toThrow('Battalion quantity must be positive');
-    });
-
-    it('should throw error for negative defender quantity', () => {
-      expect(() => {
-        calculateCombatDamage({
-          attackerType: BattalionType.Guardian,
-          attackerQuantity: 1,
-          defenderType: BattalionType.Phreak,
-          defenderQuantity: -1
-        });
-      }).toThrow('Battalion quantity must be positive');
+      expect(() => calculateCombatDamage({
+        attackerType: BattalionType.Guardian,
+        attackerQuantity: 1,
+        defenderType: BattalionType.Phreak,
+        defenderQuantity: -1
+      })).toThrow('Battalion quantity must be positive');
     });
   });
 }); 

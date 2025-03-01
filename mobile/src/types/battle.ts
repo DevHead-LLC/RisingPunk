@@ -1,9 +1,15 @@
 import { Animated } from 'react-native';
 
+export enum BattalionType {
+  GUARDIAN = 'guardian',
+  PHREAK = 'phreak',
+  BREACHER = 'breacher'
+}
+
 // IMPORTANT: Shared types for battle system
 // DO NOT DELETE - Used across multiple battle components
 export interface BattalionPosition {
-  type: 'breacher' | 'guardian' | 'phreak';
+  type: BattalionType;
   nodeIndex: number;
   position: any; // Animated.ValueXY
   quantity: number;

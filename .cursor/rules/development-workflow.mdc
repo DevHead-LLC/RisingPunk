@@ -1,5 +1,5 @@
 ---
-description: 
+description: "Primary driver for all development. EVERY feature, test, and change MUST follow these rules EXACTLY. NO assumptions, NO extra features, NO complexity unless specified here or in referenced rules. This is the source of truth for HOW we build."
 globs: 
 alwaysApply: false
 ---
@@ -31,15 +31,110 @@ alwaysApply: false
    - Allow for progress validation
    - Maintain application stability
 
-## CRITICAL: Directory Validation
-// MANDATORY: MUST BE PERFORMED BEFORE ANY FILE OPERATIONS
-```bash
-pwd  # MUST be run before ANY file operations
-```
-- MUST be: /Users/robertthiel/DevHead_LLC/RisingPunk
-- VERIFY before ANY file operations
-- ABORT if incorrect
-- RE-VALIDATE after directory changes
+## CRITICAL: Directory and Context Validation
+// MANDATORY: PERFORM BEFORE ANY OPERATION
+1. Directory Check:
+   ```bash
+   pwd  # MUST be /Users/robertthiel/DevHead_LLC/RisingPunk
+   ```
+   - ABORT if incorrect
+   - RE-VALIDATE after directory changes
+   - VERIFY before ANY file operation
+
+2. Context Rules:
+   - Start each task fresh - no cached knowledge
+   - Re-read this workflow file
+   - Review current state markers:
+     - [previous] - Last completed step (verified with passing tests)
+     - [current] - Active work
+     - [next] - Upcoming task
+
+## Development Loop
+// MANDATORY: FOLLOW IN ORDER
+// Status tracking is ONLY for battle-*.mdc files using [done], [in progress], [pending]
+
+[previous] Step 1: Start Fresh
+- Directory validated
+- Workflow file reviewed
+- Current state identified: Critical Hit System Implementation
+- Relevant battle-*.mdc files checked
+
+[current] Step 2: Test Writing
+- Writing BattleCriticalHits.test.ts
+  - Critical hit calculation test
+  - Critical hit chance test
+  - Critical hit effects test
+  - Critical hit animation test
+
+[next] Step 3: Test Execution
+- Run the new tests (should fail first)
+- Document test failures
+- Plan implementation approach
+
+// Loop Movement Rules:
+// 1. When current step completes:
+//    - Current step moves to [previous]
+//    - Next step becomes [current]
+//    - Following step becomes [next]
+// 2. Continue until Visual Validation
+// 3. At Visual Validation, wait for new command
+
+// Complete Loop Reference:
+1. Start Fresh
+2. Test Writing
+3. Test Execution
+4. Implementation
+5. Status Update
+6. Visual Validation
+
+## Implementation Guidelines
+1. Before Starting:
+   - Review this file completely
+   - Check @project-structure.mdc
+   - Review relevant battle-*.mdc files
+   - Plan minimal changes
+
+2. During Development:
+   - Stay in correct directory
+   - Make minimal required changes
+   - Follow test-first approach
+   - Create clear stopping points
+
+3. Quality Standards:
+   - Tests MUST verify requirements
+   - Changes should be minimal but complete
+   - Performance should be solid but not over-optimized
+   - Documentation should be clear but not verbose
+
+4. When to Stop:
+   - After coherent set of changes
+   - Before switching focus areas
+   - When stability check needed
+   - At Visual Validation step
+
+## Testing Process
+1. Individual Test:
+   ```bash
+   npm test -- path/to/test.ts
+   ```
+   - Write failing test first
+   - Implement minimal passing code
+   - Document changes
+
+2. Integration:
+   ```bash
+   npm test
+   ```
+   - Required after individual success
+   - Catches cross-feature impacts
+   - Prevents regressions
+
+Remember:
+1. Directory validation is MANDATORY
+2. Fresh context every time
+3. Follow loop steps in order
+4. Stop at Visual Validation
+5. Wait for new command to continue
 
 ## Implementation Workflow
 1. Before Starting
@@ -162,4 +257,50 @@ Remember:
    - No regressions
    - Documentation complete
    - Performance validated
+
+# Development Workflow Loop
+
+[previous] Combat System Core Implementation
+✓ Core combat tests complete
+✓ Basic damage calculation
+✓ Defense modifiers
+✓ Health tracking
+
+[current] Test Writing
+✓ Created BattleCriticalHits.test.ts
+✓ Defined test cases:
+  - Critical hit calculation
+  - Critical hit chance
+  - Critical hit effects
+  - Critical hit animation
+⟳ Implementation pending:
+  - calculateCriticalHitChance function
+  - calculateCriticalHitEffects function
+  - Critical hit animation system
+
+[next] Test Execution
+⧖ Run critical hit test suite
+⧖ Fix test failures
+⧖ Implement missing functionality
+⧖ Verify test coverage
+
+## Loop Function Steps
+1. Review and Plan [Mandatory First Step]
+   - Check this workflow document
+   - Identify current state ([previous], [current], [next])
+   - Review relevant battle-*.mdc file
+   - Plan minimal required changes
+   - Document test requirements
+
+2. Test Writing [TDD First]
+   - Write failing test first
+   - Document expected behavior
+   - Include edge cases
+   - Add performance tests
+   ```bash
+   # Verify directory
+   pwd  # Must be /Users/robertthiel/DevHead_LLC/RisingPunk
    
+   # Create/edit test file
+   code mobile/__tests__/battle/core/BattleCriticalHits.test.ts
+   ```
