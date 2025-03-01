@@ -9,6 +9,29 @@ alwaysApply: false
 
 # Development Workflow Standards
 
+## CRITICAL: Directory Validation
+// MANDATORY: MUST BE PERFORMED BEFORE ANY FILE OPERATIONS
+1. Directory Validation Process:
+   ```bash
+   pwd  # MUST be run before ANY file operations
+   ```
+   - ALWAYS verify current directory
+   - NEVER trust cached directory information
+   - NEVER proceed without directory confirmation
+   - IMMEDIATELY abort if in wrong location
+
+2. Common Failure Points:
+   - Cached directory information
+   - Assumed directory context
+   - Multiple terminal sessions
+   - Incomplete directory changes
+
+3. Validation Requirements:
+   - Must be first step in any operation
+   - Must abort if directory is incorrect
+   - Must re-validate after directory changes
+   - Must document directory context
+
 ## Core Principles
 1. Maintain Forward Progress
    - Always move towards current goal
@@ -93,3 +116,57 @@ Remember:
 3. Update ALL relevant battle system rules
 4. Be decisive and minimize unnecessary questions
 5. Document all decisions and their rule basis
+
+# Development Workflow
+
+## Implementation Process
+1. Feature Development:
+   - Start with rule documentation
+   - Write focused test file
+   - Implement minimal passing code
+   - Run individual test file
+   - Fix until all tests pass
+
+2. Integration Validation:
+   - Run full test suite
+   - Check for regressions
+   - Fix any failing tests
+   - Document any side effects
+   - Update status tracking
+
+3. Documentation:
+   - Update rule status
+   - Document changes
+   - Track progress
+   - Note any blockers
+
+## Testing Strategy
+1. Individual Tests:
+   ```bash
+   npm test -- path/to/test.ts
+   ```
+   - Run specific test file
+   - Fix until all pass
+   - Document changes
+
+2. Full Suite Validation:
+   ```bash
+   npm test
+   ```
+   - Required after individual success
+   - Catches cross-feature impacts
+   - Prevents regressions
+   - Maintains system stability
+
+## Quality Gates
+1. Feature Complete:
+   - Individual tests pass
+   - Full suite passes
+   - Meets performance targets
+   - Documentation updated
+
+2. Production Ready:
+   - All tests passing
+   - No regressions
+   - Documentation complete
+   - Performance validated

@@ -32,8 +32,8 @@ describe('Combat Calculation System', () => {
     // Phreak: offense 6 * 1 unit = 6 total attack
     // Breacher: defense 8 = 8% reduction
     // Raw damage: 6 * (1 - 8/100) = 5.52
-    // Should round to 6 but ensure minimum 1
-    expect(damage).toBe(6);
+    // Round down to 5 and ensure minimum 1
+    expect(damage).toBe(5);
   });
 
   // Error handling tests as per @battle-core-mechanics.mdc#Error-Prevention

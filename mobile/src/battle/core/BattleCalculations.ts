@@ -28,58 +28,43 @@ const BASE_STATS: Record<BattalionType, BattalionStats> = {
   }
 };
 
-export function calculateBattalionStats(type: BattalionType, quantity: number): BattalionStats {
-  // Validate inputs as per @battle-core-mechanics.mdc#Error-Prevention
-  if (!BASE_STATS[type]) {
+export function calculateBattalionStats(type: BattalionType): BattalionStats {
+  const stats = BASE_STATS[type];
+  if (!stats) {
     throw new Error('Invalid battalion type');
   }
-  
-  if (quantity <= 0) {
-    throw new Error('Battalion quantity must be positive');
-  }
-
-  const baseStats = BASE_STATS[type];
-  
-  // Only include scaled stats when quantity > 1
-  return quantity > 1 ? {
-    ...baseStats,
-    totalHealth: baseStats.health * quantity,
-    totalAttack: baseStats.offense * quantity
-  } : baseStats;
+  return { ...stats };
 }
 
 // Implementation of @battle-core-mechanics.mdc#Combat-Logic#Battalion-Combat
-export function calculateCombatDamage(params: CombatCalculationParams): number {
-  const { attackerType, attackerQuantity, defenderType, defenderQuantity } = params;
-
-  // Validate battalion types
+export function calculateCombatDamage({
+  attackerType,
+  attackerQuantity,
+  defenderType,
+  defenderQuantity,
+}: CombatCalculationParams): number {
   if (!BASE_STATS[attackerType] || !BASE_STATS[defenderType]) {
     throw new Error('Invalid battalion type');
   }
-
-  // Validate quantities
+  
   if (attackerQuantity <= 0 || defenderQuantity <= 0) {
     throw new Error('Battalion quantity must be positive');
   }
 
-  // Get base stats
-  const attackerStats = BASE_STATS[attackerType];
-  const defenderStats = BASE_STATS[defenderType];
-
-  // Calculate total attack power
-  const totalAttack = attackerStats.offense * attackerQuantity;
-
-  // Apply defense reduction
-  const defenseMultiplier = 1 - (defenderStats.defense / 100);
-  const rawDamage = totalAttack * defenseMultiplier;
-
-  // Round to nearest integer and ensure minimum damage of 1
-  return Math.max(1, Math.round(rawDamage));
+  const totalAttack = BASE_STATS[attackerType].offense * attackerQuantity;
+  const defenseMultiplier = 1 - (BASE_STATS[defenderType].defense / 100);
+  
+  // Calculate damage and round down as per battle-core-mechanics rule
+  const damage = Math.floor(totalAttack * defenseMultiplier);
+  
+  // Ensure minimum damage of 1 as per battle-core-mechanics rule
+  return Math.max(1, damage);
 }
 
 // Implementation of @battle-core-mechanics.mdc#Combat-Logic#Universal-Targeting
 function validatePosition(position: Position): void {
-  if (typeof position.x !== 'number' || typeof position.y !== 'number') {
+  if (typeof position.x !== 'number' || typeof position.y !== 'number' ||
+      isNaN(position.x) || isNaN(position.y)) {
     throw new Error('Invalid position coordinates');
   }
 }
