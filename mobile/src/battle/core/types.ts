@@ -26,4 +26,34 @@ export interface CombatCalculationParams {
   attackerQuantity: number;
   defenderType: BattalionType;
   defenderQuantity: number;
+}
+
+// Position type for targeting calculations
+export interface Position {
+  x: number;
+  y: number;
+}
+
+// Target information for targeting calculations
+export interface TargetInfo {
+  type: BattalionType;
+  position: Position;
+}
+
+// Parameters for targeting priority calculation
+export interface TargetingParams {
+  attackerPosition: Position;
+  targets: TargetInfo[];
+}
+
+// Result of targeting priority calculation
+export interface TargetingResult {
+  selectedTarget: TargetInfo;
+}
+
+// Parameters for attack position calculation
+export interface AttackPositionParams {
+  attackerType: BattalionType;
+  attackerPosition: Position;
+  targetPosition: Position;
 } 
