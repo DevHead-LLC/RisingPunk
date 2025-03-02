@@ -1,14 +1,15 @@
 // Implementation of @battle-state-persistence.mdc#State-Management-Philosophy
 // Core battle state management system with frontend focus
 
-import { BattlePhase } from './BattleTypes';
+import { BattlePhase, BattalionType, Battalion as BattleTypeBattalion, Node as BattleTypeNode } from './BattleTypes';
 import { BattleService } from './BattleService';
+import { BattlePerformanceMonitor } from './BattlePerformanceMonitor';
 
 export interface BattleState {
   phase: BattlePhase;
   timeRemaining: number;
-  nodes: Map<string, Node>;
-  battalions: Map<string, Battalion>;
+  nodes: Map<string, BattleTypeNode>;
+  battalions: Map<string, BattleTypeBattalion>;
   updateId: number;
   lastUpdated: Date;
 }
@@ -25,6 +26,7 @@ export interface Battalion {
   id: string;
   position: { x: number; y: number };
   team: string;
+  type: BattalionType;
   health: number;
   quantity: number;
   targetId: string | null;
@@ -46,6 +48,7 @@ export class BattleStateManager {
   private battleService: BattleService;
   private queuedUpdates: BattleStateUpdate[] = [];
   private isProcessingUpdates: boolean = false;
+  private pendingUpdates: BattleStateUpdate[] = [];
 
   constructor(battleService: BattleService) {
     if (!battleService) {
@@ -69,12 +72,14 @@ export class BattleStateManager {
     return BattleStateManager.instance;
   }
 
-  public initializeBattle(battleId: string): void {
+  public initializeBattle(battleId: string, initialState?: BattleState): void {
     if (!battleId) {
       throw new Error('Battle ID is required for initialization');
     }
     this.battleId = battleId;
-    this.state = {
+    
+    // Use provided initial state or create default state
+    this.state = initialState || {
       phase: BattlePhase.PRE_BATTLE,
       timeRemaining: 20,
       nodes: new Map(),
@@ -82,6 +87,8 @@ export class BattleStateManager {
       updateId: 0,
       lastUpdated: new Date()
     };
+
+    this.notifySubscribers();
     this.battleService.startSync(
       battleId,
       this.handleServerUpdate.bind(this),
@@ -97,24 +104,37 @@ export class BattleStateManager {
     };
   }
 
-  public queueStateUpdate(update: BattleStateUpdate): void {
-    this.queuedUpdates.push(update);
+  public async queueStateUpdate(update: BattleStateUpdate): Promise<void> {
+    // Add update to queue
+    this.pendingUpdates.push(update);
+
+    // If we're not already processing updates, start processing
     if (!this.isProcessingUpdates) {
-      this.processQueuedUpdates();
+      await this.processUpdates();
     }
   }
 
-  private async processQueuedUpdates(): Promise<void> {
-    if (this.isProcessingUpdates || this.queuedUpdates.length === 0) return;
-    
-    this.isProcessingUpdates = true;
-    while (this.queuedUpdates.length > 0) {
-      const update = this.queuedUpdates.shift();
-      if (update) {
-        await this.updateState(update);
-      }
+  private async processUpdates(): Promise<void> {
+    if (this.isProcessingUpdates) {
+      return;
     }
-    this.isProcessingUpdates = false;
+
+    this.isProcessingUpdates = true;
+
+    try {
+      while (this.pendingUpdates.length > 0) {
+        const update = this.pendingUpdates.shift();
+        if (update) {
+          await this.updateState(update);
+        }
+      }
+    } catch (error) {
+      console.error('Error processing updates:', error);
+      // Clear pending updates on error to prevent deadlock
+      this.pendingUpdates = [];
+    } finally {
+      this.isProcessingUpdates = false;
+    }
   }
 
   public async updateState(update: BattleStateUpdate): Promise<void> {
@@ -174,25 +194,24 @@ export class BattleStateManager {
     if (update.battalionUpdates) {
       const newBattalions = new Map(this.state.battalions);
       update.battalionUpdates.forEach((battalionUpdate, battalionId) => {
-        const existingBattalion = newBattalions.get(battalionId);
-        if (!existingBattalion && !battalionUpdate.position) {
-          console.warn(`Attempted to update non-existent battalion without position: ${battalionId}`);
+        if (!this.validateBattalionUpdate(battalionId, battalionUpdate)) {
           return;
         }
         
-        const updatedBattalion = {
-          ...(existingBattalion || {
-            id: battalionId,
-            position: { x: 0, y: 0 },
-            team: '',
-            health: 100,
-            quantity: 10,
-            targetId: null
-          }),
-          ...battalionUpdate
+        const existingBattalion = newBattalions.get(battalionId) || {
+          id: battalionId,
+          position: battalionUpdate.position || { x: 0, y: 0 },
+          team: battalionUpdate.team || '',
+          type: battalionUpdate.type || BattalionType.GUARDIAN,
+          health: 100,
+          quantity: 10,
+          targetId: null
         };
         
-        newBattalions.set(battalionId, updatedBattalion);
+        newBattalions.set(battalionId, {
+          ...existingBattalion,
+          ...battalionUpdate
+        });
       });
       newState.battalions = newBattalions;
     }
@@ -221,6 +240,30 @@ export class BattleStateManager {
     };
 
     return validTransitions[currentPhase]?.includes(newPhase) || false;
+  }
+
+  private validateBattalionUpdate(battalionId: string, battalionUpdate: Partial<Battalion>): boolean {
+    const existingBattalion = this.state.battalions.get(battalionId);
+    
+    // For existing battalions, allow any updates
+    if (existingBattalion) {
+      return true;
+    }
+    
+    // For new battalions, require position
+    if (!battalionUpdate.position) {
+      console.warn(`Attempted to create new battalion without position: ${battalionId}`);
+      return false;
+    }
+
+    // Validate position coordinates
+    const { x, y } = battalionUpdate.position;
+    if (typeof x !== 'number' || typeof y !== 'number' || isNaN(x) || isNaN(y)) {
+      console.warn(`Invalid position coordinates for battalion ${battalionId}: x=${x}, y=${y}`);
+      return false;
+    }
+
+    return true;
   }
 
   public subscribe(callback: (state: BattleState) => void): () => void {
@@ -274,15 +317,27 @@ export class BattleStateManager {
 
   private handleSyncError(error: Error): void {
     console.error('Battle sync error:', error);
-    // Implement retry logic
-    setTimeout(() => {
-      if (this.battleId) {
-        this.battleService.startSync(
-          this.battleId,
-          this.handleServerUpdate.bind(this),
-          this.handleSyncError.bind(this)
-        );
-      }
-    }, 5000);
+    const performanceMonitor = BattlePerformanceMonitor.getInstance();
+    performanceMonitor.recordNetworkError(error);
+    
+    // During network errors, we preserve the existing state to maintain consistency
+    // If no state exists, we initialize with PRE_BATTLE phase
+    if (!this.state) {
+      this.state = {
+        phase: BattlePhase.PRE_BATTLE,
+        timeRemaining: 0,
+        updateId: 0,
+        lastUpdated: new Date(),
+        nodes: new Map(),
+        battalions: new Map()
+      };
+    }
+
+    // Clear any pending updates to ensure we can accept new ones
+    this.pendingUpdates = [];
+    this.isProcessingUpdates = false;
+
+    // Notify subscribers of the error state
+    this.notifySubscribers();
   }
 } 

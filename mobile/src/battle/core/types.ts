@@ -38,12 +38,14 @@ export interface Position {
 export interface TargetInfo {
   type: BattalionType;
   position: Position;
+  id: string;  // Unique identifier for the target
 }
 
 // Parameters for targeting priority calculation
 export interface TargetingParams {
   attackerPosition: Position;
   targets: TargetInfo[];
+  currentTargetId?: string;  // Optional ID of current target
 }
 
 // Result of targeting priority calculation

@@ -13,6 +13,18 @@ declare global {
 import { BattlePhase } from './BattleContext';
 import { Platform } from 'react-native';
 
+interface LogDetails {
+  value: number;
+  threshold?: number;
+  error?: string;
+}
+
+interface PerformanceLog {
+  type: 'frame_drop' | 'memory_warning' | 'network_latency' | 'js_thread_warning' | 'load_time' | 'error';
+  timestamp: number;
+  details: LogDetails;
+}
+
 export interface PerformanceMetrics {
   frameRate: number;
   memoryUsage: number;
@@ -20,15 +32,8 @@ export interface PerformanceMetrics {
   loadTime: number;
   jsThreadUsage: number;
   lastFrameTime: number;
-}
-
-export interface PerformanceLog {
-  type: 'frame_drop' | 'memory_warning' | 'network_latency' | 'js_thread_warning' | 'load_time' | 'error';
-  timestamp: number;
-  details: {
-    value: number;
-    threshold?: number;
-  };
+  networkErrors: number;
+  lastNetworkError: Error | null;
 }
 
 type PerformanceSubscriber = (metrics: PerformanceMetrics) => void;
@@ -52,6 +57,8 @@ export class BattlePerformanceMonitor {
   private frameTimeHistory: number[] = [];
   private readonly maxHistoryLength = 60; // 1 second of frames at 60fps
   private readonly targetFrameTime = 16; // ~60fps
+  private networkErrors: number = 0;
+  private lastNetworkError: Error | null = null;
 
   private constructor() {}
 
@@ -163,6 +170,14 @@ export class BattlePerformanceMonitor {
     this.notifySubscribers();
   }
 
+  public recordNetworkError(error: Error): void {
+    // Set high latency value on error
+    this.networkLatency = 1000;
+    this.networkErrors++;
+    this.lastNetworkError = error;
+    this.notifySubscribers();
+  }
+
   public recordLoadStart(): void {
     this.loadStartTime = performance.now();
   }
@@ -189,7 +204,7 @@ export class BattlePerformanceMonitor {
     this.jsThreadUsage = usage;
     if (usage > 0.8) { // 80%
       this.logs.push({
-        type: 'error',
+        type: 'js_thread_warning',
         timestamp: performance.now(),
         details: {
           value: usage * 100,
@@ -214,9 +229,11 @@ export class BattlePerformanceMonitor {
 
   public getMetrics(): PerformanceMetrics {
     return {
-      frameRate: this.frameRate,
+      frameRate: this.calculateFrameRate(),
       memoryUsage: this.memoryUsage,
       networkLatency: this.networkLatency,
+      networkErrors: this.networkErrors,
+      lastNetworkError: this.lastNetworkError,
       loadTime: this.loadTime,
       jsThreadUsage: this.jsThreadUsage,
       lastFrameTime: this.frameTimeHistory[this.frameTimeHistory.length - 1] || 0
@@ -238,6 +255,8 @@ export class BattlePerformanceMonitor {
     this.lastMemoryCheck = 0;
     this.frameCount = 0;
     this.frameTimeHistory = [];
+    this.networkErrors = 0;
+    this.lastNetworkError = null;
   }
 
   public cleanup(): void {
@@ -269,5 +288,11 @@ export class BattlePerformanceMonitor {
 
   reset(): void {
     this.frameTimeHistory = [];
+  }
+
+  private calculateFrameRate(): number {
+    if (this.frameTimeHistory.length === 0) return 60; // Default to 60fps when no history
+    const sum = this.frameTimeHistory.reduce((a, b) => a + b, 0);
+    return 1000 / (sum / this.frameTimeHistory.length);
   }
 } 

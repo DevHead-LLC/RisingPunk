@@ -3,206 +3,35 @@ description: "Defines testing requirements, mocking standards, and implementatio
 globs: 
 alwaysApply: false
 ---
-// IMPORTANT: When working with any section of this file, ALWAYS review ALL "Implementation of" and "Referenced by" 
-// connections to ensure full context and maintain consistency across the codebase.
 
-# Testing Standards
+// CRITICAL: All tests MUST be derived from battle-*.mdc rules in .cursor/rules/battle/
+// These rules ARE the game mechanics - they define how the game actually works
+// Each test MUST validate a specific rule's requirements
 
-## CRITICAL: Directory Context
-// MANDATORY: MUST BE VALIDATED BEFORE ANY TEST OPERATIONS
-1. Directory Validation:
-   ```bash
-   pwd  # REQUIRED before ANY file operations
-   ```
-   - ALWAYS verify test directory context
-   - NEVER assume directory location
-   - ABORT if directory is incorrect
-   - RE-VALIDATE after any directory changes
+## Status Tracking
+// Tracks the last rule implemented to maintain development continuity
+Last Rule Implemented: none
+Source File: none
+Status: none
 
-2. Test Directory Structure:
-   - Must operate in correct workspace
-   - Must validate before file operations
-   - Must maintain directory context
-   - Must document directory requirements
+1. Write failing test first
+   - Select rule from any [IN_PROGRESS] battle-*.mdc file in .cursor/rules/
+   - Test MUST validate rule's specific requirements 
+   - Rule being tested MUST be referenced in test
+   - Test MUST validate actual game mechanics
+   - Update Status Tracking section after selection
 
-3. Common Test Directory Errors:
-   - Wrong test directory level
-   - Incorrect workspace root
-   - Mixed test contexts
-   - Invalid file paths
+2. Implement minimal code to pass
+   - Write ONLY code needed to make test pass
+   - Implementation MUST follow rule exactly
+   - NO extra features or optimizations yet
+   - Keep it simple and focused
 
-## Core Testing Principles
-// Implementation of:
-// - @project-structure.mdc#Rule-System
-// - @code-style-and-structure.mdc#Testing-Guidelines
+3. Run test suite
+   - Verify ALL rule-based tests pass
+   - Each battle-*.mdc rule MUST have coverage
+   - Update source file's status if all tests for rule pass
 
-// Referenced by:
-// - @battle-core-mechanics.mdc#Quality-Gates
-// - @battle-performance-standards.mdc#Error-Handling
-
-### Rule-Test Mapping
-// IMPORTANT: Tests must be minimal and focused, affecting only the specific functionality being tested
-
-1. Test File Organization:
-   ```
-   mobile/src/__tests__/battle/
-   ├── core/              # @battle-core-mechanics.mdc tests
-   │   ├── BattleCoreStats.test.ts
-   │   └── BattleState.test.ts
-   ├── movement/         # @battle-movement-system.mdc tests
-   ├── targeting/        # @battle-targeting-system.mdc tests
-   └── README.md        # Test status tracking
-   ```
-
-2. Test Implementation:
-   ```typescript
-   // Implementation of @battle-core-mechanics.mdc#Combat-Logic#Battalion-Stats
-   describe('Battalion Stats System', () => {
-     it('should calculate correct stats', () => {
-       // Minimal test focusing only on stats calculation
-       const stats = calculateBattalionStats(BattalionType.Guardian, 1);
-       expect(stats).toEqual({
-         speed: 9,
-         range: 4,
-         // ... only test required properties
-       });
-     });
-   });
-   ```
-
-3. Status Tracking:
-   - [DONE] - Tests written and passing
-   - [IN_PROGRESS] - Tests being implemented
-   - [PENDING] - Tests not started
-   - [BLOCKED] - Waiting on dependencies
-
-### Test Focus Priority
-1. Rule Implementation:
-   - Test only what the rule requires
-   - Keep tests minimal and focused
-   - Avoid testing unrelated features
-   - Document rule connections
-
-2. Cross-Rule Testing:
-   - Identify shared requirements
-   - Test common functionality once
-   - Reference all related rules
-   - Maintain test independence
-
-### Test Organization
-1. File Structure:
-   - Tests mirror rule organization
-   - Group by battle system component
-   - Keep setup minimal and focused
-   - Document rule references
-
-2. Naming Conventions:
-   - Test files: `FeatureName.test.ts`
-   - Rule reference in comments
-   - Clear test descriptions
-   - Status tracking in README
-
-## Implementation Guidelines
-// Implementation of @project-structure.mdc#Rule-Implementation-Strategy
-
-1. Test First Development:
-   ```typescript
-   // Implementation of @battle-core-mechanics.mdc#Combat-Logic
-   describe('Combat Calculations', () => {
-     // Document rule requirements
-     // Write minimal test
-     // Implement only what's needed
-     // Track completion status
-   });
-   ```
-
-2. Test Scope:
-   - Test only rule requirements
-   - No unnecessary coverage
-   - Clear rule references
-   - Status documentation
-
-3. Test Independence:
-   - Tests don't affect each other
-   - Minimal shared setup
-   - Clean state between tests
-   - Focused assertions
-
-## Quality Gates
-// Implementation of @project-structure.mdc#Quality-Gates
-
-### Test Requirements
-1. Must Have:
-   - Rule reference comments
-   - Minimal, focused tests
-   - Clear status tracking
-   - Independent execution
-   - Full test suite validation after individual success
-
-2. Must Not Have:
-   - Unnecessary complexity
-   - Unrelated test coverage
-   - Cross-test dependencies
-   - Duplicate rule testing
-
-### Test Validation Process
-1. Individual Test Phase:
-   - Run specific test file
-   - Validate all tests pass
-   - Fix any failures
-   - Document changes
-
-2. Comprehensive Test Phase:
-   - Run entire test suite
-   - Verify no regressions
-   - Check for side effects
-   - Update status tracking
-
-3. Test Commands:
-   ```bash
-   # Individual test
-   npm test -- path/to/test.ts
-   
-   # Full test suite validation
-   npm test
-   ```
-
-### Coverage Goals
-1. Rule Implementation:
-   - Core Logic: 100% [IN_PROGRESS]
-     - Current: 89.41% overall
-     - BattleStateManager.ts: 95.29%
-     - BattleCalculations.ts: 95.31%
-     - BattleContext.ts: 73.26% [NEEDS IMPROVEMENT]
-     - types.ts: 0% [NEEDS IMPROVEMENT]
-   - Rule Requirements: 100%
-     - State persistence complete
-     - Movement system complete
-     - Combat calculations complete
-   - Edge Cases: As specified
-     - Branch coverage: 80.62% [NEEDS IMPROVEMENT]
-     - Error handling scenarios covered
-     - Network failure recovery tested
-   - Performance: When required
-     - Basic timing tests implemented
-     - Load testing pending
-     - Animation performance pending
-
-2. Test Quality:
-   - Minimal and focused [DONE]
-   - Clear rule mapping [DONE]
-   - Independent execution [DONE]
-   - Proper status tracking [IN_PROGRESS]
-     - Coverage tracking implemented
-     - Test scenarios documented
-     - Edge cases identified
-     - Improvement plan created
-
-3. Priority Improvements:
-   - BattleContext.ts coverage (Target: 95%)
-   - types.ts validation (Target: 80%)
-   - Branch coverage (Target: 90%)
-   - Error handling scenarios (Target: 100%)
-   - Performance validation (When required)
-
-Remember: Tests should be as simple as possible while fully validating rule requirements. Avoid complexity that doesn't directly support rule validation. 
+4. Return to workflow
+   - Move to performance check phase
+   - Let workflow handle status updates

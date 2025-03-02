@@ -1,0 +1,10 @@
+---
+description: "Defines performance check requirements and steps."
+---
+
+1. Monitor frame rates (target 60fps)
+2. Track memory usage and optimize
+3. Measure load times
+4. Profile and optimize critical paths
+5. Log performance metrics
+6. Take immediate action on performance issues 

@@ -79,7 +79,7 @@ function calculateDistance(a: Position, b: Position): number {
 }
 
 export function calculateTargetingPriority(params: TargetingParams): TargetingResult {
-  const { attackerPosition, targets } = params;
+  const { attackerPosition, targets, currentTargetId } = params;
 
   // Validate inputs
   validatePosition(attackerPosition);
@@ -96,19 +96,48 @@ export function calculateTargetingPriority(params: TargetingParams): TargetingRe
     validatePosition(target.position);
   }
 
-  // Find closest target based on distance only
-  let closestTarget = targets[0];
-  let minDistance = calculateDistance(attackerPosition, closestTarget.position);
-
-  for (const target of targets.slice(1)) {
-    const distance = calculateDistance(attackerPosition, target.position);
-    if (distance < minDistance) {
-      minDistance = distance;
-      closestTarget = target;
+  // If we have a current target and it's still in the target list, maintain it
+  if (currentTargetId) {
+    const currentTarget = targets.find(t => t.id === currentTargetId);
+    if (currentTarget) {
+      const distance = calculateDistance(attackerPosition, currentTarget.position);
+      // Only maintain current target if it's within range
+      if (distance <= BASE_STATS[currentTarget.type].range) {
+        return { selectedTarget: currentTarget };
+      }
     }
   }
 
-  return { selectedTarget: closestTarget };
+  // Find closest target that's within range
+  let validTarget: TargetInfo | null = null;
+  let minDistance = Infinity;
+
+  for (const target of targets) {
+    const distance = calculateDistance(attackerPosition, target.position);
+    const range = BASE_STATS[target.type].range;
+    
+    // Check if target is within range and closer than current best
+    if (distance <= range && distance < minDistance) {
+      minDistance = distance;
+      validTarget = target;
+    }
+  }
+
+  // If no valid target found within range, find the closest target overall
+  if (!validTarget) {
+    validTarget = targets[0];
+    minDistance = calculateDistance(attackerPosition, validTarget.position);
+
+    for (const target of targets.slice(1)) {
+      const distance = calculateDistance(attackerPosition, target.position);
+      if (distance < minDistance) {
+        minDistance = distance;
+        validTarget = target;
+      }
+    }
+  }
+
+  return { selectedTarget: validTarget };
 }
 
 // Implementation of @battle-movement-system.mdc#Core-Movement-Properties
@@ -197,7 +226,8 @@ export function calculateAttackPosition(params: AttackPositionParams): Position 
   const distance = Math.sqrt(dx * dx + dy * dy);
 
   // Calculate position at edge of range
-  const scale = (distance - range) / distance;
+  // Move towards target by (currentDistance - range) units
+  const scale = (currentDistance - range) / currentDistance;
   return {
     x: Math.round(attackerPosition.x + dx * scale),
     y: Math.round(attackerPosition.y + dy * scale)
