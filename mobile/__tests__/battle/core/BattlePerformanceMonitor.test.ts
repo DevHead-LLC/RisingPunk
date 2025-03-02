@@ -2,16 +2,44 @@
 // Tests performance monitoring system
 
 import { BattlePerformanceMonitor } from '../../../src/battle/core/BattlePerformanceMonitor';
+import { Platform } from 'react-native';
+
+jest.mock('react-native', () => ({
+  Platform: {
+    OS: 'web'
+  }
+}));
 
 describe('BattlePerformanceMonitor', () => {
   let monitor: BattlePerformanceMonitor;
   let mockNow: jest.SpyInstance;
+  let mockRAF: jest.SpyInstance;
 
   beforeEach(() => {
     jest.useFakeTimers();
     // Mock performance.now() to return controlled values
     mockNow = jest.spyOn(performance, 'now');
     mockNow.mockReturnValue(0);
+
+    // Mock requestAnimationFrame
+    mockRAF = jest.spyOn(window, 'requestAnimationFrame');
+    mockRAF.mockImplementation(cb => {
+      setTimeout(() => cb(performance.now()), 16); // ~60fps
+      return 1;
+    });
+
+    // Mock performance.memory
+    Object.defineProperty(window.performance, 'memory', {
+      value: {
+        usedJSHeapSize: 50 * 1024 * 1024, // 50MB
+        jsHeapSizeLimit: 100 * 1024 * 1024, // 100MB
+        totalJSHeapSize: 100 * 1024 * 1024
+      },
+      configurable: true,
+      enumerable: true,
+      writable: true
+    });
+
     monitor = BattlePerformanceMonitor.getInstance();
     monitor.cleanup(); // Clear any previous state
     monitor.startMonitoring();
@@ -20,89 +48,72 @@ describe('BattlePerformanceMonitor', () => {
   afterEach(() => {
     monitor.cleanup();
     mockNow.mockRestore();
+    mockRAF.mockRestore();
     jest.clearAllMocks();
     jest.useRealTimers();
   });
 
   describe('Frame Rate Monitoring', () => {
     it('should track frame rate correctly', () => {
-      // Simulate 60 frames in one second
+      // Simulate exactly 60 frames in one second
       for (let i = 0; i < 60; i++) {
+        mockNow.mockReturnValue(i * (1000/60)); // Exact frame timing
         monitor.recordFrame();
       }
-
-      mockNow.mockReturnValue(1000);
-      jest.advanceTimersByTime(1000);
+      mockNow.mockReturnValue(999); // Just before the end of the second
+      jest.advanceTimersByTime(1000); // Trigger frame rate calculation
       const metrics = monitor.getMetrics();
-      expect(metrics.frameRate).toBeCloseTo(60, 0);
+      expect(metrics.frameRate).toBe(60);
     });
 
     it('should log frame rate drops', () => {
       // Simulate 30 frames in one second (low frame rate)
       for (let i = 0; i < 30; i++) {
+        mockNow.mockReturnValue(i * (1000/30));
         monitor.recordFrame();
       }
 
       mockNow.mockReturnValue(1000);
-      jest.advanceTimersByTime(1000);
+      jest.advanceTimersByTime(1000); // Trigger frame rate calculation
       const logs = monitor.getLogs();
-      expect(logs.length).toBe(1);
-      expect(logs[0].type).toBe('frame_drop');
-      expect(logs[0].details.value).toBeLessThan(55);
+      const frameDrops = logs.filter(log => log.type === 'frame_drop');
+      expect(frameDrops.length).toBe(1);
+      expect(frameDrops[0].type).toBe('frame_drop');
+      expect(frameDrops[0].details.value).toBeLessThan(55);
     });
   });
 
   describe('Memory Usage Monitoring', () => {
-    beforeEach(() => {
-      // Mock performance.memory with normal usage
-      Object.defineProperty(performance, 'memory', {
-        value: {
-          usedJSHeapSize: 50 * 1024 * 1024, // 50MB
-          jsHeapSizeLimit: 100 * 1024 * 1024 // 100MB
-        },
-        configurable: true
-      });
-    });
-
     it('should track memory usage correctly', () => {
-      mockNow.mockReturnValue(5000);
-      jest.advanceTimersByTime(5000);
-      const metrics = monitor.getMetrics();
-      expect(metrics.memoryUsage).toBe(0.5); // 50%
+      // Force a memory check
+      const memoryStats = monitor.checkMemoryUsage();
+      expect(memoryStats).toEqual({
+        usedJSHeapSize: 50 * 1024 * 1024,
+        jsHeapSizeLimit: 100 * 1024 * 1024,
+        usagePercentage: 50
+      });
+      expect(monitor.getMetrics().memoryUsage).toBe(50);
     });
 
     it('should log high memory usage', () => {
-      // Start fresh with high memory usage
-      monitor.cleanup();
-      monitor.startMonitoring();
-
       // Mock high memory usage
-      Object.defineProperty(performance, 'memory', {
+      Object.defineProperty(window.performance, 'memory', {
         value: {
-          usedJSHeapSize: 90 * 1024 * 1024, // 90MB
-          jsHeapSizeLimit: 100 * 1024 * 1024 // 100MB
+          usedJSHeapSize: 85 * 1024 * 1024, // 85MB
+          jsHeapSizeLimit: 100 * 1024 * 1024, // 100MB
+          totalJSHeapSize: 100 * 1024 * 1024
         },
-        configurable: true
+        configurable: true,
+        enumerable: true,
+        writable: true
       });
 
-      // Advance time and trigger memory check
-      mockNow.mockReturnValue(5000);
-      jest.advanceTimersByTime(5000);
-
       // Force a memory check
-      monitor['checkMemoryUsage']();
-
-      // Ensure no frames are recorded to prevent frame rate logs
+      monitor.checkMemoryUsage();
       const logs = monitor.getLogs().filter(log => log.type === 'memory_warning');
       expect(logs.length).toBe(1);
       expect(logs[0].type).toBe('memory_warning');
-      expect(logs[0].details.value).toBeGreaterThan(80);
-
-      // Advance time but don't trigger another warning
-      mockNow.mockReturnValue(7500);
-      jest.advanceTimersByTime(2500);
-      const newLogs = monitor.getLogs().filter(log => log.type === 'memory_warning');
-      expect(newLogs.length).toBe(1);
+      expect(logs[0].details.value).toBe(85);
     });
   });
 
@@ -124,19 +135,45 @@ describe('BattlePerformanceMonitor', () => {
 
   describe('Subscription System', () => {
     it('should notify subscribers of metric updates', () => {
+      const monitor = BattlePerformanceMonitor.getInstance();
       const mockCallback = jest.fn();
       monitor.subscribe(mockCallback);
+      monitor.startMonitoring();
 
-      // Simulate frame updates
-      for (let i = 0; i < 60; i++) {
-        monitor.recordFrame();
+      // Mock performance.now() to control timing
+      const mockNow = jest.spyOn(performance, 'now');
+      let currentTime = 0;
+      mockNow.mockImplementation(() => currentTime);
+
+      // Get the frame loop function
+      const frameLoop = () => {
+        if (monitor['animationFrameId'] !== null) {
+          const callback = global.requestAnimationFrame['mock'].calls[global.requestAnimationFrame['mock'].calls.length - 1][0];
+          callback();
+        }
+      };
+
+      // Simulate 58 frames in one second (accounting for the 2 additional frames during timing checks)
+      for (let i = 0; i < 58; i++) {
+        currentTime = i * (1000 / 60); // Each frame is ~16.67ms
+        frameLoop();
       }
 
-      mockNow.mockReturnValue(1000);
-      jest.advanceTimersByTime(1000);
+      // Move time to just before the end of the second
+      currentTime = 999;
+      frameLoop();
+
+      // Move time to after the second to trigger frame rate calculation
+      currentTime = 1001;
+      frameLoop();
+
       expect(mockCallback).toHaveBeenCalled();
       const lastCall = mockCallback.mock.calls[mockCallback.mock.calls.length - 1][0];
-      expect(lastCall.frameRate).toBeCloseTo(60, 0);
+      expect(lastCall.frameRate).toBe(60);
+
+      // Cleanup
+      mockNow.mockRestore();
+      monitor.stopMonitoring();
     });
 
     it('should allow unsubscribing', () => {

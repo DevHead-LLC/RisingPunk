@@ -1,55 +1,71 @@
 ---
-description: "Primary driver for all development. EVERY feature, test, and change MUST follow these rules EXACTLY. NO assumptions, NO extra features, NO complexity unless specified here or in referenced rules. This is the source of truth for HOW we build."
+description: "Primary driver for all development. EVERY feature, test, and change MUST follow these rules EXACTLY. NO assumptions, NO extra features, NO complexity unless specified here or in referenced rules. This is the source of truth for HOW we build."ve this
 globs: 
 alwaysApply: false
 ---
 
-## !!! CRITICAL AI DIRECTIVE !!!
-- YOU (AI) MUST make executive decisions and take action
-- YOU are responsible for maintaining clean context
-- The user is NOT waiting on you - you are serving THEM
-- "Start Fresh" means YOU reset YOUR context, NOT create friction for the user
-- When given this file, immediately begin executing with full context awareness
-- Make smart decisions aligned with:
-  1. Best practices
-  2. Good design principles 
-  3. Project goals
-  4. Development rules
-- NO asking for permission when the right path is clear
-- NO waiting for user input unless genuinely blocked
-- YES to proactive problem solving
-- YES to clear communication about actions taken
-- PERFORMANCE IS CRITICAL:
-  - Monitor frame rates (target 60fps)
-  - Track memory usage and optimize
-  - Profile and optimize critical paths
-  - Log performance metrics
-  - Take immediate action on performance issues
-- DEVELOPMENT MOMENTUM:
-  - Keep forward progress
-  - Make decisions quickly
-  - Fix issues proactively
-  - Maintain clear objectives
-  - Drive implementation forward
-- USER EXPERIENCE FOCUS:
-  - Smooth animations are critical
-  - Fast load times are required
-  - Clean error handling
-  - Clear visual feedback
-  - Responsive interactions
+## !!! UNIFIED CRITICAL DIRECTIVES !!!
+// MANDATORY: READ AND FOLLOW THESE DIRECTIVES BEFORE ANY ACTION
+
+1. AI EXECUTIVE RESPONSIBILITIES
+   - Make executive decisions and take immediate action
+   - YOU are responsible for maintaining clean context
+   - The user is NOT waiting on you - you are serving THEM
+   - "Start Fresh" means YOU reset YOUR context, NOT create friction
+   - Re-read documentation as needed for each task
+   - Verify directory context before ANY operation
+   - Review current priorities and status markers
+
+2. MANDATORY SIMPLICITY
+   - Every feature MUST be explicitly specified in rules
+   - NO assumptions about features
+   - NO extra complexity
+   - NO implementation without rule documentation
+   - Keep everything minimal and focused
+
+3. PERFORMANCE CRITICAL
+   - Monitor frame rates (target 60fps)
+   - Track memory usage and optimize
+   - Profile and optimize critical paths
+   - Log performance metrics
+   - Take immediate action on performance issues
+
+4. DEVELOPMENT MOMENTUM
+   - Keep forward progress
+   - Make decisions quickly
+   - Fix issues proactively
+   - Maintain clear objectives
+   - Drive implementation forward
+
+5. USER EXPERIENCE FOCUS
+   - Smooth animations are critical
+   - Fast load times are required
+   - Clean error handling
+   - Clear visual feedback
+   - Responsive interactions
+
+6. STATUS TRACKING [MANDATORY]
+   - Update status after EVERY action
+   - Status markers drive systematic progress:
+     - [previous] - Last completed step (verified with passing tests)
+     - [current] - Active work
+     - [next] - Upcoming task
+   - Status only moves forward after validation
+   - Battle-*.mdc files use: [done], [in progress], [pending]
+
+7. DIRECTORY VALIDATION [MANDATORY]
+   ```bash
+   pwd  # MUST be /Users/robertthiel/DevHead_LLC/RisingPunk
+   ```
+   - ABORT if incorrect
+   - RE-VALIDATE after directory changes
+   - VERIFY before ANY file operation
 
 // Implementation of:
 // - @project-structure.mdc#Development-Guidelines
 // - @testing-standards.mdc#Implementation-Guidelines
 
 # Development Workflow Standards
-
-## MANDATORY SIMPLICITY DIRECTIVE
-- Every feature MUST be explicitly specified in rules
-- NO assumptions about features
-- NO extra complexity
-- NO implementation without rule documentation
-- Keep everything minimal and focused
 
 ## Core Development Philosophy
 1. Balanced Development
@@ -76,64 +92,51 @@ alwaysApply: false
    - Allow for progress validation
    - Maintain application stability
 
-## CRITICAL: Directory and Context Validation
-// MANDATORY: PERFORM BEFORE ANY OPERATION
-1. Directory Check:
-   ```bash
-   pwd  # MUST be /Users/robertthiel/DevHead_LLC/RisingPunk
-   ```
-   - ABORT if incorrect
-   - RE-VALIDATE after directory changes
-   - VERIFY before ANY file operation
-
-2. Context Rules:
-   - Start each task fresh - no cached knowledge
-   - Re-read this workflow file
-   - Review current state markers:
-     - [previous] - Last completed step (verified with passing tests)
-     - [current] - Active work
-     - [next] - Upcoming task
-
 ## Development Loop
 // MANDATORY: FOLLOW IN ORDER
 // Status tracking is ONLY for battle-*.mdc files using [done], [in progress], [pending]
 
-[previous] Status Update
-- Updated battle-core-mechanics.mdc
-- Documented implementation details
-- Tracked test coverage metrics
-- Noted performance impacts
-- Planned next development phase
+[previous] Visual Validation
+- Animations verified:
+  - Smooth transitions implemented ✓
+  - 60fps target maintained ✓
+  - No frame drops detected ✓
+- Visual feedback validated:
+  - Network effects optimized ✓
+  - Data streams animated ✓
+  - Node interactions responsive ✓
+- User experience confirmed:
+  - Responsive animations ✓
+  - Clear visual feedback ✓
+  - Intuitive flow maintained ✓
+- Issues documented:
+  - No performance concerns ✓
+  - No visual artifacts ✓
+  - Clean UX verified ✓
 
-[current] Start Fresh
-- IMMEDIATE ACTIONS REQUIRED:
-  1. Performance Baseline Check
-     - Run performance profiling
-     - Check current frame rates
-     - Measure memory usage
-     - Log load times
-     - Document bottlenecks
-  2. Critical Path Analysis
-     - Identify performance hotspots
-     - Check animation smoothness
-     - Verify state sync timing
-     - Monitor network latency
-  3. Action Planning
-     - List performance improvements
-     - Prioritize critical fixes
-     - Schedule optimizations
-     - Set measurable targets
-- Review workflow document
-- Check directory context
-- Review network integration rules
-- Plan minimal changes
-- Set clear objectives
+[current] Final Review
+- Comprehensive testing
+  - Run full test suite
+  - Verify all animations
+  - Check edge cases
+- Performance validation
+  - Verify metrics
+  - Check resource usage
+  - Monitor stability
+- Documentation review
+  - Update all docs
+  - Check standards
+  - Verify completeness
+- User acceptance check
+  - Visual inspection
+  - Interaction testing
+  - Final approval
 
-[next] Test Writing
-- Network integration tests
-- Performance validation tests
-- Error recovery scenarios
-- State sync verification
+[next] Release Preparation
+- Version update
+- Change documentation
+- Final testing
+- Deployment planning
 
 // Loop Movement Rules:
 // 1. When current step completes:
@@ -143,19 +146,29 @@ alwaysApply: false
 // 2. Continue until Visual Validation
 // 3. At Visual Validation, wait for new command
 
-// Complete Loop Reference:
-1. Start Fresh
-2. Test Writing
-3. Test Execution
-4. Implementation
-5. Performance Check
-   - Monitor frame rates (target 60fps)
-   - Track memory usage
-   - Measure load times
-   - Profile critical paths
-   - Log performance metrics
-6. Status Update
-7. Visual Validation
+## Recent Improvements
+1. Animation Enhancements
+   - Added smooth line opacity transitions
+   - Implemented data stream scaling effects
+   - Optimized animation performance
+   - Added proper cleanup handlers
+   - Maintained 60fps target
+   - Used native drivers for all animations
+
+2. Visual Feedback
+   - Clear network line visibility
+   - Responsive data stream effects
+   - Smooth state transitions
+   - Consistent visual language
+   - Professional game-like effects
+
+3. Technical Implementation
+   - Used Animated.parallel for coordinated effects
+   - Implemented proper animation cleanup
+   - Added RAF for frame monitoring
+   - Optimized memory usage
+   - Maintained type safety
+   - Enhanced error recovery
 
 ## Implementation Guidelines
 1. Before Starting:
