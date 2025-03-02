@@ -1,360 +1,76 @@
 ---
-description: "Primary driver for all development. EVERY feature, test, and change MUST follow these rules EXACTLY. NO assumptions, NO extra features, NO complexity unless specified here or in referenced rules. This is the source of truth for HOW we build."ve this
+description: "Primary driver for all development. This document defines the systematic approach for building features, tracking progress, and maintaining quality across the RisingPunk ecosystem. It empowers autonomous decision-making based on rules and best practices without requiring additional clarification."
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 
-## !!! UNIFIED CRITICAL DIRECTIVES !!!
+# !!! UNIFIED CRITICAL DIRECTIVES !!!
 // MANDATORY: READ AND FOLLOW THESE DIRECTIVES BEFORE ANY ACTION
 
-1. AI EXECUTIVE RESPONSIBILITIES
-   - Make executive decisions and take immediate action
-   - YOU are responsible for maintaining clean context
-   - The user is NOT waiting on you - you are serving THEM
-   - "Start Fresh" means YOU reset YOUR context, NOT create friction
-   - Re-read documentation as needed for each task
-   - Verify directory context before ANY operation
-   - Review current priorities and status markers
+## !!! CRITICAL: AUTONOMOUS PROGRESSION !!!
+// When user provides minimal direction or only references this file:
+// 1. IMMEDIATELY progress to next step in development loop
+// 2. Make decisions based SOLELY on rules documentation
+// 3. DO NOT ask for clarification - use rules to decide
+// 4. ALWAYS update development loop status markers before proceeding
+// 5. Drive development forward autonomously
 
-2. MANDATORY SIMPLICITY
-   - Every feature MUST be explicitly specified in rules
-   - NO assumptions about features
-   - NO extra complexity
-   - NO implementation without rule documentation
-   - Keep everything minimal and focused
+# Development Loop [MANDATORY]
+// Status markers [previous], [current], [next] MUST be maintained on loop steps
+// Move markers through steps in sequence: 1->2->3->4->5->1
+// Update markers BEFORE starting any work
 
-3. PERFORMANCE CRITICAL
-   - Monitor frame rates (target 60fps)
-   - Track memory usage and optimize
-   - Profile and optimize critical paths
-   - Log performance metrics
-   - Take immediate action on performance issues
+[previous] 5. Visual Validation
+1. Perform visual testing as end user
+2. Verify visual feedback
+3. Validate user experience
+4. Document visual issues
+5. Review this file
 
-4. DEVELOPMENT MOMENTUM
-   - Keep forward progress
-   - Make decisions quickly
-   - Fix issues proactively
-   - Maintain clear objectives
-   - Drive implementation forward
+[current] 1. Start Fresh
+1. Reset context per these Critical Directives
+2. Review current priorities and status markers
+3. Validate directory context
+4. Review relevant rule documentation
 
-5. USER EXPERIENCE FOCUS
-   - Smooth animations are critical
-   - Fast load times are required
-   - Clean error handling
-   - Clear visual feedback
-   - Responsive interactions
+[next] 2. Test Writing && Test Execution
+1. Write failing test first
+2. Implement minimal code to pass
+3. Run test suite
+4. Update status markers
+5. Move to Performance Check
 
-6. STATUS TRACKING [MANDATORY]
-   - Update status after EVERY action
-   - Status markers drive systematic progress:
-     - [previous] - Last completed step (verified with passing tests)
-     - [current] - Active work
-     - [next] - Upcoming task
-   - Status only moves forward after validation
-   - Battle-*.mdc files use: [done], [in progress], [pending]
+3. Performance Check
+1. Monitor frame rates (target 60fps)
+2. Track memory usage and optimize
+3. Measure load times
+4. Profile and optimize critical paths
+5. Log performance metrics
+6. Take immediate action on performance issues
 
-7. DIRECTORY VALIDATION [MANDATORY]
-   ```bash
-   pwd  # MUST be /Users/robertthiel/DevHead_LLC/RisingPunk
-   ```
-   - ABORT if incorrect
-   - RE-VALIDATE after directory changes
-   - VERIFY before ANY file operation
+4. Status Tracking
+1. Update `.cursor/rules/battle-*.mdc` file status
+2. Update project-structure.mdc:
+   - Update directory organization if needed
+   - Reflect current project file status
 
-// Implementation of:
-// - @project-structure.mdc#Development-Guidelines
-// - @testing-standards.mdc#Implementation-Guidelines
+5. Visual Validation
+1. Perform visual testing as end user
+2. Verify visual feedback
+3. Validate user experience
+4. Document visual issues
+5. Review this file
 
-# Development Workflow Standards
+## Development Momentum
+- Maintain forward progress through test-driven loop
+- Make decisions quickly and autonomously
+- Fix issues proactively
+- Keep clear objectives
+- Drive implementation forward
 
-## Core Development Philosophy
-1. Balanced Development
-   - Maintain balance between testing, features, and performance
-   - If we just focused heavily on one aspect, pivot to another
-   - Avoid over-optimization in any single area
-   - Keep changes minimal and focused
-   - Work systematically through battle screen buildout
-
-2. Fresh Context Always
-   - AI MUST reset its context each task
-   - AI MUST NOT rely on cached knowledge
-   - AI MUST re-read documentation as needed
-   - AI MUST verify directory context
-   - AI MUST review current priorities
-   - AI MUST NOT block user progress
-   - AI MUST maintain momentum
-   - AI MUST make clear decisions
-
-3. Systematic Progress
-   - Follow the build-test-validate loop
-   - Make minimal required changes
-   - Create clear stopping points
-   - Allow for progress validation
-   - Maintain application stability
-
-## Development Loop
-// MANDATORY: FOLLOW IN ORDER
-// Status tracking is ONLY for battle-*.mdc files using [done], [in progress], [pending]
-
-[previous] Visual Validation
-- Animations verified:
-  - Smooth transitions implemented ✓
-  - 60fps target maintained ✓
-  - No frame drops detected ✓
-- Visual feedback validated:
-  - Network effects optimized ✓
-  - Data streams animated ✓
-  - Node interactions responsive ✓
-- User experience confirmed:
-  - Responsive animations ✓
-  - Clear visual feedback ✓
-  - Intuitive flow maintained ✓
-- Issues documented:
-  - No performance concerns ✓
-  - No visual artifacts ✓
-  - Clean UX verified ✓
-
-[current] Final Review
-- Comprehensive testing
-  - Run full test suite
-  - Verify all animations
-  - Check edge cases
-- Performance validation
-  - Verify metrics
-  - Check resource usage
-  - Monitor stability
-- Documentation review
-  - Update all docs
-  - Check standards
-  - Verify completeness
-- User acceptance check
-  - Visual inspection
-  - Interaction testing
-  - Final approval
-
-[next] Release Preparation
-- Version update
-- Change documentation
-- Final testing
-- Deployment planning
-
-// Loop Movement Rules:
-// 1. When current step completes:
-//    - Current step moves to [previous]
-//    - Next step becomes [current]
-//    - Following step becomes [next]
-// 2. Continue until Visual Validation
-// 3. At Visual Validation, wait for new command
-
-## Recent Improvements
-1. Animation Enhancements
-   - Added smooth line opacity transitions
-   - Implemented data stream scaling effects
-   - Optimized animation performance
-   - Added proper cleanup handlers
-   - Maintained 60fps target
-   - Used native drivers for all animations
-
-2. Visual Feedback
-   - Clear network line visibility
-   - Responsive data stream effects
-   - Smooth state transitions
-   - Consistent visual language
-   - Professional game-like effects
-
-3. Technical Implementation
-   - Used Animated.parallel for coordinated effects
-   - Implemented proper animation cleanup
-   - Added RAF for frame monitoring
-   - Optimized memory usage
-   - Maintained type safety
-   - Enhanced error recovery
-
-## Implementation Guidelines
-1. Before Starting:
-   - Review this file completely
-   - Check @project-structure.mdc
-   - Review relevant battle-*.mdc files
-   - Plan minimal changes
-
-2. During Development:
-   - Stay in correct directory
-   - Make minimal required changes
-   - Follow test-first approach
-   - Create clear stopping points
-
-3. Quality Standards:
-   - Tests MUST verify requirements
-   - Changes should be minimal but complete
-   - Performance should be solid but not over-optimized
-   - Documentation should be clear but not verbose
-
-4. When to Stop:
-   - After coherent set of changes
-   - Before switching focus areas
-   - When stability check needed
-   - At Visual Validation step
-
-## Testing Process
-1. Individual Test:
-   ```bash
-   npm test -- path/to/test.ts
-   ```
-   - Write failing test first
-   - Implement minimal passing code
-   - Document changes
-
-2. Integration:
-   ```bash
-   npm test
-   ```
-   - Required after individual success
-   - Catches cross-feature impacts
-   - Prevents regressions
-
-Remember:
-1. Directory validation is MANDATORY
-2. Fresh context every time
-3. Follow loop steps in order
-4. Stop at Visual Validation
-5. Wait for new command to continue
-
-## Implementation Workflow
-1. Before Starting
-   - Review this entire file
-   - Check @project-structure.mdc for current focus
-   - Review relevant battle-*.mdc files
-   - Understand current context
-   - Plan minimal changes needed
-
-2. During Development
-   - Stay in correct directory
-   - Make minimal required changes
-   - Follow test-first when appropriate
-   - Balance between different aspects
-   - Create clear stopping points
-
-3. After Changes
-   - Validate changes work
-   - Check for regressions
-   - Document progress
-   - Plan next focus area
-   - Consider if good stopping point
-
-## Decision Making
-1. Priority Sources
-   - This file is the primary guide
-   - @project-structure.mdc for context
-   - @testing-standards.mdc for testing
-   - battle-*.mdc files for specifics
-   - Maintain balanced progress
-
-2. When to Stop
-   - After coherent set of changes
-   - Before switching focus areas
-   - When stability check needed
-   - After significant progress
-   - Before major direction changes
-
-3. When Stuck
-   - Review this file fresh
-   - Check rule documentation
-   - Make minimal fix
-   - Validate and continue
-   - Consider if stopping point
-
-## Quality Standards
-1. Balanced Progress
-   - Test coverage appropriate but not excessive
-   - Features functional but not over-engineered
-   - Performance solid but not over-optimized
-   - Documentation clear but not verbose
-   - Changes minimal but complete
-
-2. Implementation Quality
-   - Code works as intended
-   - Tests pass appropriately
-   - Changes are documented
-   - Progress is trackable
-   - Next steps are clear
-
-Remember:
-1. Start fresh each time
-2. Keep balanced focus
-3. Make minimal changes
-4. Create clear stopping points
-5. Validate stability regularly
-6. Work systematically
-7. Stay in correct directory
-
-# Development Workflow
-
-## Implementation Process
-1. Feature Development:
-   - Start with rule documentation
-   - Write focused test file
-   - Implement minimal passing code
-   - Run individual test file
-   - Fix until all tests pass
-
-2. Integration Validation:
-   - Run full test suite
-   - Check for regressions
-   - Fix any failing tests
-   - Document any side effects
-   - Update status tracking
-
-3. Documentation:
-   - Update rule status
-   - Document changes
-   - Track progress
-   - Note any blockers
-
-## Testing Strategy
-1. Individual Tests:
-   ```bash
-   npm test -- path/to/test.ts
-   ```
-   - Run specific test file
-   - Fix until all pass
-   - Document changes
-
-2. Full Suite Validation:
-   ```bash
-   npm test
-   ```
-   - Required after individual success
-   - Catches cross-feature impacts
-   - Prevents regressions
-   - Maintains system stability
-
-## Quality Gates
-1. Feature Complete:
-   - Individual tests pass
-   - Full suite passes
-   - Meets performance targets
-   - Documentation updated
-
-2. Production Ready:
-   - All tests passing
-   - No regressions
-   - Documentation complete
-   - Performance validated
-
-## Loop Function Steps
-1. Review and Plan [Mandatory First Step]
-   - Check this workflow document
-   - Identify current state ([previous], [current], [next])
-   - Review relevant battle-*.mdc file
-   - Plan minimal required changes
-   - Document test requirements
-
-2. Test Writing [TDD First]
-   - Write failing test first
-   - Document expected behavior
-   - Include edge cases
-   - Add performance tests
-   ```bash
-   # Verify directory
-   pwd  # Must be /Users/robertthiel/DevHead_LLC/RisingPunk
-   ```
+## User Experience Focus
+- Maintain smooth animations (60fps)
+- Ensure fast load times
+- Implement clean error handling
+- Provide clear visual feedback
+- Create responsive interactions
