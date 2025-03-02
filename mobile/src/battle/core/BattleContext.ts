@@ -196,19 +196,16 @@ function validateBattleStateUpdate(update: BattleStateUpdate, currentState: Batt
 function updateBattalionState(
   battalionUpdate: BattalionStateUpdate,
   current: BattalionState | undefined
-): BattalionState {
+): BattalionState | undefined {
   if (!current) {
-    // For new battalions, health is required
-    if (battalionUpdate.health === undefined || typeof battalionUpdate.health !== 'number') {
-      throw new BattleStateError(
-        'Invalid battalion health value',
-        { update: battalionUpdate }
-      );
+    // For new battalions, require both health and position
+    if (battalionUpdate.health === undefined || battalionUpdate.position === undefined) {
+      return undefined;
     }
     return {
       id: battalionUpdate.id,
       health: battalionUpdate.health,
-      position: battalionUpdate.position || { x: 0, y: 0 } // Default position for new battalions
+      position: battalionUpdate.position
     };
   }
 
@@ -241,19 +238,31 @@ function updateBattalionState(
 function updateNodeState(
   nodeUpdate: NodeStateUpdate,
   current: NodeState | undefined
-): NodeState {
+): NodeState | undefined {
   if (!current) {
+    // For new nodes, require both health and owner
+    if (nodeUpdate.health === undefined || nodeUpdate.owner === undefined || 
+        typeof nodeUpdate.health !== 'number' || nodeUpdate.health < 0) {
+      return undefined;
+    }
     return {
       id: nodeUpdate.id,
-      health: nodeUpdate.health || 100,
+      health: nodeUpdate.health,
       owner: nodeUpdate.owner
     };
   }
 
+  // For existing nodes, update only provided fields and validate health
+  if (nodeUpdate.health !== undefined) {
+    if (typeof nodeUpdate.health !== 'number' || nodeUpdate.health < 0) {
+      return current;
+    }
+  }
+
   return {
-    ...current,
-    ...nodeUpdate,
-    id: current.id
+    id: current.id,
+    health: nodeUpdate.health ?? current.health,
+    owner: nodeUpdate.owner ?? current.owner
   };
 }
 
@@ -261,128 +270,51 @@ export function updateBattleState(
   currentState: BattleContext,
   update: BattleStateUpdate
 ): BattleContext {
-  // Create new state to maintain immutability
-  const newState: BattleContext = {
-    currentPhase: currentState.currentPhase,
-    timer: { ...currentState.timer },
-    battalions: new Map(currentState.battalions),
-    nodes: new Map(currentState.nodes),
+  validateBattleStateUpdate(update, currentState);
+
+  const nextPhase = determineNextPhase(
+    currentState.currentPhase,
+    update.elapsedTime ?? currentState.timer.elapsed,
+    update.forcedPhase
+  );
+
+  const timer = updateTimer(
+    nextPhase,
+    update.elapsedTime ?? currentState.timer.elapsed,
+    currentState.timer.elapsed
+  );
+
+  const battalions = new Map(currentState.battalions);
+  if (update.battalionUpdates) {
+    for (const battalionUpdate of update.battalionUpdates) {
+      const updatedBattalion = updateBattalionState(battalionUpdate, battalions.get(battalionUpdate.id));
+      if (updatedBattalion) {
+        battalions.set(battalionUpdate.id, updatedBattalion);
+      } else {
+        battalions.delete(battalionUpdate.id);
+      }
+    }
+  }
+
+  const nodes = new Map(currentState.nodes);
+  if (update.nodeUpdates) {
+    for (const nodeUpdate of update.nodeUpdates) {
+      const currentNode = nodes.get(nodeUpdate.id);
+      const updatedNode = updateNodeState(nodeUpdate, currentNode);
+      if (updatedNode) {
+        nodes.set(nodeUpdate.id, updatedNode);
+      } else if (currentNode) {
+        nodes.delete(nodeUpdate.id);
+      }
+    }
+  }
+
+  return {
+    currentPhase: nextPhase,
+    timer,
+    battalions,
+    nodes,
     updateId: currentState.updateId + 1,
     logger: currentState.logger
   };
-
-  try {
-    // Validate all updates before applying any changes
-    validateBattleStateUpdate(update, currentState);
-
-    // Update timer and phase
-    if (update.elapsedTime !== undefined) {
-      if (update.elapsedTime < currentState.timer.elapsed) {
-        throw new BattleStateError(
-          'Time cannot move backwards',
-          { current: currentState.timer.elapsed, attempted: update.elapsedTime }
-        );
-      }
-
-      const nextPhase = determineNextPhase(
-        newState.currentPhase,
-        update.elapsedTime,
-        update.forcedPhase
-      );
-      newState.timer = updateTimer(
-        nextPhase,
-        update.elapsedTime,
-        currentState.timer.elapsed
-      );
-      newState.currentPhase = nextPhase;
-    } else if (update.forcedPhase !== undefined) {
-      validatePhaseTransition(currentState.currentPhase, update.forcedPhase);
-      newState.currentPhase = update.forcedPhase;
-    }
-
-    // Update battalions
-    if (update.battalionUpdates) {
-      for (const battalionUpdate of update.battalionUpdates) {
-        try {
-          const current = currentState.battalions.get(battalionUpdate.id);
-          const updatedBattalion = updateBattalionState(battalionUpdate, current);
-          // Store without ID for state comparison
-          const { id, ...stateWithoutId } = updatedBattalion;
-          newState.battalions.set(battalionUpdate.id, stateWithoutId as BattalionState);
-        } catch (error) {
-          // Keep the current state for this battalion
-          const current = currentState.battalions.get(battalionUpdate.id);
-          if (current) {
-            const { id, ...stateWithoutId } = current;
-            newState.battalions.set(battalionUpdate.id, stateWithoutId as BattalionState);
-          }
-          // Re-throw validation errors
-          if (error instanceof BattleStateError && (
-            error.message.includes('Missing required fields') ||
-            error.message.includes('health cannot be negative') ||
-            error.message.includes('Invalid battalion health value')
-          )) {
-            throw error;
-          }
-        }
-      }
-    }
-
-    // Update nodes
-    if (update.nodeUpdates) {
-      for (const nodeUpdate of update.nodeUpdates) {
-        try {
-          const current = currentState.nodes.get(nodeUpdate.id);
-          const updatedNode = updateNodeState(nodeUpdate, current);
-          newState.nodes.set(nodeUpdate.id, updatedNode);
-        } catch (error) {
-          // Keep the current state for this node
-          const current = currentState.nodes.get(nodeUpdate.id);
-          if (current) {
-            newState.nodes.set(nodeUpdate.id, { ...current });
-          }
-          // Re-throw validation errors
-          if (error instanceof BattleStateError && (
-            error.message.includes('Missing required fields') ||
-            error.message.includes('health cannot be negative') ||
-            error.message.includes('Invalid battalion health value')
-          )) {
-            throw error;
-          }
-        }
-      }
-    }
-
-    return newState;
-  } catch (error) {
-    if (currentState.logger && error instanceof Error) {
-      currentState.logger({
-        level: 'error',
-        message: error.message,
-        context: error instanceof BattleStateError ? error.context : {}
-      });
-    }
-
-    // Update timer in error state
-    if (update.elapsedTime !== undefined) {
-      newState.timer = {
-        ...currentState.timer,
-        elapsed: update.elapsedTime,
-        remaining: Math.max(0, currentState.timer.duration - update.elapsedTime)
-      };
-    }
-
-    // Re-throw validation errors
-    if (error instanceof BattleStateError && (
-      error.message.includes('phase transition') ||
-      error.message.includes('Time cannot move backwards') ||
-      error.message.includes('Missing required fields') ||
-      error.message.includes('health cannot be negative') ||
-      error.message.includes('Invalid battalion health value')
-    )) {
-      throw error;
-    }
-
-    return newState;
-  }
 } 

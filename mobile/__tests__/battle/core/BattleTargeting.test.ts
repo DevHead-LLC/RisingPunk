@@ -7,9 +7,9 @@ describe('Battle Targeting System', () => {
     it('should always select nearest target regardless of type', () => {
       const attackerPosition: Position = { x: 0, y: 0 };
       const targets: TargetInfo[] = [
-        { type: BattalionType.Guardian, position: { x: 10, y: 0 } },  // Distance: 10
-        { type: BattalionType.Phreak, position: { x: 5, y: 0 } },     // Distance: 5
-        { type: BattalionType.Breacher, position: { x: 15, y: 0 } }   // Distance: 15
+        { type: BattalionType.Guardian, position: { x: 10, y: 0 }, id: 'test-1' },  // Distance: 10
+        { type: BattalionType.Phreak, position: { x: 5, y: 0 }, id: 'test-2' },     // Distance: 5
+        { type: BattalionType.Breacher, position: { x: 15, y: 0 }, id: 'test-3' }   // Distance: 15
       ];
 
       const result = calculateTargetingPriority({ attackerPosition, targets });
@@ -19,7 +19,7 @@ describe('Battle Targeting System', () => {
     it('should handle single target case', () => {
       const attackerPosition: Position = { x: 0, y: 0 };
       const targets: TargetInfo[] = [
-        { type: BattalionType.Guardian, position: { x: 10, y: 0 } }
+        { type: BattalionType.Guardian, position: { x: 10, y: 0 }, id: 'test-1' }
       ];
 
       const result = calculateTargetingPriority({ attackerPosition, targets });
@@ -37,8 +37,8 @@ describe('Battle Targeting System', () => {
     it('should handle targets at same distance', () => {
       const attackerPosition: Position = { x: 0, y: 0 };
       const targets: TargetInfo[] = [
-        { type: BattalionType.Guardian, position: { x: 10, y: 0 } },
-        { type: BattalionType.Phreak, position: { x: 10, y: 0 } }
+        { type: BattalionType.Guardian, position: { x: 10, y: 0 }, id: 'test-1' },
+        { type: BattalionType.Phreak, position: { x: 10, y: 0 }, id: 'test-2' }
       ];
 
       const result = calculateTargetingPriority({ attackerPosition, targets });
@@ -49,7 +49,7 @@ describe('Battle Targeting System', () => {
     it('should throw error for invalid positions', () => {
       const attackerPosition: Position = { x: 0, y: 0 };
       const targets: TargetInfo[] = [
-        { type: BattalionType.Guardian, position: { x: NaN, y: 0 } }
+        { type: BattalionType.Guardian, position: { x: NaN, y: 0 }, id: 'test-1' }
       ];
 
       expect(() => calculateTargetingPriority({ attackerPosition, targets }))
@@ -59,7 +59,7 @@ describe('Battle Targeting System', () => {
     it('should throw error for invalid battalion type', () => {
       const attackerPosition: Position = { x: 0, y: 0 };
       const targets: TargetInfo[] = [
-        { type: 'InvalidType' as BattalionType, position: { x: 10, y: 0 } }
+        { type: 'InvalidType' as BattalionType, position: { x: 10, y: 0 }, id: 'test-1' }
       ];
 
       expect(() => calculateTargetingPriority({ attackerPosition, targets }))
@@ -166,6 +166,119 @@ describe('Battle Targeting System', () => {
         attackerPosition,
         targetPosition: { x: 10, y: NaN }
       })).toThrow('Invalid position coordinates');
+    });
+  });
+
+  describe('Range-Based Targeting', () => {
+    it('should validate target is within battalion range', () => {
+      const attackerPosition: Position = { x: 0, y: 0 };
+      const targets: TargetInfo[] = [
+        { type: BattalionType.Guardian, position: { x: 3, y: 0 }, id: 'test-1' }  // Within Guardian range (4)
+      ];
+
+      const result = calculateTargetingPriority({ attackerPosition, targets });
+      expect(result.selectedTarget).toBeDefined();
+      
+      // Calculate if target is in range
+      const distance = Math.sqrt(
+        Math.pow(result.selectedTarget.position.x - attackerPosition.x, 2) +
+        Math.pow(result.selectedTarget.position.y - attackerPosition.y, 2)
+      );
+      
+      // Should be within Guardian's range (4)
+      expect(distance).toBeLessThanOrEqual(4);
+    });
+
+    it('should handle multiple targets within range', () => {
+      const attackerPosition: Position = { x: 0, y: 0 };
+      const targets: TargetInfo[] = [
+        { type: BattalionType.Guardian, position: { x: 3, y: 0 }, id: 'test-1' },  // Distance: 3
+        { type: BattalionType.Phreak, position: { x: 2, y: 0 }, id: 'test-2' },    // Distance: 2
+        { type: BattalionType.Breacher, position: { x: 4, y: 0 }, id: 'test-3' }   // Distance: 4
+      ];
+
+      const result = calculateTargetingPriority({ attackerPosition, targets });
+      expect(result.selectedTarget).toEqual(targets[1]); // Should select closest (Phreak)
+    });
+  });
+
+  describe('Retargeting Behavior', () => {
+    it('should maintain current target if still valid', () => {
+      const attackerPosition: Position = { x: 0, y: 0 };
+      const currentTarget: TargetInfo = { 
+        type: BattalionType.Guardian, 
+        position: { x: 3, y: 0 },
+        id: 'test-1'
+      };
+      const targets: TargetInfo[] = [
+        currentTarget,
+        { type: BattalionType.Phreak, position: { x: 2, y: 0 }, id: 'test-2' }  // Closer but should stick with current
+      ];
+
+      const result = calculateTargetingPriority({ 
+        attackerPosition, 
+        targets,
+        currentTargetId: 'test-1'
+      });
+      expect(result.selectedTarget).toEqual(currentTarget);
+    });
+
+    it('should select new target when current target becomes invalid', () => {
+      const attackerPosition: Position = { x: 0, y: 0 };
+      const targets: TargetInfo[] = [
+        { type: BattalionType.Phreak, position: { x: 2, y: 0 }, id: 'test-1' }
+      ];
+
+      const result = calculateTargetingPriority({ 
+        attackerPosition, 
+        targets,
+        currentTargetId: 'invalid-id'
+      });
+      expect(result.selectedTarget).toEqual(targets[0]);
+    });
+  });
+
+  describe('Performance Requirements', () => {
+    it('should handle large number of targets efficiently', () => {
+      const attackerPosition: Position = { x: 0, y: 0 };
+      const targets: TargetInfo[] = [];
+      
+      // Generate 1000 targets
+      for (let i = 0; i < 1000; i++) {
+        targets.push({
+          type: BattalionType.Guardian,
+          position: { x: Math.random() * 100, y: Math.random() * 100 },
+          id: `test-${i}`
+        });
+      }
+
+      const startTime = performance.now();
+      const result = calculateTargetingPriority({ attackerPosition, targets });
+      const endTime = performance.now();
+      
+      expect(result.selectedTarget).toBeDefined();
+      expect(endTime - startTime).toBeLessThan(16); // Should complete within one frame (16ms)
+    });
+
+    it('should handle rapid retargeting', () => {
+      const attackerPosition: Position = { x: 0, y: 0 };
+      const targets: TargetInfo[] = [
+        { type: BattalionType.Guardian, position: { x: 3, y: 0 }, id: 'test-1' }
+      ];
+
+      // Simulate rapid retargeting (60fps)
+      const iterations = 60;
+      const startTime = performance.now();
+      
+      for (let i = 0; i < iterations; i++) {
+        const result = calculateTargetingPriority({ attackerPosition, targets });
+        expect(result.selectedTarget).toBeDefined();
+      }
+      
+      const endTime = performance.now();
+      const averageTime = (endTime - startTime) / iterations;
+      
+      expect(averageTime).toBeLessThan(1); // Average time should be under 1ms
     });
   });
 }); 

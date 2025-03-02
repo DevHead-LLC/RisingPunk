@@ -48,8 +48,7 @@ RisingPunk/
 │       │   ├── battle-targeting-system.mdc   [PENDING]
 │       │   ├── battle-node-control.mdc       [PENDING]
 │       │   ├── battle-animation-standards.mdc[PENDING]
-│       │   ├── battle-visual-feedback.mdc    [PENDING]
-│       │   ├── battle-performance-standards.mdc [PENDING]
+│       │   ├── battle-performance-standards.mdc[VERIFIED]
 │       │   ├── battle-logging-standards.mdc  [PENDING]
 │       │   └── battle-state-persistence.mdc  [PENDING]
 │       ├── testing-standards.mdc

@@ -1,0 +1,10 @@
+---
+description: "Defines status tracking requirements and steps. UPDATE SHOULD ONLY OCCUR IF TESTING WAS VERIFIED"
+globs: 
+alwaysApply: false
+---
+
+1. Update `.cursor/rules/battle-*.mdc` file status
+2. Update project-structure.mdc:
+   - Update directory organization if needed
+   - Reflect current project file status 

@@ -128,7 +128,7 @@ describe('BattlePerformanceMonitor', () => {
       monitor.recordJSThreadUsage(0.9); // 90% usage
       const logs = monitor.getLogs();
       expect(logs.length).toBe(1);
-      expect(logs[0].type).toBe('error');
+      expect(logs[0].type).toBe('js_thread_warning');
       expect(logs[0].details.value).toBeGreaterThan(80);
     });
   });

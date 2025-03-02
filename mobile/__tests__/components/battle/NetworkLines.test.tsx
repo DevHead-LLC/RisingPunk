@@ -27,6 +27,8 @@ describe('NetworkLines Performance', () => {
     render(<NetworkLines nodes={mockNodes} width={300} height={300} />);
     const renderTime = performance.now() - startTime;
     
+    performanceMonitor.recordFrame();
+    
     // 16.67ms is one frame at 60fps
     expect(renderTime).toBeLessThan(16.67);
     expect(performanceMonitor.getMetrics().frameRate).toBeGreaterThanOrEqual(55);

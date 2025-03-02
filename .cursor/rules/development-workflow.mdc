@@ -1,76 +1,49 @@
 ---
-description: "Primary driver for all development. This document defines the systematic approach for building features, tracking progress, and maintaining quality across the RisingPunk ecosystem. It empowers autonomous decision-making based on rules and best practices without requiring additional clarification."
+description: "Defines the mandatory development loop that ensures each game mechanic is properly implemented. Starting with a fresh context, we derive tests from rules, implement and verify them, check performance, track status, and validate visually before returning to start fresh for the next rule."
 globs: 
 alwaysApply: true
 ---
 
-# !!! UNIFIED CRITICAL DIRECTIVES !!!
-// MANDATORY: READ AND FOLLOW THESE DIRECTIVES BEFORE ANY ACTION
-
-## !!! CRITICAL: AUTONOMOUS PROGRESSION !!!
-// When user provides minimal direction or only references this file:
-// 1. IMMEDIATELY progress to next step in development loop
-// 2. Make decisions based SOLELY on rules documentation
-// 3. DO NOT ask for clarification - use rules to decide
-// 4. ALWAYS update development loop status markers before proceeding
-// 5. Drive development forward autonomously
+// MANDATORY: Review and execute @critical-directives.mdc
+// These directives MUST be followed for all development work
 
 # Development Loop [MANDATORY]
+// This loop ensures each game mechanic:
+// 1. Starts from a fresh context
+// 2. Is driven by tests derived from rules
+// 3. Maintains performance standards
+// 4. Updates implementation status
+// 5. Validates visual integrity
+// Then loops back to start fresh for the next rule
+
 // Status markers [previous], [current], [next] MUST be maintained on loop steps
 // Move markers through steps in sequence: 1->2->3->4->5->1
-// Update markers BEFORE starting any work
+// Update markers BEFORE starting any work - IN THIS DOCUMENT, JUST BELOW!!!  RIGHT NOW!!!!
 
-[previous] 5. Visual Validation
-1. Perform visual testing as end user
-2. Verify visual feedback
-3. Validate user experience
-4. Document visual issues
-5. Review this file
+[previous] 1. Start Fresh
+      // MANDATORY: Review and execute @start-fresh.mdc
+      // All steps in start-fresh.mdc MUST be completed
+      // Proceed ONLY after validation checklist is complete
 
-[current] 1. Start Fresh
-1. Reset context per these Critical Directives
-2. Review current priorities and status markers
-3. Validate directory context
-4. Review relevant rule documentation
+[current] 2. Test Writing && Test Execution
+      // CRITICAL: @testing-standards.mdc defines how we derive ALL tests from battle-*.mdc rules
+      // These rules ARE the actual game mechanics - tests ensure they work correctly
+      // MANDATORY: Review and execute @testing-standards.mdc
+      // All steps in testing-standards.mdc MUST be completed
+      // Proceed ONLY after all rule-based tests pass
 
-[next] 2. Test Writing && Test Execution
-1. Write failing test first
-2. Implement minimal code to pass
-3. Run test suite
-4. Update status markers
-5. Move to Performance Check
-
-3. Performance Check
-1. Monitor frame rates (target 60fps)
-2. Track memory usage and optimize
-3. Measure load times
-4. Profile and optimize critical paths
-5. Log performance metrics
-6. Take immediate action on performance issues
+[next] 3. Performance Check
+      // MANDATORY: Review and execute @performance-check.mdc
+      // All steps in performance-check.mdc MUST be completed
+      // Proceed ONLY after performance targets are met
 
 4. Status Tracking
-1. Update `.cursor/rules/battle-*.mdc` file status
-2. Update project-structure.mdc:
-   - Update directory organization if needed
-   - Reflect current project file status
+      // UPDATE SHOULD ONLY OCCUR IF TESTING WAS VERIFIED
+      // MANDATORY: Review and execute @status-tracking.mdc
+      // All steps in status-tracking.mdc MUST be completed
+      // Proceed ONLY after all status updates are verified
 
 5. Visual Validation
-1. Perform visual testing as end user
-2. Verify visual feedback
-3. Validate user experience
-4. Document visual issues
-5. Review this file
-
-## Development Momentum
-- Maintain forward progress through test-driven loop
-- Make decisions quickly and autonomously
-- Fix issues proactively
-- Keep clear objectives
-- Drive implementation forward
-
-## User Experience Focus
-- Maintain smooth animations (60fps)
-- Ensure fast load times
-- Implement clean error handling
-- Provide clear visual feedback
-- Create responsive interactions
+      // MANDATORY: Review and execute @visual-validation.mdc
+      // All steps in visual-validation.mdc MUST be completed
+      // Proceed ONLY after all visual checks pass

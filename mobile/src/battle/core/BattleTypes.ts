@@ -5,6 +5,12 @@ export enum BattlePhase {
   RESULTS = 'RESULTS'
 }
 
+export enum BattalionType {
+  GUARDIAN = 'Guardian',
+  PHREAK = 'Phreak',
+  BREACHER = 'Breacher'
+}
+
 export interface Position {
   x: number;
   y: number;
@@ -21,6 +27,7 @@ export interface Node {
 export interface Battalion {
   id: string;
   position: Position;
+  type: BattalionType;
   team: string;
   health: number;
   quantity: number;
