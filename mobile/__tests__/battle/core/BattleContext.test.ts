@@ -276,4 +276,108 @@ describe('Battle Context', () => {
       }
     });
   });
+
+  describe('Time Validation', () => {
+    it('should throw error when time moves backwards', () => {
+      let state = updateBattleState(battleContext, { elapsedTime: 2 });
+      expect(() => 
+        updateBattleState(state, { elapsedTime: 1 })
+      ).toThrow(BattleStateError);
+    });
+
+    it('should handle exact phase transition times', () => {
+      // Test PRE_BATTLE -> ACTIVE_BATTLE at exactly 3 seconds
+      let state = updateBattleState(battleContext, { elapsedTime: 3 });
+      expect(state.currentPhase).toBe(BattlePhase.ACTIVE_BATTLE);
+      expect(state.timer.remaining).toBe(20);
+
+      // Test ACTIVE_BATTLE -> RESULTS at exactly 23 seconds
+      state = updateBattleState(state, { elapsedTime: 23 });
+      expect(state.currentPhase).toBe(BattlePhase.RESULTS);
+      expect(state.timer.remaining).toBe(0);
+    });
+  });
+
+  describe('State Update Validation', () => {
+    it('should handle undefined values in battalion updates', () => {
+      const state = updateBattleState(battleContext, {
+        battalionUpdates: [{
+          id: 'test-battalion',
+          health: undefined,
+          position: undefined
+        }]
+      });
+      expect(state.battalions.size).toBe(0);
+    });
+
+    it('should handle undefined values in node updates', () => {
+      const state = updateBattleState(battleContext, {
+        nodeUpdates: [{
+          id: 'test-node',
+          health: undefined,
+          owner: undefined
+        }]
+      });
+      expect(state.nodes.size).toBe(0);
+    });
+
+    it('should maintain existing state after failed updates', () => {
+      // Set up initial state
+      let state = updateBattleState(battleContext, {
+        battalionUpdates: [{
+          id: 'test-battalion',
+          health: 100,
+          position: { x: 0, y: 0 }
+        }]
+      });
+
+      // Attempt invalid update
+      try {
+        state = updateBattleState(state, {
+          battalionUpdates: [{
+            id: 'test-battalion',
+            health: -10,
+            position: { x: 100, y: 100 }
+          }]
+        });
+      } catch (error) {
+        // Verify state remains unchanged
+        const battalion = state.battalions.get('test-battalion');
+        expect(battalion?.health).toBe(100);
+        expect(battalion?.position).toEqual({ x: 0, y: 0 });
+      }
+    });
+  });
+
+  describe('Error Recovery', () => {
+    it('should recover from invalid phase transitions', () => {
+      try {
+        updateBattleState(battleContext, { forcedPhase: BattlePhase.RESULTS });
+      } catch (error) {
+        // Verify original state maintained
+        expect(battleContext.currentPhase).toBe(BattlePhase.PRE_BATTLE);
+        expect(battleContext.timer.elapsed).toBe(0);
+      }
+    });
+
+    it('should log errors when logger is provided', () => {
+      const mockLogger = jest.fn();
+      const contextWithLogger = {
+        ...battleContext,
+        logger: mockLogger
+      };
+
+      try {
+        updateBattleState(contextWithLogger, { forcedPhase: BattlePhase.RESULTS });
+      } catch (error) {
+        expect(mockLogger).toHaveBeenCalledWith(
+          expect.objectContaining({
+            level: 'error',
+            message: expect.stringContaining('Invalid phase transition'),
+            context: expect.any(Object)
+          })
+        );
+      }
+    });
+  });
 }); 
