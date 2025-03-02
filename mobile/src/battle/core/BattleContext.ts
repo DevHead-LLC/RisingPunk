@@ -74,19 +74,27 @@ const VALID_PHASE_TRANSITIONS = new Map<BattlePhase, Set<BattlePhase>>([
   [BattlePhase.RESULTS, new Set()]
 ]);
 
-function validatePhaseTransition(currentPhase: BattlePhase, nextPhase: BattlePhase): void {
+function validatePhaseTransition(currentPhase: BattlePhase, nextPhase: BattlePhase, context?: BattleContext): void {
   const validTransitions = VALID_PHASE_TRANSITIONS.get(currentPhase);
   if (!validTransitions?.has(nextPhase)) {
+    const errorContext = { currentPhase, nextPhase, validTransitions: Array.from(validTransitions || []) };
+    if (context?.logger) {
+      context.logger({
+        level: 'error',
+        message: `Invalid phase transition from ${currentPhase} to ${nextPhase}`,
+        context: errorContext
+      });
+    }
     throw new BattleStateError(
       `Invalid phase transition from ${currentPhase} to ${nextPhase}`,
-      { currentPhase, nextPhase, validTransitions: Array.from(validTransitions || []) }
+      errorContext
     );
   }
 }
 
-function determineNextPhase(currentPhase: BattlePhase, elapsedTime: number, forcedPhase?: BattlePhase): BattlePhase {
+function determineNextPhase(currentPhase: BattlePhase, elapsedTime: number, forcedPhase?: BattlePhase, context?: BattleContext): BattlePhase {
   if (forcedPhase !== undefined) {
-    validatePhaseTransition(currentPhase, forcedPhase);
+    validatePhaseTransition(currentPhase, forcedPhase, context);
     return forcedPhase;
   }
 
@@ -171,7 +179,7 @@ function validateBattleStateUpdate(update: BattleStateUpdate, currentState: Batt
   }
 
   if (update.forcedPhase !== undefined) {
-    validatePhaseTransition(currentState.currentPhase, update.forcedPhase);
+    validatePhaseTransition(currentState.currentPhase, update.forcedPhase, currentState);
   }
 
   if (update.battalionUpdates) {
@@ -275,7 +283,8 @@ export function updateBattleState(
   const nextPhase = determineNextPhase(
     currentState.currentPhase,
     update.elapsedTime ?? currentState.timer.elapsed,
-    update.forcedPhase
+    update.forcedPhase,
+    currentState
   );
 
   const timer = updateTimer(

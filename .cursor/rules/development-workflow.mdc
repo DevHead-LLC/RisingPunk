@@ -7,6 +7,9 @@ alwaysApply: true
 // MANDATORY: Review and execute @critical-directives.mdc
 // These directives MUST be followed for all development work
 
+# IMPORTANT!
+   - CHECK YOUR CURRENT DIRECTORY BEFORE MAKING CHANGES
+
 # Development Loop [MANDATORY]
 // This loop ensures each game mechanic:
 // 1. Starts from a fresh context
@@ -20,30 +23,34 @@ alwaysApply: true
 // Move markers through steps in sequence: 1->2->3->4->5->1
 // Update markers BEFORE starting any work - IN THIS DOCUMENT, JUST BELOW!!!  RIGHT NOW!!!!
 
-[previous] 1. Start Fresh
+Previous Marker: Performance Check
+Current Marker: Status Tracking
+Next Marker: Visual Validation
+
+[previous] 4. Status Tracking
+      // UPDATE SHOULD ONLY OCCUR IF TESTING WAS VERIFIED
+      // MANDATORY: Review and execute @status-tracking.mdc
+      // All steps in status-tracking.mdc MUST be completed
+      // Proceed ONLY after all status updates are verified
+
+[current] 5. Visual Validation
+      // MANDATORY: Review and execute @visual-validation.mdc
+      // All steps in visual-validation.mdc MUST be completed
+      // Proceed ONLY after all visual checks pass
+
+[next] 1. Start Fresh
       // MANDATORY: Review and execute @start-fresh.mdc
       // All steps in start-fresh.mdc MUST be completed
       // Proceed ONLY after validation checklist is complete
 
-[current] 2. Test Writing && Test Execution
+2. Test Writing && Test Execution
       // CRITICAL: @testing-standards.mdc defines how we derive ALL tests from battle-*.mdc rules
       // These rules ARE the actual game mechanics - tests ensure they work correctly
       // MANDATORY: Review and execute @testing-standards.mdc
       // All steps in testing-standards.mdc MUST be completed
       // Proceed ONLY after all rule-based tests pass
 
-[next] 3. Performance Check
+3. Performance Check
       // MANDATORY: Review and execute @performance-check.mdc
       // All steps in performance-check.mdc MUST be completed
       // Proceed ONLY after performance targets are met
-
-4. Status Tracking
-      // UPDATE SHOULD ONLY OCCUR IF TESTING WAS VERIFIED
-      // MANDATORY: Review and execute @status-tracking.mdc
-      // All steps in status-tracking.mdc MUST be completed
-      // Proceed ONLY after all status updates are verified
-
-5. Visual Validation
-      // MANDATORY: Review and execute @visual-validation.mdc
-      // All steps in visual-validation.mdc MUST be completed
-      // Proceed ONLY after all visual checks pass
