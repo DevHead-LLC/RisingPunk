@@ -11,62 +11,45 @@ declare global {
 }
 
 import { BattlePhase } from './BattleContext';
+import { Platform } from 'react-native';
 
-interface PerformanceMetrics {
+export interface PerformanceMetrics {
   frameRate: number;
   memoryUsage: number;
+  networkLatency: number;
+  loadTime: number;
   jsThreadUsage: number;
-  lastUpdated: Date;
-  loadTime?: number;
-  networkLatency?: number;
 }
 
-interface PerformanceLog {
-  timestamp: Date;
-  type: 'frame_drop' | 'memory_warning' | 'error' | 'load_time' | 'network_latency';
+export interface PerformanceLog {
+  type: 'frame_drop' | 'memory_warning' | 'network_latency' | 'js_thread_warning' | 'load_time' | 'error';
+  timestamp: number;
   details: {
     value: number;
-    threshold: number;
-    cause?: string;
+    threshold?: number;
   };
 }
 
+type PerformanceSubscriber = (metrics: PerformanceMetrics) => void;
+
 export class BattlePerformanceMonitor {
   private static instance: BattlePerformanceMonitor;
-  private metrics: PerformanceMetrics;
-  private logs: PerformanceLog[];
-  private frameRateInterval: NodeJS.Timeout | null;
-  private memoryInterval: NodeJS.Timeout | null;
-  private subscribers: Set<(metrics: PerformanceMetrics) => void>;
-  private frameCount: number;
-  private lastFrameTime: number;
-  private isMonitoring: boolean;
-  private lastMemoryWarning: number;
-  private lastMemoryCheck: number;
-  private lastFrameCheck: number;
-  private loadStartTime: number;
+  private frameCount: number = 0;
+  private lastFrameTime: number = 0;
+  private frameRate: number = 60;
+  private memoryUsage: number = 0;
+  private networkLatency: number = 0;
+  private loadStartTime: number = 0;
+  private loadTime: number = 0;
+  private jsThreadUsage: number = 0;
+  private logs: PerformanceLog[] = [];
+  private isMonitoring: boolean = false;
+  private animationFrameId: number | null = null;
+  private subscribers: Set<PerformanceSubscriber> = new Set();
+  private lastMemoryCheck: number = 0;
+  private memoryCheckInterval: number = 5000; // Check every 5 seconds
 
-  private constructor() {
-    this.metrics = {
-      frameRate: 60,
-      memoryUsage: 0,
-      jsThreadUsage: 0,
-      lastUpdated: new Date(),
-      loadTime: 0,
-      networkLatency: 0
-    };
-    this.logs = [];
-    this.frameRateInterval = null;
-    this.memoryInterval = null;
-    this.subscribers = new Set();
-    this.frameCount = 0;
-    this.lastFrameTime = performance.now();
-    this.isMonitoring = false;
-    this.lastMemoryWarning = 0;
-    this.lastMemoryCheck = 0;
-    this.lastFrameCheck = 0;
-    this.loadStartTime = performance.now();
-  }
+  private constructor() {}
 
   public static getInstance(): BattlePerformanceMonitor {
     if (!BattlePerformanceMonitor.instance) {
@@ -76,94 +59,57 @@ export class BattlePerformanceMonitor {
   }
 
   public startMonitoring(): void {
-    if (this.isMonitoring) return;
     this.isMonitoring = true;
-    this.frameCount = 0;
+    this.resetLogs();
+    this.frameRate = 60;
     this.lastFrameTime = performance.now();
-    this.lastMemoryWarning = 0;
-    this.lastMemoryCheck = 0;
-    this.lastFrameCheck = 0;
-
-    // Monitor frame rate every 1 second
-    this.frameRateInterval = setInterval(() => {
-      this.checkFrameRate();
-    }, 1000);
-
-    // Monitor memory usage every 5 seconds
-    this.memoryInterval = setInterval(() => {
-      this.checkMemoryUsage();
-    }, 5000);
-  }
-
-  private checkFrameRate(): void {
-    if (!this.isMonitoring) return;
-
-    const currentTime = performance.now();
-    if (currentTime - this.lastFrameCheck < 1000) return;
-    this.lastFrameCheck = currentTime;
-
-    const elapsed = currentTime - this.lastFrameTime;
-    
-    // Calculate FPS based on frame count and elapsed time
-    const currentFPS = elapsed > 0 ? (this.frameCount * 1000) / elapsed : 60;
-    this.metrics.frameRate = Math.min(Math.max(currentFPS, 0), 120); // Clamp between 0 and 120
-    this.metrics.lastUpdated = new Date();
-
-    // Log if frame rate drops below 55fps and we have recorded frames
-    if (this.metrics.frameRate < 55 && this.frameCount > 0) {
-      this.logs.push({
-        timestamp: new Date(),
-        type: 'frame_drop',
-        details: {
-          value: this.metrics.frameRate,
-          threshold: 55,
-          cause: 'Frame rate drop detected'
-        }
-      });
-    }
-
     this.frameCount = 0;
-    this.lastFrameTime = currentTime;
-    this.notifySubscribers();
-  }
-
-  private checkMemoryUsage(): void {
-    if (!this.isMonitoring || !performance.memory) return;
-
-    const memoryInfo = performance.memory;
-    const usedHeap = memoryInfo.usedJSHeapSize / memoryInfo.jsHeapSizeLimit;
-    this.metrics.memoryUsage = usedHeap;
-
-    // Log if memory usage is above 80%
-    if (usedHeap > 0.8) {
-      const currentTime = performance.now();
-      // Only log once every 5 seconds
-      if (currentTime - this.lastMemoryWarning >= 5000) {
-        this.lastMemoryWarning = currentTime;
-        this.logs.push({
-          timestamp: new Date(),
-          type: 'memory_warning',
-          details: {
-            value: usedHeap * 100,
-            threshold: 80,
-            cause: 'High memory usage'
-          }
-        });
-      }
-    }
-    this.notifySubscribers();
+    this.startFrameLoop();
+    this.loadStartTime = performance.now();
   }
 
   public stopMonitoring(): void {
-    if (this.frameRateInterval) {
-      clearInterval(this.frameRateInterval);
-      this.frameRateInterval = null;
-    }
-    if (this.memoryInterval) {
-      clearInterval(this.memoryInterval);
-      this.memoryInterval = null;
-    }
     this.isMonitoring = false;
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+  }
+
+  private startFrameLoop(): void {
+    const frameLoop = () => {
+      if (!this.isMonitoring) return;
+
+      const now = performance.now();
+      this.frameCount++;
+
+      if (now - this.lastFrameTime >= 1000) {
+        this.frameRate = this.frameCount;
+        if (this.frameRate < 55) {
+          this.logs.push({
+            type: 'frame_drop',
+            timestamp: now,
+            details: {
+              value: this.frameRate,
+              threshold: 55
+            }
+          });
+        }
+        this.frameCount = 0;
+        this.lastFrameTime = now;
+        this.notifySubscribers();
+      }
+
+      // Check memory usage periodically
+      if (now - this.lastMemoryCheck >= this.memoryCheckInterval) {
+        this.checkMemoryUsage();
+        this.lastMemoryCheck = now;
+      }
+
+      this.animationFrameId = requestAnimationFrame(frameLoop);
+    };
+
+    this.animationFrameId = requestAnimationFrame(frameLoop);
   }
 
   public recordFrame(): void {
@@ -171,32 +117,90 @@ export class BattlePerformanceMonitor {
     this.frameCount++;
   }
 
-  public recordJSThreadUsage(usage: number): void {
-    this.metrics.jsThreadUsage = usage;
-    if (usage > 0.8) { // 80% threshold
+  public checkMemoryUsage(): { usedJSHeapSize: number; jsHeapSizeLimit: number; usagePercentage: number } {
+    if (Platform.OS === 'web' && performance.memory) {
+      const { usedJSHeapSize, jsHeapSizeLimit } = performance.memory;
+      const usagePercentage = (usedJSHeapSize / jsHeapSizeLimit) * 100;
+      this.recordMemoryUsage(usagePercentage);
+      return { usedJSHeapSize, jsHeapSizeLimit, usagePercentage };
+    }
+    return { usedJSHeapSize: 0, jsHeapSizeLimit: 0, usagePercentage: 0 };
+  }
+
+  public recordMemoryUsage(usage: number): void {
+    if (!this.isMonitoring) return;
+    this.memoryUsage = usage;
+    if (usage > 80) {
       this.logs.push({
-        timestamp: new Date(),
-        type: 'error',
+        type: 'memory_warning',
+        timestamp: performance.now(),
         details: {
-          value: usage * 100,
-          threshold: 80,
-          cause: 'High JS thread usage'
+          value: usage,
+          threshold: 80
         }
       });
+      this.notifySubscribers();
     }
   }
 
-  public getMetrics(): PerformanceMetrics {
-    return { ...this.metrics };
+  public recordNetworkLatency(latency: number): void {
+    if (!this.isMonitoring) return;
+    this.networkLatency = latency;
+    if (latency > 200) {
+      this.logs.push({
+        type: 'network_latency',
+        timestamp: performance.now(),
+        details: {
+          value: latency,
+          threshold: 200
+        }
+      });
+    }
+    this.notifySubscribers();
   }
 
-  public getLogs(): PerformanceLog[] {
-    return [...this.logs];
+  public recordLoadStart(): void {
+    this.loadStartTime = performance.now();
   }
 
-  public subscribe(callback: (metrics: PerformanceMetrics) => void): () => void {
+  public recordLoadComplete(): void {
+    if (!this.isMonitoring || !this.loadStartTime) return;
+    const loadTime = performance.now() - this.loadStartTime;
+    this.loadTime = loadTime;
+    if (loadTime > 1000) {
+      this.logs.push({
+        type: 'load_time',
+        timestamp: performance.now(),
+        details: {
+          value: loadTime,
+          threshold: 1000
+        }
+      });
+    }
+    this.notifySubscribers();
+  }
+
+  public recordJSThreadUsage(usage: number): void {
+    if (!this.isMonitoring) return;
+    this.jsThreadUsage = usage;
+    if (usage > 0.8) { // 80%
+      this.logs.push({
+        type: 'error',
+        timestamp: performance.now(),
+        details: {
+          value: usage * 100,
+          threshold: 80
+        }
+      });
+    }
+    this.notifySubscribers();
+  }
+
+  public subscribe(callback: PerformanceSubscriber): () => void {
     this.subscribers.add(callback);
-    return () => this.subscribers.delete(callback);
+    return () => {
+      this.subscribers.delete(callback);
+    };
   }
 
   private notifySubscribers(): void {
@@ -204,56 +208,35 @@ export class BattlePerformanceMonitor {
     this.subscribers.forEach(callback => callback(metrics));
   }
 
-  public recordLoadComplete(): void {
-    const loadTime = performance.now() - this.loadStartTime;
-    this.metrics.loadTime = loadTime;
-    
-    if (loadTime > 1000) { // 1 second threshold
-      this.logs.push({
-        timestamp: new Date(),
-        type: 'load_time',
-        details: {
-          value: loadTime,
-          threshold: 1000,
-          cause: 'Slow load time detected'
-        }
-      });
-    }
-    this.notifySubscribers();
+  public getMetrics(): PerformanceMetrics {
+    return {
+      frameRate: this.frameRate,
+      memoryUsage: this.memoryUsage,
+      networkLatency: this.networkLatency,
+      loadTime: this.loadTime,
+      jsThreadUsage: this.jsThreadUsage
+    };
   }
 
-  public recordNetworkLatency(latency: number): void {
-    this.metrics.networkLatency = latency;
-    
-    if (latency > 200) { // 200ms threshold
-      this.logs.push({
-        timestamp: new Date(),
-        type: 'network_latency',
-        details: {
-          value: latency,
-          threshold: 200,
-          cause: 'High network latency'
-        }
-      });
-    }
-    this.notifySubscribers();
+  public getLogs(): PerformanceLog[] {
+    return [...this.logs];
+  }
+
+  private resetLogs(): void {
+    this.frameRate = 60;
+    this.memoryUsage = 0;
+    this.networkLatency = 0;
+    this.loadTime = 0;
+    this.jsThreadUsage = 0;
+    this.logs = [];
+    this.loadStartTime = 0;
+    this.lastMemoryCheck = 0;
+    this.frameCount = 0;
   }
 
   public cleanup(): void {
     this.stopMonitoring();
+    this.resetLogs();
     this.subscribers.clear();
-    this.logs = [];
-    this.lastMemoryWarning = 0;
-    this.lastMemoryCheck = 0;
-    this.lastFrameCheck = 0;
-    this.loadStartTime = performance.now();
-    this.metrics = {
-      frameRate: 60,
-      memoryUsage: 0,
-      jsThreadUsage: 0,
-      lastUpdated: new Date(),
-      loadTime: 0,
-      networkLatency: 0
-    };
   }
 } 

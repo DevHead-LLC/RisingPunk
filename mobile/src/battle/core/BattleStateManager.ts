@@ -1,124 +1,250 @@
 // Implementation of @battle-state-persistence.mdc#State-Management-Philosophy
 // Core battle state management system with frontend focus
 
-import { BattlePhase } from './BattleContext';
-import { Position, NodeOwnership } from './types';
-import { BattleService } from '../../services/BattleService';
-import { BattlePerformanceMonitor } from './BattlePerformanceMonitor';
+import { BattlePhase } from './BattleTypes';
+import { BattleService } from './BattleService';
 
 export interface BattleState {
   phase: BattlePhase;
   timeRemaining: number;
-  battalions: Map<string, BattalionState>;
-  nodes: Map<number, NodeState>;
+  nodes: Map<string, Node>;
+  battalions: Map<string, Battalion>;
   updateId: number;
   lastUpdated: Date;
 }
 
-export interface BattalionState {
+export interface Node {
   id: string;
-  type: 'breacher' | 'guardian' | 'phreak';
-  quantity: number;
-  health: number;
-  position: Position;
-  targetId: string | null;
-  team: 'user' | 'enemy';
-}
-
-export interface NodeState {
-  id: number;
-  position: Position;
-  controllingTeam: 'user' | 'enemy' | null;
+  position: { x: number; y: number };
+  controllingTeam: string | null;
   controlProgress: number;
   health: number;
 }
 
-export interface StateUpdate {
-  battalionUpdates?: Partial<BattalionState>[];
-  nodeUpdates?: Partial<NodeState>[];
+export interface Battalion {
+  id: string;
+  position: { x: number; y: number };
+  team: string;
+  health: number;
+  quantity: number;
+  targetId: string | null;
+}
+
+export interface BattleStateUpdate {
   phaseUpdate?: BattlePhase;
   timeUpdate?: number;
+  nodeUpdates?: Map<string, Partial<Node>>;
+  battalionUpdates?: Map<string, Partial<Battalion>>;
 }
 
 export class BattleStateManager {
+  private static instance: BattleStateManager | null = null;
   private state: BattleState;
-  private subscribers: Set<(state: BattleState) => void>;
-  private updateTimer: NodeJS.Timeout | null;
+  private subscribers: Array<(state: BattleState) => void> = [];
+  private updateTimer: NodeJS.Timeout | null = null;
   private battleId: string | null = null;
   private battleService: BattleService;
-  private syncEnabled: boolean = false;
-  private performanceMonitor: BattlePerformanceMonitor;
+  private queuedUpdates: BattleStateUpdate[] = [];
+  private isProcessingUpdates: boolean = false;
 
-  constructor() {
-    this.state = this.createInitialState();
-    this.subscribers = new Set();
-    this.updateTimer = null;
-    this.battleService = BattleService.getInstance();
-    this.performanceMonitor = BattlePerformanceMonitor.getInstance();
-    this.performanceMonitor.startMonitoring();
-  }
-
-  private createInitialState(): BattleState {
-    return {
+  constructor(battleService: BattleService) {
+    if (!battleService) {
+      throw new Error('BattleService is required for BattleStateManager');
+    }
+    this.battleService = battleService;
+    this.state = {
       phase: BattlePhase.PRE_BATTLE,
       timeRemaining: 20,
-      battalions: new Map(),
       nodes: new Map(),
+      battalions: new Map(),
       updateId: 0,
       lastUpdated: new Date()
     };
   }
 
-  // Initialize battle with ID and start sync
+  public static getInstance(battleService: BattleService): BattleStateManager {
+    if (!BattleStateManager.instance) {
+      BattleStateManager.instance = new BattleStateManager(battleService);
+    }
+    return BattleStateManager.instance;
+  }
+
   public initializeBattle(battleId: string): void {
+    if (!battleId) {
+      throw new Error('Battle ID is required for initialization');
+    }
     this.battleId = battleId;
-    this.syncEnabled = true;
+    this.state = {
+      phase: BattlePhase.PRE_BATTLE,
+      timeRemaining: 20,
+      nodes: new Map(),
+      battalions: new Map(),
+      updateId: 0,
+      lastUpdated: new Date()
+    };
     this.battleService.startSync(
       battleId,
-      (state) => this.handleServerState(state),
-      (error) => this.handleSyncError(error)
+      this.handleServerUpdate.bind(this),
+      this.handleSyncError.bind(this)
     );
   }
 
-  // Handle incoming server state
-  private handleServerState(serverState: BattleState): void {
-    // Only update if server state is newer
-    if (serverState.updateId > this.state.updateId) {
-      this.state = serverState;
-      this.notifySubscribers();
+  public getState(): BattleState {
+    return {
+      ...this.state,
+      nodes: new Map(this.state.nodes),
+      battalions: new Map(this.state.battalions)
+    };
+  }
+
+  public queueStateUpdate(update: BattleStateUpdate): void {
+    this.queuedUpdates.push(update);
+    if (!this.isProcessingUpdates) {
+      this.processQueuedUpdates();
     }
   }
 
-  // Handle sync errors
-  private handleSyncError(error: string): void {
-    console.error('Battle state sync error:', error);
-    // Continue with local state if sync fails
-    this.syncEnabled = false;
+  private async processQueuedUpdates(): Promise<void> {
+    if (this.isProcessingUpdates || this.queuedUpdates.length === 0) return;
+    
+    this.isProcessingUpdates = true;
+    while (this.queuedUpdates.length > 0) {
+      const update = this.queuedUpdates.shift();
+      if (update) {
+        await this.updateState(update);
+      }
+    }
+    this.isProcessingUpdates = false;
   }
 
-  // Subscribe to state updates
+  public async updateState(update: BattleStateUpdate): Promise<void> {
+    const newState = { ...this.state };
+
+    if (update.phaseUpdate !== undefined) {
+      const isValidTransition = this.validatePhaseTransition(this.state.phase, update.phaseUpdate);
+      if (!isValidTransition) {
+        console.warn(`Invalid phase transition from ${this.state.phase} to ${update.phaseUpdate}`);
+        return;
+      }
+      newState.phase = update.phaseUpdate;
+      
+      // Handle phase-specific logic
+      if (update.phaseUpdate === BattlePhase.DEPLOYMENT) {
+        this.startUpdateTimer();
+      } else if (update.phaseUpdate === BattlePhase.RESULTS) {
+        this.stopUpdateTimer();
+      }
+    }
+
+    if (update.timeUpdate !== undefined) {
+      newState.timeRemaining = Math.max(0, update.timeUpdate);
+      if (newState.timeRemaining === 0 && newState.phase === BattlePhase.COMBAT) {
+        if (this.validatePhaseTransition(newState.phase, BattlePhase.RESULTS)) {
+          newState.phase = BattlePhase.RESULTS;
+          this.stopUpdateTimer();
+        }
+      }
+    }
+
+    if (update.nodeUpdates) {
+      const newNodes = new Map(this.state.nodes);
+      update.nodeUpdates.forEach((nodeUpdate, nodeId) => {
+        const existingNode = newNodes.get(nodeId);
+        if (!existingNode && !nodeUpdate.position) {
+          console.warn(`Attempted to update non-existent node without position: ${nodeId}`);
+          return;
+        }
+        
+        const updatedNode = {
+          ...(existingNode || {
+            id: nodeId,
+            position: { x: 0, y: 0 },
+            controllingTeam: null,
+            controlProgress: 0,
+            health: 100
+          }),
+          ...nodeUpdate
+        };
+        
+        newNodes.set(nodeId, updatedNode);
+      });
+      newState.nodes = newNodes;
+    }
+
+    if (update.battalionUpdates) {
+      const newBattalions = new Map(this.state.battalions);
+      update.battalionUpdates.forEach((battalionUpdate, battalionId) => {
+        const existingBattalion = newBattalions.get(battalionId);
+        if (!existingBattalion && !battalionUpdate.position) {
+          console.warn(`Attempted to update non-existent battalion without position: ${battalionId}`);
+          return;
+        }
+        
+        const updatedBattalion = {
+          ...(existingBattalion || {
+            id: battalionId,
+            position: { x: 0, y: 0 },
+            team: '',
+            health: 100,
+            quantity: 10,
+            targetId: null
+          }),
+          ...battalionUpdate
+        };
+        
+        newBattalions.set(battalionId, updatedBattalion);
+      });
+      newState.battalions = newBattalions;
+    }
+
+    newState.updateId++;
+    newState.lastUpdated = new Date();
+    this.state = newState;
+
+    if (this.battleId) {
+      try {
+        await this.battleService.syncState(this.battleId, newState);
+      } catch (error) {
+        console.error('Failed to sync state with server:', error);
+      }
+    }
+
+    this.notifySubscribers();
+  }
+
+  private validatePhaseTransition(currentPhase: BattlePhase, newPhase: BattlePhase): boolean {
+    const validTransitions = {
+      [BattlePhase.PRE_BATTLE]: [BattlePhase.DEPLOYMENT],
+      [BattlePhase.DEPLOYMENT]: [BattlePhase.COMBAT],
+      [BattlePhase.COMBAT]: [BattlePhase.RESULTS],
+      [BattlePhase.RESULTS]: [BattlePhase.PRE_BATTLE]
+    };
+
+    return validTransitions[currentPhase]?.includes(newPhase) || false;
+  }
+
   public subscribe(callback: (state: BattleState) => void): () => void {
-    this.subscribers.add(callback);
-    return () => this.subscribers.delete(callback);
+    this.subscribers.push(callback);
+    return () => {
+      this.subscribers = this.subscribers.filter(cb => cb !== callback);
+    };
   }
 
-  // Start the global update timer
+  private notifySubscribers(): void {
+    const state = this.getState();
+    this.subscribers.forEach(callback => callback(state));
+  }
+
   public startUpdateTimer(): void {
     if (this.updateTimer) return;
-
     this.updateTimer = setInterval(() => {
-      this.updateState({
-        timeUpdate: this.state.timeRemaining - 1
-      });
-
-      if (this.state.timeRemaining <= 0) {
-        this.stopUpdateTimer();
-        this.updateState({ phaseUpdate: BattlePhase.RESULTS });
+      if (this.state.phase === BattlePhase.COMBAT) {
+        const newTimeRemaining = Math.max(0, this.state.timeRemaining - 1);
+        this.queueStateUpdate({ timeUpdate: newTimeRemaining });
       }
     }, 1000);
   }
 
-  // Stop the global update timer
   public stopUpdateTimer(): void {
     if (this.updateTimer) {
       clearInterval(this.updateTimer);
@@ -126,169 +252,37 @@ export class BattleStateManager {
     }
   }
 
-  // Update state with validation and sync
-  public async updateState(update: StateUpdate): Promise<void> {
-    const startTime = performance.now();
-    const newState = {
-      ...this.state,
-      battalions: new Map(this.state.battalions),
-      nodes: new Map(this.state.nodes)
-    };
-
-    let hasChanges = false;
-
-    try {
-      // Update phase if provided
-      if (update.phaseUpdate) {
-        if (this.isValidPhaseTransition(this.state.phase, update.phaseUpdate)) {
-          newState.phase = update.phaseUpdate;
-          hasChanges = true;
-        }
-      }
-
-      // Update time if provided
-      if (update.timeUpdate !== undefined) {
-        newState.timeRemaining = Math.max(0, update.timeUpdate);
-        hasChanges = true;
-      }
-
-      // Update battalions
-      if (update.battalionUpdates) {
-        update.battalionUpdates.forEach(battalionUpdate => {
-          if (!battalionUpdate.id) return;
-
-          const currentBattalion = this.state.battalions.get(battalionUpdate.id);
-          if (currentBattalion) {
-            newState.battalions.set(battalionUpdate.id, {
-              ...currentBattalion,
-              ...battalionUpdate
-            });
-          } else {
-            // Only add new battalion if it has all required fields
-            if (this.isValidBattalionState(battalionUpdate as BattalionState)) {
-              newState.battalions.set(battalionUpdate.id, battalionUpdate as BattalionState);
-            }
-          }
-          hasChanges = true;
-        });
-      }
-
-      // Update nodes
-      if (update.nodeUpdates) {
-        update.nodeUpdates.forEach(nodeUpdate => {
-          if (nodeUpdate.id === undefined) return;
-
-          const currentNode = this.state.nodes.get(nodeUpdate.id);
-          if (currentNode) {
-            newState.nodes.set(nodeUpdate.id, {
-              ...currentNode,
-              ...nodeUpdate
-            });
-          } else {
-            // Only add new node if it has all required fields
-            if (this.isValidNodeState(nodeUpdate as NodeState)) {
-              newState.nodes.set(nodeUpdate.id, nodeUpdate as NodeState);
-            }
-          }
-          hasChanges = true;
-        });
-      }
-
-      // Only update if there are changes
-      if (hasChanges) {
-        newState.updateId++;
-        newState.lastUpdated = new Date();
-        this.state = newState;
-        this.notifySubscribers();
-
-        // Sync with backend if enabled
-        if (this.syncEnabled && this.battleId) {
-          try {
-            await this.battleService.updateState(this.battleId, this.state);
-          } catch (error) {
-            console.error('Failed to sync state update:', error);
-            // Continue with local state if sync fails
-          }
-        }
-      }
-
-      // Record performance metrics
-      const endTime = performance.now();
-      const jsThreadUsage = (endTime - startTime) / 16.67; // 16.67ms is one frame at 60fps
-      this.performanceMonitor.recordJSThreadUsage(jsThreadUsage);
-      this.performanceMonitor.recordFrame();
-
-    } catch (error) {
-      console.error('Error during state update:', error);
-      throw error;
-    }
-  }
-
-  // Validate phase transitions
-  private isValidPhaseTransition(current: BattlePhase, next: BattlePhase): boolean {
-    const validTransitions = new Map([
-      [BattlePhase.PRE_BATTLE, [BattlePhase.ACTIVE_BATTLE]],
-      [BattlePhase.ACTIVE_BATTLE, [BattlePhase.RESULTS]],
-      [BattlePhase.RESULTS, []]
-    ]);
-
-    const allowed = validTransitions.get(current);
-    return allowed ? allowed.includes(next) : false;
-  }
-
-  // Validate battalion state
-  private isValidBattalionState(battalion: any): battalion is BattalionState {
-    return (
-      typeof battalion.id === 'string' &&
-      ['breacher', 'guardian', 'phreak'].includes(battalion.type) &&
-      typeof battalion.quantity === 'number' &&
-      typeof battalion.health === 'number' &&
-      battalion.position &&
-      typeof battalion.position.x === 'number' &&
-      typeof battalion.position.y === 'number' &&
-      ['user', 'enemy'].includes(battalion.team)
-    );
-  }
-
-  // Validate node state
-  private isValidNodeState(node: any): node is NodeState {
-    return (
-      typeof node.id === 'number' &&
-      node.position &&
-      typeof node.position.x === 'number' &&
-      typeof node.position.y === 'number' &&
-      typeof node.health === 'number' &&
-      typeof node.controlProgress === 'number' &&
-      (node.controllingTeam === null || ['user', 'enemy'].includes(node.controllingTeam))
-    );
-  }
-
-  // Notify all subscribers of state changes
-  private notifySubscribers(): void {
-    this.subscribers.forEach(callback => callback(this.state));
-  }
-
-  // Get current state (immutable)
-  public getState(): Readonly<BattleState> {
-    return Object.freeze({ ...this.state });
-  }
-
-  // Reset state and stop sync
-  public reset(): void {
-    this.stopUpdateTimer();
-    if (this.battleId) {
-      this.battleService.stopSync();
-    }
-    this.battleId = null;
-    this.syncEnabled = false;
-    this.state = this.createInitialState();
-    this.notifySubscribers();
-  }
-
-  // Clean up resources
   public cleanup(): void {
-    this.subscribers.clear();
-    this.performanceMonitor.cleanup();
-    this.reset();
+    this.stopUpdateTimer();
+    this.subscribers = [];
+    this.queuedUpdates = [];
+    this.isProcessingUpdates = false;
+    if (this.battleId) {
+      this.battleService.stopSync(this.battleId);
+      this.battleId = null;
+    }
+  }
+
+  private async handleServerUpdate(serverState: BattleState): Promise<void> {
+    await this.updateState({
+      phaseUpdate: serverState.phase,
+      timeUpdate: serverState.timeRemaining,
+      nodeUpdates: serverState.nodes,
+      battalionUpdates: serverState.battalions
+    });
+  }
+
+  private handleSyncError(error: Error): void {
+    console.error('Battle sync error:', error);
+    // Implement retry logic
+    setTimeout(() => {
+      if (this.battleId) {
+        this.battleService.startSync(
+          this.battleId,
+          this.handleServerUpdate.bind(this),
+          this.handleSyncError.bind(this)
+        );
+      }
+    }, 5000);
   }
 } 
