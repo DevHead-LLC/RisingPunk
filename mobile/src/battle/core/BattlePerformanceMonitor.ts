@@ -19,6 +19,7 @@ export interface PerformanceMetrics {
   networkLatency: number;
   loadTime: number;
   jsThreadUsage: number;
+  lastFrameTime: number;
 }
 
 export interface PerformanceLog {
@@ -48,6 +49,9 @@ export class BattlePerformanceMonitor {
   private subscribers: Set<PerformanceSubscriber> = new Set();
   private lastMemoryCheck: number = 0;
   private memoryCheckInterval: number = 5000; // Check every 5 seconds
+  private frameTimeHistory: number[] = [];
+  private readonly maxHistoryLength = 60; // 1 second of frames at 60fps
+  private readonly targetFrameTime = 16; // ~60fps
 
   private constructor() {}
 
@@ -214,7 +218,8 @@ export class BattlePerformanceMonitor {
       memoryUsage: this.memoryUsage,
       networkLatency: this.networkLatency,
       loadTime: this.loadTime,
-      jsThreadUsage: this.jsThreadUsage
+      jsThreadUsage: this.jsThreadUsage,
+      lastFrameTime: this.frameTimeHistory[this.frameTimeHistory.length - 1] || 0
     };
   }
 
@@ -232,11 +237,37 @@ export class BattlePerformanceMonitor {
     this.loadStartTime = 0;
     this.lastMemoryCheck = 0;
     this.frameCount = 0;
+    this.frameTimeHistory = [];
   }
 
   public cleanup(): void {
     this.stopMonitoring();
     this.resetLogs();
     this.subscribers.clear();
+  }
+
+  recordFrameTime(frameTime: number): void {
+    this.frameTimeHistory.push(frameTime);
+    if (this.frameTimeHistory.length > this.maxHistoryLength) {
+      this.frameTimeHistory.shift();
+    }
+
+    if (frameTime > this.targetFrameTime) {
+      console.warn(`Frame time exceeded target: ${frameTime}ms > ${this.targetFrameTime}ms`);
+    }
+  }
+
+  getAverageFrameTime(): number {
+    if (this.frameTimeHistory.length === 0) return 0;
+    const sum = this.frameTimeHistory.reduce((a, b) => a + b, 0);
+    return sum / this.frameTimeHistory.length;
+  }
+
+  isPerformanceOptimal(): boolean {
+    return this.getAverageFrameTime() <= this.targetFrameTime;
+  }
+
+  reset(): void {
+    this.frameTimeHistory = [];
   }
 } 
