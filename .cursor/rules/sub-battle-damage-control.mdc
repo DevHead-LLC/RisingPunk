@@ -1,0 +1,43 @@
+# Battle Damage and Control Implementation
+// Implementation of:
+// - @battle-core-mechanics.mdc#Damage-Calculation
+// - @battle-core-mechanics.mdc#Control-Progress
+
+### Damage Calculation
+// Implementation of:
+// - @battle-node-control.mdc#Capture-System#Control-Progress
+// - @battle-performance-standards.mdc#State-Updates#Combat-State
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Combat-Sequence#Damage-Application
+// - @battle-visual-feedback.mdc#Combat-Effects#Control-Feedback
+
+Node Control Damage:
+- Calculate total army health at battle start
+- Set capture threshold at 75% of total health
+- Track accumulated damage per side
+- Apply damage immediately on hits
+- Update control status after each hit
+
+Battalion Combat:
+- Calculate total attack power = base_offense * battalion_quantity
+- Apply defense reduction: damage = attack * (1 - defense/100)
+- Ensure minimum damage of 1 point
+- Track individual battalion total health (base_health * quantity)
+- Apply damage after defense calculation
+- Trigger destruction at 0 total health
+
+### Control Progress
+// Implementation of:
+// - @battle-node-control.mdc#Capture-System#Control-Progress
+// - @battle-performance-standards.mdc#State-Updates#Damage-Tracking
+
+// Referenced by:
+// - @battle-visual-feedback.mdc#Node-Status#Control-Progress
+// - @battle-targeting-system.mdc#Combat-Sequence#Node-Control
+
+- Track damage dealt to nodes by each side
+- Compare against capture threshold
+- Account for opposing side's control
+- Trigger capture state changes
+- Update network effects on capture 

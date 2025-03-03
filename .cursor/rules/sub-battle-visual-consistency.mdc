@@ -1,0 +1,116 @@
+---
+description: "Defines visual consistency requirements, animation type specifications, and quality standards for the battle animation system."
+globs: ["src/**/*.tsx", "src/**/*.ts"]
+alwaysApply: true
+---
+# Battle Visual Consistency [IN_PROGRESS]
+
+## Animation Quality Requirements
+// Implementation of:
+// - @battle-animation-standards.mdc#Animation-Quality-Standards
+// - @battle-visual-feedback.mdc#Combat-Effects
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Combat-Sequence#Visual-Feedback
+// - @battle-movement-system.mdc#Movement-Animation#Quality
+
+1. Visual Language Standards [IN_PROGRESS]
+   - Transition Quality
+     - Smooth state changes without jarring
+     - Consistent animation curves
+     - Professional polish level
+   - Feedback Clarity
+     - Clear cause and effect
+     - Obvious state transitions
+     - Intuitive visual hierarchy
+   - Visual Consistency
+     - Unified animation style
+     - Coherent effect system
+     - Standardized transitions
+
+## Animation Categories
+// Implementation of:
+// - @battle-visual-feedback.mdc#Combat-Effects
+// - @battle-movement-system.mdc#Movement-Animation
+// - @battle-node-control.mdc#Capture-System#Visual-Feedback
+
+1. Combat Animations [IN_PROGRESS]
+   - Attack Sequences
+     - Speed-synced timing (see @sub-battle-animation-timing.mdc)
+     - Impact effects with spring physics
+     - Multi-hit coordination
+   - Damage Visualization
+     - Number popups with 1s fade
+     - Scale/fade combinations
+     - Multiple hit staggering
+   - Health System
+     - Color interpolation at 60fps
+     - Smooth value transitions
+     - Rapid update buffering
+   - Status Effects
+     - Composable overlay system
+     - Z-index management
+     - Multiple effect handling
+
+2. Movement System [IN_PROGRESS]
+   - Position Updates
+     - Matrix transform usage
+     - Path following logic
+     - Network line constraints
+   - Path Preview
+     - State-based transitions
+     - Valid/invalid indication
+     - Real-time updates
+   - Range Indicators
+     - Efficient circle scaling
+     - Real-time updates
+     - Clear boundary display
+   - Network Visualization
+     - Bezier curve transitions
+     - Direction indicators
+     - Connection state feedback
+
+3. State Transitions [PENDING]
+   - Node Control
+     - Color morphing system
+     - Particle effect management
+     - Progress visualization
+   - Battalion States
+     - Health state indication
+     - Status visualization
+     - State change clarity
+   - Victory Feedback
+     - Score visualization
+     - Contribution indicators
+     - Achievement effects
+   - Error States
+     - Clear warning system
+     - Recovery indication
+     - User feedback clarity
+
+## Implementation Standards
+// Implementation of:
+// - @battle-performance-standards.mdc#Visual-Requirements
+// - @battle-visual-feedback.mdc#Technical-Implementation
+
+1. Visual Hierarchy [PENDING]
+   - Layer Management
+     - Clear z-index system
+     - Consistent stacking
+     - Effect composition
+   - State Indication
+     - Clear current state
+     - Obvious transitions
+     - Status hierarchy
+
+2. Effect Composition [PENDING]
+   - Multiple Effects
+     - Proper layering
+     - Effect coordination
+     - Visual clarity
+   - State Combinations
+     - Clear combined states
+     - Priority system
+     - Conflict resolution
+
+Remember: Visual consistency and clarity are critical for player understanding. All animations must maintain professional quality while clearly communicating game state. 
