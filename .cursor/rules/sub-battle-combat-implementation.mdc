@@ -1,0 +1,231 @@
+---
+description: "Defines combat system implementation details including damage calculations, control mechanics, and combat state management"
+globs: ["src/**/*.tsx", "src/**/*.ts"]
+alwaysApply: true
+---
+# Battle Combat Implementation
+
+## Combat Calculations
+// Implementation of:
+// - @battle-node-control.mdc#Capture-System#Control-Progress
+// - @battle-performance-standards.mdc#State-Updates#Combat-State
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Combat-Sequence#Damage-Application
+// - @battle-visual-feedback.mdc#Combat-Effects#Control-Feedback
+
+### Battalion Combat Implementation
+Implementation requirements:
+
+1. Attack Power Calculation
+   ```typescript
+   const calculateAttackPower = (battalion: Battalion) => {
+     return battalion.base_offense * battalion.quantity;
+   };
+   ```
+   - Base damage = base_offense * battalion_quantity
+   - Cache results for performance
+   - Update on quantity changes
+
+2. Defense Application
+   ```typescript
+   const applyDefense = (rawDamage: number, targetDefense: number) => {
+     const reduction = 1 - (targetDefense / 100);
+     return Math.max(1, Math.floor(rawDamage * reduction));
+   };
+   ```
+   - Apply defense reduction: damage = attack * (1 - defense/100)
+   - Ensure minimum damage of 1 point
+   - Round down to nearest integer
+
+3. Health Tracking
+   ```typescript
+   const calculateTotalHealth = (battalion: Battalion) => {
+     return battalion.base_health * battalion.quantity;
+   };
+   ```
+   - Track individual battalion total health
+   - Update on damage or quantity changes
+   - Trigger destruction at 0 health
+
+### Node Control Implementation
+Implementation requirements:
+
+1. Initial Setup
+   ```typescript
+   const initializeNodeControl = (armies: Army[]) => {
+     const totalHealth = armies.reduce((sum, army) => 
+       sum + army.battalions.reduce((bSum, b) => 
+         bSum + calculateTotalHealth(b), 0), 0);
+     return {
+       captureThreshold: totalHealth * 0.75,
+       damageTracking: new Map()
+     };
+   };
+   ```
+   - Calculate total army health at start
+   - Set capture threshold at 75%
+   - Initialize damage tracking
+
+2. Damage Application
+   ```typescript
+   const applyNodeDamage = (node: Node, damage: number, side: Side) => {
+     const currentDamage = node.damageTracking.get(side) || 0;
+     node.damageTracking.set(side, currentDamage + damage);
+     checkControlStatus(node);
+   };
+   ```
+   - Track accumulated damage per side
+   - Apply damage immediately
+   - Update control status after hits
+
+3. Node Control Damage Requirements:
+   - Calculate total army health at battle start
+   - Set capture threshold at 75% of total health
+   - Track accumulated damage per side
+   - Apply damage immediately on hits
+   - Update control status after each hit
+
+4. Battalion Combat Requirements:
+   - Calculate total attack power = base_offense * battalion_quantity
+   - Apply defense reduction: damage = attack * (1 - defense/100)
+   - Ensure minimum damage of 1 point
+   - Track individual battalion total health (base_health * quantity)
+   - Apply damage after defense calculation
+   - Trigger destruction at 0 total health
+
+5. Control Progress Requirements:
+   - Track damage dealt to nodes by each side
+   - Compare against capture threshold
+   - Account for opposing side's control
+   - Trigger capture state changes
+   - Update network effects on capture
+
+## Control System
+// Implementation of:
+// - @battle-node-control.mdc#Capture-System#Control-Progress
+// - @battle-performance-standards.mdc#State-Updates#Damage-Tracking
+
+// Referenced by:
+// - @battle-visual-feedback.mdc#Node-Status#Control-Progress
+// - @battle-targeting-system.mdc#Combat-Sequence#Node-Control
+
+### Progress Tracking
+Implementation requirements:
+
+1. Damage Tracking
+   ```typescript
+   const trackNodeDamage = (node: Node, side: Side, damage: number) => {
+     const current = node.damageByTeam.get(side) || 0;
+     node.damageByTeam.set(side, current + damage);
+     evaluateControl(node);
+   };
+   ```
+   - Track damage per side
+   - Update running totals
+   - Trigger evaluations
+
+2. Control Evaluation
+   ```typescript
+   const evaluateControl = (node: Node) => {
+     const controlStatus = calculateControlStatus(node);
+     if (controlStatus !== node.currentControl) {
+       updateNodeControl(node, controlStatus);
+     }
+   };
+   ```
+   - Compare against threshold
+   - Check opposing control
+   - Trigger state changes
+
+3. Network Effects
+   ```typescript
+   const updateNetworkEffects = (node: Node) => {
+     const connectedNodes = getConnectedNodes(node);
+     connectedNodes.forEach(connected => {
+       recalculateNodeEffects(connected);
+     });
+   };
+   ```
+   - Update connected nodes
+   - Recalculate network bonuses
+   - Propagate effects
+
+## Combat State Management
+// Implementation of:
+// - @battle-core-mechanics.mdc#State-Management#Combat-State
+// - @battle-performance-standards.mdc#State-Updates#Combat-State
+
+### Combat Flow
+Implementation requirements:
+
+1. Attack Resolution
+   ```typescript
+   const resolveAttack = (attacker: Battalion, target: Battalion) => {
+     const damage = calculateDamage(attacker, target);
+     applyDamage(target, damage);
+     updateCombatState(attacker, target);
+   };
+   ```
+   - Calculate and apply damage
+   - Update unit states
+   - Trigger effects
+
+2. State Updates
+   ```typescript
+   const updateCombatState = (attacker: Battalion, target: Battalion) => {
+     updateAttackerState(attacker);
+     updateTargetState(target);
+     notifyCombatEffects(attacker, target);
+   };
+   ```
+   - Update both units
+   - Trigger animations
+   - Update UI
+
+3. Death Handling
+   ```typescript
+   const handleUnitDeath = (battalion: Battalion) => {
+     if (battalion.totalHealth <= 0) {
+       triggerDestructionEffects(battalion);
+       removeBattalion(battalion);
+     }
+   };
+   ```
+   - Check health status
+   - Trigger effects
+   - Clean up resources
+
+### Combat Optimization
+Implementation requirements:
+
+1. Calculation Caching
+   ```typescript
+   const combatCache = new Map<string, CombatValues>();
+   
+   const getCachedValues = (battalion: Battalion) => {
+     const key = getCacheKey(battalion);
+     if (!combatCache.has(key)) {
+       combatCache.set(key, calculateCombatValues(battalion));
+     }
+     return combatCache.get(key);
+   };
+   ```
+   - Cache common calculations
+   - Update on state changes
+   - Clear on battle end
+
+2. Batch Processing
+   ```typescript
+   const batchCombatUpdates = (updates: CombatUpdate[]) => {
+     const batch = new CombatBatch(updates);
+     batch.process();
+     batch.applyEffects();
+     batch.notify();
+   };
+   ```
+   - Group similar updates
+   - Process in order
+   - Apply effects once
+
+Remember: Combat implementation must maintain system integrity and follow core mechanics while ensuring optimal performance. 

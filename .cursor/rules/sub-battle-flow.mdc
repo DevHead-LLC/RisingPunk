@@ -1,0 +1,61 @@
+# Battle Flow Implementation
+// Implementation of:
+// - @battle-core-mechanics.mdc#Battle-Flow
+// - @battle-performance-standards.mdc#State-Management#Phase-Transitions
+// - @battle-visual-feedback.mdc#Battle-States#Phase-Indicators
+
+## Battle Flow
+### Pre-Battle Phase (3 seconds)
+// Implementation of:
+// - @battle-movement-system.mdc#Initial-Deployment#Placement-Rules
+// - @battle-visual-feedback.mdc#Pre-Battle#Countdown-Display
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Initial-Target-Selection#Priority-Order
+// - @battle-node-control.mdc#Initial-State#Node-Ownership
+
+- Battalion placement validation
+- Initial state setup
+- Initial Node Restrictions:
+  - Node 0 battalions: Can target nodes 3, 4
+  - Node 1 battalions: Can target nodes 3, 4, 5
+  - Node 2 battalions: Can target nodes 4, 5
+- Display countdown overlay
+- Show deployment zones
+- Animate network nodes and connection lines
+
+### Active Battle Phase (20 seconds)
+// Implementation of:
+// - @battle-performance-standards.mdc#State-Updates#Battle-Timer
+// - @battle-movement-system.mdc#Movement-Rules#Network-Lines
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Combat-Sequence#Attack-Initiation
+// - @battle-visual-feedback.mdc#Combat-Feedback#State-Updates
+
+- Battle Timer
+  - Simple 20-second countdown display
+  - Located at screen top
+  - No intermediate warnings
+  - Continuous countdown until completion
+- Network Line Movement:
+  - Battalions must stay on network lines when moving
+  - Can traverse any connected network line to reach target
+  - No restrictions on which lines can be used after initial attack
+- Combat System:
+  - Attack frequency determined solely by speed stat
+  - Target selection based purely on proximity
+  - State updates every 1 second for consistency
+  - Visual updates synchronized with state timer
+  - Begin attacks immediately when in range
+  - Capture mechanics identical for all types
+- Real-time feedback with batched updates
+
+### Results Phase
+// Implementation of:
+// - @battle-performance-standards.mdc#State-Management#Battle-Completion
+// - @battle-visual-feedback.mdc#Results-Display#Victory-Screen
+
+// Referenced by:
+// - @battle-node-control.mdc#Victory-Conditions#Final-State
+// - @battle-targeting-system.mdc#Combat-Sequence#Battle-End 

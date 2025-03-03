@@ -1,0 +1,115 @@
+---
+description: "Defines core targeting principles, universal targeting rules, and foundational range calculations for the battle system"
+globs: ["src/**/*.tsx", "src/**/*.ts"]
+alwaysApply: true
+---
+# Battle Targeting Core System
+
+## Core Principles
+// Implementation of:
+// - @battle-core-mechanics.mdc#Combat-Logic#Universal-Targeting-Rules
+// - @battle-state-persistence.mdc#Frontend-vs-Backend-Balance
+
+// Referenced by:
+// - @battle-movement-system.mdc#Movement-Mechanics#Target-Selection
+// - @battle-node-control.mdc#Network-Effects#Strategic-Impact
+
+1. Proximity is the ONLY targeting factor
+2. No type-specific preferences ever
+3. Closest valid target is always selected
+4. Target changes only when proximity changes
+
+## Stats Reference
+// Implementation of:
+// - @DigitalBarracksScreen.tsx#BOT_CATEGORIES
+// - @battle-core-mechanics.mdc#Combat-Logic#Battalion-Stats
+
+Battalion stats are defined in @DigitalBarracksScreen.tsx and include:
+- Guardian: range: 4, speed: 9
+- Phreak: range: 9, speed: 7
+- Breacher: range: 5, speed: 5
+
+These stats affect HOW battalions engage (range, speed) but NEVER WHO they target.
+
+## Target Selection Rules
+// Implementation of:
+// - @battle-core-mechanics.mdc#Combat-Logic#Universal-Targeting-Rules
+// - @battle-state-persistence.mdc#Frontend-vs-Backend-Balance
+
+### Universal Targeting Priority
+// Referenced by:
+// - @battle-movement-system.mdc#Movement-Mechanics#Target-Approach
+// - @battle-node-control.mdc#Network-Effects#Strategic-Impact
+
+- ALWAYS target nearest available entity:
+  - Enemy battalions OR non-captured nodes
+  - NO distinction between target types
+  - ONLY factor is distance to target
+  - Must be reachable via network lines
+- Target changes ONLY when:
+  - Current target is destroyed/captured
+  - A different target becomes closer
+  - Current target moves out of reach
+
+## Initial Target Selection
+// Implementation of:
+// - @battle-core-mechanics.mdc#Battle-Flow#Pre-Battle-Phase
+// - @battle-node-control.mdc#Initial-Setup#Node-States
+
+// Referenced by:
+// - @battle-movement-system.mdc#Initial-Deployment#Target-Selection
+// - @battle-visual-feedback.mdc#Pre-Battle#Target-Indicators
+
+### Priority Order
+1. Random available node:
+   - Neutral nodes within initial restrictions
+   - Must follow initial node targeting rules
+
+### Line Restrictions
+// Implementation of:
+// - @battle-core-mechanics.mdc#Battle-Flow#Pre-Battle-Phase
+// - @battle-movement-system.mdc#Network-Structure#Initial-Node-Control
+
+// Referenced by:
+// - @battle-node-control.mdc#Network-Effects#Network-Connectivity
+// - @battle-visual-feedback.mdc#Network-Display#Line-Visualization
+
+- Initial attack restrictions:
+  - Node 0 battalions: Can target nodes 3, 4
+  - Node 1 battalions: Can target nodes 3, 4, 5
+  - Node 2 battalions: Can target nodes 4, 5
+- After initial attack:
+  - Can target any node reachable via network lines
+  - Must stay on network lines when moving
+  - Must reach nodes to change direction
+
+## Combat Range
+// Implementation of:
+// - @battle-core-mechanics.mdc#Combat-Logic#Battalion-Stats
+// - @DigitalBarracksScreen.tsx#BOT_CATEGORIES
+
+### Range Calculation
+// Referenced by:
+// - @battle-movement-system.mdc#Attack-Range-Behavior#Range-Requirements
+// - @battle-visual-feedback.mdc#Combat-Effects#Range-Indicators
+
+- Use range values from @DigitalBarracksScreen.tsx
+- Calculate from battalion center to target center
+- Stop when attack range edge reaches target
+- Update position on global 1-second timer
+
+### Attack Positioning
+// Implementation of:
+// - @battle-movement-system.mdc#Movement-Mechanics#Attack-Range-Behavior
+// - @battle-state-persistence.mdc#Update-Frequency
+
+// Referenced by:
+// - @battle-visual-feedback.mdc#Combat-Effects#Position-Feedback
+// - @battle-node-control.mdc#Network-Effects#Strategic-Impact
+
+- Move to range edge if target beyond range
+- Stay in current position if target within range
+- Must reach nodes to change movement direction
+- Update position only if target moves out of range
+
+Remember: All targeting must respect network line restrictions and battalion-specific range values while maintaining the core principle that proximity is the ONLY targeting factor. 

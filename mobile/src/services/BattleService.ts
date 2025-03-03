@@ -1,5 +1,7 @@
 import { API_URL } from '../config';
-import { BattleState, BattalionState, NodeState } from '../battle/core/BattleStateManager';
+import { BattleState } from '../battle/core/BattleStateManager';
+import { Node } from '../battle/core/BattleTypes';
+import { Position } from '../battle/core/types';
 
 interface BattleStateResponse {
   success: boolean;
@@ -126,8 +128,8 @@ export class BattleService {
       timeRemaining: data.timeRemaining,
       battalions: new Map(Object.entries(data.battalions)),
       nodes: new Map(Object.entries(data.nodes).map(([key, value]) => [
-        Number(key),
-        value as NodeState
+        key,
+        value as Node
       ])),
       updateId: data.updateId,
       lastUpdated: new Date(data.lastUpdated),
@@ -140,6 +142,134 @@ export class BattleService {
       ...state,
       battalions: state.battalions ? Object.fromEntries(state.battalions) : undefined,
       nodes: state.nodes ? Object.fromEntries(state.nodes) : undefined,
+    };
+  }
+
+  // Move battalion with optimistic updates
+  public async moveBattalion(
+    battleId: string,
+    battalionId: string,
+    newPosition: Position,
+    onUpdate: (state: BattleState) => void
+  ): Promise<BattleStateResponse> {
+    try {
+      // Get current state
+      const currentState = await this.syncState(battleId);
+      if (!currentState.success || !currentState.state) {
+        throw new Error('Failed to get current state');
+      }
+
+      // Create optimistic update
+      const optimisticState = this.cloneState(currentState.state);
+      const battalion = optimisticState.battalions.get(battalionId);
+      if (!battalion) {
+        throw new Error('Battalion not found');
+      }
+
+      // Store original position for rollback
+      const originalPosition = { ...battalion.position };
+
+      // Apply optimistic update
+      battalion.position = newPosition;
+      onUpdate(optimisticState);
+
+      try {
+        // Send update to server
+        const response = await this.updateState(battleId, {
+          battalions: new Map([[battalionId, battalion]])
+        });
+
+        if (!response.success) {
+          // Rollback on failure
+          battalion.position = originalPosition;
+          onUpdate(optimisticState);
+          throw new Error(response.error || 'Failed to update battalion position');
+        }
+
+        return response;
+      } catch (error) {
+        // Rollback on error
+        battalion.position = originalPosition;
+        onUpdate(optimisticState);
+        throw error;
+      }
+    } catch (error) {
+      // Ensure error is propagated
+      throw error;
+    }
+  }
+
+  // Capture node with optimistic updates
+  public async captureNode(
+    battleId: string,
+    nodeId: string,
+    team: string,
+    onUpdate: (state: BattleState) => void
+  ): Promise<BattleStateResponse> {
+    try {
+      // Get current state
+      const currentState = await this.syncState(battleId);
+      if (!currentState.success || !currentState.state) {
+        throw new Error('Failed to get current state');
+      }
+
+      // Create optimistic update
+      const optimisticState = this.cloneState(currentState.state);
+      const node = optimisticState.nodes.get(nodeId);
+      if (!node) {
+        throw new Error('Node not found');
+      }
+
+      // Store original values for rollback
+      const originalControllingTeam = node.controllingTeam;
+      const originalControlProgress = node.controlProgress;
+
+      // Apply optimistic update
+      node.controllingTeam = team;
+      node.controlProgress = 100;
+      onUpdate(optimisticState);
+
+      try {
+        // Send update to server
+        const response = await this.updateState(battleId, {
+          nodes: new Map([[nodeId, node]])
+        });
+
+        if (!response.success) {
+          // Rollback on failure
+          node.controllingTeam = originalControllingTeam;
+          node.controlProgress = originalControlProgress;
+          onUpdate(optimisticState);
+          throw new Error(response.error || 'Failed to update node control');
+        }
+
+        return response;
+      } catch (error) {
+        // Rollback on error
+        node.controllingTeam = originalControllingTeam;
+        node.controlProgress = originalControlProgress;
+        onUpdate(optimisticState);
+        throw error;
+      }
+    } catch (error) {
+      // Ensure error is propagated
+      throw error;
+    }
+  }
+
+  // Deep clone state to prevent mutations
+  private cloneState(state: BattleState): BattleState {
+    return {
+      ...state,
+      battalions: new Map(Array.from(state.battalions.entries()).map(([key, value]) => [
+        key,
+        { ...value, position: { ...value.position } }
+      ])),
+      nodes: new Map(Array.from(state.nodes.entries()).map(([key, value]) => [
+        key,
+        { ...value, position: { ...value.position } }
+      ])),
+      lastUpdated: new Date(state.lastUpdated)
     };
   }
 } 

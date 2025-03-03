@@ -15,29 +15,23 @@ alwaysApply: true
 # Battle Performance Standards
 
 ## Core Requirements
-// Implementation of:
-// - @battle-core-mechanics.mdc#Performance-Standards
-// - @battle-animation-standards.mdc#Technical-Requirements
+// Implementation details moved to:
+// - @sub-battle-performance-boundaries.mdc (concrete thresholds and monitoring requirements)
+// - @sub-battle-performance-standards.mdc (optimization guidelines and quality standards)
 
-### Visual Feedback
-- Frame rate: 60fps target
-  - Monitor drops below 55fps
-  - Log duration and cause
-  - Implement quality scaling
-- Animation smoothness
-  - Use native drivers
-  - Batch updates
-  - Monitor bridge usage
+See @sub-battle-performance-boundaries.mdc for detailed performance thresholds and monitoring requirements, including:
+- Frame Rate Requirements
+- Resource Management
+- Optimization Guidelines
+- Monitoring Requirements
 
-### State Management
-- Update frequency: 1/second
-  - Synchronized global timer
-  - Batched state changes
-  - Buffered transitions
-- Memory efficiency
-  - Cache common values
-  - Clear unused resources
-  - Monitor heap usage
+See @sub-battle-performance-standards.mdc for detailed performance standards and optimization guidelines, including:
+- State Update Requirements
+- Error Handling Standards
+- Update Timing Requirements
+- Performance Optimization Categories
+
+Remember: Performance and stability are critical for maintaining game quality. Monitor, optimize, and maintain clear error boundaries.
 
 ## Combat Performance
 // Implementation of:
@@ -285,4 +279,4 @@ alwaysApply: true
   - State recovery
   - Performance scaling
 
-Remember: Performance and stability are critical for maintaining game quality. Monitor, optimize, and maintain clear error boundaries. 
+Remember: Performance and stability are critical for maintaining game quality. Monitor, optimize, and maintain clear error boundaries.

@@ -1,0 +1,87 @@
+# Battle State Management Implementation
+// Implementation of:
+// - @battle-core-mechanics.mdc#State-Management
+// - @code-style-and-structure.mdc#Performance-Guidelines#State-Management
+// - @battle-performance-standards.mdc#Core-Requirements#State-Control
+
+### Core State Principles
+Single Source of Truth:
+- Centralized state management
+- Clear ownership of state updates
+- Predictable state transitions
+- Atomic state operations
+
+Update Frequency:
+- Global 1-second update timer
+- Batch related state changes
+- Optimize update scheduling
+- Handle state dependencies
+
+### Update Timing Hierarchy
+// Referenced by:
+// - @battle-animation-standards.mdc#Core-Timing-Principles
+// - @battle-targeting-system.mdc#Combat-Sequence#Frontend-Flow
+// - @battle-movement-system.mdc#Movement-Feedback#Visual-Updates
+// - @battle-visual-feedback.mdc#Combat-Effects#Animation-Timing
+// - @battle-node-control.mdc#Capture-System#Visual-Feedback
+
+Core Update Requirements:
+1. Real-time (60fps): Animations, movement, visual effects
+   - Use requestAnimationFrame for smooth updates
+   - Implement RAF fallback for background tabs
+   - Required for smooth visual feedback
+
+2. Speed-based: Attack animations (per battalion speed stat)
+   - Duration = 1000ms / speed stat
+   - Use Animated.timing with proper easing
+   - Critical for consistent combat pacing
+
+3. Global timer (1s): Health, damage, state synchronization
+   - Align with backend update cycle
+   - Buffer state changes for smooth transitions
+   - Ensures consistent game state
+
+State Categories:
+1. Battle State:
+   - Phase tracking
+   - Timer management
+   - Victory conditions
+   - Node ownership
+
+2. Battalion State:
+   - Position tracking
+   - Health/status
+   - Target information
+   - Movement paths
+
+3. Combat State:
+   - Attack calculations
+   - Damage resolution
+   - Range checking
+   - Collision detection
+
+### State Updates
+Update Process:
+- Validate state changes
+- Batch related updates
+- Maintain consistency
+- Handle edge cases
+
+Error Handling:
+- Validate state transitions
+- Recover from failures
+- Log state errors
+- Maintain fallback states
+
+### State Synchronization
+Timing Requirements:
+- Sync with global timer
+- Handle network delays
+- Manage animation states
+- Coordinate multiple updates
+
+Performance Optimization:
+- Minimize state updates
+- Batch similar changes
+- Optimize calculations
+- Monitor update frequency 

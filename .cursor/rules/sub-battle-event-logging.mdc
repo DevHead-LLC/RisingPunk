@@ -1,0 +1,132 @@
+---
+description: "Defines battle system event logging requirements, formats, and implementation details for tracking game state and debugging"
+globs: ["src/**/*.tsx", "src/**/*.ts"]
+alwaysApply: true
+---
+# Battle Event Logging
+
+## Essential Events
+// Implementation of:
+// - @battle-targeting-system.mdc#Retargeting-Logging
+// - @battle-core-mechanics.mdc#Combat-Logic#Damage-Calculation
+// - @battle-movement-system.mdc#Movement-Logging#Standards
+
+// Referenced by:
+// - @battle-node-control.mdc#State-Updates#Logging
+// - @battle-visual-feedback.mdc#Debug-Logging#Standards
+// - @battle-performance-standards.mdc#Error-Handling#Error-Types
+
+### 1. Targeting Events
+```typescript
+// Format: [Target] {side}.{type}.{battalionId} -> {action}
+logger.debug('[Target] red.guardian.b1 -> selecting_target', {
+  currentTarget: targetId,
+  distance: calculatedDistance,
+  validTargets: availableTargets.length
+});
+```
+- Log retargeting attempts
+  - Previous target
+  - New target selection
+  - Reason for change
+- Track target distances
+  - Current distance
+  - Range thresholds
+  - Movement impact
+- Record targeting failures
+  - Invalid targets
+  - Range issues
+  - State conflicts
+
+### 2. Combat Events
+```typescript
+// Format: [Combat] {side}.{type}.{battalionId} hits {targetId}
+logger.info('[Combat] blue.phreak.b2 hits red.guardian.b1', {
+  rawDamage: baseOffense * quantity,
+  defenseReduction: 1 - defense/100,
+  finalDamage: calculatedDamage,
+  targetHealth: {before: oldHealth, after: newHealth}
+});
+```
+- Track damage calculations
+  - Raw damage values
+  - Defense reductions
+  - Final damage dealt
+- Monitor health changes
+  - Previous health
+  - New health
+  - Health percentage
+- Log combat stats
+  - Attack frequency
+  - Hit/miss ratio
+  - Critical hits
+
+### 3. State Changes
+```typescript
+// Format: [State] {side}.{type}.{battalionId}: {oldState} -> {newState}
+logger.info('[State] red.breacher.b3: moving -> attacking', {
+  reason: 'target_in_range',
+  position: {x: 120, y: 350},
+  targetId: 'blue.guardian.b1',
+  healthPercent: 75
+});
+```
+- Log state transitions
+  - Previous state
+  - New state
+  - Transition reason
+- Track position updates
+  - Old position
+  - New position
+  - Movement path
+- Monitor health status
+  - Current percentage
+  - Recent changes
+  - Critical thresholds
+
+### 4. Error Events
+```typescript
+// Format: [Error] {side}.{type}.{battalionId}: {errorType} - {message}
+logger.error('[Error] blue.phreak.b4: calculation_error - invalid_defense', {
+  error: err,
+  state: currentState,
+  context: {
+    target: targetId,
+    combat: combatState,
+    performance: perfMetrics
+  }
+});
+```
+- Log calculation errors
+  - Error type
+  - Stack trace
+  - State context
+- Track state conflicts
+  - Invalid transitions
+  - State mismatches
+  - Recovery attempts
+- Monitor performance
+  - Frame rate drops
+  - Memory issues
+  - Network latency
+
+## Event Format Standards
+1. Entity Identification
+   - Side: red/blue
+   - Type: battalion type
+   - ID: unique identifier
+   - Format: {side}.{type}.{id}
+
+2. Event Categories
+   - Target: targeting and range
+   - Combat: attacks and damage
+   - State: state transitions
+   - Error: failures and issues
+
+3. Context Requirements
+   - Relevant state data
+   - Performance metrics
+   - Error information
+   - Timing data
+
+Remember: Event logging must provide clear debugging value while maintaining consistent formats and complete context. 

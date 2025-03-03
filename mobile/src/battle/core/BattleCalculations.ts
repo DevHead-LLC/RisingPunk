@@ -579,4 +579,43 @@ export function resolveBattle(): BattleResult {
     winner,
     points
   };
+}
+
+// Implementation of @battle-core-mechanics.mdc#Node-Control#Damage-Calculation
+export function calculateNodeDamage(params: {
+  battalions: Array<{ type: BattalionType; quantity: number }>;
+  side?: 'user' | 'enemy';
+}): number {
+  let totalDamage = 0;
+
+  for (const battalion of params.battalions) {
+    if (!BASE_STATS[battalion.type]) {
+      throw new Error('Invalid battalion type');
+    }
+
+    if (battalion.quantity <= 0) {
+      throw new Error('Battalion quantity must be positive');
+    }
+
+    // Calculate damage contribution based on offense and quantity
+    const baseDamage = BASE_STATS[battalion.type].offense * battalion.quantity;
+    
+    // Apply side-specific modifiers if specified
+    const modifier = params.side === 'enemy' ? 0.9 : 1; // Enemy battalions deal 90% damage to nodes
+    
+    totalDamage += Math.floor(baseDamage * modifier);
+  }
+
+  return Math.max(1, totalDamage); // Minimum damage of 1
+}
+
+// Implementation of @battle-core-mechanics.mdc#Combat-Logic#Attack-Timing
+export function calculateAttackInterval(type: BattalionType): number {
+  if (!BASE_STATS[type]) {
+    throw new Error('Invalid battalion type');
+  }
+
+  // Attack interval is inversely proportional to speed
+  // Base interval of 1000ms divided by speed stat
+  return Math.floor(1000 / BASE_STATS[type].speed);
 } 

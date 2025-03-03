@@ -1,0 +1,96 @@
+---
+description: "Defines foundational movement rules, network structure, and core movement constraints"
+globs: ["src/**/*.tsx", "src/**/*.ts"]
+alwaysApply: true
+---
+# Battle Movement Core System
+
+## Core Movement Properties
+// Implementation of:
+// - @battle-core-mechanics.mdc#Combat-Logic#Battalion-Stats
+// - @battle-performance-standards.mdc#State-Management#Update-Efficiency
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Combat-Range#Range-Calculation
+// - @battle-visual-feedback.mdc#Movement-Feedback#Speed-Indicators
+
+### Battalion Movement Speeds
+- Guardian: 9 units per second
+- Phreak: 7 units per second
+- Breacher: 5 units per second
+
+### Global Update Rules
+- State updates on 1-second intervals
+- Batch all movement updates
+- Synchronize with combat system timer
+- Maintain performance during mass movement
+
+## Network Structure
+// Implementation of:
+// - @battle-core-mechanics.mdc#Pre-Battle-Phase#Initial-Node-Restrictions
+// - @battle-node-control.mdc#Initial-State#Node-Setup
+
+### Initial Node Control
+// Implementation of:
+// - @battle-node-control.mdc#Control-Mechanics#Initial-Ownership
+// - @battle-core-mechanics.mdc#Pre-Battle-Phase#Initial-state-setup
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Initial-Target-Selection#Line-Restrictions
+// - @battle-visual-feedback.mdc#Pre-Battle#Node-Display
+
+Initial Node States:
+- User-controlled nodes: 0, 1, 2 (permanent ownership)
+- Neutral nodes: 3, 4, 5 (initially neutral, can be captured)
+- Enemy-controlled nodes: 6, 7, 8 (permanent ownership)
+
+Node Capture Rules:
+- Only neutral nodes (3, 4, 5) can be captured
+- Once captured, nodes:
+  - Change ownership to capturing side
+  - Update visual state to match owner
+  - Can no longer be targeted
+  - Become part of owner's network
+
+### Network Lines
+// Implementation of:
+// - @battle-core-mechanics.mdc#Active-Battle-Phase#Network-Line-Movement
+// - @battle-performance-standards.mdc#State-Updates#Movement-Tracking
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Target-Selection-Rules#Universal-Targeting-Priority
+// - @battle-visual-feedback.mdc#Network-Display#Line-Visualization
+
+Line Properties:
+- Lines connect adjacent nodes
+- Movement only possible along these lines
+- Lines serve as valid movement paths
+- Lines cannot be traversed diagonally
+
+Line Movement Rules:
+- Battalions must follow lines exactly
+- Movement speed determined by battalion stats:
+  - Guardian: 9 units per second
+  - Phreak: 7 units per second
+  - Breacher: 5 units per second
+- Distance calculation uses line path length
+- Shortest path must be taken when multiple routes exist
+
+## Movement Constraints
+// Implementation of:
+// - @battle-core-mechanics.mdc#Active-Battle-Phase#Network-Line-Movement
+// - @battle-targeting-system.mdc#Combat-Range#Attack-Positioning
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Retargeting-Logic#Target-Acquisition
+// - @battle-visual-feedback.mdc#Movement-Feedback#Path-Display
+
+- Battalions must always move along network lines
+- Can only change direction at nodes:
+  - Must reach a node to change lines
+  - Cannot switch lines mid-path
+  - Must stop at node to turn onto new line
+- Can use any connected network line after initial attack
+- Must maintain connection to network at all times
+
+Remember: All movement must strictly adhere to these core rules while maintaining system integrity. 

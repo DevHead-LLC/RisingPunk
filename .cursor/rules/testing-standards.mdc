@@ -8,6 +8,61 @@ alwaysApply: false
 // These rules ARE the game mechanics - they define how the game actually works
 // Each test MUST validate a specific rule's requirements
 
+# 🚨 MANDATORY FIRST STEP 🚨
+// BEFORE DOING ANYTHING ELSE:
+// 1. RUN ALL TESTS
+// 2. RECORD THE CURRENT FAILING TESTS
+// 3. DOCUMENT THE FAILURE COUNT AND PATTERNS
+// ⛔️ DO NOT PROCEED UNTIL THIS IS DONE ⛔️
+
+# ⚠️ CRITICAL: KEEP TESTS SIMPLE AND FOCUSED ⚠️
+// THE MOST IMPORTANT PRINCIPLE: Write the absolute minimum code needed
+// DO NOT add complexity or try to be clever
+// DO NOT try to handle edge cases not specified in the rules
+// DO NOT add "nice to have" features
+// JUST implement exactly what the rule requires - NOTHING MORE
+// ALWAYS RUN A TEST TO SEE IF WE HAVE ANY FAILING AT THE START
+
+# ⚠️ CRITICAL: TEST ISOLATION AND ORGANIZATION ⚠️
+// @see @reactNativeLang/testing
+// @see @jestLang/isolation
+// @see @typescriptLang/testing-best-practices
+
+1. Test Isolation Requirements
+   - Each test MUST be completely independent
+   - NEVER share mutable state between tests
+   - Reset ALL mocks and spies in beforeEach/afterEach
+   - Clear ALL timers and intervals after each test
+   - Restore ALL modified globals after each test
+   - Use unique test data per test case
+
+2. Test Organization Standards
+   - Group tests by feature/component/rule
+   - Use descriptive test blocks (describe/context)
+   - Follow naming pattern: "should <expected behavior> when <condition>"
+   - Keep test files parallel to source files
+   - Maximum test file size: 300 lines
+   - Split large test suites into focused subsets
+
+3. Mocking and Isolation Practices
+   - Mock ALL external dependencies
+   - Use dependency injection for better isolation
+   - Create fresh mock instances per test
+   - Never mock the system under test
+   - Document ALL mock behaviors
+   - Verify mock interactions explicitly
+
+4. Debugging Support
+   - Add meaningful test descriptions
+   - Use clear failure messages
+   - Log relevant state on failure
+   - Maintain one assertion per test when possible
+   - Include setup context in test names
+   - Document complex test scenarios
+
+# IMPORTANT!
+   - CHECK YOUR CURRENT DIRECTORY BEFORE MAKING CHANGES
+
 ## Status Tracking
 // Tracks the last rule implemented to maintain development continuity
 Last Rule Implemented: Battle Core Mechanics - Phase Management and Error Handling
@@ -19,19 +74,24 @@ Status: VERIFIED - All tests passing with comprehensive coverage of phase transi
    - Test MUST validate rule's specific requirements 
    - Rule being tested MUST be referenced in test
    - Test MUST validate actual game mechanics
+   - Test MUST be as simple as possible - NO extra complexity
    - Update Status Tracking section after selection
 
 2. Implement minimal code to pass
    - Write ONLY code needed to make test pass
+   - NO extra features or optimizations
+   - NO "future-proofing" or "just in case" code
    - Implementation MUST follow rule exactly
-   - NO extra features or optimizations yet
-   - Keep it simple and focused
+   - If it feels complex, you're doing too much
+   - Keep it ruthlessly simple and focused
 
 3. Run test suite
    - Verify ALL rule-based tests pass
    - Each battle-*.mdc rule MUST have coverage
    - Update source file's status if all tests for rule pass
+   - If tests are complex, simplify them
 
 4. Return to workflow
    - Move to performance check phase
    - Let workflow handle status updates
+   - Remember: Simple tests are easier to maintain

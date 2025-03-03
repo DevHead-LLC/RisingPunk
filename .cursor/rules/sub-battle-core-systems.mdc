@@ -1,0 +1,52 @@
+---
+description: "Defines the foundational battle system components, their relationships, and cross-references between core mechanics and implementation details"
+globs: ["src/**/*.tsx", "src/**/*.ts"]
+alwaysApply: true
+---
+# Battle Core Systems
+
+## Core Systems
+// Implementation of:
+// - @code-style-and-structure.mdc#Cross-Reference-Standards#Reference-Requirements
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Development-Approach#System-Stability
+// - @battle-node-control.mdc#Core-Rules#Principles
+
+### State Management
+// Implementation details moved to:
+// - @sub-battle-state-management.mdc (state principles, timing hierarchy, updates, synchronization)
+
+See @sub-battle-state-management.mdc for state management implementation details.
+
+### Combat System
+// Implementation details moved to:
+// - @sub-battle-damage-control.mdc (damage calculation, control progress)
+
+See @sub-battle-damage-control.mdc for damage and control implementation details.
+
+### Development Guidelines
+// Implementation details moved to:
+// - @sub-battle-development.mdc (state management, combat logic, error prevention)
+
+See @sub-battle-development.mdc for detailed development guidelines and implementation requirements.
+
+### Victory Conditions
+// Implementation details moved to:
+// - @sub-battle-victory.mdc (loss tracking, scoring, victory determination, node control)
+
+See @sub-battle-victory.mdc for detailed victory conditions and implementation requirements.
+
+### Battle Flow
+// Implementation details moved to:
+// - @sub-battle-flow.mdc (phase transitions, timing, and battle progression)
+
+See @sub-battle-flow.mdc for detailed battle flow implementation and phase requirements.
+
+### Integration Points
+// Implementation details moved to:
+// - @sub-battle-integration-points.mdc (critical interaction points between systems)
+
+See @sub-battle-integration-points.mdc for detailed system integration points and current status.
+
+Remember: Changes must directly support these core mechanics and maintain system integrity. 

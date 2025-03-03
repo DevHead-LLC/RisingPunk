@@ -1,0 +1,78 @@
+---
+description: "Defines concrete performance thresholds, resource limits, and monitoring boundaries that the battle system must operate within"
+globs: ["src/**/*.tsx", "src/**/*.ts"]
+alwaysApply: true
+---
+
+# Battle Performance Implementation
+// Implementation of:
+// - @battle-performance-standards.mdc#Core-Requirements#Visual-Feedback
+// - @battle-performance-standards.mdc#Animation-Performance#Animation-Optimization
+// - @battle-animation-standards.mdc#Resource-Management
+
+## Performance Boundaries
+// Referenced by:
+// - @battle-movement-system.mdc#Performance#Animation-Requirements
+// - @battle-visual-feedback.mdc#Performance-Standards
+// - @battle-targeting-system.mdc#Performance-Considerations#Optimization
+
+### Frame Rate Requirements
+- 60fps baseline for all animations
+  - Monitor using Performance.now()
+  - Log drops below 55fps
+  - Implement low-quality mode triggers
+- Native driver utilization required
+  - Use for all transform animations
+  - Fallback gracefully for unsupported props
+- Batched state updates
+  - Group related visual changes
+  - Use requestAnimationFrame for batching
+
+### Resource Management
+// Implementation of:
+// - @battle-performance-standards.mdc#Animation-Performance#Animation-Optimization
+// - @battle-state-persistence.mdc#Frontend-Performance
+
+// Referenced by:
+// - @battle-movement-system.mdc#Performance#Resource-Usage
+// - @battle-visual-feedback.mdc#Technical-Implementation
+// - @battle-targeting-system.mdc#Performance-Considerations#Optimization
+
+#### Optimization Guidelines
+- Use React Native Animated API
+  - Prefer useNativeDriver
+  - Batch with Animated.parallel
+  - Share Animated.Value when possible
+- Implement proper cleanup
+  - Clear all subscriptions
+  - Reset Animated.Value
+  - Remove listeners
+- Batch similar animations
+  - Group state updates
+  - Use composition
+- Cache common animations
+  - Reuse Animated.Value
+  - Share interpolation configs
+- Minimize JS bridge usage
+  - Use native-only props
+  - Batch bridge updates
+
+#### Monitoring Requirements
+- Track frame rates
+  - Log below 55fps
+  - Monitor duration
+  - Track cause of drops
+- Monitor memory usage
+  - Watch animation objects
+  - Track value sharing
+- Log animation errors
+  - Capture stack traces
+  - Record state at failure
+- Performance profiling
+  - Regular profiling runs
+  - Track heavy animations
+- Resource cleanup verification
+  - Validate unmount cleanup
+  - Check memory after battles
+
+Remember: All performance implementations must strictly adhere to the core requirements defined in @battle-performance-standards.mdc#Core-Requirements. 

@@ -1,5 +1,7 @@
 ---
 description: "Defines performance check requirements and steps."
+globs: 
+alwaysApply: false
 ---
 
 1. Monitor frame rates (target 60fps)
@@ -8,3 +10,4 @@ description: "Defines performance check requirements and steps."
 4. Profile and optimize critical paths
 5. Log performance metrics
 6. Take immediate action on performance issues 
+7. Return to `development-workflow.mdc` and continue to next phase - be sure to update the stats in development loop per that document's requirements.

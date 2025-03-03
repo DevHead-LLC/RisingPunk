@@ -86,8 +86,26 @@ Tests: mobile/__tests__/components/battle/BattleRelease.test.tsx
 // connections to ensure full context and maintain consistency across the codebase.
 
 # Battle Visual Feedback System
-// IMPORTANT: When working with any section of this file, ALWAYS review ALL "Implementation of" and "Referenced by" 
-// connections to ensure full context and maintain consistency across the codebase.
+
+## Core Architecture
+// Implementation details moved to:
+// - @sub-battle-visual-consistency.mdc (visual standards, animation types, and quality requirements)
+// - @sub-battle-animation-timing.mdc (timing implementation, synchronization, and performance)
+
+See @sub-battle-visual-consistency.mdc for detailed visual standards and animation types, including:
+- Animation Quality Requirements
+- Visual Language Standards
+- Animation Categories
+- Implementation Standards
+
+See @sub-battle-animation-timing.mdc for detailed timing implementation and synchronization, including:
+- Real-time Updates (60fps)
+- Speed-based Updates
+- Global Timer Integration
+- Performance Monitoring
+- Animation Type Timing
+
+Remember: Visual feedback must maintain clarity and performance while adhering to the global state management system. All updates must respect the timing hierarchy defined in @battle-animation-standards.mdc and follow proximity-based targeting rules.
 
 ## Core Principles
 // Implementation of:

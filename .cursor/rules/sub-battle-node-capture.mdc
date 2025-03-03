@@ -1,0 +1,88 @@
+---
+description: "Specifies capture mechanics, control progress tracking, and victory conditions"
+globs: ["src/**/*.tsx", "src/**/*.ts"]
+alwaysApply: true
+---
+# Battle Node Capture System
+
+## Capture System
+// Implementation of:
+// - @battle-core-mechanics.mdc#Combat-Logic#Universal-Capture-Mechanics
+// - @battle-targeting-system.mdc#Combat-Range#Range-Calculation
+// - @battle-core-mechanics.mdc#Combat-Logic#Damage-Calculation
+
+// Referenced by:
+// - @battle-movement-system.mdc#Attack-Range-Behavior#Range-Requirements
+// - @battle-visual-feedback.mdc#Combat-Effects#Node-Control-Indicators
+// - @battle-targeting-system.mdc#Combat-Sequence#Damage-Application
+
+### Capture Requirements
+- Total capture threshold = total battalion health for all armies * 0.75
+- Battalion must be within attack range to deal damage
+- Damage dealt contributes to side's control progress
+- Target must be neutral node (3, 4, 5)
+
+### Control Progress
+// Implementation of:
+// - @battle-performance-standards.mdc#State-Updates#Damage-Tracking
+// - @battle-core-mechanics.mdc#Combat-Logic#Control-Progress
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Combat-Sequence#State-Updates
+// - @battle-visual-feedback.mdc#Node-Status#Control-Progress
+
+Capture Mechanics:
+- Each side accumulates control through damage dealt
+- To capture a node with existing enemy control:
+  1. Must deal enough damage to reach total capture threshold
+  2. Must also overcome enemy's accumulated control damage
+- Example:
+  - Capture threshold: 1000 damage (based on total army health)
+  - User deals 400 damage
+  - Enemy must now deal 1400 damage to capture (1000 + 400)
+  - Or user can complete capture with 600 more damage
+
+### State Updates
+// Implementation of:
+// - @battle-performance-standards.mdc#State-Updates#Combat-State
+// - @battle-core-mechanics.mdc#Combat-Logic#Damage-Application
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Combat-Sequence#Node-Control
+// - @battle-visual-feedback.mdc#Combat-Effects#Control-Feedback
+
+- Track damage dealt by each side
+- Update control progress with each hit
+- Trigger capture when threshold reached
+- Synchronize with combat system timer
+
+## Victory Conditions
+// Implementation of:
+// - @battle-core-mechanics.mdc#Victory-Conditions#Victory-Determination
+// - @battle-performance-standards.mdc#Victory-Calculation#Scoring-Rules
+
+// Referenced by:
+// - @battle-targeting-system.mdc#Combat-Sequence#Battle-End
+// - @battle-visual-feedback.mdc#Results-Display#Victory-Screen
+
+### Control Points
+- Node ownership determines points
+- Simple majority for victory
+- Strategic node positioning value
+- Continuous point calculation
+
+### Battle Resolution
+// Implementation of:
+// - @battle-core-mechanics.mdc#Results-Phase#Victory-Screen
+// - @battle-performance-standards.mdc#State-Management#Battle-Completion
+
+// Referenced by:
+// - @battle-visual-feedback.mdc#Results-Display#Winner-Declaration
+// - @battle-targeting-system.mdc#Combat-Sequence#Battle-End
+
+- Final node ownership check
+- Victory point tallying
+- Winner determination
+- Battle state cleanup
+
+Remember: Node capture mechanics and victory conditions are critical for battle progression and outcome determination. 
