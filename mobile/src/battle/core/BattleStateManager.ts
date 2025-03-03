@@ -39,23 +39,39 @@ export interface BattleStateUpdate {
   battalionUpdates?: Map<string, Partial<Battalion>>;
 }
 
+interface Position {
+  x: number;
+  y: number;
+}
+
+interface StateUpdate {
+  type: 'health' | 'position' | 'target';
+  value: any;
+  timestamp: number;
+}
+
 export class BattleStateManager {
   private static instance: BattleStateManager | null = null;
-  private state: BattleState;
-  private subscribers: Array<(state: BattleState) => void> = [];
-  private updateTimer: NodeJS.Timeout | null = null;
-  private battleId: string | null = null;
   private battleService: BattleService;
+  private currentState: BattleState;
+  private subscribers: ((state: BattleState) => void)[] = [];
+  private stateQueue: any[] = [];
+  private battleId: string | null = null;
   private queuedUpdates: BattleStateUpdate[] = [];
   private isProcessingUpdates: boolean = false;
-  private pendingUpdates: BattleStateUpdate[] = [];
+  private pendingUpdates: StateUpdate[] = [];
+  private updateBuffer: StateUpdate[];
+  private readonly BUFFER_FLUSH_INTERVAL = 1000; // 1 second
+  private readonly MAX_BUFFER_SIZE = 100;
+  private bufferTimer: NodeJS.Timeout | null;
+  private updateTimer: NodeJS.Timeout | null = null;
 
   constructor(battleService: BattleService) {
     if (!battleService) {
       throw new Error('BattleService is required for BattleStateManager');
     }
     this.battleService = battleService;
-    this.state = {
+    this.currentState = {
       phase: BattlePhase.PRE_BATTLE,
       timeRemaining: 20,
       nodes: new Map(),
@@ -63,6 +79,9 @@ export class BattleStateManager {
       updateId: 0,
       lastUpdated: new Date()
     };
+    this.updateBuffer = [];
+    this.bufferTimer = null;
+    this.startBufferTimer();
   }
 
   public static getInstance(battleService: BattleService): BattleStateManager {
@@ -79,7 +98,7 @@ export class BattleStateManager {
     this.battleId = battleId;
     
     // Use provided initial state or create default state
-    this.state = initialState || {
+    this.currentState = initialState || {
       phase: BattlePhase.PRE_BATTLE,
       timeRemaining: 20,
       nodes: new Map(),
@@ -91,22 +110,18 @@ export class BattleStateManager {
     this.notifySubscribers();
     this.battleService.startSync(
       battleId,
-      this.handleServerUpdate.bind(this),
-      this.handleSyncError.bind(this)
+      this.handleStateUpdate.bind(this),
+      (error) => console.error('Battle sync error:', error)
     );
   }
 
   public getState(): BattleState {
-    return {
-      ...this.state,
-      nodes: new Map(this.state.nodes),
-      battalions: new Map(this.state.battalions)
-    };
+    return this.currentState;
   }
 
   public async queueStateUpdate(update: BattleStateUpdate): Promise<void> {
     // Add update to queue
-    this.pendingUpdates.push(update);
+    this.queuedUpdates.push(update);
 
     // If we're not already processing updates, start processing
     if (!this.isProcessingUpdates) {
@@ -122,8 +137,8 @@ export class BattleStateManager {
     this.isProcessingUpdates = true;
 
     try {
-      while (this.pendingUpdates.length > 0) {
-        const update = this.pendingUpdates.shift();
+      while (this.queuedUpdates.length > 0) {
+        const update = this.queuedUpdates.shift();
         if (update) {
           await this.updateState(update);
         }
@@ -131,26 +146,31 @@ export class BattleStateManager {
     } catch (error) {
       console.error('Error processing updates:', error);
       // Clear pending updates on error to prevent deadlock
-      this.pendingUpdates = [];
+      this.queuedUpdates = [];
     } finally {
       this.isProcessingUpdates = false;
     }
   }
 
   public async updateState(update: BattleStateUpdate): Promise<void> {
-    const newState = { ...this.state };
+    const newState = { ...this.currentState };
 
     if (update.phaseUpdate !== undefined) {
-      const isValidTransition = this.validatePhaseTransition(this.state.phase, update.phaseUpdate);
+      const isValidTransition = this.validatePhaseTransition(this.currentState.phase, update.phaseUpdate);
       if (!isValidTransition) {
-        console.warn(`Invalid phase transition from ${this.state.phase} to ${update.phaseUpdate}`);
+        console.warn(`Invalid phase transition from ${this.currentState.phase} to ${update.phaseUpdate}`);
         return;
       }
       newState.phase = update.phaseUpdate;
       
       // Handle phase-specific logic
-      if (update.phaseUpdate === BattlePhase.DEPLOYMENT) {
+      if (update.phaseUpdate === BattlePhase.COMBAT) {
+        this.stopUpdateTimer(); // Clear any existing timer
+        newState.timeRemaining = update.timeUpdate !== undefined ? update.timeUpdate : 20;
+        this.currentState = newState; // Update state before starting timer
         this.startUpdateTimer();
+        this.notifySubscribers();
+        return; // Return early since we've already notified subscribers
       } else if (update.phaseUpdate === BattlePhase.RESULTS) {
         this.stopUpdateTimer();
       }
@@ -167,7 +187,7 @@ export class BattleStateManager {
     }
 
     if (update.nodeUpdates) {
-      const newNodes = new Map(this.state.nodes);
+      const newNodes = new Map(this.currentState.nodes);
       update.nodeUpdates.forEach((nodeUpdate, nodeId) => {
         const existingNode = newNodes.get(nodeId);
         if (!existingNode && !nodeUpdate.position) {
@@ -192,7 +212,7 @@ export class BattleStateManager {
     }
 
     if (update.battalionUpdates) {
-      const newBattalions = new Map(this.state.battalions);
+      const newBattalions = new Map(this.currentState.battalions);
       update.battalionUpdates.forEach((battalionUpdate, battalionId) => {
         if (!this.validateBattalionUpdate(battalionId, battalionUpdate)) {
           return;
@@ -218,7 +238,7 @@ export class BattleStateManager {
 
     newState.updateId++;
     newState.lastUpdated = new Date();
-    this.state = newState;
+    this.currentState = newState;
 
     if (this.battleId) {
       try {
@@ -231,7 +251,7 @@ export class BattleStateManager {
     this.notifySubscribers();
   }
 
-  private validatePhaseTransition(currentPhase: BattlePhase, newPhase: BattlePhase): boolean {
+  private validatePhaseTransition(currentPhase: BattlePhase, nextPhase: BattlePhase): boolean {
     const validTransitions = {
       [BattlePhase.PRE_BATTLE]: [BattlePhase.DEPLOYMENT],
       [BattlePhase.DEPLOYMENT]: [BattlePhase.COMBAT],
@@ -239,11 +259,11 @@ export class BattleStateManager {
       [BattlePhase.RESULTS]: [BattlePhase.PRE_BATTLE]
     };
 
-    return validTransitions[currentPhase]?.includes(newPhase) || false;
+    return validTransitions[currentPhase]?.includes(nextPhase) || false;
   }
 
   private validateBattalionUpdate(battalionId: string, battalionUpdate: Partial<Battalion>): boolean {
-    const existingBattalion = this.state.battalions.get(battalionId);
+    const existingBattalion = this.currentState.battalions.get(battalionId);
     
     // For existing battalions, allow any updates
     if (existingBattalion) {
@@ -266,26 +286,36 @@ export class BattleStateManager {
     return true;
   }
 
-  public subscribe(callback: (state: BattleState) => void): () => void {
+  public subscribe(callback: (state: BattleState) => void): void {
     this.subscribers.push(callback);
-    return () => {
-      this.subscribers = this.subscribers.filter(cb => cb !== callback);
-    };
+    // Immediately notify the new subscriber of the current state
+    callback(this.getState());
   }
 
-  private notifySubscribers(): void {
-    const state = this.getState();
-    this.subscribers.forEach(callback => callback(state));
+  public subscribeToUpdates(callback: (state: BattleState) => void): void {
+    this.subscribers.push(callback);
+  }
+
+  public queueStateChanges(changes: any[]): void {
+    this.stateQueue.push(...changes);
+  }
+
+  public getStateBuffer(): any[] {
+    return [...this.stateQueue];
   }
 
   public startUpdateTimer(): void {
-    if (this.updateTimer) return;
-    this.updateTimer = setInterval(() => {
-      if (this.state.phase === BattlePhase.COMBAT) {
-        const newTimeRemaining = Math.max(0, this.state.timeRemaining - 1);
-        this.queueStateUpdate({ timeUpdate: newTimeRemaining });
-      }
-    }, 1000);
+    if (this.updateTimer === null && this.currentState.phase === BattlePhase.COMBAT) {
+      this.updateTimer = setInterval(() => {
+        if (this.currentState.timeRemaining > 0) {
+          this.updateState({
+            timeUpdate: this.currentState.timeRemaining - 1
+          }).catch(error => {
+            console.error('Failed to update timer:', error);
+          });
+        }
+      }, 1000);
+    }
   }
 
   public stopUpdateTimer(): void {
@@ -293,6 +323,37 @@ export class BattleStateManager {
       clearInterval(this.updateTimer);
       this.updateTimer = null;
     }
+  }
+
+  private startBufferTimer(): void {
+    if (this.bufferTimer === null) {
+      this.bufferTimer = setInterval(() => this.flushBuffer(), this.BUFFER_FLUSH_INTERVAL);
+    }
+  }
+
+  private flushBuffer(): void {
+    if (this.updateBuffer.length > 0) {
+      // Process buffered updates
+      const updates = [...this.updateBuffer];
+      this.updateBuffer = [];
+      
+      // Apply updates
+      updates.forEach(update => {
+        this.pendingUpdates.push(update);
+      });
+      
+      this.notifySubscribers();
+    }
+  }
+
+  public notifySubscribers(): void {
+    this.subscribers.forEach(callback => {
+      try {
+        callback(this.currentState);
+      } catch (error) {
+        console.error('Error in subscriber callback:', error);
+      }
+    });
   }
 
   public cleanup(): void {
@@ -304,40 +365,48 @@ export class BattleStateManager {
       this.battleService.stopSync(this.battleId);
       this.battleId = null;
     }
-  }
-
-  private async handleServerUpdate(serverState: BattleState): Promise<void> {
-    await this.updateState({
-      phaseUpdate: serverState.phase,
-      timeUpdate: serverState.timeRemaining,
-      nodeUpdates: serverState.nodes,
-      battalionUpdates: serverState.battalions
-    });
-  }
-
-  private handleSyncError(error: Error): void {
-    console.error('Battle sync error:', error);
-    const performanceMonitor = BattlePerformanceMonitor.getInstance();
-    performanceMonitor.recordNetworkError(error);
-    
-    // During network errors, we preserve the existing state to maintain consistency
-    // If no state exists, we initialize with PRE_BATTLE phase
-    if (!this.state) {
-      this.state = {
-        phase: BattlePhase.PRE_BATTLE,
-        timeRemaining: 0,
-        updateId: 0,
-        lastUpdated: new Date(),
-        nodes: new Map(),
-        battalions: new Map()
-      };
-    }
-
-    // Clear any pending updates to ensure we can accept new ones
     this.pendingUpdates = [];
-    this.isProcessingUpdates = false;
+    this.updateBuffer = [];
+    if (this.bufferTimer) {
+      clearInterval(this.bufferTimer);
+      this.bufferTimer = null;
+    }
+  }
 
-    // Notify subscribers of the error state
+  private handleStateUpdate(state: BattleState): void {
+    this.currentState = state;
     this.notifySubscribers();
   }
-} 
+
+  public processStateQueue(): void {
+    if (this.stateQueue.length === 0) return;
+
+    const changes = [...this.stateQueue];
+    this.stateQueue = [];
+
+    // Process all queued changes
+    const newState = { ...this.currentState };
+    for (const change of changes) {
+      switch (change.type) {
+        case 'MOVE':
+          // Update battalion position
+          if (newState.battalions.has(change.data.id)) {
+            const battalion = newState.battalions.get(change.data.id)!;
+            battalion.position = change.data.position;
+          }
+          break;
+        case 'ATTACK':
+          // Update battalion combat state
+          if (newState.battalions.has(change.data.id)) {
+            const battalion = newState.battalions.get(change.data.id)!;
+            battalion.targetId = change.data.target;
+          }
+          break;
+        // Add more cases as needed
+      }
+    }
+
+    // Update state and notify subscribers
+    this.handleStateUpdate(newState);
+  }
+}

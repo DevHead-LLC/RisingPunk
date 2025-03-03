@@ -4,6 +4,54 @@ globs:
 alwaysApply: false
 ---
 
+# 🚨 CRITICAL: AI GUIDANCE AND TEST ISOLATION 🚨
+// IMPORTANT: This section defines how to guide AI through test development while maintaining test isolation
+
+## AI Guidance Comments
+// These comments help guide AI through test development and implementation
+// Format: // AI: <purpose> - <context> - <next steps>
+// Example: // AI: Test Setup - Validating battalion movement - Next: Implement movement constraints
+
+1. Test Development Comments
+   - Purpose: Guide AI through test creation
+   - Context: Current test focus and requirements
+   - Next Steps: Clear indication of next implementation
+   - Example: // AI: Test Creation - Battle state transitions - Next: Add phase validation
+
+2. Implementation Comments
+   - Purpose: Guide AI through code changes
+   - Context: Current implementation focus
+   - Next Steps: Required changes and validations
+   - Example: // AI: Implementation - Adding phase validation - Next: Test edge cases
+
+3. Test Isolation Comments
+   - Purpose: Prevent test interference
+   - Context: Dependencies and isolation requirements
+   - Next Steps: Cleanup and state reset
+   - Example: // AI: Isolation - Preventing state bleed - Next: Reset mocks
+
+## Test Isolation Requirements
+// CRITICAL: Never modify code outside the specific test/implementation focus
+// All changes must be isolated to the current test target
+
+1. Code Modification Boundaries
+   - Only modify code directly related to current test
+   - Document any required cross-test dependencies
+   - Preserve existing test functionality
+   - Example: // AI: Boundaries - Modifying only BattleStateManager - Next: Update related tests
+
+2. State Management
+   - Reset all state between tests
+   - Clear all mocks and spies
+   - Document state dependencies
+   - Example: // AI: State Reset - Clearing battle state - Next: Initialize test data
+
+3. Cross-Test Dependencies
+   - Document any required shared state
+   - Minimize shared dependencies
+   - Clear documentation of requirements
+   - Example: // AI: Dependencies - Shared mock service - Next: Update mock implementation
+
 // CRITICAL: All tests MUST be derived from battle-*.mdc rules in .cursor/rules/battle/
 // These rules ARE the game mechanics - they define how the game actually works
 // Each test MUST validate a specific rule's requirements
