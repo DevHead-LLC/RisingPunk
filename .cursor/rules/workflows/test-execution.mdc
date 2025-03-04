@@ -13,7 +13,7 @@ You must follow these steps in order:
 2. Navigate to the mobile directory: RisingPunk/mobile/
 3. Execute the test command: `npm run test`
 4. If tests are successful (no failures), proceed to step 5
-5. If tests fail, immediately read and follow the testing standards directive at:
-   `.cursor/rules/testing/testing-standards.mdc`
-
-This directive ensures proper test execution and systematic resolution of any test failures. 
+   If tests fail, immediately read and follow the failed test loop directive at:
+   `.cursor/rules/testing/failed-test-loop.mdc`
+5. If tests are successful, read and follow the feature selection directive at:
+   `.cursor/rules/workflows/feature-selection.mdc`

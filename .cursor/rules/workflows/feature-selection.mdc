@@ -1,0 +1,56 @@
+---
+description: Critical directive for feature selection - ensures systematic selection of next development target
+globs: 
+alwaysApply: true
+---
+
+# AI DIRECTIVE: FEATURE SELECTION
+⚠️ CRITICAL SYSTEM DIRECTIVE ⚠️
+
+You must first verify and update this project structure to reflect the current state of the codebase. Only then may you proceed with feature selection.
+
+Current project structure:
+```
+RisingPunk/
+├── .cursor/
+│   └── rules/
+│       ├── ai-directives/
+│       │   ├── `initiation-command.mdc`
+│       │   └── `reset-context.mdc`
+│       ├── workflows/
+│       │   ├── `development-workflow.mdc`
+│       │   ├── `test-execution.mdc`
+│       │   └── `feature-selection.mdc`
+│       ├── testing/
+│       │   ├── `testing-standards.mdc`
+│       │   └── `failed-test-loop.mdc`
+│       └── gameplay/
+│           ├── features/
+│           └── design/
+└── mobile/
+    ├── src/
+    │   ├── components/
+    │   │   └── battle/
+    │   │       ├── BattleCombatAnimations.tsx
+    │   │       ├── BattleAnimationSystem.tsx
+    │   │       ├── NetworkLines.tsx
+    │   │       └── RangeIndicator.tsx
+    │   └── __tests__/
+    │       └── components/
+    │           └── battle/
+    │               ├── BattleCombatAnimations.test.tsx
+    │               ├── BattleAnimationSystem.test.tsx
+    │               ├── NetworkLines.test.tsx
+    │               └── RangeIndicator.test.tsx
+    └── package.json
+```
+
+You must:
+1. Verify and update this structure to reflect current state
+2. Analyze the current state of the game's features
+3. Identify the next logical feature to implement or improve
+4. Focus only on the selected feature
+5. Do not deviate from the selected feature until it is complete
+6. Document your selection and reasoning
+
+This directive ensures systematic progression through the game's feature set with accurate project structure awareness.
