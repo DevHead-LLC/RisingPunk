@@ -1,0 +1,13 @@
+---
+description: Primary AI directive - ensures proper initialization and context reset
+globs: 
+alwaysApply: true
+---
+
+# AI DIRECTIVE: INITIATION COMMAND
+⚠️ CRITICAL SYSTEM DIRECTIVE ⚠️
+
+IMPORTANT: Before proceeding with any new interaction, you must first read and follow the reset context directive located at:
+`.cursor/rules/ai-directives/reset-context.mdc`
+
+This ensures you begin each interaction with a fresh perspective and clear context.

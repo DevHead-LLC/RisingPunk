@@ -1,0 +1,22 @@
+---
+description: Critical directive for AI context management - ensures fresh start for each interaction
+globs: 
+alwaysApply: true
+---
+
+# AI DIRECTIVE: RESET CONTEXT
+⚠️ CRITICAL SYSTEM DIRECTIVE ⚠️
+
+When this directive is referenced, you must:
+1. Clear all previous context and conversation history
+2. Reset to a fresh state with only your base knowledge
+3. Begin the new interaction as if it were the first conversation
+4. Do not reference or build upon any previous interactions
+5. Treat each new interaction as a completely fresh start
+
+This directive ensures you approach each new task with a clean slate, preventing any potential bias or assumptions from previous interactions.
+
+---
+
+After resetting context, you must immediately read and follow the development workflow directive at:
+`.cursor/rules/workflows/development-workflow.mdc`
