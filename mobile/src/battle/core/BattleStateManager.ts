@@ -2,7 +2,7 @@
 // Core battle state management system with frontend focus
 
 import { BattlePhase, BattalionType, Battalion as BattleTypeBattalion, Node as BattleTypeNode } from './BattleTypes';
-import { BattleService } from './BattleService';
+import { BattleService, VictoryNotification } from './BattleService';
 import { BattlePerformanceMonitor } from './BattlePerformanceMonitor';
 
 export interface BattleState {
@@ -20,6 +20,7 @@ export interface Node {
   controllingTeam: string | null;
   controlProgress: number;
   health: number;
+  type?: string;
 }
 
 export interface Battalion {
@@ -82,6 +83,21 @@ export class BattleStateManager {
   private eliminationPoints: Map<string, number> = new Map();
   private controlPoints: Map<string, number> = new Map();
   private battalionPointValues: Map<BattalionType, number> = new Map();
+  // Network control bonuses tracking
+  private networkBonusPoints: Map<string, number> = new Map();
+  private dominationBonusPoints: Map<string, number> = new Map();
+  private readonly ADJACENT_NODES_BONUS = 1.2; // 20% bonus for adjacent nodes
+  private readonly STRATEGIC_NODE_MULTIPLIER = 1.5; // 50% bonus for strategic nodes
+  private readonly DOMINATION_THRESHOLD = 70; // 70% control threshold for domination bonus
+  private readonly DOMINATION_BONUS = 50; // 50 bonus points for domination
+
+  // Add these properties to the BattleStateManager class
+  private networkControlTimestamps: Map<string, Date> = new Map();
+  private readonly TOTAL_CONTROL_DURATION_MS = 10000; // 10 seconds required for victory
+
+  // Add this property to the class with the other properties
+  private readonly DEFAULT_POINT_THRESHOLD = 1000; // Default threshold for point victory
+  private pointThreshold: number = this.DEFAULT_POINT_THRESHOLD;
 
   constructor(battleService: BattleService) {
     if (!battleService) {
@@ -332,6 +348,10 @@ export class BattleStateManager {
     }
 
     this.notifySubscribers();
+
+    // Check for victory conditions
+    this.checkForTotalNetworkControlVictory();
+    this.checkForPointThresholdVictory();
   }
 
   private validatePhaseTransition(currentPhase: BattlePhase, nextPhase: BattlePhase): boolean {
@@ -1148,7 +1168,10 @@ export class BattleStateManager {
    * @returns The current point total for the team
    */
   public getTeamPoints(teamId: string): number {
-    return (this.teamPoints.get(teamId) || 0) + (this.eliminationPoints.get(teamId) || 0);
+    return (this.controlPoints.get(teamId) || 0) + 
+           (this.eliminationPoints.get(teamId) || 0) + 
+           (this.networkBonusPoints.get(teamId) || 0) + 
+           (this.dominationBonusPoints.get(teamId) || 0);
   }
   
   /**
@@ -1254,6 +1277,8 @@ export class BattleStateManager {
     this.teamPoints.set(teamId, 0);
     this.eliminationPoints.set(teamId, 0);
     this.controlPoints.set(teamId, 0);
+    this.networkBonusPoints.set(teamId, 0);
+    this.dominationBonusPoints.set(teamId, 0);
   }
 
   public processBattalionElimination(battalionId: string, eliminatingTeam: string): void {
@@ -1285,5 +1310,369 @@ export class BattleStateManager {
     
     // Scale by quantity (with diminishing returns using square root)
     return Math.round(baseValue * Math.sqrt(quantity) * 2);
+  }
+
+  /**
+   * Process network bonuses based on adjacent controlled nodes
+   */
+  public processNetworkBonuses(): void {
+    // Map to track nodes by team
+    const teamNodes: Map<string, BattleTypeNode[]> = new Map();
+    
+    // Group nodes by controlling team
+    for (const node of this.currentState.nodes.values()) {
+      if (node.controllingTeam) {
+        if (!teamNodes.has(node.controllingTeam)) {
+          teamNodes.set(node.controllingTeam, []);
+        }
+        
+        const teamNodeList = teamNodes.get(node.controllingTeam);
+        if (teamNodeList) {
+          teamNodeList.push(node);
+        }
+      }
+    }
+    
+    // Process each team's networks
+    for (const [team, nodes] of teamNodes.entries()) {
+      // Calculate connected networks
+      const networks = this.identifyNetworks(nodes);
+      
+      let totalNetworkBonus = 0;
+      
+      // Calculate bonus for each network
+      for (const network of networks) {
+        const networkSize = network.length;
+        
+        // Only apply bonus for networks with 2+ nodes
+        if (networkSize >= 2) {
+          // Get base score from control points
+          const baseControlPoints = this.getControlPoints(team);
+          
+          // Calculate multiplier based on network size (diminishing returns)
+          let networkMultiplier = 1 + (Math.log10(networkSize) * 0.1);
+          
+          // Check if network has strategic nodes
+          const hasStrategicNode = network.some(node => (node as any).type === 'strategic');
+          if (hasStrategicNode) {
+            networkMultiplier *= this.STRATEGIC_NODE_MULTIPLIER;
+          }
+          
+          // Calculate bonus points
+          const networkBonus = baseControlPoints * (networkMultiplier - 1);
+          totalNetworkBonus += networkBonus;
+        }
+      }
+      
+      // Store network bonus points
+      this.networkBonusPoints.set(team, totalNetworkBonus);
+    }
+  }
+  
+  /**
+   * Identify connected networks of nodes
+   * @param nodes List of nodes controlled by a team
+   * @returns Array of connected networks
+   */
+  private identifyNetworks(nodes: BattleTypeNode[]): BattleTypeNode[][] {
+    // Mark all nodes as unvisited
+    const visited = new Set<string>();
+    const networks: BattleTypeNode[][] = [];
+    
+    // Function to check if two nodes are adjacent
+    const areNodesAdjacent = (node1: BattleTypeNode, node2: BattleTypeNode): boolean => {
+      // Calculate distance between nodes
+      const dx = node1.position.x - node2.position.x;
+      const dy = node1.position.y - node2.position.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      // Nodes are adjacent if they are within a certain distance
+      // Using 150 as a reasonable threshold for adjacency
+      return distance <= 150;
+    };
+    
+    // DFS function to find connected nodes
+    const dfs = (node: BattleTypeNode, network: BattleTypeNode[]): void => {
+      visited.add(node.id);
+      network.push(node);
+      
+      // Find all adjacent nodes
+      for (const otherNode of nodes) {
+        if (!visited.has(otherNode.id) && areNodesAdjacent(node, otherNode)) {
+          dfs(otherNode, network);
+        }
+      }
+    };
+    
+    // Find all networks
+    for (const node of nodes) {
+      if (!visited.has(node.id)) {
+        const network: BattleTypeNode[] = [];
+        dfs(node, network);
+        networks.push(network);
+      }
+    }
+    
+    return networks;
+  }
+  
+  /**
+   * Calculate network bonus multiplier for a team
+   * @param teamId Team ID
+   * @returns Bonus multiplier
+   */
+  public getNetworkBonusMultiplier(teamId: string): number {
+    const teamNodes = Array.from(this.currentState.nodes.values()).filter(node => 
+      node.controllingTeam === teamId
+    );
+    
+    if (teamNodes.length <= 1) {
+      return 1.0; // No bonus for single nodes
+    }
+    
+    const networks = this.identifyNetworks(teamNodes);
+    
+    // Find largest network
+    let largestNetworkSize = 0;
+    let hasStrategicNode = false;
+    
+    for (const network of networks) {
+      if (network.length > largestNetworkSize) {
+        largestNetworkSize = network.length;
+        hasStrategicNode = network.some(node => (node as any).type === 'strategic');
+      }
+    }
+    
+    // Calculate multiplier based on network size (diminishing returns)
+    let networkMultiplier = 1 + (Math.log10(largestNetworkSize) * 0.1);
+    
+    // Apply strategic node bonus
+    if (hasStrategicNode) {
+      networkMultiplier *= this.STRATEGIC_NODE_MULTIPLIER;
+    }
+    
+    return networkMultiplier;
+  }
+  
+  /**
+   * Get network bonus points for a team
+   * @param teamId Team ID
+   * @returns Network bonus points
+   */
+  public getNetworkBonusPoints(teamId: string): number {
+    return this.networkBonusPoints.get(teamId) || 0;
+  }
+  
+  /**
+   * Calculate network domination percentage
+   * @param teamId Team ID
+   * @returns Percentage of nodes controlled by the team
+   */
+  public getNetworkDominationPercentage(teamId: string): number {
+    const totalNodes = this.currentState.nodes.size;
+    
+    if (totalNodes === 0) {
+      return 0;
+    }
+    
+    const teamNodeCount = Array.from(this.currentState.nodes.values()).filter(node => 
+      node.controllingTeam === teamId
+    ).length;
+    
+    return (teamNodeCount / totalNodes) * 100;
+  }
+  
+  /**
+   * Process domination bonuses
+   */
+  public processDominationBonuses(): void {
+    // Calculate domination percentages for all teams
+    const teams = new Set<string>();
+    
+    // Collect all teams
+    for (const node of this.currentState.nodes.values()) {
+      if (node.controllingTeam) {
+        teams.add(node.controllingTeam);
+      }
+    }
+    
+    // Check domination threshold for each team
+    for (const team of teams) {
+      const dominationPercentage = this.getNetworkDominationPercentage(team);
+      
+      // Award bonus if team exceeds threshold
+      if (dominationPercentage >= this.DOMINATION_THRESHOLD) {
+        this.dominationBonusPoints.set(team, this.DOMINATION_BONUS);
+      } else {
+        this.dominationBonusPoints.set(team, 0);
+      }
+    }
+  }
+  
+  /**
+   * Get domination bonus points for a team
+   * @param teamId Team ID
+   * @returns Domination bonus points
+   */
+  public getDominationBonusPoints(teamId: string): number {
+    return this.dominationBonusPoints.get(teamId) || 0;
+  }
+
+  /**
+   * Get all nodes in the current battle state
+   * @returns Map of node id to node
+   */
+  public getNodes(): Map<string, BattleTypeNode> {
+    return this.currentState.nodes;
+  }
+
+  /**
+   * Check if a team has total control of the network
+   * @returns Object containing controlling team and control percentage
+   */
+  public checkNetworkControl(): { controllingTeam: string | null, controlPercentage: number } {
+    const nodes = this.getNodes();
+    if (nodes.size === 0) {
+      return { controllingTeam: null, controlPercentage: 0 };
+    }
+    
+    // Count nodes controlled by each team
+    const controlCounts: Map<string | null, number> = new Map();
+    
+    nodes.forEach(node => {
+      const team = node.controllingTeam;
+      const currentCount = controlCounts.get(team) || 0;
+      controlCounts.set(team, currentCount + 1);
+    });
+    
+    // Find team with highest control count
+    let maxTeam: string | null = null;
+    let maxCount = 0;
+    
+    controlCounts.forEach((count, team) => {
+      if (team !== null && count > maxCount) {
+        maxCount = count;
+        maxTeam = team;
+      }
+    });
+    
+    // Calculate control percentage
+    const controlPercentage = maxTeam ? (maxCount / nodes.size) * 100 : 0;
+    
+    return {
+      controllingTeam: maxTeam,
+      controlPercentage
+    };
+  }
+
+  /**
+   * Check for total network control victory condition
+   * Victory is declared when one team controls 100% of nodes for the minimum duration
+   */
+  public checkForTotalNetworkControlVictory(): void {
+    const { controllingTeam, controlPercentage } = this.checkNetworkControl();
+    
+    // If no team has control or not 100% control, reset timestamps
+    if (!controllingTeam || controlPercentage < 100) {
+      this.networkControlTimestamps.clear();
+      return;
+    }
+    
+    // If this team just gained 100% control, record the timestamp
+    if (!this.networkControlTimestamps.has(controllingTeam)) {
+      this.networkControlTimestamps.set(controllingTeam, new Date());
+      return;
+    }
+    
+    // Check if the team has maintained control for the required duration
+    const controlStartTime = this.networkControlTimestamps.get(controllingTeam)!;
+    const currentTime = new Date();
+    const controlDuration = currentTime.getTime() - controlStartTime.getTime();
+    
+    if (controlDuration >= this.TOTAL_CONTROL_DURATION_MS) {
+      // Victory condition met!
+      const gameStats = {
+        controlledNodes: this.getNodes().size,
+        totalNodes: this.getNodes().size,
+        controlDuration: controlDuration,
+        controlPercentage: controlPercentage
+      };
+      
+      this.battleService.notifyVictory({
+        winningTeam: controllingTeam,
+        victoryType: 'TOTAL_NETWORK_CONTROL',
+        gameStats
+      });
+    }
+  }
+
+  /**
+   * Set the network control timestamp for a team (for testing purposes)
+   * @param team The team to set the timestamp for
+   * @param timestamp The timestamp to set
+   */
+  public setNetworkControlTimestamp(team: string, timestamp: Date): void {
+    this.networkControlTimestamps.set(team, timestamp);
+  }
+
+  /**
+   * Set the point threshold for victory
+   * @param threshold The threshold value
+   */
+  public setPointThreshold(threshold: number): void {
+    if (threshold <= 0) {
+      console.warn('Point threshold must be positive, using default value');
+      this.pointThreshold = this.DEFAULT_POINT_THRESHOLD;
+      return;
+    }
+    this.pointThreshold = threshold;
+  }
+
+  /**
+   * Add points to a team's score
+   * @param teamId The team to add points to
+   * @param points The number of points to add
+   */
+  public addPoints(teamId: string, points: number): void {
+    // Get current points or default to 0 if not set
+    const currentPoints = this.teamPoints.get(teamId) || 0;
+    this.teamPoints.set(teamId, currentPoints + points);
+    
+    // Don't automatically check for victory condition here
+    // Let the tests explicitly call checkForPointThresholdVictory
+  }
+
+  /**
+   * Check for point threshold victory condition
+   * Victory is declared when one team's points exceed the threshold
+   */
+  public checkForPointThresholdVictory(): void {
+    let winningTeam: string | null = null;
+    let highestPoints = 0;
+    
+    // Check each team's points
+    this.teamPoints.forEach((points, teamId) => {
+      if (points >= this.pointThreshold && points > highestPoints) {
+        winningTeam = teamId;
+        highestPoints = points;
+      }
+    });
+    
+    // If no team has reached the threshold, no victory
+    if (!winningTeam) {
+      return;
+    }
+    
+    // Victory condition met!
+    const gameStats = {
+      points: highestPoints,
+      threshold: this.pointThreshold
+    };
+    
+    this.battleService.notifyVictory({
+      winningTeam,
+      victoryType: 'POINT_THRESHOLD',
+      gameStats
+    });
   }
 }

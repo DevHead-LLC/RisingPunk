@@ -1,5 +1,11 @@
 import { BattleState } from './BattleTypes';
 
+export interface VictoryNotification {
+  winningTeam: string;
+  victoryType: 'TOTAL_NETWORK_CONTROL' | 'POINT_THRESHOLD' | 'ENEMY_FORCE_ELIMINATION';
+  gameStats: any;
+}
+
 export interface BattleService {
   startSync(
     battleId: string,
@@ -8,6 +14,7 @@ export interface BattleService {
   ): void;
   stopSync(battleId: string): void;
   syncState(battleId: string, state: BattleState): Promise<void>;
+  notifyVictory(victoryData: VictoryNotification): void;
 }
 
 export class MockBattleService implements BattleService {
@@ -41,6 +48,11 @@ export class MockBattleService implements BattleService {
         this.onUpdate(state);
       }
     }
+  }
+
+  public notifyVictory(victoryData: VictoryNotification): void {
+    // In a real implementation, this would notify the UI or server
+    console.log('Victory notification:', victoryData);
   }
 
   // Test helper methods
