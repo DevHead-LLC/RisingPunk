@@ -1,0 +1,51 @@
+---
+description: Defines the essential targeting mechanics for battalions during combat, focusing on proximity-based target selection
+globs: 
+alwaysApply: true
+---
+
+# AI DIRECTIVE: BATTLE TARGETING SYSTEM
+⚠️ CRITICAL IMPLEMENTATION DIRECTIVE ⚠️
+
+You must:
+1. Follow the feature selection process in `.cursor/rules/workflows/feature-implementation/feature-selection-directive.mdc`
+2. Track implementation status of each feature using the following labels:
+   - [done] - Feature is fully implemented and tested
+   - [in-progress] - Feature is currently being implemented
+   - [to-do] - Feature is pending implementation
+3. Update feature status in this file when directed by the selection process
+4. Maintain active context in `.cursor/rules/workflows/feature-implementation/active-working-feature-context.mdc`
+
+# Battle Targeting System
+
+## Core Targeting Principles [to-do]
+- Implement proximity-based targeting (closest valid target)
+- Apply universal targeting rules across all battalion types
+- Restrict movement and targeting to network lines
+- Ensure targets change only when proximity changes
+
+## Target Selection Rules [to-do]
+- Target nearest available entity (enemy battalion or node)
+- Calculate distance from battalion center to target center
+- Ensure targets are reachable via network lines
+- Implement checks for valid target candidates
+
+## Combat Range [to-do]
+- Define attack range values for each battalion type
+- Calculate attack range from battalion center to target
+- Determine when battalions are in range to attack
+- Stop movement when attack range reaches target
+
+## Retargeting Logic [to-do]
+- Implement retargeting when current target is destroyed
+- Handle retargeting when node is captured
+- Create logic for when better targets become available
+- Ensure seamless transition between targets
+
+## Combat Sequence [to-do]
+- Verify target is in range before initiating attack
+- Implement basic damage calculation logic
+- Update health status after attacks
+- Trigger appropriate visual feedback
+
+The MVP implementation should focus on creating a reliable proximity-based targeting system that works within network line restrictions. Advanced features like complex pathfinding and special targeting rules can be added in future iterations. 

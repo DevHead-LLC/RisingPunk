@@ -1,0 +1,84 @@
+---
+description: Specifies movement rules, network line restrictions, pathfinding requirements, and position calculations for battalion movement
+globs: 
+alwaysApply: true
+---
+
+# AI DIRECTIVE: BATTLE MOVEMENT SYSTEM
+⚠️ CRITICAL IMPLEMENTATION DIRECTIVE ⚠️
+
+You must:
+1. Follow the feature selection process in `.cursor/rules/workflows/feature-implementation/feature-selection-directive.mdc`
+2. Track implementation status of each feature using the following labels:
+   - [done] - Feature is fully implemented and tested
+   - [in-progress] - Feature is currently being implemented
+   - [to-do] - Feature is pending implementation
+3. Update feature status in this file when directed by the selection process
+4. Maintain active context in `.cursor/rules/workflows/feature-implementation/active-working-feature-context.mdc`
+
+# Battle Movement System
+
+## Battalion Movement Rules [to-do]
+- Define speed metrics for different battalion types
+- Implement consistent movement timing system
+- Calculate movement delays based on battalion type
+- Ensure smooth transitions between positions
+- Apply speed penalties based on terrain or status effects
+
+## Network Structure [to-do]
+- Connect network nodes with traversable lines
+- Define valid paths between strategic nodes
+- Establish node adjacency relationships
+- Create network graph for pathfinding calculations
+- Support dynamic network changes during battle
+
+## Movement Constraints [to-do]
+- Restrict movement to connected network lines only
+- Implement collision detection between battalions
+- Handle priority rules for opposing forces
+- Enforce team-specific movement restrictions
+- Apply realistic movement limitations
+
+## Pathfinding System [to-do]
+- Implement A* algorithm for optimal path calculation
+- Calculate shortest valid path between nodes
+- Handle dynamic path recalculation when blocked
+- Support partial path execution
+- Optimize for large numbers of concurrent battalions
+
+## Position Calculation [to-do]
+- Track real-time battalion positions
+- Interpolate positions between network nodes
+- Calculate exact coordinates along network lines
+- Implement precision positioning for attack range
+- Handle z-index layering for visual clarity
+
+## Movement Animation [to-do]
+- Create smooth transitions between positions
+- Implement animation timing based on movement speed
+- Synchronize visual position with logical position
+- Handle start/stop animations gracefully
+- Support direction-based animation variants
+
+## Collision Management [to-do]
+- Detect and resolve movement collisions
+- Implement priority system for conflicting movements
+- Create fallback positions when paths are blocked
+- Handle special collision cases (e.g., retreating forces)
+- Ensure deterministic collision resolution
+
+## State Management [to-do]
+- Track movement state of each battalion
+- Coordinate movement requests with battle phase
+- Manage concurrent movement operations
+- Handle interruptions to movement (attacks, status effects)
+- Persist partial movements between state updates
+
+Each feature must ensure battalions adhere strictly to network line restrictions while maintaining smooth gameplay experience.
+
+## Performance Considerations
+- Optimize pathfinding for multiple concurrent calculations
+- Batch movement updates for efficient processing
+- Implement spatial partitioning for collision detection
+- Minimize state updates during animation
+- Balance visual fidelity with performance 

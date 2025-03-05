@@ -1,0 +1,51 @@
+---
+description: Defines essential visual feedback requirements for battles including health displays, animations, and state indicators focusing on performance and clarity
+globs: 
+alwaysApply: true
+---
+
+# AI DIRECTIVE: BATTLE VISUAL FEEDBACK SYSTEM
+⚠️ CRITICAL IMPLEMENTATION DIRECTIVE ⚠️
+
+You must:
+1. Follow the feature selection process in `.cursor/rules/workflows/feature-implementation/feature-selection-directive.mdc`
+2. Track implementation status of each feature using the following labels:
+   - [done] - Feature is fully implemented and tested
+   - [in-progress] - Feature is currently being implemented
+   - [to-do] - Feature is pending implementation
+3. Update feature status in this file when directed by the selection process
+4. Maintain active context in `.cursor/rules/workflows/feature-implementation/active-working-feature-context.mdc`
+
+# Battle Visual Feedback System
+
+## Health Display Visualization [to-do]
+- Implement basic health bar with color indicators (green/yellow/red)
+- Create smooth health transitions for damage feedback
+- Display total battalion health (base_health * quantity)
+- Ensure health visuals update consistently after combat
+
+## Combat Animation Effects [to-do]
+- Create basic attack animations that show direction
+- Implement simple damage number popups on hit
+- Ensure animations sync with battalion speed stat
+- Add visual indicators for attack range
+
+## Battalion Status Indicators [to-do]
+- Display battalion type indicators (Breacher/Guardian/Phreak)
+- Show mark level indicators (Mk1-4)
+- Implement target indication with visual line to current target
+- Create basic range circle showing attack area
+
+## Node State Visualization [to-do]
+- Design neutral, contested, and captured node states
+- Implement visual progress indicators for node control
+- Create network line visualization showing valid movement paths
+- Ensure node state changes have clear visual transitions
+
+## Performance Requirements [to-do]
+- Maintain 60fps target for all animations
+- Implement proper cleanup of animation resources
+- Optimize render cycles to under 16ms per frame
+- Create fallback systems for performance bottlenecks
+
+The MVP implementation should focus on creating clear, functional visual feedback that maintains performance standards. Advanced effects and optimizations can be introduced in future iterations after the core system is proven. 
