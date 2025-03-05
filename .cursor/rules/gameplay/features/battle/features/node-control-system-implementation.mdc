@@ -17,7 +17,7 @@ You must:
 5. Update status in parent file when complete
 
 # Feature: Node Control System
-Status: [in-progress]
+Status: [test-passing]
 
 ## Parent Reference
 - Parent File: `.cursor/rules/gameplay/features/battle/core-mechanics.mdc`
@@ -52,56 +52,70 @@ Status: [in-progress]
   - [x] Test Passing
   - [x] Performance Verified
 
-### Capture Threshold Calculation [to-do]
+### Capture Threshold Calculation [test-passing]
 - Requirements:
   - Calculate total army health per team
   - Set capture threshold at 75% of total health
   - Update threshold when army size changes
 - Implementation Status:
-  - [ ] Test Created
-  - [ ] Test Failing
-  - [ ] Implementation Started
-  - [ ] Implementation Complete
-  - [ ] Test Passing
+  - [x] Test Created
+  - [x] Test Failing
+  - [x] Implementation Started
+  - [x] Implementation Complete
+  - [x] Test Passing
 
-### Control Status Updates [to-do]
+### Control Status Updates [test-passing]
 - Requirements:
   - Update node control status after each hit
   - Change controlling team when threshold reached
   - Visual representation of control progress
 - Implementation Status:
-  - [ ] Test Created
-  - [ ] Test Failing
-  - [ ] Implementation Started
-  - [ ] Implementation Complete
-  - [ ] Test Passing
+  - [x] Test Created
+  - [x] Test Failing
+  - [x] Implementation Started
+  - [x] Implementation Complete
+  - [x] Test Passing
 
 ## Test Writing Phase
 ### Current Focus
-- Sub-Feature: Capture Threshold Calculation
+- Sub-Feature: All sub-features implemented
 - Test File: mobile/__tests__/battle/core/NodeControlSystem.test.ts
 - Test Requirements: 
-  - Verify total army health calculation
-  - Confirm capture threshold set at 75% of total health
-  - Test threshold updates when army size changes
+  - All tests are now passing
+  - Feature is fully implemented
 
 ### Test Implementation Status
-- [ ] Test file created
-- [ ] Initial test failing
-- [ ] Test requirements documented
-- [ ] Test implementation complete
+- [x] Test file created
+- [x] Initial test failing
+- [x] Test requirements documented
+- [x] Test implementation complete
 
 ## Progress Tracking
 - Last Updated: 2023-03-05 
-- Current Phase: Performance Verification Complete for Node Damage Tracking
+- Current Phase: Implementation Complete for Node Control System
 - Next Steps: 
-  1. Begin test writing for Capture Threshold Calculation
-  2. Create tests for the next sub-feature
-  3. Run tests to confirm they fail as expected
+  1. Update parent file to reflect completion
+  2. Consider integration with UI components
+  3. Verify performance in larger battle scenarios
 
 ## Performance Notes
 - Node Damage Tracking implementation shows good performance:
   - Tests run in 0.2-0.6 seconds
   - No memory leaks detected
   - Efficient data structure (Map of Maps) for tracking damage
-  - Minimal overhead added to the update process 
+  - Minimal overhead added to the update process
+
+## Implementation Notes
+- Capture Threshold Calculation:
+  - Implemented getTotalArmyHealth method to calculate total health per team
+  - Created getCaptureThreshold method that calculates 75% of total health
+  - Added isNodeCaptured method that compares damage to threshold
+  - All methods are efficient with O(n) complexity where n is number of battalions
+
+- Control Status Updates:
+  - Implemented updateNodeControlStatus method to update node control after damage
+  - Added tracking of teams that have reached 100% capture threshold
+  - Implemented logic to determine controlling team based on damage progress
+  - Added getNodeControlProgress and getDominantTeam helper methods
+  - Control status updates happen in the same update cycle as damage tracking
+  - Most recent team to reach capture threshold takes control of the node 

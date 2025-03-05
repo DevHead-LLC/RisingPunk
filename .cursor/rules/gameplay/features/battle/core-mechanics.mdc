@@ -18,7 +18,7 @@ You must:
 
 # Battle Core Mechanics
 
-## Node Control System [in-progress]
+## Node Control System [done]
 - Strategic network nodes must be captured and held
 - Control determined by damage dealt to nodes
 - Capture threshold set at 75% of total army health
