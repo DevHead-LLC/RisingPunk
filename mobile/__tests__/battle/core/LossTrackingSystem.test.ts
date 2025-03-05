@@ -4,18 +4,26 @@ import { BattlePhase, BattalionType } from '../../../src/battle/core/BattleTypes
 
 // Mock BattleService
 jest.mock('../../../src/battle/core/BattleService', () => {
+  const MockBattleServiceImpl = jest.fn().mockImplementation(() => {
+    return {
+      startSync: jest.fn().mockImplementation((battleId, callback, errorCallback) => {
+        // Mock successful sync startup
+        return Promise.resolve();
+      }),
+      stopSync: jest.fn(),
+      syncState: jest.fn().mockResolvedValue({}),
+      notifyVictory: jest.fn()
+    };
+  });
+  
   return {
-    BattleService: jest.fn().mockImplementation(() => {
-      return {
-        updateBattleState: jest.fn().mockResolvedValue({}),
-        startSync: jest.fn().mockImplementation((battleId, callback, errorCallback) => {
-          // Mock successful sync startup
-          return Promise.resolve();
-        }),
-      };
-    }),
+    BattleService: jest.fn(),
+    MockBattleService: MockBattleServiceImpl
   };
 });
+
+// Get the mocked constructor
+const { MockBattleService } = jest.requireMock('../../../src/battle/core/BattleService');
 
 describe('Loss Tracking System', () => {
   let battleStateManager: BattleStateManager;
@@ -26,7 +34,7 @@ describe('Loss Tracking System', () => {
     jest.clearAllMocks();
     
     // Create fresh instance
-    mockBattleService = new BattleService() as jest.Mocked<BattleService>;
+    mockBattleService = new MockBattleService() as unknown as jest.Mocked<BattleService>;
     battleStateManager = BattleStateManager.getInstance(mockBattleService);
     
     // Reset any tracking data
