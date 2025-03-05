@@ -78,6 +78,10 @@ export class BattleStateManager {
   private teamPoints: Map<string, number> = new Map();
   private nodeControlHistory: Map<string, Array<{timestamp: Date, controllingTeam: string | null}>> = new Map();
   private nodePointValues: Map<string, number> = new Map();
+  // Battalion elimination points tracking
+  private eliminationPoints: Map<string, number> = new Map();
+  private controlPoints: Map<string, number> = new Map();
+  private battalionPointValues: Map<BattalionType, number> = new Map();
 
   constructor(battleService: BattleService) {
     if (!battleService) {
@@ -99,6 +103,11 @@ export class BattleStateManager {
     // Initialize scoring system with default node point values
     this.nodePointValues.set('standard', 1);
     this.nodePointValues.set('strategic', 3);
+    
+    // Initialize battalion point values
+    this.battalionPointValues.set(BattalionType.GUARDIAN, 3);
+    this.battalionPointValues.set(BattalionType.PHREAK, 2);
+    this.battalionPointValues.set(BattalionType.BREACHER, 4);
   }
 
   public static getInstance(battleService: BattleService): BattleStateManager {
@@ -123,6 +132,8 @@ export class BattleStateManager {
     // Reset scoring system
     this.teamPoints.clear();
     this.nodeControlHistory.clear();
+    this.eliminationPoints.clear();
+    this.controlPoints.clear();
     
     // Use provided initial state or create default state
     this.currentState = initialState || {
@@ -1137,7 +1148,7 @@ export class BattleStateManager {
    * @returns The current point total for the team
    */
   public getTeamPoints(teamId: string): number {
-    return this.teamPoints.get(teamId) || 0;
+    return (this.teamPoints.get(teamId) || 0) + (this.eliminationPoints.get(teamId) || 0);
   }
   
   /**
@@ -1145,23 +1156,27 @@ export class BattleStateManager {
    * @param secondsElapsed The number of seconds elapsed
    */
   public processControlPoints(secondsElapsed: number): void {
-    if (this.currentState.phase !== BattlePhase.BATTLE) {
+    if (this.currentState.phase !== BattlePhase.COMBAT) {
       return;
     }
     
-    // Calculate points for each controlled node
-    this.currentState.nodes.forEach(node => {
+    // Get all controlled nodes
+    for (const node of this.currentState.nodes.values()) {
       if (node.controllingTeam) {
-        // Get point value based on node type (default to standard if type not specified)
+        // Get point value based on node type
         const nodeType = (node as any).type || 'standard';
-        const pointsPerMinute = this.getNodePointValue(nodeType);
+        const pointsPerMinute = this.nodePointValues.get(nodeType) || 1;
         
-        // Convert to points per second and multiply by elapsed time
-        const pointsEarned = (pointsPerMinute / 60) * secondsElapsed;
+        // Calculate points for this time period
+        const pointsEarned = (pointsPerMinute * secondsElapsed) / 60;
         
-        // Add points to the controlling team
-        const currentPoints = this.teamPoints.get(node.controllingTeam) || 0;
-        this.teamPoints.set(node.controllingTeam, currentPoints + pointsEarned);
+        // Add points to controlling team
+        const team = node.controllingTeam;
+        const currentPoints = this.teamPoints.get(team) || 0;
+        const currentControlPoints = this.controlPoints.get(team) || 0;
+        
+        this.teamPoints.set(team, currentPoints + pointsEarned);
+        this.controlPoints.set(team, currentControlPoints + pointsEarned);
         
         // Record control history
         if (!this.nodeControlHistory.has(node.id)) {
@@ -1169,19 +1184,16 @@ export class BattleStateManager {
         }
         
         const history = this.nodeControlHistory.get(node.id);
-        if (history) {
-          const lastRecord = history.length > 0 ? history[history.length - 1] : null;
-          
-          // Only add a new record if the controlling team has changed
-          if (!lastRecord || lastRecord.controllingTeam !== node.controllingTeam) {
-            history.push({
-              timestamp: new Date(),
-              controllingTeam: node.controllingTeam
-            });
-          }
+        const lastEntry = history?.[history.length - 1];
+        
+        if (!lastEntry || lastEntry.controllingTeam !== node.controllingTeam) {
+          history?.push({
+            timestamp: new Date(),
+            controllingTeam: node.controllingTeam
+          });
         }
       }
-    });
+    }
   }
   
   /**
@@ -1192,12 +1204,13 @@ export class BattleStateManager {
   public getPointsPerMinute(teamId: string): number {
     let pointsPerMinute = 0;
     
-    this.currentState.nodes.forEach(node => {
+    // Sum up points from all controlled nodes
+    for (const node of this.currentState.nodes.values()) {
       if (node.controllingTeam === teamId) {
         const nodeType = (node as any).type || 'standard';
-        pointsPerMinute += this.getNodePointValue(nodeType);
+        pointsPerMinute += this.nodePointValues.get(nodeType) || 1;
       }
-    });
+    }
     
     return pointsPerMinute;
   }
@@ -1227,5 +1240,50 @@ export class BattleStateManager {
    */
   public getNodeControlHistory(nodeId: string): Array<{timestamp: Date, controllingTeam: string | null}> {
     return this.nodeControlHistory.get(nodeId) || [];
+  }
+
+  public getControlPoints(teamId: string): number {
+    return this.controlPoints.get(teamId) || 0;
+  }
+
+  public getEliminationPoints(teamId: string): number {
+    return this.eliminationPoints.get(teamId) || 0;
+  }
+
+  public resetTeamPoints(teamId: string): void {
+    this.teamPoints.set(teamId, 0);
+    this.eliminationPoints.set(teamId, 0);
+    this.controlPoints.set(teamId, 0);
+  }
+
+  public processBattalionElimination(battalionId: string, eliminatingTeam: string): void {
+    // Get the battalion that was eliminated
+    const battalion = this.currentState.battalions.get(battalionId);
+    
+    if (!battalion) {
+      console.warn(`Cannot process elimination for non-existent battalion: ${battalionId}`);
+      return;
+    }
+    
+    // Only award points if the eliminating team is different from the battalion's team
+    if (battalion.team !== eliminatingTeam) {
+      // Calculate points based on battalion type and quantity
+      const pointValue = this.getBattalionPointValue(battalion.type, battalion.quantity);
+      
+      // Award points to the eliminating team
+      const currentEliminationPoints = this.eliminationPoints.get(eliminatingTeam) || 0;
+      this.eliminationPoints.set(eliminatingTeam, currentEliminationPoints + pointValue);
+      
+      // Log the elimination
+      console.log(`${eliminatingTeam} eliminated ${battalion.team}'s ${battalion.type} battalion (${battalionId}) and earned ${pointValue} points`);
+    }
+  }
+  
+  public getBattalionPointValue(battalionType: BattalionType, quantity: number): number {
+    // Get base value for battalion type
+    const baseValue = this.battalionPointValues.get(battalionType) || 1;
+    
+    // Scale by quantity (with diminishing returns using square root)
+    return Math.round(baseValue * Math.sqrt(quantity) * 2);
   }
 }
