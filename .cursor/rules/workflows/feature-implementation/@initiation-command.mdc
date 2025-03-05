@@ -1,0 +1,126 @@
+---
+description: Command to initiate a new feature implementation process
+globs: 
+alwaysApply: true
+---
+
+# Feature Implementation Initiation Command
+
+## Overview
+This command initiates the feature implementation process, guiding you through selecting, planning, implementing, and testing a new feature according to our development workflow.
+
+## Process Flow
+The implementation follows a structured process:
+1. **Context Verification** - Verify or restore necessary context
+2. **Feature Selection** - Select the next feature to implement
+3. **Test Creation** - Create tests for the selected feature
+4. **Implementation** - Implement the feature
+5. **Verification** - Verify implementation meets requirements
+6. **Transition** - Complete feature and prepare for the next one
+
+## Context Management
+Context is critical throughout this process. Each step of the process includes:
+- Loading required context for that step
+- Performing operations within that context
+- Updating context when the step is complete
+- Verifying context consistency across files
+
+## Step 1: Context Verification
+
+### Load Context Checkpoints
+1. Load the pre-feature-selection checkpoint
+2. Check core-mechanics.mdc for feature status consistency
+3. Verify active-working-feature-context.mdc reflects the current state
+4. Check context-persistence.mdc for reference information
+
+### Restore Context (if needed)
+If context is incomplete or inconsistent:
+1. Check test status to determine actual state
+2. Update context files to reflect the actual state
+3. Document the context restoration process
+
+## Step 2: Feature Selection
+
+### Select Feature
+1. Load the feature-selection module
+2. Review core-mechanics.mdc for features marked as [planned] or [ready]
+3. Select the highest priority feature for implementation
+4. Load the selecting-feature workflow state
+
+### Update Feature Status
+1. Update the feature status to [in-progress] in core-mechanics.mdc
+2. Create or update the feature implementation file
+3. Identify sub-features and prioritize them
+4. Load the post-feature-selection checkpoint
+
+### Update Working Context
+1. Update active-working-feature-context.mdc with the selected feature
+2. Update context-persistence.mdc
+3. Document the selection in the progress history
+
+## Step 3: Test Creation
+
+### Select Sub-Feature
+1. Load the test-preparation module
+2. Identify the first/next sub-feature to implement
+3. Load the writing-tests workflow state
+
+### Create Tests
+1. Create or update the test file for the sub-feature
+2. Implement test cases based on requirements
+3. Run tests to confirm they fail for the expected reasons
+4. Update sub-feature status to [test-failing]
+
+### Update Context
+1. Update the implementation file with test status
+2. Update active-working-feature-context.mdc
+3. Update context-persistence.mdc
+4. Load the pre-implementation checkpoint
+
+## Step 4: Implementation
+
+### Plan Implementation
+1. Load the implementation-preparation module
+2. Analyze test requirements and failing tests
+3. Create implementation plan
+4. Load the implementing-feature workflow state
+
+### Implement Feature
+1. Implement the required functionality
+2. Run tests regularly to track progress
+3. Fix implementation issues until tests pass
+4. Update sub-feature status to [test-passing]
+
+### Update Context
+1. Update the implementation file with implementation status
+2. Update active-working-feature-context.mdc
+3. Update context-persistence.mdc
+4. Load the post-implementation checkpoint
+
+## Step 5: Iterate or Complete
+
+### If More Sub-Features Remain
+1. Return to Step 3 and select the next sub-feature
+2. Continue until all sub-features are implemented
+
+### If Feature is Complete
+1. Verify all sub-features are implemented and tests pass
+2. Update feature status to [done] in core-mechanics.mdc
+3. Load the transitioning-features workflow state
+4. Prepare for the next feature selection
+5. Return to Step 1 to begin the next feature
+
+## Troubleshooting
+If you encounter issues during the implementation process:
+1. Check context consistency across all files
+2. Verify test status to determine actual state
+3. Use context-persistence.mdc as a reference
+4. Restore context and document the process
+
+## Instructions for Use
+To properly use this command:
+1. Start with a clean context or verify existing context
+2. Follow each step in order
+3. Update context files after each significant step
+4. Verify context consistency regularly
+5. Document progress in active-working-feature-context.mdc 

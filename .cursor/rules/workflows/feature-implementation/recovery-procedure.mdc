@@ -1,0 +1,130 @@
+---
+description: Procedure for recovering context when it is lost or inconsistent
+globs: 
+alwaysApply: true
+---
+
+# Context Recovery Procedure
+
+## Purpose
+This procedure provides a systematic approach to recover context when it is lost or inconsistent during feature implementation. It ensures that work can continue with minimal disruption.
+
+## Signs of Context Loss
+The following symptoms may indicate context loss:
+1. Inconsistent feature status across files
+2. Missing information in active-working-feature-context.mdc
+3. Confusion about current implementation state
+4. Uncertainty about which tests are expected to pass/fail
+5. Conflicting information about current feature/sub-feature
+
+## Recovery Steps
+
+### 1. Assess Test Status
+```yaml
+process: assess_test_status
+input: 
+  - suspected_feature_name
+  - suspected_subfeature_name
+action: run_relevant_tests
+output:
+  - actual_test_status
+  - implementation_status
+```
+
+1. Identify the test file for the suspected feature/sub-feature
+2. Run the tests to determine actual passing/failing status
+3. Record which tests pass and which fail
+4. Determine the implementation status based on test results
+
+### 2. Scan Implementation Files
+```yaml
+process: scan_implementation_files
+input: none
+action: examine_implementation_files
+output:
+  - feature_inventory
+  - implementation_status
+  - subfeature_list
+```
+
+1. Scan `.cursor/rules/gameplay/features/battle/features/` directory
+2. Examine each implementation file
+3. Build a complete inventory of features and sub-features
+4. Determine implementation status based on file contents
+
+### 3. Check Core Mechanics
+```yaml
+process: check_core_mechanics
+input: none
+action: examine_core_mechanics
+output:
+  - feature_list
+  - feature_status
+  - feature_dependencies
+```
+
+1. Examine `.cursor/rules/gameplay/features/battle/core-mechanics.mdc`
+2. Extract the list of features and their current status
+3. Identify any dependencies between features
+4. Compare with implementation files for consistency
+
+### 4. Analyze Code Base
+```yaml
+process: analyze_code_base
+input:
+  - suspected_feature_name
+action: examine_relevant_code
+output:
+  - implemented_functionality
+  - missing_functionality
+```
+
+1. Examine the codebase, particularly `BattleStateManager.ts`
+2. Identify functionality that has been implemented
+3. Determine what functionality is missing based on requirements
+4. Compare with test results for consistency
+
+### 5. Rebuild Context
+```yaml
+process: rebuild_context
+input:
+  - actual_test_status
+  - feature_inventory
+  - feature_status
+  - implemented_functionality
+action: recreate_context_files
+output:
+  - updated_context_files
+```
+
+1. Determine the actual current feature and sub-feature
+2. Identify the actual implementation status
+3. Recreate or update active-working-feature-context.mdc
+4. Update context-persistence.mdc
+5. Ensure implementation files reflect actual status
+6. If necessary, update core-mechanics.mdc for consistency
+
+## Recovery Validation
+After rebuilding context, validate by:
+1. Running all tests to verify they behave as expected
+2. Checking that context files are consistent with test results
+3. Ensuring code base matches described implementation status
+4. Verifying that next steps are clear and actionable
+
+## Prevention Measures
+To prevent future context loss:
+1. Update context-persistence.mdc after every significant step
+2. Use the context synchronization module regularly
+3. Document context changes thoroughly
+4. Follow the checkpoint procedures at key points
+5. Maintain clear progress history in active-working-feature-context.mdc
+
+## Emergency Recovery
+If normal recovery fails:
+1. Focus on test results as the source of truth
+2. Rebuild minimum context needed to continue work
+3. Document the recovery process thoroughly
+4. Consider creating a new branch for clean context
+5. Gradually rebuild full context as work continues
+
+This procedure should be followed whenever context inconsistencies are detected to ensure that development can proceed efficiently. 

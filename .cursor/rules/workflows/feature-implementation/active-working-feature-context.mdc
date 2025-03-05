@@ -14,73 +14,89 @@ This file maintains the active context for feature implementation and testing. I
 4. When completing work
 5. When encountering issues
 
-# Current Session
-- Session Start: 2023-03-05 10:00
-- Last Updated: 2023-03-05 12:15
-- Status: completed
+# Active Working Feature Context
 
-# Active Feature
-- Name: Node Control System
-- Parent File: `.cursor/rules/gameplay/features/battle/core-mechanics.mdc`
+## Current Session
+- Started: 2023-03-06 10:00
+- Last Updated: 2023-03-06 12:15
+- Status: active
+
+## Active Feature
+- Name: Loss Tracking System
+- Parent File: .cursor/rules/gameplay/features/battle/core-mechanics.mdc
+- Implementation File: .cursor/rules/gameplay/features/battle/features/loss-tracking-system-implementation.mdc
+- Status: [in-progress]
+
+## Current Phase
+- Phase: Implementing
+- Last Action: Implemented Loss Rate Calculation and fixed all tests
+- Next Action: Begin test writing for Loss Comparison Analytics
+
+## Test Context
+- Test File: mobile/__tests__/battle/core/LossTrackingSystem.test.ts
+- Tests: 
+  - Battalion Loss Tracking:
+    - Status: Passing
+    - Tests:
+      - Should track total unit losses for each team
+      - Should maintain historical record of losses with timestamps
+      - Should reset tracking when battle is reinitialized
+      - Should update loss counters whenever battalion unit quantities decrease
+  - Loss Rate Calculation:
+    - Status: Passing
+    - Tests:
+      - Should calculate overall loss rate for a team
+      - Should calculate recent loss rate (last 60 seconds)
+      - Should handle edge case of no losses in time period
+      - Should handle edge case of very short time periods
+      - Should provide different rates for different teams
+
+## Implementation Context
+- Modified Files:
+  - .cursor/rules/gameplay/features/battle/features/loss-tracking-system-implementation.mdc
+  - .cursor/rules/gameplay/features/battle/core-mechanics.mdc
+  - .cursor/rules/workflows/feature-implementation/active-working-feature-context.mdc
+  - mobile/__tests__/battle/core/LossTrackingSystem.test.ts
+  - mobile/src/battle/core/BattleStateManager.ts
+- Last Changes:
+  - Implemented Loss Rate Calculation methods in BattleStateManager
+  - Added methods for calculating overall and recent loss rates
+  - Added special handling for short-term loss rates
+  - Fixed test issues and ensured all tests pass
+  - Updated implementation file to reflect passing tests
+
+## Progress History
+1. Selected Loss Tracking System as next feature to implement
+2. Updated core-mechanics.mdc to mark feature as [in-progress]
+3. Created loss-tracking-system-implementation.mdc file
+4. Updated active working feature context
+5. Created test file with failing tests for Battalion Loss Tracking
+6. Confirmed tests failing as expected
+7. Implemented Battalion Loss Tracking in BattleStateManager.ts
+8. Tests now passing for Battalion Loss Tracking
+9. Updated implementation status in loss-tracking-system-implementation.mdc
+10. Created tests for Loss Rate Calculation sub-feature
+11. Confirmed tests failing as expected
+12. Implemented Loss Rate Calculation methods in BattleStateManager.ts
+13. Fixed test issues and ensured all tests pass
+14. Updated implementation file to reflect passing tests
+15. Updated active working feature context
+
+# Notes
+Starting work on the Loss Tracking System after successfully completing the Node Control System feature. The first sub-feature to implement is Battalion Loss Tracking, which will track unit losses for battalions over time. This will form the foundation for the Victory Point Calculation sub-feature later.
+
+# Previous Feature Context
+## Node Control System
+- Status: [done]
 - Implementation File: `.cursor/rules/gameplay/features/battle/features/node-control-system-implementation.mdc`
-- Current Status: [done]
-- Dependencies: Node Damage Tracking (for Capture Threshold Calculation), Capture Threshold Calculation (for Control Status Updates)
-
-# Current Phase
-- Phase: feature-complete
 - Last Action: Implemented Control Status Updates and confirmed all tests pass
-- Next Action: Select next feature to implement
-
-# Test Context
-- Test File: mobile/__tests__/battle/core/NodeControlSystem.test.ts
-- Current Test Status: All tests passing
-- Last Test Run: 2023-03-05 12:15
-- Failing Tests: None
-- Test Coverage: All sub-features fully covered
-
-# Implementation Context
 - Modified Files: 
   - mobile/__tests__/battle/core/NodeControlSystem.test.ts
   - mobile/src/battle/core/BattleStateManager.ts
   - .cursor/rules/gameplay/features/battle/features/node-control-system-implementation.mdc
   - .cursor/rules/workflows/feature-implementation/active-working-feature-context.mdc
   - .cursor/rules/gameplay/features/battle/core-mechanics.mdc
-- Last Changes: 
-  - Implemented updateNodeControlStatus method
-  - Added tracking of teams that have reached 100% capture threshold
-  - Implemented logic to determine controlling team based on damage progress
-  - Added getNodeControlProgress and getDominantTeam helper methods
-- Current Focus: Feature complete, ready for next feature
-- Blockers: None
-
-# Performance Context
-- Last Check: 2023-03-05 12:15
-- Status: ok
-- Metrics: 
-  - Test execution time: 0.2-0.6 seconds
-  - Memory usage: Minimal increase
-  - CPU usage: Negligible impact
-
-# Progress History
-- 2023-03-05 10:00: Feature selection
-- 2023-03-05 10:15: Created feature implementation file
-- 2023-03-05 10:30: Created test file in centralized test directory
-- 2023-03-05 10:45: Ran tests and confirmed they fail as expected
-- 2023-03-05 11:00: Implemented Node Damage Tracking and confirmed tests pass
-- 2023-03-05 11:15: Verified performance of Node Damage Tracking implementation
-- 2023-03-05 11:30: Created failing tests for Capture Threshold Calculation
-- 2023-03-05 11:45: Implemented Capture Threshold Calculation and confirmed tests pass
-- 2023-03-05 12:00: Created failing tests for Control Status Updates
-- 2023-03-05 12:15: Implemented Control Status Updates and confirmed all tests pass
-
-# Notes
-The Node Control System feature is now fully implemented with all tests passing. The implementation includes:
-
-1. Node Damage Tracking: Efficiently tracks damage dealt to nodes by each team using a Map of Maps data structure.
-2. Capture Threshold Calculation: Calculates the threshold for node capture at 75% of a team's total army health.
-3. Control Status Updates: Updates node control status after each hit, with the controlling team determined by the highest damage percentage relative to their threshold.
-
-The implementation ensures that control status is updated in the same update cycle as damage tracking, and that the most recent team to reach the capture threshold takes control of the node. This creates a strategic dynamic where teams must maintain their damage output to hold nodes.
+- Implementation Notes: Successfully implemented tracking of node damage, capture threshold calculation, and control status updates. All tests passing.
 
 ---
 

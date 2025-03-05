@@ -1,0 +1,42 @@
+---
+description: Checkpoint to verify context after selecting a new feature
+globs: 
+alwaysApply: true
+---
+
+# Post-Feature Selection Checkpoint
+
+## Required Context
+After selecting a feature, verify the following context elements:
+
+1. Selected Feature Information
+   - Feature name is clearly identified
+   - Feature status in core-mechanics.mdc is updated to [in-progress]
+   - Feature implementation file exists or has been created
+   - Sub-features are identified and prioritized
+
+2. Context Updates
+   - active-working-feature-context.mdc is updated with the new feature
+   - Previous feature is properly recorded in the history section
+   - Current phase is accurately set to "Planning" or "Test Writing"
+
+## Verification Steps
+- [ ] Confirm the selected feature's status is now [in-progress] in core-mechanics.mdc
+- [ ] Verify the implementation file exists with the correct structure
+- [ ] Check that sub-features are identified with clear requirements
+- [ ] Ensure active-working-feature-context.mdc reflects the new feature
+- [ ] Validate that file paths and references are correct and accessible
+
+## Context Synchronization
+If any inconsistencies are detected:
+1. Update core-mechanics.mdc to reflect the current feature as [in-progress]
+2. Create or update the implementation file for the selected feature
+3. Ensure active-working-feature-context.mdc is fully synchronized
+4. Document the synchronization process and any changes made
+
+## Expected Output
+After completing this checkpoint, you should have:
+- Selected feature clearly marked as [in-progress] in all relevant files
+- Implementation file ready for development
+- Active working context fully updated with the new feature information
+- Clear understanding of the next steps in the implementation process 

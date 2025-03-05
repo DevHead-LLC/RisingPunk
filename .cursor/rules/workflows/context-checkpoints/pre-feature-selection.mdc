@@ -1,0 +1,39 @@
+---
+description: Checkpoint to verify context before selecting a new feature
+globs: 
+alwaysApply: true
+---
+
+# Pre-Feature Selection Checkpoint
+
+## Required Context
+Before proceeding with feature selection, verify the following context elements:
+
+1. Current state of core-mechanics.mdc
+   - All feature statuses must be accurate
+   - Previous feature should be marked as [done] if complete
+
+2. Current state of active-working-feature-context.mdc
+   - If a previous feature exists, it should be properly recorded
+   - Previous feature status should match core-mechanics.mdc
+
+## Verification Steps
+- [ ] Run a scan of core-mechanics.mdc to identify all features and their statuses
+- [ ] Compare with active-working-feature-context.mdc for consistency
+- [ ] Resolve any inconsistencies before proceeding
+- [ ] If transitioning from a previous feature, verify all its tests pass
+- [ ] Ensure the implementation files for the previous feature are complete
+
+## Context Restoration
+If context has been lost or is incomplete:
+1. Examine core-mechanics.mdc to identify the current feature set
+2. Review the most recent implementation files to determine their status
+3. Update active-working-feature-context.mdc to reflect the actual state
+4. Document any discrepancies found in the restoration process
+
+## Expected Output
+After completing this checkpoint, you should have:
+- Clear understanding of all feature statuses
+- Accurate representation of the previous feature's state
+- Consistent status indicators across all relevant files
+- A solid foundation for selecting the next feature to implement 

@@ -1,0 +1,193 @@
+---
+description: Tool for verifying context consistency across files
+globs: 
+alwaysApply: true
+---
+
+# Context Verification Tool
+
+## Purpose
+This tool provides a systematic approach to verify context consistency across all relevant files used in the feature implementation process.
+
+## Usage
+```yaml
+tool: context_verification
+input:
+  - verification_level: [quick|complete|recovery]
+output:
+  - consistency_report
+  - detected_issues
+  - suggested_fixes
+```
+
+## Verification Levels
+
+### Quick Verification
+Performs a basic check of critical context elements:
+- Active feature name and status
+- Current sub-feature name and status
+- Test status (passing/failing)
+- Current phase and next action
+
+### Complete Verification
+Performs an in-depth verification of all context elements:
+- Feature inventory and status
+- Sub-feature details and status
+- Implementation progress
+- Test details and status
+- Modified files
+- Progress history
+- Next steps
+
+### Recovery Verification
+Used when context loss is suspected:
+- Verifies actual code implementation
+- Runs tests to determine actual status
+- Analyzes implementation files
+- Checks test file structure
+- Rebuilds context from available evidence
+
+## Verification Process
+
+### 1. Load Context Files
+```yaml
+process: load_context_files
+action: read_all_context_files
+output:
+  - core_mechanics_data
+  - implementation_file_data
+  - active_context_data
+  - persistent_context_data
+```
+
+1. Load `.cursor/rules/gameplay/features/battle/core-mechanics.mdc`
+2. Load the implementation file for the active feature
+3. Load `.cursor/rules/workflows/feature-implementation/active-working-feature-context.mdc`
+4. Load `.cursor/rules/workflows/feature-implementation/context-persistence.mdc`
+
+### 2. Extract Key Elements
+```yaml
+process: extract_key_elements
+input:
+  - core_mechanics_data
+  - implementation_file_data
+  - active_context_data
+  - persistent_context_data
+action: extract_context_elements
+output:
+  - feature_elements
+  - subfeature_elements
+  - test_elements
+  - progress_elements
+```
+
+Extract and organize key context elements from each file:
+1. Feature name, status, and description
+2. Sub-feature name, status, and requirements
+3. Test status and details
+4. Implementation progress and history
+
+### 3. Compare Elements
+```yaml
+process: compare_elements
+input:
+  - feature_elements
+  - subfeature_elements
+  - test_elements
+  - progress_elements
+action: identify_inconsistencies
+output:
+  - inconsistencies
+  - severity_levels
+```
+
+Compare context elements across files to identify inconsistencies:
+1. Compare feature status across files
+2. Compare sub-feature status across files
+3. Compare test status with implementation status
+4. Verify progress history consistency
+
+### 4. Verify with Tests
+```yaml
+process: verify_with_tests
+input:
+  - test_elements
+action: run_tests
+output:
+  - actual_test_status
+  - implementation_accuracy
+```
+
+If recovery verification is requested:
+1. Run tests to determine actual status
+2. Compare actual test status with reported status
+3. Assess implementation accuracy
+
+### 5. Generate Report
+```yaml
+process: generate_report
+input:
+  - inconsistencies
+  - severity_levels
+  - actual_test_status
+  - implementation_accuracy
+action: create_report
+output:
+  - consistency_report
+```
+
+Generate a comprehensive report:
+1. List all detected inconsistencies
+2. Categorize by severity (critical, important, minor)
+3. Provide suggested fixes for each issue
+4. Recommend recovery actions if needed
+
+## Output Format
+The tool produces a structured report:
+
+```
+# Context Consistency Report
+Generated: [timestamp]
+Verification Level: [quick|complete|recovery]
+
+## Summary
+- Consistency Status: [consistent|minor issues|inconsistent|broken]
+- Critical Issues: [count]
+- Important Issues: [count]
+- Minor Issues: [count]
+
+## Detected Issues
+### Critical Issues
+1. [Issue description]
+   - Files Affected: [file paths]
+   - Suggested Fix: [fix description]
+
+### Important Issues
+1. [Issue description]
+   - Files Affected: [file paths]
+   - Suggested Fix: [fix description]
+
+### Minor Issues
+1. [Issue description]
+   - Files Affected: [file paths]
+   - Suggested Fix: [fix description]
+
+## Recovery Actions
+If context is severely inconsistent:
+1. [Action description]
+2. [Action description]
+3. [Action description]
+
+## Verification Details
+- Feature Status: [status]
+- Sub-feature Status: [status]
+- Test Status: [status]
+- Implementation Status: [status]
+```
+
+## Integration
+This tool should be integrated with the feature implementation workflow:
+1. Run quick verification before starting any work
+2. Run complete verification after significant changes
+3. Run recovery verification if context loss is suspected
+4. Use the output to maintain consistent context across files 

@@ -1,0 +1,74 @@
+---
+description: Module for selecting the next feature to implement
+globs: 
+alwaysApply: true
+---
+
+# Feature Selection Module
+
+## Purpose
+This module guides the process of selecting the next feature to implement based on the core-mechanics.mdc file and ensuring proper context management.
+
+## Pre-Selection Context Check
+Before selecting a feature:
+1. Load the pre-feature-selection checkpoint
+2. Verify all current feature statuses in core-mechanics.mdc
+3. Check active-working-feature-context.mdc for consistency
+4. Resolve any inconsistencies before proceeding
+
+## Selection Process
+1. Scan core-mechanics.mdc for features marked as [planned] or [ready]
+2. Prioritize features based on dependencies and importance
+3. Select the highest priority feature that is ready for implementation
+4. If selecting a feature with dependencies, verify those dependencies are [done]
+
+## Post-Selection Actions
+After selecting a feature:
+1. Update the feature's status to [in-progress] in core-mechanics.mdc
+2. Create or update the feature implementation file (.cursor/rules/gameplay/features/battle/features/{feature-name}-implementation.mdc)
+3. Update active-working-feature-context.mdc with the new feature
+4. Document the selection in the progress history
+5. Load the post-feature-selection checkpoint to verify context
+
+## Implementation File Template
+Create the implementation file with the following structure:
+```
+# {Feature Name} Implementation
+
+## Sub-Features
+
+### 1. {First Sub-Feature}
+
+**Status**: [not-started]
+
+**Implementation Status**:
+- [ ] Test Created
+- [ ] Implementation Started 
+- [ ] Implementation Complete
+- [ ] Test Passing
+
+**Test Requirements**:
+- List test requirements here
+
+## Current Focus
+
+**Test Writing**: {First Sub-Feature}
+
+- List test writing tasks
+
+## Progress Tracking
+
+**Current Phase**: Feature Selected
+
+**Next Steps**:
+1. Create tests for {First Sub-Feature}
+2. Implement {First Sub-Feature}
+3. Move on to {Second Sub-Feature}
+```
+
+## Context Update
+Ensure the following context updates are made:
+1. Set active feature in active-working-feature-context.mdc
+2. Record previous feature in history section
+3. Update current phase to "Planning" or "Test Writing"
+4. Set next action to "Create tests for {First Sub-Feature}" 
