@@ -1,0 +1,45 @@
+---
+description: Defines the minimal architecture needed for persisting battle state data, focusing on an MVP approach
+globs: 
+alwaysApply: true
+---
+
+# AI DIRECTIVE: BATTLE STATE PERSISTENCE SYSTEM
+⚠️ CRITICAL IMPLEMENTATION DIRECTIVE ⚠️
+
+You must:
+1. Follow the feature selection process in `.cursor/rules/workflows/feature-implementation/feature-selection-directive.mdc`
+2. Track implementation status of each feature using the following labels:
+   - [done] - Feature is fully implemented and tested
+   - [in-progress] - Feature is currently being implemented
+   - [to-do] - Feature is pending implementation
+3. Update feature status in this file when directed by the selection process
+4. Maintain active context in `.cursor/rules/workflows/feature-implementation/active-working-feature-context.mdc`
+
+# Battle State Persistence System
+
+## Core State Elements [to-do]
+- Identify essential battle state that requires persistence
+- Implement serializable state structure
+- Define minimal required state for battle recovery
+- Create simple versioning system for state format
+
+## Basic Persistence Strategy [to-do]
+- Save complete state at battle phase transitions
+- Implement manual save points for critical events
+- Create simple local backup before server transmission
+- Store only delta changes during active combat
+
+## Client-Server Communication [to-do]
+- Implement basic state synchronization protocol
+- Define server authority over critical state elements
+- Create simple conflict resolution for state divergence
+- Design reconnection flow for interrupted sessions
+
+## Error Recovery [to-do]
+- Implement basic error detection for failed saves
+- Create fallback to last known good state
+- Design simple retry mechanism for persistence failures
+- Log critical errors for debugging
+
+The MVP implementation should prioritize reliability over complexity. Start with core functionality that ensures battles can be saved and resumed, then iterate with more advanced features as needed. 

@@ -1,0 +1,98 @@
+---
+description: Defines node control mechanics, capture systems, strategic network effects, and victory point contributions
+globs: 
+alwaysApply: true
+---
+
+# AI DIRECTIVE: BATTLE NODE CONTROL SYSTEM
+⚠️ CRITICAL IMPLEMENTATION DIRECTIVE ⚠️
+
+You must:
+1. Follow the feature selection process in `.cursor/rules/workflows/feature-implementation/feature-selection-directive.mdc`
+2. Track implementation status of each feature using the following labels:
+   - [done] - Feature is fully implemented and tested
+   - [in-progress] - Feature is currently being implemented
+   - [to-do] - Feature is pending implementation
+3. Update feature status in this file when directed by the selection process
+4. Maintain active context in `.cursor/rules/workflows/feature-implementation/active-working-feature-context.mdc`
+
+# Battle Node Control System
+
+## Node States and Control [to-do]
+- Define possible node control states (neutral, contested, controlled)
+- Implement team-specific control indicators
+- Track historical control for scoring purposes
+- Handle state transitions between control states
+- Synchronize control state across the game system
+
+## Control States Visualization [to-do]
+- Create visual indicators for node control status
+- Implement progress bar for capture visualization
+- Design team-colored effects for controlled nodes
+- Animate state transitions for enhanced feedback
+- Provide clear visual hierarchy for contested nodes
+
+## Initial Setup [to-do]
+- Configure starting node control distribution
+- Balance initial network advantage for each team
+- Implement map-specific control patterns
+- Allow for scenario-based control configurations
+- Support randomized initialization for varied gameplay
+
+## Network Effects [to-do]
+- Implement strategic bonuses for connected nodes
+- Calculate control chain multipliers
+- Apply defensive bonuses to connected friendly nodes
+- Create supply line effects through controlled paths
+- Support special abilities unlocked by node control patterns
+
+## Network Connectivity [to-do]
+- Track logical connections between controlled nodes
+- Calculate strategic network strength
+- Implement algorithms to determine cut points and bridges
+- Provide strategic value assessment
+- Support dynamic network recalculation after control changes
+
+## Capture System [to-do]
+- Implement damage-based capture mechanics
+- Calculate team-specific capture thresholds
+- Track damage contribution toward capture
+- Handle multi-team capture scenarios
+- Implement capture resistance scaling
+
+## Control Progress [to-do]
+- Track capture progress as percentage
+- Implement visual feedback of control progress
+- Calculate incremental control updates
+- Handle contested progress situations
+- Support tug-of-war control mechanics
+
+## State Updates [to-do]
+- Process control changes in real-time
+- Implement efficient state synchronization
+- Batch control updates for performance
+- Trigger appropriate effects on control changes
+- Maintain state consistency across clients
+
+## Victory Conditions [to-do]
+- Calculate victory points from node control
+- Implement time-based scoring for held nodes
+- Create strategic victory triggers
+- Support multiple victory paths
+- Balance scoring for different control strategies
+
+## Battle Resolution [to-do]
+- Calculate final battle outcome based on node control
+- Implement tie-breaking mechanisms
+- Create end-of-battle control state summary
+- Apply strategic consequences of node control
+- Support campaign progression based on node control outcomes
+
+Node control is fundamental to battle strategy and victory conditions, forming the core of the strategic gameplay experience.
+
+## Performance Considerations
+- Optimize control state calculations for large networks
+- Implement efficient algorithms for network connectivity
+- Minimize state updates during rapid control changes
+- Batch visual updates for controlled nodes
+- Balance strategic complexity with computational efficiency 
