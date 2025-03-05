@@ -8,13 +8,14 @@ alwaysApply: true
 
 ## Current Context
 ```yaml
-timestamp: 2023-03-06T12:15:00Z
-current_feature: Loss Tracking System
+timestamp: 2023-03-06T13:15:00Z
+current_feature: Scoring System
 current_status: in-progress
-current_sub_feature: Loss Comparison Analytics
-sub_feature_status: not-started
-previous_feature: Node Control System
+current_sub_feature: Node Control Points
+sub_feature_status: test-passing
+previous_feature: Loss Tracking System
 previous_status: done
+implementation_file: .cursor/rules/gameplay/features/battle/features/scoring-system-implementation.mdc
 ```
 
 ## Feature Inventory
@@ -32,7 +33,7 @@ features:
         status: test-passing
         
   - name: Loss Tracking System
-    status: in-progress
+    status: done
     implementation_file: .cursor/rules/gameplay/features/battle/features/loss-tracking-system-implementation.mdc
     sub_features:
       - name: Battalion Loss Tracking
@@ -40,43 +41,48 @@ features:
       - name: Loss Rate Calculation
         status: test-passing
       - name: Loss Comparison Analytics
-        status: not-started
+        status: test-passing
+        
+  - name: Scoring System
+    status: in-progress
+    implementation_file: .cursor/rules/gameplay/features/battle/features/scoring-system-implementation.mdc
+    sub_features:
+      - name: Node Control Points
+        status: test-passing
+      - name: Battalion Elimination Points
+        status: to-do
+      - name: Network Control Bonuses
+        status: to-do
 ```
 
 ## Active Working Context
 ```yaml
-current_phase: Implementation Complete for Loss Rate Calculation
-last_action: Implemented Loss Rate Calculation and fixed all tests
-next_action: Begin test writing for Loss Comparison Analytics
-test_file: mobile/__tests__/battle/core/LossTrackingSystem.test.ts
+current_phase: Implementation
+last_action: Implemented Node Control Points and all tests pass
+next_action: Begin work on Battalion Elimination Points sub-feature
+test_file: mobile/__tests__/battle/core/ScoringSystem.test.ts
 modified_files:
-  - .cursor/rules/gameplay/features/battle/features/loss-tracking-system-implementation.mdc
+  - .cursor/rules/gameplay/features/battle/features/scoring-system-implementation.mdc
   - .cursor/rules/gameplay/features/battle/core-mechanics.mdc
   - .cursor/rules/workflows/feature-implementation/active-working-feature-context.mdc
-  - mobile/__tests__/battle/core/LossTrackingSystem.test.ts
+  - .cursor/rules/workflows/feature-implementation/context-persistence.mdc
+  - mobile/__tests__/battle/core/ScoringSystem.test.ts
   - mobile/src/battle/core/BattleStateManager.ts
 ```
 
 ## Implementation Progress
 ```yaml
 progress_steps:
-  - Select Loss Tracking System as next feature to implement
+  - Select Scoring System as next feature to implement
   - Update core-mechanics.mdc to mark feature as [in-progress]
-  - Create loss-tracking-system-implementation.mdc file
+  - Create scoring-system-implementation.mdc file
   - Update active working feature context
-  - Create test file with failing tests for Battalion Loss Tracking
+  - Create test file with failing tests for Node Control Points
   - Confirm tests failing as expected
-  - Implement Battalion Loss Tracking in BattleStateManager.ts
-  - Tests now passing for Battalion Loss Tracking
-  - Update implementation status in loss-tracking-system-implementation.mdc
-  - Create tests for Loss Rate Calculation sub-feature
-  - Confirm tests failing as expected
-  - Implement Loss Rate Calculation methods in BattleStateManager.ts
+  - Implement Node Control Points in BattleStateManager.ts
   - Fix test issues and ensure all tests pass
   - Update implementation file to reflect passing tests
-  - Update active working feature context
-  - Implement context management system components
-  - Synchronize context across all files
+  - Begin work on Battalion Elimination Points sub-feature
 ```
 
 ## Critical Context Elements

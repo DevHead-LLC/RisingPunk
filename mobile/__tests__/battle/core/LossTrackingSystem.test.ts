@@ -490,4 +490,203 @@ describe('Loss Tracking System', () => {
       expect(redRate).toBeCloseTo(2.0, 1);
     });
   });
+
+  describe('Loss Comparison Analytics', () => {
+    beforeEach(() => {
+      // Reset tracking data
+      battleStateManager.resetLossTracking();
+      
+      // Initialize with test battle
+      const testBattleId = 'test-battle-123';
+      const initialState = {
+        phase: BattlePhase.COMBAT,
+        timeRemaining: 300,
+        nodes: new Map<string, Node>([
+          ['node1', {
+            id: 'node1',
+            position: { x: 100, y: 100 },
+            controllingTeam: null,
+            controlProgress: 0,
+            health: 1000
+          }]
+        ]),
+        battalions: new Map<string, Battalion>([
+          ['blue-battalion', {
+            id: 'blue-battalion',
+            position: { x: 50, y: 50 },
+            team: 'blue',
+            type: BattalionType.GUARDIAN,
+            health: 100,
+            quantity: 10,
+            targetId: 'node1'
+          }],
+          ['red-battalion', {
+            id: 'red-battalion',
+            position: { x: 150, y: 150 },
+            team: 'red',
+            type: BattalionType.BREACHER,
+            health: 80,
+            quantity: 8,
+            targetId: 'node1'
+          }]
+        ]),
+        updateId: 0,
+        lastUpdated: new Date()
+      };
+      
+      battleStateManager.initializeBattle(testBattleId, initialState);
+    });
+    
+    it('should calculate loss ratio between two teams', async () => {
+      // Simulate losses for both teams
+      const blueUpdate = {
+        battalionUpdates: new Map([
+          ['blue-battalion', {
+            id: 'blue-battalion',
+            quantity: 7 // Lose 3 units
+          }]
+        ])
+      };
+      
+      const redUpdate = {
+        battalionUpdates: new Map([
+          ['red-battalion', {
+            id: 'red-battalion',
+            quantity: 4 // Lose 4 units
+          }]
+        ])
+      };
+      
+      // Apply updates
+      await battleStateManager.updateState(blueUpdate);
+      await battleStateManager.updateState(redUpdate);
+      
+      // Calculate loss ratio (blue:red)
+      const lossRatio = battleStateManager.calculateLossRatio('blue', 'red');
+      
+      // Blue lost 3, Red lost 4, so ratio should be 0.75 (3/4)
+      expect(lossRatio).toBeCloseTo(0.75, 2);
+    });
+    
+    it('should calculate advantage metrics based on loss ratios', async () => {
+      // Simulate losses for both teams
+      const blueUpdate = {
+        battalionUpdates: new Map([
+          ['blue-battalion', {
+            id: 'blue-battalion',
+            quantity: 5 // Lose 5 units
+          }]
+        ])
+      };
+      
+      const redUpdate = {
+        battalionUpdates: new Map([
+          ['red-battalion', {
+            id: 'red-battalion',
+            quantity: 6 // Lose 2 units
+          }]
+        ])
+      };
+      
+      // Apply updates
+      await battleStateManager.updateState(blueUpdate);
+      await battleStateManager.updateState(redUpdate);
+      
+      // Get advantage metrics
+      const advantageMetrics = battleStateManager.calculateAdvantageMetrics('blue', 'red');
+      
+      // Blue lost 5, Red lost 2, so red has the advantage
+      expect(advantageMetrics.advantageTeam).toBe('red');
+      expect(advantageMetrics.advantageRatio).toBeCloseTo(2.5, 2); // 5/2 = 2.5
+      expect(advantageMetrics.significantAdvantage).toBe(true); // Ratio > 2.0 is significant
+    });
+    
+    it('should provide historical comparison of loss rates', async () => {
+      // Create a series of updates over time
+      const updates = [
+        {
+          battalionUpdates: new Map([
+            ['blue-battalion', { id: 'blue-battalion', quantity: 9 }] // Lose 1
+          ])
+        },
+        {
+          battalionUpdates: new Map([
+            ['red-battalion', { id: 'red-battalion', quantity: 7 }] // Lose 1
+          ])
+        },
+        {
+          battalionUpdates: new Map([
+            ['blue-battalion', { id: 'blue-battalion', quantity: 7 }] // Lose 2
+          ])
+        },
+        {
+          battalionUpdates: new Map([
+            ['red-battalion', { id: 'red-battalion', quantity: 5 }] // Lose 2
+          ])
+        }
+      ];
+      
+      // Apply updates with delays to simulate time passing
+      for (const update of updates) {
+        await battleStateManager.updateState(update);
+      }
+      
+      // Get historical comparison
+      const historicalComparison = battleStateManager.getHistoricalLossComparison('blue', 'red');
+      
+      // Should have entries for each time period
+      expect(historicalComparison.length).toBeGreaterThan(0);
+      
+      // Check structure of comparison data
+      const firstPeriod = historicalComparison[0];
+      expect(firstPeriod).toHaveProperty('startTime');
+      expect(firstPeriod).toHaveProperty('endTime');
+      expect(firstPeriod).toHaveProperty('team1Losses');
+      expect(firstPeriod).toHaveProperty('team2Losses');
+      expect(firstPeriod).toHaveProperty('lossRatio');
+      expect(firstPeriod).toHaveProperty('advantageTeam');
+    });
+    
+    it('should detect significant changes in loss rates', async () => {
+      // First phase - equal losses
+      await battleStateManager.updateState({
+        battalionUpdates: new Map([
+          ['blue-battalion', { id: 'blue-battalion', quantity: 9 }] // Lose 1
+        ])
+      });
+      
+      await battleStateManager.updateState({
+        battalionUpdates: new Map([
+          ['red-battalion', { id: 'red-battalion', quantity: 7 }] // Lose 1
+        ])
+      });
+      
+      // Second phase - blue losing more
+      await battleStateManager.updateState({
+        battalionUpdates: new Map([
+          ['blue-battalion', { id: 'blue-battalion', quantity: 6 }] // Lose 3
+        ])
+      });
+      
+      await battleStateManager.updateState({
+        battalionUpdates: new Map([
+          ['red-battalion', { id: 'red-battalion', quantity: 6 }] // Lose 1
+        ])
+      });
+      
+      // Check for significant changes
+      const significantChanges = battleStateManager.detectSignificantLossRateChanges('blue', 'red');
+      
+      // Should detect the change from equal losses to blue losing more
+      expect(significantChanges.length).toBeGreaterThan(0);
+      
+      // Check structure of change data
+      const change = significantChanges[0];
+      expect(change).toHaveProperty('beforePeriod');
+      expect(change).toHaveProperty('afterPeriod');
+      expect(change).toHaveProperty('changeMagnitude');
+      expect(change).toHaveProperty('changeDirection');
+      expect(change.changeDirection).toBe('increased'); // Blue's losses increased relative to red
+    });
+  });
 }); 
