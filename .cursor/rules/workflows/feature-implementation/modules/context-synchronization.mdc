@@ -1,0 +1,122 @@
+---
+description: Module for synchronizing context across all relevant files
+globs: 
+alwaysApply: true
+---
+
+# Context Synchronization Module
+
+## Purpose
+This module defines procedures for synchronizing context across all relevant files to ensure consistency in the feature implementation process.
+
+## Context Sources
+The following files contain context information that must be kept in sync:
+1. **core-mechanics.mdc** - Contains feature status
+2. **feature-implementation.mdc** - Contains sub-feature status and details
+3. **active-working-feature-context.mdc** - Contains current working context
+4. **context-persistence.mdc** - Contains persistent context information
+
+## Synchronization Process
+
+### 1. Verify Core Mechanics File
+```yaml
+process: verify_core_mechanics
+action: check_feature_status
+input: active_feature_name
+output:
+  - feature_status
+  - feature_description
+  - feature_dependencies
+```
+
+1. Load `.cursor/rules/gameplay/features/battle/core-mechanics.mdc`
+2. Find the active feature by name
+3. Verify its status is correct (should match active-working-feature-context.mdc)
+4. Extract feature description and dependencies
+
+### 2. Verify Implementation File
+```yaml
+process: verify_implementation_file
+action: check_subfeature_status
+input: 
+  - active_feature_name
+  - active_subfeature_name
+output:
+  - subfeature_status
+  - implementation_status
+  - test_requirements
+```
+
+1. Load the implementation file (`.cursor/rules/gameplay/features/battle/features/{feature-name}-implementation.mdc`)
+2. Find the active sub-feature by name
+3. Verify its status is correct
+4. Extract implementation status and test requirements
+
+### 3. Verify Active Working Context
+```yaml
+process: verify_active_context
+action: check_context_consistency
+input:
+  - feature_status
+  - subfeature_status
+  - implementation_status
+output:
+  - context_consistent (boolean)
+  - inconsistencies (list)
+```
+
+1. Load `.cursor/rules/workflows/feature-implementation/active-working-feature-context.mdc`
+2. Verify active feature name and status match core-mechanics.mdc
+3. Verify sub-feature status matches implementation file
+4. Verify implementation status matches reality (test status)
+5. Identify any inconsistencies
+
+### 4. Verify Persistent Context
+```yaml
+process: verify_persistent_context
+action: check_persistence_consistency
+input:
+  - feature_status
+  - subfeature_status
+  - implementation_status
+output:
+  - persistence_consistent (boolean)
+  - inconsistencies (list)
+```
+
+1. Load `.cursor/rules/workflows/feature-implementation/context-persistence.mdc`
+2. Verify feature inventory matches core-mechanics.mdc
+3. Verify current context matches active-working-feature-context.mdc
+4. Verify implementation progress is up-to-date
+5. Identify any inconsistencies
+
+## Context Synchronization Procedure
+
+When performing context synchronization:
+
+1. Run the verification process for all context sources
+2. Identify all inconsistencies across files
+3. Determine the source of truth for each inconsistency
+   - Test results are the ultimate source of truth for implementation status
+   - core-mechanics.mdc is the source of truth for feature listing
+   - Implementation file is the source of truth for sub-feature requirements
+4. Update all files to match the source of truth
+5. Document the synchronization in active-working-feature-context.mdc
+6. Update the context-persistence.mdc with the synchronized context
+
+## Automatic Synchronization Triggers
+Context synchronization should be performed automatically at these points:
+
+1. Before beginning feature selection
+2. After selecting a new feature
+3. After creating tests
+4. After completing implementation
+5. Before transitioning to a new feature
+6. When inconsistencies are detected
+
+## Manual Synchronization
+To manually synchronize context:
+1. Identify the current feature and sub-feature
+2. Check the test status to determine implementation status
+3. Update all context files to reflect the actual state
+4. Document the manual synchronization process 

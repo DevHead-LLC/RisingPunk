@@ -1,0 +1,136 @@
+---
+description: Summary of the feature implementation workflow and context management system
+globs: 
+alwaysApply: true
+---
+
+# Feature Implementation Workflow Summary
+
+## Overview
+This document provides a high-level overview of the feature implementation workflow and context management system. It explains how all components work together to ensure a smooth and consistent development process.
+
+## Workflow Structure
+
+### 1. Feature Lifecycle
+A feature progresses through the following stages:
+1. **Planning** - Feature is defined and dependencies identified
+2. **Selection** - Feature is selected for implementation
+3. **Test Writing** - Tests are created for each sub-feature
+4. **Implementation** - Sub-features are implemented
+5. **Verification** - Implementation is verified against requirements
+6. **Completion** - Feature is marked as done and transitioned
+
+### 2. Status Indicators
+Features and sub-features use consistent status indicators:
+- **Feature Status**:
+  - [planned] - Feature is defined but not yet ready
+  - [ready] - Feature is ready for implementation
+  - [in-progress] - Feature is currently being implemented
+  - [done] - Feature is fully implemented and tested
+  - [blocked] - Feature implementation is blocked
+
+- **Sub-Feature Status**:
+  - [not-started] - Sub-feature has not been started
+  - [test-needed] - Sub-feature needs tests to be written
+  - [test-failing] - Tests are created and failing
+  - [test-passing] - Implementation is complete and tests pass
+
+### 3. Workflow States
+The implementation process moves through these workflow states:
+1. **Selecting Feature** - Choosing the next feature to implement
+2. **Writing Tests** - Creating tests for a sub-feature
+3. **Implementing Feature** - Implementing a sub-feature
+4. **Transitioning Features** - Completing a feature and preparing for the next
+
+## Context Management System
+
+### Key Components
+1. **Initiation Command** - Starts the implementation process
+2. **Context Checkpoints** - Verify context at critical points
+3. **Workflow Modules** - Handle specific aspects of implementation
+4. **Context Persistence** - Maintains critical context information
+5. **Workflow States** - Define valid operations in each state
+6. **Context Synchronization** - Ensures consistency across files
+7. **Recovery Procedure** - Restores context when it's lost
+8. **Verification Tool** - Checks context consistency
+
+### Context Files
+The system maintains context across these files:
+1. **core-mechanics.mdc** - Lists features and their status
+2. **{feature}-implementation.mdc** - Details sub-features and their status
+3. **active-working-feature-context.mdc** - Tracks current working context
+4. **context-persistence.mdc** - Persists critical context information
+
+### Context Flow
+Context flows through the system as follows:
+
+```
+┌─────────────────┐         ┌────────────────┐
+│ core-mechanics  │◄───────►│ implementation │
+│     .mdc        │         │     .mdc       │
+└────────┬────────┘         └────────┬───────┘
+         │                           │
+         │                           │
+         ▼                           ▼
+┌─────────────────┐         ┌────────────────┐
+│ active-context  │◄───────►│    context     │
+│     .mdc        │         │ persistence.mdc│
+└─────────────────┘         └────────────────┘
+```
+
+## Using the System
+
+### Normal Workflow
+1. Start with the initiation command
+2. Follow each step in the process
+3. Use context checkpoints to verify consistency
+4. Update context after significant changes
+5. Transition between workflow states as appropriate
+
+### Context Verification
+1. Run quick verification before starting work
+2. Run complete verification after significant changes
+3. Use verification tool to check consistency
+4. Address any inconsistencies immediately
+
+### Context Recovery
+If context is lost or inconsistent:
+1. Use the recovery procedure
+2. Focus on test results as the source of truth
+3. Rebuild context based on actual implementation
+4. Document the recovery process
+
+## Best Practices
+
+### Maintaining Context
+1. Update all context files after significant changes
+2. Document progress in the history section
+3. Verify context consistency regularly
+4. Follow the checkpoint procedures
+
+### Preventing Context Loss
+1. Update context-persistence.mdc regularly
+2. Use the context synchronization module
+3. Document context changes thoroughly
+4. Maintain clear progress history
+
+### Handling Transitions
+1. Complete all sub-features before marking a feature as done
+2. Verify all tests pass before transitioning
+3. Update all context files during transition
+4. Document the transition in the progress history
+
+## Integration Points
+The context management system integrates with:
+1. Test-driven development process
+2. Code implementation workflow
+3. Feature planning and prioritization
+4. Progress tracking and reporting
+
+## System Benefits
+This context management system provides:
+1. Clear visibility into implementation status
+2. Consistent development process
+3. Reliable recovery from context loss
+4. Detailed progress tracking
+5. Smooth transitions between features 

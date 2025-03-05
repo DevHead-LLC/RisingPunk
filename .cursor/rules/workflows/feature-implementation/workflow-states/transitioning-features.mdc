@@ -1,0 +1,48 @@
+---
+description: Workflow state for transitioning between features
+globs: 
+alwaysApply: false
+---
+
+# Transitioning Features Workflow State
+
+## Current State
+The workflow is currently in the **Transitioning Features** state.
+
+## Context Requirements
+In this state, the following context is required:
+- Completed feature and all its sub-features
+- Implementation file with all sub-features marked as [test-passing]
+- Test files showing all tests pass
+- Next candidate features for implementation
+
+## Available Operations
+The following operations are valid in this state:
+1. Verify all sub-features are implemented and tests pass
+2. Update feature status to [done] in core-mechanics.mdc
+3. Finalize documentation in the implementation file
+4. Run all tests to ensure no regressions
+5. Prepare for selecting the next feature
+6. Update active-working-feature-context.mdc
+7. Prepare for next feature selection
+
+## Required Context Updates
+When transitioning from this state, update:
+1. Completed feature status to [done] in core-mechanics.mdc
+2. Implementation file with final status and documentation
+3. Update active-working-feature-context.mdc to reflect completion
+4. Update context-persistence.mdc
+5. Document the feature completion in the progress history
+
+## Next State Transitions
+From this state, the workflow can transition to:
+- **Selecting Feature** - After completing the current feature and preparing to select the next one
+
+## Verification Checklist
+Before transitioning to the next state, verify:
+- [ ] All sub-features are implemented with passing tests
+- [ ] Feature status is updated to [done] in core-mechanics.mdc
+- [ ] Implementation file is finalized with appropriate documentation
+- [ ] active-working-feature-context.mdc is updated to reflect completion
+- [ ] context-persistence.mdc is updated
+- [ ] Pre-feature-selection checkpoint has been reviewed for the next feature 

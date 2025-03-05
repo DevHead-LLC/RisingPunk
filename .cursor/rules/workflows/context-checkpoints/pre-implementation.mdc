@@ -1,0 +1,44 @@
+---
+description: Checkpoint to verify context before beginning implementation
+globs: 
+alwaysApply: true
+---
+
+# Pre-Implementation Checkpoint
+
+## Required Context
+Before beginning implementation, verify the following context elements:
+
+1. Test Status
+   - Test file exists for the current sub-feature
+   - Tests are correctly failing (for TDD approach)
+   - Test requirements are clear and comprehensive
+
+2. Implementation Preparation
+   - Sub-feature requirements are well-defined
+   - Implementation file is updated with the current sub-feature status as [test-failing]
+   - Required dependencies and interfaces are identified
+   - Active working context accurately reflects the current state
+
+## Verification Steps
+- [ ] Confirm tests exist and are failing for the correct reasons
+- [ ] Verify the implementation file correctly describes the sub-feature requirements
+- [ ] Check that active-working-feature-context.mdc reflects the current phase
+- [ ] Identify all files that will need modification
+- [ ] Ensure necessary interfaces and dependencies are understood
+
+## Implementation Plan
+Before proceeding, outline:
+1. Which files will be modified
+2. What methods/functions need to be implemented
+3. What data structures will be used
+4. Any performance considerations
+5. How implementation will be tested
+
+## Expected Output
+After completing this checkpoint, you should have:
+- Clear understanding of what needs to be implemented
+- Failing tests that provide guidance for implementation
+- Updated implementation file reflecting the current status
+- A detailed plan for the implementation approach
+- Active working context accurately reflecting the current state 
