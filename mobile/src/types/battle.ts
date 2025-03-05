@@ -15,6 +15,7 @@ export interface BattalionPosition {
   quantity: number;
   currentHealth?: number;
   targetNode?: number;
+  targetType?: 'node' | 'battalion';
   mark: number;
 }
 
