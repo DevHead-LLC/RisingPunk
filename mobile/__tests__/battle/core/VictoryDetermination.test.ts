@@ -275,4 +275,93 @@ describe('VictoryDetermination', () => {
       });
     });
   });
+
+  describe('Enemy Force Elimination Victory', () => {
+    test('should declare victory when all enemy battalions are eliminated', () => {
+      // Get current state to verify test setup
+      const state = battleStateManager.getState();
+      
+      // Verify initial state has battalions from both teams
+      expect(state.battalions.size).toBeGreaterThan(0);
+      
+      // Record the number of TeamB battalions (enemies of TeamA)
+      const teamBBattalions = Array.from(state.battalions.values())
+        .filter(battalion => battalion.team === 'TeamB');
+      expect(teamBBattalions.length).toBeGreaterThan(0);
+      
+      // Eliminate all TeamB battalions
+      teamBBattalions.forEach(battalion => {
+        // Remove the battalion from the state
+        state.battalions.delete(battalion.id);
+      });
+      
+      // Trigger victory check
+      battleStateManager.checkForEnemyEliminationVictory('TeamA');
+      
+      // Expect victory notification to be called with TeamA as winner
+      expect(mockBattleService.notifyVictory).toHaveBeenCalledWith({
+        winningTeam: 'TeamA',
+        victoryType: 'ENEMY_FORCE_ELIMINATION',
+        gameStats: expect.objectContaining({
+          eliminatedEnemyCount: expect.any(Number)
+        })
+      });
+    });
+    
+    test('should not declare victory if any enemy battalions remain', () => {
+      // Get current state
+      const state = battleStateManager.getState();
+      
+      // Remove one TeamB battalion but leave at least one
+      const teamBBattalions = Array.from(state.battalions.values())
+        .filter(battalion => battalion.team === 'TeamB');
+      
+      if (teamBBattalions.length > 1) {
+        // Remove all but one TeamB battalion
+        for (let i = 0; i < teamBBattalions.length - 1; i++) {
+          state.battalions.delete(teamBBattalions[i].id);
+        }
+      }
+      
+      // Verify at least one TeamB battalion remains
+      const remainingTeamBBattalions = Array.from(state.battalions.values())
+        .filter(battalion => battalion.team === 'TeamB');
+      expect(remainingTeamBBattalions.length).toBeGreaterThan(0);
+      
+      // Trigger victory check
+      battleStateManager.checkForEnemyEliminationVictory('TeamA');
+      
+      // Expect victory notification NOT to be called
+      expect(mockBattleService.notifyVictory).not.toHaveBeenCalled();
+    });
+    
+    test('should trigger appropriate victory notification', () => {
+      // Get current state
+      const state = battleStateManager.getState();
+      
+      // Count TeamA battalions (to be eliminated)
+      const teamABattalions = Array.from(state.battalions.values())
+        .filter(battalion => battalion.team === 'TeamA');
+      
+      // Eliminate all TeamA battalions
+      teamABattalions.forEach(battalion => {
+        state.battalions.delete(battalion.id);
+      });
+      
+      // Trigger victory check
+      battleStateManager.checkForEnemyEliminationVictory('TeamB');
+      
+      // We only care that the notification was called with the right structure
+      expect(mockBattleService.notifyVictory).toHaveBeenCalled();
+      
+      // Get the actual call arguments
+      const callArgs = mockBattleService.notifyVictory.mock.calls[0][0];
+      
+      // Check the structure but not specific values
+      expect(callArgs.winningTeam).toBe('TeamB');
+      expect(callArgs.victoryType).toBe('ENEMY_FORCE_ELIMINATION');
+      expect(callArgs.gameStats).toBeDefined();
+      expect(callArgs.gameStats.eliminatedEnemyCount).toBeDefined();
+    });
+  });
 }); 
