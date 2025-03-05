@@ -25,17 +25,17 @@ The Scoring System calculates and tracks points earned during battle based on va
   - [x] Implementation Complete
   - [x] Test Passing
 
-### Battalion Elimination Points [to-do]
+### Battalion Elimination Points [test-passing]
 - Requirements:
   - Award points when enemy battalions are eliminated
   - Point value should be based on battalion strength/type
   - Track elimination points separately from control points
 - Implementation Status:
-  - [ ] Test Created
-  - [ ] Test Failing
-  - [ ] Implementation Started
-  - [ ] Implementation Complete
-  - [ ] Test Passing
+  - [x] Test Created
+  - [x] Test Failing
+  - [x] Implementation Started
+  - [x] Implementation Complete
+  - [x] Test Passing
 
 ### Network Control Bonuses [to-do]
 - Requirements:
@@ -51,24 +51,25 @@ The Scoring System calculates and tracks points earned during battle based on va
 
 ## Test Writing Phase
 ### Current Focus
-- Sub-Feature: Node Control Points
+- Sub-Feature: Network Control Bonuses
 - Test File: mobile/__tests__/battle/core/ScoringSystem.test.ts
 - Test Requirements: 
-  - Verify points are awarded for node control
-  - Test accumulation of points over time
-  - Validate different point rates for different node types
+  - Verify bonus points are awarded for specific node configurations
+  - Test network domination percentage bonuses
+  - Validate strategic node control multipliers
 
 ### Test Implementation Status
 - [x] Test file created
-- [x] Initial test failing
-- [x] Test requirements documented
-- [x] Test implementation complete
+- [ ] Tests for Network Control Bonuses created
+- [ ] Initial test failing
+- [ ] Test requirements documented
+- [ ] Test implementation complete
 
 ## Progress Tracking
-- Last Updated: 2023-03-06
-- Current Phase: Implementation Complete for Node Control Points
+- Last Updated: 2023-03-07
+- Current Phase: Implementation Complete for Battalion Elimination Points
 - Next Steps: 
-  1. Begin work on Battalion Elimination Points sub-feature
-  2. Create tests for Battalion Elimination Points
-  3. Implement Battalion Elimination Points feature
+  1. Begin work on Network Control Bonuses sub-feature
+  2. Create tests for Network Control Bonuses
+  3. Implement Network Control Bonuses feature
   4. Update context files 
