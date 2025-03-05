@@ -1,0 +1,38 @@
+---
+description: Simple performance verification directive
+globs: 
+alwaysApply: true
+---
+
+# AI DIRECTIVE: SIMPLIFIED PERFORMANCE CHECK
+⚠️ PERFORMANCE VERIFICATION DIRECTIVE ⚠️
+
+When performing a performance check:
+
+1. Run the application with typical workload
+2. Observe any obvious performance issues
+3. Check for:
+   - Excessive loading times
+   - UI responsiveness issues
+   - Memory usage concerns
+   - Battery consumption (mobile)
+
+No formal benchmarking is required unless specifically requested.
+
+If no obvious performance issues are observed, mark the feature as [performance-verified].
+
+If performance issues are detected:
+1. Document the specific issues observed
+2. Suggest simple optimization approaches
+3. Mark the feature as needing optimization
+4. Address the issues before marking as [done]
+
+This check should be quick and pragmatic, not an exhaustive performance analysis.
+After completing this check, proceed to update the feature status and move to the next step in the workflow.
+
+---
+
+After performance check, you must:
+1. Update active-working-feature-context.mdc
+2. Follow the development workflow directive
+3. Proceed with next phase of implementation 

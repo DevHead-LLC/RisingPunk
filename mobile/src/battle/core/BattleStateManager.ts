@@ -37,6 +37,7 @@ export interface BattleStateUpdate {
   timeUpdate?: number;
   nodeUpdates?: Map<string, Partial<Node>>;
   battalionUpdates?: Map<string, Partial<Battalion>>;
+  damagingTeam?: string;
 }
 
 interface Position {
@@ -65,6 +66,9 @@ export class BattleStateManager {
   private readonly MAX_BUFFER_SIZE = 100;
   private bufferTimer: NodeJS.Timeout | null;
   private updateTimer: NodeJS.Timeout | null = null;
+  private nodeDamageByTeam: Map<string, Map<string, number>> = new Map();
+  // Default capture threshold percentage
+  private readonly CAPTURE_THRESHOLD_PERCENTAGE = 0.75;
 
   constructor(battleService: BattleService) {
     if (!battleService) {
@@ -96,6 +100,9 @@ export class BattleStateManager {
       throw new Error('Battle ID is required for initialization');
     }
     this.battleId = battleId;
+    
+    // Reset damage tracking on new battle initialization
+    this.resetDamageTracking();
     
     // Use provided initial state or create default state
     this.currentState = initialState || {
@@ -186,6 +193,8 @@ export class BattleStateManager {
       }
     }
 
+    const nodesToUpdate: string[] = [];
+
     if (update.nodeUpdates) {
       const newNodes = new Map(this.currentState.nodes);
       update.nodeUpdates.forEach((nodeUpdate, nodeId) => {
@@ -193,6 +202,26 @@ export class BattleStateManager {
         if (!existingNode && !nodeUpdate.position) {
           console.warn(`Attempted to update non-existent node without position: ${nodeId}`);
           return;
+        }
+        
+        if (existingNode && nodeUpdate.health !== undefined && existingNode.health > nodeUpdate.health) {
+          const damageAmount = existingNode.health - nodeUpdate.health;
+          
+          let damagingTeam: string | null = update.damagingTeam || null;
+          
+          if (!damagingTeam) {
+            for (const battalion of this.currentState.battalions.values()) {
+              if (battalion.targetId === nodeId) {
+                damagingTeam = battalion.team;
+                break;
+              }
+            }
+          }
+          
+          if (damagingTeam) {
+            this.trackNodeDamage(nodeId, damagingTeam, damageAmount);
+            nodesToUpdate.push(nodeId);
+          }
         }
         
         const updatedNode = {
@@ -234,6 +263,19 @@ export class BattleStateManager {
         });
       });
       newState.battalions = newBattalions;
+      
+      // Check if any battalions were updated that might affect capture thresholds
+      if (nodesToUpdate.length === 0) {
+        // Find nodes that currently have damage and need control recalculation
+        for (const [nodeId] of this.nodeDamageByTeam.entries()) {
+          nodesToUpdate.push(nodeId);
+        }
+      }
+    }
+
+    // Apply control status updates for all affected nodes
+    for (const nodeId of nodesToUpdate) {
+      this.updateNodeControlStatus(nodeId, newState);
     }
 
     newState.updateId++;
@@ -408,5 +450,143 @@ export class BattleStateManager {
 
     // Update state and notify subscribers
     this.handleStateUpdate(newState);
+  }
+
+  public getNodeDamageByTeam(nodeId: string, team: string): number {
+    const nodeDamageMap = this.nodeDamageByTeam.get(nodeId) || new Map<string, number>();
+    return nodeDamageMap.get(team) || 0;
+  }
+
+  private trackNodeDamage(nodeId: string, team: string, damage: number): void {
+    const nodeDamageMap = this.nodeDamageByTeam.get(nodeId) || new Map<string, number>();
+    const currentDamage = nodeDamageMap.get(team) || 0;
+    nodeDamageMap.set(team, currentDamage + damage);
+    this.nodeDamageByTeam.set(nodeId, nodeDamageMap);
+    
+    // Note: Control status update is now handled in updateState method
+  }
+
+  // Updated method to update a node's control status
+  private updateNodeControlStatus(nodeId: string, newState: BattleState): void {
+    const node = newState.nodes.get(nodeId);
+    if (!node) return;
+    
+    // Find team with highest damage percentage relative to their threshold
+    let highestProgressTeam: string | null = null;
+    let highestProgress = 0;
+    
+    // Track all teams that have reached 100% capture
+    const capturedTeams: string[] = [];
+    
+    // Calculate progress for each team that has dealt damage
+    const nodeDamageMap = this.nodeDamageByTeam.get(nodeId) || new Map<string, number>();
+    
+    // Get all teams that have dealt damage to this node
+    for (const [team, damage] of nodeDamageMap.entries()) {
+      const threshold = this.getCaptureThreshold(team);
+      if (threshold <= 0) continue; // Skip teams with no threshold
+      
+      // Calculate capture progress as percentage of threshold
+      const progress = damage / threshold;
+      
+      // Track teams that have fully captured the node
+      if (progress >= 1.0) {
+        capturedTeams.push(team);
+      }
+      
+      // Update highest progress team
+      if (progress > highestProgress) {
+        highestProgress = progress;
+        highestProgressTeam = team;
+      }
+    }
+    
+    // Update node control status
+    if (highestProgressTeam) {
+      // Determine the controlling team
+      let controlTeam = highestProgressTeam;
+      
+      // If multiple teams have reached 100%, use the most recent one to attack
+      // This is determined by the order in the capturedTeams array (last one is most recent)
+      if (capturedTeams.length > 0) {
+        controlTeam = capturedTeams[capturedTeams.length - 1];
+      }
+      
+      // Create a new node object with updated control values
+      const updatedNode = { 
+        ...node,
+        controllingTeam: controlTeam,
+        controlProgress: Math.min(highestProgress, 1.0) // Cap at 1.0 (100%)
+      };
+      
+      // Update the node in the state
+      newState.nodes.set(nodeId, updatedNode);
+    }
+  }
+
+  public resetDamageTracking(): void {
+    this.nodeDamageByTeam = new Map();
+  }
+
+  // Calculate total army health for a given team
+  public getTotalArmyHealth(team: string): number {
+    let totalHealth = 0;
+    
+    // Iterate through all battalions
+    for (const battalion of this.currentState.battalions.values()) {
+      // Sum up health for the specified team
+      if (battalion.team === team) {
+        // Total health = health per unit * number of units
+        totalHealth += battalion.health * battalion.quantity;
+      }
+    }
+    
+    return totalHealth;
+  }
+  
+  // Calculate the capture threshold for a team (75% of total army health)
+  public getCaptureThreshold(team: string): number {
+    const totalHealth = this.getTotalArmyHealth(team);
+    return Math.floor(totalHealth * this.CAPTURE_THRESHOLD_PERCENTAGE);
+  }
+  
+  // Check if a node has been captured by a team
+  public isNodeCaptured(nodeId: string, team: string): boolean {
+    // Get the damage dealt by the team to this node
+    const damageDealt = this.getNodeDamageByTeam(nodeId, team);
+    
+    // Get the capture threshold for this team
+    const threshold = this.getCaptureThreshold(team);
+    
+    // Node is captured if damage exceeds threshold
+    return damageDealt >= threshold;
+  }
+
+  // Calculate the percentage of damage towards capturing a node
+  public getNodeControlProgress(nodeId: string, team: string): number {
+    const damageDealt = this.getNodeDamageByTeam(nodeId, team);
+    const threshold = this.getCaptureThreshold(team);
+    
+    if (threshold <= 0) return 0;
+    return Math.min(damageDealt / threshold, 1.0);
+  }
+  
+  // Get the team with the highest control progress for a node
+  public getDominantTeam(nodeId: string): string | null {
+    const nodeDamageMap = this.nodeDamageByTeam.get(nodeId);
+    if (!nodeDamageMap || nodeDamageMap.size === 0) return null;
+    
+    let highestProgressTeam: string | null = null;
+    let highestProgress = 0;
+    
+    for (const [team, damage] of nodeDamageMap.entries()) {
+      const progress = this.getNodeControlProgress(nodeId, team);
+      if (progress > highestProgress) {
+        highestProgress = progress;
+        highestProgressTeam = team;
+      }
+    }
+    
+    return highestProgressTeam;
   }
 }
