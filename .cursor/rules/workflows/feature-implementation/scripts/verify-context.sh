@@ -16,16 +16,18 @@ ACTIVE_CONTEXT=".cursor/rules/workflows/feature-implementation/active-working-fe
 CONTEXT_PERSISTENCE=".cursor/rules/workflows/feature-implementation/context-persistence.mdc"
 
 # Extract current feature from active context
-FEATURE=$(grep "Active Feature" "$ACTIVE_CONTEXT" -A 5 | grep "Name:" | cut -d':' -f2- | tr -d ' ')
+FEATURE_WITH_SPACES=$(grep "Active Feature" "$ACTIVE_CONTEXT" -A 5 | grep "Name:" | cut -d':' -f2- | sed 's/^ *//')
+FEATURE=$(echo "$FEATURE_WITH_SPACES" | tr -d ' ')
 FEATURE_STATUS=$(grep "Active Feature" "$ACTIVE_CONTEXT" -A 5 | grep "Status:" | cut -d']' -f1 | cut -d'[' -f2)
-SUB_FEATURE=$(grep "Current Phase" "$ACTIVE_CONTEXT" -A 10 | grep "Sub-feature:" | head -1 | cut -d':' -f2- | tr -d ' ')
+SUB_FEATURE=$(grep "Current Phase" "$ACTIVE_CONTEXT" -A 10 | grep "Sub-feature:" | head -1 | cut -d':' -f2- | sed 's/^ *//')
 
-# Implementation file path
-IMPL_FILE=".cursor/rules/gameplay/features/battle/features/$FEATURE-implementation.mdc"
-IMPL_FILE=$(echo "$IMPL_FILE" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+# Implementation file path - use hyphenated version of the feature name with spaces
+FEATURE_HYPHENATED=$(echo "$FEATURE_WITH_SPACES" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+IMPL_FILE=".cursor/rules/gameplay/features/battle/features/${FEATURE_HYPHENATED}-implementation.mdc"
 
 echo "Detected Context:"
-echo "  Feature: $FEATURE"
+echo "  Feature (with spaces): $FEATURE_WITH_SPACES"
+echo "  Feature (no spaces): $FEATURE"
 echo "  Status: [$FEATURE_STATUS]"
 echo "  Sub-feature: $SUB_FEATURE"
 echo "  Implementation File: $IMPL_FILE"
@@ -44,7 +46,12 @@ echo
 
 # Check feature status in core mechanics
 echo "Checking Feature Status in Core Mechanics:"
-CORE_STATUS=$(grep -A 1 "## $FEATURE" "$CORE_MECHANICS" | head -1 | tr -d ' ' | cut -d']' -f1 | cut -d'[' -f2)
+CORE_STATUS=$(grep -A 1 "## $FEATURE_WITH_SPACES" "$CORE_MECHANICS" | head -1 | tr -d ' ' | cut -d']' -f1 | cut -d'[' -f2)
+if [ -z "$CORE_STATUS" ]; then
+  # Try without spaces as fallback
+  CORE_STATUS=$(grep -A 1 "## $FEATURE" "$CORE_MECHANICS" | head -1 | tr -d ' ' | cut -d']' -f1 | cut -d'[' -f2)
+fi
+
 if [ "$CORE_STATUS" = "$FEATURE_STATUS" ]; then
   echo "  ✅ Feature status in core-mechanics.mdc matches active context: [$CORE_STATUS]"
 else
@@ -76,14 +83,35 @@ echo
 
 # Check context persistence
 echo "Checking Context Persistence:"
-PERSISTENCE_FEATURE=$(grep -A 10 "current_context:" "$CONTEXT_PERSISTENCE" | grep "current_feature:" | cut -d':' -f2- | tr -d ' ')
-PERSISTENCE_STATUS=$(grep -A 10 "current_context:" "$CONTEXT_PERSISTENCE" | grep "current_status:" | cut -d':' -f2- | tr -d ' ')
-PERSISTENCE_SUB_FEATURE=$(grep -A 10 "current_context:" "$CONTEXT_PERSISTENCE" | grep "current_sub_feature:" | cut -d':' -f2- | tr -d ' ')
+PERSISTENCE_FEATURE=$(grep -A 10 "current_context:" "$CONTEXT_PERSISTENCE" | grep "current_feature:" | cut -d':' -f2- | sed 's/^ *//')
+if [ -z "$PERSISTENCE_FEATURE" ]; then
+  # Try markdown format instead of YAML
+  PERSISTENCE_FEATURE=$(grep -A 5 "## Active Feature" "$CONTEXT_PERSISTENCE" | grep "- Name:" | cut -d':' -f2- | sed 's/^ *//')
+fi
 
-if [ "$PERSISTENCE_FEATURE" = "$FEATURE" ]; then
+PERSISTENCE_STATUS=$(grep -A 10 "current_context:" "$CONTEXT_PERSISTENCE" | grep "current_status:" | cut -d':' -f2- | sed 's/^ *//')
+if [ -z "$PERSISTENCE_STATUS" ]; then
+  # Try markdown format
+  PERSISTENCE_STATUS=$(grep -A 5 "## Active Feature" "$CONTEXT_PERSISTENCE" | grep "- Status:" | cut -d']' -f1 | cut -d'[' -f2)
+fi
+
+PERSISTENCE_SUB_FEATURE=$(grep -A 10 "current_context:" "$CONTEXT_PERSISTENCE" | grep "current_sub_feature:" | cut -d':' -f2- | sed 's/^ *//')
+if [ -z "$PERSISTENCE_SUB_FEATURE" ]; then
+  # Try markdown format
+  PERSISTENCE_SUB_FEATURE=$(grep -A 10 "## Current Phase" "$CONTEXT_PERSISTENCE" | grep "Sub-feature:" | head -1 | cut -d':' -f2- | sed 's/^ *//')
+fi
+
+# Compare with spaces preserved
+if [ "$PERSISTENCE_FEATURE" = "$FEATURE_WITH_SPACES" ]; then
   echo "  ✅ Feature in context-persistence.mdc matches active context: $PERSISTENCE_FEATURE"
 else
-  echo "  ❌ Feature mismatch: context-persistence.mdc [$PERSISTENCE_FEATURE] vs active context [$FEATURE]"
+  # Try comparing without spaces as fallback
+  PERSISTENCE_FEATURE_NO_SPACES=$(echo "$PERSISTENCE_FEATURE" | tr -d ' ')
+  if [ "$PERSISTENCE_FEATURE_NO_SPACES" = "$FEATURE" ]; then
+    echo "  ✅ Feature in context-persistence.mdc matches active context (ignoring spaces)"
+  else
+    echo "  ❌ Feature mismatch: context-persistence.mdc [$PERSISTENCE_FEATURE] vs active context [$FEATURE_WITH_SPACES]"
+  fi
 fi
 
 if [ "$PERSISTENCE_STATUS" = "$FEATURE_STATUS" ]; then

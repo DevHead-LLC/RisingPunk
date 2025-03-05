@@ -1,0 +1,89 @@
+---
+description: Guidelines to ensure correct test file locations and prevent test placement issues
+globs: 
+alwaysApply: true
+---
+
+# Test Location Guidelines
+
+## Overview
+This document outlines our standardized approach to ensuring tests are correctly located and verified during the feature implementation process. Following these guidelines will prevent issues with tests being placed in incorrect locations or not being properly recognized by the test runner.
+
+## Standard Test Locations
+
+All tests must follow these location standards:
+
+- Feature tests: `mobile/__tests__/battle/core/{FeatureName}.test.ts`
+- Component tests: `mobile/__tests__/components/{ComponentName}.test.tsx`
+- Utility tests: `mobile/__tests__/utils/{UtilityName}.test.ts`
+
+## Test Path Verification
+
+Always verify test paths before creating or modifying tests:
+
+1. Use the verification script:
+   ```bash
+   .cursor/rules/workflows/feature-implementation/scripts/verify-test-path.sh "{FeatureName}"
+   ```
+
+2. The script will:
+   - Verify the correct directory structure exists
+   - Check if the test file exists in the correct location
+   - Offer to create a template file if it doesn't exist
+   - Verify the file can be recognized by Jest
+   - List existing tests in the file
+   
+3. Examine the verification summary for any issues
+
+## Creating New Test Files
+
+When creating a new test file:
+
+1. Run the verification script first
+2. If the file doesn't exist, use the template generator
+3. Always include proper imports and setup code
+4. Test the file with Jest before adding specific tests
+
+## Common Test Location Issues
+
+1. **Incorrect Directory**: Tests must be in the correct subdirectory under `__tests__`
+2. **Incorrect Naming**: Test files must follow the naming convention `{FeatureName}.test.ts`
+3. **Import Path Issues**: Use relative paths from the test file location (e.g., `../../../src/...`)
+4. **Test Not Found**: Verify the test is properly exported and the describe/it blocks are formatted correctly
+
+## Troubleshooting
+
+If tests aren't being recognized:
+
+1. Check the test file path using the verification script
+2. Verify the test file syntax is correct
+3. Try running the test with an explicit path:
+   ```bash
+   cd mobile && npm test -- __tests__/battle/core/{FeatureName}.test.ts
+   ```
+4. Check for import errors or syntax issues in the test file
+
+## Context Management
+
+After creating or modifying tests:
+
+1. Update the active working feature context with:
+   - Test file path
+   - Test file location
+   - Test file path verification status
+   - Test names and their status
+
+2. Run the context verification script to ensure consistency:
+   ```bash
+   .cursor/rules/workflows/feature-implementation/scripts/verify-context.sh
+   ```
+
+## Best Practices
+
+1. Always use the verification script before starting test work
+2. Document all test names in the context file
+3. Run tests with specific patterns to confirm they execute as expected
+4. Keep test files focused on a single feature or component
+5. Use proper setup and teardown patterns to isolate tests
+
+By following these guidelines, we ensure tests are correctly located, recognized by our test runner, and properly documented in our context management system. 
