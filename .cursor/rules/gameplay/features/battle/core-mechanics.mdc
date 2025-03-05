@@ -1,0 +1,123 @@
+---
+description: Core battle mechanics implementation requirements and specifications
+globs: 
+alwaysApply: true
+---
+
+# AI DIRECTIVE: BATTLE CORE MECHANICS
+⚠️ CRITICAL IMPLEMENTATION DIRECTIVE ⚠️
+
+You must:
+1. Follow the feature selection process in `.cursor/rules/workflows/feature-implementation/feature-selection-directive.mdc`
+2. Track implementation status of each feature using the following labels:
+   - [done] - Feature is fully implemented and tested
+   - [in-progress] - Feature is currently being implemented
+   - [to-do] - Feature is pending implementation
+3. Update feature status in this file when directed by the selection process
+4. Maintain active context in `.cursor/rules/workflows/feature-implementation/active-working-feature-context.mdc`
+
+# Battle Core Mechanics
+
+## Node Control System [in-progress]
+- Strategic network nodes must be captured and held
+- Control determined by damage dealt to nodes
+- Capture threshold set at 75% of total army health
+- Tracks accumulated damage per side
+- Updates control status after each hit
+
+## Loss Tracking System [to-do]
+- Tracks battalion losses
+- Monitors node control changes
+- Calculates victory points based on control duration
+
+## Scoring System [to-do]
+- Points awarded for:
+  - Node control duration
+  - Enemy battalion elimination
+  - Network control bonuses
+
+## Victory Determination [to-do]
+- Victory achieved through:
+  - Total network control
+  - Point threshold reached
+  - Enemy force elimination
+
+## State Management System [to-do]
+### Core Principles:
+- Single source of truth
+- Centralized state management
+- Clear ownership of state updates
+- Predictable state transitions
+- Atomic state operations
+
+### Update Frequency:
+- Global 1-second update timer
+- Batch related state changes
+- Optimize update scheduling
+- Handle state dependencies
+
+## Update Timing System [to-do]
+### Three-tier hierarchy:
+1. Real-time (60fps):
+   - Animations, movement, visual effects
+   - Uses requestAnimationFrame
+   - RAF fallback for background tabs
+
+2. Speed-based:
+   - Attack animations (per battalion speed stat)
+   - Duration = 1000ms / speed stat
+   - Uses Animated.timing with easing
+
+3. Global timer (1s):
+   - Health, damage, state synchronization
+   - Aligns with backend update cycle
+   - Buffers state changes
+
+## State Categories [to-do]
+### Battle State:
+- Phase tracking
+- Timer management
+- Victory conditions
+- Node ownership
+
+### Battalion State:
+- Position tracking
+- Health/status
+- Target information
+- Movement paths
+
+### Combat State:
+- Attack calculations
+- Damage resolution
+- Range checking
+- Collision detection
+
+## Combat System [to-do]
+### Damage Calculation:
+- Total attack power = base_offense * battalion_quantity
+- Defense reduction: damage = attack * (1 - defense/100)
+- Minimum damage of 1 point
+- Individual battalion total health tracking
+- Damage application after defense calculation
+- Destruction at 0 total health
+
+## Error Handling System [to-do]
+- Validates state transitions
+- Recovers from failures
+- Logs state errors
+- Maintains fallback states
+
+## State Synchronization System [to-do]
+### Timing Requirements:
+- Syncs with global timer
+- Handles network delays
+- Manages animation states
+- Coordinates multiple updates
+
+### Performance Optimization:
+- Minimizes state updates
+- Batches similar changes
+- Optimizes calculations
+- Monitors update frequency
+
+Each of these features is interconnected and must maintain system integrity while supporting the core battle mechanics. 

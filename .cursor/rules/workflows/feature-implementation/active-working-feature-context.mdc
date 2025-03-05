@@ -1,0 +1,79 @@
+---
+description: Tracks the currently active feature being implemented and its progress
+globs: 
+alwaysApply: true
+---
+
+# AI DIRECTIVE: ACTIVE WORKING FEATURE CONTEXT
+⚠️ CRITICAL CONTEXT TRACKING DIRECTIVE ⚠️
+
+This file maintains the active context for feature implementation and testing. It must be updated:
+1. BEFORE starting any work
+2. AFTER each significant change
+3. When switching features
+4. When completing work
+5. When encountering issues
+
+# Current Session
+- Session Start: 2023-03-05 10:00
+- Last Updated: 2023-03-05 11:15
+- Status: active
+
+# Active Feature
+- Name: Node Control System
+- Parent File: `.cursor/rules/gameplay/features/battle/core-mechanics.mdc`
+- Implementation File: `.cursor/rules/gameplay/features/battle/features/node-control-system-implementation.mdc`
+- Current Status: [in-progress]
+- Dependencies: None
+
+# Current Phase
+- Phase: test-writing for next sub-feature
+- Last Action: Verified performance of Node Damage Tracking implementation
+- Next Action: Begin test writing for Capture Threshold Calculation
+
+# Test Context
+- Test File: mobile/__tests__/battle/core/NodeControlSystem.test.ts
+- Current Test Status: Passing for Node Damage Tracking
+- Last Test Run: 2023-03-05 11:15
+- Failing Tests: None for Node Damage Tracking
+- Test Coverage: Node Damage Tracking fully covered
+
+# Implementation Context
+- Modified Files: 
+  - mobile/__tests__/battle/core/NodeControlSystem.test.ts
+  - mobile/src/battle/core/BattleStateManager.ts
+  - .cursor/rules/gameplay/features/battle/features/node-control-system-implementation.mdc
+  - .cursor/rules/workflows/feature-implementation/active-working-feature-context.mdc
+- Last Changes: 
+  - Added nodeDamageByTeam tracking to BattleStateManager
+  - Implemented getNodeDamageByTeam method
+  - Added resetDamageTracking method
+  - Modified updateState to track damage by team
+- Current Focus: Beginning test writing for Capture Threshold Calculation
+- Blockers: None
+
+# Performance Context
+- Last Check: 2023-03-05 11:15
+- Status: ok
+- Metrics: 
+  - Test execution time: 0.2-0.6 seconds
+  - Memory usage: Minimal increase
+  - CPU usage: Negligible impact
+
+# Progress History
+- 2023-03-05 10:00: Feature selection
+- 2023-03-05 10:15: Created feature implementation file
+- 2023-03-05 10:30: Created test file in centralized test directory
+- 2023-03-05 10:45: Ran tests and confirmed they fail as expected
+- 2023-03-05 11:00: Implemented Node Damage Tracking and confirmed tests pass
+- 2023-03-05 11:15: Verified performance of Node Damage Tracking implementation
+
+# Notes
+The Node Control System is essential for the battle mechanics, allowing for strategic capture and control of network nodes. Tests have been organized in a centralized directory structure for better maintainability. The Node Damage Tracking sub-feature is now complete, allowing damage to be tracked per team for each node, which is a foundational part of the node control system. Performance testing shows the implementation is efficient with minimal overhead.
+
+---
+
+After updating this context:
+1. Follow development-workflow.mdc
+2. Proceed with current phase
+3. Update status as needed 

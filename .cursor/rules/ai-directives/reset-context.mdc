@@ -1,22 +1,20 @@
 ---
-description: Critical directive for AI context management - ensures fresh start for each interaction
+description: Simple context reset directive
 globs: 
 alwaysApply: true
 ---
 
-# AI DIRECTIVE: RESET CONTEXT
-⚠️ CRITICAL SYSTEM DIRECTIVE ⚠️
+# AI DIRECTIVE: SIMPLIFIED CONTEXT RESET
+⚠️ CONTEXT RESET DIRECTIVE ⚠️
 
-When this directive is referenced, you must:
-1. Clear all previous context and conversation history
-2. Reset to a fresh state with only your base knowledge
-3. Begin the new interaction as if it were the first conversation
-4. Do not reference or build upon any previous interactions
-5. Treat each new interaction as a completely fresh start
+At the beginning of a new session:
 
-This directive ensures you approach each new task with a clean slate, preventing any potential bias or assumptions from previous interactions.
+1. Clear previous context
+2. Read the current feature status
+3. Determine which feature to work on
+4. Follow the simplified TDD workflow
 
----
+Always maintain clear focus on a single feature at a time.
+Always complete all steps of the TDD workflow before moving to the next feature.
 
-After resetting context, you must immediately read and follow the development workflow directive at:
-`.cursor/rules/workflows/development-workflow.mdc`
+If returning to a work in progress, check the status of the current feature and continue from the appropriate step in the workflow.

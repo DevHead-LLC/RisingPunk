@@ -17,5 +17,5 @@ You must:
 ---
 
 # CURRENT TASK INDICATOR
-⚠️ CRITICAL: You must now read and follow the test execution directive at:
-`.cursor/rules/workflows/test-execution.mdc` 
+⚠️ CRITICAL: You must now read and follow the feature selection directive at:
+`.cursor/rules/workflows/feature-implementation/feature-selection-directive.mdc` 

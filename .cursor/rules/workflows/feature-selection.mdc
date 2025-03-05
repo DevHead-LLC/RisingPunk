@@ -26,6 +26,9 @@ RisingPunk/
 │       │   └── `failed-test-loop.mdc`
 │       └── gameplay/
 │           ├── features/
+│           │   └── battle/
+│           │       ├── `core-mechanics.mdc` [in-progress]
+│           │       └── features/
 │           └── design/
 └── mobile/
     ├── src/
@@ -46,11 +49,27 @@ RisingPunk/
 ```
 
 You must:
-1. Verify and update this structure to reflect current state
-2. Analyze the current state of the game's features
-3. Identify the next logical feature to implement or improve
+1. Read and verify the active context in `.cursor/rules/workflows/feature-implementation/active-working-feature-context.mdc`
+2. If active context exists:
+   - Use that as the current feature to work on
+   - Follow `.cursor/rules/workflows/feature-implementation/feature-selection-directive.mdc` for implementation steps
+3. If no active context exists:
+   - Look for [in-progress] features in the project structure
+   - If found, create active context for that feature
+   - If none found, look for [to-do] features
+   - Follow `.cursor/rules/workflows/feature-implementation/feature-selection-directive.mdc` for implementation steps
 4. Focus only on the selected feature
 5. Do not deviate from the selected feature until it is complete
 6. Document your selection and reasoning
+
+# Status Update Context
+⚠️ IMPORTANT: Status updates ([to-do], [in-progress], [done]) will be handled in a separate phase after:
+1. Feature selection is complete
+2. Tests are written and failing
+3. Implementation is complete
+4. Tests are passing
+5. User has verified the changes
+
+Do not update statuses until explicitly directed to do so in that phase.
 
 This directive ensures systematic progression through the game's feature set with accurate project structure awareness.

@@ -37,6 +37,7 @@ export interface BattleStateUpdate {
   timeUpdate?: number;
   nodeUpdates?: Map<string, Partial<Node>>;
   battalionUpdates?: Map<string, Partial<Battalion>>;
+  damagingTeam?: string;
 }
 
 interface Position {
@@ -65,6 +66,7 @@ export class BattleStateManager {
   private readonly MAX_BUFFER_SIZE = 100;
   private bufferTimer: NodeJS.Timeout | null;
   private updateTimer: NodeJS.Timeout | null = null;
+  private nodeDamageByTeam: Map<string, Map<string, number>> = new Map();
 
   constructor(battleService: BattleService) {
     if (!battleService) {
@@ -96,6 +98,9 @@ export class BattleStateManager {
       throw new Error('Battle ID is required for initialization');
     }
     this.battleId = battleId;
+    
+    // Reset damage tracking on new battle initialization
+    this.resetDamageTracking();
     
     // Use provided initial state or create default state
     this.currentState = initialState || {
@@ -193,6 +198,25 @@ export class BattleStateManager {
         if (!existingNode && !nodeUpdate.position) {
           console.warn(`Attempted to update non-existent node without position: ${nodeId}`);
           return;
+        }
+        
+        if (existingNode && nodeUpdate.health !== undefined && existingNode.health > nodeUpdate.health) {
+          const damageAmount = existingNode.health - nodeUpdate.health;
+          
+          let damagingTeam: string | null = update.damagingTeam || null;
+          
+          if (!damagingTeam) {
+            for (const battalion of this.currentState.battalions.values()) {
+              if (battalion.targetId === nodeId) {
+                damagingTeam = battalion.team;
+                break;
+              }
+            }
+          }
+          
+          if (damagingTeam) {
+            this.trackNodeDamage(nodeId, damagingTeam, damageAmount);
+          }
         }
         
         const updatedNode = {
@@ -408,5 +432,21 @@ export class BattleStateManager {
 
     // Update state and notify subscribers
     this.handleStateUpdate(newState);
+  }
+
+  public getNodeDamageByTeam(nodeId: string, team: string): number {
+    const nodeDamageMap = this.nodeDamageByTeam.get(nodeId) || new Map<string, number>();
+    return nodeDamageMap.get(team) || 0;
+  }
+
+  private trackNodeDamage(nodeId: string, team: string, damage: number): void {
+    const nodeDamageMap = this.nodeDamageByTeam.get(nodeId) || new Map<string, number>();
+    const currentDamage = nodeDamageMap.get(team) || 0;
+    nodeDamageMap.set(team, currentDamage + damage);
+    this.nodeDamageByTeam.set(nodeId, nodeDamageMap);
+  }
+
+  public resetDamageTracking(): void {
+    this.nodeDamageByTeam = new Map();
   }
 }

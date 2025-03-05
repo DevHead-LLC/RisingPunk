@@ -1,0 +1,70 @@
+---
+description: Template for feature-specific implementation files
+globs: 
+alwaysApply: true
+---
+
+# AI DIRECTIVE: FEATURE IMPLEMENTATION
+⚠️ CRITICAL IMPLEMENTATION DIRECTIVE ⚠️
+
+This file is a child of: `.cursor/rules/gameplay/features/battle/core-mechanics.mdc`
+
+You must:
+1. Track implementation status of each sub-feature
+2. Maintain reference to parent file
+3. Document all implementation decisions
+4. Create failing tests for each sub-feature
+5. Update status in parent file when complete
+
+# Feature: [Feature Name]
+Status: [in-progress/to-do]
+
+## Parent Reference
+- Parent File: `.cursor/rules/gameplay/features/battle/core-mechanics.mdc`
+- Feature Section: [Section Name]
+- Original Requirements: [Copy of original requirements]
+
+## Implementation Context
+- Related Files: [List of files from mobile/src/battle]
+- Implementation Notes: [Any important implementation details]
+- Questions/Concerns: [List any unclear aspects]
+
+## Sub-Features
+### [Sub-Feature 1] [to-do/in-progress/done]
+- Requirements:
+  - [Requirement 1]
+  - [Requirement 2]
+- Implementation Status:
+  - [ ] Test Created
+  - [ ] Test Failing
+  - [ ] Implementation Started
+  - [ ] Implementation Complete
+  - [ ] Test Passing
+
+### [Sub-Feature 2] [to-do/in-progress/done]
+- Requirements:
+  - [Requirement 1]
+  - [Requirement 2]
+- Implementation Status:
+  - [ ] Test Created
+  - [ ] Test Failing
+  - [ ] Implementation Started
+  - [ ] Implementation Complete
+  - [ ] Test Passing
+
+## Test Writing Phase
+### Current Focus
+- Sub-Feature: [Current sub-feature being tested]
+- Test File: [Path to test file]
+- Test Requirements: [List of test requirements]
+
+### Test Implementation Status
+- [ ] Test file created
+- [ ] Initial test failing
+- [ ] Test requirements documented
+- [ ] Test implementation complete
+
+## Progress Tracking
+- Last Updated: [Timestamp]
+- Current Phase: [Selection/Implementation/Testing/Complete]
+- Next Steps: [List of next actions] 
