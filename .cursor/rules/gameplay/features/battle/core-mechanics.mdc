@@ -36,13 +36,13 @@ You must:
   - Enemy battalion elimination ✓
   - Network control bonuses ✓
 
-## Victory Determination [in-progress]
+## Victory Determination [done]
 - Victory achieved through:
-  - Total network control
-  - Point threshold reached
-  - Enemy force elimination
+  - Total network control ✓
+  - Point threshold reached ✓
+  - Enemy force elimination ✓
 
-## State Management System [to-do]
+## State Management System [in-progress]
 ### Core Principles:
 - Single source of truth
 - Centralized state management
