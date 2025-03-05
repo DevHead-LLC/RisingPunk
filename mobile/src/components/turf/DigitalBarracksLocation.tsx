@@ -1,9 +1,16 @@
 import React, {memo} from 'react';
-import {TouchableOpacity, View, Text, Image, StyleSheet} from 'react-native';
+import {TouchableOpacity, View, Text, Image, StyleSheet, ImageStyle} from 'react-native';
 import {COLORS, SIZING} from '../../styles/theme';
 
 type DigitalBarracksLocationProps = {
   onPress: () => void;
+};
+
+// Define image style separately with correct typing
+const imageStyles: ImageStyle = {
+  width: '100%',
+  height: '100%',
+  resizeMode: 'contain',
 };
 
 export const DigitalBarracksLocation = memo(function DigitalBarracksLocation({ onPress }: DigitalBarracksLocationProps) {
@@ -15,7 +22,7 @@ export const DigitalBarracksLocation = memo(function DigitalBarracksLocation({ o
       <View style={styles.iconContainer}>
         <Image 
           source={require('../../assets/images/digital-barracks.png')}
-          style={styles.locationIcon}
+          style={imageStyles}
         />
       </View>
       <Text style={styles.locationLabel}>DIGITAL BARRACKS</Text>
