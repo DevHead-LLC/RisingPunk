@@ -17,8 +17,8 @@ This file maintains the active context for feature implementation and testing. I
 # Active Working Feature Context
 
 ## Current Session
-- Started: 2023-03-07 10:00
-- Last Updated: 2023-03-07 11:30
+- Started: 2023-03-06 13:00
+- Last Updated: 2023-03-06 13:15
 - Status: active
 
 ## Active Feature
@@ -29,8 +29,8 @@ This file maintains the active context for feature implementation and testing. I
 
 ## Current Phase
 - Phase: Implementation
-- Last Action: Implemented Battalion Elimination Points and all tests pass
-- Next Action: Begin work on Network Control Bonuses sub-feature
+- Last Action: Implemented Node Control Points and all tests pass
+- Next Action: Begin work on Battalion Elimination Points sub-feature
 
 ## Test Context
 - Test File: mobile/__tests__/battle/core/ScoringSystem.test.ts
@@ -43,15 +43,6 @@ This file maintains the active context for feature implementation and testing. I
       - Should award points for node control
       - Should accumulate points over time based on control duration
       - Should apply different point rates for different node types
-  - Battalion Elimination Points:
-    - Status: Passing
-    - Tests:
-      - Should award points when enemy battalion is eliminated
-      - Should not award points when own battalion is eliminated
-      - Should award different points based on battalion type
-      - Should award points based on battalion quantity
-      - Should track elimination points separately from control points
-      - Should get battalion point value based on type and quantity
 
 ## Implementation Context
 - Modified Files:
@@ -61,9 +52,11 @@ This file maintains the active context for feature implementation and testing. I
   - mobile/__tests__/battle/core/ScoringSystem.test.ts
   - mobile/src/battle/core/BattleStateManager.ts
 - Last Changes:
-  - Created tests for Battalion Elimination Points
-  - Implemented Battalion Elimination Points functionality in BattleStateManager
-  - Added methods for tracking and calculating elimination points
+  - Updated Scoring System status to [in-progress] in core-mechanics.mdc
+  - Created scoring-system-implementation.mdc file
+  - Defined sub-features and requirements for Scoring System
+  - Created test file with failing tests for Node Control Points
+  - Implemented Node Control Points functionality in BattleStateManager
   - Fixed test issues and confirmed all tests passing
   - Updated implementation file to reflect tests passing
   - Updated active working feature context
@@ -78,25 +71,14 @@ This file maintains the active context for feature implementation and testing. I
 7. Implemented Node Control Points in BattleStateManager.ts
 8. Fixed test issues and ensured all tests pass
 9. Updated implementation file to reflect passing tests
-10. Created tests for Battalion Elimination Points
-11. Confirmed tests failing as expected
-12. Implemented Battalion Elimination Points in BattleStateManager.ts
-13. Fixed test issues and ensured all tests pass
-14. Updated implementation file to reflect passing tests
 
 # Notes
-Completed the Battalion Elimination Points sub-feature. The implementation includes:
-- Tracking elimination points separately from control points
-- Calculating point values based on battalion type and quantity
-- Awarding points only when eliminating enemy battalions
-- Scaling point values based on battalion quantity with diminishing returns
-
-Next, we'll focus on implementing the Network Control Bonuses sub-feature.
+Starting work on the Scoring System after successfully completing the Loss Tracking System feature. The first sub-feature to implement is Node Control Points, which will track node control and award points based on control duration.
 
 # Previous Feature Context
 ## Loss Tracking System
-- Status: [done]
-- Implementation File: .cursor/rules/gameplay/features/battle/features/loss-tracking-system-implementation.mdc
+- Status: [in-progress]
+- Implementation File: .cursor/rules/gameplay/features/battle/features/scoring-system-implementation.mdc
 - Last Action: Implemented Loss Comparison Analytics and fixed all tests
 - Modified Files: 
   - mobile/__tests__/battle/core/LossTrackingSystem.test.ts
