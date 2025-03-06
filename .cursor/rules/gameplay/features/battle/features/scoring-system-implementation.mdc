@@ -37,21 +37,21 @@ The Scoring System calculates and tracks points earned during battle based on va
   - [x] Implementation Complete
   - [x] Test Passing
 
-### Network Control Bonuses [test-passing]
+### Network Control Bonuses [to-do]
 - Requirements:
   - Award bonus points for controlling specific node configurations
   - Calculate bonuses for network domination percentage
   - Implement multipliers for strategic node control
 - Implementation Status:
-  - [x] Test Created
-  - [x] Test Failing
-  - [x] Implementation Started
-  - [x] Implementation Complete
-  - [x] Test Passing
+  - [ ] Test Created
+  - [ ] Test Failing
+  - [ ] Implementation Started
+  - [ ] Implementation Complete
+  - [ ] Test Passing
 
 ## Test Writing Phase
 ### Current Focus
-- Sub-Feature: Network Control Bonuses - COMPLETED
+- Sub-Feature: Network Control Bonuses
 - Test File: mobile/__tests__/battle/core/ScoringSystem.test.ts
 - Test Requirements: 
   - Verify bonus points are awarded for specific node configurations
@@ -60,15 +60,16 @@ The Scoring System calculates and tracks points earned during battle based on va
 
 ### Test Implementation Status
 - [x] Test file created
-- [x] Tests for Network Control Bonuses created
-- [x] Initial test failing
-- [x] Test requirements documented
-- [x] Test implementation complete
+- [ ] Tests for Network Control Bonuses created
+- [ ] Initial test failing
+- [ ] Test requirements documented
+- [ ] Test implementation complete
 
 ## Progress Tracking
-- Last Updated: 2023-03-08
-- Current Phase: Implementation Complete for Scoring System
+- Last Updated: 2023-03-07
+- Current Phase: Implementation Complete for Battalion Elimination Points
 - Next Steps: 
-  1. Mark the Scoring System feature as complete
-  2. Update context files to reflect completion
-  3. Determine the next feature to implement 
+  1. Begin work on Network Control Bonuses sub-feature
+  2. Create tests for Network Control Bonuses
+  3. Implement Network Control Bonuses feature
+  4. Update context files 

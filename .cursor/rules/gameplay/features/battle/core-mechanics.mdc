@@ -30,13 +30,13 @@ You must:
 - Monitors node control changes
 - Calculates victory points based on control duration
 
-## Scoring System [done]
+## Scoring System [in-progress]
 - Points awarded for:
   - Node control duration ✓
   - Enemy battalion elimination ✓
-  - Network control bonuses ✓
+  - Network control bonuses
 
-## Victory Determination [in-progress]
+## Victory Determination [to-do]
 - Victory achieved through:
   - Total network control
   - Point threshold reached

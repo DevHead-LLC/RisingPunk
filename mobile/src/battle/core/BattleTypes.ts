@@ -22,7 +22,6 @@ export interface Node {
   controllingTeam: string | null;
   controlProgress: number;
   health: number;
-  type?: string;
 }
 
 export interface Battalion {

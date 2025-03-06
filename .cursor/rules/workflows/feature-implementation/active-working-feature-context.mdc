@@ -17,127 +17,95 @@ This file maintains the active context for feature implementation and testing. I
 # Active Working Feature Context
 
 ## Current Session
-- Started: 2023-03-08 12:00
-- Last Updated: 2023-03-08 14:30
+- Started: 2023-03-07 10:00
+- Last Updated: 2023-03-07 11:30
 - Status: active
 
 ## Active Feature
-- Name: Victory Determination
+- Name: Scoring System
 - Parent File: .cursor/rules/gameplay/features/battle/core-mechanics.mdc
-- Implementation File: .cursor/rules/gameplay/features/battle/features/victory-determination-implementation.mdc
+- Implementation File: .cursor/rules/gameplay/features/battle/features/scoring-system-implementation.mdc
 - Status: [in-progress]
 
 ## Current Phase
 - Phase: Implementation
-- Last Action: Implemented Point Threshold Victory sub-feature and all tests are passing
-- Next Action: Create tests for Enemy Force Elimination Victory sub-feature
+- Last Action: Implemented Battalion Elimination Points and all tests pass
+- Next Action: Begin work on Network Control Bonuses sub-feature
 
 ## Test Context
-- Test File: mobile/__tests__/battle/core/VictoryDetermination.test.ts
+- Test File: mobile/__tests__/battle/core/ScoringSystem.test.ts
 - Test File Path Verified: Yes
 - Test File Location: mobile/__tests__/battle/core/
 - Tests: 
-  - Total Network Control Victory:
+  - Node Control Points:
     - Status: Passing
     - Tests:
-      - Should declare victory when 100% of network is controlled
-      - Should require minimum control duration before declaring victory
-      - Should trigger appropriate victory notification
-  - Point Threshold Victory:
+      - Should award points for node control
+      - Should accumulate points over time based on control duration
+      - Should apply different point rates for different node types
+  - Battalion Elimination Points:
     - Status: Passing
     - Tests:
-      - Should declare victory when point threshold is reached
-      - Should use configurable point threshold
-      - Should trigger appropriate victory notification
-  - Enemy Force Elimination Victory:
-    - Status: Test-Needed
-    - Tests:
-      - Should declare victory when all enemy battalions are eliminated
-      - Should not declare victory if any enemy battalions remain
-      - Should trigger appropriate victory notification
+      - Should award points when enemy battalion is eliminated
+      - Should not award points when own battalion is eliminated
+      - Should award different points based on battalion type
+      - Should award points based on battalion quantity
+      - Should track elimination points separately from control points
+      - Should get battalion point value based on type and quantity
 
 ## Implementation Context
 - Modified Files:
   - .cursor/rules/gameplay/features/battle/core-mechanics.mdc
-  - .cursor/rules/gameplay/features/battle/features/victory-determination-implementation.mdc
-  - .cursor/rules/workflows/feature-implementation/active-working-feature-context.mdc
-  - .cursor/rules/workflows/feature-implementation/context-persistence.mdc
-  - mobile/__tests__/battle/core/VictoryDetermination.test.ts
-  - mobile/src/battle/core/BattleStateManager.ts
-  - mobile/src/battle/core/BattleService.ts
-- Last Changes:
-  - Implemented Point Threshold Victory functionality in BattleStateManager.ts
-  - Added DEFAULT_POINT_THRESHOLD constant
-  - Added setPointThreshold method for configurable threshold
-  - Added addPoints method to increment team points
-  - Added checkForPointThresholdVictory method to check for victory
-  - Integrated point threshold victory check into updateState method
-  - Fixed all tests and verified they pass
-  - Updated implementation file to mark Point Threshold Victory as complete
-
-## Progress History
-1. Selected Victory Determination as next feature to implement
-2. Updated core-mechanics.mdc to mark feature as [in-progress]
-3. Created victory-determination-implementation.mdc file
-4. Defined sub-features: Total Network Control Victory, Point Threshold Victory, Enemy Force Elimination Victory
-5. Specified requirements for each sub-feature
-6. Updated active working feature context
-7. Updated context-persistence.mdc
-8. Created test file mobile/__tests__/battle/core/VictoryDetermination.test.ts
-9. Implemented failing tests for Total Network Control Victory
-10. Updated victory-determination-implementation.mdc to mark tests as created and failing
-11. Updated context files to reflect current status
-12. Implemented Total Network Control Victory functionality in BattleStateManager.ts
-13. Added victory notification through BattleService
-14. Fixed tests to properly test time-based functionality
-15. Verified all tests passing for Total Network Control Victory
-16. Updated implementation file to mark Total Network Control Victory as [done]
-17. Updated context files to move to Point Threshold Victory sub-feature
-18. Fixed compatibility issues in the full test suite caused by the addition of the notifyVictory interface
-19. Verified all tests in the codebase are now passing
-20. Created failing tests for Point Threshold Victory sub-feature
-21. Updated implementation file to mark Point Threshold Victory tests as created and failing
-22. Implemented Point Threshold Victory functionality in BattleStateManager.ts
-23. Fixed test issues related to point accumulation
-24. Verified all Point Threshold Victory tests passing
-25. Updated implementation file to mark Point Threshold Victory as complete
-26. Updated context files to move to Enemy Force Elimination Victory sub-feature
-
-# Notes
-Recent changes:
-- Implemented Point Threshold Victory functionality in BattleStateManager.ts
-- Added DEFAULT_POINT_THRESHOLD constant (1000 points)
-- Added setPointThreshold method to allow configurable threshold
-- Added addPoints method to add points to a team's score
-- Added checkForPointThresholdVictory method to check for victory conditions
-- Identified and fixed issue with point accumulation in the addPoints method
-- Integrated point threshold victory check into updateState method
-- Removed debug console.log statements
-- Verified that all tests now pass
-
-Next steps:
-1. Create tests for Enemy Force Elimination Victory sub-feature
-2. Implement tests for:
-   - Victory when all enemy battalions are eliminated
-   - No victory if any enemy battalions remain
-   - Proper victory notification
-3. Implement checkForEnemyEliminationVictory method
-4. Update battalion elimination logic to check for victory conditions
-5. Verify tests pass
-
-# Previous Feature Context
-## Scoring System
-- Status: [in-progress]
-- Implementation File: .cursor/rules/gameplay/features/battle/features/victory-determination-implementation.mdc
-- Last Action: Implemented Network Control Bonuses and all tests pass. Feature complete.
-- Modified Files:
-  - .cursor/rules/gameplay/features/battle/core-mechanics.mdc
   - .cursor/rules/gameplay/features/battle/features/scoring-system-implementation.mdc
   - .cursor/rules/workflows/feature-implementation/active-working-feature-context.mdc
-  - .cursor/rules/workflows/feature-implementation/context-persistence.mdc
   - mobile/__tests__/battle/core/ScoringSystem.test.ts
   - mobile/src/battle/core/BattleStateManager.ts
-- Implementation Notes: Successfully implemented Node Control Points, Battalion Elimination Points, and Network Control Bonuses. All tests passing.
+- Last Changes:
+  - Created tests for Battalion Elimination Points
+  - Implemented Battalion Elimination Points functionality in BattleStateManager
+  - Added methods for tracking and calculating elimination points
+  - Fixed test issues and confirmed all tests passing
+  - Updated implementation file to reflect tests passing
+  - Updated active working feature context
+
+## Progress History
+1. Selected Scoring System as next feature to implement
+2. Updated core-mechanics.mdc to mark feature as [in-progress]
+3. Created scoring-system-implementation.mdc file
+4. Updated active working feature context
+5. Created test file with failing tests for Node Control Points
+6. Confirmed tests failing as expected
+7. Implemented Node Control Points in BattleStateManager.ts
+8. Fixed test issues and ensured all tests pass
+9. Updated implementation file to reflect passing tests
+10. Created tests for Battalion Elimination Points
+11. Confirmed tests failing as expected
+12. Implemented Battalion Elimination Points in BattleStateManager.ts
+13. Fixed test issues and ensured all tests pass
+14. Updated implementation file to reflect passing tests
+
+# Notes
+Completed the Battalion Elimination Points sub-feature. The implementation includes:
+- Tracking elimination points separately from control points
+- Calculating point values based on battalion type and quantity
+- Awarding points only when eliminating enemy battalions
+- Scaling point values based on battalion quantity with diminishing returns
+
+Next, we'll focus on implementing the Network Control Bonuses sub-feature.
+
+# Previous Feature Context
+## Loss Tracking System
+- Status: [done]
+- Implementation File: .cursor/rules/gameplay/features/battle/features/loss-tracking-system-implementation.mdc
+- Last Action: Implemented Loss Comparison Analytics and fixed all tests
+- Modified Files: 
+  - mobile/__tests__/battle/core/LossTrackingSystem.test.ts
+  - mobile/src/battle/core/BattleStateManager.ts
+  - .cursor/rules/gameplay/features/battle/features/loss-tracking-system-implementation.mdc
+  - .cursor/rules/gameplay/features/battle/core-mechanics.mdc
+  - .cursor/rules/workflows/feature-implementation/active-working-feature-context.mdc
+  - .cursor/rules/workflows/feature-implementation/context-persistence.mdc
+- Implementation Notes: Successfully implemented tracking of unit losses, loss rate calculation, and loss comparison analytics. All tests passing.
 
 ## Implementation Guidelines
 - Always verify test file paths using verify-test-path.sh script before creating/modifying tests
