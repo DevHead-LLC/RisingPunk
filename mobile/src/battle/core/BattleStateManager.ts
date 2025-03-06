@@ -69,10 +69,6 @@ export class BattleStateManager {
   private nodeDamageByTeam: Map<string, Map<string, number>> = new Map();
   // Default capture threshold percentage
   private readonly CAPTURE_THRESHOLD_PERCENTAGE = 0.75;
-  
-  // Battalion loss tracking
-  private battalionLossesByTeam: Map<string, number> = new Map();
-  private battalionLossHistory: Map<string, Array<{timestamp: Date, quantity: number}>> = new Map();
 
   constructor(battleService: BattleService) {
     if (!battleService) {
@@ -107,9 +103,6 @@ export class BattleStateManager {
     
     // Reset damage tracking on new battle initialization
     this.resetDamageTracking();
-    
-    // Reset loss tracking
-    this.resetLossTracking();
     
     // Use provided initial state or create default state
     this.currentState = initialState || {
@@ -263,16 +256,6 @@ export class BattleStateManager {
           quantity: 10,
           targetId: null
         };
-        
-        // Track battalion losses if quantity has decreased
-        if (existingBattalion && 
-            battalionUpdate.quantity !== undefined && 
-            battalionUpdate.quantity < existingBattalion.quantity) {
-          // Calculate the number of units lost
-          const lostUnits = existingBattalion.quantity - battalionUpdate.quantity;
-          // Track the loss
-          this.trackBattalionLoss(existingBattalion.team, lostUnits);
-        }
         
         newBattalions.set(battalionId, {
           ...existingBattalion,
@@ -605,166 +588,5 @@ export class BattleStateManager {
     }
     
     return highestProgressTeam;
-  }
-
-  // Battalion Loss Tracking Methods
-  
-  /**
-   * Reset all battalion loss tracking data
-   */
-  public resetLossTracking(): void {
-    this.battalionLossesByTeam = new Map();
-    this.battalionLossHistory = new Map();
-  }
-  
-  /**
-   * Track a loss of units for a given team
-   * 
-   * @param team The team that lost units
-   * @param quantity The number of units lost
-   */
-  private trackBattalionLoss(team: string, quantity: number): void {
-    // Update total losses for the team
-    const currentLosses = this.battalionLossesByTeam.get(team) || 0;
-    this.battalionLossesByTeam.set(team, currentLosses + quantity);
-    
-    // Add to loss history
-    const lossHistory = this.battalionLossHistory.get(team) || [];
-    lossHistory.push({
-      timestamp: new Date(),
-      quantity: quantity
-    });
-    this.battalionLossHistory.set(team, lossHistory);
-  }
-  
-  /**
-   * Get the total number of units lost for a team
-   * 
-   * @param team The team to get losses for
-   * @returns The total number of units lost
-   */
-  public getBattalionLosses(team: string): number {
-    return this.battalionLossesByTeam.get(team) || 0;
-  }
-  
-  /**
-   * Get the history of battalion losses for a team
-   * 
-   * @param team The team to get loss history for
-   * @returns An array of loss events with timestamp and quantity
-   */
-  public getBattalionLossHistory(team: string): Array<{timestamp: Date, quantity: number}> {
-    return this.battalionLossHistory.get(team) || [];
-  }
-  
-  /**
-   * Calculate the overall loss rate for a team (units per minute)
-   * 
-   * @param team The team to calculate loss rate for
-   * @returns The loss rate in units per minute
-   */
-  public calculateLossRate(team: string): number {
-    const lossHistory = this.getBattalionLossHistory(team);
-    
-    // If no history, return 0
-    if (lossHistory.length === 0) {
-      return 0;
-    }
-    
-    // Get first and last timestamp
-    const firstLoss = lossHistory[0];
-    const lastLoss = lossHistory[lossHistory.length - 1];
-    
-    // Calculate total time elapsed in milliseconds
-    const elapsedMs = lastLoss.timestamp.getTime() - firstLoss.timestamp.getTime();
-    
-    // Calculate total losses
-    const totalLosses = lossHistory.reduce((sum, loss) => sum + loss.quantity, 0);
-    
-    // Handle case where all losses happened at the same time or very close together
-    if (elapsedMs < 1000) { // Less than 1 second
-      // Use a small time value to avoid division by zero
-      // This effectively treats the loss as an instantaneous event
-      return totalLosses;
-    }
-    
-    // Calculate elapsed time in minutes
-    const elapsedMinutes = elapsedMs / (1000 * 60);
-    
-    // Calculate and return loss rate (units lost per minute)
-    return totalLosses / elapsedMinutes;
-  }
-  
-  /**
-   * Calculate the loss rate for a team within a specified time window (units per minute)
-   * 
-   * @param team The team to calculate loss rate for
-   * @param timeWindowSeconds The time window in seconds to consider
-   * @returns The recent loss rate in units per minute
-   */
-  public calculateRecentLossRate(team: string, timeWindowSeconds: number): number {
-    const lossHistory = this.getBattalionLossHistory(team);
-    
-    // If no history, return 0
-    if (lossHistory.length === 0) {
-      return 0;
-    }
-    
-    // Get the current time (using Date.now for test compatibility)
-    const now = Date.now();
-    
-    // Calculate the cutoff time
-    const cutoffTime = now - (timeWindowSeconds * 1000);
-    
-    // Filter the loss history to only include events within the time window
-    const recentLosses = lossHistory.filter(loss => 
-      loss.timestamp.getTime() >= cutoffTime
-    );
-    
-    // If no recent losses, return 0
-    if (recentLosses.length === 0) {
-      return 0;
-    }
-    
-    // Calculate total recent losses
-    const totalRecentLosses = recentLosses.reduce((sum, loss) => sum + loss.quantity, 0);
-    
-    // Calculate the actual time window - use the exact duration for more accuracy
-    // This handles cases where the loss events don't span the entire window
-    const startTime = Math.max(cutoffTime, recentLosses[0].timestamp.getTime());
-    const effectiveWindowSeconds = (now - startTime) / 1000;
-    
-    // If all losses happened at the current time, use the full window
-    if (effectiveWindowSeconds <= 0) {
-      return (totalRecentLosses / timeWindowSeconds) * 60;
-    }
-    
-    // Calculate loss rate (units per minute) using the effective time window
-    return (totalRecentLosses / effectiveWindowSeconds) * 60;
-  }
-
-  /**
-   * Calculate the loss rate for very short time periods
-   * This is a specialized method for test scenarios and rapid loss situations
-   * 
-   * @param team The team to calculate loss rate for
-   * @param timeWindowSeconds The short time window in seconds
-   * @returns The loss rate in units per minute
-   */
-  public calculateShortTermLossRate(team: string, timeWindowSeconds: number): number {
-    // For very short periods, we need a different approach
-    // Get all losses
-    const lossHistory = this.getBattalionLossHistory(team);
-    
-    // If no history, return 0
-    if (lossHistory.length === 0) {
-      return 0;
-    }
-    
-    // Calculate total losses in the time window
-    const totalLosses = lossHistory.reduce((sum, loss) => sum + loss.quantity, 0);
-    
-    // Convert to units per minute (60 seconds)
-    return (totalLosses / timeWindowSeconds) * 60;
   }
 }
