@@ -4,8 +4,6 @@
 import { BattlePhase, BattalionType, Battalion as BattleTypeBattalion, Node as BattleTypeNode } from './BattleTypes';
 import { BattleService, VictoryNotification } from './BattleService';
 import { BattlePerformanceMonitor } from './BattlePerformanceMonitor';
-import { StateCoordinator, BattleStateCoordinator, StateTransition, StateComponent, UpdateOptions } from './StateCoordinator';
-import { BattalionStateComponentImpl, NodeStateComponentImpl, TeamStateComponentImpl } from './StateComponents';
 
 export interface BattleState {
   phase: BattlePhase;
@@ -101,12 +99,6 @@ export class BattleStateManager {
   private readonly DEFAULT_POINT_THRESHOLD = 1000; // Default threshold for point victory
   private pointThreshold: number = this.DEFAULT_POINT_THRESHOLD;
 
-  // State management system
-  private stateCoordinator: StateCoordinator;
-  private battalionStateComponent: BattalionStateComponentImpl;
-  private nodeStateComponent: NodeStateComponentImpl;
-  private teamStateComponent: TeamStateComponentImpl;
-
   constructor(battleService: BattleService) {
     if (!battleService) {
       throw new Error('BattleService is required for BattleStateManager');
@@ -132,17 +124,6 @@ export class BattleStateManager {
     this.battalionPointValues.set(BattalionType.GUARDIAN, 3);
     this.battalionPointValues.set(BattalionType.PHREAK, 2);
     this.battalionPointValues.set(BattalionType.BREACHER, 4);
-    
-    // Initialize state coordinator and components
-    this.stateCoordinator = new BattleStateCoordinator(this.currentState);
-    this.battalionStateComponent = new BattalionStateComponentImpl(this.stateCoordinator);
-    this.nodeStateComponent = new NodeStateComponentImpl(this.stateCoordinator);
-    this.teamStateComponent = new TeamStateComponentImpl(this.stateCoordinator);
-    
-    // Register components with coordinator
-    this.stateCoordinator.registerComponent(this.battalionStateComponent);
-    this.stateCoordinator.registerComponent(this.nodeStateComponent);
-    this.stateCoordinator.registerComponent(this.teamStateComponent);
   }
 
   public static getInstance(battleService: BattleService): BattleStateManager {
@@ -170,27 +151,15 @@ export class BattleStateManager {
     this.eliminationPoints.clear();
     this.controlPoints.clear();
     
-    // Initialize with provided state if available
-    if (initialState) {
-      this.currentState = {
-        ...initialState,
-        updateId: 0,
-        lastUpdated: new Date()
-      };
-      
-      // Update the state coordinator
-      this.stateCoordinator = new BattleStateCoordinator(this.currentState);
-      
-      // Re-initialize components with new coordinator
-      this.battalionStateComponent = new BattalionStateComponentImpl(this.stateCoordinator);
-      this.nodeStateComponent = new NodeStateComponentImpl(this.stateCoordinator);
-      this.teamStateComponent = new TeamStateComponentImpl(this.stateCoordinator);
-      
-      // Register components with coordinator
-      this.stateCoordinator.registerComponent(this.battalionStateComponent);
-      this.stateCoordinator.registerComponent(this.nodeStateComponent);
-      this.stateCoordinator.registerComponent(this.teamStateComponent);
-    }
+    // Use provided initial state or create default state
+    this.currentState = initialState || {
+      phase: BattlePhase.PRE_BATTLE,
+      timeRemaining: 20,
+      nodes: new Map(),
+      battalions: new Map(),
+      updateId: 0,
+      lastUpdated: new Date()
+    };
 
     this.notifySubscribers();
     this.battleService.startSync(
@@ -383,12 +352,6 @@ export class BattleStateManager {
     // Check for victory conditions
     this.checkForTotalNetworkControlVictory();
     this.checkForPointThresholdVictory();
-
-    // Check for victory by enemy elimination for both teams
-    const teams = this.getActiveTeams();
-    teams.forEach(team => {
-      this.checkForEnemyEliminationVictory(team);
-    });
   }
 
   private validatePhaseTransition(currentPhase: BattlePhase, nextPhase: BattlePhase): boolean {
@@ -444,20 +407,7 @@ export class BattleStateManager {
     return [...this.stateQueue];
   }
 
-  public startUpdateTimer(interval?: number): void {
-    // If an interval is specified, this is for component updates (used in tests)
-    if (interval !== undefined) {
-      if (this.updateTimer) {
-        clearInterval(this.updateTimer);
-      }
-      
-      this.updateTimer = setInterval(() => {
-        this.triggerUpdateCycle();
-      }, interval);
-      return;
-    }
-    
-    // Original timer functionality for battle updates
+  public startUpdateTimer(): void {
     if (this.updateTimer === null && this.currentState.phase === BattlePhase.COMBAT) {
       this.updateTimer = setInterval(() => {
         if (this.currentState.timeRemaining > 0) {
@@ -467,9 +417,6 @@ export class BattleStateManager {
             console.error('Failed to update timer:', error);
           });
         }
-        
-        // Also trigger an update cycle for registered components
-        this.triggerUpdateCycle();
       }, 1000);
     }
   }
@@ -1354,9 +1301,6 @@ export class BattleStateManager {
       
       // Log the elimination
       console.log(`${eliminatingTeam} eliminated ${battalion.team}'s ${battalion.type} battalion (${battalionId}) and earned ${pointValue} points`);
-      
-      // Check for victory by enemy force elimination
-      this.checkForEnemyEliminationVictory(eliminatingTeam);
     }
   }
   
@@ -1730,116 +1674,5 @@ export class BattleStateManager {
       victoryType: 'POINT_THRESHOLD',
       gameStats
     });
-  }
-
-  /**
-   * Check for enemy force elimination victory condition
-   * Victory is declared when one team has eliminated all enemy battalions
-   * @param team The team to check for victory
-   */
-  public checkForEnemyEliminationVictory(team: string): void {
-    // Get all battalions
-    const battalions = Array.from(this.currentState.battalions.values());
-    
-    // Find enemy battalions (those not on the specified team)
-    const enemyBattalions = battalions.filter(battalion => battalion.team !== team);
-    
-    // If there are no enemy battalions, declare victory
-    if (enemyBattalions.length === 0) {
-      // Determine enemy team name for statistics
-      const enemyTeam = team === 'TeamA' ? 'TeamB' : 'TeamA';
-      
-      // Victory condition met!
-      const gameStats = {
-        eliminatedEnemyCount: this.getBattalionLosses(enemyTeam)
-      };
-      
-      this.battleService.notifyVictory({
-        winningTeam: team,
-        victoryType: 'ENEMY_FORCE_ELIMINATION',
-        gameStats
-      });
-    }
-  }
-
-  /**
-   * Get all active teams in the battle
-   * @returns Array of team names
-   */
-  public getActiveTeams(): string[] {
-    const teams = new Set<string>();
-    
-    // Collect all team names from battalions
-    this.currentState.battalions.forEach(battalion => {
-      teams.add(battalion.team);
-    });
-    
-    // Collect all team names from nodes with controlling teams
-    this.currentState.nodes.forEach(node => {
-      if (node.controllingTeam) {
-        teams.add(node.controllingTeam);
-      }
-    });
-    
-    return Array.from(teams);
-  }
-
-  // Methods for the Core State Architecture tests
-  public hasStateCoordinator(): boolean {
-    return this.stateCoordinator !== undefined && this.stateCoordinator !== null;
-  }
-  
-  public getStateCoordinator(): StateCoordinator {
-    return this.stateCoordinator;
-  }
-  
-  public hasComponentOwnership(): boolean {
-    return this.stateCoordinator.getComponent('BattalionStateComponent') !== null &&
-           this.stateCoordinator.getComponent('NodeStateComponent') !== null &&
-           this.stateCoordinator.getComponent('TeamStateComponent') !== null;
-  }
-  
-  public getComponentOwner(componentName: string): string {
-    if (componentName === 'teams') return 'TeamStateComponent';
-    if (componentName === 'battalions') return 'BattalionStateComponent';
-    if (componentName === 'nodes') return 'NodeStateComponent';
-    return '';
-  }
-  
-  public hasTransitionLog(): boolean {
-    return this.stateCoordinator.getLastTransition() !== null;
-  }
-  
-  public getLastTransition(): StateTransition {
-    return this.stateCoordinator.getLastTransition() as StateTransition;
-  }
-  
-  public performAtomicOperation(operation: () => void): void {
-    this.stateCoordinator.performAtomicOperation(operation);
-  }
-  
-  public applyDamage(battalionId: string, damage: number): void {
-    this.stateCoordinator.applyDamage(battalionId, damage);
-  }
-  
-  public stateChangesAreCoordinated(): boolean {
-    return true; // This will be properly implemented as we refactor the manager
-  }
-  
-  // Methods for the Update Frequency Management tests
-  public registerComponentForUpdates(component: StateComponent, options?: UpdateOptions): void {
-    this.stateCoordinator.registerComponentForUpdates(component, options);
-  }
-  
-  public triggerUpdateCycle(timestamp?: number): void {
-    this.stateCoordinator.triggerUpdateCycle(timestamp);
-  }
-  
-  public hasRegisteredComponent(componentName: string): boolean {
-    return this.stateCoordinator.hasRegisteredComponent(componentName);
-  }
-  
-  public requestImmediateUpdate(componentName: string): void {
-    this.stateCoordinator.requestImmediateUpdate(componentName);
   }
 }
