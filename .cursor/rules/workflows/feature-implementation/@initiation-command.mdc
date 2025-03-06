@@ -32,27 +32,12 @@ Context is critical throughout this process. Each step of the process includes:
 2. Check core-mechanics.mdc for feature status consistency
 3. Verify active-working-feature-context.mdc reflects the current state
 4. Check context-persistence.mdc for reference information
-5. Run the verification script to check for context inconsistencies:
-   ```
-   .cursor/rules/workflows/feature-implementation/scripts/verify-context.sh
-   ```
-
-### Verify Naming Conventions
-1. Check that all implementation files follow the standard naming convention:
-   - Implementation files: `.cursor/rules/gameplay/features/battle/features/{feature-name-with-hyphens}-implementation.mdc`
-   - Test files: `mobile/__tests__/battle/core/{FeatureNameWithoutHyphens}.test.ts`
-2. Verify that references to these files in context files use the correct paths
-3. Correct any inconsistencies in naming or paths
 
 ### Restore Context (if needed)
 If context is incomplete or inconsistent:
 1. Check test status to determine actual state
 2. Update context files to reflect the actual state
-3. Run the synchronization script to fix inconsistencies:
-   ```
-   .cursor/rules/workflows/feature-implementation/scripts/sync-context.sh "{FeatureName}" "{SubFeatureName}" "{status}"
-   ```
-4. Document the context restoration process
+3. Document the context restoration process
 
 ## Step 2: Feature Selection
 
@@ -79,47 +64,18 @@ If context is incomplete or inconsistent:
 1. Load the test-preparation module
 2. Identify the first/next sub-feature to implement
 3. Load the writing-tests workflow state
-4. Run the test path verification script:
-   ```
-   .cursor/rules/workflows/feature-implementation/scripts/verify-test-path.sh "{FeatureName}"
-   ```
 
 ### Create Tests
 1. Create or update the test file for the sub-feature
-   - ALWAYS use the correct path: `mobile/__tests__/battle/core/{FeatureName}.test.ts`
-   - Verify the file exists and is in the correct location using the verification script
-   - If the file doesn't exist, use the template generator from the verification script
 2. Implement test cases based on requirements
-3. Verify test location and file structure:
-   ```
-   cd mobile && ls -la __tests__/battle/core/{FeatureName}.test.ts
-   ```
-4. Run tests with specific test name to confirm they fail for the expected reasons:
-   ```
-   cd mobile && npm test -- -t '{specific test name}'
-   ```
-5. Run the full test file to verify all tests are discovered:
-   ```
-   cd mobile && npm test -- __tests__/battle/core/{FeatureName}.test.ts
-   ```
-6. Update sub-feature status to [test-failing]
+3. Run tests to confirm they fail for the expected reasons
+4. Update sub-feature status to [test-failing]
 
 ### Update Context
 1. Update the implementation file with test status
-2. Update active-working-feature-context.mdc with:
-   - Test file path: `mobile/__tests__/battle/core/{FeatureName}.test.ts`
-   - Test file location: `mobile/__tests__/battle/core/`  
-   - Test file path verified: Yes
-   - Test names and status
-3. Use the context synchronization script to ensure consistency:
-   ```
-   .cursor/rules/workflows/feature-implementation/scripts/sync-context.sh "{FeatureName}" "{SubFeatureName}" "test-failing"
-   ```
-4. Verify context synchronization:
-   ```
-   .cursor/rules/workflows/feature-implementation/scripts/verify-context.sh
-   ```
-5. Load the pre-implementation checkpoint
+2. Update active-working-feature-context.mdc
+3. Update context-persistence.mdc
+4. Load the pre-implementation checkpoint
 
 ## Step 4: Implementation
 
@@ -138,15 +94,8 @@ If context is incomplete or inconsistent:
 ### Update Context
 1. Update the implementation file with implementation status
 2. Update active-working-feature-context.mdc
-3. Use the context synchronization script:
-   ```
-   .cursor/rules/workflows/feature-implementation/scripts/sync-context.sh "{FeatureName}" "{SubFeatureName}" "test-passing"
-   ```
-4. Verify context synchronization:
-   ```
-   .cursor/rules/workflows/feature-implementation/scripts/verify-context.sh
-   ```
-5. Load the post-implementation checkpoint
+3. Update context-persistence.mdc
+4. Load the post-implementation checkpoint
 
 ## Step 5: Iterate or Complete
 
@@ -157,32 +106,16 @@ If context is incomplete or inconsistent:
 ### If Feature is Complete
 1. Verify all sub-features are implemented and tests pass
 2. Update feature status to [done] in core-mechanics.mdc
-3. Synchronize context across all files:
-   ```
-   .cursor/rules/workflows/feature-implementation/scripts/sync-context.sh "{FeatureName}" "complete" "done"
-   ```
-4. Verify final context state:
-   ```
-   .cursor/rules/workflows/feature-implementation/scripts/verify-context.sh
-   ```
-5. Load the transitioning-features workflow state
-6. Prepare for the next feature selection
-7. Return to Step 1 to begin the next feature
+3. Load the transitioning-features workflow state
+4. Prepare for the next feature selection
+5. Return to Step 1 to begin the next feature
 
 ## Troubleshooting
 If you encounter issues during the implementation process:
-1. Run the verification script to identify inconsistencies:
-   ```
-   .cursor/rules/workflows/feature-implementation/scripts/verify-context.sh
-   ```
-2. Check for naming convention inconsistencies in file references
-3. Verify test status to determine actual state
-4. Use context-persistence.mdc as a reference
-5. Use the synchronization script to fix context inconsistencies:
-   ```
-   .cursor/rules/workflows/feature-implementation/scripts/sync-context.sh "{FeatureName}" "{SubFeatureName}" "{status}"
-   ```
-6. Restore context and document the process
+1. Check context consistency across all files
+2. Verify test status to determine actual state
+3. Use context-persistence.mdc as a reference
+4. Restore context and document the process
 
 ## Instructions for Use
 To properly use this command:

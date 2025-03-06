@@ -3,7 +3,7 @@ description:
 globs: 
 alwaysApply: false
 ---
-### Battalion Loss Tracking [test-passing]
+### Battalion Loss Tracking [test-failing]
 - Requirements:
   - Track battalion unit losses over time
   - Record which team lost units
@@ -37,32 +37,3 @@ alwaysApply: false
   1. Implement Battalion Loss Tracking in BattleStateManager
   2. Add methods for tracking and querying battalion losses
   3. Run tests to confirm they pass with the implementation 
-
-### Loss Comparison Analytics [test-passing]
-- Requirements:
-  - Calculate loss ratios between teams
-  - Determine advantage metrics based on losses
-  - Provide historical comparison of loss rates
-  - Detect significant changes in loss patterns
-- Implementation Status:
-  - [x] Test Created
-  - [ ] Test Failing
-  - [ ] Implementation Started
-  - [ ] Implementation Complete
-  - [ ] Test Passing
-
-## Test Writing Phase
-### Current Focus
-- Sub-Feature: Loss Comparison Analytics
-- Test File: mobile/__tests__/battle/core/LossTrackingSystem.test.ts
-- Test Requirements: 
-  - Calculate and verify loss ratios between teams
-  - Test advantage metrics calculation
-  - Validate historical loss comparison functionality
-  - Test detection of significant changes in loss rates
-
-### Test Implementation Status
-- [x] Test file exists
-- [x] Tests written
-- [ ] Tests failing (needs implementation)
-- [ ] Tests passing 

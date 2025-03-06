@@ -17,83 +17,88 @@ This file maintains the active context for feature implementation and testing. I
 # Active Working Feature Context
 
 ## Current Session
-- Started: 2023-03-06 13:00
-- Last Updated: 2023-03-06 13:15
+- Started: 2023-03-06 10:00
+- Last Updated: 2023-03-06 12:15
 - Status: active
 
 ## Active Feature
-- Name: Scoring System
+- Name: Loss Tracking System
 - Parent File: .cursor/rules/gameplay/features/battle/core-mechanics.mdc
-- Implementation File: .cursor/rules/gameplay/features/battle/features/scoring-system-implementation.mdc
+- Implementation File: .cursor/rules/gameplay/features/battle/features/loss-tracking-system-implementation.mdc
 - Status: [in-progress]
 
 ## Current Phase
-- Phase: Implementation
-- Last Action: Implemented Node Control Points and all tests pass
-- Next Action: Begin work on Battalion Elimination Points sub-feature
+- Phase: Implementing
+- Last Action: Implemented Loss Rate Calculation and fixed all tests
+- Next Action: Begin test writing for Loss Comparison Analytics
 
 ## Test Context
-- Test File: mobile/__tests__/battle/core/ScoringSystem.test.ts
-- Test File Path Verified: Yes
-- Test File Location: mobile/__tests__/battle/core/
+- Test File: mobile/__tests__/battle/core/LossTrackingSystem.test.ts
 - Tests: 
-  - Node Control Points:
+  - Battalion Loss Tracking:
     - Status: Passing
     - Tests:
-      - Should award points for node control
-      - Should accumulate points over time based on control duration
-      - Should apply different point rates for different node types
+      - Should track total unit losses for each team
+      - Should maintain historical record of losses with timestamps
+      - Should reset tracking when battle is reinitialized
+      - Should update loss counters whenever battalion unit quantities decrease
+  - Loss Rate Calculation:
+    - Status: Passing
+    - Tests:
+      - Should calculate overall loss rate for a team
+      - Should calculate recent loss rate (last 60 seconds)
+      - Should handle edge case of no losses in time period
+      - Should handle edge case of very short time periods
+      - Should provide different rates for different teams
 
 ## Implementation Context
 - Modified Files:
-  - .cursor/rules/gameplay/features/battle/core-mechanics.mdc
-  - .cursor/rules/gameplay/features/battle/features/scoring-system-implementation.mdc
-  - .cursor/rules/workflows/feature-implementation/active-working-feature-context.mdc
-  - mobile/__tests__/battle/core/ScoringSystem.test.ts
-  - mobile/src/battle/core/BattleStateManager.ts
-- Last Changes:
-  - Updated Scoring System status to [in-progress] in core-mechanics.mdc
-  - Created scoring-system-implementation.mdc file
-  - Defined sub-features and requirements for Scoring System
-  - Created test file with failing tests for Node Control Points
-  - Implemented Node Control Points functionality in BattleStateManager
-  - Fixed test issues and confirmed all tests passing
-  - Updated implementation file to reflect tests passing
-  - Updated active working feature context
-
-## Progress History
-1. Selected Scoring System as next feature to implement
-2. Updated core-mechanics.mdc to mark feature as [in-progress]
-3. Created scoring-system-implementation.mdc file
-4. Updated active working feature context
-5. Created test file with failing tests for Node Control Points
-6. Confirmed tests failing as expected
-7. Implemented Node Control Points in BattleStateManager.ts
-8. Fixed test issues and ensured all tests pass
-9. Updated implementation file to reflect passing tests
-
-# Notes
-Starting work on the Scoring System after successfully completing the Loss Tracking System feature. The first sub-feature to implement is Node Control Points, which will track node control and award points based on control duration.
-
-# Previous Feature Context
-## Loss Tracking System
-- Status: [in-progress]
-- Implementation File: .cursor/rules/gameplay/features/battle/features/scoring-system-implementation.mdc
-- Last Action: Implemented Loss Comparison Analytics and fixed all tests
-- Modified Files: 
-  - mobile/__tests__/battle/core/LossTrackingSystem.test.ts
-  - mobile/src/battle/core/BattleStateManager.ts
   - .cursor/rules/gameplay/features/battle/features/loss-tracking-system-implementation.mdc
   - .cursor/rules/gameplay/features/battle/core-mechanics.mdc
   - .cursor/rules/workflows/feature-implementation/active-working-feature-context.mdc
-  - .cursor/rules/workflows/feature-implementation/context-persistence.mdc
-- Implementation Notes: Successfully implemented tracking of unit losses, loss rate calculation, and loss comparison analytics. All tests passing.
+  - mobile/__tests__/battle/core/LossTrackingSystem.test.ts
+  - mobile/src/battle/core/BattleStateManager.ts
+- Last Changes:
+  - Implemented Loss Rate Calculation methods in BattleStateManager
+  - Added methods for calculating overall and recent loss rates
+  - Added special handling for short-term loss rates
+  - Fixed test issues and ensured all tests pass
+  - Updated implementation file to reflect passing tests
 
-## Implementation Guidelines
-- Always verify test file paths using verify-test-path.sh script before creating/modifying tests
-- Tests must be placed in mobile/__tests__/battle/core/ directory
-- Always run tests with specific pattern before proceeding to implementation
-- Update test paths and test details in this context file after each test creation or modification
+## Progress History
+1. Selected Loss Tracking System as next feature to implement
+2. Updated core-mechanics.mdc to mark feature as [in-progress]
+3. Created loss-tracking-system-implementation.mdc file
+4. Updated active working feature context
+5. Created test file with failing tests for Battalion Loss Tracking
+6. Confirmed tests failing as expected
+7. Implemented Battalion Loss Tracking in BattleStateManager.ts
+8. Tests now passing for Battalion Loss Tracking
+9. Updated implementation status in loss-tracking-system-implementation.mdc
+10. Created tests for Loss Rate Calculation sub-feature
+11. Confirmed tests failing as expected
+12. Implemented Loss Rate Calculation methods in BattleStateManager.ts
+13. Fixed test issues and ensured all tests pass
+14. Updated implementation file to reflect passing tests
+15. Updated active working feature context
+
+# Notes
+Starting work on the Loss Tracking System after successfully completing the Node Control System feature. The first sub-feature to implement is Battalion Loss Tracking, which will track unit losses for battalions over time. This will form the foundation for the Victory Point Calculation sub-feature later.
+
+# Previous Feature Context
+## Node Control System
+- Status: [done]
+- Implementation File: `.cursor/rules/gameplay/features/battle/features/node-control-system-implementation.mdc`
+- Last Action: Implemented Control Status Updates and confirmed all tests pass
+- Modified Files: 
+  - mobile/__tests__/battle/core/NodeControlSystem.test.ts
+  - mobile/src/battle/core/BattleStateManager.ts
+  - .cursor/rules/gameplay/features/battle/features/node-control-system-implementation.mdc
+  - .cursor/rules/workflows/feature-implementation/active-working-feature-context.mdc
+  - .cursor/rules/gameplay/features/battle/core-mechanics.mdc
+- Implementation Notes: Successfully implemented tracking of node damage, capture threshold calculation, and control status updates. All tests passing.
+
+---
 
 After updating this context:
 1. Follow development-workflow.mdc

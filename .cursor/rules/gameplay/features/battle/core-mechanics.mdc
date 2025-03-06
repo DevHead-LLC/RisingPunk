@@ -25,12 +25,12 @@ You must:
 - Tracks accumulated damage per side
 - Updates control status after each hit
 
-## Loss Tracking System [done]
+## Loss Tracking System [in-progress]
 - Tracks battalion losses
 - Monitors node control changes
 - Calculates victory points based on control duration
 
-## Scoring System [in-progress]
+## Scoring System [to-do]
 - Points awarded for:
   - Node control duration
   - Enemy battalion elimination
