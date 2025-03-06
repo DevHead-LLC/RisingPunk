@@ -8,7 +8,7 @@
 
 import { useState } from 'react';
 import { Animated, Dimensions } from 'react-native';
-import { BattleNode, BattalionPosition, BattalionType } from '../types/battle';
+import { BattleNode, BattalionPosition } from '../types/battle';
 import { BOT_CATEGORIES } from '../screens/DigitalBarracksScreen';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -35,55 +35,49 @@ export const useBattleInitialization = () => {
   // Initialize battalions with proper positioning
   const [userBattalions, setUserBattalions] = useState<BattalionPosition[]>([
     { 
-      type: BattalionType.BREACHER, 
+      type: 'breacher', 
       quantity: 5, 
       nodeIndex: 0, 
       position: new Animated.ValueXY({ x: 20, y: SCREEN_HEIGHT * 0.225 }),
-      currentHealth: BOT_CATEGORIES['breacher'].stats.health * 5,
-      mark: 0
+      currentHealth: BOT_CATEGORIES['breacher'].stats.health * 5
     },
     { 
-      type: BattalionType.GUARDIAN, 
+      type: 'guardian', 
       quantity: 3, 
       nodeIndex: 1, 
       position: new Animated.ValueXY({ x: 20, y: SCREEN_HEIGHT * 0.5 }),
-      currentHealth: BOT_CATEGORIES['guardian'].stats.health * 3,
-      mark: 0
+      currentHealth: BOT_CATEGORIES['guardian'].stats.health * 3
     },
     { 
-      type: BattalionType.PHREAK, 
+      type: 'phreak', 
       quantity: 4, 
       nodeIndex: 2, 
       position: new Animated.ValueXY({ x: 20, y: SCREEN_HEIGHT * 0.775 }),
-      currentHealth: BOT_CATEGORIES['phreak'].stats.health * 4,
-      mark: 0
+      currentHealth: BOT_CATEGORIES['phreak'].stats.health * 4
     }
   ]);
 
   const [enemyBattalions, setEnemyBattalions] = useState<BattalionPosition[]>([
     { 
-      type: BattalionType.BREACHER, 
+      type: 'breacher', 
       quantity: 8,
       nodeIndex: 6, 
       position: new Animated.ValueXY({ x: SCREEN_WIDTH - 165, y: SCREEN_HEIGHT * 0.225 }),
-      currentHealth: BOT_CATEGORIES['breacher'].stats.health * 8,
-      mark: 0
+      currentHealth: BOT_CATEGORIES['breacher'].stats.health * 8
     },
     { 
-      type: BattalionType.GUARDIAN, 
+      type: 'guardian', 
       quantity: 7,
       nodeIndex: 7, 
       position: new Animated.ValueXY({ x: SCREEN_WIDTH - 165, y: SCREEN_HEIGHT * 0.5 }),
-      currentHealth: BOT_CATEGORIES['guardian'].stats.health * 7,
-      mark: 0
+      currentHealth: BOT_CATEGORIES['guardian'].stats.health * 7
     },
     { 
-      type: BattalionType.PHREAK, 
+      type: 'phreak', 
       quantity: 6,
       nodeIndex: 8, 
       position: new Animated.ValueXY({ x: SCREEN_WIDTH - 165, y: SCREEN_HEIGHT * 0.775 }),
-      currentHealth: BOT_CATEGORIES['phreak'].stats.health * 6,
-      mark: 0
+      currentHealth: BOT_CATEGORIES['phreak'].stats.health * 6
     }
   ]);
 

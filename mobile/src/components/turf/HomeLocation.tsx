@@ -1,16 +1,9 @@
 import React, {memo} from 'react';
-import {TouchableOpacity, View, Text, Image, StyleSheet, ImageStyle} from 'react-native';
+import {TouchableOpacity, View, Text, Image, StyleSheet} from 'react-native';
 import {COLORS, SIZING} from '../../styles/theme';
 
 type HomeLocationProps = {
   onPress: () => void;
-};
-
-// Define image style separately with correct typing
-const imageStyles: ImageStyle = {
-  width: '100%',
-  height: '100%',
-  resizeMode: 'contain',
 };
 
 export const HomeLocation = memo(function HomeLocation({ onPress }: HomeLocationProps) {
@@ -22,7 +15,7 @@ export const HomeLocation = memo(function HomeLocation({ onPress }: HomeLocation
       <View style={styles.iconContainer}>
         <Image 
           source={require('../../assets/images/home.png')}
-          style={imageStyles}
+          style={styles.locationIcon}
         />
       </View>
       <Text style={styles.locationLabel}>HOME</Text>
@@ -53,8 +46,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     resizeMode: 'contain',
-    overflow: 'hidden',
-  } as ImageStyle,
+  },
   locationLabel: {
     color: COLORS.secondary,
     fontSize: SIZING.font.body,
