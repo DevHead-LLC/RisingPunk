@@ -1,0 +1,40 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# THE PLAN
+
+## Core Principles
+
+1. **Follow requests exactly** - Do what is specifically asked, nothing more
+2. **Stay focused** - Work on one task at a time
+3. **Keep it simple** - Avoid complexity unless explicitly requested
+4. **Ask before assuming** - When in doubt, ask for clarification
+
+## Process Guidelines
+
+- Only implement what was explicitly requested
+- Avoid anticipating or adding "extras" beyond the scope of requests
+- Wait for confirmation before proceeding to next steps
+- Focus on quality over quantity
+- Respect the existing architecture and patterns
+
+## Current Focus
+
+- TDD workflow implementation
+- MongoDB integration
+- Server-side feature development
+
+## Communication Directives
+
+- Provide clear confirmations when tasks are completed
+- Keep explanations brief and to the point
+- Highlight any potential issues without overengineering solutions
+- Use simple language, avoid unnecessary technical jargon
+
+## Important Reminder
+
+**DO AS REQUESTED, NOT AS YOU THINK SHOULD BE DONE EXTRA!**
+
+This file serves as a reference point to keep our collaboration efficient and aligned with actual requirements. 
