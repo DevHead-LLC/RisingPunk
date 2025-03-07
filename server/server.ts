@@ -397,7 +397,33 @@ app.post('/api/battalions/assign', auth, async (req: Request, res: Response) => 
   }
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// Dynamic port selection - will try 5000 first, then increment if busy
+const startServer = (port = 5000, maxAttempts = 10) => {
+  try {
+    const server = app.listen(port, () => {
+      console.log(`✅ Server running successfully on port ${port}`);
+    });
+    
+    // Setup server error handler
+    server.on('error', (e: NodeJS.ErrnoException) => {
+      if (e.code === 'EADDRINUSE') {
+        console.log(`⚠️ Port ${port} is busy, trying ${port + 1}...`);
+        if (maxAttempts > 0) {
+          startServer(port + 1, maxAttempts - 1);
+        } else {
+          console.error('❌ Failed to find an available port');
+          process.exit(1);
+        }
+      } else {
+        console.error('❌ Server error:', e);
+        process.exit(1);
+      }
+    });
+  } catch (err) {
+    console.error('❌ Failed to start server:', err);
+    process.exit(1);
+  }
+};
+
+// Start the server with dynamic port selection
+startServer();
