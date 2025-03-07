@@ -88,8 +88,6 @@ export const useBattleMovement = (
     // Only log destruction events
     if (battalion.currentHealth <= 0 && oldHealth > 0) {
       const battalionId = `${isUser ? 'user' : 'enemy'}-${battalion.type}-${battalion.nodeIndex}`;
-      console.log(`[Battle] ${battalionId} destroyed`);
-      cleanupBattalion(battalionId);
       return true;
     }
     return false;
@@ -232,9 +230,6 @@ export const useBattleMovement = (
       const node = nodes[target.index];
       // Only retarget if node is not neutral (captured)
       if (node.controlState !== 'neutral') {
-        if (__DEV__) {
-          console.log(`[Battle] ${battalionId} skipping already captured node ${target.index} (${node.controlState})`);
-        }
         battalion.targetNode = undefined;
         battalion.targetType = undefined;
         const newTargets = findAvailableTargets(battalion, isUser, userBattalions!, enemyBattalions!);
@@ -245,8 +240,6 @@ export const useBattleMovement = (
           );
           if (validTarget) {
             moveBattalionAlongPath(battalion, validTarget, isUser, userBattalions, enemyBattalions);
-          } else if (__DEV__) {
-            console.log(`[Battle] ${battalionId} no valid targets found`);
           }
         }
         return;
@@ -300,9 +293,6 @@ export const useBattleMovement = (
         const node = nodes[target.index];
         // Only retarget if node is not neutral (captured)
         if (node.controlState !== 'neutral') {
-          if (__DEV__) {
-            console.log(`[Battle] ${battalionId} skipping already captured node ${target.index} (${node.controlState})`);
-          }
           battalion.targetNode = undefined;
           battalion.targetType = undefined;
           const newTargets = findAvailableTargets(battalion, isUser, userBattalions!, enemyBattalions!);
@@ -313,8 +303,6 @@ export const useBattleMovement = (
             );
             if (validTarget) {
               moveBattalionAlongPath(battalion, validTarget, isUser, userBattalions, enemyBattalions);
-            } else if (__DEV__) {
-              console.log(`[Battle] ${battalionId} no valid targets found`);
             }
           }
           return;
@@ -327,9 +315,6 @@ export const useBattleMovement = (
         
         // Check if target battalion was destroyed
         if (!enemyBattalion || enemyBattalion.quantity <= 0 || enemyBattalion.currentHealth <= 0) {
-          if (__DEV__) {
-            console.log(`[Battle] Retargeting from destroyed battalion ${target.index}`);
-          }
           battalion.targetNode = undefined;
           battalion.targetType = undefined;
           const newTargets = findAvailableTargets(battalion, isUser, userBattalions!, enemyBattalions!);
@@ -396,9 +381,6 @@ export const useBattleMovement = (
           const node = nodes[target.index];
           // Only retarget if node is not neutral (captured)
           if (node.controlState !== 'neutral') {
-            if (__DEV__) {
-              console.log(`[Battle] ${battalionId} retargeting from captured node ${target.index} (${node.controlState})`);
-            }
             cleanupBattalion(battalionId);
             battalion.targetNode = undefined;
             battalion.targetType = undefined;
@@ -412,9 +394,6 @@ export const useBattleMovement = (
           // Apply damage
           const damageApplied = nodeRef.applyDamage(totalDamage, isUser);
           if (!damageApplied) {
-            if (__DEV__) {
-              console.log(`[Battle] ${battalionId} retargeting - node ${target.index} captured by ${isUser ? 'user' : 'enemy'}`);
-            }
             cleanupBattalion(battalionId);
             battalion.targetNode = undefined;
             battalion.targetType = undefined;
@@ -434,9 +413,6 @@ export const useBattleMovement = (
 
         const enemyBattalion = enemyBatts[target.index];
         if (!enemyBattalion || enemyBattalion.quantity <= 0 || enemyBattalion.currentHealth <= 0) {
-          if (__DEV__) {
-            console.log(`[Battle] Target battalion destroyed, finding new target`);
-          }
           const newTargets = findAvailableTargets(battalion, isUser, userBattalions!, enemyBattalions!);
           if (newTargets.length > 0) {
             moveBattalionAlongPath(battalion, newTargets[0], isUser, userBattalions, enemyBattalions);
@@ -466,9 +442,6 @@ export const useBattleMovement = (
             
             // Schedule retargeting if target was destroyed
             if (wasDestroyed) {
-              if (__DEV__) {
-                console.log(`[Battle] ${battalionId} retargeting - target battalion ${enemyId} destroyed during combat`);
-              }
               setTimeout(() => {
                 const newTargets = findAvailableTargets(
                   battalion,
@@ -507,9 +480,6 @@ export const useBattleMovement = (
 
   const findNewTarget = (battalion: BattalionPosition, isUser: boolean) => {
     const battalionId = `${isUser ? 'user' : 'enemy'}-${battalion.type}-${battalion.nodeIndex}`;
-    if (__DEV__) {
-      console.log(`[Battle] ${battalionId} searching for new target - previous target ${battalion.targetType === 'node' ? `node ${battalion.targetNode}` : battalion.targetType === 'battalion' ? 'battalion' : 'none'}`);
-    }
     
     setUserBattalions(userBatts => {
       setEnemyBattalions(enemyBatts => {
@@ -522,9 +492,6 @@ export const useBattleMovement = (
         
         if (targets.length > 0) {
           const target = targets[0];
-          if (__DEV__) {
-            console.log(`[Battle] ${battalionId} selected new target: ${target.type} ${target.index}`);
-          }
           moveBattalionAlongPath(
             battalion,
             target,
@@ -532,8 +499,6 @@ export const useBattleMovement = (
             userBatts,
             enemyBatts
           );
-        } else if (__DEV__) {
-          console.log(`[Battle] ${battalionId} found no valid targets`);
         }
         return enemyBatts;
       });

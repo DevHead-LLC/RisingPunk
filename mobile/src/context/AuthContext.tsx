@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem('token'),
           AsyncStorage.getItem('user'),
         ]);
-
+        
         if (storedToken && storedUser) {
           setAuthState({
             token: storedToken,
@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
         }
       } catch (error) {
-        console.error('Error loading auth state:', error);
+        // Silent error handling
       } finally {
         setIsLoading(false);
       }
@@ -56,9 +56,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (token: string, user: AuthState['user']) => {
-    await AsyncStorage.setItem('token', token);
-    await AsyncStorage.setItem('user', JSON.stringify(user));
-    setAuthState({ token, user });
+    try {
+      await AsyncStorage.setItem('token', token);
+      await AsyncStorage.setItem('user', JSON.stringify(user));
+      setAuthState({ token, user });
+    } catch (error) {
+      // Silent error handling
+      throw error;
+    }
   };
 
   const logout = async () => {
@@ -71,7 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!authState.token || !authState.user) return;
 
     try {
-      const response = await fetch(`${API_URL}/api/users/unlock-hack-rig`, {
+      const response = await fetch(`${API_URL}/users/unlock-hack-rig`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${authState.token}`,

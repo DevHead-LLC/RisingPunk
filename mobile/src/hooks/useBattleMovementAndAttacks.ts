@@ -74,10 +74,6 @@ export const useBattleMovementAndAttacks = (
   useEffect(() => {
     if (battleStarted && !battleInitializedRef.current) {
       battleInitializedRef.current = true;
-      if (__DEV__) {
-        // Log initial battle setup once at the start
-        console.log('[Battle] Starting battle');
-      }
 
       // Base duration for slowest speed (speed stat of 5)
       const BASE_DURATION = 5000; // 3 seconds for base movement
@@ -118,10 +114,6 @@ export const useBattleMovementAndAttacks = (
         const targetNodeIndex = availableNodes[Math.floor(Math.random() * availableNodes.length)];
         targetedNodes.add(targetNodeIndex);
 
-        if (__DEV__) {
-          // Only log initial targeting
-          console.log(`[Battle] ${battalion.type} targeting node ${targetNodeIndex}`);
-        }
         const targetNode = nodesRef.current[targetNodeIndex];
         const range = BOT_CATEGORIES[battalion.type].stats.range * 15;
         
@@ -151,7 +143,6 @@ export const useBattleMovementAndAttacks = (
           );
 
           if (inRange) {
-            // Remove redundant attack range logging
             anim.stop();
             battalion.position.removeListener(listener);
             
@@ -177,10 +168,6 @@ export const useBattleMovementAndAttacks = (
                   nodeRef.triggerDamageAnimation();
                   const damageApplied = nodeRef.applyDamage(totalDamage, true);
                   if (!damageApplied) {
-                    if (__DEV__) {
-                      // Log only when target is destroyed/captured
-                      console.log(`[Battle] Target node ${targetNodeIndex} captured/destroyed`);
-                    }
                     // Node was captured or destroyed, find new target
                     const newTargets = findAvailableTargets(battalion, true, battalionsRef.current.user, battalionsRef.current.enemy);
                     if (newTargets.length > 0) {
@@ -193,7 +180,6 @@ export const useBattleMovementAndAttacks = (
               }, 100);
               
               attackIntervals.current[existingKey] = setInterval(() => {
-                // Remove verbose attack logging
                 const nodeRef = nodeRefs.current[targetNodeIndex];
                 if (nodeRef) {
                   battalionRefs.current[`user-${battalion.nodeIndex}`]?.triggerAttackAnimation();
@@ -212,8 +198,6 @@ export const useBattleMovementAndAttacks = (
                   }, 100);
                 }
               }, attackInterval);
-
-              // Remove interval logging
             }, 150);
           }
         });
@@ -256,9 +240,6 @@ export const useBattleMovementAndAttacks = (
         const targetNodeIndex = availableNodes[Math.floor(Math.random() * availableNodes.length)];
         enemyTargetedNodes.add(targetNodeIndex);
 
-        if (__DEV__) {
-          console.log(`[Battle] enemy-${battalion.type}-${battalion.nodeIndex} targeting node ${targetNodeIndex}`);
-        }
         const targetNode = nodesRef.current[targetNodeIndex];
         const range = BOT_CATEGORIES[battalion.type].stats.range * 15;
         
@@ -390,10 +371,6 @@ export const useBattleMovementAndAttacks = (
         battalion.mark || 1 // Default to mark 1 if not specified
       );
 
-      if (__DEV__) {
-        console.log(`[Battle] ${isUser ? 'User' : 'Enemy'} battalion ${battalion.type}-${battalion.nodeIndex} lost ${botsLost} units`);
-      }
-
       return newQuantity === 0; // Return true if battalion is destroyed
     }
     return false;
@@ -469,10 +446,6 @@ export const useBattleMovementAndAttacks = (
       return; // Still in cooldown
     }
     
-    if (__DEV__) {
-      console.log(`[Retarget] Finding new target for ${isUser ? 'user' : 'enemy'} battalion at node ${battalion.nodeIndex}`);
-    }
-    
     // First try to find neutral nodes
     let targets = findAvailableTargets(
       battalion,
@@ -525,9 +498,6 @@ export const useBattleMovementAndAttacks = (
     
     if (targets.length > 0) {
       const target = targets[0];
-      if (__DEV__) {
-        console.log(`[Retarget] Moving battalion to ${target.type} ${target.index}`);
-      }
       
       // Set cooldown
       retargetCooldowns.current[battalionId] = now;
@@ -547,8 +517,6 @@ export const useBattleMovementAndAttacks = (
         battalionsRef.current.user,
         battalionsRef.current.enemy
       );
-    } else if (__DEV__) {
-      console.log(`[Retarget] No valid targets found for battalion at node ${battalion.nodeIndex}`);
     }
   };
 

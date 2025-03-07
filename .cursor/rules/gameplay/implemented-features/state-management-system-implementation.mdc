@@ -1,0 +1,151 @@
+---
+description: Implementation directives for the State Management System feature
+globs: 
+alwaysApply: true
+---
+
+# AI DIRECTIVE: FEATURE IMPLEMENTATION
+⚠️ CRITICAL IMPLEMENTATION DIRECTIVE ⚠️
+
+This file is a child of: `.cursor/rules/gameplay/features/battle/core-mechanics.mdc`
+
+You must:
+1. Track implementation status of each sub-feature
+2. Maintain reference to parent file
+3. Document all implementation decisions
+4. Create failing tests for each sub-feature
+5. Update status in parent file when complete
+
+# State Management System Implementation
+
+## Implementation Directives
+- Track implementation status of each sub-feature
+- Maintain reference to parent file
+- Document all implementation decisions
+- Create failing tests for each sub-feature
+- Update status in parent file upon completion
+
+## Feature Status
+- Name: State Management System
+- Status: [in-progress]
+- Core Principles:
+  - Single source of truth
+  - Centralized state management
+  - Clear ownership of state updates
+  - Predictable state transitions
+  - Atomic state operations
+
+## Implementation Context
+- Related Files: 
+  - mobile/src/battle/core/BattleStateManager.ts
+  - mobile/src/battle/core/BattleService.ts
+  - mobile/src/battle/core/BattleTypes.ts
+  - mobile/src/battle/core/StateCoordinator.ts (new)
+  - mobile/src/battle/core/StateComponents.ts (new)
+- Implementation Notes: The current BattleStateManager is over 1700 lines and handles multiple responsibilities; this feature will refactor it for better organization while maintaining functionality
+- Questions/Concerns: Need to ensure refactoring doesn't break existing functionality
+
+## Sub-Features
+
+### Core State Architecture
+- Status: [done]
+- Requirements:
+  - Establish single source of truth for battle state ✓
+  - Centralize state management through a coordinator ✓
+  - Define clear ownership for different state components ✓
+  - Ensure predictable state transitions ✓
+  - Implement atomic state operations ✓
+- Implementation Notes:
+  - Created StateCoordinator interface and implementation
+  - Created component interfaces for battalions, nodes, and teams
+  - Implemented component implementations
+  - Added state transition logging
+  - Implemented atomic operations with state backup and restore
+  - Modified BattleStateManager to use the new architecture
+  - All tests passing
+
+### Update Frequency Management
+- Status: [done]
+- Requirements:
+  - Implement global 1-second update timer ✓
+  - Allow components to register for update notifications ✓
+  - Optimize update scheduling based on component needs ✓
+  - Provide mechanism for immediate updates when necessary ✓
+  - Ensure consistent update sequence ✓
+- Implementation Notes:
+  - Added UpdateOptions interface for configuration
+  - Added methods to register components for updates
+  - Implemented update cycle notification system
+  - Added support for update priorities and sequences
+  - Implemented immediate update mechanism
+  - Extended existing timer functionality to trigger component updates
+  - All tests passing
+
+### State Component Separation
+- Status: [to-do]
+- Requirements:
+  - Separate BattleStateManager into logical components
+  - Define clear interfaces between components
+  - Maintain backward compatibility with existing code
+  - Ensure components can be tested in isolation
+  - Provide mechanism for component communication
+
+## Implementation Phase
+- Current Focus: State Component Separation
+- Test File: mobile/__tests__/battle/core/StateManagementSystem.test.ts
+- Test Requirements:
+  - Should separate BattleStateManager into logical components
+  - Should define clear interfaces between components
+  - Should maintain backward compatibility
+  - Should allow components to be tested in isolation
+  - Should provide mechanism for component communication
+- Test Status: Not started
+- Implementation Status: Not started
+
+## Progress Tracking
+- Last Update: 2023-03-08 18:30
+- Current Phase: Implementation
+- Last Action: Implemented Update Frequency Management with all tests passing
+- Next Action: Create tests for State Component Separation
+
+## Implementation Decisions
+1. Created a StateCoordinator interface to centralize state management
+2. Implemented three components: BattalionStateComponent, NodeStateComponent, and TeamStateComponent
+3. Each component owns a specific part of the state and is responsible for its updates
+4. Added state transition logging to track changes to the state
+5. Implemented atomic operations using a transaction-like approach with backup and restore
+6. Added methods to BattleStateManager to interact with the new architecture
+7. Maintained backward compatibility with existing code
+8. Added component registration and update notification system
+9. Implemented optimized update scheduling based on priority and frequency
+10. Extended timer functionality to support both regular updates and component updates
+
+## Files Created or Modified
+1. mobile/src/battle/core/StateCoordinator.ts - New file with interfaces and coordination logic
+2. mobile/src/battle/core/StateComponents.ts - New file with component implementations
+3. mobile/src/battle/core/BattleStateManager.ts - Modified to integrate new architecture
+4. mobile/__tests__/battle/core/StateManagementSystem.test.ts - Added tests for Core State Architecture and Update Frequency Management
+
+## State Component Separation Planning
+- Need to create test file with requirements
+- Will define interfaces for additional component types
+- Will extract business logic into separate component classes
+- Will ensure all components use the coordinator for state access
+- Will implement backward-compatible facade methods in BattleStateManager
+
+## Implementation Status
+- [x] Core State Architecture Test Created
+- [x] Core State Architecture Test Failing
+- [x] Core State Architecture Implementation Started
+- [x] Core State Architecture Implementation Complete
+- [x] Core State Architecture Test Passing
+- [x] Update Frequency Management Test Created
+- [x] Update Frequency Management Test Failing
+- [x] Update Frequency Management Implementation Started
+- [x] Update Frequency Management Implementation Complete
+- [x] Update Frequency Management Test Passing
+- [ ] State Component Separation Test Created
+- [ ] State Component Separation Test Failing
+- [ ] State Component Separation Implementation Started
+- [ ] State Component Separation Implementation Complete
+- [ ] State Component Separation Test Passing 

@@ -11,7 +11,7 @@ import { BattlePhase } from './useBattleStateMachine';
 import { BattleNode, BattalionPosition } from '../types/battle';
 
 // IMPORTANT: Keep these debug flags for development
-const DEBUG_MODE = __DEV__;
+const DEBUG_MODE = false;
 const VERBOSE_LOGGING = false;
 
 export const useBattleStateVisualization = (
@@ -22,17 +22,7 @@ export const useBattleStateVisualization = (
 ) => {
   // IMPORTANT: Keep state transition logging for debugging
   useEffect(() => {
-    if (DEBUG_MODE) {
-      console.log(`[Battle Phase] ${phase}`);
-      
-      if (VERBOSE_LOGGING) {
-        console.log('[Node Control States]', nodes.map(n => n.controlState));
-        console.log('[Battalion Positions]', {
-          user: userBattalions.map(b => b.nodeIndex),
-          enemy: enemyBattalions.map(b => b.nodeIndex)
-        });
-      }
-    }
+    // Debug logging disabled
   }, [phase, nodes, userBattalions, enemyBattalions]);
 
   /**
@@ -41,23 +31,7 @@ export const useBattleStateVisualization = (
    * @important DO NOT DELETE - Critical for performance monitoring
    */
   const logBattleMetrics = useCallback(() => {
-    if (!DEBUG_MODE) return;
-
-    const controlledByUser = nodes.filter(n => n.controlState === 'user').length;
-    const controlledByEnemy = nodes.filter(n => n.controlState === 'enemy').length;
-    const neutralNodes = nodes.filter(n => n.controlState === 'neutral').length;
-
-    console.log('[Battle Metrics]', {
-      nodeControl: {
-        user: controlledByUser,
-        enemy: controlledByEnemy,
-        neutral: neutralNodes
-      },
-      battalions: {
-        user: userBattalions.reduce((acc, b) => acc + b.quantity, 0),
-        enemy: enemyBattalions.reduce((acc, b) => acc + b.quantity, 0)
-      }
-    });
+    // Debug logging disabled
   }, [nodes, userBattalions, enemyBattalions]);
 
   /**

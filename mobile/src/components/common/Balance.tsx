@@ -4,19 +4,29 @@ import { useBalance, formatBalance } from '../../context/BalanceContext';
 import { SIZING, COLORS } from '../../styles/theme';
 
 export const Balance = memo(() => {
-  const { balance } = useBalance();
-  const [displayBalance, setDisplayBalance] = useState<number | null>(null);
+  try {
+    const { balance } = useBalance();
+    const [displayBalance, setDisplayBalance] = useState<number | null>(null);
 
-  useEffect(() => {
-    setDisplayBalance(balance);
-  }, [balance]);
+    useEffect(() => {
+      setDisplayBalance(balance);
+    }, [balance]);
 
-  return (
-    <View style={styles.balanceContainer}>
-      <Text style={styles.balanceLabel}>WALLET:</Text>
-      <Text style={styles.balanceAmount}>${displayBalance ? formatBalance(displayBalance) : 0}</Text>
-    </View>
-  );
+    return (
+      <View style={styles.balanceContainer}>
+        <Text style={styles.balanceLabel}>WALLET:</Text>
+        <Text style={styles.balanceAmount}>${displayBalance !== null ? formatBalance(displayBalance) : '0'}</Text>
+      </View>
+    );
+  } catch (error) {
+    // Silent error handling with fallback UI
+    return (
+      <View style={styles.balanceContainer}>
+        <Text style={styles.balanceLabel}>WALLET:</Text>
+        <Text style={styles.balanceAmount}>$0</Text>
+      </View>
+    );
+  }
 });
 
 const styles = StyleSheet.create({

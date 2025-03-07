@@ -119,10 +119,13 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
             battalionId: 'B'
           });
         } catch (error) {
+          // Just log the error instead of showing it to the user
+          // This is cleanup code and shouldn't block the user
           console.error('Failed to reset battalions:', error);
         }
       };
       
+      // Use void to indicate we're intentionally not handling the promise
       void resetBattalions();
     };
   }, [assignToBattalion]);

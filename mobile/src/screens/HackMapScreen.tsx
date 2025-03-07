@@ -179,7 +179,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
   useEffect(() => {
     const fetchMap = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/map/main`, {
+        const response = await fetch(`${API_URL}/map/main`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }

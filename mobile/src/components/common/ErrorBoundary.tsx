@@ -1,9 +1,9 @@
-import React, { Component, ErrorInfo } from 'react';
+import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, SIZING } from '../../styles/theme';
+import { COLORS } from '../../styles/theme';
 
 interface Props {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 interface State {
@@ -14,27 +14,29 @@ interface State {
 export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = {
+      hasError: false,
+      error: null
+    };
   }
 
   static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+    console.log('ErrorBoundary caught error:', error);
+    return {
+      hasError: true,
+      error
+    };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    console.error('Uncaught error:', error, errorInfo);
   }
 
-  render() {
+  render(): ReactNode {
     if (this.state.hasError) {
       return (
-        <View style={styles.container}>
-          <Text style={styles.errorText}>
-            SYSTEM_ERROR
-          </Text>
-          <Text style={styles.errorDetails}>
-            {this.state.error?.message || 'Unknown error occurred'}
-          </Text>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Component Error</Text>
         </View>
       );
     }
@@ -44,21 +46,15 @@ export class ErrorBoundary extends Component<Props, State> {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
-    padding: SIZING.spacing.lg,
+  errorContainer: {
+    padding: 10,
+    backgroundColor: 'rgba(255, 0, 0, 0.1)',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 0, 0, 0.3)',
   },
   errorText: {
-    color: COLORS.error,
-    fontSize: SIZING.font.h1,
-    marginBottom: SIZING.spacing.md,
-  },
-  errorDetails: {
-    color: COLORS.text.primary,
-    fontSize: SIZING.font.body,
-    textAlign: 'center',
+    color: '#FF0000',
+    fontSize: 12,
   },
 }); 
