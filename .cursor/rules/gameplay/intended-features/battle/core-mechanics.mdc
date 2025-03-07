@@ -25,24 +25,24 @@ You must:
 - Tracks accumulated damage per side
 - Updates control status after each hit
 
-## Loss Tracking System [to-do]
+## Loss Tracking System [done]
 - Tracks battalion losses
 - Monitors node control changes
 - Calculates victory points based on control duration
 
-## Scoring System [to-do]
+## Scoring System [done]
 - Points awarded for:
-  - Node control duration
-  - Enemy battalion elimination
-  - Network control bonuses
+  - Node control duration ✓
+  - Enemy battalion elimination ✓
+  - Network control bonuses ✓
 
-## Victory Determination [to-do]
+## Victory Determination [done]
 - Victory achieved through:
-  - Total network control
-  - Point threshold reached
-  - Enemy force elimination
+  - Total network control ✓
+  - Point threshold reached ✓
+  - Enemy force elimination ✓
 
-## State Management System [to-do]
+## State Management System [in-progress]
 ### Core Principles:
 - Single source of truth
 - Centralized state management

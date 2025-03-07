@@ -177,10 +177,9 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   };
 
   const determineVictor = () => {
+    // Calculate loss points for each side
     const userPoints = calculateTotalLossPoints('user');
     const enemyPoints = calculateTotalLossPoints('enemy');
-    
-    console.log(`[Battle] Final Loss Points - User: ${userPoints}, Enemy: ${enemyPoints}`);
     
     if (userPoints === enemyPoints) {
       // Defending party wins ties
@@ -271,11 +270,6 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       ...movingUserBattalions,
       ...movingEnemyBattalions
     ];
-
-    // Only log retargeting if there are affected battalions
-    if (allAffectedBattalions.length > 0) {
-      console.log(`[Battle] Retargeting ${allAffectedBattalions.length} battalions from node ${nodeIndex}`);
-    }
 
     // Clear attack intervals for battalions that were attacking this node
     allAffectedBattalions.forEach(({ key, interval }) => {

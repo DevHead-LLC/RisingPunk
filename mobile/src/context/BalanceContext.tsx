@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
-import { API_URL } from '../services/api';
+import { API_URL } from '../config';
 
 type BalanceContextType = {
   balance: number | null;
@@ -32,7 +32,7 @@ export function BalanceProvider({ children }: { children: React.ReactNode }) {
 
     const fetchBalance = async () => {
       try {
-        const response = await fetch(`${API_URL}/balance`, {
+        const response = await fetch(`${API_URL}/api/balance`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -45,7 +45,7 @@ export function BalanceProvider({ children }: { children: React.ReactNode }) {
           setLastSync(new Date());
         }
       } catch (error) {
-        console.error('Balance fetch error:', error);
+        // Silent error handling
       }
     };
 

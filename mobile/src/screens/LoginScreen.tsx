@@ -117,7 +117,24 @@ export const LoginScreen = () => {
           await login(response.token, response.user);
         }
       } catch (err) {
-        setError(`ACCESS_DENIED: ${err instanceof Error ? err.message : 'UNKNOWN_ERROR'}`);
+        // Convert technical errors to user-friendly messages
+        let userMessage = 'ACCESS_DENIED: ';
+        
+        if (err instanceof Error) {
+          if (err.message.includes('Network error')) {
+            userMessage += 'SERVER_UNAVAILABLE';
+          } else if (err.message.includes('Server error')) {
+            userMessage += 'SERVER_ERROR';
+          } else if (err.message.includes('Invalid response')) {
+            userMessage += 'INVALID_RESPONSE';
+          } else {
+            userMessage += err.message;
+          }
+        } else {
+          userMessage += 'UNKNOWN_ERROR';
+        }
+        
+        setError(userMessage);
       } finally {
         setLoading(false);
       }
