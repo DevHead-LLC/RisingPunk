@@ -1,0 +1,86 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# TDD WORKFLOW INITIALIZATION
+
+## PURPOSE
+This file triggers the automated TDD workflow process. Present this file to the AI to begin working through the TDD workflow steps as defined in the AI Directive Tree.
+
+## INITIALIZATION COMMAND
+
+```
+COMMAND: initialize-tdd-workflow
+OPERATION: Begin automated TDD workflow process
+ACTION: Start with "Reset Context" step in the AI Directive Tree
+```
+
+## CONTEXT PATHS
+
+- **AI Directive Tree**: `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/ai-directives/tdd-workflow.mdc`
+- **Working Context**: `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/context/tdd/active-working-context.mdc`
+- **Workflow Reference**: `/Users/robertthiel/DevHead_LLC/RisingPunk/workflow-reference.mdc`
+
+## INITIALIZATION PROCESS
+
+When this file is presented to the AI, it should:
+
+1. Read the AI Directive Tree at the path specified above
+2. Check the current status in the working context file
+3. Begin or resume the workflow at the appropriate step
+4. Automatically update status markers in the AI Directive Tree
+5. Create necessary files and execute required scripts
+6. Maintain context across workflow steps
+7. Pause at the completion of the current feature
+
+## WORKING CONTEXT SYNCHRONIZATION
+
+Throughout the workflow, the AI should:
+1. Update status markers from [to-do] → [in-progress] → [done]
+2. Record all progress in the active-working-context.mdc file
+3. Execute scripts to maintain context synchronization
+4. Generate appropriate output for user verification
+
+## FEATURE IMPLEMENTATION FLOW
+
+The AI will work through these steps in sequence:
+1. Reset Context
+2. Select Feature from Files
+3. Build a Failing Test
+4. Run Failing Test to Verify It Fails
+5. Implement Minimal Fix
+6. Run Test to Verify Fix
+7. Run All Tests to Ensure No Other Tests Break
+8. Performance Check
+9. Feature Completion or Iteration
+10. Pause and Wait
+
+## USER COMMANDS
+
+- To initialize the workflow: Present this file to the AI
+- To continue after a pause: Present this file to the AI again
+- To restart from the beginning: Run `rules/tdd/scripts/reset-workflow-state.sh` and then present this file
+
+## COMPLETION STATE
+
+When the workflow reaches the "Pause and Wait" step, the AI will:
+1. Report completion of the current feature
+2. Summarize what was accomplished
+3. Wait for this file to be presented again to begin the next feature
+
+---
+
+# BEGIN TDD WORKFLOW
+
+Present this section to trigger the workflow initialization.
+
+```
+INITIALIZE: TDD WORKFLOW
+COMMAND: initialize-tdd-workflow
+CONTEXT: Read from AI Directive Tree
+ACTION: Begin with Reset Context step
+STATUS: Ready to start
+```
+
+When you see the above command block, begin the TDD workflow process by checking the AI Directive Tree and working context file. Start with the "Reset Context" step and proceed through each step, updating status markers and maintaining context throughout. 

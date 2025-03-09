@@ -1,0 +1,190 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# TDD WORKFLOW REFERENCE - AUTOMATION SETUP
+
+## FIRST-TIME SETUP PURPOSE
+This reference guides our **one-time manual walkthrough** to set up automation for each step of the TDD workflow. The goal is to systematically go through each section of the AI Directive Tree **once**, ensuring each step automatically guides to the next and updates statuses properly.
+
+## MASTER FILES
+- **Directive Tree**: `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/ai-directives/tdd-workflow.mdc`
+- **Master Directive**: `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/context/tdd/workflow-directive.mdc`
+- **Plan Guidelines**: `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/the-plan.mdc`
+- **Working Context**: `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/context/tdd/active-working-context.mdc`
+- **Features Location**: `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/gameplay/intended-features/`
+
+## AUTOMATION SETUP PROCESS
+Our goal is to create automation for each step in the TDD workflow.
+For each step, we will:
+1. Set up the required files/scripts for that step
+2. Ensure the step can update its own status markers
+3. Create seamless transitions to the next step
+4. Test the automation of that specific step
+5. Only after verifying, move to setting up the next step
+
+## FIRST-TIME WORKFLOW SETUP
+
+### 1. RESET CONTEXT AUTOMATION
+```
+SETUP TASKS:
+1. Create/verify rules/tdd/context/ directory
+2. Create active-working-context.mdc template
+3. Create verify-context.sh script that:
+   - Checks if context files exist
+   - Creates them with proper format if missing
+   - Updates Reset Context status to [in-progress] on start
+   - Updates to [done] when complete
+4. Test script execution
+5. Ensure script returns to next step in directive tree
+```
+
+### 2. SELECT FEATURE AUTOMATION
+```
+SETUP TASKS:
+1. Set up feature scanning mechanism that:
+   - Reads from rules/gameplay/intended-features/ (including subdirectories)
+   - Identifies features with [planned] or [ready] status
+   - Allows selection of next feature to implement
+2. Create mechanism to update feature status to [in-progress]
+3. Set up context updates in active-working-context.mdc
+4. Create sync-context.sh script for context synchronization
+5. Ensure status markers update appropriately
+6. Verify transition to next step
+```
+
+### 3. BUILD FAILING TEST AUTOMATION
+```
+SETUP TASKS:
+1. Create server/tdd/tests/ directory structure
+2. Set up verify-test-path.sh script that:
+   - Creates test file templates
+   - Sets up correct imports and structure
+3. Create template for test files based on feature requirements
+4. Set up status update mechanism to mark [test-failing]
+5. Create context update mechanism
+6. Ensure seamless transition to next step
+```
+
+### 4. VERIFY TEST FAILS AUTOMATION
+```
+SETUP TASKS:
+1. Create server/tdd/scripts/ directory
+2. Set up run-test.sh script that:
+   - Supports running specific tests
+   - Supports running test files
+   - Reports test results clearly
+3. Create failure verification mechanism
+4. Set up context update for test status
+5. Ensure automatic transition to next step
+```
+
+### 5. IMPLEMENT FIX AUTOMATION
+```
+SETUP TASKS:
+1. Create implementing-feature.mdc workflow state file
+2. Set up mechanism to identify minimal implementation needs
+3. Create implementation file templates
+4. Set up status update to [implementing]
+5. Create context synchronization for implementation status
+6. Ensure transition to verification step
+```
+
+### 6. VERIFY FIX AUTOMATION
+```
+SETUP TASKS:
+1. Enhance run-test.sh to verify fixes
+2. Create pass/fail determination mechanism
+3. Set up status update to [test-passing]
+4. Update context synchronization
+5. Ensure transition to all-tests verification
+```
+
+### 7. VERIFY ALL TESTS AUTOMATION
+```
+SETUP TASKS:
+1. Enhance run-test.sh to support suite testing
+2. Create regression detection mechanism
+3. Set up resolution guidance for test failures
+4. Set up context update mechanism
+5. Ensure transition to performance check
+```
+
+### 8. PERFORMANCE CHECK AUTOMATION
+```
+SETUP TASKS:
+1. Create performance-test.sh script
+2. Set up performance baseline mechanism
+3. Create comparison and reporting tools
+4. Set up context updates for performance results
+5. Ensure transition to feature completion
+```
+
+### 9. FEATURE COMPLETION AUTOMATION
+```
+SETUP TASKS:
+1. Create transitioning-features.mdc workflow state
+2. Set up sub-feature tracking mechanism
+3. Create feature status update mechanism for [done]
+4. Set up context synchronization for completion
+5. Create branching logic:
+   - If more sub-features: return to step 3
+   - If complete: move to pause and reset
+```
+
+### 10. PAUSE AND RESET AUTOMATION
+```
+SETUP TASKS:
+1. Create reset-workflow-state.sh script
+2. Set up context reset mechanism
+3. Create clean transition to beginning of workflow
+4. Set up user notification system
+5. Ensure all state is properly reset for next feature
+```
+
+## VALIDATION APPROACH
+
+For each automation step, validate:
+1. **Status Updates**: Confirm status markers update correctly
+2. **File Creation**: Verify required files are created with proper templates
+3. **Transition Flow**: Test transition to next step happens automatically
+4. **Context Maintenance**: Verify context files maintain correct state
+5. **Error Handling**: Test error conditions and recovery
+
+## COMPLETION CRITERIA
+
+The first-time setup is complete when:
+1. All 10 steps have working automation
+2. The entire workflow can run through a simple feature without manual intervention
+3. Context is properly maintained throughout the process
+4. Status markers update correctly at each stage
+5. Scripts handle error conditions gracefully
+
+IMPORTANT: Focus only on the current step being automated. Do not proceed to setting up the next step until the current one is verified working.
+
+## FEATURE SEARCH PATTERN
+
+When selecting features, search in these locations:
+```
+/Users/robertthiel/DevHead_LLC/RisingPunk/rules/gameplay/intended-features/*.mdc
+/Users/robertthiel/DevHead_LLC/RisingPunk/rules/gameplay/intended-features/*/*.mdc
+```
+
+## STATUS TRACKING
+
+Throughout the workflow, maintain status using these markers:
+- `[to-do]`: Step not yet started
+- `[in-progress]`: Step currently being worked on
+- `[done]`: Step completed
+- `[blocked]`: Step cannot proceed (requires attention)
+
+## SCRIPT REFERENCE
+
+Key scripts used in the workflow:
+- **Context Verification**: `rules/tdd/scripts/verify-context.sh`
+- **Context Synchronization**: `rules/tdd/scripts/sync-context.sh "{FeatureName}" "{SubFeatureName}" "{Status}"`
+- **Test Path Verification**: `rules/tdd/scripts/verify-test-path.sh "{FeatureName}"`
+- **Run Tests**: `server/tdd/scripts/run-test.sh -t '{TestName}'` or `--file={FeatureName}.test.ts`
+- **Performance Testing**: `server/tdd/scripts/performance-test.sh --feature={FeatureName}`
+- **Workflow Reset**: `rules/tdd/scripts/reset-workflow-state.sh`

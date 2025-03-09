@@ -1,0 +1,40 @@
+{
+  "rules": [
+    {
+      "name": "TDD Workflow Initialization",
+      "description": "Triggers the TDD workflow process when viewing the initialization file",
+      "pattern": "**/tdd-initialize.mdc",
+      "directive": "When this file is presented, treat it as a command to begin the TDD workflow process. Follow the instructions in the file to read the AI Directive Tree at /Users/robertthiel/DevHead_LLC/RisingPunk/rules/ai-directives/tdd-workflow.mdc, check context status, and begin working through the workflow steps in sequence."
+    },
+    {
+      "name": "TDD Workflow Main",
+      "description": "Main directive for TDD workflow automation",
+      "pattern": "**/*.ts",
+      "directive": "Follow the TDD workflow reference guide at /Users/robertthiel/DevHead_LLC/RisingPunk/workflow-reference.mdc. Always check current context in rules/tdd/context/active-working-context.mdc before taking action. Update status markers from [to-do] → [in-progress] → [done] as tasks complete."
+    },
+    {
+      "name": "Feature Test Files",
+      "description": "Rules for creating and modifying feature test files",
+      "pattern": "**/server/tdd/tests/*.test.ts",
+      "directive": "When working with test files, ensure they follow TDD principles: 1) Tests should initially fail for the right reasons, 2) Tests should be minimal and focused, 3) Tests should have clear assertions and failure messages, 4) Test organization should match the feature structure."
+    },
+    {
+      "name": "Feature Implementation Files",
+      "description": "Rules for implementing features to pass tests",
+      "pattern": "**/server/src/features/*.ts",
+      "directive": "When implementing features: 1) Write only the minimal code needed to pass the failing test, 2) Avoid over-engineering solutions, 3) Follow the feature requirements exactly, 4) Document any complex logic or edge cases, 5) Ensure code is maintainable and readable."
+    },
+    {
+      "name": "Context Tracking Files",
+      "description": "Rules for handling TDD context files",
+      "pattern": "**/rules/tdd/context/*.mdc",
+      "directive": "When updating context files: 1) Always maintain the current working state accurately, 2) Record the feature, sub-feature, and current status, 3) Include timestamp with each update, 4) Ensure the file structure matches the expected format for context tracking."
+    },
+    {
+      "name": "Feature Registry Files",
+      "description": "Rules for managing feature registry",
+      "pattern": "**/rules/gameplay/intended-features/**/*.mdc",
+      "directive": "When reading or updating feature files: 1) Ensure status markers ([planned], [ready], [in-progress], [done]) are updated accurately, 2) Maintain the feature hierarchy and dependencies, 3) Follow the established format for feature descriptions and requirements."
+    }
+  ]
+} 

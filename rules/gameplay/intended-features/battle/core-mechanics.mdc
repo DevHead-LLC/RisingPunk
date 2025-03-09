@@ -18,31 +18,31 @@ You must:
 
 # Battle Core Mechanics
 
-## Node Control System [done]
+## Node Control System [to-do]
 - Strategic network nodes must be captured and held
 - Control determined by damage dealt to nodes
 - Capture threshold set at 75% of total army health
 - Tracks accumulated damage per side
 - Updates control status after each hit
 
-## Loss Tracking System [done]
+## Loss Tracking System [to-do]
 - Tracks battalion losses
 - Monitors node control changes
 - Calculates victory points based on control duration
 
-## Scoring System [done]
+## Scoring System [to-do]
 - Points awarded for:
   - Node control duration ✓
   - Enemy battalion elimination ✓
   - Network control bonuses ✓
 
-## Victory Determination [done]
+## Victory Determination [to-do]
 - Victory achieved through:
   - Total network control ✓
   - Point threshold reached ✓
   - Enemy force elimination ✓
 
-## State Management System [in-progress]
+## State Management System [to-do]
 ### Core Principles:
 - Single source of truth
 - Centralized state management
