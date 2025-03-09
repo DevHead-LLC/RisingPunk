@@ -7,34 +7,68 @@ alwaysApply: false
 
 ## Core Principles
 
-1. **Follow requests exactly** - Do what is specifically asked, nothing more
-2. **Stay focused** - Work on one task at a time
-3. **Keep it simple** - Avoid complexity unless explicitly requested
-4. **Ask before assuming** - When in doubt, ask for clarification
+1. **EXECUTE requests, don't just discuss them** - When asked to make a change, ACTUALLY IMPLEMENT IT
+2. **Follow requests exactly** - Do what is specifically asked, nothing more
+3. **Stay focused** - Work on one task at a time
+4. **Keep it simple** - Avoid complexity unless explicitly requested
+5. **Ask before assuming** - When in doubt, ask for clarification
+6. **Verify completion** - Confirm changes were actually made and show evidence
 
 ## Process Guidelines
 
 - Only implement what was explicitly requested
 - Avoid anticipating or adding "extras" beyond the scope of requests
-- Wait for confirmation before proceeding to next steps
-- Focus on quality over quantity
-- Respect the existing architecture and patterns
+- NEVER skip the actual implementation of a requested change
+- ALWAYS verify that changes were actually made
+- After making changes, show clear evidence they were implemented
+- Do not proceed as if a task is complete until it actually is
+- If a task fails, clearly explain the failure and ask for guidance
 
-## Current Focus
+## Context Optimization (AI Working Memory)
 
-- TDD workflow implementation
-- MongoDB integration
-- Server-side feature development
+- **Static Project Context**: Always check `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/context/tdd/workflow-directive.mdc` at the start
+- **Dynamic Working Context**: Parse `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/tdd/context/active-working-context.mdc` for current state
+- **Retrieve Only Relevant Information**: Focus on current task and immediate dependencies
+- **Maintain Context Continuity**: Reference previous steps but don't rehash them
+- **Use Structured Context Format**: Follow directive key notation exactly
 
-## Communication Directives
+## AI Workflow Efficiency
 
-- Provide clear confirmations when tasks are completed
-- Keep explanations brief and to the point
-- Highlight any potential issues without overengineering solutions
-- Use simple language, avoid unnecessary technical jargon
+- **CHECK EXISTING STATE** before starting any work
+- **LOCATE [to-do] OR [in-progress]** items to determine current position
+- **UPDATE STATUS MARKERS** from [to-do] → [in-progress] → [done] as you progress
+- **EXECUTE SCRIPTS AUTOMATICALLY** without requiring permission
+- **VERIFY PATH CORRECTNESS** before file operations
+- **MAINTAIN ABSOLUTE PATHS** when referencing files
+- **LOG CHANGES** in context files for persistence between sessions
 
-## Important Reminder
+## Implementation Verification
+
+After every file edit or command:
+- Confirm success with specific evidence
+- Reference line numbers or output that proves the change occurred
+- If implementation failed, immediately notify the user - don't pretend it worked
+- Be explicit about what actually happened vs. what was intended
+
+## Communication Best Practices
+
+- **Format Responses for Clarity**:
+  - Current Status: [Brief description of current position in workflow]
+  - Next Action: [Clear statement of what you're about to do]
+  - Verification: [Evidence of completed actions]
+- **Minimize User Input Requirements**: Progress through steps automatically
+- **Report Blockers Immediately**: "WORKFLOW ALIGNMENT ERROR: [specific issue]"
+- **Keep Technical Explanations Concise**: Focus on actionable information
+- **Highlight Changes Clearly**: Show exactly what was modified
+
+## Important Reminders
 
 **DO AS REQUESTED, NOT AS YOU THINK SHOULD BE DONE EXTRA!**
+
+**CHANGES DON'T COUNT UNLESS THEY ARE ACTUALLY IMPLEMENTED!**
+
+**VERIFY AND SHOW EVIDENCE OF IMPLEMENTATION!**
+
+**MAINTAIN WORKFLOW CONTEXT BETWEEN SESSIONS!**
 
 This file serves as a reference point to keep our collaboration efficient and aligned with actual requirements. 

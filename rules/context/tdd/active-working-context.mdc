@@ -1,0 +1,71 @@
+---
+description: Active working context for TDD workflow
+globs: 
+alwaysApply: false
+---
+
+<!-- 
+AI CONTEXT MANAGEMENT DIRECTIVE
+1. CONTEXT SIZE MONITORING: This file should remain under 50KB total size to fit within AI context window
+2. CONTEXT OVERFLOW: If file exceeds 40KB, automatically archive older history entries to `/rules/context/tdd/archive/`
+3. NOTIFICATION REQUIREMENT: Notify user when context size approaches 80% of limit with message:
+   "CONTEXT OVERFLOW WARNING: active-working-context.mdc is approaching size limits. Consider archiving older entries."
+4. CRITICAL ALERT: If context exceeds 90% of limit, display warning:
+   "CONTEXT CRITICAL: Important details may be truncated. Run archive script to preserve history."
+5. SIZE REDUCTION: When trimming context:
+   - Preserve current status, workflow position, and feature tracking sections
+   - Maintain the most recent 10 history entries
+   - Keep all actively [in-progress] items with full details
+   - Archive remaining items to date-stamped files
+-->
+
+# TDD WORKFLOW ACTIVE CONTEXT
+
+## CURRENT STATUS
+- **Workflow Position**: Reset Context
+- **Status**: [to-do]
+- **Last Updated**: 2024-04-03T12:00:00Z
+
+## FEATURE TRACKING
+- **Current Feature**: None
+- **Feature Status**: Not started
+- **Sub-Feature**: None
+- **Sub-Feature Status**: Not started
+
+## WORKFLOW PROGRESS
+- **Reset Context**: [to-do]
+- **Select Feature from Files**: [to-do]
+- **Build a Failing Test**: [to-do]
+- **Run Failing Test to Verify It Fails**: [to-do]
+- **Implement Minimal Fix**: [to-do]
+- **Run Test to Verify Fix**: [to-do]
+- **Run All Tests to Ensure No Other Tests Break**: [to-do]
+- **Performance Check**: [to-do]
+- **Feature Completion or Iteration**: [to-do]
+- **Pause and Wait**: [to-do]
+
+## CONTEXT HISTORY
+- 2024-04-03T12:00:00Z: Reset workflow to initial state
+- 2024-04-03T12:00:00Z: Initialized TDD workflow context
+
+## EXECUTION NOTES
+- Initial context file created
+- Ready to begin TDD workflow process
+- Following workflow as defined in `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/ai-directives/tdd-workflow.mdc`
+- Master directive located at `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/context/tdd/workflow-directive.mdc`
+- All steps reset to [to-do] status
+
+## NEXT ACTIONS
+1. When @tdd-initialize.mdc is presented:
+   - If any step is [in-progress] -> Continue workflow from current position
+   - If all steps are [to-do] -> Begin with Reset Context step and update to [in-progress]
+2. Follow AI Directive Tree for workflow progression
+3. Update status markers as tasks are completed
+4. Run verify-context.sh to ensure context and directive files are synchronized
+
+## WORKFLOW CONTINUATION LOGIC
+- The verify-context.sh script automatically detects if we're continuing a workflow or starting fresh
+- Statuses are synchronized between context and directive files
+- All workflow history is preserved in the CONTEXT HISTORY section
+- Current position is always clearly identified in CURRENT STATUS and WORKFLOW PROGRESS
+
