@@ -14,6 +14,18 @@ This reference guides our **one-time manual walkthrough** to set up automation f
 - **Plan Guidelines**: `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/the-plan.mdc`
 - **Working Context**: `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/context/tdd/active-working-context.mdc`
 - **Features Location**: `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/gameplay/intended-features/`
+- **TDD Initialization**: `/Users/robertthiel/DevHead_LLC/RisingPunk/tdd-initialize.mdc`
+
+## AI DIRECTIVE FLOWCHART
+The TDD workflow follows an automated directive process:
+
+1. **Entry Point**: User presents the `tdd-initialize.mdc` file to the AI
+2. **Initial Reading**: AI reads the initialization file to understand specific tasks
+3. **Directive Tree**: AI reads the workflow directive at `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/ai-directives/tdd-workflow.mdc`
+4. **Context Check**: AI checks current status in working context file
+5. **Workflow Execution**: AI begins or resumes at the appropriate step
+6. **Status Updates**: AI automatically updates status markers through each phase
+7. **Completion**: AI pauses at completion and awaits further instruction
 
 ## AUTOMATION SETUP PROCESS
 Our goal is to create automation for each step in the TDD workflow.
