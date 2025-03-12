@@ -48,8 +48,51 @@ update_active_context() {
             sed -i '' -e "s/- \*\*Sub-Feature Status\*\*: .*$/- **Sub-Feature Status**: ${STATUS}/" "$ACTIVE_CONTEXT"
         fi
         
+        # Update CURRENT POSITION section with return pointer to AI Directive Tree
+        # Check if the section exists
+        if grep -q "^## CURRENT POSITION" "$ACTIVE_CONTEXT"; then
+            # Update the current workflow position based on status
+            case "$STATUS" in 
+                "in-progress")
+                    # Update to show we're starting this step
+                    local current_tree=$(grep -A 1 "^## CURRENT STATUS" "$ACTIVE_CONTEXT" | grep "Workflow Position" | sed 's/.*: //')
+                    sed -i '' 's/- \*\*Tree\*\*: .*/- **Tree**: '"$current_tree"'/' "$ACTIVE_CONTEXT"
+                    sed -i '' 's/- \*\*Last Completed Sub-step\*\*: .*/- **Last Completed Sub-step**: Previous step complete/' "$ACTIVE_CONTEXT"
+                    sed -i '' 's/- \*\*Next Sub-step\*\*: .*/- **Next Sub-step**: First sub-step of '"$current_tree"'/' "$ACTIVE_CONTEXT"
+                    ;;
+                "test-failing"|"implementing"|"test-passing")
+                    # Update for feature implementation steps
+                    sed -i '' 's/- \*\*Last Completed Sub-step\*\*: .*/- **Last Completed Sub-step**: Status updated to ['"$STATUS"']/' "$ACTIVE_CONTEXT"
+                    sed -i '' 's/- \*\*Next Sub-step\*\*: .*/- **Next Sub-step**: Continue with next action in AI Directive Tree/' "$ACTIVE_CONTEXT"
+                    ;;
+                "done")
+                    # Update to show completion and next step
+                    sed -i '' 's/- \*\*Last Completed Sub-step\*\*: .*/- **Last Completed Sub-step**: All sub-steps of current step/' "$ACTIVE_CONTEXT"
+                    sed -i '' 's/- \*\*Next Sub-step\*\*: .*/- **Next Sub-step**: Move to next workflow step/' "$ACTIVE_CONTEXT"
+                    ;;
+            esac
+            
+            # Always ensure the return path is correct
+            sed -i '' 's|- \*\*Return To\*\*: .*|- **Return To**: '"$AI_DIRECTIVE_TREE"'|' "$ACTIVE_CONTEXT"
+        else
+            # Add the section if it doesn't exist
+            sed -i '' "/^## FEATURE TRACKING/i\\
+## CURRENT POSITION\\
+- **Tree**: $(grep -A 1 "^## CURRENT STATUS" "$ACTIVE_CONTEXT" | grep "Workflow Position" | sed 's/.*: //')\\
+- **Last Completed Sub-step**: Status synchronized to [$STATUS]\\
+- **Next Sub-step**: Continue with next action in AI Directive Tree\\
+- **Return To**: $AI_DIRECTIVE_TREE\\
+" "$ACTIVE_CONTEXT"
+        fi
+        
+        # Update the NEXT ACTIONS section to point back to AI Directive Tree
+        if grep -q "^## NEXT ACTIONS" "$ACTIVE_CONTEXT"; then
+            # Replace first action to point back to AI Directive Tree
+            sed -i '' '/^## NEXT ACTIONS/,/^##/{s/^1\..*/1. Return to AI Directive Tree at: '"$AI_DIRECTIVE_TREE"'/}' "$ACTIVE_CONTEXT"
+        fi
+        
         # Add timestamp to context history
-        sed -i '' -e "/^## CONTEXT HISTORY/a\\
+        sed -i '' "/^## CONTEXT HISTORY/a\\
 - $(date -u +"%Y-%m-%dT%H:%M:%SZ"): Context synchronized for ${FEATURE_NAME}:${SUB_FEATURE_NAME} with status [${STATUS}]" "$ACTIVE_CONTEXT"
         
         echo -e "${GREEN}✓ Active context updated${NC}"

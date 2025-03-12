@@ -33,7 +33,7 @@ WORKFLOW & FEATURE STATUS NOTATION:
 AI Directive Tree
 └── Reset Context ◉To-Do
     ├── Check Current Directory and Workspace Status ◉To-Do
-    ├── Run Context Verification Script: {Make File: rules/tdd/scripts/verify-context.sh} ◉To-Do
+    ├── Run Context Verification Script: `rules/tdd/scripts/verify-context.sh` ◉To-Do
     ├── Reset Internal Context State ◉To-Do
     ├── Confirm Reset Success ◉To-Do
     ├── Update Running Context in `rules/context/tdd/active-working-context.mdc` ◉To-Do
@@ -45,7 +45,7 @@ AI Directive Tree
     ├── Update Feature Status to [in-progress] ◉To-Do
     ├── Create/Update Implementation File in {Make File: `rules/tdd/features/{feature-name-with-hyphens}-implementation.mdc`} ◉To-Do
     ├── Update {Make File: `rules/context/tdd/active-working-context.mdc`} and {Make File: `rules/context/tdd/context-persistence.mdc`} ◉To-Do
-    ├── Run Script: {Make File: `rules/tdd/scripts/sync-context.sh`} "{FeatureName}" "init" "in-progress" ◉To-Do
+    ├── Run Script: `rules/tdd/scripts/sync-context.sh` "{FeatureName}" "init" "in-progress" ◉To-Do
     ├── Special Note: Simplicity First—Focus on Core Functionality Only ◉To-Do
     └── Special Note: Verify File Paths Are Correct ◉To-Do
 
@@ -57,7 +57,7 @@ AI Directive Tree
     ├── Ensure Test Accurately Represents Missing Functionality ◉To-Do
     ├── Update Sub-Feature Status to [test-failing] ◉To-Do
     ├── Update Running Context in {Make File: `rules/context/tdd/active-working-context.mdc`} ◉To-Do
-    ├── Run Script: {Make File: `rules/tdd/scripts/sync-context.sh`} "{FeatureName}" "{SubFeatureName}" "test-failing" ◉To-Do
+    ├── Run Script: `rules/tdd/scripts/sync-context.sh` "{FeatureName}" "{SubFeatureName}" "test-failing" ◉To-Do
     ├── Special Note: Simplicity in Test Design—No Unnecessary Complexity ◉To-Do
     └── Special Note: Comment Test Purpose Clearly for Future AI Review ◉To-Do
 
@@ -66,7 +66,7 @@ AI Directive Tree
     ├── Verify Full Test File: {Make File: `server/tdd/scripts/run-test.sh`} --file={FeatureName}.test.ts ◉To-Do
     ├── Ensure Failure Matches Expectations ◉To-Do
     ├── Update Running Context in {Make File: `rules/context/tdd/active-working-context.mdc`} ◉To-Do
-    ├── Verify Context Synchronization: {Make File: `rules/tdd/scripts/verify-context.sh`} ◉To-Do
+    ├── Verify Context Synchronization: `rules/tdd/scripts/verify-context.sh` ◉To-Do
     └── Special Note: Failure is Expected—Do Not Adjust Test Prematurely ◉To-Do
 
 └── Implement Minimal Fix ◉To-Do
@@ -77,7 +77,7 @@ AI Directive Tree
     ├── Avoid Unintended Modifications ◉To-Do
     ├── Update Sub-Feature Status to [implementing] ◉To-Do
     ├── Update Running Context in {Make File: `rules/context/tdd/active-working-context.mdc`} ◉To-Do
-    ├── Run Script: {Make File: `rules/tdd/scripts/sync-context.sh`} "{FeatureName}" "{SubFeatureName}" "implementing" ◉To-Do
+    ├── Run Script: `rules/tdd/scripts/sync-context.sh` "{FeatureName}" "{SubFeatureName}" "implementing" ◉To-Do
     ├── Special Note: Simplicity—Only Fix What's Needed ◉To-Do
     └── Special Note: Comment Fix Purpose to Prevent Accidental Removal ◉To-Do
 
@@ -86,7 +86,7 @@ AI Directive Tree
     ├── Ensure Fix Resolves the Intended Issue ◉To-Do
     ├── Update Sub-Feature Status to [test-passing] ◉To-Do
     ├── Update Running Context in {Make File: `rules/context/tdd/active-working-context.mdc`} ◉To-Do
-    ├── Run Script: {Make File: `rules/tdd/scripts/sync-context.sh`} "{FeatureName}" "{SubFeatureName}" "test-passing" ◉To-Do
+    ├── Run Script: `rules/tdd/scripts/sync-context.sh` "{FeatureName}" "{SubFeatureName}" "test-passing" ◉To-Do
     ├── Special Note: If Fix Fails, Reassess Simplicity and Correctness ◉To-Do
     └── Special Note: Comment Test Adjustments Clearly ◉To-Do
 
@@ -116,18 +116,18 @@ AI Directive Tree
     │   └── Continue Until All Sub-Features are Implemented ◉To-Do
     ├── If Feature is Complete: ◉To-Do
     │   ├── Update Feature Status to [done] in feature file ◉To-Do
-    │   ├── Run Script: {Make File: `rules/tdd/scripts/sync-context.sh`} "{FeatureName}" "complete" "done" ◉To-Do
+    │   ├── Run Script: `rules/tdd/scripts/sync-context.sh` "{FeatureName}" "complete" "done" ◉To-Do
     │   ├── Load {Make File: `rules/tdd/workflow-states/transitioning-features.mdc`} Workflow State ◉To-Do
     │   └── Prepare for Next Feature Selection ◉To-Do
     ├── Update Running Context in {Make File: `rules/context/tdd/active-working-context.mdc`} ◉To-Do
-    ├── Run Script: {Make File: `rules/tdd/scripts/verify-context.sh`} ◉To-Do
+    ├── Run Script: `rules/tdd/scripts/verify-context.sh` ◉To-Do
     └── Special Note: Document the Feature Status Change ◉To-Do
 
 └── Pause and Wait ◉To-Do
     ├── Allow for Manual Review Before Proceeding ◉To-Do
     ├── Update Running Context in {Make File: `rules/context/tdd/active-working-context.mdc`} ◉To-Do
     ├── Run Script: {Make File: `rules/tdd/scripts/reset-workflow-state.sh`} to Prevent Accidental Loops ◉To-Do
-    ├── Run Script: {Make File: `rules/tdd/scripts/verify-context.sh`} ◉To-Do
+    ├── Run Script: `rules/tdd/scripts/verify-context.sh` ◉To-Do
     ├── Special Note: No Action Should Be Taken Until Explicitly Directed ◉To-Do
     └── Special Note: Final Comments Should Summarize What Was Done and Why ◉To-Do
     
