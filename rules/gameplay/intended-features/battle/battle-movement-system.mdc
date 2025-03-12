@@ -11,63 +11,96 @@ You must:
 1. Follow the feature selection process in `.cursor/rules/workflows/feature-implementation/feature-selection-directive.mdc`
 2. Track implementation status of each feature using the following labels:
    - [done] - Feature is fully implemented and tested
+   - [test-passing] - Feature implementation passes its tests
+   - [implementing] - Feature implementation in progress to pass failing tests
+   - [test-failing] - Feature has tests written that are failing
    - [in-progress] - Feature is currently being implemented
-   - [to-do] - Feature is pending implementation
+   - [ready] - Feature is ready for implementation in the next cycle
+   - [planned] - Feature has been designed but not yet selected for implementation
 3. Update feature status in this file when directed by the selection process
 4. Maintain active context in `.cursor/rules/workflows/feature-implementation/active-working-feature-context.mdc`
 
 # Battle Movement System
 
-## Battalion Movement Rules [to-do]
-- Define speed metrics for different battalion types
-- Implement consistent movement timing system
+## Related Features
+- **Battle Targeting System**: Relies on the movement system's pathfinding for target selection
+- **Battle Node Control System**: Movement determines which nodes can be attacked
+- **Battle Visual Feedback System**: Requires position data for visual effects
+- **Core Mechanics**: Integrates movement with combat and state management
+
+## Implementation Order
+1. Battalion Movement Rules → Network Structure → Initial Targeting
+2. Pathfinding System → Movement Constraints
+3. Position Calculation → Attack-Based Position Stopping
+4. Retargeting System → Movement Animation → State Management
+
+## Battalion Movement Rules [ready]
+- **[PRIORITY]** Define speed metrics for different battalion types
+- Fastest battalions should reach neutral nodes in 2-3 seconds
 - Calculate movement delays based on battalion type
 - Ensure smooth transitions between positions
-- Apply speed penalties based on terrain or status effects
+- Tie speed stat to attack frequency
 
-## Network Structure [to-do]
+## Network Structure [planned]
 - Connect network nodes with traversable lines
 - Define valid paths between strategic nodes
 - Establish node adjacency relationships
 - Create network graph for pathfinding calculations
 - Support dynamic network changes during battle
 
-## Movement Constraints [to-do]
+## Movement Constraints [planned]
 - Restrict movement to connected network lines only
-- Implement collision detection between battalions
-- Handle priority rules for opposing forces
-- Enforce team-specific movement restrictions
-- Apply realistic movement limitations
+- **[SIMPLIFIED]** Base "collision" on attack range rather than physical collision
+- Battalion should stop movement when target is within its attack range
+- Handle cases where battalions have different attack ranges
+- Ensure battalions with longer ranges can attack while shorter-range battalions continue approach
 
-## Pathfinding System [to-do]
-- Implement A* algorithm for optimal path calculation
+## Pathfinding System [ready]
+- **[PRIORITY]** Implement A* algorithm for optimal path calculation
 - Calculate shortest valid path between nodes
-- Handle dynamic path recalculation when blocked
-- Support partial path execution
-- Optimize for large numbers of concurrent battalions
+- Measure distance along network lines (not straight-line distance)
+- Support partial path execution when interrupted by combat
+- Optimize for multiple concurrent battalions
 
-## Position Calculation [to-do]
+## Initial Targeting [planned]
+- At battle start, battalions randomly target one accessible node (3, 4, or 5)
+- Determine valid paths to target nodes via network connections
+- Calculate initial movement paths
+- Ensure all battalions have valid initial targets
+- Handle cases where multiple battalions target the same node
+
+## Retargeting System [planned]
+- While moving, continuously check for closer available targets
+- Only retarget when:
+  1. Current target is defeated/captured
+  2. Target moves out of range
+  3. Battalion itself is defeated
+- Once attacking, maintain target until one of above conditions occurs
+- Calculate distances along network lines for target priorities
+- Prioritize closest target when retargeting
+
+## Position Calculation [planned]
 - Track real-time battalion positions
 - Interpolate positions between network nodes
 - Calculate exact coordinates along network lines
 - Implement precision positioning for attack range
-- Handle z-index layering for visual clarity
+- Position should be based on current progress along path
 
-## Movement Animation [to-do]
+## Movement Animation [planned]
 - Create smooth transitions between positions
 - Implement animation timing based on movement speed
 - Synchronize visual position with logical position
 - Handle start/stop animations gracefully
-- Support direction-based animation variants
+- Ensure movement appears fluid to enhance user experience
 
-## Collision Management [to-do]
-- Detect and resolve movement collisions
-- Implement priority system for conflicting movements
-- Create fallback positions when paths are blocked
-- Handle special collision cases (e.g., retreating forces)
-- Ensure deterministic collision resolution
+## Attack-Based Position Stopping [planned]
+- Stop battalion movement when reaching attack range of target
+- Different battalion types have different attack ranges (from Digital Barracks stats)
+- Attack range is measured from battalion center to target center
+- Always advance toward objectives (no retreat functionality)
+- Implement attack cycle based on battalion speed stat
 
-## State Management [to-do]
+## State Management [planned]
 - Track movement state of each battalion
 - Coordinate movement requests with battle phase
 - Manage concurrent movement operations
@@ -75,6 +108,27 @@ You must:
 - Persist partial movements between state updates
 
 Each feature must ensure battalions adhere strictly to network line restrictions while maintaining smooth gameplay experience.
+
+## Testing Approach
+- Unit tests for individual movement calculations
+- Integration tests for pathfinding algorithms
+- Visual tests for movement animations
+- Performance tests for concurrent battalion movement
+- Scenario tests for specific battlefield situations
+
+## Implementation Notes
+- Battalion Movement Rules and Pathfinding System should be implemented first
+- Measuring distance along network lines is critical for proper targeting
+- Implement the zero-retreat policy from the beginning
+- Ensure movement system coordinates with the 20-second battle timer
+- Attack range calculations must align with Digital Barracks stats
+
+## MVP Implementation Focus
+- Prioritize A* pathfinding implementation for distance calculation along network lines
+- Focus on smooth, responsive movement
+- Implement attack range-based stopping
+- Ensure proper initial targeting and retargeting logic
+- Optimize for user experience with minimal complexity
 
 ## Performance Considerations
 - Optimize pathfinding for multiple concurrent calculations

@@ -1,5 +1,5 @@
 ---
-description: Defines essential visual feedback requirements for battles including health displays, animations, and state indicators focusing on performance and clarity
+description: Defines essential visual feedback requirements for battles including health displays, animations, and state indicators focusing on clarity and user experience
 globs: 
 alwaysApply: true
 ---
@@ -18,34 +18,60 @@ You must:
 
 # Battle Visual Feedback System
 
-## Health Display Visualization [to-do]
-- Implement basic health bar with color indicators (green/yellow/red)
-- Create smooth health transitions for damage feedback
-- Display total battalion health (base_health * quantity)
-- Ensure health visuals update consistently after combat
+## Battalion Health Display [to-do]
+- **[PRIORITY]** Implement health bars in faction colors (blue for user, red for enemy)
+- Calculate total battalion health (base_health * quantity)
+- Update health visually as damage is taken
+- Ensure health depletes proportionally to damage received
+- Implement smooth transitions for health changes
+
+## Node Control Visualization [to-do]
+- Show node control progress in faction colors (blue for user, red for enemy)
+- Display percentage of damage done toward capture threshold (75% of total army health)
+- Implement zero-sum visualization where opposing progress first negates existing progress
+- Ensure clear transition when node returns to neutral state (0%)
+- Animate control state changes for clear visual feedback
+
+## Network Line Effects [to-do]
+- When node is captured, connected network lines glow with faction color
+- For example: if node 3 is captured, lines to nodes 0, 1, 6, and 7 would glow
+- Create subtle pulsing effect to indicate active bonus
+- Ensure visual distinction between normal and glowing lines
+- Update glow effect immediately when node control changes
 
 ## Combat Animation Effects [to-do]
 - Create basic attack animations that show direction
-- Implement simple damage number popups on hit
-- Ensure animations sync with battalion speed stat
+- **[LOWER PRIORITY]** Implement damage number popups on hit ("-X" display)
+- Ensure animations align with battalion actions
 - Add visual indicators for attack range
+- Create clear visual feedback for battle events
 
 ## Battalion Status Indicators [to-do]
 - Display battalion type indicators (Breacher/Guardian/Phreak)
 - Show mark level indicators (Mk1-4)
 - Implement target indication with visual line to current target
-- Create basic range circle showing attack area
+- Create range indicators showing attack area
+- Ensure status is clearly visible to players
 
-## Node State Visualization [to-do]
-- Design neutral, contested, and captured node states
-- Implement visual progress indicators for node control
-- Create network line visualization showing valid movement paths
-- Ensure node state changes have clear visual transitions
+## Battle Phase Transitions [to-do]
+- Create visual countdown for pre-battle phase
+- Implement smooth transition to active battle phase
+- Design clear battle conclusion visual effects
+- Show timer visualization during battle
+- Ensure clear indication when battle ends (at 20 seconds)
 
-## Performance Requirements [to-do]
-- Maintain 60fps target for all animations
-- Implement proper cleanup of animation resources
-- Optimize render cycles to under 16ms per frame
-- Create fallback systems for performance bottlenecks
+## User Experience Focus [to-do]
+- Ensure smooth, responsive animations
+- Prioritize visual clarity in all feedback
+- Create intuitive visual language for battle events
+- Balance information density with visual appeal
+- Optimize for mobile device viewing and interaction
+
+## MVP Implementation Focus
+- Prioritize faction-colored health bars that deplete with damage
+- Implement clear zero-sum node control visualization
+- Add network line glow effect for captured nodes
+- Create smooth battle phase transitions
+- Ensure timer visualization works correctly for 20-second duration
 
 The MVP implementation should focus on creating clear, functional visual feedback that maintains performance standards. Advanced effects and optimizations can be introduced in future iterations after the core system is proven. 

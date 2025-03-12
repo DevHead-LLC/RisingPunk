@@ -11,84 +11,137 @@ You must:
 1. Follow the feature selection process in `.cursor/rules/workflows/feature-implementation/feature-selection-directive.mdc`
 2. Track implementation status of each feature using the following labels:
    - [done] - Feature is fully implemented and tested
+   - [test-passing] - Feature implementation passes its tests
+   - [implementing] - Feature implementation in progress to pass failing tests
+   - [test-failing] - Feature has tests written that are failing
    - [in-progress] - Feature is currently being implemented
-   - [to-do] - Feature is pending implementation
+   - [ready] - Feature is ready for implementation in the next cycle
+   - [planned] - Feature has been designed but not yet selected for implementation
 3. Update feature status in this file when directed by the selection process
 4. Maintain active context in `.cursor/rules/workflows/feature-implementation/active-working-feature-context.mdc`
 
 # Battle Node Control System
 
-## Node States and Control [to-do]
-- Define possible node control states (neutral, contested, controlled)
-- Implement team-specific control indicators
+## Related Features
+- **Battle Movement System**: Provides targeting and pathfinding to reach nodes
+- **Battle Targeting System**: Determines which nodes battalions target
+- **Battle Visual Feedback System**: Visualizes node control states and progress
+- **Battle Conclusion System**: Uses node control for victory determination
+- **Core Mechanics**: Integrates node control with combat and scoring systems
+
+## Implementation Order
+1. Node Health Calculation → Node States and Control → Initial Setup
+2. Zero-Sum Control Progress → Control States Visualization
+3. Capture System → Control Progress
+4. Network Effects → Network Connectivity 
+5. State Updates → Victory Conditions → Battle Resolution
+
+## Node States and Control [ready]
+- Define possible node control states (neutral, user, enemy)
+- Track which nodes are targetable (specifically nodes 3, 4, and 5 only)
 - Track historical control for scoring purposes
 - Handle state transitions between control states
 - Synchronize control state across the game system
 
-## Control States Visualization [to-do]
-- Create visual indicators for node control status
-- Implement progress bar for capture visualization
-- Design team-colored effects for controlled nodes
-- Animate state transitions for enhanced feedback
-- Provide clear visual hierarchy for contested nodes
+## Node Health Calculation [ready]
+- Set node health/capture threshold to 75% of total battalion health from both sides
+- Calculate total health at battle start by summing all battalion health values
+- Store this value as the capture threshold for all nodes
+- Apply consistent capture threshold across all targetable nodes
+- Ensure this calculation occurs only once at battle initialization
 
-## Initial Setup [to-do]
+## Control States Visualization [planned]
+- Create visual indicators for node control status
+- Implement progress bar for capture visualization (red for enemy, blue for user)
+- Show percentage of damage done toward capture as filled portion of bar
+- Animate state transitions for enhanced feedback
+- Provide clear indicators when nodes are being contested
+
+## Zero-Sum Control Progress [planned]
+- Implement zero-sum control progress system
+- When opposing forces attack controlled/partially-controlled node, they must first negate existing progress
+- Return node to neutral (0%) state before progress can be made toward opposing control
+- Track damage contributions from both sides
+- Ensure smooth visual transition between control states
+
+## Initial Setup [planned]
 - Configure starting node control distribution
 - Balance initial network advantage for each team
 - Implement map-specific control patterns
-- Allow for scenario-based control configurations
-- Support randomized initialization for varied gameplay
+- Ensure neutral status for targetable nodes (3, 4, 5) at start
+- Support scenario-based control configurations
 
-## Network Effects [to-do]
-- Implement strategic bonuses for connected nodes
-- Calculate control chain multipliers
-- Apply defensive bonuses to connected friendly nodes
-- Create supply line effects through controlled paths
-- Support special abilities unlocked by node control patterns
+## Network Effects [planned]
+- When node is captured, network lines connected to it should glow with that team's color
+- For example: if node 3 is captured, lines to nodes 0, 1, 6, and 7 would glow
+- Apply 2% stat bonus (attack, defense, speed, range) for battalions on glowing network lines
+- Create visual feedback for network effects
+- Ensure network effects update when control changes
 
-## Network Connectivity [to-do]
+## Network Connectivity [planned]
 - Track logical connections between controlled nodes
 - Calculate strategic network strength
-- Implement algorithms to determine cut points and bridges
+- Implement algorithms to determine network advantage
 - Provide strategic value assessment
 - Support dynamic network recalculation after control changes
 
-## Capture System [to-do]
+## Capture System [planned]
 - Implement damage-based capture mechanics
-- Calculate team-specific capture thresholds
+- Apply damage to node based on attacking battalion's power
 - Track damage contribution toward capture
-- Handle multi-team capture scenarios
-- Implement capture resistance scaling
+- Show progress visually with team colors (red/blue)
+- Switch node control state when capture threshold reached
 
-## Control Progress [to-do]
-- Track capture progress as percentage
+## Control Progress [planned]
+- Track capture progress as percentage of required damage
 - Implement visual feedback of control progress
-- Calculate incremental control updates
-- Handle contested progress situations
-- Support tug-of-war control mechanics
+- Calculate incremental control updates as damage is dealt
+- Handle contested progress situations with zero-sum system
+- Support tug-of-war control mechanics between opposing forces
 
-## State Updates [to-do]
+## State Updates [planned]
 - Process control changes in real-time
 - Implement efficient state synchronization
 - Batch control updates for performance
 - Trigger appropriate effects on control changes
-- Maintain state consistency across clients
+- Maintain state consistency across components
 
-## Victory Conditions [to-do]
+## Victory Conditions [planned]
 - Calculate victory points from node control
-- Implement time-based scoring for held nodes
+- Implement scoring for held nodes
 - Create strategic victory triggers
 - Support multiple victory paths
 - Balance scoring for different control strategies
 
-## Battle Resolution [to-do]
+## Battle Resolution [planned]
 - Calculate final battle outcome based on node control
 - Implement tie-breaking mechanisms
 - Create end-of-battle control state summary
 - Apply strategic consequences of node control
-- Support campaign progression based on node control outcomes
+- Generate battle conclusion report
 
 Node control is fundamental to battle strategy and victory conditions, forming the core of the strategic gameplay experience.
+
+## Testing Approach
+- Unit tests for node health calculations
+- Integration tests for control state transitions
+- Visual tests for control progress visualization
+- Component tests for network effects implementation
+- End-to-end tests for complete battle scenarios
+
+## Implementation Notes
+- Node Health Calculation should be implemented first as other features depend on it
+- The zero-sum control progress is critical for battle balance
+- Targeting should be restricted to nodes 3, 4, and 5 from the beginning
+- Network effects (2% stat bonus) should be well-balanced and clearly visualized
+- Ensure battle resolution properly factors node control into victory conditions
+
+## MVP Implementation Focus
+- Focus on implementing control mechanics for nodes 3, 4, and 5
+- Prioritize 75% health calculation and zero-sum control progress
+- Implement the glowing network lines effect and 2% stat bonus
+- Ensure clear visual indicators for control progress
+- Optimize for smooth, responsive control state transitions
 
 ## Performance Considerations
 - Optimize control state calculations for large networks
