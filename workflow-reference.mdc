@@ -201,6 +201,44 @@ Throughout the workflow, maintain status using these markers:
 - `[done]`: Step completed
 - `[blocked]`: Step cannot proceed (requires attention)
 
+## COMMENTING PRACTICES
+
+Comments are a critical part of the TDD workflow and should be maintained throughout the codebase:
+
+### AI Context Comments
+- Include descriptive comments in all files to maintain AI context
+- Comments should explain the purpose, behavior, and relationships of each code element
+- Mark implementation details, edge cases, and algorithmic logic clearly
+- Never remove AI context comments unless the described behavior is no longer accurate
+- Format AI context comments with standard language comment syntax
+- These comments should specifically be referenced within AI's working context
+
+### User Documentation Comments
+- Add separate explanatory comments specifically for the user/developer
+- User comments should be more high-level, explaining "why" rather than "how"
+- Include a special comment section at the top of each file explaining:
+  - File purpose and behavior overview
+  - Rules and constraints being implemented
+  - Key functions and their relationships
+  - Important details specific to this implementation
+- Format user documentation with clear headers in comment blocks
+- These comments should be left out of AI's working context
+
+### Comment Maintenance
+- Update comments when behavior changes
+- Only remove comments when they contradict actual behavior
+- Keep comment sections organized and relevant to their respective code blocks
+- When refactoring, ensure comments are updated to reflect new structure
+
+### Implementation Comments
+- When implementing TDD features, include:
+  - Test rationale comments explaining what is being tested and why
+  - Implementation comments explaining the approach taken
+  - Edge case handling comments when special cases are addressed
+  - Performance considerations when relevant
+
+Maintain clear separation between comments for AI context and comments for user documentation to ensure both audiences receive appropriate guidance.
+
 ## SCRIPT REFERENCE
 
 Key scripts used in the workflow:
