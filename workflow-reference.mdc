@@ -195,11 +195,23 @@ When selecting features, search in these locations:
 
 ## STATUS TRACKING
 
-Throughout the workflow, maintain status using these markers:
+The TDD Feature Implementation Automation workflow must include status tracking mechanisms using these markers:
 - `[to-do]`: Step not yet started
 - `[in-progress]`: Step currently being worked on
 - `[done]`: Step completed
 - `[blocked]`: Step cannot proceed (requires attention)
+
+Our automation setup should ensure proper status tracking exists within the workflow, with scripts automatically updating these statuses at appropriate points. The AI's role is to verify this capability exists in the automation framework, not to manually update these statuses directly.
+
+### Distinction Between Status Systems
+
+Note the important distinction between two separate status tracking systems:
+
+1. **Workflow Automation Status** (defined above): Tracks the progress of automation setup steps themselves
+2. **Feature Implementation Status** (defined in desired-feature-model.mdc): Tracks the TDD progress of individual features with markers like:
+   - `[planned]` → `[ready]` → `[in-progress]` → `[test-failing]` → `[implementing]` → `[test-passing]` → `[done]`
+
+The automation we're setting up should handle both status systems, updating workflow status during setup and feature status during TDD implementation. These systems work in parallel but track different aspects of the process.
 
 ## COMMENTING PRACTICES
 
