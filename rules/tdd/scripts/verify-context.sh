@@ -48,6 +48,12 @@ updated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 - **Status**: [in-progress]
 - **Last Updated**: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
+## CURRENT POSITION
+- **Tree**: Reset Context
+- **Last Completed Sub-step**: None
+- **Next Sub-step**: Check Current Directory and Workspace Status
+- **Return To**: ${AI_DIRECTIVE_TREE}
+
 ## FEATURE TRACKING
 - **Current Feature**: None
 - **Feature Status**: Not started
@@ -77,9 +83,10 @@ updated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 - Master directive located at "${WORKFLOW_DIRECTIVE}"
 
 ## NEXT ACTIONS
-1. Complete Reset Context step
-2. Update status to [done]
-3. Proceed to Select Feature from Files step
+1. Return to AI Directive Tree at: ${AI_DIRECTIVE_TREE}
+2. Continue with "Check Current Directory and Workspace Status" sub-step
+3. After completing each sub-step, return to AI Directive Tree for next instructions
+4. Update status markers as each sub-step completes
 EOF
                     ;;
             esac
@@ -151,6 +158,11 @@ sync_statuses() {
         # Add a note to the context history
         sed -i '' "/^## CONTEXT HISTORY/a\\
 - $(date -u +"%Y-%m-%dT%H:%M:%SZ"): Continuing workflow from existing state" "$ACTIVE_CONTEXT"
+        
+        # Update the NEXT ACTIONS section to point back to the AI Directive Tree
+        if ! grep -q "Return to AI Directive Tree" "$ACTIVE_CONTEXT"; then
+            sed -i '' '/^## NEXT ACTIONS/,/^##/{s/^1\..*/1. Return to AI Directive Tree at: '"${AI_DIRECTIVE_TREE}"'/}' "$ACTIVE_CONTEXT"
+        fi
     fi
     
     echo -e "${GREEN}✓ Status synchronization complete${NC}"
@@ -168,6 +180,21 @@ if [ -f "$ACTIVE_CONTEXT" ]; then
     # Add verification timestamp to context history
     sed -i '' "/^## CONTEXT HISTORY/a\\
 - $(date -u +"%Y-%m-%dT%H:%M:%SZ"): Context verification completed" "$ACTIVE_CONTEXT"
+    
+    # Ensure we have a CURRENT POSITION section
+    if ! grep -q "^## CURRENT POSITION" "$ACTIVE_CONTEXT"; then
+        sed -i '' "/^## FEATURE TRACKING/i\\
+## CURRENT POSITION\\
+- **Tree**: Reset Context\\
+- **Last Completed Sub-step**: Run Context Verification Script\\
+- **Next Sub-step**: Reset Internal Context State\\
+- **Return To**: ${AI_DIRECTIVE_TREE}\\
+" "$ACTIVE_CONTEXT"
+    else
+        # Update the CURRENT POSITION if it exists
+        sed -i '' 's/- \*\*Last Completed Sub-step\*\*: .*/- **Last Completed Sub-step**: Run Context Verification Script/' "$ACTIVE_CONTEXT"
+        sed -i '' 's/- \*\*Next Sub-step\*\*: .*/- **Next Sub-step**: Reset Internal Context State/' "$ACTIVE_CONTEXT"
+    fi
     
     echo -e "${GREEN}✓ Context verification complete${NC}"
 else
