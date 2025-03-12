@@ -19,33 +19,55 @@ You must:
 # Battle Targeting System
 
 ## Core Targeting Principles [to-do]
-- Implement proximity-based targeting (closest valid target)
+- **[PRIORITY]** Implement proximity-based targeting (closest valid target)
 - Apply universal targeting rules across all battalion types
 - Restrict movement and targeting to network lines
-- Ensure targets change only when proximity changes
+- Ensure targeting aligns with pathfinding system
+- Focus exclusively on targeting nodes 3, 4, and 5 for node capture
+
+## Initial Target Selection [to-do]
+- At battle start, battalions randomly select one accessible node from nodes 3, 4, and 5
+- Determine valid paths to target nodes via network connections
+- Only target nodes that can be reached via connected network lines
+- Calculate initial movement paths to selected target
+- Handle cases where multiple battalions target the same node
 
 ## Target Selection Rules [to-do]
 - Target nearest available entity (enemy battalion or node)
-- Calculate distance from battalion center to target center
-- Ensure targets are reachable via network lines
-- Implement checks for valid target candidates
+- Calculate distance from battalion center to target center along network lines
+- Integrate with A* pathfinding from movement system
+- Prioritize nodes 3, 4, and 5 for targeting
+- Consider battalion and node positions in real-time
+
+## Dynamic Retargeting System [to-do]
+- While moving, continuously check for closer available targets
+- Once attacking, maintain current target until:
+  1. Target is destroyed/captured
+  2. Target moves out of range
+  3. Battalion itself is defeated
+- Prioritize closest target when retargeting (measured along network lines)
+- Ensure seamless transition between targets
+- Recalculate paths when retargeting occurs
 
 ## Combat Range [to-do]
-- Define attack range values for each battalion type
-- Calculate attack range from battalion center to target
+- Define attack range values for each battalion type based on Digital Barracks stats
+- Calculate attack range from battalion center to target center
 - Determine when battalions are in range to attack
 - Stop movement when attack range reaches target
-
-## Retargeting Logic [to-do]
-- Implement retargeting when current target is destroyed
-- Handle retargeting when node is captured
-- Create logic for when better targets become available
-- Ensure seamless transition between targets
+- Maintain visual indicators for attack range
 
 ## Combat Sequence [to-do]
 - Verify target is in range before initiating attack
 - Implement basic damage calculation logic
 - Update health status after attacks
 - Trigger appropriate visual feedback
+- Tie attack frequency to battalion speed stat
+
+## MVP Implementation Focus
+- Prioritize targeting restrictions to nodes 3, 4, and 5
+- Implement proximity-based targeting along network lines
+- Ensure proper dynamic retargeting while moving
+- Maintain target lock once attacking begins
+- Optimize for responsive targeting and smooth gameplay
 
 The MVP implementation should focus on creating a reliable proximity-based targeting system that works within network line restrictions. Advanced features like complex pathfinding and special targeting rules can be added in future iterations. 

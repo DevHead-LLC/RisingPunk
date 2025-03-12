@@ -19,28 +19,71 @@ You must:
 # Battle Core Mechanics
 
 ## Node Control System [to-do]
-- Strategic network nodes must be captured and held
-- Control determined by damage dealt to nodes
-- Capture threshold set at 75% of total army health
-- Tracks accumulated damage per side
-- Updates control status after each hit
+- Strategic network nodes (specifically nodes 3, 4, and 5) must be captured and held
+- Node capture threshold set at 75% of total battalion health from both sides
+- Capture progress shown with team colors (red/blue)
+- Track accumulated damage per side using zero-sum system
+- Opponents must first negate existing progress before gaining control
+
+## Network Bonus System [to-do]
+- When node is captured, connected network lines glow with team color
+- For example: if node 3 is captured, lines to nodes 0, 1, 6, and 7 would glow
+- Battalions on glowing network lines receive 2% bonus to all stats (attack, defense, speed, range)
+- Visual indicator shows which battalions are receiving bonus
+- Bonus updates immediately when node control changes
 
 ## Loss Tracking System [to-do]
-- Tracks battalion losses
-- Monitors node control changes
-- Calculates victory points based on control duration
+- Tracks battalion losses by quantity
+- Records mark level of lost units (Mk1-4)
+- Calculates point values based on mark (Mk1=1pt, Mk2=2pts, Mk3=4pts, Mk4=8pts)
+- Updates loss counter in real-time
+- Provides summary for battle conclusion
+
+## Battle Timer System [to-do]
+- Implement precise 20-second battle timer
+- Countdown phase before battle begins
+- Active battle phase during 20-second timer
+- Conclusion phase when timer expires
+- All movement and actions stop at timer expiration
 
 ## Scoring System [to-do]
 - Points awarded for:
-  - Node control duration ✓
-  - Enemy battalion elimination ✓
-  - Network control bonuses ✓
+  - Enemy battalion elimination (based on mark level)
+  - Node control
+  - Battle duration survival
+- Higher score determines victor
+- Tie-breaking: defending party wins ties
 
 ## Victory Determination [to-do]
 - Victory achieved through:
-  - Total network control ✓
-  - Point threshold reached ✓
-  - Enemy force elimination ✓
+  - Total control of nodes 3, 4, and 5
+  - Point threshold reached
+  - Enemy force elimination
+  - Battle timer expiration (highest score wins)
+- Apply tie-breaking when scores are equal
+
+## Initial Targeting System [to-do]
+- At battle start, battalions randomly target one of nodes 3, 4, or 5
+- Only nodes 3, 4, and 5 can be targeted for capture
+- While moving, check for closer targets continuously
+- Once attacking, maintain target until conditions change
+- Retarget when current target is destroyed/captured/moved
+
+## Movement and Pathfinding [to-do]
+- Calculate paths along network lines using A* algorithm
+- Battalion speed determines movement time (fastest reach nodes in 2-3 seconds)
+- Stop movement when attack range reaches target
+- Different battalion types have different attack ranges
+- No retreat functionality - always advance toward objectives
+
+## Combat System [to-do]
+### Damage Calculation:
+- Total attack power = base_offense * battalion_quantity
+- Defense reduction: damage = attack * (1 - defense/100)
+- Minimum damage of 1 point
+- Individual battalion total health tracking
+- Damage application after defense calculation
+- Destruction at 0 total health
 
 ## State Management System [to-do]
 ### Core Principles:
@@ -51,34 +94,40 @@ You must:
 - Atomic state operations
 
 ### Update Frequency:
-- Global 1-second update timer
+- Optimize update timing for smooth user experience
 - Batch related state changes
-- Optimize update scheduling
-- Handle state dependencies
+- Prioritize visual responsiveness
+- Handle state dependencies efficiently
 
 ## Update Timing System [to-do]
 ### Three-tier hierarchy:
-1. Real-time (60fps):
+1. Real-time:
    - Animations, movement, visual effects
-   - Uses requestAnimationFrame
-   - RAF fallback for background tabs
+   - Smooth, responsive visual feedback
 
 2. Speed-based:
    - Attack animations (per battalion speed stat)
-   - Duration = 1000ms / speed stat
-   - Uses Animated.timing with easing
+   - Movement based on battalion speed stat
+   - Fastest battalions reach nodes in 2-3 seconds
 
-3. Global timer (1s):
+3. Global timer:
    - Health, damage, state synchronization
-   - Aligns with backend update cycle
-   - Buffers state changes
+   - Score and progress updates
+   - 20-second battle duration tracking
+
+## MVP Implementation Focus
+- Prioritize smooth user experience
+- Focus on core gameplay mechanics
+- Implement essential visual feedback
+- Ensure battles properly conclude with clear outcome
+- Balance simplicity with strategic depth
 
 ## State Categories [to-do]
 ### Battle State:
 - Phase tracking
 - Timer management
 - Victory conditions
-- Node ownership
+- Node ownership (3, 4, 5)
 
 ### Battalion State:
 - Position tracking
@@ -90,34 +139,6 @@ You must:
 - Attack calculations
 - Damage resolution
 - Range checking
-- Collision detection
-
-## Combat System [to-do]
-### Damage Calculation:
-- Total attack power = base_offense * battalion_quantity
-- Defense reduction: damage = attack * (1 - defense/100)
-- Minimum damage of 1 point
-- Individual battalion total health tracking
-- Damage application after defense calculation
-- Destruction at 0 total health
-
-## Error Handling System [to-do]
-- Validates state transitions
-- Recovers from failures
-- Logs state errors
-- Maintains fallback states
-
-## State Synchronization System [to-do]
-### Timing Requirements:
-- Syncs with global timer
-- Handles network delays
-- Manages animation states
-- Coordinates multiple updates
-
-### Performance Optimization:
-- Minimizes state updates
-- Batches similar changes
-- Optimizes calculations
-- Monitors update frequency
+- Target selection (proximity-based)
 
 Each of these features is interconnected and must maintain system integrity while supporting the core battle mechanics. 
