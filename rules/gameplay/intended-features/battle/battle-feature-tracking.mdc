@@ -117,6 +117,6 @@ Controlled nodes should cause connected network lines to glow with the controlli
 
 ## Status Tracking
 This file will be updated as features progress through the TDD workflow:
-- `[ready]` → `[in-progress]` → `[test-failing]` → `[implementing]` → `[test-passing]` → `[done]`
+- `[planned]` → `[ready]` → `[in-progress]` → `[test-failing]` → `[implementing]` → `[test-passing]` → `[done]`
 
 The status of individual features in their respective files should be synchronized with this tracking file. 
