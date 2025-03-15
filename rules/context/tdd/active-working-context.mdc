@@ -1,5 +1,5 @@
 ---
-description: Active working context for TDD workflow
+description: Active working context for TDD workflow - maintains current state and directs workflow progression
 globs: 
 alwaysApply: false
 ---
@@ -20,6 +20,21 @@ AI CONTEXT MANAGEMENT DIRECTIVE
 -->
 
 # TDD WORKFLOW ACTIVE CONTEXT
+
+## NEXT DIRECTIVE ACTION
+This file is the central coordinator for workflow progression. Based on the current state:
+
+1. **Regular Workflow Progression**:
+   - If any step shows [in-progress] → Continue from that step in the AI Directive Tree
+   - If all steps are [to-do] → Begin with "Reset Context" in the AI Directive Tree
+
+2. **Feature Iteration Handling**:
+   - If "Feature Completion or Iteration" is [done] AND more sub-features exist → Set "Build a Failing Test" to [to-do]
+   - If "Feature Completion or Iteration" is [done] AND feature is complete → Set "Pause and Wait" to [to-do]
+
+3. **In All Cases**:
+   - Proceed to: `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/ai-directives/tdd-workflow.mdc`
+   - Use statuses below to determine your exact position in the workflow
 
 ## CURRENT STATUS
 - **Workflow Position**: Reset Context

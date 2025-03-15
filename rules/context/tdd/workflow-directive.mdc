@@ -1,5 +1,5 @@
 ---
-description: Master directive for TDD workflow automation
+description: Master directive for TDD workflow automation - provides central execution rules and protocols
 globs: 
 alwaysApply: false
 ---
@@ -13,6 +13,12 @@ AUTO-VERIFICATION DIRECTIVE [INTERNAL]
 -->
 
 # TDD WORKFLOW AUTOMATION DIRECTIVE [ACTIVE]
+
+## NEXT FILE TO READ
+After processing this directive file, the AI must:
+1. CHECK WORKING CONTEXT: Read `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/context/tdd/active-working-context.mdc`
+2. DETERMINE NEXT STEP based on the working context status markers
+3. ONLY THEN proceed to the AI Directive Tree if appropriate
 
 ## DIRECTIVE KEY
 - [to-do]: Task not yet started
@@ -28,12 +34,15 @@ AUTO-VERIFICATION DIRECTIVE [INTERNAL]
 Guide AI through TDD workflow systematically without requiring explicit instructions for each step.
 
 ## ACTION PROTOCOL
-1. CHECK: On each interaction, check `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/context/tdd/active-working-context.mdc` for current state
-2. IDENTIFY: Locate current position in workflow tree (find [to-do] OR [in-progress] tasks)
-3. UPDATE: Change status from [to-do] → [in-progress] → [done] as tasks complete
-4. EXECUTE: Run required scripts at each workflow position automatically
-5. PROGRESS: Move to next step only when current step is fully complete
-6. REPORT: Clearly state current position and next action in the workflow
+1. CHECK: On each interaction, first check `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/context/tdd/active-working-context.mdc` for current state
+2. DECIDE: 
+   - If any step is [in-progress], continue from that position
+   - If all steps are [to-do], then consult the AI Directive Tree and start with Reset Context
+3. IDENTIFY: Locate current position in workflow tree (find [to-do] OR [in-progress] tasks)
+4. UPDATE: Change status from [to-do] → [in-progress] → [done] as tasks complete
+5. EXECUTE: Run required scripts at each workflow position automatically
+6. PROGRESS: Move to next step only when current step is fully complete
+7. REPORT: Clearly state current position and next action in the workflow
 
 ## WORKING MODE
 - MINIMIZE QUESTIONS: Proceed through workflow with minimal user prompting
@@ -74,3 +83,4 @@ This directive implements @the-plan.mdc principles:
 - IMMEDIATELY NOTIFY USER IF ANY PART OF THIS DIRECTIVE CANNOT BE FOLLOWED.
 - USE ABSOLUTE PATHS WHEN NEEDED TO AVOID CONFUSION.
 - WORKING DIRECTORY IS: `/Users/robertthiel/DevHead_LLC/RisingPunk`
+- AFTER READING THIS FILE, PROCEED DIRECTLY TO ACTIVE-WORKING-CONTEXT.MDC

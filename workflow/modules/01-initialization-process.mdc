@@ -1,0 +1,62 @@
+# TDD Workflow: Initialization Process
+
+---
+description: Detailed documentation of the file-directed initialization process for TDD workflow
+globs: 
+alwaysApply: false
+---
+
+## INITIALIZATION SEQUENCE
+
+The TDD workflow begins with a precise file-directed sequence that establishes context and determines the next steps:
+
+1. **Entry Point**: User presents the `tdd-initialize.mdc` file to the AI
+   - This file explicitly directs AI to first read the master directive at `rules/context/tdd/workflow-directive.mdc`
+   - Only after processing the master directive should AI proceed to the next step
+
+2. **Master Directive Processing**: AI reads `rules/context/tdd/workflow-directive.mdc`
+   - This file provides the action protocol and execution rules
+   - Explicitly directs AI to check `rules/context/tdd/active-working-context.mdc` next
+
+3. **Context Check**: AI reads `rules/context/tdd/active-working-context.mdc`
+   - Determines current workflow state based on status markers
+   - If any step is [in-progress] → Continue from that step
+   - If all steps are [to-do] → Directive to proceed to `rules/ai-directives/tdd-workflow.mdc`
+
+4. **Decision Recording**: After determining which path to take:
+   - Update `active-working-context.mdc` to record the decision
+   - For [to-do] path: Record "Selected Reset Context as next step"
+   - For [in-progress] path: Record "Continuing from [specific step]"
+   - This creates resilience in case of interruption between decision and execution
+
+5. **Directive Tree Navigation**: AI reads `rules/ai-directives/tdd-workflow.mdc`
+   - Identifies the specific step to work on (Reset Context if starting fresh)
+   - Contains step-by-step tasks with clear status markers
+   - Each sub-step contains explicit file references or actions to take
+
+This explicit file-directed flow ensures the AI always knows which file to reference next, maintains proper context, and follows a consistent process for step determination.
+
+## ENTRY CONDITIONS
+
+The initialization process can be triggered under two conditions:
+
+1. **Fresh Start**: All steps in active-working-context.mdc show [to-do]
+   - Begin with Reset Context step from the beginning
+   - Initialize a new feature implementation cycle
+
+2. **Continuation**: One or more steps show [in-progress]
+   - Resume from the most recent in-progress step
+   - Maintain context from previous session
+   - Continue implementation of the current feature
+
+## RESILIENCE MECHANISMS
+
+Several mechanisms ensure workflow integrity during initialization:
+
+1. **Explicit Directional References**: Each file contains explicit references to the next file
+2. **Context Verification**: The verify-context.sh script validates context files
+3. **Decision Recording**: Workflow decisions are recorded in context files before proceeding
+4. **Status Tracking**: Clear status markers track progress at all times
+5. **File-Path Verification**: Absolute paths prevent context confusion
+
+*Reference this module when working specifically with the initialization phase of the TDD workflow.* 
