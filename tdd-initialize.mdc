@@ -43,10 +43,25 @@ This explicit file-directed flow ensures proper sequence of operations and maint
 After following the file-directed process flow, the AI should:
 
 1. Begin or resume the workflow at the appropriate step
-2. Automatically update status markers in the AI Directive Tree
-3. Create necessary files and execute required scripts
-4. Maintain context across workflow steps
-5. Pause at the completion of the current feature
+2. For the identified step (e.g., Reset Context):
+   - Update its status to [in-progress] in active-working-context.mdc
+   - Update its status to ◉In-Progress in tdd-workflow.mdc
+   - Review the current context to ensure proper alignment:
+     - Verify all prerequisite steps are complete
+     - Confirm required files and resources are available
+     - Check that the current state matches what is expected at this point
+3. For each sub-step of the identified step:
+   - Update the sub-step status to ◉In-Progress
+   - Execute the specific action required by the sub-step
+   - Update the sub-step status to ◉Done
+   - Proceed sequentially to the next sub-step
+4. After all sub-steps complete:
+   - Update the main step status to [done] in active-working-context.mdc
+   - Update the main step status to ◉Done in tdd-workflow.mdc
+5. Return to active-working-context.mdc to determine the next step
+6. Pause at the completion of the current feature
+
+This meticulous tracking ensures proper execution of each task, maintains accurate status records, and provides resilience against interruptions.
 
 ## WORKING CONTEXT SYNCHRONIZATION
 

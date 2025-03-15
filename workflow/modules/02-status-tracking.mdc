@@ -1,3 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
 # TDD Workflow: Status Tracking
 
 ---
@@ -54,6 +59,39 @@ Status updates must follow these protocols:
 5. **After Any Status Change**:
    - Save updates to relevant files
    - Run verification scripts when specified
+
+## SUB-STEP EXECUTION PROTOCOL
+
+The detailed execution sequence for sub-steps follows this precise pattern:
+
+1. **Main Step Initialization**:
+   - Update in active-working-context.mdc: [to-do] → [in-progress]
+   - Update in directive tree: ◉To-Do → ◉In-Progress
+
+2. **For Each Individual Sub-step**:
+   - **Before Execution**:
+     - Update the sub-step status: ◉To-Do → ◉In-Progress
+   - **Perform Execution**:
+     - Execute the actual task described in the sub-step
+     - This may be a file operation, script execution, or internal check
+   - **After Execution**:
+     - Update the sub-step status: ◉In-Progress → ◉Done
+     - Proceed to the next sub-step
+
+3. **Sequence Example for Reset Context**:
+   - Update "Reset Context" to [in-progress] in active-working-context.mdc
+   - Update "Reset Context" to ◉In-Progress in directive tree
+   - Update "Check Current Directory" to ◉In-Progress
+   - Perform the directory check
+   - Update "Check Current Directory" to ◉Done
+   - Update "Run Context Verification Script" to ◉In-Progress
+   - Run the script
+   - Update "Run Context Verification Script" to ◉Done
+   - Continue through all sub-steps in sequence
+   - After all sub-steps are ◉Done, update "Reset Context" to [done] in active-working-context.mdc
+   - Update "Reset Context" to ◉Done in directive tree
+
+This sequential progression through sub-steps ensures meticulous tracking of each operation and maintains a clear record of exactly what has been completed at any point in the workflow.
 
 ## CONTEXT FILE MANAGEMENT
 
