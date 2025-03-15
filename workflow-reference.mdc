@@ -17,56 +17,42 @@ This reference guides our **one-time manual walkthrough** to set up automation f
 - **TDD Initialization**: `/Users/robertthiel/DevHead_LLC/RisingPunk/tdd-initialize.mdc`
 - **Flowchart Patterns**: `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/flowchart-patterns.mdc` *(Reference for visualization tasks only)*
 
-## AI DIRECTIVE FLOWCHART
+## WORKFLOW OVERVIEW
+
 The TDD workflow follows this file-directed process flow:
 
-1. **Entry Point**: User presents the `tdd-initialize.mdc` file to the AI
-   - This file explicitly directs AI to first read the master directive at `rules/context/tdd/workflow-directive.mdc`
-   - Only after processing the master directive should AI proceed to the next step
+1. **Entry Point**: User presents the `tdd-initialize.mdc` file
+2. **File-Directed Sequence**:
+   - Read workflow-directive.mdc
+   - Check active-working-context.mdc
+   - Record workflow decision
+   - Navigate to tdd-workflow.mdc
+3. **Implementation Steps**:
+   - Reset Context
+   - Select Feature from Files
+   - Build a Failing Test
+   - Verify Test Fails
+   - Implement Minimal Fix
+   - Verify Fix
+   - Ensure No Regressions
+   - Check Performance
+   - Complete or Iterate Feature
+   - Pause and Wait
 
-2. **Master Directive Processing**: AI reads `rules/context/tdd/workflow-directive.mdc`
-   - This file provides the action protocol and execution rules
-   - Explicitly directs AI to check `rules/context/tdd/active-working-context.mdc` next
+4. **Sub-step Execution Pattern**:
+   - For each main step, update its status to [in-progress] in both tracking files
+   - Review context to ensure proper alignment for the current workflow step
+     - Verify prerequisites are complete
+     - Confirm required resources are available
+     - Check that current state matches expected context
+   - For each sub-step:
+     a. Update sub-step status to ◉In-Progress
+     b. Execute the sub-step action
+     c. Update sub-step status to ◉Done
+   - Proceed sequentially through all sub-steps
+   - After all sub-steps complete, mark main step as [done]
 
-3. **Context Check**: AI reads `rules/context/tdd/active-working-context.mdc`
-   - Determines current workflow state based on status markers
-   - If any step is [in-progress] → Continue from that step
-   - If all steps are [to-do] → Directive to proceed to `rules/ai-directives/tdd-workflow.mdc`
-
-4. **Directive Tree Navigation**: AI reads `rules/ai-directives/tdd-workflow.mdc`
-   - Identifies the specific step to work on (Reset Context if starting fresh)
-   - Contains step-by-step tasks with clear status markers
-   - Each sub-step contains explicit file references or actions to take
-
-5. **Status Updates**: Before executing actions, update statuses:
-   - First update `rules/context/tdd/active-working-context.mdc` status to [in-progress]
-   - Then update status in `rules/ai-directives/tdd-workflow.mdc` to ◉In-Progress
-
-6. **Sub-step Execution**: Work through each sub-step of the current workflow step
-   - Each sub-step must include clear file references to scripts or files to modify
-   - After completing each sub-step, update its status in the directive tree
-
-7. **Script Execution**: Run scripts referenced in sub-steps
-   - Each script provides clear success/failure feedback
-   - Scripts update status markers in relevant files automatically
-
-8. **Step Completion**: When all sub-steps complete:
-   - Update step status to ◉Done in `rules/ai-directives/tdd-workflow.mdc`
-   - Update step status to [done] in `rules/context/tdd/active-working-context.mdc`
-   - Return to `rules/context/tdd/active-working-context.mdc` for next step guidance
-
-9. **Conditional Branching and Iteration**:
-   - At key decision points (particularly Feature Completion or Iteration):
-   - The `active-working-context.mdc` file determines whether to:
-     - Loop back to an earlier step (e.g., "Build a Failing Test" for the next sub-feature)
-     - Proceed to the next sequential step (e.g., "Pause and Wait" if feature is complete)
-   - This allows for flexible, non-linear workflows while maintaining clear file direction
-
-10. **Workflow Completion**: When reaching "Pause and Wait" step:
-    - AI will clearly indicate workflow is paused awaiting next command
-    - User must present `tdd-initialize.mdc` again to continue
-
-This explicit file-directed flow ensures the AI always knows which file to reference next, maintains proper context, and follows a consistent process for each step, while allowing for the complexity of workflow branching and iteration.
+For detailed information on each stage, refer to the appropriate module file rather than attempting to load all documentation simultaneously.
 
 ## AUTOMATION SETUP PROCESS
 Our goal is to create automation for each step in the TDD workflow.
