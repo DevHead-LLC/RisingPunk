@@ -1,5 +1,5 @@
 ---
-description: 
+description: TDD workflow initialization file that directs the process flow through the entire TDD system
 globs: 
 alwaysApply: false
 ---
@@ -13,26 +13,40 @@ This file triggers the automated TDD workflow process. Present this file to the 
 ```
 COMMAND: initialize-tdd-workflow
 OPERATION: Begin automated TDD workflow process
-ACTION: Start with "Reset Context" step in the AI Directive Tree
+ACTION: Read the Master Directive FIRST, then proceed to the Reset Context step
 ```
 
 ## CONTEXT PATHS
 
+- **Master Directive**: `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/context/tdd/workflow-directive.mdc`
 - **AI Directive Tree**: `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/ai-directives/tdd-workflow.mdc`
 - **Working Context**: `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/context/tdd/active-working-context.mdc`
 - **Workflow Reference**: `/Users/robertthiel/DevHead_LLC/RisingPunk/workflow-reference.mdc`
 
+## FILE-DIRECTED PROCESS FLOW
+
+When this file is presented to the AI, it should follow this sequence exactly:
+
+1. First, read the Master Directive at `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/context/tdd/workflow-directive.mdc`
+2. Next, check the Working Context at `/Users/robertthiel/DevHead_LLC/RisingPunk/rules/context/tdd/active-working-context.mdc`
+3. Then, based on the context state:
+   - If any step is [in-progress] → Continue workflow from that position
+   - If all steps are [to-do] → Read the AI Directive Tree and begin with Reset Context
+4. Record the decision in the Working Context before proceeding:
+   - Update active-working-context.mdc with the determined path
+   - This creates resilience in case of workflow interruption
+
+This explicit file-directed flow ensures proper sequence of operations and maintains context.
+
 ## INITIALIZATION PROCESS
 
-When this file is presented to the AI, it should:
+After following the file-directed process flow, the AI should:
 
-1. Read the AI Directive Tree at the path specified above
-2. Check the current status in the working context file
-3. Begin or resume the workflow at the appropriate step
-4. Automatically update status markers in the AI Directive Tree
-5. Create necessary files and execute required scripts
-6. Maintain context across workflow steps
-7. Pause at the completion of the current feature
+1. Begin or resume the workflow at the appropriate step
+2. Automatically update status markers in the AI Directive Tree
+3. Create necessary files and execute required scripts
+4. Maintain context across workflow steps
+5. Pause at the completion of the current feature
 
 ## WORKING CONTEXT SYNCHRONIZATION
 
@@ -69,6 +83,13 @@ When the workflow reaches the "Pause and Wait" step, the AI will:
 2. Summarize what was accomplished
 3. Wait for this file to be presented again to begin the next feature
 
+## EXTERNAL RESOURCES
+When needed, the AI should reference relevant documentation:
+- @Web - For general web searches
+- @typescriptLang - For TypeScript language reference
+- @reactNativeLang - For React Native documentation
+- @mongoDBDocs - For MongoDB documentation
+
 ---
 
 # BEGIN TDD WORKFLOW
@@ -78,9 +99,10 @@ Present this section to trigger the workflow initialization.
 ```
 INITIALIZE: TDD WORKFLOW
 COMMAND: initialize-tdd-workflow
-CONTEXT: Read from AI Directive Tree
-ACTION: Begin with Reset Context step
+FIRST_ACTION: Read the Master Directive at rules/context/tdd/workflow-directive.mdc
+SECOND_ACTION: Check Working Context at rules/context/tdd/active-working-context.mdc
+NEXT_ACTION: Read AI Directive Tree based on context state
 STATUS: Ready to start
 ```
 
-When you see the above command block, begin the TDD workflow process by checking the AI Directive Tree and working context file. Start with the "Reset Context" step and proceed through each step, updating status markers and maintaining context throughout. 
+When you see the above command block, begin the TDD workflow process by following the file-directed process flow. Each file will explicitly direct you to the next file to reference. 

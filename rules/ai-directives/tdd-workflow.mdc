@@ -30,6 +30,31 @@ WORKFLOW & FEATURE STATUS NOTATION:
 - Feature File Statuses: [planned] [ready] [in-progress] [test-failing] [implementing] [test-passing] [done]
 -->
 
+# STATUS UPDATE INSTRUCTIONS
+When working with this Directive Tree, follow these status update procedures:
+
+1. **Before Starting a Step**:
+   - Update the status in active-working-context.mdc from [to-do] → [in-progress]
+   - Update the status in this file from ◉To-Do → ◉In-Progress
+
+2. **For Each Sub-step**:
+   - Update from ◉To-Do → ◉Done as each sub-step completes
+   - Execute any scripts or file operations mentioned in the sub-step
+
+3. **After Completing a Step**:
+   - Update the status in this file from ◉In-Progress → ◉Done
+   - Update the status in active-working-context.mdc from [in-progress] → [done]
+   - Return to active-working-context.mdc to determine your next actions
+
+4. **For Decision Points**:
+   - When reaching a decision point (like Feature Completion or Iteration)
+   - Let active-working-context.mdc determine which step to execute next
+   - Do not assume a linear progression through the steps
+
+5. **After Any Status Change**:
+   - Remember to save your updates to both files
+   - Run verification scripts when specified to ensure context consistency
+
 AI Directive Tree
 └── Reset Context ◉To-Do
     ├── Check Current Directory and Workspace Status ◉To-Do

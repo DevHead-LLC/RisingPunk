@@ -1,0 +1,105 @@
+# TDD Workflow: Feature Implementation
+
+---
+description: Documentation of the TDD feature implementation process from test creation to verification
+globs: 
+alwaysApply: false
+---
+
+## TDD IMPLEMENTATION CYCLE
+
+The feature implementation process follows these key steps:
+
+1. **Select Feature from Files**
+   - Identify feature with [planned] or [ready] status
+   - Update feature status to [in-progress]
+   - Create/update implementation context files
+
+2. **Build a Failing Test**
+   - Identify the sub-feature to implement
+   - Create/update test file at server/tdd/tests/{FeatureName}.test.ts
+   - Implement test based on feature requirements
+   - Update sub-feature status to [test-failing]
+
+3. **Run Failing Test to Verify It Fails**
+   - Execute test with run-test.sh
+   - Ensure failure matches expectations
+   - Verify test properly represents missing functionality
+
+4. **Implement Minimal Fix**
+   - Create implementation plan
+   - Make the smallest change necessary to pass the test
+   - Ensure solution aligns with feature requirements
+   - Update sub-feature status to [implementing]
+
+5. **Run Test to Verify Fix**
+   - Execute test to ensure fix resolves the issue
+   - Update sub-feature status to [test-passing]
+
+6. **Run All Tests to Ensure No Other Tests Break**
+   - Execute all tests for the feature
+   - Fix any regressions
+   - Re-run tests until all pass
+
+7. **Performance Check**
+   - Execute performance-test.sh
+   - Ensure no performance regressions
+   - Confirm feature meets efficiency standards
+
+## FEATURE ITERATION
+
+After completing a sub-feature:
+
+1. **If More Sub-Features Remain**:
+   - Return to "Build a Failing Test" step for the next sub-feature
+   - Continue until all sub-features are implemented
+
+2. **If Feature is Complete**:
+   - Update feature status to [done]
+   - Prepare for next feature selection
+   - Pause and wait for next user command
+
+## IMPLEMENTATION PRINCIPLES
+
+All implementations should follow these principles:
+
+1. **Simplicity First**: Implement only what's needed to pass the test
+2. **Test-Driven**: Tests must fail before implementing a solution
+3. **Incremental Progress**: Work through one sub-feature at a time
+4. **Explicit Status Tracking**: Keep status markers updated
+5. **Context Maintenance**: Document progress and decisions
+6. **Regression Prevention**: Never break existing functionality
+
+## TEST DESIGN PRINCIPLES
+
+Tests should follow these principles:
+
+1. **Minimal and Focused**: Test one aspect of functionality
+2. **Clear Assertions**: Define exactly what should happen
+3. **Descriptive Messages**: Error messages should be helpful
+4. **Proper Organization**: Structure matches feature hierarchy
+5. **Independent**: Tests should not depend on each other
+6. **Deterministic**: Same input always produces same result
+
+## IMPLEMENTATION FILES
+
+Key files involved in feature implementation:
+
+1. **Test Files**: server/tdd/tests/{FeatureName}.test.ts
+2. **Implementation Files**: server/src/features/{FeatureName}.ts
+3. **Feature Definition**: rules/gameplay/intended-features/{feature-path}
+4. **Implementation Context**: rules/tdd/features/{feature-name-with-hyphens}-implementation.mdc
+
+## SCRIPTS AND COMMANDS
+
+Scripts used during implementation:
+
+1. **Verify Test Path**: rules/tdd/scripts/verify-test-path.sh "{FeatureName}"
+2. **Run Tests**: server/tdd/scripts/run-test.sh with various parameters:
+   - Single test: -t '{specific test name}'
+   - Test file: --file={FeatureName}.test.ts
+   - Test suite: --suite={FeatureName}
+3. **Sync Context**: rules/tdd/scripts/sync-context.sh "{FeatureName}" "{SubFeatureName}" "{Status}"
+4. **Performance Test**: server/tdd/scripts/performance-test.sh --feature={FeatureName}
+
+*Reference this module when working specifically with feature implementation aspects of the TDD workflow.* 

@@ -1,0 +1,93 @@
+# TDD Workflow: Status Tracking
+
+---
+description: Documentation of the status tracking systems used in the TDD workflow process
+globs: 
+alwaysApply: false
+---
+
+## STATUS MARKER SYSTEM
+
+The TDD workflow uses specific status markers to track progress through each stage:
+
+### Workflow Step Status
+- `[to-do]`: Step not yet started
+- `[in-progress]`: Step currently being worked on
+- `[done]`: Step completed successfully
+- `[blocked]`: Step cannot proceed (requires attention)
+
+### Directive Tree Status
+- ◉To-Do: Sub-step not yet started
+- ◉In-Progress: Sub-step currently being worked on
+- ◉Done: Sub-step completed successfully
+
+### Feature Implementation Status
+- `[planned]`: Feature identified but not ready for implementation
+- `[ready]`: Feature ready for implementation
+- `[in-progress]`: Feature currently being implemented
+- `[test-failing]`: Feature has failing tests written
+- `[implementing]`: Feature implementation in progress
+- `[test-passing]`: Feature tests now pass
+- `[done]`: Feature completely implemented
+
+## STATUS UPDATE PROTOCOLS
+
+Status updates must follow these protocols:
+
+1. **Before Starting a Step**:
+   - Update the status in active-working-context.mdc from [to-do] → [in-progress]
+   - Update the status in the directive tree from ◉To-Do → ◉In-Progress
+
+2. **For Each Sub-step**:
+   - Update from ◉To-Do → ◉Done as each sub-step completes
+   - Execute any scripts or file operations mentioned in the sub-step
+
+3. **After Completing a Step**:
+   - Update the status in the directive tree from ◉In-Progress → ◉Done
+   - Update the status in active-working-context.mdc from [in-progress] → [done]
+   - Return to active-working-context.mdc to determine next actions
+
+4. **For Decision Points**:
+   - Update context to record the decision made
+   - Ensure context reflects the selected path before proceeding
+
+5. **After Any Status Change**:
+   - Save updates to relevant files
+   - Run verification scripts when specified
+
+## CONTEXT FILE MANAGEMENT
+
+Status tracking primarily occurs in these files:
+
+1. **active-working-context.mdc**: Maintains current workflow status
+   - CURRENT STATUS section: Shows current step and status
+   - WORKFLOW PROGRESS section: Shows status of all workflow steps
+   - FEATURE TRACKING section: Shows current feature and sub-feature
+   - CONTEXT HISTORY section: Records workflow history with timestamps
+
+2. **tdd-workflow.mdc**: Contains detailed sub-step tracking
+   - Uses ◉ notation to track progress through sub-steps
+   - Each workflow step contains multiple sub-steps
+   - Sub-steps marked as ◉Done when completed
+
+3. **Feature Files**: Track feature implementation status
+   - Use bracketed status markers ([planned], [ready], etc.)
+   - Located in rules/gameplay/intended-features/
+
+## STATUS SYNCHRONIZATION
+
+Status synchronization occurs through:
+
+1. **Manual Updates**: AI updates status markers when:
+   - Beginning or completing a step
+   - Making workflow decisions
+   - Recording progress
+
+2. **Script Updates**: Scripts automatically update status when:
+   - Running sync-context.sh with feature parameters
+   - Executing verify-context.sh to check consistency
+   - Running reset-workflow-state.sh to reset workflow
+
+Maintaining accurate status tracking is critical for workflow continuity between sessions and proper branching at decision points.
+
+*Reference this module when working specifically with status tracking aspects of the TDD workflow.* 

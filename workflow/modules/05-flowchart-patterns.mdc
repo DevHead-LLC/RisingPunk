@@ -1,0 +1,159 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# TDD Workflow: Flowchart Patterns
+
+---
+description: Comprehensive guidelines for creating and maintaining workflow flowcharts that accurately represent the TDD automated process
+globs: 
+alwaysApply: false
+---
+
+## PURPOSE
+
+This file establishes consistent patterns for visualizing TDD workflow processes in Lucid Chart flowcharts. It captures the specific conventions developed for representing file-directed AI workflows and ensures alignment between flowcharts and actual system behavior.
+
+## VISUAL LANGUAGE
+
+### Color Coding System
+- **Green Nodes**: Files that direct the TDD workflow process
+- **Yellow Nodes**: AI behaviors and actions (READ, WRITE, RUN, DECIDE)
+- **Gray Nodes**: Manual user actions or inputs
+
+### Node Types and Shapes
+- **File Nodes**: Green document shapes with full file paths
+- **Action Boxes**: 
+  - Gray rectangles for user actions
+  - Yellow rectangles for AI behaviors
+- **Decision Diamonds**: Yellow diamonds for AI decision points
+- **Directive Labels**: Green boxes for "Directed by" source information
+
+### Connection Patterns
+- **Numbered Steps**: Use sequential numbering (1, 2, 3) for main flow
+- **Sub-steps**: Use decimal notation (4.a, 4.b, 4.c) for branching paths
+- **Decision Path Numbering**:
+  - Use letter sub-steps (a., b., c.) ONLY for decision splits (e.g., 4.a, 4.b, 4.c.)
+  - For nested splits within a path, use roman numerals (e.g., 6.a.i, 6.a.ii)
+  - Continue tracking separate paths until they either merge or terminate
+  - When paths merge, continue with the next sequential number
+  - When a path terminates, clearly mark its endpoint
+  - **Examples**:
+    ```
+    # Decision path numbering example:
+    4.a. AI Decision (diamond)
+      ├── 4.b. If any step [in-progress] → Continue from that point
+      └── 4.c. If all steps [to-do] → Return to active-working-context.mdc
+          ├── WRITE: Record "Begin with Reset Context" decision in file
+          └── 4.d. Follow NEXT DIRECTIVE ACTION instruction from active-working-context.mdc
+              └── Proceed to tdd-workflow.mdc
+    
+    # File interaction pattern (showing read-write-read cycle):
+    3. READ active-working-context.mdc to check status
+    4.a. DECIDE based on status markers
+    4.c. WRITE decision back to active-working-context.mdc
+    4.d. READ next directive from active-working-context.mdc
+    
+    # Sequential steps example (not decision paths):
+    5. WRITE status update to active-working-context.mdc
+    6. WRITE status update to tdd-workflow.mdc
+    7. RUN verify-context.sh script
+    8. Begin execution of identified workflow step
+    ```
+- **Arrow Labels**: Clearly indicate what causes the transition
+- **Connection Labels**: Label what causes transitions (directive, command, etc.)
+- **Convergence Points**: Show where paths reconverge with a label
+- **Different Line Styles**: Use different line styles for automatic vs. manual actions if needed
+
+## STANDARD ELEMENTS
+
+### File Nodes (Green)
+- Include full path on first reference
+- Label with filename in quotes
+- Add "ENTRY POINT" label for starting files
+- Number each file for potential later reference
+
+### Action Nodes (Yellow/Gray)
+- Start with action verb in ALL CAPS (READ, WRITE, RUN, DECIDE)
+- Include brief description of the action
+- For READ actions, note what information is gained
+- For DECIDE actions, clearly state the decision criteria
+
+### "Directed By" Boxes
+- **Green boxes**: Show file directives (include section if known)
+- **Gray boxes**: Show user-initiated actions
+- Position consistently to the right of the action they're directing
+
+### Decision Paths
+- Clearly label each possible path
+- Use exact status marker notation ([to-do], [in-progress], [done])
+- Show both paths even when one is more common
+
+## MANDATORY PATTERNS
+
+1. **User Entry Point**:
+   - Start with gray user action box
+   - Connect to entry point file (tdd-initialize.mdc)
+
+2. **File-Directed Flow**:
+   - Each file must explicitly direct to the next file
+   - Direction must match actual workflow defined in files
+   - Label with exact directive name (FIRST_ACTION, NEXT FILE TO READ, etc.)
+
+3. **Decision Handling**:
+   - All major decision points require a yellow diamond
+   - Show all possible paths from decisions
+   - Explicitly label what directs the decision
+
+4. **Status Operations**:
+   - Show status changes with WRITE operations
+   - Include before → after notation for status markers
+   - Link to directive that requires the status update
+
+5. **Script Execution**:
+   - Show with RUN operation nodes
+   - Include script path and basic purpose
+   - Link to directive that calls for script execution
+
+## REFERENCE OPTIMIZATION
+
+- Use numbers to identify nodes that may be referenced again
+- Use reference notation "See File #3" instead of duplicating nodes
+- Use curved arrows for reference connections to minimize crossing lines
+
+## ADVANCED FEATURES
+
+- Add status indicators to show workflow progression
+- Include script execution nodes for automation steps
+- Use swimlanes to separate different types of activities
+
+## ALIGNMENT WITH WORKFLOW REFERENCE
+
+Ensure the flowchart accurately represents the sequence defined in workflow-reference.mdc:
+1. Entry Point (tdd-initialize.mdc)
+2. Master Directive (workflow-directive.mdc)
+3. Context Check (active-working-context.mdc)
+4. Decision Logic (based on context status)
+5. Decision Recording (update context with path choice)
+6. Directive Tree (tdd-workflow.mdc)
+7. Status Updates, Script Execution, and Implementation Steps
+
+## VALIDATION CRITERIA
+
+A correctly implemented flowchart should:
+1. Visually distinguish between files, AI actions, and user actions
+2. Clearly show what directs each action
+3. Accurately represent decision points and alternative paths
+4. Match the exact sequence defined in the actual workflow files
+5. Use consistent visual language throughout
+
+## USE OF THIS REFERENCE
+
+Reference this file when:
+1. Creating new workflow flowcharts
+2. Updating existing flowcharts to match workflow changes
+3. Aligning flowchart representations with actual implementation
+4. Simplifying complex workflow visualization
+
+*Note: This file should only be referenced when specifically working with Lucid Chart flowchart tasks and should not be incorporated into the actual TDD workflow system.* 
