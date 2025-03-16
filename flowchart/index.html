@@ -8,8 +8,8 @@
 </head>
 <body>
     <header>
-        <h1>TDD Workflow Flowchart</h1>
-        <button class="toggle-btn" id="toggleLegend">Show Legend</button>
+        <h1>TDD Workflow Process Flow</h1>
+        <button id="toggleLegend">Show Legend</button>
     </header>
 
     <!-- Collapsible Legend Panel - hidden by default -->
@@ -17,32 +17,68 @@
         <div class="legend-content">
             <div class="legend-section">
                 <div class="legend-title">Command Types</div>
-                <ul class="legend">
-                    <li><div class="legend-item command-read"></div> READ - Get information</li>
-                    <li><div class="legend-item command-write"></div> WRITE - Update information</li>
-                    <li><div class="legend-item command-decide"></div> DECIDE - Make a decision</li>
-                    <li><div class="legend-item command-run"></div> RUN - Execute commands</li>
-                </ul>
+                <div class="legend-items">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #d6e4ff;"></div>
+                        <span>READ - Get information</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #d8ecd0;"></div>
+                        <span>WRITE - Update information</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #f9e79f;"></div>
+                        <span>DECIDE - Make a decision</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #ffcc99;"></div>
+                        <span>RUN - Execute commands</span>
+                    </div>
+                </div>
             </div>
             
             <div class="legend-section">
                 <div class="legend-title">Process Types</div>
-                <ul class="legend">
-                    <li><div class="legend-item legend-automated"></div> Automated Process</li>
-                    <li><div class="legend-item legend-manual"></div> Manual Process</li>
-                    <li><div class="legend-item legend-info"></div> Information Process</li>
-                    <li><div class="legend-item legend-document"></div> Document</li>
-                    <li><div class="legend-item legend-phase"></div> Phase</li>
-                </ul>
+                <div class="legend-items">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #d8ecd0;"></div>
+                        <span>Automated Process</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #f9e79f;"></div>
+                        <span>Manual Process</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #d6e4ff;"></div>
+                        <span>Information Process</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #e8e8e8;"></div>
+                        <span>Document</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #f0f0f0; border-radius: 0;"></div>
+                        <span>Phase</span>
+                    </div>
+                </div>
             </div>
             
             <div class="legend-section">
                 <div class="legend-title">Actors</div>
-                <ul class="legend-actor">
-                    <li><div class="legend-item actor-user"></div> User Action</li>
-                    <li><div class="legend-item actor-ai"></div> AI Action</li>
-                    <li><div class="legend-item actor-file"></div> File Directive</li>
-                </ul>
+                <div class="legend-items">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #f9e79f;"></div>
+                        <span>User Action</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #d8ecd0;"></div>
+                        <span>AI Action</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #ffcc99;"></div>
+                        <span>File Directive</span>
+                    </div>
+                </div>
             </div>
 
             <div class="legend-section">
@@ -82,10 +118,10 @@
         <span class="controls-label">Jump to:</span>
         <select class="phase-select" id="phaseSelect">
             <option value="">Select Phase...</option>
-            <option value="initialization">Initialization</option>
-            <option value="test-creation">Test Creation</option>
-            <option value="implementation">Implementation</option>
-            <option value="completion">Completion</option>
+            <option value="initialization">Initialization Phase</option>
+            <option value="test-creation">Test Creation Phase</option>
+            <option value="implementation">Implementation Phase</option>
+            <option value="completion">Completion Phase</option>
         </select>
     </div>
 
