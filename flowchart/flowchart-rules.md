@@ -16,6 +16,13 @@ and suggest updates when appropriate based on development progress.
 - Any interpretation of vague instructions must be confirmed with the user first
 - All implementation details must adhere strictly to user specifications
 
+## CRITICAL RULE - NO DUPLICATE FILES
+- NEVER create duplicate versions of existing project files
+- ALWAYS reference original file paths like `/Users/robertthiel/DevHead_LLC/RisingPunk/tdd-initialize.mdc`
+- If a file needs to be examined, USE `cat`, `grep`, or other commands to view it in its original location 
+- DO NOT create copies in the flowchart directory or elsewhere
+- VERIFY file existence before claiming it can't be found
+
 ## Purpose
 This file establishes guidelines for creating a comprehensive flowchart application that visualizes the TDD workflow using HTML, CSS, and JavaScript. The goal is to create a detailed yet understandable visualization of the complex workflow process.
 

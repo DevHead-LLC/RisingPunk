@@ -250,12 +250,13 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Document nodes (each document appears only once, positioned for best access)
             documents: [
-                { id: 'doc-tdd-init', x: colWidth*2, y: documentY, text: 'TDD Initialize', path: '/tdd-initialize.mdc', type: 'document-node' },
-                { id: 'doc-workflow', x: colWidth*4, y: documentY, text: 'TDD Workflow', path: '/rules/ai-directives/tdd-workflow.mdc', type: 'document-node' },
-                { id: 'doc-active-context', x: colWidth*6, y: documentY, text: 'Active Context', path: '/rules/context/tdd/active-working-context.mdc', type: 'document-node' },
-                { id: 'doc-feature-registry', x: colWidth*8, y: documentY, text: 'Feature Registry', path: '/rules/gameplay/intended-features/', type: 'document-node' },
-                { id: 'doc-test-file', x: colWidth*2, y: 850, text: 'Feature Test File', path: '/server/tdd/tests/{feature}.test.ts', type: 'document-node' },
-                { id: 'doc-impl-file', x: colWidth*4, y: 1450, text: 'Feature Implementation', path: '/server/src/features/{feature}.ts', type: 'document-node' }
+                { id: 'doc-tdd-init', x: colWidth*2, y: documentY, text: 'TDD Initialize', path: '/Users/robertthiel/DevHead_LLC/RisingPunk/tdd-initialize.mdc', type: 'document-node' },
+                { id: 'doc-workflow', x: colWidth*4, y: documentY, text: 'Workflow Directive', path: '/Users/robertthiel/DevHead_LLC/RisingPunk/rules/context/tdd/workflow-directive.mdc', type: 'document-node' },
+                { id: 'doc-active-context', x: colWidth*6, y: documentY, text: 'Active Context', path: '/Users/robertthiel/DevHead_LLC/RisingPunk/rules/context/tdd/active-working-context.mdc', type: 'document-node' },
+                { id: 'doc-ai-directives', x: colWidth*8, y: documentY, text: 'AI Directive Tree', path: '/Users/robertthiel/DevHead_LLC/RisingPunk/rules/ai-directives/tdd-workflow.mdc', type: 'document-node' },
+                { id: 'doc-feature-registry', x: colWidth*10, y: documentY, text: 'Feature Registry', path: '/Users/robertthiel/DevHead_LLC/RisingPunk/rules/gameplay/intended-features/', type: 'document-node' },
+                { id: 'doc-test-file', x: colWidth*2, y: 850, text: 'Feature Test File', path: '/Users/robertthiel/DevHead_LLC/RisingPunk/server/tdd/tests/{feature}.test.ts', type: 'document-node' },
+                { id: 'doc-impl-file', x: colWidth*4, y: 1450, text: 'Feature Implementation', path: '/Users/robertthiel/DevHead_LLC/RisingPunk/server/src/features/{feature}.ts', type: 'document-node' }
             ],
             
             // Process nodes (command steps in sequential order) using grid layout with more space
@@ -264,12 +265,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Initialization Phase - Row 1
                 { id: 'step-1', x: colWidth*1, y: headerRow + rowHeight*1, text: 'Initialize TDD Workflow', actor: 'user', type: 'node-manual', command: 'RUN', step: 1 },
                 { id: 'step-2', x: colWidth*3, y: headerRow + rowHeight*1, text: 'Read TDD Initialize', actor: 'ai', type: 'node-automated', command: 'READ', step: 2 },
-                { id: 'step-3', x: colWidth*5, y: headerRow + rowHeight*1, text: 'Read TDD Workflow', actor: 'ai', type: 'node-automated', command: 'READ', step: 3 },
-                { id: 'step-4', x: colWidth*7, y: headerRow + rowHeight*1, text: 'Read Active Context', actor: 'ai', type: 'node-automated', command: 'READ', step: 4 },
+                { id: 'step-3', x: colWidth*5, y: headerRow + rowHeight*1, text: 'Read Workflow Directive', actor: 'ai', type: 'node-automated', command: 'READ', step: 3 },
+                { id: 'step-4', x: colWidth*7, y: headerRow + rowHeight*1, text: 'Check Working Context', actor: 'ai', type: 'node-automated', command: 'READ', step: 4 },
                 
                 // Initialization Phase - Row 2
-                { id: 'step-5', x: colWidth*1, y: headerRow + rowHeight*2, text: 'Determine Current Status', actor: 'ai', type: 'node-automated', command: 'DECIDE', step: 5 },
-                { id: 'step-6', x: colWidth*3, y: headerRow + rowHeight*2, text: 'Identify Next Action', actor: 'ai', type: 'node-automated', command: 'DECIDE', step: 6 },
+                { id: 'step-5', x: colWidth*1, y: headerRow + rowHeight*2, text: 'Read AI Directive Tree', actor: 'ai', type: 'node-automated', command: 'READ', step: 5 },
+                { id: 'step-6', x: colWidth*3, y: headerRow + rowHeight*2, text: 'Verify Working Directory', actor: 'ai', type: 'node-automated', command: 'RUN', step: 6 },
                 { id: 'step-7', x: colWidth*5, y: headerRow + rowHeight*2, text: 'Browse Feature Registry', actor: 'ai', type: 'node-automated', command: 'READ', step: 7 },
                 { id: 'step-8', x: colWidth*7, y: headerRow + rowHeight*2, text: 'Select Feature to Implement', actor: 'ai', type: 'node-automated', command: 'DECIDE', step: 8 },
                 
@@ -318,8 +319,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 { from: 'step-3', to: 'step-4', label: 'Next', connectionClass: 'step-connection' },
                 { from: 'step-4', to: 'doc-active-context', label: 'Read from', connectionClass: 'step-to-doc-connection' },
                 { from: 'step-4', to: 'step-5', label: 'Next', connectionClass: 'step-connection' },
-                { from: 'step-5', to: 'step-6', label: 'Decide', connectionClass: 'step-connection' },
-                { from: 'step-6', to: 'step-7', label: 'Next', connectionClass: 'step-connection' },
+                { from: 'step-5', to: 'doc-ai-directives', label: 'Read from', connectionClass: 'step-to-doc-connection' },
+                { from: 'step-5', to: 'step-6', label: 'Next', connectionClass: 'step-connection' },
+                { from: 'step-6', to: 'step-7', label: 'Run Command', connectionClass: 'step-connection' },
                 { from: 'step-7', to: 'doc-feature-registry', label: 'Read from', connectionClass: 'step-to-doc-connection' },
                 { from: 'step-7', to: 'step-8', label: 'Next', connectionClass: 'step-connection' },
                 { from: 'step-8', to: 'step-9', label: 'After decision', connectionClass: 'step-connection' },
@@ -363,9 +365,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 { from: 'step-29', to: 'step-30', label: 'Next', connectionClass: 'step-connection' },
                 { from: 'step-30', to: 'step-1', label: 'Restart process', connectionClass: 'step-connection' },
                 // Document relationships
-                { from: 'doc-tdd-init', to: 'doc-workflow', label: 'References' },
-                { from: 'doc-workflow', to: 'doc-active-context', label: 'Directs' },
-                { from: 'doc-active-context', to: 'doc-feature-registry', label: 'Tracks status' }
+                { from: 'doc-tdd-init', to: 'doc-workflow', label: 'References', connectionClass: 'document-connection' },
+                { from: 'doc-workflow', to: 'doc-active-context', label: 'Directs', connectionClass: 'document-connection' },
+                { from: 'doc-workflow', to: 'doc-ai-directives', label: 'References', connectionClass: 'document-connection' },
+                { from: 'doc-active-context', to: 'doc-feature-registry', label: 'Tracks status', connectionClass: 'document-connection' }
             ]
         };
         
