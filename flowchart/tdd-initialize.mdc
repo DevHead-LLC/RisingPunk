@@ -1,0 +1,36 @@
+# TDD Workflow Initialization
+
+This document serves as the entry point for the Test-Driven Development workflow process. When this file is presented to the AI, it will trigger the TDD workflow sequence.
+
+## Workflow Initialization Command [to-do]
+
+To begin the TDD workflow process, the AI should follow these initial steps:
+
+1. Read the AI Directive Tree at `/rules/ai-directives/tdd-workflow.mdc` to understand the full workflow
+2. Check the current context in `/rules/context/tdd/active-working-context.mdc`
+3. Begin processing the workflow steps in sequence according to the directive tree
+
+## Context Information [to-do]
+
+The AI should check the following context before proceeding:
+
+- Current feature status in the Feature Registry at `/rules/gameplay/intended-features/`
+- Current working context to determine if this is a new feature or continuation
+- Any relevant test files and implementation files for the feature being worked on
+
+## Workflow Reference [to-do]
+
+The complete workflow reference is available at `/workflow-reference.mdc`. This document contains the full description of the TDD workflow process, including all phases, steps, and expected outcomes.
+
+## Next Steps [to-do]
+
+After reading this initialization document, the AI should:
+
+1. Update the status markers from [to-do] to [in-progress] as each task is started
+2. Update to [done] when tasks are completed
+3. Follow the sequential steps in the workflow directive tree
+4. Maintain the context file with current status throughout the process
+
+---
+
+Note: This document is a trigger for the TDD workflow process. When presented to the AI, it should be treated as a command to begin following the workflow process as defined in the directive tree. 

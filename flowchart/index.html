@@ -3,30 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Directive Flowchart</title>
+    <title>TDD Workflow Flowchart</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <header>
-        <h1>AI Directive Flowchart Viewer</h1>
-        <p>A visualization tool for AI workflow directives</p>
+        <h1>TDD Workflow Flowchart</h1>
+        <button class="toggle-btn" id="toggleLegend">Show Legend</button>
     </header>
-    
-    <div class="toolbar">
-        <div class="instructions">
-            <p>This flowchart displays the automated AI directive workflow. The sample below represents a portion of a TDD workflow.</p>
-            <ul class="legend">
-                <li><span class="legend-item legend-automated"></span> Automated Process</li>
-                <li><span class="legend-item legend-manual"></span> Manual Action</li>
-                <li><span class="legend-item legend-info"></span> Information</li>
-            </ul>
+
+    <!-- Collapsible Legend Panel - hidden by default -->
+    <div class="legend-panel" id="legendPanel">
+        <div class="legend-content">
+            <div class="legend-section">
+                <div class="legend-title">Command Types</div>
+                <ul class="legend">
+                    <li><div class="legend-item command-read"></div> READ - Get information</li>
+                    <li><div class="legend-item command-write"></div> WRITE - Update information</li>
+                    <li><div class="legend-item command-decide"></div> DECIDE - Make a decision</li>
+                    <li><div class="legend-item command-run"></div> RUN - Execute commands</li>
+                </ul>
+            </div>
+            
+            <div class="legend-section">
+                <div class="legend-title">Process Types</div>
+                <ul class="legend">
+                    <li><div class="legend-item legend-automated"></div> Automated Process</li>
+                    <li><div class="legend-item legend-manual"></div> Manual Process</li>
+                    <li><div class="legend-item legend-info"></div> Information Process</li>
+                    <li><div class="legend-item legend-document"></div> Document</li>
+                    <li><div class="legend-item legend-phase"></div> Phase</li>
+                </ul>
+            </div>
+            
+            <div class="legend-section">
+                <div class="legend-title">Actors</div>
+                <ul class="legend-actor">
+                    <li><div class="legend-item actor-user"></div> User Action</li>
+                    <li><div class="legend-item actor-ai"></div> AI Action</li>
+                    <li><div class="legend-item actor-file"></div> File Directive</li>
+                </ul>
+            </div>
+
+            <div class="legend-section">
+                <div class="legend-title">How to Navigate</div>
+                <p>Click and drag to pan the flowchart. Use the controls in the bottom right to zoom in/out, center view, or jump to specific workflow phases.</p>
+                <p>Follow the numbered steps to understand the sequential workflow progression.</p>
+                <p>The grid lines provide a visual reference for node positioning and spacing.</p>
+            </div>
+            
+            <div class="legend-section">
+                <div class="legend-title">Reference Documents</div>
+                <ul class="legend">
+                    <li>tdd-workflow-flow.md: Complete workflow details</li>
+                    <li>tdd-initialize.mdc: Entry point for the process</li>
+                </ul>
+            </div>
         </div>
     </div>
-    
-    <div class="flowchart-container">
-        <!-- The flowchart will be rendered here -->
+
+    <div class="flowchart-wrapper">
+        <div class="flowchart-container" id="flowchart">
+            <!-- The flowchart will be generated here by JavaScript -->
+        </div>
     </div>
-    
-    <script src="flowchart.js"></script>
+
+    <!-- Tooltip for displaying file paths -->
+    <div class="tooltip" id="tooltip"></div>
+
+    <!-- Control buttons - with better visibility -->
+    <div class="controls">
+        <span class="controls-label">Navigation:</span>
+        <button class="control-btn" id="resetViewBtn">Reset View</button>
+        <button class="control-btn" id="centerViewBtn">Center View</button>
+        <button class="control-btn" id="zoomInBtn">Zoom In</button>
+        <button class="control-btn" id="zoomOutBtn">Zoom Out</button>
+        
+        <span class="controls-label">Jump to:</span>
+        <select class="phase-select" id="phaseSelect">
+            <option value="">Select Phase...</option>
+            <option value="initialization">Initialization</option>
+            <option value="test-creation">Test Creation</option>
+            <option value="implementation">Implementation</option>
+            <option value="completion">Completion</option>
+        </select>
+    </div>
+
+    <script src="tdd-flowchart.js"></script>
 </body>
 </html> 

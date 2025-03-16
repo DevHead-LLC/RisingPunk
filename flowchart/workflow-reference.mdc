@@ -1,0 +1,264 @@
+# TDD Workflow Reference Guide
+
+This document serves as the complete reference for the Test-Driven Development workflow process. It outlines all phases, steps, and expected outcomes for implementing features using the TDD approach.
+
+## Workflow Overview
+
+The TDD workflow consists of four main phases:
+
+1. **Initialization Phase**: Set up the environment and select a feature
+2. **Test Creation Phase**: Write tests that define the expected behavior
+3. **Implementation Phase**: Write code to make the tests pass
+4. **Completion Phase**: Update context and progress to the next feature
+
+## Phase 1: Initialization [in-progress]
+
+### Step 1: Initialize TDD Workflow
+- **Actor**: USER
+- **Command**: READ
+- **Action**: Read the TDD initialization file at `/tdd-initialize.mdc`
+- **Outcome**: Trigger the TDD workflow process
+- **Status**: [done]
+
+### Step 2: Read AI Directive Tree
+- **Actor**: AI
+- **Command**: READ
+- **Action**: Read the AI directive tree at `/rules/ai-directives/tdd-workflow.mdc`
+- **Outcome**: Understand the complete workflow process
+- **Status**: [in-progress]
+
+### Step 3: Check Current Context
+- **Actor**: AI
+- **Command**: READ
+- **Action**: Check the current context at `/rules/context/tdd/active-working-context.mdc`
+- **Outcome**: Determine current status of the workflow
+- **Status**: [to-do]
+
+### Step 4: Update Context Status
+- **Actor**: AI
+- **Command**: WRITE
+- **Action**: Update the context file with the current status
+- **Outcome**: Status markers reflect current progress
+- **Status**: [to-do]
+
+### Step 5: Determine Current Status
+- **Actor**: AI
+- **Command**: DECIDE
+- **Action**: Decide whether to continue existing feature or select new feature
+- **Outcome**: Decision on which feature to work on
+- **Status**: [to-do]
+
+### Step 6: Read Feature Registry
+- **Actor**: AI
+- **Command**: READ
+- **Action**: Read the feature registry at `/rules/gameplay/intended-features/`
+- **Outcome**: List of available features and their status
+- **Status**: [to-do]
+
+### Step 7: Select Feature
+- **Actor**: AI
+- **Command**: DECIDE
+- **Action**: Select a feature to implement
+- **Outcome**: Feature is selected for implementation
+- **Status**: [to-do]
+
+### Step 8: Update Context with Feature
+- **Actor**: AI
+- **Command**: WRITE
+- **Action**: Update the context file with the selected feature
+- **Outcome**: Context file reflects current feature
+- **Status**: [to-do]
+
+### Step 9: Read Feature Requirements
+- **Actor**: AI
+- **Command**: READ
+- **Action**: Read the requirements for the selected feature
+- **Outcome**: Understanding of what to implement
+- **Status**: [to-do]
+
+### Step 10: Plan Implementation Approach
+- **Actor**: AI
+- **Command**: DECIDE
+- **Action**: Plan how to implement the feature using TDD
+- **Outcome**: Strategy for test creation and implementation
+- **Status**: [to-do]
+
+## Phase 2: Test Creation [to-do]
+
+### Step 11: Determine Test File Path
+- **Actor**: AI
+- **Command**: DECIDE
+- **Action**: Determine the path for the test file
+- **Outcome**: Path where test file will be created or updated
+- **Status**: [to-do]
+
+### Step 12: Check Existing Test File
+- **Actor**: AI
+- **Command**: READ
+- **Action**: Check if the test file already exists
+- **Outcome**: Determination if test file needs creation or update
+- **Status**: [to-do]
+
+### Step 13: Create or Update Test File
+- **Actor**: AI
+- **Command**: WRITE
+- **Action**: Create a new test file or update existing one
+- **Outcome**: Test file with failing tests for the feature
+- **Status**: [to-do]
+
+### Step 14: Run Tests (Expect Fail)
+- **Actor**: AI
+- **Command**: RUN
+- **Action**: Run the tests, expecting them to fail
+- **Outcome**: Confirmation that tests fail for the right reasons
+- **Status**: [to-do]
+
+### Step 15: Verify Test Failure
+- **Actor**: AI
+- **Command**: DECIDE
+- **Action**: Verify that tests fail for the expected reasons
+- **Outcome**: Confirmation that tests are valid
+- **Status**: [to-do]
+
+### Step 16: Update Test If Needed
+- **Actor**: AI
+- **Command**: WRITE
+- **Action**: Update tests if they don't fail for the right reasons
+- **Outcome**: Valid failing tests
+- **Status**: [to-do]
+
+### Step 17: Document Test Expectations
+- **Actor**: AI
+- **Command**: WRITE
+- **Action**: Document what the tests are expecting
+- **Outcome**: Clear documentation of test expectations
+- **Status**: [to-do]
+
+### Step 18: Update Context with Test Status
+- **Actor**: AI
+- **Command**: WRITE
+- **Action**: Update the context file with test creation status
+- **Outcome**: Context file reflects that tests are created
+- **Status**: [to-do]
+
+## Phase 3: Implementation [to-do]
+
+### Step 19: Determine Implementation File Path
+- **Actor**: AI
+- **Command**: DECIDE
+- **Action**: Determine the path for the implementation file
+- **Outcome**: Path where implementation will be created or updated
+- **Status**: [to-do]
+
+### Step 20: Check Existing Implementation
+- **Actor**: AI
+- **Command**: READ
+- **Action**: Check if the implementation file already exists
+- **Outcome**: Determination if file needs creation or update
+- **Status**: [to-do]
+
+### Step 21: Create or Update Implementation
+- **Actor**: AI
+- **Command**: WRITE
+- **Action**: Create a new implementation file or update existing one
+- **Outcome**: Minimal implementation to make tests pass
+- **Status**: [to-do]
+
+### Step 22: Run Tests (Expect Pass)
+- **Actor**: AI
+- **Command**: RUN
+- **Action**: Run the tests, expecting them to pass
+- **Outcome**: Confirmation that implementation works
+- **Status**: [to-do]
+
+### Step 23: Verify Test Success
+- **Actor**: AI
+- **Command**: DECIDE
+- **Action**: Verify that all tests pass
+- **Outcome**: Confirmation that implementation is correct
+- **Status**: [to-do]
+
+### Step 24: Refactor If Needed
+- **Actor**: AI
+- **Command**: WRITE
+- **Action**: Refactor the implementation if necessary
+- **Outcome**: Clean, optimized implementation
+- **Status**: [to-do]
+
+### Step 25: Run Tests After Refactoring
+- **Actor**: AI
+- **Command**: RUN
+- **Action**: Run tests again after refactoring
+- **Outcome**: Confirmation that refactoring didn't break functionality
+- **Status**: [to-do]
+
+### Step 26: Update Context with Implementation Status
+- **Actor**: AI
+- **Command**: WRITE
+- **Action**: Update the context file with implementation status
+- **Outcome**: Context file reflects that implementation is complete
+- **Status**: [to-do]
+
+## Phase 4: Completion [to-do]
+
+### Step 27: Update Feature Status
+- **Actor**: AI
+- **Command**: WRITE
+- **Action**: Update the feature status in the feature registry
+- **Outcome**: Feature registry reflects that feature is implemented
+- **Status**: [to-do]
+
+### Step 28: Check For Additional Features
+- **Actor**: AI
+- **Command**: READ
+- **Action**: Check if there are more features to implement
+- **Outcome**: Determination if workflow should continue
+- **Status**: [to-do]
+
+### Step 29: Update Context with Completion Status
+- **Actor**: AI
+- **Command**: WRITE
+- **Action**: Update the context file with completion status
+- **Outcome**: Context file reflects completion of the current feature
+- **Status**: [to-do]
+
+### Step 30: Transition to Next Feature or End
+- **Actor**: AI
+- **Command**: DECIDE
+- **Action**: Decide whether to proceed to next feature or end workflow
+- **Outcome**: Either restart at Step 5 for next feature or end workflow
+- **Status**: [to-do]
+
+## Status Tracking
+
+Throughout the workflow, the following status markers are used:
+
+- **[to-do]**: Step has not been started
+- **[in-progress]**: Step is currently being worked on
+- **[done]**: Step has been completed
+
+The AI should update these status markers in both this reference file and the context file as each step is started and completed.
+
+## Context Management
+
+The active working context file at `/rules/context/tdd/active-working-context.mdc` must be maintained throughout the workflow process. This file tracks:
+
+- Current phase and step
+- Current feature being implemented
+- Status of test creation and implementation
+- Any blockers or issues encountered
+
+## Feature Registry
+
+The feature registry at `/rules/gameplay/intended-features/` contains all features to be implemented, organized by category. Each feature has:
+
+- Feature name and description
+- Requirements and dependencies
+- Status ([planned], [ready], [in-progress], [done])
+- Priority level
+
+When selecting a feature, the AI should prioritize features that are [ready] and have no unmet dependencies.
+
+---
+
+Note: This reference guide should be consulted throughout the TDD workflow process to ensure all steps are followed correctly and in the proper sequence. 
