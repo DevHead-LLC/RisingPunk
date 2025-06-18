@@ -11,6 +11,7 @@ import { CloseButton } from '../components/common/CloseButton';
 import { DisconnectButton } from '../components/turf/DisconnectButton';
 import { useAuth } from '../context/AuthContext';
 import { COLORS, SIZING } from '../styles/theme';
+import { Balance } from '../components/common/Balance';
 
 interface UserProfile {
   username: string;
@@ -47,6 +48,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   return (
     <SafeAreaView style={styles.container}>
       <CloseButton onPress={onClose} />
+      <Balance />
       <ScrollView style={styles.scrollView}>
         <View style={styles.header}>
           <Text style={styles.username}>{profile.username}</Text>

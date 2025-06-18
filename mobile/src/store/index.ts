@@ -3,6 +3,8 @@ import uiSlice from './slices/uiSlice';
 import authSlice from './slices/authSlice';
 import { baseApi } from './api/baseApi';
 import { storageListener } from './middleware/storage';
+import balanceSlice from './slices/balanceSlice';
+import { balanceApi } from './api/balanceApi';
 
 // Import slices (will be added in later phases)
 // import balanceSlice from './slices/balanceSlice';
@@ -21,7 +23,7 @@ export const store = configureStore({
   reducer: {
     // Slices (will be added in later phases)
     auth: authSlice,
-    // balance: balanceSlice,
+    balance: balanceSlice,
     // bots: botsSlice,
     // battle: battleSlice,
     ui: uiSlice,
@@ -29,6 +31,7 @@ export const store = configureStore({
     
     // APIs (will be added in later phases)
     [baseApi.reducerPath]: baseApi.reducer,
+    [balanceApi.reducerPath]: balanceApi.reducer,
     // [authApi.reducerPath]: authApi.reducer,
     // [botsApi.reducerPath]: botsApi.reducer,
     // [balanceApi.reducerPath]: balanceApi.reducer,
@@ -38,16 +41,29 @@ export const store = configureStore({
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
-        // Ignore these action types for serialization checks
-        ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],
-        // Ignore these field paths in all actions
-        ignoredActionPaths: ['payload.timestamp'],
-        // Ignore these paths in the state
-        ignoredPaths: ['some.path.to.ignore'],
+        ignoredActions: [
+          'persist/PERSIST',
+          'persist/REHYDRATE',
+          // RTK Query balanceApi actions
+          'balanceApi/executeQuery/fulfilled',
+          'balanceApi/executeQuery/rejected',
+          'balanceApi/executeQuery/pending',
+        ],
+        ignoredActionPaths: [
+          'payload.timestamp',
+          'meta.baseQueryMeta.request',
+          'meta.baseQueryMeta.response',
+        ],
+        ignoredPaths: [
+          'some.path.to.ignore',
+          'balanceApi.queries',
+          'balanceApi.mutations',
+        ],
       },
     })
     .prepend(storageListener.middleware)
     .concat(baseApi.middleware)
+    .concat(balanceApi.middleware)
     // Add API middleware (will be added in later phases)
     // .concat(authApi.middleware)
     // .concat(botsApi.middleware)

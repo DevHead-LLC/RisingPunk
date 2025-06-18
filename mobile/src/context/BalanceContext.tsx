@@ -1,90 +1,53 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useAuth } from './AuthContext';
-import { API_URL } from '../config';
-
-type BalanceContextType = {
-  balance: number | null;
-  ratePerSecond: number;
-  updateBalance: (newBalance: number) => void;
-  addToBalance: (amount: number) => void;
-  subtractFromBalance: (amount: number) => void;
-};
-
-const BalanceContext = createContext<BalanceContextType | undefined>(undefined);
+import React, { createContext, useContext, useEffect } from 'react';
+import { useAppSelector, useAppDispatch } from '../store/hooks';
+import { getCurrentBalance, updateBalance, addToBalance, subtractFromBalance } from '../store/slices/balanceSlice';
+import { useFetchBalanceQuery } from '../store/api/balanceApi';
 
 export function formatBalance(amount: number): string {
   if (amount === undefined || amount === null) return '0';
   return amount.toLocaleString();
 }
 
+type BalanceContextType = {
+  balance: number | null;
+  ratePerSecond: number;
+  updateBalance: (newBalance: number, ratePerSecond?: number) => void;
+  addToBalance: (amount: number) => void;
+  subtractFromBalance: (amount: number) => void;
+};
+
+const BalanceContext = createContext<BalanceContextType | undefined>(undefined);
+
 export function BalanceProvider({ children }: { children: React.ReactNode }) {
-  const { token } = useAuth();
-  const [balance, setBalance] = useState<number | null>(null);
-  const [ratePerSecond, setRatePerSecond] = useState(1);
-  const [lastSync, setLastSync] = useState<Date | null>(null);
+  const dispatch = useAppDispatch();
+  const balance = useAppSelector(getCurrentBalance);
+  const ratePerSecond = useAppSelector((state) => state.balance.ratePerSecond);
 
+  // RTK Query polling for balance
+  const { data } = useFetchBalanceQuery(undefined, { pollingInterval: 10000 });
   useEffect(() => {
-    if (!token) {
-      setBalance(null);
-      setLastSync(null);
-      return;
+    if (data) {
+      dispatch(updateBalance({ total: data.total, ratePerSecond: data.ratePerSecond }));
     }
+  }, [data, dispatch]);
 
-    const fetchBalance = async () => {
-      try {
-        const response = await fetch(`${API_URL}/api/balance`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setBalance(data.total);
-          setRatePerSecond(data.ratePerSecond);
-          setLastSync(new Date());
-        }
-      } catch (error) {
-        // Silent error handling
-      }
-    };
-
-    fetchBalance();
-    const interval = setInterval(fetchBalance, 10000);
-
-    return () => clearInterval(interval);
-  }, [token]);
-
-  // Reset state when logging out
-  useEffect(() => {
-    if (!token) {
-      setBalance(null);
-      setLastSync(null);
-    }
-  }, [token]);
-
-  const updateBalance = async (newBalance: number) => {
-    setBalance(newBalance);
+  const updateBalanceHandler = (newBalance: number, newRate?: number) => {
+    dispatch(updateBalance({ total: newBalance, ratePerSecond: newRate ?? ratePerSecond }));
   };
-
-  const addToBalance = async (amount: number) => {
-    setBalance(prev => prev !== null ? prev + amount : amount);
+  const addToBalanceHandler = (amount: number) => {
+    dispatch(addToBalance(amount));
   };
-
-  const subtractFromBalance = async (amount: number) => {
-    if (balance === null || balance < amount) {
-      throw new Error('Insufficient balance');
-    }
-    setBalance(prev => prev !== null ? prev - amount : 0);
+  const subtractFromBalanceHandler = (amount: number) => {
+    dispatch(subtractFromBalance(amount));
   };
 
   return (
     <BalanceContext.Provider value={{
       balance,
       ratePerSecond,
-      updateBalance,
-      addToBalance,
-      subtractFromBalance
+      updateBalance: updateBalanceHandler,
+      addToBalance: addToBalanceHandler,
+      subtractFromBalance: subtractFromBalanceHandler,
     }}>
       {children}
     </BalanceContext.Provider>

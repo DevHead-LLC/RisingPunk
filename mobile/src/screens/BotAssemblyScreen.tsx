@@ -12,7 +12,8 @@ import { Balance } from '../components/common/Balance';
 import { CloseButton } from '../components/common/CloseButton';
 import { BotTypeCard } from '../components/botAssembly/BotTypeCard';
 import { useBots } from '../context/BotsContext';
-import { useBalance } from '../context/BalanceContext';
+import { useAppSelector } from '../store/hooks';
+import { getCurrentBalance } from '../store/slices/balanceSlice';
 import { COLORS, SIZING } from '../styles/theme';
 import { LevelSection } from '../components/botAssembly/LevelSection';
 import { BuildProgressBar } from '../components/botAssembly/BuildProgressBar';
@@ -35,7 +36,7 @@ const LEVELS = [1, 2, 3, 4];
 export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
   const { botCounts, buildingProgress, selectedType, selectBotType, startBuilding } = useBots();
   const [quantity, setQuantity] = useState('1');
-  const { balance } = useBalance();
+  const balance = useAppSelector(getCurrentBalance);
   const BOT_COST = 1;
 
   const handleBuild = useCallback(() => {

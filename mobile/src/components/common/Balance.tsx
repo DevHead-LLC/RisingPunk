@@ -1,32 +1,19 @@
-import React, { memo, useState, useEffect } from 'react';
+import React, { memo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { useBalance, formatBalance } from '../../context/BalanceContext';
+import { useAppSelector } from '../../store/hooks';
+import { getCurrentBalance } from '../../store/slices/balanceSlice';
+import { formatBalance } from '../../context/BalanceContext';
 import { SIZING, COLORS } from '../../styles/theme';
 
 export const Balance = memo(() => {
-  try {
-    const { balance } = useBalance();
-    const [displayBalance, setDisplayBalance] = useState<number | null>(null);
+  const balance = useAppSelector(getCurrentBalance);
 
-    useEffect(() => {
-      setDisplayBalance(balance);
-    }, [balance]);
-
-    return (
-      <View style={styles.balanceContainer}>
-        <Text style={styles.balanceLabel}>WALLET:</Text>
-        <Text style={styles.balanceAmount}>${displayBalance !== null ? formatBalance(displayBalance) : '0'}</Text>
-      </View>
-    );
-  } catch (error) {
-    // Silent error handling with fallback UI
-    return (
-      <View style={styles.balanceContainer}>
-        <Text style={styles.balanceLabel}>WALLET:</Text>
-        <Text style={styles.balanceAmount}>$0</Text>
-      </View>
-    );
-  }
+  return (
+    <View style={styles.balanceContainer}>
+      <Text style={styles.balanceLabel}>WALLET:</Text>
+      <Text style={styles.balanceAmount}>${formatBalance(balance)}</Text>
+    </View>
+  );
 });
 
 const styles = StyleSheet.create({

@@ -1,0 +1,48 @@
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+
+export interface BalanceState {
+  total: number | null;
+  ratePerSecond: number;
+  lastUpdated: number | null; // timestamp (ms)
+}
+
+const initialState: BalanceState = {
+  total: null,
+  ratePerSecond: 1,
+  lastUpdated: null,
+};
+
+export const balanceSlice = createSlice({
+  name: 'balance',
+  initialState,
+  reducers: {
+    updateBalance: (state, action: PayloadAction<{ total: number; ratePerSecond: number }>) => {
+      state.total = action.payload.total;
+      state.ratePerSecond = action.payload.ratePerSecond;
+      state.lastUpdated = Date.now();
+    },
+    addToBalance: (state, action: PayloadAction<number>) => {
+      if (state.total !== null) {
+        state.total += action.payload;
+        state.lastUpdated = Date.now();
+      }
+    },
+    subtractFromBalance: (state, action: PayloadAction<number>) => {
+      if (state.total !== null && state.total >= action.payload) {
+        state.total -= action.payload;
+        state.lastUpdated = Date.now();
+      }
+    },
+  },
+});
+
+export const { updateBalance, addToBalance, subtractFromBalance } = balanceSlice.actions;
+export default balanceSlice.reducer;
+
+// Selector to get the current balance (with time-based accrual)
+export const getCurrentBalance = (state: { balance: BalanceState }) => {
+  const { total, ratePerSecond, lastUpdated } = state.balance;
+  if (total === null || lastUpdated === null) return 0;
+  const elapsed = (Date.now() - lastUpdated) / 1000;
+  return Math.floor(total + ratePerSecond * elapsed);
+}; 
