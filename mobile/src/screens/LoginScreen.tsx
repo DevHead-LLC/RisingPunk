@@ -8,8 +8,8 @@ import {
   Dimensions,
 } from 'react-native';
 import {COLORS, SIZING, styleGuide} from '../styles/theme';
-import {useAuth} from '../context/AuthContext';
-import {api} from '../services/api';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { loginUser, registerUser, clearError } from '../store/slices/authSlice';
 import { TitleSection } from '../components/auth/TitleSection';
 import { useDebounce } from '../hooks/useDebounce';
 import { useFormState } from '../hooks/useFormState';
@@ -47,7 +47,8 @@ const ErrorMessage = memo(function ErrorMessage({ error }: { error: string | nul
 });
 
 export const LoginScreen = () => {
-  const { login } = useAuth();
+  const dispatch = useAppDispatch();
+  const { isLoading: authLoading, error: authError } = useAppSelector((state) => state.auth);
   const [formType, setFormType] = useState<FormType>('login');
   const [formData, setFormData] = useState({
     email: '',
@@ -55,14 +56,25 @@ export const LoginScreen = () => {
     accessKey: '',
     verifyAccessKey: '',
   });
-  const { isLoading, error, setLoading, setError, clearError } = useFormState();
+  const { isLoading: formLoading, error: formError, setLoading, setError, clearError: clearFormError } = useFormState();
   const debouncedFormData = useDebounce(formData);
+
+  // Combine loading states
+  const isLoading = authLoading || formLoading;
+  const error = authError || formError;
 
   useEffect(() => {
     if (debouncedFormData !== formData) {
       validateForm();
     }
   }, [debouncedFormData]);
+
+  // Clear auth error when form type changes
+  useEffect(() => {
+    if (authError) {
+      dispatch(clearError());
+    }
+  }, [formType, authError, dispatch]);
 
   const validateForm = () => {
     setError('');
@@ -98,23 +110,21 @@ export const LoginScreen = () => {
   }, []);
 
   const handleSubmit = useCallback(async () => {
-    clearError();
+    clearFormError();
     if (validateForm()) {
       try {
         setLoading(true);
         if (formType === 'login') {
-          const response = await api.login({
+          await dispatch(loginUser({
             handle: formData.handle,
             accessKey: formData.accessKey,
-          });
-          await login(response.token, response.user);
+          })).unwrap();
         } else {
-          const response = await api.register({
+          await dispatch(registerUser({
             email: formData.email,
             handle: formData.handle,
             accessKey: formData.accessKey,
-          });
-          await login(response.token, response.user);
+          })).unwrap();
         }
       } catch (err) {
         // Convert technical errors to user-friendly messages
@@ -139,7 +149,7 @@ export const LoginScreen = () => {
         setLoading(false);
       }
     }
-  }, [formType, formData, validateForm, login, clearError, setLoading, setError]);
+  }, [formType, formData, validateForm, dispatch, clearFormError, setLoading, setError]);
 
   const isFormValid = useMemo(() => {
     if (formType === 'login') {

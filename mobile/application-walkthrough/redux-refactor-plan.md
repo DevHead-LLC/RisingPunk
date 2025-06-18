@@ -1,5 +1,13 @@
 # Redux Refactoring Plan for Rising Punk Mobile App
 
+## ⚠️ CRITICAL DIRECTORY RULE
+**ALWAYS ensure correct directory before running terminal commands:**
+- **Mobile commands**: `/Users/robertthiel/DevHead_LLC/RisingPunk/mobile`
+- **Server commands**: `/Users/robertthiel/DevHead_LLC/RisingPunk/server`
+- **NEVER run from project root**: `/Users/robertthiel/DevHead_LLC/RisingPunk`
+
+**Check directory with `pwd` before any terminal command.**
+
 ## Table of Contents
 - [Executive Summary](#executive-summary)
 - [Current State Analysis](#current-state-analysis)

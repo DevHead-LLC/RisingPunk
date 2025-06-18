@@ -12,6 +12,8 @@ import { CloseButton } from '../components/common/CloseButton';
 import { API_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import { useAppSelector, useAppDispatch } from '../store/hooks';
+import { toggleLegend } from '../store/slices/uiSlice';
 
 const GRID_SIZE = 25;
 const CELL_SIZE = 60;
@@ -173,7 +175,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
   const [loading, setLoading] = useState(true);
   const { token } = useAuth();
   const [selectedCell, setSelectedCell] = useState<{x: number, y: number, info: CellData} | null>(null);
-  const [isLegendExpanded, setIsLegendExpanded] = useState(false);
+  const isLegendExpanded = useAppSelector((state) => state.ui.map.legendExpanded);
+  const dispatch = useAppDispatch();
   const scrollViewRef = useRef<ScrollView>(null);
   
   useEffect(() => {
@@ -229,7 +232,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
     <View style={[styles.legend, !isLegendExpanded && styles.legendCollapsed]}>
       <TouchableOpacity 
         style={styles.legendTitleContainer}
-        onPress={() => setIsLegendExpanded(!isLegendExpanded)}
+        onPress={() => dispatch(toggleLegend())}
       >
         <Text style={styles.legendTitle}>
           {isLegendExpanded ? 'MAP LEGEND [-]' : 'LEGEND [+]'}

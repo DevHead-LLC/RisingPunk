@@ -1,21 +1,22 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_URL } from '../config';
+import React, { createContext, useContext, useEffect } from 'react';
+import { useAppSelector, useAppDispatch } from '../store/hooks';
+import { 
+  loginUser, 
+  registerUser, 
+  logoutUser, 
+  unlockHackRig, 
+  loadStoredAuth,
+  clearError,
+  type User 
+} from '../store/slices/authSlice';
 
 interface AuthState {
   token: string | null;
-  user: {
-    handle: string;
-    email: string;
-    level: number;
-    unlockedFeatures: {
-      hackRig: boolean;
-    };
-  } | null;
+  user: User | null;
 }
 
 interface AuthContextType extends AuthState {
-  login: (token: string, user: AuthState['user']) => Promise<void>;
+  login: (token: string, user: User) => Promise<void>;
   logout: () => Promise<void>;
   isLoading: boolean;
   unlockHackRig: () => Promise<void>;
@@ -24,93 +25,41 @@ interface AuthContextType extends AuthState {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [authState, setAuthState] = useState<AuthState>({
-    token: null,
-    user: null
-  });
-  const [isLoading, setIsLoading] = useState(true);
+  const dispatch = useAppDispatch();
+  const { token, user, isLoading, error } = useAppSelector((state) => state.auth);
 
-  // Check for existing session
+  // Load stored auth on mount
   useEffect(() => {
-    const loadStoredAuth = async () => {
-      try {
-        const [storedToken, storedUser] = await Promise.all([
-          AsyncStorage.getItem('token'),
-          AsyncStorage.getItem('user'),
-        ]);
-        
-        if (storedToken && storedUser) {
-          setAuthState({
-            token: storedToken,
-            user: JSON.parse(storedUser),
-          });
-        }
-      } catch (error) {
-        // Silent error handling
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    dispatch(loadStoredAuth());
+  }, [dispatch]);
 
-    loadStoredAuth();
-  }, []);
-
-  const login = async (token: string, user: AuthState['user']) => {
-    try {
-      await AsyncStorage.setItem('token', token);
-      await AsyncStorage.setItem('user', JSON.stringify(user));
-      setAuthState({ token, user });
-    } catch (error) {
-      // Silent error handling
-      throw error;
-    }
+  const login = async (token: string, user: User) => {
+    // This is now handled by the Redux thunk, but we keep the interface
+    // The actual login should use loginUser thunk directly
+    throw new Error('Use loginUser thunk instead of this method');
   };
 
   const logout = async () => {
-    await AsyncStorage.removeItem('token');
-    await AsyncStorage.removeItem('user');
-    setAuthState({ token: null, user: null });
+    await dispatch(logoutUser()).unwrap();
   };
 
-  const unlockHackRig = async () => {
-    if (!authState.token || !authState.user) return;
-
-    try {
-      const response = await fetch(`${API_URL}/users/unlock-hack-rig`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${authState.token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) throw new Error('Failed to unlock hack rig');
-
-      const updatedUser = await response.json();
-      
-      setAuthState(prev => ({
-        ...prev,
-        user: updatedUser
-      }));
-
-      await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
-    } catch (error) {
-      console.error('Error unlocking hack rig:', error);
-      throw error;
-    }
+  const unlockHackRigAction = async () => {
+    await dispatch(unlockHackRig()).unwrap();
   };
 
+  // Don't render until we've checked for stored auth
   if (isLoading) {
     return null; // or a loading spinner
   }
 
   return (
     <AuthContext.Provider value={{ 
-      ...authState, 
+      token, 
+      user, 
       login, 
       logout, 
       isLoading,
-      unlockHackRig 
+      unlockHackRig: unlockHackRigAction 
     }}>
       {children}
     </AuthContext.Provider>
