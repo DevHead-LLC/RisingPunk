@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { COLORS, SIZING } from '../../styles/theme';
-import { useBots } from '../../context/BotsContext';
+import { useAppSelector } from '../../store/hooks';
 
 type BuildTimerProps = {
   quantity: number;
@@ -14,7 +14,8 @@ export const BuildTimer = React.memo(function BuildTimer({
   buildTimePerUnit,
   progress
 }: BuildTimerProps) {
-  const { buildStartTime, totalBuildQuantity } = useBots();
+  const buildStartTime = useAppSelector((state) => state.bots.buildStartTime);
+  const totalBuildQuantity = useAppSelector((state) => state.bots.totalBuildQuantity);
   const [timeLeft, setTimeLeft] = useState<number>(0);
 
   const botsBuilt = Math.floor((progress / 100) * totalBuildQuantity);
