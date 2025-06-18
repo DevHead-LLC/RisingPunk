@@ -1,8 +1,10 @@
 import { configureStore } from '@reduxjs/toolkit';
 import uiSlice from './slices/uiSlice';
+import authSlice from './slices/authSlice';
+import { baseApi } from './api/baseApi';
+import { storageListener } from './middleware/storage';
 
 // Import slices (will be added in later phases)
-// import authSlice from './slices/authSlice';
 // import balanceSlice from './slices/balanceSlice';
 // import botsSlice from './slices/botsSlice';
 // import battleSlice from './slices/battleSlice';
@@ -18,7 +20,7 @@ import uiSlice from './slices/uiSlice';
 export const store = configureStore({
   reducer: {
     // Slices (will be added in later phases)
-    // auth: authSlice,
+    auth: authSlice,
     // balance: balanceSlice,
     // bots: botsSlice,
     // battle: battleSlice,
@@ -26,6 +28,7 @@ export const store = configureStore({
     // map: mapSlice,
     
     // APIs (will be added in later phases)
+    [baseApi.reducerPath]: baseApi.reducer,
     // [authApi.reducerPath]: authApi.reducer,
     // [botsApi.reducerPath]: botsApi.reducer,
     // [balanceApi.reducerPath]: balanceApi.reducer,
@@ -43,6 +46,8 @@ export const store = configureStore({
         ignoredPaths: ['some.path.to.ignore'],
       },
     })
+    .prepend(storageListener.middleware)
+    .concat(baseApi.middleware)
     // Add API middleware (will be added in later phases)
     // .concat(authApi.middleware)
     // .concat(botsApi.middleware)
