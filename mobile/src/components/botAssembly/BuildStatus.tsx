@@ -4,6 +4,7 @@ import { COLORS, SIZING } from '../../styles/theme';
 import { BotType } from '../../types/bots';
 import { formatBalance } from '../../context/BalanceContext';
 import { useBots } from '../../context/BotsContext';
+import { useAppSelector } from '../../store/hooks';
 
 type BuildStatusProps = {
   selectedType: BotType | null;
@@ -17,11 +18,12 @@ export const BuildStatus = React.memo(function BuildStatus({
   botCost
 }: BuildStatusProps) {
   const { buildQueue } = useBots();
+  const appBuildQueue = useAppSelector((state) => state.bots.buildQueue);
   
   const calculateCost = () => {
     // For active builds, use the stored totalCost
-    if (buildQueue?.totalCost) {
-      return buildQueue.totalCost;
+    if (appBuildQueue?.totalCost) {
+      return appBuildQueue.totalCost;
     }
     // For new builds, calculate from inputs
     if (selectedType && quantity) {

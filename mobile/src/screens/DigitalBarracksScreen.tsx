@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Balance } from '../components/common/Balance';
 import { CloseButton } from '../components/common/CloseButton';
-import { useBots } from '../context/BotsContext';
+import { useAppSelector } from '../store/hooks';
 import { SIZING } from '../styles/theme';
 import { COLORS } from '../styles/theme';
 
@@ -53,7 +53,7 @@ export const BOT_CATEGORIES = {
 };
 
 export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
-  const { botCounts } = useBots();
+  const botCounts = useAppSelector((state) => state.bots.botCounts);
   const [selectedMark, setSelectedMark] = useState<MarkLevel>(1);
 
   const BotCard = ({ type }: { type: BotType }) => {

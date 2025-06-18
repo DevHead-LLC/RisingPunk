@@ -5,6 +5,8 @@ import { baseApi } from './api/baseApi';
 import { storageListener } from './middleware/storage';
 import balanceSlice from './slices/balanceSlice';
 import { balanceApi } from './api/balanceApi';
+import botsSlice from './slices/botsSlice';
+import { botsApi } from './api/botsApi';
 
 // Import slices (will be added in later phases)
 // import balanceSlice from './slices/balanceSlice';
@@ -24,7 +26,7 @@ export const store = configureStore({
     // Slices (will be added in later phases)
     auth: authSlice,
     balance: balanceSlice,
-    // bots: botsSlice,
+    bots: botsSlice,
     // battle: battleSlice,
     ui: uiSlice,
     // map: mapSlice,
@@ -32,6 +34,7 @@ export const store = configureStore({
     // APIs (will be added in later phases)
     [baseApi.reducerPath]: baseApi.reducer,
     [balanceApi.reducerPath]: balanceApi.reducer,
+    [botsApi.reducerPath]: botsApi.reducer,
     // [authApi.reducerPath]: authApi.reducer,
     // [botsApi.reducerPath]: botsApi.reducer,
     // [balanceApi.reducerPath]: balanceApi.reducer,
@@ -48,6 +51,10 @@ export const store = configureStore({
           'balanceApi/executeQuery/fulfilled',
           'balanceApi/executeQuery/rejected',
           'balanceApi/executeQuery/pending',
+          // RTK Query botsApi actions
+          'botsApi/executeQuery/fulfilled',
+          'botsApi/executeQuery/rejected',
+          'botsApi/executeQuery/pending',
         ],
         ignoredActionPaths: [
           'payload.timestamp',
@@ -58,12 +65,15 @@ export const store = configureStore({
           'some.path.to.ignore',
           'balanceApi.queries',
           'balanceApi.mutations',
+          'botsApi.queries',
+          'botsApi.mutations',
         ],
       },
     })
     .prepend(storageListener.middleware)
     .concat(baseApi.middleware)
     .concat(balanceApi.middleware)
+    .concat(botsApi.middleware)
     // Add API middleware (will be added in later phases)
     // .concat(authApi.middleware)
     // .concat(botsApi.middleware)

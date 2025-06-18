@@ -7,7 +7,8 @@ import { CircleSlot } from '../components/battle/CircleSlot';
 import { BattalionBotSelector } from '../components/battle/BattalionBotSelector';
 import { BattalionAssignment } from '../components/battle/BattalionSlot';
 import { BotType } from '../types/bots';
-import { useBots } from '../context/BotsContext';
+import { useAppSelector } from '../store/hooks';
+import { useAssignToBattalionMutation } from '../store/api/botsApi';
 import { API_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 
@@ -25,12 +26,18 @@ type BattalionDeployment = {
 };
 
 export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: Props) => {
-  const { botCounts, assignToBattalion, getAvailableBots } = useBots();
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [selectedBattalion, setSelectedBattalion] = useState<string | null>(null);
   const [assignments, setAssignments] = useState<Record<string, BattalionAssignment>>({});
   const { token } = useAuth();
+  const botCounts = useAppSelector((state) => state.bots.botCounts);
+  const [assignToBattalion] = useAssignToBattalionMutation();
+  const getAvailableBots = (botType) => {
+    const deployed = useAppSelector((state) => state.bots.deployedCounts[botType]);
+    const total = useAppSelector((state) => state.bots.botCounts[botType]);
+    return total - deployed;
+  };
   
   useEffect(() => {
     // Run the animation sequence twice

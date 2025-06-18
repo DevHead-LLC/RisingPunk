@@ -11,9 +11,10 @@ import {
 import { Balance } from '../components/common/Balance';
 import { CloseButton } from '../components/common/CloseButton';
 import { BotTypeCard } from '../components/botAssembly/BotTypeCard';
-import { useBots } from '../context/BotsContext';
-import { useAppSelector } from '../store/hooks';
+import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { getCurrentBalance } from '../store/slices/balanceSlice';
+import { selectBotType } from '../store/slices/botsSlice';
+import { useStartBuildMutation } from '../store/api/botsApi';
 import { COLORS, SIZING } from '../styles/theme';
 import { LevelSection } from '../components/botAssembly/LevelSection';
 import { BuildProgressBar } from '../components/botAssembly/BuildProgressBar';
@@ -25,42 +26,42 @@ import { BotAssemblyHeader } from '../components/botAssembly/BotAssemblyHeader';
 type BotType = 'breacher' | 'guardian' | 'phreak';
 type BotLevel = 1 | 2 | 3 | 4;
 
-interface BotTypeCard {
-  type: BotType;
-  level: BotLevel;
-  available: boolean;
-}
-
 const LEVELS = [1, 2, 3, 4];
 
 export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
-  const { botCounts, buildingProgress, selectedType, selectBotType, startBuilding } = useBots();
+  const dispatch = useAppDispatch();
+  const bots = useAppSelector((state) => state.bots);
   const [quantity, setQuantity] = useState('1');
   const balance = useAppSelector(getCurrentBalance);
+  const [startBuild] = useStartBuildMutation();
   const BOT_COST = 1;
 
   const handleBuild = useCallback(() => {
-    if (!selectedType) return;
+    if (!bots.selectedType) return;
     const qty = parseInt(quantity, 10);
     if (isNaN(qty) || qty <= 0) return;
-    startBuilding(selectedType, qty);
-  }, [selectedType, quantity, startBuilding]);
+    startBuild({ type: bots.selectedType, quantity: qty, totalCost: qty });
+  }, [bots.selectedType, quantity, startBuild]);
 
   const handleQuantityChange = useCallback((value: string) => {
     setQuantity(value);
   }, []);
+
+  const handleSelectBotType = useCallback((type: BotType) => {
+    dispatch(selectBotType(type));
+  }, [dispatch]);
 
   const levelSections = useMemo(() => (
     LEVELS.map((level) => (
       <LevelSection
         key={level}
         level={level}
-        selectedType={selectedType}
-        botCounts={botCounts}
-        onSelectBotType={selectBotType}
+        selectedType={bots.selectedType}
+        botCounts={bots.botCounts}
+        onSelectBotType={handleSelectBotType}
       />
     ))
-  ), [selectedType, botCounts, selectBotType]);
+  ), [bots.selectedType, bots.botCounts, handleSelectBotType]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -70,8 +71,8 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
           {levelSections}
         </ScrollView>
         <BuildSection
-          selectedType={selectedType}
-          buildingProgress={buildingProgress}
+          selectedType={bots.selectedType}
+          buildingProgress={bots.buildingProgress}
           quantity={quantity}
           onQuantityChange={handleQuantityChange}
           onBuild={handleBuild}
@@ -200,7 +201,8 @@ const styles = StyleSheet.create({
   },
   buildButtonDisabled: {
     opacity: 0.5,
-    backgroundColor: 'rgba(26, 77, 51, 0.4)',
+    backgroundColor: 'rgba(26, 77, 51, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   buildButtonText: {
     color: COLORS.text.primary,
