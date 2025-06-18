@@ -1,4 +1,4 @@
-import React, {memo, useState, useRef, useEffect} from 'react';
+import React, {memo, useEffect, useRef, useState} from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,8 @@ import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { toggleLegend } from '../store/slices/uiSlice';
+import { setGrid, setLoading } from '../store/slices/mapSlice';
+import { useFetchMapQuery } from '../store/api/mapApi';
 
 const GRID_SIZE = 25;
 const CELL_SIZE = 60;
@@ -171,58 +173,21 @@ type Props = {
 };
 
 export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
-  const [grid, setGrid] = useState<GridData>([]);
-  const [loading, setLoading] = useState(true);
+  const dispatch = useAppDispatch();
+  const grid = useAppSelector((state) => state.map.grid);
+  const loading = useAppSelector((state) => state.map.loading);
   const { token } = useAuth();
   const [selectedCell, setSelectedCell] = useState<{x: number, y: number, info: CellData} | null>(null);
   const isLegendExpanded = useAppSelector((state) => state.ui.map.legendExpanded);
-  const dispatch = useAppDispatch();
   const scrollViewRef = useRef<ScrollView>(null);
-  
+  const { data: mapData, isLoading } = useFetchMapQuery();
+
   useEffect(() => {
-    const fetchMap = async () => {
-      try {
-        const response = await fetch(`${API_URL}/map/main`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        if (!response.ok) throw new Error('Failed to fetch map');
-        
-        const mapData = await response.json();
-        
-        // Convert the 1D array to 2D grid
-        const newGrid: GridData = Array(GRID_SIZE).fill(null).map(() =>
-          Array(GRID_SIZE).fill(null).map((): CellData => ({
-            terrain: 'plain',
-            entity: 'empty'
-          }))
-        );
-
-        // Fill grid with server data
-        mapData.cells.forEach((cell: any) => {
-          newGrid[cell.y][cell.x] = {
-            terrain: cell.terrain,
-            entity: cell.isOccupied ? cell.occupiedBy : 'empty',
-            owner: cell.occupiedBy === 'player' ? 'player' : 
-                   cell.occupiedBy === 'npc' ? 'enemy' : undefined,
-            name: cell.entityName || ''
-          };
-        });
-
-        setGrid(newGrid);
-      } catch (error) {
-        console.error('Error fetching map:', error);
-        // Fallback to local generation if fetch fails
-        setGrid(generateInitialGrid());
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMap();
-  }, []); // Empty dependency array means this runs once on mount
+    dispatch(setLoading(isLoading));
+    if (mapData && mapData.grid) {
+      dispatch(setGrid(mapData.grid));
+    }
+  }, [mapData, isLoading, dispatch]);
 
   const handleCellPress = (x: number, y: number, cellData: CellData) => {
     setSelectedCell({x, y, info: cellData});
