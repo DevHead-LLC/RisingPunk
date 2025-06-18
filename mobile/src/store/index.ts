@@ -7,6 +7,7 @@ import balanceSlice from './slices/balanceSlice';
 import { balanceApi } from './api/balanceApi';
 import botsSlice from './slices/botsSlice';
 import { botsApi } from './api/botsApi';
+import battleSlice from './slices/battleSlice';
 
 // Import slices (will be added in later phases)
 // import balanceSlice from './slices/balanceSlice';
@@ -27,7 +28,7 @@ export const store = configureStore({
     auth: authSlice,
     balance: balanceSlice,
     bots: botsSlice,
-    // battle: battleSlice,
+    battle: battleSlice,
     ui: uiSlice,
     // map: mapSlice,
     
