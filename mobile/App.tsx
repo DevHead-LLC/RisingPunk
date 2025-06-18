@@ -1,5 +1,7 @@
 import React from 'react';
 import { View } from 'react-native';
+import { Provider } from 'react-redux';
+import { store } from './src/store';
 import { COLORS } from './src/styles/theme';
 import { TurfScreen } from './src/screens/TurfScreen';
 import { BalanceProvider } from './src/context/BalanceContext';
@@ -24,11 +26,13 @@ function AppContent(): React.JSX.Element {
 
 function App(): React.JSX.Element {
   return (
-    <ErrorBoundary>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </ErrorBoundary>
+    <Provider store={store}>
+      <ErrorBoundary>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </ErrorBoundary>
+    </Provider>
   );
 }
 
