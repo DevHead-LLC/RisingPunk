@@ -21,7 +21,7 @@ storageListener.startListening({
     const stateToPersist = {
       ui: state.ui,
       auth: state.auth,
-      // balance: state.balance, // Will be added in Phase 3
+      balance: state.balance,
     };
     
     try {
