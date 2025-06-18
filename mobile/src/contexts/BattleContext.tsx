@@ -1,4 +1,15 @@
-import React, { createContext, useContext, useReducer, useCallback } from 'react';
+import React, { createContext, useContext, useCallback } from 'react';
+import { useAppSelector, useAppDispatch } from '../store/hooks';
+import {
+  deployBattalion,
+  updateBattalionPosition,
+  updateBattalionTarget,
+  updateBattalionHealth,
+  updateNodeControl,
+  startBattle,
+  endBattle,
+  resetBattle,
+} from '../store/slices/battleSlice';
 
 // Types
 export interface Battalion {
@@ -52,181 +63,58 @@ const initialState: BattleState = {
   winner: null,
 };
 
-// Reducer
-function battleReducer(state: BattleState, action: BattleAction): BattleState {
-  console.log('Action:', action.type, action);
-  console.log('Current state:', state);
-
-  let newState: BattleState;
-
-  switch (action.type) {
-    case 'DEPLOY_BATTALION': {
-      const newBattalions = { ...state.battalions };
-      newBattalions[action.battalion.id] = { ...action.battalion };
-      newState = {
-        ...state,
-        battalions: newBattalions,
-      };
-      break;
-    }
-
-    case 'UPDATE_BATTALION_POSITION': {
-      if (!state.battalions[action.id]) {
-        console.log('Battalion not found for UPDATE_BATTALION_POSITION:', action.id);
-        return state;
-      }
-      const newBattalions = { ...state.battalions };
-      newBattalions[action.id] = {
-        ...newBattalions[action.id],
-        position: { ...action.position },
-      };
-      newState = {
-        ...state,
-        battalions: newBattalions,
-      };
-      break;
-    }
-
-    case 'UPDATE_BATTALION_TARGET': {
-      if (!state.battalions[action.id]) {
-        console.log('Battalion not found for UPDATE_BATTALION_TARGET:', action.id);
-        return state;
-      }
-      const newBattalions = { ...state.battalions };
-      newBattalions[action.id] = {
-        ...newBattalions[action.id],
-        targetId: action.targetId,
-      };
-      newState = {
-        ...state,
-        battalions: newBattalions,
-      };
-      break;
-    }
-
-    case 'UPDATE_BATTALION_HEALTH': {
-      if (!state.battalions[action.id]) {
-        console.log('Battalion not found for UPDATE_BATTALION_HEALTH:', action.id);
-        return state;
-      }
-      const newBattalions = { ...state.battalions };
-      newBattalions[action.id] = {
-        ...newBattalions[action.id],
-        health: action.health,
-      };
-      newState = {
-        ...state,
-        battalions: newBattalions,
-      };
-      break;
-    }
-
-    case 'UPDATE_NODE_CONTROL': {
-      if (!state.nodes[action.id]) {
-        console.log('Node not found for UPDATE_NODE_CONTROL:', action.id);
-        return state;
-      }
-      const newNodes = { ...state.nodes };
-      newNodes[action.id] = {
-        ...newNodes[action.id],
-        controllingTeam: action.team,
-        controlProgress: action.progress,
-      };
-      newState = {
-        ...state,
-        nodes: newNodes,
-      };
-      break;
-    }
-
-    case 'START_BATTLE': {
-      newState = {
-        ...state,
-        phase: 'active' as const,
-      };
-      break;
-    }
-
-    case 'END_BATTLE': {
-      newState = {
-        ...state,
-        phase: 'complete' as const,
-        winner: action.winner,
-      };
-      break;
-    }
-
-    default:
-      return state;
-  }
-
-  console.log('New state:', newState);
-  return newState;
-}
-
 // Context
-const BattleContext = createContext<{
-  state: BattleState;
-  deployBattalion: (battalion: Battalion) => void;
-  updatePosition: (id: string, position: { x: number; y: number }) => void;
-  updateTarget: (id: string, targetId: string | null) => void;
-  updateHealth: (id: string, health: number) => void;
-  updateNodeControl: (id: number, team: 'red' | 'blue' | null, progress: number) => void;
-  startBattle: () => void;
-  endBattle: (winner: 'red' | 'blue') => void;
-} | null>(null);
+const BattleContext = createContext<any>(null);
 
-// Provider
 export function BattleProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(battleReducer, initialState);
+  const dispatch = useAppDispatch();
+  const state = useAppSelector((state) => state.battle);
 
-  const deployBattalion = useCallback((battalion: Battalion) => {
-    dispatch({ type: 'DEPLOY_BATTALION', battalion });
-  }, []);
+  const deployBattalionHandler = useCallback((battalion) => {
+    dispatch(deployBattalion(battalion));
+  }, [dispatch]);
 
-  const updatePosition = useCallback((id: string, position: { x: number; y: number }) => {
-    dispatch({ type: 'UPDATE_BATTALION_POSITION', id, position });
-  }, []);
+  const updatePosition = useCallback((id, position) => {
+    dispatch(updateBattalionPosition({ id, position }));
+  }, [dispatch]);
 
-  const updateTarget = useCallback((id: string, targetId: string | null) => {
-    dispatch({ type: 'UPDATE_BATTALION_TARGET', id, targetId });
-  }, []);
+  const updateTarget = useCallback((id, targetId) => {
+    dispatch(updateBattalionTarget({ id, targetId }));
+  }, [dispatch]);
 
-  const updateHealth = useCallback((id: string, health: number) => {
-    dispatch({ type: 'UPDATE_BATTALION_HEALTH', id, health });
-  }, []);
+  const updateHealth = useCallback((id, health) => {
+    dispatch(updateBattalionHealth({ id, health }));
+  }, [dispatch]);
 
-  const updateNodeControl = useCallback((id: number, team: 'red' | 'blue' | null, progress: number) => {
-    dispatch({ type: 'UPDATE_NODE_CONTROL', id, team, progress });
-  }, []);
+  const updateNodeControlHandler = useCallback((id, team, progress) => {
+    dispatch(updateNodeControl({ id, team, progress }));
+  }, [dispatch]);
 
-  const startBattle = useCallback(() => {
-    dispatch({ type: 'START_BATTLE' });
-  }, []);
+  const startBattleHandler = useCallback(() => {
+    dispatch(startBattle());
+  }, [dispatch]);
 
-  const endBattle = useCallback((winner: 'red' | 'blue') => {
-    dispatch({ type: 'END_BATTLE', winner });
-  }, []);
-
-  const value = {
-    state,
-    deployBattalion,
-    updatePosition,
-    updateTarget,
-    updateHealth,
-    updateNodeControl,
-    startBattle,
-    endBattle,
-  };
+  const endBattleHandler = useCallback((winner) => {
+    dispatch(endBattle(winner));
+  }, [dispatch]);
 
   return (
-    <BattleContext.Provider value={value}>
+    <BattleContext.Provider value={{
+      state,
+      deployBattalion: deployBattalionHandler,
+      updatePosition,
+      updateTarget,
+      updateHealth,
+      updateNodeControl: updateNodeControlHandler,
+      startBattle: startBattleHandler,
+      endBattle: endBattleHandler,
+      resetBattle: () => dispatch(resetBattle()),
+    }}>
       {children}
     </BattleContext.Provider>
   );
 }
 
-// Hook
 export function useBattle() {
   const context = useContext(BattleContext);
   if (!context) {
