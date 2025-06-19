@@ -1,17 +1,15 @@
-import { createSlice, PayloadAction, createSelector } from '@reduxjs/toolkit';
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 export interface BalanceState {
   total: number | null;
   ratePerSecond: number;
   lastUpdated: number | null; // timestamp (ms)
-  updateTrigger: number; // Add this to force selector recalculation
 }
 
 const initialState: BalanceState = {
   total: null,
   ratePerSecond: 1,
   lastUpdated: null,
-  updateTrigger: 0,
 };
 
 export const balanceSlice = createSlice({
@@ -35,26 +33,18 @@ export const balanceSlice = createSlice({
         state.lastUpdated = Date.now();
       }
     },
-    triggerUpdate: (state) => {
-      // This action forces the selector to recalculate
-      state.updateTrigger += 1;
-    },
   },
 });
 
-export const { updateBalance, addToBalance, subtractFromBalance, triggerUpdate } = balanceSlice.actions;
+export const { updateBalance, addToBalance, subtractFromBalance } = balanceSlice.actions;
 export default balanceSlice.reducer;
 
 // Selector to get the current balance (with time-based accrual)
 // Updates every 10 seconds to match API polling interval
 export const getCurrentBalance = (state: { balance: BalanceState }) => {
-  const { total, ratePerSecond, lastUpdated, updateTrigger } = state.balance;
+  const { total, ratePerSecond, lastUpdated } = state.balance;
   if (total === null || lastUpdated === null) return 0;
-  
-  // Calculate elapsed time since last update
   const elapsed = (Date.now() - lastUpdated) / 1000;
-  const calculatedBalance = Math.floor(total + ratePerSecond * elapsed);
-  
-  // Return calculated balance (updateTrigger ensures re-evaluation)
-  return calculatedBalance + (updateTrigger * 0);
+  const roundedElapsed = Math.floor(elapsed / 10) * 10;
+  return Math.floor(total + ratePerSecond * roundedElapsed);
 }; 

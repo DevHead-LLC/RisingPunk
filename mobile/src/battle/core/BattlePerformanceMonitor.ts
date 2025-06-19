@@ -10,7 +10,7 @@ declare global {
   }
 }
 
-import { BattlePhase } from './BattleContext';
+import { BattlePhase } from './BattleTypes';
 import { Platform } from 'react-native';
 
 interface LogDetails {

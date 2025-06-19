@@ -1,7 +1,8 @@
 import React, {memo, useRef, useState} from 'react';
 import {View, StyleSheet, TouchableOpacity, Image, Text, Animated, Alert} from 'react-native';
 import { COLORS, SIZING } from '../../styles/theme';
-import { useAuth } from '../../context/AuthContext';
+import { useAppSelector, useAppDispatch } from '../../store/hooks';
+import { unlockHackRig } from '../../store/slices/authSlice';
 
 type Props = {
   onPress: () => void;
@@ -9,7 +10,8 @@ type Props = {
 };
 
 export const HackRigDisplay = ({ onPress, onNavigateToBattle }: Props) => {
-  const { user, unlockHackRig } = useAuth();
+  const user = useAppSelector((state) => state.auth.user);
+  const dispatch = useAppDispatch();
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   

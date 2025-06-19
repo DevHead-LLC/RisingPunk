@@ -5,13 +5,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  Dimensions,
 } from 'react-native';
 import {COLORS, SIZING, styleGuide} from '../styles/theme';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { loginUser, registerUser, clearError } from '../store/slices/authSlice';
 import { TitleSection } from '../components/auth/TitleSection';
-import { useDebounce } from '../hooks/useDebounce';
 import { useFormState } from '../hooks/useFormState';
 import { ScreenContainer } from '../components/common/ScreenContainer';
 
@@ -57,17 +55,10 @@ export const LoginScreen = () => {
     verifyAccessKey: '',
   });
   const { isLoading: formLoading, error: formError, setLoading, setError, clearError: clearFormError } = useFormState();
-  const debouncedFormData = useDebounce(formData);
 
   // Combine loading states
   const isLoading = authLoading || formLoading;
   const error = authError || formError;
-
-  useEffect(() => {
-    if (debouncedFormData !== formData) {
-      validateForm();
-    }
-  }, [debouncedFormData]);
 
   // Clear auth error when form type changes
   useEffect(() => {
@@ -163,12 +154,12 @@ export const LoginScreen = () => {
 
   // Update button disabled state
   const isSubmitDisabled = isLoading || !isFormValid;
-
+  
   const toggleFormType = useCallback(() => {
     setFormType(prev => prev === 'login' ? 'register' : 'login');
-    setError('');
+    clearFormError();
     setFormData({ email: '', handle: '', accessKey: '', verifyAccessKey: '' });
-  }, []);
+  }, [clearFormError]);
 
   const renderInputWithCorner = (
     placeholder: string,
