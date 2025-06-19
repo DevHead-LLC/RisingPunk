@@ -33,7 +33,7 @@ The Login Screen handles user authentication, form validation, and secure sessio
 
 ## State Management Approach
 - Uses React state/hooks for form and error state.
-- Authentication/session state managed via context/provider.
+- Authentication/session state managed via Redux store and slices.
 - Loading state managed locally in the form component.
 - Error state is reset on input change or navigation.
 - Session state is updated on successful login and cleared on logout.
