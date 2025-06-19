@@ -341,7 +341,7 @@ The Bot Assembly Screen allows users to build different types of bots (breacher,
 - Balance deduction occurs before build begins
 
 **Technical Implementation**:
-- **Balance Context**: Shared balance state across components
+- **Redux Store**: Shared balance state across components
 - **Cost Calculation**: Real-time cost updates based on quantity
 - **Server Validation**: Balance check before build initiation
 - **State Synchronization**: Balance updates reflect immediately
@@ -362,10 +362,10 @@ The Bot Assembly Screen allows users to build different types of bots (breacher,
 - Smooth transitions between different states
 
 **Technical Implementation**:
-- **Context Integration**: BotsContext, BalanceContext, AuthContext coordination
+- **Redux Integration**: BotsSlice, BalanceSlice, AuthSlice coordination
 - **Component Communication**: Props and callbacks for state updates
 - **React.memo Optimization**: Prevents unnecessary re-renders
-- **State Propagation**: Changes flow from context to all components
+- **State Propagation**: Changes flow from Redux store to all components
 
 **Complex Behaviors**:
 - **State Synchronization**: All components reflect current build state

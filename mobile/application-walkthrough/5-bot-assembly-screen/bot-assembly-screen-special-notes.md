@@ -48,13 +48,13 @@
 - [Complex Subsystems Identified](#complex-subsystems-identified)
 
 ## Overview
-The Bot Assembly Screen implements a complex bot building system with real-time progress tracking, server synchronization, and state management across multiple contexts. The screen uses a two-panel layout with scrollable bot selection and fixed build controls.
+The Bot Assembly Screen implements a complex bot building system with real-time progress tracking, server synchronization, and state management across multiple Redux slices. The screen uses a two-panel layout with scrollable bot selection and fixed build controls.
 
 ## Implementation Details
 
 ### Component Architecture
 - **9 Specialized Components**: Each handling specific bot assembly functionality
-- **Context Integration**: BotsContext, BalanceContext, AuthContext coordination
+- **Redux Integration**: BotsSlice, BalanceSlice, AuthSlice coordination
 - **State Management**: Centralized bot state with real-time updates
 - **Component Composition**: Modular design with clear separation of concerns
 
@@ -68,7 +68,7 @@ The Bot Assembly Screen implements a complex bot building system with real-time 
 - **Level System**: 4 levels (MARK 1-4) with unlocking logic
 - **Locking Logic**: Levels 2-4 currently locked (hardcoded)
 - **Bot Grid**: 3 bot types per level (breacher, guardian, phreak)
-- **State Management**: Receives selectedType and botCounts from context
+- **State Management**: Receives selectedType and botCounts from Redux store
 
 ### BotTypeCard Technical Specs
 - **Interactive States**: Normal, Selected, Locked
@@ -98,7 +98,7 @@ The Bot Assembly Screen implements a complex bot building system with real-time 
 ### BuildStatus Technical Specs
 - **Cost Calculation**: Real-time cost display (1 credit per bot)
 - **Status Updates**: Dynamic status text based on build state
-- **Data Integration**: Pulls from BotsContext for current state
+- **Data Integration**: Pulls from Redux store for current state
 
 ### BuildTimer Technical Specs
 - **Time Calculation**: Based on build progress and total build time
@@ -196,7 +196,7 @@ const isLocked = level > 1; // Current implementation
 
 ### Balance Integration System Architecture
 
-**Context Integration Pattern**:
+**Redux Integration Pattern**:
 ```javascript
 const { balance, subtractFromBalance } = useBalance();
 const { startBuilding } = useBots();
@@ -222,19 +222,19 @@ const { startBuilding } = useBots();
 
 ### Component State Coordination System Architecture
 
-**Context Integration Pattern**:
+**Redux Integration Pattern**:
 ```javascript
-// Multiple context coordination
+// Multiple Redux slice coordination
 const { botCounts, buildingProgress, selectedType } = useBots();
 const { balance } = useBalance();
 const { token } = useAuth();
 ```
 
 **Component Communication Flow**:
-- **Props Drilling**: State flows from context to child components
+- **Props Drilling**: State flows from Redux store to child components
 - **Callback Pattern**: Child components trigger parent state updates
 - **React.memo Optimization**: Prevents unnecessary re-renders
-- **State Propagation**: Changes flow from context to all components
+- **State Propagation**: Changes flow from Redux store to all components
 
 **Performance Optimization Strategy**:
 - **React.memo**: All components wrapped for render optimization
@@ -290,10 +290,10 @@ const { token } = useAuth();
 ## Related Screen Integrations
 
 ### Home Screen Integration
-- **Context Sharing**: BotsContext and BalanceContext shared between screens
+- **Redux Sharing**: BotsSlice and BalanceSlice shared between screens
 - **State Synchronization**: Bot counts and balance updates reflect immediately
 - **Navigation Flow**: Home Screen provides primary entry point
-- **Data Dependencies**: Home Screen displays bot counts from BotsContext
+- **Data Dependencies**: Home Screen displays bot counts from Redux store
 
 ### Turf Screen Integration
 - **Bot Management**: Turf Screen provides alternative bot assembly access
@@ -314,14 +314,14 @@ const { token } = useAuth();
 - **Future Enhancement**: Build history could be displayed in profile
 
 ## Technical Components Used
-- **BotsContext**: Manages bot counts, building progress, and server interactions
-- **BalanceContext**: Handles balance deduction for bot costs
-- **AuthContext**: Provides authentication token for API calls
+- **BotsSlice**: Manages bot counts, building progress, and server interactions
+- **BalanceSlice**: Handles balance deduction for bot costs
+- **AuthSlice**: Provides authentication token for API calls
 - **React Native Core**: SafeAreaView, ScrollView, TouchableOpacity, TextInput
 - **Custom Components**: 9 specialized bot assembly components
 
 ## State Management Approach
-- **Centralized State**: BotsContext manages all bot-related state
+- **Centralized State**: BotsSlice manages all bot-related state
 - **Real-time Updates**: 1-second polling for build progress
 - **Server Synchronization**: Client-server state consistency
 - **Error Recovery**: Graceful fallbacks for API failures
@@ -370,7 +370,7 @@ const { token } = useAuth();
 ### Cross-Screen Enhancements
 - **Unified Bot Management**: Centralized bot management across all screens
 - **Real-time Notifications**: Notify other screens of bot count changes
-- **Context Optimization**: Reduce context re-renders across screens
+- **Redux Optimization**: Reduce Redux re-renders across screens
 - **Navigation State**: Preserve build state during screen transitions
 
 ### Advanced Subsystem Enhancements
@@ -381,7 +381,7 @@ const { token } = useAuth();
 - **Balance Management**: Advanced balance tracking with transaction history
 
 ## Architectural Patterns Observed
-- **Context-based State Management**: BotsContext for global bot state
+- **Redux-based State Management**: BotsSlice for global bot state
 - **Server Polling**: Real-time build progress updates via API polling
 - **Component Composition**: Modular bot assembly components
 - **Error Handling**: Graceful fallbacks for API failures
