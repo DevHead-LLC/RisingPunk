@@ -6,7 +6,7 @@ import {DigitalBarracksScreen} from './DigitalBarracksScreen';
 import {ProfileScreen} from './ProfileScreen';
 import {HackMapScreen} from './HackMapScreen';
 import {BotAssemblyScreen} from './BotAssemblyScreen';
-import {useAuth} from '../context/AuthContext';
+import { useAppDispatch } from '../store/hooks';
 import {COLORS, SIZING} from '../styles/theme';
 import {ProfileLocation} from '../components/turf/ProfileLocation';
 import {HomeLocation} from '../components/turf/HomeLocation';
@@ -59,7 +59,7 @@ const ScrollViewMemo = memo(function ScrollViewMemo({
 
 export function TurfScreen(): React.JSX.Element {
   const [currentScreen, setCurrentScreen] = useState('turf');
-  const {logout} = useAuth();
+  const dispatch = useAppDispatch();
   const horizontalScrollRef = useRef<ScrollView>(null);
   const verticalScrollRef = useRef<ScrollView>(null);
 

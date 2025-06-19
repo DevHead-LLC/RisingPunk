@@ -10,8 +10,6 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { CloseButton } from '../components/common/CloseButton';
 import { API_URL } from '../config';
-import { useAuth } from '../context/AuthContext';
-import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { toggleLegend } from '../store/slices/uiSlice';
 import { setGrid, setLoading } from '../store/slices/mapSlice';
@@ -176,7 +174,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
   const dispatch = useAppDispatch();
   const grid = useAppSelector((state) => state.map.grid);
   const loading = useAppSelector((state) => state.map.loading);
-  const { token } = useAuth();
+  const token = useAppSelector((state) => state.auth.token);
   const [selectedCell, setSelectedCell] = useState<{x: number, y: number, info: CellData} | null>(null);
   const isLegendExpanded = useAppSelector((state) => state.ui.map.legendExpanded);
   const scrollViewRef = useRef<ScrollView>(null);

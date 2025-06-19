@@ -1,12 +1,30 @@
-import React, { memo } from 'react';
+import React, { memo, useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useAppSelector } from '../../store/hooks';
 import { getCurrentBalance } from '../../store/slices/balanceSlice';
-import { formatBalance } from '../../context/BalanceContext';
 import { SIZING, COLORS } from '../../styles/theme';
+
+// Utility function for formatting balance
+export function formatBalance(amount: number): string {
+  if (amount === undefined || amount === null) return '0';
+  return amount.toLocaleString();
+}
 
 export const Balance = memo(() => {
   const balance = useAppSelector(getCurrentBalance);
+  const [updateTrigger, setUpdateTrigger] = useState(0);
+
+  // Force re-render every 10 seconds to update balance display
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('Balance: Triggering update, current balance:', balance);
+      setUpdateTrigger(prev => prev + 1);
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [balance]);
+
+  console.log('Balance: Rendering with balance:', balance);
 
   return (
     <View style={styles.balanceContainer}>

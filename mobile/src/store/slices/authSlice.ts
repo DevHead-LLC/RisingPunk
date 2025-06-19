@@ -1,6 +1,8 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../../config';
+import { updateBalance } from './balanceSlice';
+import { setBots, setBuildState } from './botsSlice';
 
 // Types
 export interface User {
@@ -22,7 +24,7 @@ export interface AuthState {
 // Async thunks
 export const loginUser = createAsyncThunk(
   'auth/login',
-  async (credentials: { handle: string; accessKey: string }, { rejectWithValue }) => {
+  async (credentials: { handle: string; accessKey: string }, { rejectWithValue, dispatch }) => {
     try {
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
@@ -42,6 +44,51 @@ export const loginUser = createAsyncThunk(
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      
+      // Fetch initial data after successful login
+      try {
+        // Fetch balance
+        const balanceResponse = await fetch(`${API_URL}/api/balance`, {
+          headers: {
+            'Authorization': `Bearer ${data.token}`,
+          },
+        });
+
+        if (balanceResponse.ok) {
+          const balanceData = await balanceResponse.json();
+          dispatch(updateBalance({
+            total: balanceData.total,
+            ratePerSecond: balanceData.ratePerSecond,
+          }));
+        }
+
+        // Fetch bots
+        const botsResponse = await fetch(`${API_URL}/api/bots`, {
+          headers: {
+            'Authorization': `Bearer ${data.token}`,
+          },
+        });
+
+        if (botsResponse.ok) {
+          const botsData = await botsResponse.json();
+          dispatch(setBots(botsData.bots));
+        }
+
+        // Fetch build state
+        const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
+          headers: {
+            'Authorization': `Bearer ${data.token}`,
+          },
+        });
+
+        if (buildStateResponse.ok) {
+          const buildStateData = await buildStateResponse.json();
+          dispatch(setBuildState(buildStateData));
+        }
+      } catch (fetchError) {
+        // Don't fail login if data fetching fails
+        console.warn('Failed to fetch initial data:', fetchError);
+      }
       
       return data;
     } catch (error) {
@@ -148,6 +195,63 @@ export const loadStoredAuth = createAsyncThunk(
   }
 );
 
+export const fetchInitialData = createAsyncThunk(
+  'auth/fetchInitialData',
+  async (_, { getState, dispatch, rejectWithValue }) => {
+    try {
+      const state = getState() as { auth: AuthState };
+      const { token } = state.auth;
+      
+      if (!token) {
+        return rejectWithValue('No authentication token');
+      }
+
+      // Fetch balance
+      const balanceResponse = await fetch(`${API_URL}/api/balance`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (balanceResponse.ok) {
+        const balanceData = await balanceResponse.json();
+        dispatch(updateBalance({
+          total: balanceData.total,
+          ratePerSecond: balanceData.ratePerSecond,
+        }));
+      }
+
+      // Fetch bots
+      const botsResponse = await fetch(`${API_URL}/api/bots`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (botsResponse.ok) {
+        const botsData = await botsResponse.json();
+        dispatch(setBots(botsData.bots));
+      }
+
+      // Fetch build state
+      const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (buildStateResponse.ok) {
+        const buildStateData = await buildStateResponse.json();
+        dispatch(setBuildState(buildStateData));
+      }
+
+      return { success: true };
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+);
+
 // Initial state
 const initialState: AuthState = {
   token: null,
@@ -241,8 +345,24 @@ export const authSlice = createSlice({
       .addCase(loadStoredAuth.rejected, (state) => {
         state.isLoading = false;
       });
+
+    // Fetch Initial Data
+    builder
+      .addCase(fetchInitialData.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchInitialData.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(fetchInitialData.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      });
   },
 });
 
 export const { clearError, setCredentials } = authSlice.actions;
+export const logout = logoutUser;
 export default authSlice.reducer; 

@@ -9,7 +9,8 @@ import {
 } from 'react-native';
 import { CloseButton } from '../components/common/CloseButton';
 import { DisconnectButton } from '../components/turf/DisconnectButton';
-import { useAuth } from '../context/AuthContext';
+import { useAppDispatch } from '../store/hooks';
+import { logout } from '../store/slices/authSlice';
 import { COLORS, SIZING } from '../styles/theme';
 import { Balance } from '../components/common/Balance';
 
@@ -30,7 +31,11 @@ interface UserProfile {
 
 export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const { logout } = useAuth();
+  const dispatch = useAppDispatch();
+
+  const handleLogout = () => {
+    dispatch(logout());
+  };
 
   useEffect(() => {
     setProfile({
@@ -87,7 +92,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
           </View>
         </View>
 
-        <TouchableOpacity style={styles.disconnectButton} onPress={logout}>
+        <TouchableOpacity style={styles.disconnectButton} onPress={handleLogout}>
           <Text style={styles.disconnectText}>DISCONNECT</Text>
         </TouchableOpacity>
       </ScrollView>

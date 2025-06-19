@@ -10,7 +10,6 @@ import { BotType } from '../types/bots';
 import { useAppSelector } from '../store/hooks';
 import { useAssignToBattalionMutation } from '../store/api/botsApi';
 import { API_URL } from '../config';
-import { useAuth } from '../context/AuthContext';
 
 type Props = {
   onClose: () => void;
@@ -30,7 +29,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [selectedBattalion, setSelectedBattalion] = useState<string | null>(null);
   const [assignments, setAssignments] = useState<Record<string, BattalionAssignment>>({});
-  const { token } = useAuth();
+  const token = useAppSelector((state) => state.auth.token);
   const botCounts = useAppSelector((state) => state.bots.botCounts);
   const [assignToBattalion] = useAssignToBattalionMutation();
   const getAvailableBots = (botType) => {

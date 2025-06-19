@@ -2,9 +2,13 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { COLORS, SIZING } from '../../styles/theme';
 import { BotType } from '../../types/bots';
-import { formatBalance } from '../../context/BalanceContext';
-import { useBots } from '../../context/BotsContext';
 import { useAppSelector } from '../../store/hooks';
+
+// Utility function for formatting balance
+export function formatBalance(amount: number): string {
+  if (amount === undefined || amount === null) return '0';
+  return amount.toLocaleString();
+}
 
 type BuildStatusProps = {
   selectedType: BotType | null;
@@ -17,13 +21,12 @@ export const BuildStatus = React.memo(function BuildStatus({
   quantity,
   botCost
 }: BuildStatusProps) {
-  const { buildQueue } = useBots();
-  const appBuildQueue = useAppSelector((state) => state.bots.buildQueue);
+  const buildQueue = useAppSelector((state) => state.bots.buildQueue);
   
   const calculateCost = () => {
     // For active builds, use the stored totalCost
-    if (appBuildQueue?.totalCost) {
-      return appBuildQueue.totalCost;
+    if (buildQueue?.totalCost) {
+      return buildQueue.totalCost;
     }
     // For new builds, calculate from inputs
     if (selectedType && quantity) {
