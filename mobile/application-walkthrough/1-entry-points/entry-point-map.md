@@ -28,7 +28,7 @@ The Application Entry Points define how the app launches and initializes, bridgi
 
 ## User Experience Flow
 - **App Launch**: User taps the app icon. The native platform loads `index.js`, which registers the app and loads configuration from `app.json`.
-- **Initialization**: The root component (`App.tsx`) is loaded, initializing all providers and the main app structure.
+- **Initialization**: The root component (`App.tsx`) is loaded, initializing the Redux store and the main app structure.
 - **Authentication**: On startup, the app checks for a stored token. If present, the user is automatically logged in and taken to the main screen. If not, the login screen is shown.
 - **Navigation**: Once authenticated, the user can navigate through the app. The entry points ensure that all state and configuration are available to every screen.
 - **Logout**: When the user logs out, the app clears stored tokens and returns to the login screen.
@@ -58,7 +58,7 @@ Unlike web React applications that use an HTML file as the entry point, React Na
 The `App.tsx` component:
 1. Is imported and registered in `index.js`
 2. Serves as the root of your component tree
-3. Sets up the initial application structure and providers
+3. Sets up the initial application structure and Redux store
 
 > **Technical Details**: See [Design Considerations](./entry-point-special-notes.md#design-considerations) for implementation details.
 
@@ -68,12 +68,10 @@ The `App.tsx` component:
 ```
 App.tsx
 ├── ErrorBoundary
-│   └── AuthProvider
+│   └── Redux Provider
 │       └── AppContent
-│           ├── BalanceProvider
-│           │   └── BotsProvider
-│           │       ├── LoginScreen (if !token)
-│           │       └── TurfScreen (if token)
+│           ├── LoginScreen (if !token)
+│           └── TurfScreen (if token)
 ```
 
 #### Authentication Flow
@@ -86,9 +84,10 @@ App.tsx
 > **Technical Details**: See [Authentication Implementation](./entry-point-special-notes.md#authentication-implementation) for security and implementation details.
 
 #### State Management
-- `AuthProvider`: Manages authentication state and user data
-- `BalanceProvider`: Manages user balance state
-- `BotsProvider`: Manages bot-related state
+- `auth` slice: Manages authentication state and user data
+- `balance` slice: Manages user balance state
+- `bots` slice: Manages bot-related state
+- All state is managed globally via Redux Toolkit and accessed with hooks.
 
 ## Component Interactions
 - **index.js** is the true entry point, responsible for registering the app and loading configuration.
@@ -107,7 +106,7 @@ App.tsx
 - **Token Missing/Invalid**: User sees "TOKEN_INVALID" and is prompted to log in again.
 - **AsyncStorage Failure**: User sees "STORAGE_ERROR" and is prompted to restart the app.
 - **App Registration Error**: User sees "APP_REGISTRATION_ERROR" and cannot proceed.
-- **Partial Initialization**: If only some providers initialize, user sees partial UI with error banners or retry options.
+- **Partial Initialization**: If the Redux store fails to initialize, user sees partial UI with error banners or retry options.
 
 ### Error Messages
 - "CONFIG_LOAD_FAILED"
