@@ -51,19 +51,19 @@ The Application Entry Points layer defines how the app launches and initializes,
 > **User Experience**: See [Authentication Flow](./entry-point-map.md#authentication-flow) for how this implementation affects the user experience.
 
 ## State Management Approach
-- Providers (`AuthProvider`, `BalanceProvider`, `BotsProvider`) are initialized in `App.tsx` and wrap the main application tree.
-- State is passed down via React Context, ensuring all screens have access to authentication, balance, and bot data.
-- On app launch, the authentication provider checks for a stored token and updates state accordingly.
+- The Redux `Provider` is initialized in `App.tsx` and wraps the main application tree.
+- State is managed globally via Redux Toolkit slices (`auth`, `balance`, `bots`) and accessed with hooks.
+- On app launch, the Redux store checks for a stored token and updates state accordingly.
 
 ## Performance Considerations
 - App startup time depends on how quickly AsyncStorage can be accessed for the token.
-- Providers are initialized as early as possible to minimize UI delay.
-- Efficient context usage prevents unnecessary re-renders.
+- Redux store is initialized as early as possible to minimize UI delay.
+- Efficient Redux usage prevents unnecessary re-renders.
 - (TODO: Profile and optimize cold start performance.)
 
 ## Implementation Patterns
 - Uses React Native's `AppRegistry.registerComponent` in `index.js` to bootstrap the app.
-- Provider pattern is used for global state management.
+- Redux pattern is used for global state management.
 - AsyncStorage is used for persistent storage of tokens and user data.
 - Error boundaries are used to catch and handle initialization errors.
 
@@ -71,7 +71,7 @@ The Application Entry Points layer defines how the app launches and initializes,
 - `index.js` loads configuration and registers the app.
 - `app.json` provides the app's identity and display name.
 - `App.tsx` initializes all providers and sets up the main app structure.
-- Providers depend on the authentication state to determine what to render (login vs. main app).
+- Redux store depends on the authentication state to determine what to render (login vs. main app).
 - If any entry point fails, error boundaries or fallback UI are triggered.
 
 ## API Endpoints
@@ -83,7 +83,7 @@ The Application Entry Points layer defines how the app launches and initializes,
 - On login, credentials are sent to `/api/auth/login`. On success, session token is stored in AsyncStorage.
 - All subsequent requests (profile, balance, bots) include the session token for authentication.
 - On logout, `/api/auth/logout` is called and local state is cleared.
-- Providers listen for auth state changes to trigger data fetch or cleanup.
+- Redux store listens for auth state changes to trigger data fetch or cleanup.
 
 ## Security Considerations
 1. ✅ Using AsyncStorage for token storage is standard practice for React Native
