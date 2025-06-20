@@ -5,9 +5,10 @@ This document provides a comprehensive walkthrough of the battle system from bot
 
 ## Phase 1: Battle Initialization & Countdown
 
-**Logic Location:** `BattleScreen.tsx`, `useBattleInitialization.ts`, `useBattleAnimations.ts`, `BattalionDeploymentZone.tsx`, `BattalionSlot.tsx`, `BattleHeader.tsx`, `BattleNetwork.tsx`, `BattleOverlays.tsx`, `BattleUnits.tsx`, `CircleSlot.tsx`, `CountdownOverlay.tsx`, `NetworkLines.tsx`, `NetworkNode.tsx`, `useBattleState.ts`, `networkConstants.ts`, `healthUtils.ts`
+**Logic Location:** `BattleScreen.tsx`, `useBattleInitialization.ts`, `useBattleAnimations.ts`, `BattalionDeploymentZone.tsx`, `BattalionSlot.tsx`, `BattleHeader.tsx`, `BattleNetwork.tsx`, `BattleOverlays.tsx`, `BattleUnits.tsx`, `CircleSlot.tsx`, `CountdownOverlay.tsx`, `NetworkLines.tsx`, `NetworkNode.tsx`, `networkConstants.ts`, `healthUtils.ts`, `useBattleStateMachine.ts`
 
 **Conflicting Files:**
+- **`BattleScreen.tsx` vs `useBattleAnimations.ts`**: Both manage animation transitions - BattleScreen calls animation functions while useBattleAnimations provides them
 
 ### Step 1: Battle Screen Load
 **User Experience:** Battle screen appears with network nodes visible, user battalions on the left, enemy battalions on the right. Header shows "BATTLE STARTING" with a 20-second timer.
@@ -180,7 +181,7 @@ This document provides a comprehensive walkthrough of the battle system from bot
 
 ## Phase 5: Battle Completion & Results
 
-**Logic Location:** `BattleScreen.tsx`, `BattleOverlays.tsx`, `BattleResultsOverlay.tsx`, `useBattleAnimations.ts`, `useBattleControl.ts`, `useBattleState.ts`, `battleCalculator.ts`
+**Logic Location:** `BattleScreen.tsx`, `BattleOverlays.tsx`, `BattleResultsOverlay.tsx`, `useBattleAnimations.ts`, `useBattleControl.ts`, `battleCalculator.ts`, `useBattleStateMachine.ts`
 
 ### Step 1: Timer Expiration
 **User Experience:** 20-second timer reaches zero, all combat stops, and battle results overlay appears.
@@ -224,7 +225,7 @@ This document provides a comprehensive walkthrough of the battle system from bot
 
 ## Phase 6: Animation Coordination
 
-**Logic Location:** `useBattleAnimations.ts`, `BattleHeader.tsx`, `BattleOverlays.tsx`, `AnimatedBattalion.tsx`, `BattleAnimationSystem.tsx`, `BattleNetwork.tsx`, `BattleUnits.tsx`, `DataStream.tsx`, `NetworkLines.tsx`, `NetworkNode.tsx`, `RangeIndicator.tsx`, `useBattleState.ts`, `BattleScreen.tsx`, `battleUtils.ts`, `networkConstants.ts`
+**Logic Location:** `useBattleAnimations.ts`, `BattleHeader.tsx`, `BattleOverlays.tsx`, `AnimatedBattalion.tsx`, `BattleAnimationSystem.tsx`, `BattleNetwork.tsx`, `BattleUnits.tsx`, `DataStream.tsx`, `NetworkLines.tsx`, `NetworkNode.tsx`, `RangeIndicator.tsx`, `BattleScreen.tsx`, `battleUtils.ts`, `networkConstants.ts`
 
 ### Step 1: Coordinated Transitions
 **User Experience:** Smooth transitions between all battle phases with coordinated fade effects, movement animations, and visual feedback.

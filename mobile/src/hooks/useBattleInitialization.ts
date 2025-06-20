@@ -6,7 +6,7 @@
  * @dependencies BattleNode, BattalionPosition, Animated
  */
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Animated, Dimensions } from 'react-native';
 import { BattleNode, BattalionPosition } from '../types/battle';
 import { BOT_CATEGORIES } from '../screens/DigitalBarracksScreen';
@@ -87,7 +87,7 @@ export const useBattleInitialization = () => {
    * @description Calculates initial health for nodes based on total army strength
    * @important DO NOT DELETE - Critical for game balance
    */
-  const calculateInitialHealth = () => {
+  const calculateInitialHealth = useCallback(() => {
     let total = 0;
     userBattalions.forEach(battalion => {
       total += BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity;
@@ -96,7 +96,7 @@ export const useBattleInitialization = () => {
       total += BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity;
     });
     return Math.floor(total * 0.75); // 75% of total army health
-  };
+  }, [userBattalions, enemyBattalions]);
 
   return {
     nodes,

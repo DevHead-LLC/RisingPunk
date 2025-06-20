@@ -7,7 +7,8 @@ import { BattleUnits } from '../components/battle/BattleUnits';
 import { BattleOverlays } from '../components/battle/BattleOverlays';
 import { useBattleAnimations } from '../hooks/useBattleAnimations';
 import { useBattleMovementAndAttacks } from '../hooks/useBattleMovementAndAttacks';
-import { BattlePhase } from '../hooks/useBattleStateMachine';
+import { useBattleStateMachine } from '../hooks/useBattleStateMachine';
+import { SafeComponent } from '../components/common/SafeComponent';
 
 import { BOT_CATEGORIES } from './DigitalBarracksScreen';
 import { checkRangeIntersection } from '../utils/battleCalculator';
@@ -58,7 +59,6 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     battalionOpacity,
     countdownOpacity,
     resultsOpacity,
-    startBattleTransition,
     showBattleResults,
     showNetwork,
   } = useBattleAnimations();
@@ -73,13 +73,26 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     calculateInitialHealth,
   } = useBattleInitialization();
 
+  // Use the state machine instead of local countdown state
+  const {
+    phase,
+    countdown,
+    transitionTo,
+    startBattle,
+    endBattle
+  } = useBattleStateMachine(
+    deploymentOpacity,
+    battalionOpacity,
+    networkOpacity,
+    resultsOpacity
+  );
+
   const [timeRemaining, setTimeRemaining] = useState(20);
   const timerRef = useRef<NodeJS.Timeout>();
   const [showResults, setShowResults] = useState(false);
   const [battleWinner, setBattleWinner] = useState<'user' | 'enemy'>('user');
   const [battleStarted, setBattleStarted] = useState(false);
   const [controlledNodes, setControlledNodes] = useState<number[]>([0, 1, 2]); // User starts controlling left nodes
-  const [countdown, setCountdown] = useState(3);
   const battleInitializedRef = useRef(false);
   const [battleLosses, setBattleLosses] = useState<BattleLossTracker>({
     user: {},
@@ -143,26 +156,21 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     // Show battlefield immediately using the new hook
     showNetwork();
     
-    // Initial countdown
-    const countdownTimer = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 2) { // Start transition on 1
-          clearInterval(countdownTimer);
-          startBattleTransition(() => {
-            setBattleStarted(true);
-            startBattleTimer();
-          });
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(countdownTimer);
+    // Use state machine to start battle countdown
+    startBattle();
   };
 
   useEffect(() => {
     initializeBattle();
   }, []);
+
+  // Listen for phase changes from state machine
+  useEffect(() => {
+    if (phase === 'active' && !battleStarted) {
+      setBattleStarted(true);
+      startBattleTimer();
+    }
+  }, [phase, battleStarted]);
 
   const startBattleTimer = () => {
     setTimeRemaining(20);
@@ -199,6 +207,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   const handleBattleComplete = () => {
     const winner = determineVictor();
     setBattleWinner(winner);
+    endBattle(winner);
     showBattleResults(() => {
       setShowResults(true);
       onBattleComplete?.(winner);
@@ -208,19 +217,8 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   // Modify the countdown effect to initialize node health
   useEffect(() => {
     if (countdown === 3) {
-      // Calculate total army health (75% of combined battalion health)
-      const calculateNodeHealth = () => {
-        let total = 0;
-        userBattalions.forEach(battalion => {
-          total += BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity;
-        });
-        enemyBattalions.forEach(battalion => {
-          total += BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity;
-        });
-        return Math.floor(total * 0.75); // 75% of total army health
-      };
-
-      const nodeHealth = calculateNodeHealth();
+      // Use the centralized health calculation from useBattleInitialization
+      const nodeHealth = calculateInitialHealth();
       // Initialize all nodes with health and control progress
       setNodes(prevNodes => prevNodes.map(node => ({
         ...node,
@@ -230,7 +228,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
         isLocked: node.controlState !== 'neutral'
       })));
     }
-  }, [countdown, userBattalions, enemyBattalions]);
+  }, [countdown, userBattalions, enemyBattalions, calculateInitialHealth]);
 
   const handleNodeControlChange = (nodeIndex: number, newState: 'user' | 'enemy') => {
     // Find only battalions that were targeting this specific node
@@ -371,7 +369,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
           height={SCREEN_HEIGHT * 0.8}
           onNodeControlChange={handleNodeControlChange}
           nodeRefs={nodeRefs}
-          phase={battleStarted ? 'active' : 'deployment'}
+          phase={phase}
         />
 
         <BattleUnits
