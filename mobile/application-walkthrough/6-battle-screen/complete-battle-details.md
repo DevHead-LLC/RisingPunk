@@ -54,22 +54,21 @@ This document provides a comprehensive walkthrough of the battle system from bot
 **Logic Location:** `useBattleMovementAndAttacks.ts`, `BattleUnits.tsx`, `networkConstants.ts`, `AnimatedBattalion.tsx`, `BattleHeader.tsx`, `BattleNetwork.tsx`, `NetworkLines.tsx`, `NetworkNode.tsx`, `BattleScreen.tsx`, `battleCalculator.ts`, `battleUtils.ts`
 
 ### Step 1: Target Selection
-**User Experience:** Battalions begin moving toward neutral nodes. Each battalion chooses a random neutral node that's connected via network lines.
+**User Experience:** Battalions intelligently identify the nearest valid target (a neutral node or an opposing battalion) by calculating the shortest possible route along the network's connection lines. This ensures targeting is based on strategic pathing, not just direct line-of-sight.
 
 **Code & State Details:**
-- `findAvailableTargets` function identifies neutral nodes within network connections
-- Random selection algorithm picks from available neutral nodes
-- `targetNode` property is set on each battalion
-- Movement paths are calculated using network topology
+- The system determines target proximity by calculating the total distance of the network path required to reach it.
+- A pathfinding algorithm is used to find the shortest sequence of connected nodes leading to every potential target.
+- The primary target for each battalion is the one with the shortest calculated path distance.
+- Once a target is selected, its path is stored for the battalion to follow.
 
 ### Step 2: Movement Animation
-**User Experience:** Battalions move along network connection lines toward their selected targets, with smooth animations showing their progress.
+**User Experience:** Battalions are visually confined to the network lines, moving from one node to the next along their calculated path. This creates a clear visual representation of strategic movement and data flow across the network.
 
 **Code & State Details:**
-- `AnimatedBattalion` components handle movement animations
-- Position calculations follow network paths, not direct lines
-- Movement speed varies by battalion type (based on bot stats)
-- Battalion refs track animation states and positions
+- A battalion's movement is not a single animation to its final target.
+- Instead, the system creates a sequence of animations, one for each segment of the stored path (e.g., from Node A to Node B, then Node B to Node C).
+- As the animation for one segment completes, the next one in the sequence begins, ensuring the battalion strictly follows the network lines.
 
 ### Step 3: Node Approach
 **User Experience:** Battalions reach their target nodes and begin attacking, showing attack animations and damage effects on the nodes.
@@ -112,14 +111,14 @@ This document provides a comprehensive walkthrough of the battle system from bot
 - `controlledNodes` array updates to track user-controlled nodes
 
 ### Step 3: Retargeting Trigger
-**User Experience:** All battalions that were attacking the captured node immediately stop and begin moving toward new targets.
+**User Experience:** When a node is captured or a battalion is destroyed, affected units immediately find a new optimal path. Furthermore, all battalions continuously re-evaluate their targets (approximately once per second) to react to the fluid state of the battle, such as a new, closer threat emerging.
 
 **Code & State Details:**
-- `handleNodeControlChange` function triggers when node is captured
-- Attack intervals are cleared for all affected battalions
-- `findAvailableTargets` finds new nearest targets (uncontrolled nodes or enemy battalions)
-- New movement animations begin toward new targets
-- **Critical Impact:** All targeting battalions must retarget, intervals cleared, paths recalculated
+- **Event-Based Retargeting:** A node capture or battalion destruction event immediately triggers a retargeting check for all relevant battalions.
+- **Time-Based Retargeting:** A recurring timer (approx. 1Hz) prompts all active battalions to re-run their target-finding logic.
+- This dual system ensures battalions are highly responsive, capable of aborting their current path if a more strategically advantageous target appears.
+- When retargeting, the battalion calculates new shortest paths to all valid targets and proceeds along the new optimal route.
+- **Critical Impact:** This responsive retargeting is key to the strategic depth, preventing battalions from being locked into suboptimal paths as the battlefield evolves.
 
 **To-Do Items:**
 - Verify tug-of-war mechanics accurately reflect damage leader
@@ -228,16 +227,23 @@ This document provides a comprehensive walkthrough of the battle system from bot
 
 **Logic Location:** `useBattleAnimations.ts`, `BattleHeader.tsx`, `BattleOverlays.tsx`, `AnimatedBattalion.tsx`, `BattleAnimationSystem.tsx`, `BattleNetwork.tsx`, `BattleUnits.tsx`, `DataStream.tsx`, `NetworkLines.tsx`, `NetworkNode.tsx`, `BattleScreen.tsx`, `battleUtils.ts`, `networkConstants.ts`
 
-### Step 1: Coordinated Transitions
+### Step 1: Path-Based Movement Animation
+**User Experience:** Battalion movement is visually locked to the network lines. Animations depict battalions gliding smoothly along the path segments between nodes, reinforcing the theme of tactical data flow and control.
+
+**Code & State Details:**
+- Battalion movement is composed of a sequence of animations that correspond to the segments of its calculated path.
+- The animation system ensures a seamless transition from one path segment to the next, creating the illusion of a single, continuous movement along the network lines.
+- Easing functions are applied to the start and end of each segment's animation to enhance visual fluidity.
+
+### Step 2: Coordinated Transitions
 **User Experience:** Smooth transitions between all battle phases with coordinated fade effects, movement animations, and visual feedback.
 
 **Code & State Details:**
 - Animation values control opacity and timing across all components
-- Movement animations follow network paths with proper easing
 - Attack animations sync with damage application timing
 - Transition animations coordinate between phases
 
-### Step 2: Performance Optimization
+### Step 3: Performance Optimization
 **User Experience:** All animations run smoothly at 60fps without frame drops, even during complex battles with multiple battalions.
 
 **Code & State Details:**
