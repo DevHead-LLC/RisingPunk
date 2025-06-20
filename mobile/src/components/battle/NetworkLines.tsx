@@ -3,13 +3,7 @@ import { StyleSheet } from 'react-native';
 import Svg, { Line } from 'react-native-svg';
 import { COLORS } from '../../styles/theme';
 import { DataStream } from './DataStream';
-
-const NETWORK_CONNECTIONS = [
-  [0, 3], [3, 6], [1, 4], [4, 7], [2, 5], [5, 8], // Horizontal
-  [0, 4], [1, 3], [1, 5], [2, 4], [3, 7], [4, 6], [4, 8], [5, 7] // Diagonal
-];
-
-const ACTIVE_CONNECTIONS = new Set(NETWORK_CONNECTIONS.filter(([from, to]) => from < 3 || to < 3).map((_, i) => i));
+import { NETWORK_CONNECTIONS, ACTIVE_CONNECTIONS } from '../../utils/networkConstants';
 
 type Props = {
   nodes: Array<{ x: number; y: number }>;

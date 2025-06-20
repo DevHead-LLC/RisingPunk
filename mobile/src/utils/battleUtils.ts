@@ -41,11 +41,15 @@ export const calculateAttackRange = (battalionType: string): number => {
 /**
  * Calculate total damage for battalion
  * @param battalion - Battalion to calculate damage for
+ * @param isUser - Whether the battalion is user or enemy (default: true)
  * @returns Total damage value
  */
-export const calculateTotalDamage = (battalion: BattalionPosition): number => {
+export const calculateTotalDamage = (battalion: BattalionPosition, isUser: boolean = true): number => {
   const attackPower = BOT_CATEGORIES[battalion.type].stats.offense;
-  return attackPower * battalion.quantity;
+  const baseDamage = attackPower * battalion.quantity;
+  
+  // Enemy battalions deal 4x damage
+  return isUser ? baseDamage : baseDamage * 4;
 };
 
 /**

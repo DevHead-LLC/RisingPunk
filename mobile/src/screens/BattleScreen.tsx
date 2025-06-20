@@ -13,6 +13,8 @@ import { BOT_CATEGORIES } from './DigitalBarracksScreen';
 import { checkRangeIntersection } from '../utils/battleCalculator';
 import { BattleNode, BattalionPosition } from '../types/battle';
 import { useBattleInitialization } from '../hooks/useBattleInitialization';
+import { NETWORK_CONNECTIONS } from '../utils/networkConstants';
+import { calculateInitialNodeHealth } from '../utils/healthUtils';
 
 type Props = {
   onClose: () => void;
@@ -33,17 +35,6 @@ type BattleTarget = {
   distance: number;
   position: { x: number; y: number };
 };
-
-// Add this constant after the interfaces and before the component
-const NETWORK_CONNECTIONS = [
-  // Horizontal connections
-  [0, 3], [3, 6], // Top row
-  [1, 4], [4, 7], // Middle row
-  [2, 5], [5, 8], // Bottom row
-  // Diagonal connections
-  [0, 4], [1, 3], [1, 5], [2, 4],
-  [3, 7], [4, 6], [4, 8], [5, 7]
-];
 
 interface BattalionLosses {
   quantity: number;

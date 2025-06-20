@@ -52,6 +52,43 @@ export const BOT_CATEGORIES = {
   }
 };
 
+// Enemy bot categories with much higher attack stats
+export const ENEMY_BOT_CATEGORIES = {
+  guardian: { // Cavalry
+    role: 'Cavalry',
+    stats: {
+      health: 14,
+      speed: 9,
+      range: 4,
+      offense: 32, // 4x higher attack
+      defense: 6
+    },
+    advantage: 'Strong vs. Infantry, Weak vs. Ranged'
+  },
+  breacher: { // Infantry
+    role: 'Infantry',
+    stats: {
+      health: 18,
+      speed: 5,
+      range: 5,
+      offense: 28, // 4x higher attack
+      defense: 8
+    },
+    advantage: 'Strong vs. Ranged, Weak vs. Cavalry'
+  },
+  phreak: { // Ranged
+    role: 'Ranged',
+    stats: {
+      health: 12,
+      speed: 7,
+      range: 9,
+      offense: 24, // 4x higher attack
+      defense: 5
+    },
+    advantage: 'Strong vs. Cavalry, Weak vs. Infantry'
+  }
+};
+
 export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
   const botCounts = useAppSelector((state) => state.bots.botCounts);
   const [selectedMark, setSelectedMark] = useState<MarkLevel>(1);
