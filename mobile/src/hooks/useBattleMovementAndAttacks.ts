@@ -187,20 +187,6 @@ export const useBattleMovementAndAttacks = (
     return [];
   }, [nodes, getAnimatedPosition]);
 
-  // Movement calculation
-  const calculateMovementDuration = useCallback((
-    startNode: BattleNode, 
-    targetNode: BattleNode, 
-    speedStat: number
-  ) => {
-    const dx = targetNode.x - startNode.x;
-    const dy = targetNode.y - startNode.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    const baseSpeed = 0.1;
-    const speed = baseSpeed * (speedStat / 5);
-    return distance / speed;
-  }, []);
-
   // Movement with improved validation
   const moveBattalionAlongPath = useCallback((
     battalion: BattalionPosition,
@@ -265,7 +251,9 @@ export const useBattleMovementAndAttacks = (
     cleanupBattalion(battalionId);
 
     const speed = BOT_CATEGORIES[battalion.type].stats.speed;
-    const movementDuration = (moveDistance / speed) * 70;
+    // Calculate duration based on distance and speed
+    const baseDuration = calculateMovementDuration(speed);
+    const movementDuration = (moveDistance / 100) * baseDuration; // Scale by distance
     
     Animated.timing(battalion.position, {
       toValue: rangePosition,
@@ -513,8 +501,7 @@ export const useBattleMovementAndAttacks = (
     const movementDurations = new Map<number, number>();
     const getMovementDuration = (speed: number) => {
       if (!movementDurations.has(speed)) {
-        // Higher speed = shorter duration (faster movement) - but make it slower overall
-        movementDurations.set(speed, Math.max(2000, 8000 - (speed * 300)));
+        movementDurations.set(speed, calculateMovementDuration(speed));
       }
       return movementDurations.get(speed);
     };
