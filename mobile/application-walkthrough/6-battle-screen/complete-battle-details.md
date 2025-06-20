@@ -5,7 +5,9 @@ This document provides a comprehensive walkthrough of the battle system from bot
 
 ## Phase 1: Battle Initialization & Countdown
 
-**Logic Location:** `BattleScreen.tsx`, `useBattleInitialization.ts`, `useBattleAnimations.ts`
+**Logic Location:** `BattleScreen.tsx`, `useBattleInitialization.ts`, `useBattleAnimations.ts`, `BattalionDeploymentZone.tsx`, `BattalionSlot.tsx`, `BattleHeader.tsx`, `BattleNetwork.tsx`, `BattleOverlays.tsx`, `BattleUnits.tsx`, `CircleSlot.tsx`, `CountdownOverlay.tsx`, `NetworkLines.tsx`, `NetworkNode.tsx`, `useBattleState.ts`, `networkConstants.ts`, `healthUtils.ts`
+
+**Conflicting Files:**
 
 ### Step 1: Battle Screen Load
 **User Experience:** Battle screen appears with network nodes visible, user battalions on the left, enemy battalions on the right. Header shows "BATTLE STARTING" with a 20-second timer.
@@ -47,7 +49,7 @@ This document provides a comprehensive walkthrough of the battle system from bot
 
 ## Phase 2: Initial Battalion Movement & Targeting
 
-**Logic Location:** `useBattleMovementAndAttacks.ts`, `BattleUnits.tsx`, `networkConstants.ts`
+**Logic Location:** `useBattleMovementAndAttacks.ts`, `BattleUnits.tsx`, `networkConstants.ts`, `AnimatedBattalion.tsx`, `BattleHeader.tsx`, `BattleNetwork.tsx`, `NetworkLines.tsx`, `NetworkNode.tsx`, `RangeIndicator.tsx`, `useBattleCombat.ts`, `BattleScreen.tsx`, `battleCalculator.ts`, `battleUtils.ts`
 
 ### Step 1: Target Selection
 **User Experience:** Battalions begin moving toward neutral nodes. Each battalion chooses a random neutral node that's connected via network lines.
@@ -87,7 +89,7 @@ This document provides a comprehensive walkthrough of the battle system from bot
 
 ## Phase 3: Node Control Tug-of-War
 
-**Logic Location:** `BattleNetwork.tsx`, `useBattleMovementAndAttacks.ts`, `healthUtils.ts`
+**Logic Location:** `BattleNetwork.tsx`, `useBattleMovementAndAttacks.ts`, `healthUtils.ts`, `BattleHeader.tsx`, `NetworkLines.tsx`, `NetworkNode.tsx`, `useBattleCombat.ts`, `useBattleControl.ts`, `BattleScreen.tsx`, `networkConstants.ts`
 
 ### Step 1: Damage Accumulation
 **User Experience:** Multiple battalions attack the same neutral nodes. Control progress bars fill with blue (user) or red (enemy) based on which side is dealing more damage.
@@ -132,7 +134,7 @@ This document provides a comprehensive walkthrough of the battle system from bot
 
 ## Phase 4: Battalion Combat & Health Management
 
-**Logic Location:** `useBattleMovementAndAttacks.ts`, `healthUtils.ts`, `battleCalculator.ts`, `AnimatedBattalion.tsx`
+**Logic Location:** `useBattleMovementAndAttacks.ts`, `healthUtils.ts`, `battleCalculator.ts`, `AnimatedBattalion.tsx`, `BattleHeader.tsx`, `BattleUnits.tsx`, `RangeIndicator.tsx`, `useBattleCombat.ts`, `useBattleControl.ts`, `BattleScreen.tsx`, `battleUtils.ts`
 
 ### Step 1: Battalion Engagement
 **User Experience:** When battalions encounter enemy battalions, they show attack animations. Defending battalions flash with damage effects and their health bars decrease.
@@ -178,7 +180,7 @@ This document provides a comprehensive walkthrough of the battle system from bot
 
 ## Phase 5: Battle Completion & Results
 
-**Logic Location:** `BattleScreen.tsx`, `BattleOverlays.tsx`
+**Logic Location:** `BattleScreen.tsx`, `BattleOverlays.tsx`, `BattleResultsOverlay.tsx`, `useBattleAnimations.ts`, `useBattleControl.ts`, `useBattleState.ts`, `battleCalculator.ts`
 
 ### Step 1: Timer Expiration
 **User Experience:** 20-second timer reaches zero, all combat stops, and battle results overlay appears.
@@ -222,7 +224,7 @@ This document provides a comprehensive walkthrough of the battle system from bot
 
 ## Phase 6: Animation Coordination
 
-**Logic Location:** `useBattleAnimations.ts`, `BattleHeader.tsx`, `BattleOverlays.tsx`, `AnimatedBattalion.tsx`
+**Logic Location:** `useBattleAnimations.ts`, `BattleHeader.tsx`, `BattleOverlays.tsx`, `AnimatedBattalion.tsx`, `BattleAnimationSystem.tsx`, `BattleNetwork.tsx`, `BattleUnits.tsx`, `DataStream.tsx`, `NetworkLines.tsx`, `NetworkNode.tsx`, `RangeIndicator.tsx`, `useBattleState.ts`, `BattleScreen.tsx`, `battleUtils.ts`, `networkConstants.ts`
 
 ### Step 1: Coordinated Transitions
 **User Experience:** Smooth transitions between all battle phases with coordinated fade effects, movement animations, and visual feedback.

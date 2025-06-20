@@ -14,16 +14,7 @@ import { NetworkLines } from './NetworkLines';
 import { BattleNode } from '../../types/battle';
 import { BattlePhase } from '../../hooks/useBattleStateMachine';
 import { COLORS } from '../../styles/theme';
-
-// IMPORTANT: Keep network topology configuration here
-// DO NOT DELETE - Critical for battle network structure
-const NETWORK_CONNECTIONS = [
-  [0, 3], [3, 6], // Top row
-  [1, 4], [4, 7], // Middle row
-  [2, 5], [5, 8], // Bottom row
-  [0, 4], [1, 3], [1, 5], [2, 4],
-  [3, 7], [4, 6], [4, 8], [5, 7]
-];
+import { NETWORK_CONNECTIONS } from '../../utils/networkConstants';
 
 type Props = {
   nodes: BattleNode[];
