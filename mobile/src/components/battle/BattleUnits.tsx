@@ -38,19 +38,11 @@ export const BattleUnits = React.memo(({
         <Animated.View style={[styles.overlayContainer, { opacity: deploymentOpacity }]}>
           <BattalionDeploymentZone
             side="user"
-            battalions={[
-              { type: 'breacher', quantity: 5 },
-              { type: 'guardian', quantity: 3 },
-              { type: 'phreak', quantity: 4 }
-            ]}
+            battalions={userBattalions.map(b => ({ type: b.type, quantity: b.quantity }))}
           />
           <BattalionDeploymentZone
             side="enemy"
-            battalions={[
-              { type: 'breacher', quantity: 4 },
-              { type: 'guardian', quantity: 4 },
-              { type: 'phreak', quantity: 3 }
-            ]}
+            battalions={enemyBattalions.map(b => ({ type: b.type, quantity: b.quantity }))}
           />
         </Animated.View>
       )}

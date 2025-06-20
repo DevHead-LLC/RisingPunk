@@ -358,6 +358,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     <SafeAreaView style={styles.container}>
       <BattleHeader
         timeRemaining={timeRemaining}
+        isCountdown={countdown > 0}
         opacity={battalionOpacity}
       />
       
