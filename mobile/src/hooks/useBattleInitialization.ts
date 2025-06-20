@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { Animated, Dimensions } from 'react-native';
 import { BattleNode, BattalionPosition } from '../types/battle';
 import { BOT_CATEGORIES } from '../screens/DigitalBarracksScreen';
+import { calculateBattalionHealth, calculateInitialNodeHealth } from '../utils/healthUtils';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -60,24 +61,24 @@ export const useBattleInitialization = () => {
   const [enemyBattalions, setEnemyBattalions] = useState<BattalionPosition[]>([
     { 
       type: 'breacher', 
-      quantity: 8,
+      quantity: 24,
       nodeIndex: 6, 
       position: new Animated.ValueXY({ x: SCREEN_WIDTH - 165, y: SCREEN_HEIGHT * 0.225 }),
-      currentHealth: BOT_CATEGORIES['breacher'].stats.health * 8
+      currentHealth: BOT_CATEGORIES['breacher'].stats.health * 24
     },
     { 
       type: 'guardian', 
-      quantity: 7,
+      quantity: 21,
       nodeIndex: 7, 
       position: new Animated.ValueXY({ x: SCREEN_WIDTH - 165, y: SCREEN_HEIGHT * 0.5 }),
-      currentHealth: BOT_CATEGORIES['guardian'].stats.health * 7
+      currentHealth: BOT_CATEGORIES['guardian'].stats.health * 21
     },
     { 
       type: 'phreak', 
-      quantity: 6,
+      quantity: 18,
       nodeIndex: 8, 
       position: new Animated.ValueXY({ x: SCREEN_WIDTH - 165, y: SCREEN_HEIGHT * 0.775 }),
-      currentHealth: BOT_CATEGORIES['phreak'].stats.health * 6
+      currentHealth: BOT_CATEGORIES['phreak'].stats.health * 18
     }
   ]);
 

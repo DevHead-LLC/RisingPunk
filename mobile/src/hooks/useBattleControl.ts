@@ -8,31 +8,13 @@
 
 import { useCallback, useState } from 'react';
 import { BattleNode } from '../types/battle';
-
-// Network topology for node connections
-const NETWORK_CONNECTIONS = [
-  [0, 3], [3, 6], // Top row
-  [1, 4], [4, 7], // Middle row
-  [2, 5], [5, 8], // Bottom row
-  [0, 4], [1, 3], [1, 5], [2, 4],
-  [3, 7], [4, 6], [4, 8], [5, 7]
-];
+import { NETWORK_CONNECTIONS, getConnectedNodes } from '../utils/networkConstants';
 
 export const useBattleControl = (
   nodes: BattleNode[],
   setNodes: (nodes: BattleNode[]) => void
 ) => {
   const [controlledNodes, setControlledNodes] = useState<number[]>([0, 1, 2]);
-
-  /**
-   * @function getConnectedNodes
-   * @description Returns array of node indices connected to given node
-   */
-  const getConnectedNodes = useCallback((nodeIndex: number): number[] => {
-    return NETWORK_CONNECTIONS
-      .filter(([from, to]) => from === nodeIndex || to === nodeIndex)
-      .map(([from, to]) => from === nodeIndex ? to : from);
-  }, []);
 
   /**
    * @function updateNodeControl
