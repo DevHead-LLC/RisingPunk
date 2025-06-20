@@ -108,7 +108,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     nodeRefs,
     attackIntervals,
     findNewTarget,
-    setupAttacks
+    setupAttacks: setupAttacksOriginal
   } = useBattleMovementAndAttacks(
     battleStarted,
     nodes,
@@ -118,6 +118,23 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     setEnemyBattalions,
     recordBattalionLoss
   );
+
+  // Create a wrapper function that adapts the signature for BattleUnits
+  const setupAttacks = (
+    battalion: BattalionPosition,
+    targetBattalion: BattalionPosition,
+    isUser: boolean
+  ) => {
+    const battalionId = `${isUser ? 'user' : 'enemy'}-${battalion.type}-${battalion.nodeIndex}`;
+    const target: BattleTarget = {
+      type: 'battalion',
+      index: targetBattalion.nodeIndex,
+      distance: 0, // Will be calculated by the hook
+      position: { x: targetBattalion.position.x._value, y: targetBattalion.position.y._value }
+    };
+    
+    setupAttacksOriginal(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
+  };
 
   const initializeBattle = () => {
     if (battleInitializedRef.current) return;
