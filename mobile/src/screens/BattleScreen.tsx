@@ -97,7 +97,9 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     battalionRefs,
     nodeRefs,
     attackIntervals,
-    setupBattalionAttacks
+    setupBattalionAttacks,
+    findNewTarget,
+    handleNodeCapture
   } = useBattleMovementAndAttacks(
     battleStarted,
     nodes,
@@ -220,8 +222,8 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       return updated;
     });
 
-    // Delegate all battalion retargeting to the hook
-    // The hook will automatically handle retargeting when node control changes
+    // Use the centralized node capture handler from the hook
+    handleNodeCapture(nodeIndex, newState);
   };
 
   // Add cleanup on unmount

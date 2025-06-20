@@ -11,7 +11,8 @@ import {
   CAPTURE_MEMORY_DURATION,
   ATTACK_DELAY,
   INITIAL_ATTACK_DELAY,
-  BATTALION_CENTER_OFFSET
+  BATTALION_CENTER_OFFSET,
+  RANGE_MULTIPLIER
 } from '../utils/battleConstants';
 import {
   calculateMovementDuration,
@@ -23,6 +24,16 @@ import {
   createAttackIntervalKey,
   sortBattalionsByPriority
 } from '../utils/battleUtils';
+
+// Debug flag - set to false to disable all debugging
+const DEBUG_BATTLE = false;
+
+// Debug function
+const debugLog = (message: string) => {
+  if (DEBUG_BATTLE) {
+    console.log(message);
+  }
+};
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -127,6 +138,7 @@ export const useBattleMovementAndAttacks = (
     
     // Check neutral nodes first (primary targets)
     const connectedNodeIndices = getConnectedNodes(battalion.nodeIndex);
+    
     nodes.forEach((node, index) => {
       if (!connectedNodeIndices.includes(index)) return;
       // Only target neutral nodes
@@ -153,7 +165,9 @@ export const useBattleMovementAndAttacks = (
       const enemyBatts = isUser ? enemyBattalions : userBattalions;
       
       enemyBatts.forEach((enemyBattalion, index) => {
-        if (!enemyBattalion || enemyBattalion.quantity <= 0 || enemyBattalion.currentHealth <= 0) return;
+        if (!enemyBattalion || enemyBattalion.quantity <= 0 || enemyBattalion.currentHealth <= 0) {
+          return;
+        }
         
         const enemyPos = getAnimatedPosition(enemyBattalion.position);
         const distance = Math.sqrt(
@@ -230,15 +244,48 @@ export const useBattleMovementAndAttacks = (
     const dy = target.position.y - currentPos.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
     
-    if (isNaN(distance) || distance === 0) return;
+    if (isNaN(distance) || distance === 0) {
+      return;
+    }
 
-    const range = BOT_CATEGORIES[battalion.type].stats.range * 15;
+    const range = BOT_CATEGORIES[battalion.type].stats.range * RANGE_MULTIPLIER;
     const directionX = dx / distance;
     const directionY = dy / distance;
-    const moveDistance = Math.max(0, distance - range);
+    
+    // Calculate movement distance based on target type
+    let moveDistance: number;
+    if (target.type === 'node') {
+      // For nodes, move to attack range
+      moveDistance = Math.max(0, distance - range);
+    } else {
+      // For enemy battalions, we need to consider both attack ranges
+      // Get the enemy battalion's attack range
+      const enemyBatts = isUser ? enemyBattalions : userBattalions;
+      const enemyBattalion = enemyBatts![target.index];
+      const enemyRange = BOT_CATEGORIES[enemyBattalion.type].stats.range * RANGE_MULTIPLIER;
+      
+      // We want to be at our attack range from the enemy, but not so close that we're in their attack range
+      // The optimal position is at our range from them, but we need to ensure we're not overlapping ranges
+      const combinedRange = range + enemyRange;
+      const optimalDistance = range; // We want to be at our attack range from the enemy
+      
+      // If the enemy is too close (within our range), we don't need to move
+      if (distance <= range) {
+        moveDistance = 0;
+      } else {
+        // Move to our attack range from the enemy
+        moveDistance = distance - optimalDistance;
+      }
+    }
     
     // If in range, start attacking
     if (moveDistance < 0.5 && Math.abs(dx) < 0.1 && Math.abs(dy) < 0.1) {
+      setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
+      return;
+    }
+
+    // If we're already in range but the moveDistance calculation is wrong, start attacking anyway
+    if (distance <= range) {
       setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
       return;
     }
@@ -768,20 +815,24 @@ export const useBattleMovementAndAttacks = (
       battalionsRef.current.enemy
     );
 
+    debugLog(`[findNewTarget] ${battalionId} - Found ${allTargets.length} targets`);
+
     // Strategic target selection based on battalion type
     let targets: typeof allTargets = [];
     
     if (battalion.type === 'guardian') {
       // Guardians prioritize defending controlled nodes and capturing neutral nodes
+      
+      // First, check if battalion is already at a controlled node - if so, stay put
+      const currentNode = nodesRef.current[battalion.nodeIndex];
+      const isAtControlledNode = (isUser && currentNode.controlState === 'user') || 
+                                (!isUser && currentNode.controlState === 'enemy');
+      
+      // Guardians should still target neutral nodes even if they're at a controlled node
+      // Only stay put if there are no neutral nodes to capture
       targets = allTargets.filter(target => {
         if (target.type === 'node') {
           const node = nodesRef.current[target.index];
-          const isOurNode = (isUser && node.controlState === 'user') || (!isUser && node.controlState === 'enemy');
-          
-          // Stay at current node if we control it
-          if (isOurNode && target.index === battalion.nodeIndex) {
-            return true;
-          }
           // Target neutral nodes for capture
           return node.controlState === 'neutral';
         }
@@ -803,7 +854,7 @@ export const useBattleMovementAndAttacks = (
       targets = allTargets.filter(target => {
         if (target.type === 'node') {
           const node = nodesRef.current[target.index];
-          // Avoid recently captured nodes
+          // Only target neutral nodes, not captured ones
           return node.controlState === 'neutral' && !recentlyCapturedNodes.current.has(target.index);
         }
         return false;
@@ -814,6 +865,8 @@ export const useBattleMovementAndAttacks = (
         targets = allTargets.filter(target => target.type === 'battalion');
       }
     }
+    
+    debugLog(`[findNewTarget] ${battalionId} - Filtered to ${targets.length} valid targets`);
     
     if (targets.length > 0) {
       const target = targets[0];
@@ -829,6 +882,8 @@ export const useBattleMovementAndAttacks = (
         }, CAPTURE_MEMORY_DURATION);
       }
       
+      debugLog(`[findNewTarget] ${battalionId} - Moving to ${target.type} ${target.index}`);
+      
       moveBattalionAlongPath(
         battalion,
         target,
@@ -836,8 +891,48 @@ export const useBattleMovementAndAttacks = (
         battalionsRef.current.user,
         battalionsRef.current.enemy
       );
+    } else {
+      debugLog(`[findNewTarget] ${battalionId} - No valid targets found`);
     }
   };
+
+  // Node capture handling with retargeting
+  const handleNodeCapture = useCallback((nodeIndex: number, newControlState: 'user' | 'enemy') => {
+    debugLog(`[Node Capture] Node ${nodeIndex} captured by ${newControlState}`);
+    
+    // Update node control state
+    nodesRef.current[nodeIndex].controlState = newControlState;
+    
+    // Mark as recently captured to prevent immediate retargeting
+    recentlyCapturedNodes.current.add(nodeIndex);
+    setTimeout(() => {
+      recentlyCapturedNodes.current.delete(nodeIndex);
+    }, CAPTURE_MEMORY_DURATION);
+    
+    // Retarget all battalions
+    retargetAllBattalions();
+  }, []);
+
+  // Retarget all battalions after node capture
+  const retargetAllBattalions = useCallback(() => {
+    debugLog('[Retargeting] Starting retargeting for all battalions');
+    
+    // Retarget user battalions
+    battalionsRef.current.user.forEach((battalion, index) => {
+      if (battalion && battalion.quantity > 0 && battalion.currentHealth > 0) {
+        debugLog(`[Retargeting] User battalion ${index} (${battalion.type}) at node ${battalion.nodeIndex}`);
+        findNewTarget(battalion, true);
+      }
+    });
+    
+    // Retarget enemy battalions
+    battalionsRef.current.enemy.forEach((battalion, index) => {
+      if (battalion && battalion.quantity > 0 && battalion.currentHealth > 0) {
+        debugLog(`[Retargeting] Enemy battalion ${index} (${battalion.type}) at node ${battalion.nodeIndex}`);
+        findNewTarget(battalion, false);
+      }
+    });
+  }, []);
 
   return {
     battalionRefs,
@@ -849,6 +944,7 @@ export const useBattleMovementAndAttacks = (
     getAnimatedPosition,
     findAvailableTargets,
     calculateMovementDuration,
-    moveBattalionAlongPath
+    moveBattalionAlongPath,
+    handleNodeCapture
   };
 }; 
