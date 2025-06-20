@@ -1,16 +1,38 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { Animated } from 'react-native';
 import { BOT_CATEGORIES } from '../screens/DigitalBarracksScreen';
 import { checkRangeIntersection } from '../utils/battleCalculator';
 import { BattleNode, BattalionPosition } from '../types/battle';
 import { useBattleMovement } from './useBattleMovement';
 import { BattalionRef } from '../components/battle/AnimatedBattalion';
+import {
+  RETARGET_COOLDOWN,
+  CAPTURE_MEMORY_DURATION,
+  ATTACK_DELAY,
+  INITIAL_ATTACK_DELAY,
+  BATTALION_CENTER_OFFSET
+} from '../utils/battleConstants';
+import {
+  calculateMovementDuration,
+  calculateAttackInterval,
+  calculateAttackRange,
+  calculateTotalDamage,
+  getAvailableNodes,
+  createBattalionKey,
+  createAttackIntervalKey,
+  sortBattalionsByPriority
+} from '../utils/battleUtils';
 
-// IMPORTANT: Keep these type definitions for reference
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
+
+/** Battalion references for animations */
 interface BattalionRefs {
   [key: string]: BattalionRef;
 }
 
+/** Node references for damage animations */
 interface NodeRefs {
   [key: string]: {
     triggerDamageAnimation: () => void;
@@ -18,10 +40,12 @@ interface NodeRefs {
   } | null;
 }
 
+/** Attack intervals tracking */
 interface AttackIntervals {
   [key: string]: NodeJS.Timeout;
 }
 
+/** Battalion loss callback type */
 type OnBattalionLoss = (
   side: 'user' | 'enemy',
   battalionId: string,
@@ -29,7 +53,21 @@ type OnBattalionLoss = (
   mark: number
 ) => void;
 
-// IMPORTANT: This hook manages all battalion movement and attack logic
+// ============================================================================
+// MAIN HOOK
+// ============================================================================
+
+/**
+ * Hook managing all battalion movement and attack logic
+ * @param battleStarted - Whether battle has started
+ * @param nodes - Array of battle nodes
+ * @param userBattalions - User battalion positions
+ * @param enemyBattalions - Enemy battalion positions
+ * @param setUserBattalions - Function to update user battalions
+ * @param setEnemyBattalions - Function to update enemy battalions
+ * @param onBattalionLoss - Callback for battalion losses
+ * @returns Object with refs and utility functions
+ */
 export const useBattleMovementAndAttacks = (
   battleStarted: boolean,
   nodes: BattleNode[],
@@ -49,16 +87,64 @@ export const useBattleMovementAndAttacks = (
 
   // Add retargeting cooldown tracking
   const retargetCooldowns = useRef<{[key: string]: number}>({});
-  const RETARGET_COOLDOWN = 1000; // 1 second cooldown
   const recentlyCapturedNodes = useRef<Set<number>>(new Set());
-  const CAPTURE_MEMORY_DURATION = 2000; // 2 seconds memory
 
   const {
     getAnimatedPosition,
     findAvailableTargets,
-    calculateMovementDuration,
+    calculateMovementDuration: movementDurationFromHook,
     moveBattalionAlongPath
   } = useBattleMovement(nodes, battalionRefs, attackIntervals, nodeRefs, setUserBattalions, setEnemyBattalions);
+
+  // Memoized calculations for performance optimization
+  const memoizedCalculations = useMemo(() => {
+    const calculations: { [key: string]: any } = {};
+    
+    // Cache bot category stats to avoid repeated lookups
+    const botStats = new Map<string, any>();
+    const getBotStats = (type: string) => {
+      if (!botStats.has(type)) {
+        botStats.set(type, BOT_CATEGORIES[type].stats);
+      }
+      return botStats.get(type);
+    };
+
+    // Cache attack intervals by battalion type and speed
+    const attackIntervals = new Map<string, number>();
+    const getAttackInterval = (type: string) => {
+      const key = `attack-${type}`;
+      if (!attackIntervals.has(key)) {
+        const speed = getBotStats(type).speed;
+        attackIntervals.set(key, calculateAttackInterval(speed));
+      }
+      return attackIntervals.get(key);
+    };
+
+    // Cache attack ranges by battalion type
+    const attackRanges = new Map<string, number>();
+    const getAttackRange = (type: string) => {
+      if (!attackRanges.has(type)) {
+        attackRanges.set(type, calculateAttackRange(type));
+      }
+      return attackRanges.get(type);
+    };
+
+    // Cache movement durations by speed
+    const movementDurations = new Map<number, number>();
+    const getMovementDuration = (speed: number) => {
+      if (!movementDurations.has(speed)) {
+        movementDurations.set(speed, calculateMovementDuration(speed));
+      }
+      return movementDurations.get(speed);
+    };
+
+    return {
+      getBotStats,
+      getAttackInterval,
+      getAttackRange,
+      getMovementDuration
+    };
+  }, []);
 
   // Update refs when battalions change
   useEffect(() => {
@@ -75,26 +161,9 @@ export const useBattleMovementAndAttacks = (
     if (battleStarted && !battleInitializedRef.current) {
       battleInitializedRef.current = true;
 
-      // Base duration for slowest speed (speed stat of 5)
-      const BASE_DURATION = 5000; // 3 seconds for base movement
-      
-      // Handle user battalions
-      const targetedNodes = new Set<number>();
-      
-      // Sort battalions by type to prioritize targeting
-      const sortedBattalions = [...battalionsRef.current.user].sort((a, b) => {
-        // Prioritize guardians for node control, then breachers, then phreaks
-        const typeOrder = { guardian: 0, breacher: 1, phreak: 2 };
-        return typeOrder[a.type] - typeOrder[b.type];
-      });
-
-      sortedBattalions.forEach(battalion => {
-        let availableNodes: number[] = [];
-        switch (battalion.nodeIndex) {
-          case 0: availableNodes = [3, 4]; break;
-          case 1: availableNodes = [3, 4, 5]; break;
-          case 2: availableNodes = [4, 5]; break;
-        }
+      // Strategic target selection function
+      const selectTargetNode = (battalion: BattalionPosition, isUser: boolean, targetedNodes: Set<number>) => {
+        let availableNodes = getAvailableNodes(battalion.nodeIndex);
         
         // Filter out already targeted nodes unless it's a guardian supporting another unit
         availableNodes = availableNodes.filter(nodeIndex => {
@@ -104,229 +173,107 @@ export const useBattleMovementAndAttacks = (
 
         // If no untargeted nodes available, expand search
         if (availableNodes.length === 0) {
-          switch (battalion.nodeIndex) {
-            case 0: availableNodes = [3, 4]; break;
-            case 1: availableNodes = [3, 4, 5]; break;
-            case 2: availableNodes = [4, 5]; break;
-          }
+          availableNodes = getAvailableNodes(battalion.nodeIndex);
         }
 
-        const targetNodeIndex = availableNodes[Math.floor(Math.random() * availableNodes.length)];
-        targetedNodes.add(targetNodeIndex);
+        return availableNodes[Math.floor(Math.random() * availableNodes.length)];
+      };
 
-        const targetNode = nodesRef.current[targetNodeIndex];
-        const range = BOT_CATEGORIES[battalion.type].stats.range * 15;
+      // Node attack setup function
+      const setupNodeAttack = (
+        battalion: BattalionPosition,
+        targetNodeIndex: number,
+        isUser: boolean
+      ) => {
+        const existingKey = createAttackIntervalKey(isUser, battalion.nodeIndex, targetNodeIndex);
         
-        // Calculate duration based on speed stat
-        const speedStat = BOT_CATEGORIES[battalion.type].stats.speed;
-        const duration = BASE_DURATION * (5 / speedStat);
-        
-        const anim = Animated.timing(battalion.position, {
-          toValue: { 
-            x: targetNode.x - 10,
-            y: targetNode.y - 10
-          },
-          duration: duration,
-          useNativeDriver: true
-        });
+        // Clear any existing attack interval
+        if (attackIntervals.current[existingKey]) {
+          clearInterval(attackIntervals.current[existingKey]);
+        }
 
-        const listener = battalion.position.addListener(({ x, y }: { x: number; y: number }) => {
-          const battalionCenter = {
-            x: x + 10,
-            y: y + 10
-          };
+        const attackInterval = memoizedCalculations.getAttackInterval(battalion.type);
+        const totalDamage = calculateTotalDamage(battalion);
+
+        const performNodeAttack = () => {
+          battalionRefs.current[createBattalionKey(isUser, battalion.nodeIndex)]?.triggerAttackAnimation();
           
-          const inRange = checkRangeIntersection(
-            battalionCenter,
-            { x: targetNode.x, y: targetNode.y },
-            range
-          );
-
-          if (inRange) {
-            anim.stop();
-            battalion.position.removeListener(listener);
-            
-            // Clear any existing attack interval
-            const existingKey = `user-${battalion.nodeIndex}-${targetNodeIndex}`;
-            if (attackIntervals.current[existingKey]) {
-              clearInterval(attackIntervals.current[existingKey]);
+          setTimeout(() => {
+            const nodeRef = nodeRefs.current[targetNodeIndex];
+            if (nodeRef) {
+              nodeRef.triggerDamageAnimation();
+              const damageApplied = nodeRef.applyDamage(totalDamage, isUser);
+              if (!damageApplied) {
+                // Node was captured or destroyed, find new target
+                const newTargets = findAvailableTargets(battalion, isUser, battalionsRef.current.user, battalionsRef.current.enemy);
+                if (newTargets.length > 0) {
+                  moveBattalionAlongPath(battalion, newTargets[0], isUser, battalionsRef.current.user, battalionsRef.current.enemy);
+                }
+                clearInterval(attackIntervals.current[existingKey]);
+                delete attackIntervals.current[existingKey];
+              }
             }
+          }, ATTACK_DELAY);
+        };
 
-            // Set up new attack interval
-            const attackSpeed = BOT_CATEGORIES[battalion.type].stats.speed;
-            const attackInterval = 2000 * (5 / attackSpeed);
-            
-            setTimeout(() => {
-              battalionRefs.current[`user-${battalion.nodeIndex}`]?.triggerAttackAnimation();
-              
-              const attackPower = BOT_CATEGORIES[battalion.type].stats.offense;
-              const totalDamage = attackPower * battalion.quantity;
-              
-              setTimeout(() => {
-                const nodeRef = nodeRefs.current[targetNodeIndex];
-                if (nodeRef) {
-                  nodeRef.triggerDamageAnimation();
-                  const damageApplied = nodeRef.applyDamage(totalDamage, true);
-                  if (!damageApplied) {
-                    // Node was captured or destroyed, find new target
-                    const newTargets = findAvailableTargets(battalion, true, battalionsRef.current.user, battalionsRef.current.enemy);
-                    if (newTargets.length > 0) {
-                      moveBattalionAlongPath(battalion, newTargets[0], true, battalionsRef.current.user, battalionsRef.current.enemy);
-                    }
-                    clearInterval(attackIntervals.current[existingKey]);
-                    delete attackIntervals.current[existingKey];
-                  }
-                }
-              }, 100);
-              
-              attackIntervals.current[existingKey] = setInterval(() => {
-                const nodeRef = nodeRefs.current[targetNodeIndex];
-                if (nodeRef) {
-                  battalionRefs.current[`user-${battalion.nodeIndex}`]?.triggerAttackAnimation();
-                  setTimeout(() => {
-                    nodeRef.triggerDamageAnimation();
-                    const damageApplied = nodeRef.applyDamage(totalDamage, true);
-                    if (!damageApplied) {
-                      // Node was captured or destroyed, find new target
-                      const newTargets = findAvailableTargets(battalion, true, battalionsRef.current.user, battalionsRef.current.enemy);
-                      if (newTargets.length > 0) {
-                        moveBattalionAlongPath(battalion, newTargets[0], true, battalionsRef.current.user, battalionsRef.current.enemy);
-                      }
-                      clearInterval(attackIntervals.current[existingKey]);
-                      delete attackIntervals.current[existingKey];
-                    }
-                  }, 100);
-                }
-              }, attackInterval);
-            }, 150);
-          }
-        });
-
-        anim.start();
-      });
-
-      // Handle enemy battalions with similar logic
-      const enemyTargetedNodes = new Set<number>();
-      
-      // Sort enemy battalions by type to prioritize targeting
-      const sortedEnemyBattalions = [...battalionsRef.current.enemy].sort((a, b) => {
-        const typeOrder = { guardian: 0, breacher: 1, phreak: 2 };
-        return typeOrder[a.type] - typeOrder[b.type];
-      });
-
-      sortedEnemyBattalions.forEach(battalion => {
-        let availableNodes: number[] = [];
-        switch (battalion.nodeIndex) {
-          case 6: availableNodes = [3, 4]; break;
-          case 7: availableNodes = [3, 4, 5]; break;
-          case 8: availableNodes = [4, 5]; break;
-        }
+        // Initial attack
+        setTimeout(performNodeAttack, INITIAL_ATTACK_DELAY);
         
-        // Filter out already targeted nodes unless it's a guardian supporting another unit
-        availableNodes = availableNodes.filter(nodeIndex => {
-          if (battalion.type === 'guardian') return true;
-          return !enemyTargetedNodes.has(nodeIndex);
-        });
+        // Set up interval for subsequent attacks
+        attackIntervals.current[existingKey] = setInterval(performNodeAttack, attackInterval);
+      };
 
-        // If no untargeted nodes available, expand search
-        if (availableNodes.length === 0) {
-          switch (battalion.nodeIndex) {
-            case 6: availableNodes = [3, 4]; break;
-            case 7: availableNodes = [3, 4, 5]; break;
-            case 8: availableNodes = [4, 5]; break;
-          }
-        }
+      // Consolidated function to handle battalion actions for both sides
+      const handleBattalionActions = (battalions: BattalionPosition[], isUser: boolean) => {
+        const targetedNodes = new Set<number>();
+        const sortedBattalions = sortBattalionsByPriority(battalions);
 
-        const targetNodeIndex = availableNodes[Math.floor(Math.random() * availableNodes.length)];
-        enemyTargetedNodes.add(targetNodeIndex);
+        sortedBattalions.forEach(battalion => {
+          const targetNodeIndex = selectTargetNode(battalion, isUser, targetedNodes);
+          targetedNodes.add(targetNodeIndex);
 
-        const targetNode = nodesRef.current[targetNodeIndex];
-        const range = BOT_CATEGORIES[battalion.type].stats.range * 15;
-        
-        const speedStat = BOT_CATEGORIES[battalion.type].stats.speed;
-        const duration = BASE_DURATION * (5 / speedStat);
-        
-        const anim = Animated.timing(battalion.position, {
-          toValue: { 
-            x: targetNode.x - 10,
-            y: targetNode.y - 10
-          },
-          duration: duration,
-          useNativeDriver: true
-        });
-
-        const enemyListener = battalion.position.addListener(({ x, y }: { x: number; y: number }) => {
-          const battalionCenter = {
-            x: x + 10,
-            y: y + 10
-          };
+          const targetNode = nodesRef.current[targetNodeIndex];
+          const range = memoizedCalculations.getAttackRange(battalion.type);
           
-          const inRange = checkRangeIntersection(
-            battalionCenter,
-            { x: targetNode.x, y: targetNode.y },
-            range
-          );
+          // Calculate duration based on speed stat
+          const speedStat = memoizedCalculations.getBotStats(battalion.type).speed;
+          const duration = memoizedCalculations.getMovementDuration(speedStat);
+          
+          const anim = Animated.timing(battalion.position, {
+            toValue: { 
+              x: targetNode.x - BATTALION_CENTER_OFFSET,
+              y: targetNode.y - BATTALION_CENTER_OFFSET
+            },
+            duration: duration,
+            useNativeDriver: true
+          });
 
-          if (inRange) {
-            anim.stop();
-            battalion.position.removeListener(enemyListener);
+          const listener = battalion.position.addListener(({ x, y }: { x: number; y: number }) => {
+            const battalionCenter = {
+              x: x + BATTALION_CENTER_OFFSET,
+              y: y + BATTALION_CENTER_OFFSET
+            };
             
-            const existingKey = `enemy-${battalion.nodeIndex}-${targetNodeIndex}`;
-            if (attackIntervals.current[existingKey]) {
-              clearInterval(attackIntervals.current[existingKey]);
+            const inRange = checkRangeIntersection(
+              battalionCenter,
+              { x: targetNode.x, y: targetNode.y },
+              range
+            );
+
+            if (inRange) {
+              anim.stop();
+              battalion.position.removeListener(listener);
+              setupNodeAttack(battalion, targetNodeIndex, isUser);
             }
+          });
 
-            const attackSpeed = BOT_CATEGORIES[battalion.type].stats.speed;
-            const attackInterval = 2000 * (5 / attackSpeed);
-            
-            setTimeout(() => {
-              battalionRefs.current[`enemy-${battalion.nodeIndex}`]?.triggerAttackAnimation();
-              
-              const attackPower = BOT_CATEGORIES[battalion.type].stats.offense;
-              const totalDamage = attackPower * battalion.quantity;
-              
-              setTimeout(() => {
-                const nodeRef = nodeRefs.current[targetNodeIndex];
-                if (nodeRef) {
-                  nodeRef.triggerDamageAnimation();
-                  const damageApplied = nodeRef.applyDamage(totalDamage, false);
-                  if (!damageApplied) {
-                    // Node was captured or destroyed, find new target
-                    const newTargets = findAvailableTargets(battalion, false, battalionsRef.current.user, battalionsRef.current.enemy);
-                    if (newTargets.length > 0) {
-                      moveBattalionAlongPath(battalion, newTargets[0], false, battalionsRef.current.user, battalionsRef.current.enemy);
-                    }
-                    clearInterval(attackIntervals.current[existingKey]);
-                    delete attackIntervals.current[existingKey];
-                  }
-                }
-              }, 100);
-              
-              attackIntervals.current[existingKey] = setInterval(() => {
-                const nodeRef = nodeRefs.current[targetNodeIndex];
-                if (nodeRef) {
-                  battalionRefs.current[`enemy-${battalion.nodeIndex}`]?.triggerAttackAnimation();
-                  setTimeout(() => {
-                    nodeRef.triggerDamageAnimation();
-                    const damageApplied = nodeRef.applyDamage(totalDamage, false);
-                    if (!damageApplied) {
-                      // Node was captured or destroyed, find new target
-                      const newTargets = findAvailableTargets(battalion, false, battalionsRef.current.user, battalionsRef.current.enemy);
-                      if (newTargets.length > 0) {
-                        moveBattalionAlongPath(battalion, newTargets[0], false, battalionsRef.current.user, battalionsRef.current.enemy);
-                      }
-                      clearInterval(attackIntervals.current[existingKey]);
-                      delete attackIntervals.current[existingKey];
-                    }
-                  }, 100);
-                }
-              }, attackInterval);
-            }, 150);
-          }
+          anim.start();
         });
+      };
 
-        anim.start();
-      });
+      // Handle both user and enemy battalions with the same function
+      handleBattalionActions(battalionsRef.current.user, true);
+      handleBattalionActions(battalionsRef.current.enemy, false);
 
       return () => {
         Object.values(attackIntervals.current).forEach(interval => clearInterval(interval));
@@ -343,7 +290,7 @@ export const useBattleMovementAndAttacks = (
     damage: number,
     isUser: boolean
   ) => {
-    const healthPerBot = BOT_CATEGORIES[battalion.type].stats.health;
+    const healthPerBot = memoizedCalculations.getBotStats(battalion.type).health;
     const botsLost = Math.floor(damage / healthPerBot);
     
     if (botsLost > 0) {
@@ -376,14 +323,14 @@ export const useBattleMovementAndAttacks = (
     return false;
   };
 
-  // Update the attack logic to use handleBattalionDamage
+  // Optimized battalion vs battalion attack setup
   const setupAttacks = (
     battalion: BattalionPosition,
     targetBattalion: BattalionPosition,
     isUser: boolean
   ) => {
-    const attackerKey = `${isUser ? 'user' : 'enemy'}-${battalion.nodeIndex}`;
-    const targetKey = `${isUser ? 'enemy' : 'user'}-${targetBattalion.nodeIndex}`;
+    const attackerKey = createBattalionKey(isUser, battalion.nodeIndex);
+    const targetKey = createBattalionKey(!isUser, targetBattalion.nodeIndex);
     const intervalKey = `${attackerKey}-${targetBattalion.nodeIndex}`;
 
     // Clear any existing attack interval
@@ -391,12 +338,11 @@ export const useBattleMovementAndAttacks = (
       clearInterval(attackIntervals.current[intervalKey]);
     }
 
-    const attackSpeed = BOT_CATEGORIES[battalion.type].stats.speed;
-    const attackInterval = 2000 * (5 / attackSpeed);
-    const attackPower = BOT_CATEGORIES[battalion.type].stats.offense;
-    const totalDamage = attackPower * battalion.quantity;
+    const attackSpeed = memoizedCalculations.getBotStats(battalion.type).speed;
+    const attackInterval = memoizedCalculations.getAttackInterval(battalion.type);
+    const totalDamage = calculateTotalDamage(battalion);
 
-    const performAttack = () => {
+    const performBattalionAttack = () => {
       battalionRefs.current[attackerKey]?.triggerAttackAnimation();
       
       setTimeout(() => {
@@ -425,17 +371,17 @@ export const useBattleMovementAndAttacks = (
             );
           }
         }
-      }, 100);
+      }, ATTACK_DELAY);
     };
 
     // Initial attack
-    performAttack();
+    performBattalionAttack();
     
     // Set up interval for subsequent attacks
-    attackIntervals.current[intervalKey] = setInterval(performAttack, attackInterval);
+    attackIntervals.current[intervalKey] = setInterval(performBattalionAttack, attackInterval);
   };
 
-  // Update findNewTarget to be more strategic
+  // Strategic target selection with improved logic
   const findNewTarget = (battalion: BattalionPosition, isUser: boolean) => {
     const battalionId = `${isUser ? 'user' : 'enemy'}-${battalion.type}-${battalion.nodeIndex}`;
     
@@ -446,54 +392,59 @@ export const useBattleMovementAndAttacks = (
       return; // Still in cooldown
     }
     
-    // First try to find neutral nodes
-    let targets = findAvailableTargets(
+    // Get all available targets
+    const allTargets = findAvailableTargets(
       battalion,
       isUser,
       battalionsRef.current.user,
       battalionsRef.current.enemy
-    ).filter(target => {
-      if (target.type === 'node') {
-        const node = nodesRef.current[target.index];
-        // For guardians, stay at captured nodes to defend them
-        if (battalion.type === 'guardian') {
+    );
+
+    // Strategic target selection based on battalion type
+    let targets: typeof allTargets = [];
+    
+    if (battalion.type === 'guardian') {
+      // Guardians prioritize defending controlled nodes and capturing neutral nodes
+      targets = allTargets.filter(target => {
+        if (target.type === 'node') {
+          const node = nodesRef.current[target.index];
           const isOurNode = (isUser && node.controlState === 'user') || (!isUser && node.controlState === 'enemy');
+          
           // Stay at current node if we control it
           if (isOurNode && target.index === battalion.nodeIndex) {
             return true;
           }
-          // Only target neutral nodes, never try to recapture nodes
+          // Target neutral nodes for capture
           return node.controlState === 'neutral';
-        }
-        // For other types, only target neutral nodes that aren't recently captured
-        return node.controlState === 'neutral' && !recentlyCapturedNodes.current.has(target.index);
-      }
-      return false; // Initially only look for nodes
-    });
-
-    // If no neutral nodes found, then consider enemy battalions (if not a guardian)
-    if (targets.length === 0 && battalion.type !== 'guardian') {
-      // For non-guardians, if no neutral nodes, attack enemy battalions
-      targets = findAvailableTargets(
-        battalion,
-        isUser,
-        battalionsRef.current.user,
-        battalionsRef.current.enemy
-      ).filter(target => target.type === 'battalion');
-    } else if (targets.length === 0 && battalion.type === 'guardian') {
-      // For guardians with no targets, find the nearest controlled node to defend
-      targets = findAvailableTargets(
-        battalion,
-        isUser,
-        battalionsRef.current.user,
-        battalionsRef.current.enemy
-      ).filter(target => {
-        if (target.type === 'node') {
-          const node = nodesRef.current[target.index];
-          return (isUser && node.controlState === 'user') || (!isUser && node.controlState === 'enemy');
         }
         return false;
       });
+      
+      // If no neutral nodes, find controlled nodes to defend
+      if (targets.length === 0) {
+        targets = allTargets.filter(target => {
+          if (target.type === 'node') {
+            const node = nodesRef.current[target.index];
+            return (isUser && node.controlState === 'user') || (!isUser && node.controlState === 'enemy');
+          }
+          return false;
+        });
+      }
+    } else {
+      // Non-guardians prioritize neutral nodes, then enemy battalions
+      targets = allTargets.filter(target => {
+        if (target.type === 'node') {
+          const node = nodesRef.current[target.index];
+          // Avoid recently captured nodes
+          return node.controlState === 'neutral' && !recentlyCapturedNodes.current.has(target.index);
+        }
+        return false;
+      });
+      
+      // If no neutral nodes, attack enemy battalions
+      if (targets.length === 0) {
+        targets = allTargets.filter(target => target.type === 'battalion');
+      }
     }
     
     if (targets.length > 0) {
