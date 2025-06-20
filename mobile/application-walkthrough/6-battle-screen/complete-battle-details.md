@@ -51,7 +51,11 @@ This document provides a comprehensive walkthrough of the battle system from bot
 
 ## Phase 2: Initial Battalion Movement & Targeting
 
-**Logic Location:** `useBattleMovementAndAttacks.ts`, `BattleUnits.tsx`, `networkConstants.ts`, `AnimatedBattalion.tsx`, `BattleHeader.tsx`, `BattleNetwork.tsx`, `NetworkLines.tsx`, `NetworkNode.tsx`, `RangeIndicator.tsx`, `useBattleCombat.ts`, `BattleScreen.tsx`, `battleCalculator.ts`, `battleUtils.ts`
+**Logic Location:** `useBattleMovementAndAttacks.ts`, `BattleUnits.tsx`, `networkConstants.ts`, `AnimatedBattalion.tsx`, `BattleHeader.tsx`, `BattleNetwork.tsx`, `NetworkLines.tsx`, `NetworkNode.tsx`, `BattleScreen.tsx`, `battleCalculator.ts`, `battleUtils.ts`
+
+**Conflicting Files:**
+- **`BattleScreen.tsx` vs `useBattleMovementAndAttacks.ts`**: Both manage battalion state and targeting - duplicate targeting logic and battalion state management
+- **`battleUtils.ts` vs `useBattleMovementAndAttacks.ts`**: Both contain targeting and movement logic - duplicate `findAvailableTargets` and movement calculation functions
 
 ### Step 1: Target Selection
 **User Experience:** Battalions begin moving toward neutral nodes. Each battalion chooses a random neutral node that's connected via network lines.
@@ -91,7 +95,7 @@ This document provides a comprehensive walkthrough of the battle system from bot
 
 ## Phase 3: Node Control Tug-of-War
 
-**Logic Location:** `BattleNetwork.tsx`, `useBattleMovementAndAttacks.ts`, `healthUtils.ts`, `BattleHeader.tsx`, `NetworkLines.tsx`, `NetworkNode.tsx`, `useBattleCombat.ts`, `useBattleControl.ts`, `BattleScreen.tsx`, `networkConstants.ts`
+**Logic Location:** `BattleNetwork.tsx`, `useBattleMovementAndAttacks.ts`, `healthUtils.ts`, `BattleHeader.tsx`, `NetworkLines.tsx`, `NetworkNode.tsx`, `useBattleControl.ts`, `BattleScreen.tsx`, `networkConstants.ts`
 
 ### Step 1: Damage Accumulation
 **User Experience:** Multiple battalions attack the same neutral nodes. Control progress bars fill with blue (user) or red (enemy) based on which side is dealing more damage.
@@ -136,7 +140,7 @@ This document provides a comprehensive walkthrough of the battle system from bot
 
 ## Phase 4: Battalion Combat & Health Management
 
-**Logic Location:** `useBattleMovementAndAttacks.ts`, `healthUtils.ts`, `battleCalculator.ts`, `AnimatedBattalion.tsx`, `BattleHeader.tsx`, `BattleUnits.tsx`, `RangeIndicator.tsx`, `useBattleCombat.ts`, `useBattleControl.ts`, `BattleScreen.tsx`, `battleUtils.ts`
+**Logic Location:** `useBattleMovementAndAttacks.ts`, `healthUtils.ts`, `battleCalculator.ts`, `AnimatedBattalion.tsx`, `BattleHeader.tsx`, `BattleUnits.tsx`, `useBattleControl.ts`, `BattleScreen.tsx`, `battleUtils.ts`
 
 ### Step 1: Battalion Engagement
 **User Experience:** When battalions encounter enemy battalions, they show attack animations. Defending battalions flash with damage effects and their health bars decrease.
@@ -226,7 +230,7 @@ This document provides a comprehensive walkthrough of the battle system from bot
 
 ## Phase 6: Animation Coordination
 
-**Logic Location:** `useBattleAnimations.ts`, `BattleHeader.tsx`, `BattleOverlays.tsx`, `AnimatedBattalion.tsx`, `BattleAnimationSystem.tsx`, `BattleNetwork.tsx`, `BattleUnits.tsx`, `DataStream.tsx`, `NetworkLines.tsx`, `NetworkNode.tsx`, `RangeIndicator.tsx`, `BattleScreen.tsx`, `battleUtils.ts`, `networkConstants.ts`
+**Logic Location:** `useBattleAnimations.ts`, `BattleHeader.tsx`, `BattleOverlays.tsx`, `AnimatedBattalion.tsx`, `BattleAnimationSystem.tsx`, `BattleNetwork.tsx`, `BattleUnits.tsx`, `DataStream.tsx`, `NetworkLines.tsx`, `NetworkNode.tsx`, `BattleScreen.tsx`, `battleUtils.ts`, `networkConstants.ts`
 
 ### Step 1: Coordinated Transitions
 **User Experience:** Smooth transitions between all battle phases with coordinated fade effects, movement animations, and visual feedback.

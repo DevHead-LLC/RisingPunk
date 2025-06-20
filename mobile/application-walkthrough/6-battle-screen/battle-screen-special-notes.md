@@ -16,7 +16,6 @@
   - [BattleResultsOverlay Technical Specs](#battleresultsoverlay-technical-specs)
   - [DataStream Technical Specs](#datastream-technical-specs)
   - [NetworkLines Technical Specs](#networklines-technical-specs)
-  - [RangeIndicator Technical Specs](#rangeindicator-technical-specs)
   - [BattalionBotSelector Technical Specs](#battalionbotselector-technical-specs)
   - [BattalionDeploymentZone Technical Specs](#battaliondeploymentzone-technical-specs)
   - [BattalionSlot Technical Specs](#battalionslot-technical-specs)
@@ -146,12 +145,6 @@ The Battle Screen implements a sophisticated real-time combat system with comple
 - **Rendering**: Lines drawn between connected nodes
 - **Performance**: Efficient line rendering with minimal calculations
 - **Visual**: Network topology visualization
-
-### RangeIndicator Technical Specs
-- **Functionality**: Attack range visualization
-- **Display**: Range circles and targeting indicators
-- **Interaction**: Shows range for selected battalions
-- **Visual**: Clear range indication for strategic planning
 
 ### BattalionBotSelector Technical Specs
 - **Components**: BotTypeCard, QuantitySelector, deployment interface
