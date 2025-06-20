@@ -9,10 +9,8 @@ import { useBattleStateMachine } from '../hooks/useBattleStateMachine';
 import { SafeComponent } from '../components/common/SafeComponent';
 import { useBattleMovementAndAttacks } from '../hooks/useBattleMovementAndAttacks';
 import { BOT_CATEGORIES } from './DigitalBarracksScreen';
-import { checkRangeIntersection } from '../utils/battleCalculator';
 import { BattleNode, BattalionPosition } from '../types/battle';
 import { useBattleInitialization } from '../hooks/useBattleInitialization';
-import { NETWORK_CONNECTIONS } from '../utils/networkConstants';
 import { calculateInitialNodeHealth } from '../utils/healthUtils';
 
 type Props = {
@@ -21,19 +19,6 @@ type Props = {
 };
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-interface BattalionTarget {
-  nodeIndex: number;
-  type: 'node' | 'battalion';
-  intervalKey: string;
-}
-
-type BattleTarget = {
-  type: 'node' | 'battalion';
-  index: number;
-  distance: number;
-  position: { x: number; y: number };
-};
 
 interface BattalionLosses {
   quantity: number;
@@ -112,8 +97,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     battalionRefs,
     nodeRefs,
     attackIntervals,
-    findNewTarget,
-    setupAttacks: setupAttacksOriginal
+    setupBattalionAttacks
   } = useBattleMovementAndAttacks(
     battleStarted,
     nodes,
@@ -130,15 +114,8 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     targetBattalion: BattalionPosition,
     isUser: boolean
   ) => {
-    const battalionId = `${isUser ? 'user' : 'enemy'}-${battalion.type}-${battalion.nodeIndex}`;
-    const target: BattleTarget = {
-      type: 'battalion',
-      index: targetBattalion.nodeIndex,
-      distance: 0, // Will be calculated by the hook
-      position: { x: targetBattalion.position.x._value, y: targetBattalion.position.y._value }
-    };
-    
-    setupAttacksOriginal(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
+    // Use the setupBattalionAttacks function from the hook
+    setupBattalionAttacks(battalion, targetBattalion, isUser);
   };
 
   const initializeBattle = () => {
@@ -223,60 +200,6 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   }, [countdown, userBattalions, enemyBattalions, calculateInitialHealth]);
 
   const handleNodeControlChange = (nodeIndex: number, newState: 'user' | 'enemy') => {
-    // Find only battalions that were targeting this specific node
-    const affectedBattalions = Object.entries(attackIntervals.current)
-      .filter(([key]) => {
-        const parts = key.split('-');
-        if (parts.length !== 3) return false;
-        const [side, battalionIndex, targetNode] = parts;
-        return side && battalionIndex && targetNode && 
-               ['user', 'enemy'].includes(side) &&
-               parseInt(targetNode) === nodeIndex;
-      })
-      .map(([key, interval]) => {
-        const [side, battalionIndex] = key.split('-');
-        return {
-          key,
-          interval,
-          isUser: side === 'user',
-          battalionIndex: parseInt(battalionIndex)
-        };
-      });
-
-    // Also check for battalions that are currently moving to this node
-    const movingUserBattalions = userBattalions
-      .filter(b => b.targetNode === nodeIndex)
-      .map(b => ({
-        key: `user-${b.nodeIndex}-${nodeIndex}`,
-        interval: null,
-        isUser: true,
-        battalionIndex: b.nodeIndex
-      }));
-
-    const movingEnemyBattalions = enemyBattalions
-      .filter(b => b.targetNode === nodeIndex)
-      .map(b => ({
-        key: `enemy-${b.nodeIndex}-${nodeIndex}`,
-        interval: null,
-        isUser: false,
-        battalionIndex: b.nodeIndex
-      }));
-
-    // Combine all battalions that were targeting this node
-    const allAffectedBattalions = [
-      ...affectedBattalions,
-      ...movingUserBattalions,
-      ...movingEnemyBattalions
-    ];
-
-    // Clear attack intervals for battalions that were attacking this node
-    allAffectedBattalions.forEach(({ key, interval }) => {
-      if (interval) {
-        clearInterval(interval);
-        delete attackIntervals.current[key];
-      }
-    });
-
     // Update node control state
     setControlledNodes(prev => {
       const newControlled = newState === 'user' 
@@ -297,50 +220,14 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       return updated;
     });
 
-    // Clear target nodes for affected battalions
-    setUserBattalions(prev => {
-      const updated = [...prev];
-      allAffectedBattalions
-        .filter(b => b.isUser)
-        .forEach(({ battalionIndex }) => {
-          const battalion = updated.find(b => b.nodeIndex === battalionIndex);
-          if (battalion) {
-            battalion.targetNode = undefined;
-          }
-        });
-      return updated;
-    });
-
-    setEnemyBattalions(prev => {
-      const updated = [...prev];
-      allAffectedBattalions
-        .filter(b => !b.isUser)
-        .forEach(({ battalionIndex }) => {
-          const battalion = updated.find(b => b.nodeIndex === battalionIndex);
-          if (battalion) {
-            battalion.targetNode = undefined;
-          }
-        });
-      return updated;
-    });
-
-    // Queue finding new targets after state updates
-    requestAnimationFrame(() => {
-      allAffectedBattalions.forEach(({ isUser, battalionIndex }) => {
-        const battalions = isUser ? userBattalions : enemyBattalions;
-        const battalion = battalions.find(b => b.nodeIndex === battalionIndex);
-        if (battalion) {
-          findNewTarget(battalion, isUser);
-        }
-      });
-    });
+    // Delegate all battalion retargeting to the hook
+    // The hook will automatically handle retargeting when node control changes
   };
 
   // Add cleanup on unmount
   useEffect(() => {
     return () => {
-      Object.values(attackIntervals.current).forEach(interval => clearInterval(interval));
-      attackIntervals.current = {};
+      // Cleanup is handled by the useBattleMovementAndAttacks hook
     };
   }, []);
 

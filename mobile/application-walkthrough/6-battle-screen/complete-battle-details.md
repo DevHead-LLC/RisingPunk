@@ -53,10 +53,6 @@ This document provides a comprehensive walkthrough of the battle system from bot
 
 **Logic Location:** `useBattleMovementAndAttacks.ts`, `BattleUnits.tsx`, `networkConstants.ts`, `AnimatedBattalion.tsx`, `BattleHeader.tsx`, `BattleNetwork.tsx`, `NetworkLines.tsx`, `NetworkNode.tsx`, `BattleScreen.tsx`, `battleCalculator.ts`, `battleUtils.ts`
 
-**Conflicting Files:**
-- **`BattleScreen.tsx` vs `useBattleMovementAndAttacks.ts`**: Both manage battalion state and targeting - duplicate targeting logic and battalion state management
-- **`battleUtils.ts` vs `useBattleMovementAndAttacks.ts`**: Both contain targeting and movement logic - duplicate `findAvailableTargets` and movement calculation functions
-
 ### Step 1: Target Selection
 **User Experience:** Battalions begin moving toward neutral nodes. Each battalion chooses a random neutral node that's connected via network lines.
 
