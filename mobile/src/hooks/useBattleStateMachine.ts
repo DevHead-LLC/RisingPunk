@@ -3,7 +3,7 @@
  * @description Manages battle state transitions and phase coordination
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useRef } from 'react';
 import { Animated } from 'react-native';
 
 export type BattlePhase = 
@@ -14,12 +14,14 @@ export type BattlePhase =
   | 'complete'      // Battle ended
   | 'results';      // Showing results
 
-export const useBattleStateMachine = (
-  deploymentOpacity: Animated.Value,
-  battalionOpacity: Animated.Value,
-  networkOpacity: Animated.Value,
-  resultsOpacity: Animated.Value
-) => {
+export const useBattleStateMachine = () => {
+  // Create and own all animation values
+  const networkOpacity = useRef(new Animated.Value(0)).current;
+  const deploymentOpacity = useRef(new Animated.Value(1)).current;
+  const battalionOpacity = useRef(new Animated.Value(0)).current;
+  const countdownOpacity = useRef(new Animated.Value(1)).current;
+  const resultsOpacity = useRef(new Animated.Value(0)).current;
+
   const [phase, setPhase] = useState<BattlePhase>('initializing');
   const [countdown, setCountdown] = useState(3);
 
@@ -85,11 +87,37 @@ export const useBattleStateMachine = (
     }, 1000);
   }, [transitionTo]);
 
+  // Utility function for showing network immediately
+  const showNetwork = useCallback(() => {
+    networkOpacity.setValue(1);
+  }, [networkOpacity]);
+
+  // Utility function for showing battle results
+  const showBattleResults = useCallback((onComplete?: () => void) => {
+    Animated.timing(resultsOpacity, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start(() => {
+      onComplete?.();
+    });
+  }, [resultsOpacity]);
+
   return {
+    // Animation values
+    networkOpacity,
+    deploymentOpacity,
+    battalionOpacity,
+    countdownOpacity,
+    resultsOpacity,
+    // State
     phase,
     countdown,
+    // Functions
     transitionTo,
     startBattle,
-    endBattle
+    endBattle,
+    showNetwork,
+    showBattleResults,
   };
 }; 

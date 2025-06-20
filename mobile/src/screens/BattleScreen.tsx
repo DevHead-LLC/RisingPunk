@@ -5,11 +5,9 @@ import { BattleNetwork } from '../components/battle/BattleNetwork';
 import { BattleHeader } from '../components/battle/BattleHeader';
 import { BattleUnits } from '../components/battle/BattleUnits';
 import { BattleOverlays } from '../components/battle/BattleOverlays';
-import { useBattleAnimations } from '../hooks/useBattleAnimations';
-import { useBattleMovementAndAttacks } from '../hooks/useBattleMovementAndAttacks';
 import { useBattleStateMachine } from '../hooks/useBattleStateMachine';
 import { SafeComponent } from '../components/common/SafeComponent';
-
+import { useBattleMovementAndAttacks } from '../hooks/useBattleMovementAndAttacks';
 import { BOT_CATEGORIES } from './DigitalBarracksScreen';
 import { checkRangeIntersection } from '../utils/battleCalculator';
 import { BattleNode, BattalionPosition } from '../types/battle';
@@ -53,15 +51,23 @@ const calculateLossPoints = (losses: BattalionLosses) => {
 };
 
 export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) => {
+  // Use the state machine as the single source of truth for animations and state
   const {
+    // Animation values
     networkOpacity,
     deploymentOpacity,
     battalionOpacity,
     countdownOpacity,
     resultsOpacity,
-    showBattleResults,
+    // State
+    phase,
+    countdown,
+    // Functions
+    startBattle,
+    endBattle,
     showNetwork,
-  } = useBattleAnimations();
+    showBattleResults,
+  } = useBattleStateMachine();
 
   const {
     nodes,
@@ -72,20 +78,6 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     setEnemyBattalions,
     calculateInitialHealth,
   } = useBattleInitialization();
-
-  // Use the state machine instead of local countdown state
-  const {
-    phase,
-    countdown,
-    transitionTo,
-    startBattle,
-    endBattle
-  } = useBattleStateMachine(
-    deploymentOpacity,
-    battalionOpacity,
-    networkOpacity,
-    resultsOpacity
-  );
 
   const [timeRemaining, setTimeRemaining] = useState(20);
   const timerRef = useRef<NodeJS.Timeout>();

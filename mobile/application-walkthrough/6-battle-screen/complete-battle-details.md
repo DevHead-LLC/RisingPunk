@@ -8,7 +8,8 @@ This document provides a comprehensive walkthrough of the battle system from bot
 **Logic Location:** `BattleScreen.tsx`, `useBattleInitialization.ts`, `useBattleAnimations.ts`, `BattalionDeploymentZone.tsx`, `BattalionSlot.tsx`, `BattleHeader.tsx`, `BattleNetwork.tsx`, `BattleOverlays.tsx`, `BattleUnits.tsx`, `CircleSlot.tsx`, `CountdownOverlay.tsx`, `NetworkLines.tsx`, `NetworkNode.tsx`, `networkConstants.ts`, `healthUtils.ts`, `useBattleStateMachine.ts`
 
 **Conflicting Files:**
-- **`BattleScreen.tsx` vs `useBattleAnimations.ts`**: Both manage animation transitions - BattleScreen calls animation functions while useBattleAnimations provides them
+- **`BattleScreen.tsx` vs `useBattleInitialization.ts`**: Both have logic for initializing node health and managing node state
+- **`BattleScreen.tsx` vs `useBattleStateMachine.ts`**: Both manage countdown state and phase transitions
 
 ### Step 1: Battle Screen Load
 **User Experience:** Battle screen appears with network nodes visible, user battalions on the left, enemy battalions on the right. Header shows "BATTLE STARTING" with a 20-second timer.
