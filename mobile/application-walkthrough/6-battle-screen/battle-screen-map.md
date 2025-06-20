@@ -16,7 +16,6 @@
   - [BattleResultsOverlay](#battleresultsoverlay)
   - [DataStream](#datastream)
   - [NetworkLines](#networklines)
-  - [RangeIndicator](#rangeindicator)
   - [BattalionBotSelector](#battalionbotselector)
   - [BattalionDeploymentZone](#battaliondeploymentzone)
   - [BattalionSlot](#battalionslot)
@@ -155,12 +154,6 @@ The Battle Screen is a complex real-time combat system where users engage in str
 - **Visual Elements**: Lines connecting nodes based on network topology
 - **Connections**: Predefined connection matrix for 9-node network
 
-### RangeIndicator
-- **Purpose**: Attack range visualization for battalions
-- **User Actions**: View attack ranges and targeting
-- **Visual Elements**: Range circles, targeting indicators
-- **Functionality**: Shows attack range for selected battalions
-
 ### BattalionBotSelector
 - **Purpose**: Bot selection interface for battalion configuration
 - **User Actions**: Select bot types and quantities for battalions
@@ -218,12 +211,10 @@ The Battle Screen is a complex real-time combat system where users engage in str
 6. Battalions targeting captured nodes find new targets
 
 ### Combat System
-1. Battalions move along network connections
-2. Battalions attack enemy battalions in range
-3. Damage calculations reduce battalion health
-4. Health bars update in real-time
-5. Destroyed battalions disappear from battlefield
-6. Loss points accumulate for victory calculation
+- **useBattleMovementAndAttacks Hook**: Handles combat calculations, damage, and battalion movement
+- **Damage Calculation**: Base damage × battalion quantity
+- **Attack Intervals**: 1-second attack cycles with damage application
+- **Target Management**: Automatic target selection and switching
 
 ### Battle Completion
 1. Timer reaches 0 seconds
@@ -412,7 +403,7 @@ The Battle Screen is a complex real-time combat system where users engage in str
 - **State Management**: Centralized state for all battle components
 
 ### Combat System
-- **useBattleCombat Hook**: Handles combat calculations and damage
+- **useBattleMovementAndAttacks Hook**: Handles combat calculations, damage, and battalion movement
 - **Damage Calculation**: Base damage × battalion quantity
 - **Attack Intervals**: 1-second attack cycles with damage application
 - **Target Management**: Automatic target selection and switching
