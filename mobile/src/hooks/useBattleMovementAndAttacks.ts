@@ -251,6 +251,21 @@ export const useBattleMovementAndAttacks = (
     }
     // --- END: Minimal Pre-Movement Target Validation Test ---
     
+    // --- START: Minimal Pre-Movement Range Check Test ---
+    // Check if battalion is already in attack range before any movement calculations
+    const currentPos = getAnimatedPosition(battalion.position);
+    const dx = target.position.x - currentPos.x;
+    const dy = target.position.y - currentPos.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const range = BOT_CATEGORIES[battalion.type].stats.range * RANGE_MULTIPLIER;
+    
+    if (distance <= range) {
+      debugLog(`[Pre-Movement Range Check] ${battalionId} - Already in range (${distance.toFixed(1)} <= ${range.toFixed(1)}), starting attacks immediately`);
+      setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
+      return;
+    }
+    // --- END: Minimal Pre-Movement Range Check Test ---
+    
     // --- START: Minimal Path Testing ---
     // Only for node targets, try using the calculated path
     if (target.type === 'node') {
@@ -285,18 +300,17 @@ export const useBattleMovementAndAttacks = (
     }
     // --- END: Minimal Path Testing ---
     
-    const currentPos = getAnimatedPosition(battalion.position);
-    const dx = target.position.x - currentPos.x;
-    const dy = target.position.y - currentPos.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
+    // Recalculate distance and direction after potential target position updates
+    const updatedDx = target.position.x - currentPos.x;
+    const updatedDy = target.position.y - currentPos.y;
+    const updatedDistance = Math.sqrt(updatedDx * updatedDx + updatedDy * updatedDy);
     
-    if (isNaN(distance) || distance === 0) {
+    if (isNaN(updatedDistance) || updatedDistance === 0) {
       return;
     }
 
-    const range = BOT_CATEGORIES[battalion.type].stats.range * RANGE_MULTIPLIER;
-    const directionX = dx / distance;
-    const directionY = dy / distance;
+    const directionX = updatedDx / updatedDistance;
+    const directionY = updatedDy / updatedDistance;
     
     // Calculate movement distance based on target type
     let moveDistance: number;
@@ -304,14 +318,14 @@ export const useBattleMovementAndAttacks = (
       // --- START: Minimal Range-Based Movement Test ---
       // For nodes, move to attack range, not to the center
       const optimalDistance = range; // We want to be at our attack range from the node
-      if (distance <= range) {
+      if (updatedDistance <= range) {
         // Already in range, don't move
         moveDistance = 0;
-        debugLog(`[Range Movement] ${battalionId} - Already in range (${distance.toFixed(1)} <= ${range.toFixed(1)}), not moving`);
+        debugLog(`[Range Movement] ${battalionId} - Already in range (${updatedDistance.toFixed(1)} <= ${range.toFixed(1)}), not moving`);
       } else {
         // Move to our attack range from the node
-        moveDistance = distance - optimalDistance;
-        debugLog(`[Range Movement] ${battalionId} - Moving to range: distance=${distance.toFixed(1)}, range=${range.toFixed(1)}, moveDistance=${moveDistance.toFixed(1)}`);
+        moveDistance = updatedDistance - optimalDistance;
+        debugLog(`[Range Movement] ${battalionId} - Moving to range: distance=${updatedDistance.toFixed(1)}, range=${range.toFixed(1)}, moveDistance=${moveDistance.toFixed(1)}`);
       }
       // --- END: Minimal Range-Based Movement Test ---
     } else {
@@ -327,11 +341,11 @@ export const useBattleMovementAndAttacks = (
       const optimalDistance = range; // We want to be at our attack range from the enemy
       
       // If the enemy is too close (within our range), we don't need to move
-      if (distance <= range) {
+      if (updatedDistance <= range) {
         moveDistance = 0;
       } else {
         // Move to our attack range from the enemy
-        moveDistance = distance - optimalDistance;
+        moveDistance = updatedDistance - optimalDistance;
       }
     }
     
@@ -342,7 +356,7 @@ export const useBattleMovementAndAttacks = (
     }
 
     // If we're already in range but the moveDistance calculation is wrong, start attacking anyway
-    if (distance <= range) {
+    if (updatedDistance <= range) {
       setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
       return;
     }
