@@ -56,8 +56,8 @@ export const BattleUnits = React.memo(({
             
             return (
               <AnimatedBattalion
-                key={`user-${battalion.nodeIndex}`}
-                ref={el => battalionRefs.current[`user-${battalion.nodeIndex}`] = el}
+                key={`user-${index}`}
+                ref={el => battalionRefs.current[`user-${battalion.type}-${index}`] = el}
                 type={battalion.type}
                 quantity={battalion.quantity}
                 position={battalion.position}
@@ -77,8 +77,8 @@ export const BattleUnits = React.memo(({
             
             return (
               <AnimatedBattalion
-                key={`enemy-${battalion.nodeIndex}`}
-                ref={el => battalionRefs.current[`enemy-${battalion.nodeIndex}`] = el}
+                key={`enemy-${index}`}
+                ref={el => battalionRefs.current[`enemy-${battalion.type}-${index}`] = el}
                 type={battalion.type}
                 quantity={battalion.quantity}
                 position={battalion.position}

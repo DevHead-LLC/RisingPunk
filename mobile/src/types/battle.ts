@@ -18,6 +18,8 @@ export interface BattalionPosition {
   currentHealth?: number;
   targetNode?: number;
   mark: number;
+  remainingPath?: number[]; // For path following logic
+  finalTarget?: number; // For path following logic
 }
 
 export type BattleTarget = {
