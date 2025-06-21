@@ -67,12 +67,13 @@
 - `useBattleMovementAndAttacks.ts` - `moveBattalionAlongPath` needs to move segment by segment
 **Status**: Minimal test implemented - path following logic with remainingPath and finalTarget properties
 
-### 6. Removed Critical Target Validation Logic
+### 6. Removed Critical Target Validation Logic ✅ TESTED
 **Issue**: Removed the original target validation that checked `node.controlState !== 'neutral'` before movement
 **Impact**: Battalions move toward captured nodes because validation only happens after reaching the node
 **Evidence**: Old code had validation before movement, new code only validates after reaching target
 **Files Affected**: 
 - `useBattleMovementAndAttacks.ts` - Removed pre-movement target validation
+**Status**: Tested - Added minimal pre-movement target validation test. No validation errors in logs, battalions properly retarget when nodes are captured.
 
 ### 7. Removed Range-Based Movement Logic
 **Issue**: Removed the original logic that calculated optimal attack range positions and movement distances
