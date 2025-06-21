@@ -240,6 +240,17 @@ export const useBattleMovementAndAttacks = (
 
     if (!target || !target.position) return;
     
+    // --- START: Minimal Pre-Movement Target Validation Test ---
+    // Check target validity before any movement or path calculation
+    if (target.type === 'node') {
+      const targetNode = nodes[target.index];
+      if (targetNode.controlState !== 'neutral') {
+        debugLog(`[Pre-Movement Validation] ${battalionId} - Target node ${target.index} is not neutral (${targetNode.controlState}), aborting movement`);
+        return;
+      }
+    }
+    // --- END: Minimal Pre-Movement Target Validation Test ---
+    
     // --- START: Minimal Path Testing ---
     // Only for node targets, try using the calculated path
     if (target.type === 'node') {
