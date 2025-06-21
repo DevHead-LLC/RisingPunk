@@ -75,12 +75,13 @@
 - `useBattleMovementAndAttacks.ts` - Removed pre-movement target validation
 **Status**: Tested - Added minimal pre-movement target validation test. No validation errors in logs, battalions properly retarget when nodes are captured.
 
-### 7. Removed Range-Based Movement Logic
+### 7. Removed Range-Based Movement Logic ✅ TESTED
 **Issue**: Removed the original logic that calculated optimal attack range positions and movement distances
 **Impact**: Battalions move directly to node centers instead of stopping at attack range
 **Evidence**: Old code had `moveDistance = Math.max(0, distance - range)` logic
 **Files Affected**: 
 - `useBattleMovementAndAttacks.ts` - Removed range calculation and optimal positioning
+**Status**: Tested - Added minimal range-based movement test. Logs show proper range calculations: distance=103.0, range=75.0, moveDistance=28.0. Battalions now stop at attack range instead of node centers.
 
 ### 8. Removed Pre-Movement Attack Range Checks
 **Issue**: Removed the original logic that checked if battalion was already in range before moving
