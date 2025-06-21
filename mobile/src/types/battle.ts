@@ -1,5 +1,7 @@
 import { Animated } from 'react-native';
 
+export type Path = number[];
+
 export enum BattalionType {
   GUARDIAN = 'guardian',
   PHREAK = 'phreak',
@@ -23,6 +25,7 @@ export type BattleTarget = {
   index: number;
   distance: number;
   position: { x: number; y: number };
+  path?: Path;
 };
 
 export type BattleNode = {

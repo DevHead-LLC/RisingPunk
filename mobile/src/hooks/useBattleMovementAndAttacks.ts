@@ -24,9 +24,10 @@ import {
   createAttackIntervalKey,
   sortBattalionsByPriority
 } from '../utils/battleUtils';
+import { findShortestPaths, reconstructPath } from '../utils/pathfinding';
 
 // Debug flag - set to false to disable all debugging
-const DEBUG_BATTLE = false;
+const DEBUG_BATTLE = true;
 
 // Debug function
 const debugLog = (message: string) => {
@@ -191,14 +192,7 @@ export const useBattleMovementAndAttacks = (
       .filter(target => !isNaN(target.distance))
       .sort((a, b) => a.distance - b.distance);
     
-    if (validTargets.length > 0) {
-      const bestTarget = validTargets[0];
-      battalion.targetNode = bestTarget.index;
-      return [bestTarget];
-    }
-    
-    battalion.targetNode = undefined;
-    return [];
+    return validTargets;
   }, [nodes, getAnimatedPosition]);
 
   // Movement with improved validation
@@ -870,6 +864,12 @@ export const useBattleMovementAndAttacks = (
     
     if (targets.length > 0) {
       const target = targets[0];
+      
+      // --- START: Pathfinding Verification ---
+      const { distances, previousNodes } = findShortestPaths(battalion.nodeIndex, nodesRef.current);
+      const path = reconstructPath(battalion.nodeIndex, target.index, previousNodes);
+      debugLog(`[Pathfinder] For ${battalionId} to target ${target.type} ${target.index}: Path = [${path.join(' -> ')}], Distance = ${distances[target.index].toFixed(2)}`);
+      // --- END: Pathfinding Verification ---
       
       // Set cooldown
       retargetCooldowns.current[battalionId] = now;
