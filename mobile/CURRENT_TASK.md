@@ -7,6 +7,10 @@
 2. DO NOT delete pieces of code outside of the current task. If something needs to be REPLACED, that's ok. Otherwise DO NOT delete code in files outside of what we're doing.
 3. ALL battalions in this effort have the same goals: capture neutral nodes and/or defeat opposing team battalions. That's it. They all have different stats such as attack power, defense, speed, and attack range. Otherwise their tasks are identical.
 4. Move SMALL. SMALL actions. We're going to achieve the minimum possible testable solution, which I will manually test. So we only do what we can verify through a console log or through my manual visual test in the smallest possible changes to verify.
+5. **ALWAYS update the current task file** whenever debug logs are added - this is mandatory
+6. **Be direct about what works and doesn't** - don't sugarcoat issues, be honest about problems
+7. **Keep things simple** - do exactly as requested, no more, no less
+8. **If user appears to be struggling, help identify where prompts or additional information might help improve responses**
 
 ## CURRENT TASK
 **Goal**: Get the pathfinder working so battalions follow the network lines
