@@ -99,3 +99,15 @@
 - `useBattleMovementAndAttacks.ts` - Simplified targeting logic may break battalion combat
 **Status**: Tested - Added minimal battalion targeting test. Logs show battalion targeting working correctly: "[Battalion Targeting] enemy-phreak-2 - Moving directly to enemy battalion 1 at position (313.2, 256.9)". Battalion vs battalion combat is functioning properly with direct movement to target positions.
 
+### 10. Network Path Following Not Working - Straight Line Movement ✅ TESTED
+**Issue**: Battalions are still moving in straight lines instead of following network paths, even though path calculation is working
+**Impact**: Visual movement doesn't follow network connections, making the game look unrealistic
+**Evidence**: 
+- Path calculation works: "[Pathfinder] For user-breacher-0 to target node 3: Path = [0 -> 3]"
+- Movement diagnostic shows straight line movement: "Current pos: (269.7, 170.9) -> Target pos: (297.9, 165.3)"
+- Path information is available: "Path: [3]" but not being used for movement
+**Root Cause**: The movement calculation uses straight line direction vectors instead of following the calculated network paths
+**Files Affected**: 
+- `useBattleMovementAndAttacks.ts` - Movement calculation doesn't use network paths
+**Status**: Tested - Added diagnostic test to understand movement calculations. Path calculation works but movement uses straight line vectors instead of network paths.
+

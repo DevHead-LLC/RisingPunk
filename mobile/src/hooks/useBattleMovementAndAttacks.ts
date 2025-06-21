@@ -372,6 +372,13 @@ export const useBattleMovementAndAttacks = (
       y: currentPos.y + (directionY * moveDistance)
     };
     
+    // --- START: Minimal Movement Diagnostic Test ---
+    // Log the movement calculations to understand why paths aren't being followed
+    if (target.type === 'node' && battalion.remainingPath && battalion.remainingPath.length > 0) {
+      debugLog(`[Movement Diagnostic] ${battalionId} - Current pos: (${currentPos.x.toFixed(1)}, ${currentPos.y.toFixed(1)}) -> Target pos: (${rangePosition.x.toFixed(1)}, ${rangePosition.y.toFixed(1)}) - Path: [${battalion.remainingPath.join(' -> ')}]`);
+    }
+    // --- END: Minimal Movement Diagnostic Test ---
+    
     cleanupBattalion(battalionId);
 
     const speed = BOT_CATEGORIES[battalion.type].stats.speed;
