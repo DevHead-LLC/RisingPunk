@@ -297,6 +297,12 @@ export const useBattleMovementAndAttacks = (
         }
       }
       // --- END: Minimal Path Following Test ---
+    } else if (target.type === 'battalion') {
+      // --- START: Minimal Battalion Targeting Test ---
+      // For battalion targets, use direct movement to target position
+      // No pathfinding needed since we're moving directly to the enemy battalion
+      debugLog(`[Battalion Targeting] ${battalionId} - Moving directly to enemy battalion ${target.index} at position (${target.position.x.toFixed(1)}, ${target.position.y.toFixed(1)})`);
+      // --- END: Minimal Battalion Targeting Test ---
     }
     // --- END: Minimal Path Testing ---
     
