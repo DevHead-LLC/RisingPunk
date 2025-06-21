@@ -91,10 +91,11 @@
 - `useBattleMovementAndAttacks.ts` - Removed pre-movement range validation
 **Status**: Tested - Added minimal pre-movement range check test. Logs show battalions starting attacks immediately when in range: "Already in range (135.0 <= 135.0), starting attacks immediately". No unnecessary movement when already positioned correctly.
 
-### 9. Battalion vs Node Targeting Logic Confusion
+### 9. Battalion vs Node Targeting Logic Confusion ✅ TESTED
 **Issue**: Path-based movement treats all targets as nodes, but original logic distinguished between node and battalion targets
 **Impact**: Battalion vs battalion combat may not work correctly
 **Evidence**: Old code had separate logic for `target.type === 'node'` vs `target.type === 'battalion'`
 **Files Affected**: 
 - `useBattleMovementAndAttacks.ts` - Simplified targeting logic may break battalion combat
+**Status**: Tested - Added minimal battalion targeting test. Logs show battalion targeting working correctly: "[Battalion Targeting] enemy-phreak-2 - Moving directly to enemy battalion 1 at position (313.2, 256.9)". Battalion vs battalion combat is functioning properly with direct movement to target positions.
 
