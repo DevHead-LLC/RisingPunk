@@ -301,8 +301,19 @@ export const useBattleMovementAndAttacks = (
     // Calculate movement distance based on target type
     let moveDistance: number;
     if (target.type === 'node') {
-      // For nodes, move to attack range
-      moveDistance = Math.max(0, distance - range);
+      // --- START: Minimal Range-Based Movement Test ---
+      // For nodes, move to attack range, not to the center
+      const optimalDistance = range; // We want to be at our attack range from the node
+      if (distance <= range) {
+        // Already in range, don't move
+        moveDistance = 0;
+        debugLog(`[Range Movement] ${battalionId} - Already in range (${distance.toFixed(1)} <= ${range.toFixed(1)}), not moving`);
+      } else {
+        // Move to our attack range from the node
+        moveDistance = distance - optimalDistance;
+        debugLog(`[Range Movement] ${battalionId} - Moving to range: distance=${distance.toFixed(1)}, range=${range.toFixed(1)}, moveDistance=${moveDistance.toFixed(1)}`);
+      }
+      // --- END: Minimal Range-Based Movement Test ---
     } else {
       // For enemy battalions, we need to consider both attack ranges
       // Get the enemy battalion's attack range
