@@ -233,6 +233,26 @@ export const useBattleMovementAndAttacks = (
 
     if (!target || !target.position) return;
     
+    // --- START: Minimal Path Testing ---
+    // Only for node targets, try using the calculated path
+    if (target.type === 'node') {
+      const { distances, previousNodes } = findShortestPaths(battalion.nodeIndex, nodes);
+      const path = reconstructPath(battalion.nodeIndex, target.index, previousNodes);
+      debugLog(`[Movement Test] ${battalionId} - Calculated path: [${path.join(' -> ')}]`);
+      
+      // If we have a valid path with more than 1 step, use the first step
+      if (path.length >= 2) {
+        const nextNodeIndex = path[1];
+        const nextNode = nodes[nextNodeIndex];
+        if (nextNode) {
+          debugLog(`[Movement Test] ${battalionId} - Moving to next node: ${nextNodeIndex}`);
+          // Use the next node's position instead of target position
+          target.position = { x: nextNode.x, y: nextNode.y };
+        }
+      }
+    }
+    // --- END: Minimal Path Testing ---
+    
     const currentPos = getAnimatedPosition(battalion.position);
     const dx = target.position.x - currentPos.x;
     const dy = target.position.y - currentPos.y;
