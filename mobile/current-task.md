@@ -83,12 +83,13 @@
 - `useBattleMovementAndAttacks.ts` - Removed range calculation and optimal positioning
 **Status**: Tested - Added minimal range-based movement test. Logs show proper range calculations: distance=103.0, range=75.0, moveDistance=28.0. Battalions now stop at attack range instead of node centers.
 
-### 8. Removed Pre-Movement Attack Range Checks
+### 8. Removed Pre-Movement Attack Range Checks ✅ TESTED
 **Issue**: Removed the original logic that checked if battalion was already in range before moving
 **Impact**: Battalions may move unnecessarily when already in attack range
 **Evidence**: Old code had `if (distance <= range)` checks before movement
 **Files Affected**: 
 - `useBattleMovementAndAttacks.ts` - Removed pre-movement range validation
+**Status**: Tested - Added minimal pre-movement range check test. Logs show battalions starting attacks immediately when in range: "Already in range (135.0 <= 135.0), starting attacks immediately". No unnecessary movement when already positioned correctly.
 
 ### 9. Battalion vs Node Targeting Logic Confusion
 **Issue**: Path-based movement treats all targets as nodes, but original logic distinguished between node and battalion targets
