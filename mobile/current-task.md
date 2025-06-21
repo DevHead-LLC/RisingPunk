@@ -29,13 +29,13 @@
 
 ## Potential Problems
 
-### 1. Battalion ID Format Mismatch ✅ FIXED
+### 1. Battalion ID Format Mismatch ✅ FIXED & TESTED
 **Issue**: Changed battalion ref keys from `user-${battalion.nodeIndex}` to `user-${battalion.type}-${index}` but movement logic may still be using old format
 **Impact**: Battalion refs not found, attack animations and damage effects may not work
 **Files Affected**: 
 - `BattleUnits.tsx` - Changed ref key format
 - `useBattleMovementAndAttacks.ts` - May still reference old format in attack logic
-**Status**: Fixed - Using array index for React keys and type+index for ref keys to prevent duplicate keys
+**Status**: Fixed & Tested - Using array index for battalion ID generation to match ref key format. Logs show consistent IDs like `user-breacher-0`, `user-guardian-1`, etc.
 
 ### 2. Target Validation Logic Broken ✅ TESTED
 **Issue**: Path-based movement may have broken the target validation that prevents targeting captured nodes
@@ -53,11 +53,12 @@
 - `useBattleMovementAndAttacks.ts` - `moveBattalionAlongPath` moves to node coordinates directly
 **Status**: Minimal test implemented - using first step of calculated path for node targets
 
-### 4. Battalion Index Finding Logic
+### 4. Battalion Index Finding Logic ✅ TESTED
 **Issue**: Using `findIndex(b => b === battalion)` may not work reliably if battalion objects are recreated
 **Impact**: Wrong battalion IDs generated, causing ref mismatches and broken functionality
 **Files Affected**: 
 - `useBattleMovementAndAttacks.ts` - Modified battalion ID generation in multiple functions
+**Status**: Tested - Battalion ID generation using findIndex is working correctly. Logs show consistent IDs and no ref errors.
 
 ### 5. Path Following Logic Incomplete ✅ TESTED
 **Issue**: Path calculation works but actual movement doesn't follow the calculated path segments

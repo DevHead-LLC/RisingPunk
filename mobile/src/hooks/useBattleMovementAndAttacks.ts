@@ -203,7 +203,14 @@ export const useBattleMovementAndAttacks = (
     userBattalions?: BattalionPosition[],
     enemyBattalions?: BattalionPosition[]
   ): void => {
-    const battalionId = `${isUser ? 'user' : 'enemy'}-${battalion.type}-${battalion.nodeIndex}`;
+    // --- START: Minimal Battalion ID Fix Test ---
+    // Find the battalion's array index to generate consistent ID
+    const battalionArray = isUser ? (userBattalions || []) : (enemyBattalions || []);
+    const battalionIndex = battalionArray.findIndex(b => b === battalion);
+    const battalionId = battalionIndex >= 0 
+      ? `${isUser ? 'user' : 'enemy'}-${battalion.type}-${battalionIndex}`
+      : `${isUser ? 'user' : 'enemy'}-${battalion.type}-${battalion.nodeIndex}`; // fallback
+    // --- END: Minimal Battalion ID Fix Test ---
     
     // Check if battalion is destroyed
     if (battalion.quantity <= 0 || battalion.currentHealth <= 0) {
@@ -863,7 +870,14 @@ export const useBattleMovementAndAttacks = (
 
   // Strategic target selection with improved logic
   const findNewTarget = (battalion: BattalionPosition, isUser: boolean) => {
-    const battalionId = `${isUser ? 'user' : 'enemy'}-${battalion.type}-${battalion.nodeIndex}`;
+    // --- START: Minimal Battalion ID Fix Test ---
+    // Find the battalion's array index to generate consistent ID
+    const battalionArray = isUser ? battalionsRef.current.user : battalionsRef.current.enemy;
+    const battalionIndex = battalionArray.findIndex(b => b === battalion);
+    const battalionId = battalionIndex >= 0 
+      ? `${isUser ? 'user' : 'enemy'}-${battalion.type}-${battalionIndex}`
+      : `${isUser ? 'user' : 'enemy'}-${battalion.type}-${battalion.nodeIndex}`; // fallback
+    // --- END: Minimal Battalion ID Fix Test ---
     
     // Check cooldown
     const now = Date.now();
