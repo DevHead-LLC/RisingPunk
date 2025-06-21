@@ -1,6 +1,7 @@
 # Active Task
 
 - Pathfinder Movement Logic
+- **Current Focus**: Testing minimal path-based movement changes to identify issues
 
 ## Associated Logic
 
@@ -42,12 +43,13 @@
 **Files Affected**: 
 - `useBattleMovementAndAttacks.ts` - Modified `moveBattalionAlongPath` function
 
-### 3. Network Line Movement Not Implemented
+### 3. Network Line Movement Not Implemented ✅ TESTED
 **Issue**: Path-based movement calculates paths but doesn't actually move battalions along network lines
 **Impact**: Battalions move in straight lines instead of following network connections
 **Evidence**: Movement logs show path calculation but visual movement is off-network
 **Files Affected**: 
 - `useBattleMovementAndAttacks.ts` - `moveBattalionAlongPath` moves to node coordinates directly
+**Status**: Minimal test implemented - using first step of calculated path for node targets
 
 ### 4. Battalion Index Finding Logic
 **Issue**: Using `findIndex(b => b === battalion)` may not work reliably if battalion objects are recreated
