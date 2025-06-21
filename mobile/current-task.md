@@ -29,12 +29,13 @@
 
 ## Potential Problems
 
-### 1. Battalion ID Format Mismatch
+### 1. Battalion ID Format Mismatch ✅ FIXED
 **Issue**: Changed battalion ref keys from `user-${battalion.nodeIndex}` to `user-${battalion.type}-${index}` but movement logic may still be using old format
 **Impact**: Battalion refs not found, attack animations and damage effects may not work
 **Files Affected**: 
 - `BattleUnits.tsx` - Changed ref key format
 - `useBattleMovementAndAttacks.ts` - May still reference old format in attack logic
+**Status**: Fixed - Using array index for React keys and type+index for ref keys to prevent duplicate keys
 
 ### 2. Target Validation Logic Broken ✅ TESTED
 **Issue**: Path-based movement may have broken the target validation that prevents targeting captured nodes
@@ -58,11 +59,12 @@
 **Files Affected**: 
 - `useBattleMovementAndAttacks.ts` - Modified battalion ID generation in multiple functions
 
-### 5. Path Following Logic Incomplete
+### 5. Path Following Logic Incomplete ✅ TESTED
 **Issue**: Path calculation works but actual movement doesn't follow the calculated path segments
 **Impact**: Battalions jump between nodes instead of moving smoothly along network lines
 **Files Affected**: 
 - `useBattleMovementAndAttacks.ts` - `moveBattalionAlongPath` needs to move segment by segment
+**Status**: Minimal test implemented - path following logic with remainingPath and finalTarget properties
 
 ### 6. Removed Critical Target Validation Logic
 **Issue**: Removed the original target validation that checked `node.controlState !== 'neutral'` before movement

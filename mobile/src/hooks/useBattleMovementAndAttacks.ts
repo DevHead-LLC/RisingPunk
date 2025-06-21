@@ -248,6 +248,7 @@ export const useBattleMovementAndAttacks = (
       const path = reconstructPath(battalion.nodeIndex, target.index, previousNodes);
       debugLog(`[Movement Test] ${battalionId} - Calculated path: [${path.join(' -> ')}]`);
       
+      // --- START: Minimal Path Following Test ---
       // If we have a valid path with more than 1 step, use the first step
       if (path.length >= 2) {
         const nextNodeIndex = path[1];
@@ -256,8 +257,13 @@ export const useBattleMovementAndAttacks = (
           debugLog(`[Movement Test] ${battalionId} - Moving to next node: ${nextNodeIndex}`);
           // Use the next node's position instead of target position
           target.position = { x: nextNode.x, y: nextNode.y };
+          
+          // Store the remaining path for continuation
+          battalion.remainingPath = path.slice(1);
+          battalion.finalTarget = target.index;
         }
       }
+      // --- END: Minimal Path Following Test ---
     }
     // --- END: Minimal Path Testing ---
     
@@ -354,6 +360,43 @@ export const useBattleMovementAndAttacks = (
           }
           return;
         }
+        
+        // --- START: Path Following Continuation Test ---
+        // Check if we have a remaining path to follow
+        if (battalion.remainingPath && battalion.remainingPath.length > 0 && battalion.finalTarget !== undefined) {
+          const nextNodeIndex = battalion.remainingPath[0];
+          const nextNode = nodes[nextNodeIndex];
+          
+          if (nextNode) {
+            debugLog(`[Path Following] ${battalionId} - Continuing to next node: ${nextNodeIndex}`);
+            
+            // Update battalion position to the current node
+            battalion.nodeIndex = target.index;
+            
+            // Remove the current node from remaining path
+            battalion.remainingPath = battalion.remainingPath.slice(1);
+            
+            // Move to the next node in the path
+            const nextTarget = {
+              type: 'node' as const,
+              index: nextNodeIndex,
+              distance: 0,
+              position: { x: nextNode.x, y: nextNode.y }
+            };
+            
+            moveBattalionAlongPath(battalion, nextTarget, isUser, userBattalions, enemyBattalions);
+            return;
+          }
+        }
+        
+        // If we've reached the final target, clear path data and start attacking
+        if (battalion.finalTarget !== undefined && target.index === battalion.finalTarget) {
+          debugLog(`[Path Following] ${battalionId} - Reached final target: ${battalion.finalTarget}`);
+          battalion.remainingPath = undefined;
+          battalion.finalTarget = undefined;
+        }
+        // --- END: Path Following Continuation Test ---
+        
         // Continue attacking neutral node
         setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
       } else if (target.type === 'battalion') {
