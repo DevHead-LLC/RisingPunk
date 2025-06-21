@@ -236,6 +236,14 @@ export const useBattleMovementAndAttacks = (
     // --- START: Minimal Path Testing ---
     // Only for node targets, try using the calculated path
     if (target.type === 'node') {
+      // --- START: Minimal Target Validation Test ---
+      const targetNode = nodes[target.index];
+      if (targetNode.controlState !== 'neutral') {
+        debugLog(`[Target Validation] ${battalionId} - Target node ${target.index} is no longer neutral (${targetNode.controlState}), aborting movement`);
+        return;
+      }
+      // --- END: Minimal Target Validation Test ---
+      
       const { distances, previousNodes } = findShortestPaths(battalion.nodeIndex, nodes);
       const path = reconstructPath(battalion.nodeIndex, target.index, previousNodes);
       debugLog(`[Movement Test] ${battalionId} - Calculated path: [${path.join(' -> ')}]`);

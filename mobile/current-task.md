@@ -36,12 +36,13 @@
 - `BattleUnits.tsx` - Changed ref key format
 - `useBattleMovementAndAttacks.ts` - May still reference old format in attack logic
 
-### 2. Target Validation Logic Broken
+### 2. Target Validation Logic Broken ✅ TESTED
 **Issue**: Path-based movement may have broken the target validation that prevents targeting captured nodes
 **Impact**: Battalions continue moving toward already captured nodes instead of finding new targets
 **Evidence**: Logs show "No valid targets found" but battalions still move to captured nodes
 **Files Affected**: 
 - `useBattleMovementAndAttacks.ts` - Modified `moveBattalionAlongPath` function
+**Status**: Minimal test implemented - checking target node state before movement for node targets
 
 ### 3. Network Line Movement Not Implemented ✅ TESTED
 **Issue**: Path-based movement calculates paths but doesn't actually move battalions along network lines
