@@ -36,6 +36,7 @@ const calculateLossPoints = (losses: BattalionLosses) => {
 };
 
 export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) => {
+  // CORRECTION_COMMENT: This screen should handle battles between a human player and an AI opponent.
   // Use the state machine as the single source of truth for animations and state
   const {
     // Animation values
@@ -91,6 +92,11 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       return newLosses;
     });
   };
+
+  // CLARIFICATION_COMMENT: The movement and targeting logic in the useBattleMovementAndAttacks hook must respect node ownership.
+  // Once a node is owned (not neutral), it cannot be targeted by anyone nor can it be captured by the opposing party.
+  // KEY_FEATURE_COMMENT: Battalions SHOULD move according to pathfinding. Currently, initial node targeting is random.
+  // Upon retargeting, they should follow pathfinding logic within the hook.
 
   // IMPORTANT: Use the new battle movement and attacks hook
   const {
@@ -163,6 +169,8 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     }, 0);
   };
 
+  // MAIN_PURPOSE_COMMENT: The main purpose of the battle is to defeat enemy battalions.
+  // Victory is determined by which side has sustained fewer losses when the battle ends.
   const determineVictor = () => {
     // Calculate loss points for each side
     const userPoints = calculateTotalLossPoints('user');
@@ -176,6 +184,8 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   };
 
   const handleBattleComplete = () => {
+    // KEY_FEATURE_COMMENT: The battle SHOULD also end if all of one side's battalions are defeated.
+    // This is not yet implemented. The battle currently only ends when the timer runs out.
     const winner = determineVictor();
     setBattleWinner(winner);
     endBattle(winner);
@@ -190,6 +200,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     if (countdown === 3) {
       // Use the centralized health calculation from useBattleInitialization
       const nodeHealth = calculateInitialHealth();
+      // CLARIFICATION_COMMENT: Users "own" their initial nodes (left side), and enemies "own" theirs (right side). This initial ownership is permanent.
       // Initialize all nodes with health and control progress
       setNodes(prevNodes => prevNodes.map(node => ({
         ...node,
@@ -202,6 +213,8 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   }, [countdown, userBattalions, enemyBattalions, calculateInitialHealth]);
 
   const handleNodeControlChange = (nodeIndex: number, newState: 'user' | 'enemy') => {
+    // CLARIFICATION_COMMENT: When a neutral node is captured, ownership becomes permanent for the rest of the battle.
+    // Owned nodes cannot be targeted or controlled by the opposing party.
     // Update node control state
     setControlledNodes(prev => {
       const newControlled = newState === 'user' 
