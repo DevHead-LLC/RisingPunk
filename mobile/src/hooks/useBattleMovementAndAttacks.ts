@@ -4,7 +4,7 @@ import { BOT_CATEGORIES } from '../screens/DigitalBarracksScreen';
 import { checkRangeIntersection } from '../utils/battleCalculator';
 import { BattleNode, BattalionPosition, BattleTarget } from '../types/battle';
 import { BattalionRef } from '../components/battle/AnimatedBattalion';
-import { NETWORK_CONNECTIONS, getConnectedNodes } from '../utils/networkConstants';
+import { getConnectedNodes } from '../utils/networkConstants';
 import { updateBattalionHealth } from '../utils/healthUtils';
 import {
   RETARGET_COOLDOWN,
