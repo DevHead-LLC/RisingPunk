@@ -301,6 +301,20 @@ export const useBattleMovementAndAttacks = (
       
       debugLog(`[Movement Test] ${battalionId} - Calculated path: [${path.join(' -> ')}]`);
       
+      // --- START: Step 2 - Enforce Pathfinding for Node Targets ---
+      // Validate that we have a valid path before allowing any movement
+      if (path.length === 0) {
+        debugLog(`[Step 2 Validation] ${battalionId} - No valid path to target node ${target.index}, aborting movement`);
+        return;
+      }
+      
+      if (path.length === 1) {
+        debugLog(`[Step 2 Validation] ${battalionId} - Already at target node ${target.index}, starting attacks immediately`);
+        setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
+        return;
+      }
+      // --- END: Step 2 - Enforce Pathfinding for Node Targets ---
+      
       // --- START: Minimal Path Following Test ---
       // If we have a valid path with more than 1 step, use the first step
       if (path.length >= 2) {
@@ -316,6 +330,10 @@ export const useBattleMovementAndAttacks = (
           debugLog(`[Movement Test] ${battalionId} - Moving to next node: ${nextNodeIndex}`);
           // Use the next node's position instead of target position
           target.position = { x: nextNode.x, y: nextNode.y };
+          
+          // --- START: Step 2 - Verify Pathfinding Target Position ---
+          debugLog(`[Step 2 Target Position] ${battalionId} - Using pathfinding target: (${target.position.x.toFixed(1)}, ${target.position.y.toFixed(1)}) instead of original target`);
+          // --- END: Step 2 - Verify Pathfinding Target Position ---
           
           // Store the remaining path for continuation
           battalion.remainingPath = path.slice(1);
@@ -333,11 +351,21 @@ export const useBattleMovementAndAttacks = (
       }
       // --- END: Minimal Path Following Test ---
     } else if (target.type === 'battalion') {
-      // --- START: Minimal Battalion Targeting Test ---
-      // For battalion targets, use direct movement to target position
-      // No pathfinding needed since we're moving directly to the enemy battalion
-      debugLog(`[Battalion Targeting] ${battalionId} - Moving directly to enemy battalion ${target.index} at position (${target.position.x.toFixed(1)}, ${target.position.y.toFixed(1)})`);
-      // --- END: Minimal Battalion Targeting Test ---
+      // --- START: Step 2 - Battalion Targeting Pathfinding Test ---
+      // Calculate path to enemy battalion's node position
+      const enemyBatts = isUser ? enemyBattalions : userBattalions;
+      const enemyBattalion = enemyBatts![target.index];
+      const targetNodeIndex = enemyBattalion.nodeIndex;
+      
+      debugLog(`[Step 2 Battalion Pathfinding] ${battalionId} - Calculating path to enemy battalion ${target.index} at node ${targetNodeIndex}`);
+      
+      // --- START: Step 2 - Actual Battalion Pathfinding Implementation ---
+      const { distances, previousNodes } = findShortestPaths(battalion.nodeIndex, nodes);
+      const battalionPath = reconstructPath(battalion.nodeIndex, targetNodeIndex, previousNodes);
+      
+      debugLog(`[Step 2 Battalion Path] ${battalionId} - Calculated path: [${battalionPath.join(' -> ')}]`);
+      // --- END: Step 2 - Actual Battalion Pathfinding Implementation ---
+      // --- END: Step 2 - Battalion Targeting Pathfinding Test ---
     }
     // --- END: Minimal Path Testing ---
     
@@ -345,6 +373,10 @@ export const useBattleMovementAndAttacks = (
     const updatedDx = target.position.x - currentPos.x;
     const updatedDy = target.position.y - currentPos.y;
     const updatedDistance = Math.sqrt(updatedDx * updatedDx + updatedDy * updatedDy);
+    
+    // --- START: Step 2 - Verify Range Movement Uses Pathfinding Target ---
+    debugLog(`[Step 2 Range Movement] ${battalionId} - Using target position: (${target.position.x.toFixed(1)}, ${target.position.y.toFixed(1)}) for range calculations`);
+    // --- END: Step 2 - Verify Range Movement Uses Pathfinding Target ---
     
     if (isNaN(updatedDistance) || updatedDistance === 0) {
       return;
