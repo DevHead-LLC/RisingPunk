@@ -277,8 +277,28 @@ export const useBattleMovementAndAttacks = (
       }
       // --- END: Minimal Target Validation Test ---
       
+      // --- START: Step 1 - Pathfinding Validation Logging ---
+      debugLog(`[Pathfinding Start] ${battalionId} - Starting pathfinding from node ${battalion.nodeIndex} to target node ${target.index}`);
+      debugLog(`[Pathfinding Input] ${battalionId} - Current node: ${battalion.nodeIndex}, Target node: ${target.index}, Total nodes: ${nodes.length}`);
+      // --- END: Step 1 - Pathfinding Validation Logging ---
+      
       const { distances, previousNodes } = findShortestPaths(battalion.nodeIndex, nodes);
+      
+      // --- START: Step 1 - Pathfinding Validation Logging ---
+      debugLog(`[Pathfinding Results] ${battalionId} - Distances calculated for all nodes: ${Object.keys(distances).length} nodes`);
+      debugLog(`[Pathfinding Distance] ${battalionId} - Distance to target ${target.index}: ${distances[target.index]?.toFixed(2) || 'INFINITY'}`);
+      // --- END: Step 1 - Pathfinding Validation Logging ---
+      
       const path = reconstructPath(battalion.nodeIndex, target.index, previousNodes);
+      
+      // --- START: Step 1 - Pathfinding Validation Logging ---
+      debugLog(`[Path Reconstruction] ${battalionId} - Reconstructed path: [${path.join(' -> ')}]`);
+      debugLog(`[Path Validation] ${battalionId} - Path length: ${path.length}, Valid path: ${path.length > 0 ? 'YES' : 'NO'}`);
+      if (path.length > 0) {
+        debugLog(`[Path Details] ${battalionId} - Start: ${path[0]}, End: ${path[path.length - 1]}, Steps: ${path.length - 1}`);
+      }
+      // --- END: Step 1 - Pathfinding Validation Logging ---
+      
       debugLog(`[Movement Test] ${battalionId} - Calculated path: [${path.join(' -> ')}]`);
       
       // --- START: Minimal Path Following Test ---
@@ -287,6 +307,12 @@ export const useBattleMovementAndAttacks = (
         const nextNodeIndex = path[1];
         const nextNode = nodes[nextNodeIndex];
         if (nextNode) {
+          // --- START: Step 1 - Pathfinding Validation Logging ---
+          debugLog(`[Path Following Decision] ${battalionId} - Valid path found, moving to next node: ${nextNodeIndex}`);
+          debugLog(`[Path Following Details] ${battalionId} - Next node position: (${nextNode.x.toFixed(1)}, ${nextNode.y.toFixed(1)})`);
+          debugLog(`[Path Following Remaining] ${battalionId} - Remaining path after next node: [${path.slice(2).join(' -> ')}]`);
+          // --- END: Step 1 - Pathfinding Validation Logging ---
+          
           debugLog(`[Movement Test] ${battalionId} - Moving to next node: ${nextNodeIndex}`);
           // Use the next node's position instead of target position
           target.position = { x: nextNode.x, y: nextNode.y };
@@ -295,6 +321,15 @@ export const useBattleMovementAndAttacks = (
           battalion.remainingPath = path.slice(1);
           battalion.finalTarget = target.index;
         }
+      } else {
+        // --- START: Step 1 - Pathfinding Validation Logging ---
+        debugLog(`[Path Following Decision] ${battalionId} - No valid path found or already at target, path length: ${path.length}`);
+        if (path.length === 1) {
+          debugLog(`[Path Following Details] ${battalionId} - Already at target node ${target.index}`);
+        } else if (path.length === 0) {
+          debugLog(`[Path Following Details] ${battalionId} - No path exists to target node ${target.index}`);
+        }
+        // --- END: Step 1 - Pathfinding Validation Logging ---
       }
       // --- END: Minimal Path Following Test ---
     } else if (target.type === 'battalion') {
@@ -532,7 +567,6 @@ export const useBattleMovementAndAttacks = (
             if (newTargets.length > 0) {
               moveBattalionAlongPath(battalion, newTargets[0], isUser, userBattalions, enemyBattalions);
             }
-            return;
           }
 
           // Apply damage
