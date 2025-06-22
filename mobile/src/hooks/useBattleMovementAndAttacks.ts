@@ -19,7 +19,6 @@ import {
   calculateAttackInterval,
   calculateAttackRange,
   calculateTotalDamage,
-  getAvailableNodes,
   createBattalionKey,
   createAttackIntervalKey,
   sortBattalionsByPriority
@@ -180,8 +179,8 @@ export const useBattleMovementAndAttacks = (
       }
     });
 
-    // If no neutral nodes found and not a guardian, check enemy battalions
-    if (allTargets.length === 0 && battalion.type !== 'guardian') {
+    // If no neutral nodes found, check enemy battalions
+    if (allTargets.length === 0) {
       const enemyBatts = isUser ? enemyBattalions : userBattalions;
       
       enemyBatts.forEach((enemyBattalion, index) => {
@@ -778,17 +777,16 @@ export const useBattleMovementAndAttacks = (
 
       // Strategic target selection function
       const selectTargetNode = (battalion: BattalionPosition, isUser: boolean, targetedNodes: Set<number>) => {
-        let availableNodes = getAvailableNodes(battalion.nodeIndex);
+        let availableNodes = getConnectedNodes(battalion.nodeIndex);
         
-        // Filter out already targeted nodes unless it's a guardian supporting another unit
+        // Filter out already targeted nodes
         availableNodes = availableNodes.filter(nodeIndex => {
-          if (battalion.type === 'guardian') return true;
           return !targetedNodes.has(nodeIndex);
         });
 
         // If no untargeted nodes available, expand search
         if (availableNodes.length === 0) {
-          availableNodes = getAvailableNodes(battalion.nodeIndex);
+          availableNodes = getConnectedNodes(battalion.nodeIndex);
         }
 
         return availableNodes[Math.floor(Math.random() * availableNodes.length)];
@@ -996,7 +994,7 @@ export const useBattleMovementAndAttacks = (
     attackIntervals.current[intervalKey] = setInterval(performBattalionAttack, attackInterval);
   };
 
-  // Strategic target selection with improved logic
+  // Strategic target selection with unified logic
   const findNewTarget = (battalion: BattalionPosition, isUser: boolean) => {
     // --- START: Minimal Battalion ID Fix Test ---
     // Find the battalion's array index to generate consistent ID
@@ -1022,53 +1020,22 @@ export const useBattleMovementAndAttacks = (
       battalionsRef.current.enemy
     );
 
-    // Strategic target selection based on battalion type
+    // Unified target selection - all battalion types behave identically
     let targets: typeof allTargets = [];
     
-    if (battalion.type === 'guardian') {
-      // Guardians prioritize defending controlled nodes and capturing neutral nodes
-      
-      // First, check if battalion is already at a controlled node - if so, stay put
-      const currentNode = nodesRef.current[battalion.nodeIndex];
-      const isAtControlledNode = (isUser && currentNode.controlState === 'user') || 
-                                (!isUser && currentNode.controlState === 'enemy');
-      
-      // Guardians should still target neutral nodes even if they're at a controlled node
-      // Only stay put if there are no neutral nodes to capture
-      targets = allTargets.filter(target => {
-        if (target.type === 'node') {
-          const node = nodesRef.current[target.index];
-          // Target neutral nodes for capture
-          return node.controlState === 'neutral';
-        }
-        return false;
-      });
-      
-      // If no neutral nodes, find controlled nodes to defend
-      if (targets.length === 0) {
-        targets = allTargets.filter(target => {
-          if (target.type === 'node') {
-            const node = nodesRef.current[target.index];
-            return (isUser && node.controlState === 'user') || (!isUser && node.controlState === 'enemy');
-          }
-          return false;
-        });
+    // All battalions prioritize neutral nodes, then enemy battalions
+    targets = allTargets.filter(target => {
+      if (target.type === 'node') {
+        const node = nodesRef.current[target.index];
+        // Only target neutral nodes, not captured ones
+        return node.controlState === 'neutral' && !recentlyCapturedNodes.current.has(target.index);
       }
-    } else {
-      // Non-guardians prioritize neutral nodes, then enemy battalions
-      targets = allTargets.filter(target => {
-        if (target.type === 'node') {
-          const node = nodesRef.current[target.index];
-          // Only target neutral nodes, not captured ones
-          return node.controlState === 'neutral' && !recentlyCapturedNodes.current.has(target.index);
-        }
-        return false;
-      });
-      
-      // If no neutral nodes, attack enemy battalions
-      if (targets.length === 0) {
-        targets = allTargets.filter(target => target.type === 'battalion');
-      }
+      return false;
+    });
+    
+    // If no neutral nodes, attack enemy battalions
+    if (targets.length === 0) {
+      targets = allTargets.filter(target => target.type === 'battalion');
     }
     
     if (targets.length > 0) {
