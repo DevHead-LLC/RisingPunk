@@ -27,7 +27,7 @@ import {
 import { findShortestPaths, reconstructPath } from '../utils/pathfinding';
 
 // Debug flag - set to false to disable all debugging
-const DEBUG_BATTLE = true;
+const DEBUG_BATTLE = false;
 
 // Debug function
 const debugLog = (message: string) => {
@@ -240,18 +240,14 @@ export const useBattleMovementAndAttacks = (
 
     if (!target || !target.position) return;
     
-    // --- START: Minimal Pre-Movement Target Validation Test ---
     // Check target validity before any movement or path calculation
     if (target.type === 'node') {
       const targetNode = nodes[target.index];
       if (targetNode.controlState !== 'neutral') {
-        debugLog(`[Pre-Movement Validation] ${battalionId} - Target node ${target.index} is not neutral (${targetNode.controlState}), aborting movement`);
         return;
       }
     }
-    // --- END: Minimal Pre-Movement Target Validation Test ---
     
-    // --- START: Minimal Pre-Movement Range Check Test ---
     // Check if battalion is already in attack range before any movement calculations
     const currentPos = getAnimatedPosition(battalion.position);
     const dx = target.position.x - currentPos.x;
@@ -260,123 +256,57 @@ export const useBattleMovementAndAttacks = (
     const range = BOT_CATEGORIES[battalion.type].stats.range * RANGE_MULTIPLIER;
     
     if (distance <= range) {
-      debugLog(`[Pre-Movement Range Check] ${battalionId} - Already in range (${distance.toFixed(1)} <= ${range.toFixed(1)}), starting attacks immediately`);
       setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
       return;
     }
-    // --- END: Minimal Pre-Movement Range Check Test ---
     
-    // --- START: Minimal Path Testing ---
     // Only for node targets, try using the calculated path
     if (target.type === 'node') {
-      // --- START: Minimal Target Validation Test ---
       const targetNode = nodes[target.index];
       if (targetNode.controlState !== 'neutral') {
-        debugLog(`[Target Validation] ${battalionId} - Target node ${target.index} is no longer neutral (${targetNode.controlState}), aborting movement`);
         return;
       }
-      // --- END: Minimal Target Validation Test ---
-      
-      // --- START: Step 1 - Pathfinding Validation Logging ---
-      debugLog(`[Pathfinding Start] ${battalionId} - Starting pathfinding from node ${battalion.nodeIndex} to target node ${target.index}`);
-      debugLog(`[Pathfinding Input] ${battalionId} - Current node: ${battalion.nodeIndex}, Target node: ${target.index}, Total nodes: ${nodes.length}`);
-      // --- END: Step 1 - Pathfinding Validation Logging ---
       
       const { distances, previousNodes } = findShortestPaths(battalion.nodeIndex, nodes);
-      
-      // --- START: Step 1 - Pathfinding Validation Logging ---
-      debugLog(`[Pathfinding Results] ${battalionId} - Distances calculated for all nodes: ${Object.keys(distances).length} nodes`);
-      debugLog(`[Pathfinding Distance] ${battalionId} - Distance to target ${target.index}: ${distances[target.index]?.toFixed(2) || 'INFINITY'}`);
-      // --- END: Step 1 - Pathfinding Validation Logging ---
-      
       const path = reconstructPath(battalion.nodeIndex, target.index, previousNodes);
       
-      // --- START: Step 1 - Pathfinding Validation Logging ---
-      debugLog(`[Path Reconstruction] ${battalionId} - Reconstructed path: [${path.join(' -> ')}]`);
-      debugLog(`[Path Validation] ${battalionId} - Path length: ${path.length}, Valid path: ${path.length > 0 ? 'YES' : 'NO'}`);
-      if (path.length > 0) {
-        debugLog(`[Path Details] ${battalionId} - Start: ${path[0]}, End: ${path[path.length - 1]}, Steps: ${path.length - 1}`);
-      }
-      // --- END: Step 1 - Pathfinding Validation Logging ---
-      
-      debugLog(`[Movement Test] ${battalionId} - Calculated path: [${path.join(' -> ')}]`);
-      
-      // --- START: Step 2 - Enforce Pathfinding for Node Targets ---
       // Validate that we have a valid path before allowing any movement
       if (path.length === 0) {
-        debugLog(`[Step 2 Validation] ${battalionId} - No valid path to target node ${target.index}, aborting movement`);
         return;
       }
       
       if (path.length === 1) {
-        debugLog(`[Step 2 Validation] ${battalionId} - Already at target node ${target.index}, starting attacks immediately`);
         setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
         return;
       }
-      // --- END: Step 2 - Enforce Pathfinding for Node Targets ---
       
-      // --- START: Minimal Path Following Test ---
       // If we have a valid path with more than 1 step, use the first step
       if (path.length >= 2) {
         const nextNodeIndex = path[1];
         const nextNode = nodes[nextNodeIndex];
         if (nextNode) {
-          // --- START: Step 1 - Pathfinding Validation Logging ---
-          debugLog(`[Path Following Decision] ${battalionId} - Valid path found, moving to next node: ${nextNodeIndex}`);
-          debugLog(`[Path Following Details] ${battalionId} - Next node position: (${nextNode.x.toFixed(1)}, ${nextNode.y.toFixed(1)})`);
-          debugLog(`[Path Following Remaining] ${battalionId} - Remaining path after next node: [${path.slice(2).join(' -> ')}]`);
-          // --- END: Step 1 - Pathfinding Validation Logging ---
-          
-          debugLog(`[Movement Test] ${battalionId} - Moving to next node: ${nextNodeIndex}`);
           // Use the next node's position instead of target position
           target.position = { x: nextNode.x, y: nextNode.y };
-          
-          // --- START: Step 2 - Verify Pathfinding Target Position ---
-          debugLog(`[Step 2 Target Position] ${battalionId} - Using pathfinding target: (${target.position.x.toFixed(1)}, ${target.position.y.toFixed(1)}) instead of original target`);
-          // --- END: Step 2 - Verify Pathfinding Target Position ---
           
           // Store the remaining path for continuation
           battalion.remainingPath = path.slice(1);
           battalion.finalTarget = target.index;
         }
-      } else {
-        // --- START: Step 1 - Pathfinding Validation Logging ---
-        debugLog(`[Path Following Decision] ${battalionId} - No valid path found or already at target, path length: ${path.length}`);
-        if (path.length === 1) {
-          debugLog(`[Path Following Details] ${battalionId} - Already at target node ${target.index}`);
-        } else if (path.length === 0) {
-          debugLog(`[Path Following Details] ${battalionId} - No path exists to target node ${target.index}`);
-        }
-        // --- END: Step 1 - Pathfinding Validation Logging ---
       }
-      // --- END: Minimal Path Following Test ---
     } else if (target.type === 'battalion') {
-      // --- START: Step 2 - Battalion Targeting Pathfinding Test ---
       // Calculate path to enemy battalion's node position
       const enemyBatts = isUser ? enemyBattalions : userBattalions;
       const enemyBattalion = enemyBatts![target.index];
       const targetNodeIndex = enemyBattalion.nodeIndex;
       
-      debugLog(`[Step 2 Battalion Pathfinding] ${battalionId} - Calculating path to enemy battalion ${target.index} at node ${targetNodeIndex}`);
-      
-      // --- START: Step 2 - Actual Battalion Pathfinding Implementation ---
       const { distances, previousNodes } = findShortestPaths(battalion.nodeIndex, nodes);
       const battalionPath = reconstructPath(battalion.nodeIndex, targetNodeIndex, previousNodes);
-      
-      debugLog(`[Step 2 Battalion Path] ${battalionId} - Calculated path: [${battalionPath.join(' -> ')}]`);
-      // --- END: Step 2 - Actual Battalion Pathfinding Implementation ---
-      // --- END: Step 2 - Battalion Targeting Pathfinding Test ---
     }
-    // --- END: Minimal Path Testing ---
     
     // Recalculate distance and direction after potential target position updates
     const updatedDx = target.position.x - currentPos.x;
     const updatedDy = target.position.y - currentPos.y;
     const updatedDistance = Math.sqrt(updatedDx * updatedDx + updatedDy * updatedDy);
-    
-    // --- START: Step 2 - Verify Range Movement Uses Pathfinding Target ---
-    debugLog(`[Step 2 Range Movement] ${battalionId} - Using target position: (${target.position.x.toFixed(1)}, ${target.position.y.toFixed(1)}) for range calculations`);
-    // --- END: Step 2 - Verify Range Movement Uses Pathfinding Target ---
     
     if (isNaN(updatedDistance) || updatedDistance === 0) {
       return;
@@ -388,19 +318,15 @@ export const useBattleMovementAndAttacks = (
     // Calculate movement distance based on target type
     let moveDistance: number;
     if (target.type === 'node') {
-      // --- START: Minimal Range-Based Movement Test ---
       // For nodes, move to attack range, not to the center
       const optimalDistance = range; // We want to be at our attack range from the node
       if (updatedDistance <= range) {
         // Already in range, don't move
         moveDistance = 0;
-        debugLog(`[Range Movement] ${battalionId} - Already in range (${updatedDistance.toFixed(1)} <= ${range.toFixed(1)}), not moving`);
       } else {
         // Move to our attack range from the node
         moveDistance = updatedDistance - optimalDistance;
-        debugLog(`[Range Movement] ${battalionId} - Moving to range: distance=${updatedDistance.toFixed(1)}, range=${range.toFixed(1)}, moveDistance=${moveDistance.toFixed(1)}`);
       }
-      // --- END: Minimal Range-Based Movement Test ---
     } else {
       // For enemy battalions, we need to consider both attack ranges
       // Get the enemy battalion's attack range
@@ -438,13 +364,6 @@ export const useBattleMovementAndAttacks = (
       x: currentPos.x + (directionX * moveDistance),
       y: currentPos.y + (directionY * moveDistance)
     };
-    
-    // --- START: Minimal Movement Diagnostic Test ---
-    // Log the movement calculations to understand why paths aren't being followed
-    if (target.type === 'node' && battalion.remainingPath && battalion.remainingPath.length > 0) {
-      debugLog(`[Movement Diagnostic] ${battalionId} - Current pos: (${currentPos.x.toFixed(1)}, ${currentPos.y.toFixed(1)}) -> Target pos: (${rangePosition.x.toFixed(1)}, ${rangePosition.y.toFixed(1)}) - Path: [${battalion.remainingPath.join(' -> ')}]`);
-    }
-    // --- END: Minimal Movement Diagnostic Test ---
     
     cleanupBattalion(battalionId);
 
@@ -484,15 +403,12 @@ export const useBattleMovementAndAttacks = (
           return;
         }
         
-        // --- START: Path Following Continuation Test ---
         // Check if we have a remaining path to follow
         if (battalion.remainingPath && battalion.remainingPath.length > 0 && battalion.finalTarget !== undefined) {
           const nextNodeIndex = battalion.remainingPath[0];
           const nextNode = nodes[nextNodeIndex];
           
           if (nextNode) {
-            debugLog(`[Path Following] ${battalionId} - Continuing to next node: ${nextNodeIndex}`);
-            
             // Update battalion position to the current node
             battalion.nodeIndex = target.index;
             
@@ -514,11 +430,9 @@ export const useBattleMovementAndAttacks = (
         
         // If we've reached the final target, clear path data and start attacking
         if (battalion.finalTarget !== undefined && target.index === battalion.finalTarget) {
-          debugLog(`[Path Following] ${battalionId} - Reached final target: ${battalion.finalTarget}`);
           battalion.remainingPath = undefined;
           battalion.finalTarget = undefined;
         }
-        // --- END: Path Following Continuation Test ---
         
         // Continue attacking neutral node
         setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
@@ -1009,8 +923,6 @@ export const useBattleMovementAndAttacks = (
       battalionsRef.current.enemy
     );
 
-    debugLog(`[findNewTarget] ${battalionId} - Found ${allTargets.length} targets`);
-
     // Strategic target selection based on battalion type
     let targets: typeof allTargets = [];
     
@@ -1060,16 +972,8 @@ export const useBattleMovementAndAttacks = (
       }
     }
     
-    debugLog(`[findNewTarget] ${battalionId} - Filtered to ${targets.length} valid targets`);
-    
     if (targets.length > 0) {
       const target = targets[0];
-      
-      // --- START: Pathfinding Verification ---
-      const { distances, previousNodes } = findShortestPaths(battalion.nodeIndex, nodesRef.current);
-      const path = reconstructPath(battalion.nodeIndex, target.index, previousNodes);
-      debugLog(`[Pathfinder] For ${battalionId} to target ${target.type} ${target.index}: Path = [${path.join(' -> ')}], Distance = ${distances[target.index].toFixed(2)}`);
-      // --- END: Pathfinding Verification ---
       
       // Set cooldown
       retargetCooldowns.current[battalionId] = now;
@@ -1082,8 +986,6 @@ export const useBattleMovementAndAttacks = (
         }, CAPTURE_MEMORY_DURATION);
       }
       
-      debugLog(`[findNewTarget] ${battalionId} - Moving to ${target.type} ${target.index}`);
-      
       moveBattalionAlongPath(
         battalion,
         target,
@@ -1091,15 +993,11 @@ export const useBattleMovementAndAttacks = (
         battalionsRef.current.user,
         battalionsRef.current.enemy
       );
-    } else {
-      debugLog(`[findNewTarget] ${battalionId} - No valid targets found`);
     }
   };
 
   // Node capture handling with retargeting
   const handleNodeCapture = useCallback((nodeIndex: number, newControlState: 'user' | 'enemy') => {
-    debugLog(`[Node Capture] Node ${nodeIndex} captured by ${newControlState}`);
-    
     // Update node control state
     nodesRef.current[nodeIndex].controlState = newControlState;
     
@@ -1115,12 +1013,9 @@ export const useBattleMovementAndAttacks = (
 
   // Retarget all battalions after node capture
   const retargetAllBattalions = useCallback(() => {
-    debugLog('[Retargeting] Starting retargeting for all battalions');
-    
     // Retarget user battalions
     battalionsRef.current.user.forEach((battalion, index) => {
       if (battalion && battalion.quantity > 0 && battalion.currentHealth > 0) {
-        debugLog(`[Retargeting] User battalion ${index} (${battalion.type}) at node ${battalion.nodeIndex}`);
         findNewTarget(battalion, true);
       }
     });
@@ -1128,7 +1023,6 @@ export const useBattleMovementAndAttacks = (
     // Retarget enemy battalions
     battalionsRef.current.enemy.forEach((battalion, index) => {
       if (battalion && battalion.quantity > 0 && battalion.currentHealth > 0) {
-        debugLog(`[Retargeting] Enemy battalion ${index} (${battalion.type}) at node ${battalion.nodeIndex}`);
         findNewTarget(battalion, false);
       }
     });
