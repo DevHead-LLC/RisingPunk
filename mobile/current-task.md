@@ -1,113 +1,188 @@
-# Active Task
+# Active Task: Pathfinder Movement Logic Implementation
 
-- Pathfinder Movement Logic
-- **Current Focus**: Testing minimal path-based movement changes to identify issues
+## Current Focus
+Implementing proper pathfinding-based movement system where battalions follow network connections between nodes rather than direct movement.
 
-## Associated Logic
+## Core Problem
+Current movement system allows direct movement to any target, but should require battalions to move along network connections (lines) by first moving to connecting nodes, then following the network topology.
 
-- Battalion movement and targeting logic
-- Animation system for battalion movement along network paths
-- Pathfinding algorithm for calculating shortest routes between nodes
-- Network node connections and routing
-- Battalion position tracking and updates
+## Movement, Animation, Pathfinding, Targeting, and Retargeting Logic Analysis
 
-## Associated Code
+### 1. **useBattleMovementAndAttacks.ts** - Primary Movement Logic
+**File:** `mobile/src/hooks/useBattleMovementAndAttacks.ts`
 
-- `useBattleMovementAndAttacks.ts` - Battalion movement and targeting logic - See [useBattleMovementAndAttacks.ts](src/hooks/useBattleMovementAndAttacks.ts)
-- `AnimatedBattalion.tsx` - Animation system for battalion movement - See [AnimatedBattalion.tsx](src/components/battle/AnimatedBattalion.tsx)
-- `pathfinding.ts` - Pathfinding algorithm for network routes - See [pathfinding.ts](src/utils/pathfinding.ts)
-- `networkConstants.ts` - Network node connections and routing data - See [networkConstants.ts](src/utils/networkConstants.ts)
-- `BattleUnits.tsx` - Battalion position tracking and rendering - See [BattleUnits.tsx](src/components/battle/BattleUnits.tsx)
+#### **Movement Logic (Lines 200-450)**
+- **`moveBattalionAlongPath` function (Lines 200-450)**: Core movement implementation
+  - **Lines 200-220**: Battalion ID generation and validation
+  - **Lines 230-250**: Target validation before movement
+  - **Lines 260-280**: Pre-movement range checking
+  - **Lines 290-350**: **PATHFINDING INTEGRATION** - Uses `findShortestPaths` and `reconstructPath`
+  - **Lines 360-380**: Path following logic with `remainingPath` and `finalTarget` properties
+  - **Lines 390-420**: Movement distance calculations based on target type
+  - **Lines 430-450**: Animated movement using `Animated.timing`
 
-## Blocking Logic
+#### **Pathfinding Integration (Lines 290-350)**
+- **Lines 290-310**: Calls `findShortestPaths(battalion.nodeIndex, nodes)` for path calculation
+- **Lines 310-320**: Uses `reconstructPath(battalion.nodeIndex, target.index, previousNodes)` for path reconstruction
+- **Lines 330-350**: Path following logic that updates `battalion.remainingPath` and `battalion.finalTarget`
 
-- None identified yet - pathfinder logic is currently working
+#### **Targeting Logic (Lines 120-200)**
+- **`findAvailableTargets` function (Lines 120-200)**: Target discovery and prioritization
+  - **Lines 130-150**: Neutral node targeting (primary targets)
+  - **Lines 160-180**: Enemy battalion targeting (secondary targets)
+  - **Lines 190-200**: Target sorting by distance
 
-## Code Cleanup
+#### **Retargeting Logic (Lines 920-1080)**
+- **`findNewTarget` function (Lines 920-1080)**: Strategic retargeting system
+  - **Lines 930-950**: Cooldown management with `retargetCooldowns`
+  - **Lines 960-980**: Target filtering based on battalion type (guardian vs others)
+  - **Lines 1000-1020**: **PATHFINDING VERIFICATION** - Calls pathfinding for each target
+  - **Lines 1030-1050**: Target selection and movement initiation
+- **`handleNodeCapture` function (Lines 1050-1070)**: Node capture handling
+- **`retargetAllBattalions` function (Lines 1070-1080)**: Mass retargeting after node capture
 
-- None identified yet
+#### **Animation Integration (Lines 430-450)**
+- **Lines 430-450**: `Animated.timing(battalion.position, {...})` for smooth movement
+- **Lines 450-480**: Movement completion callbacks and path continuation logic
 
-## Potential Problems
+### 2. **AnimatedBattalion.tsx** - Animation System
+**File:** `mobile/src/components/battle/AnimatedBattalion.tsx`
 
-### 1. Battalion ID Format Mismatch ✅ FIXED & TESTED
-**Issue**: Changed battalion ref keys from `user-${battalion.nodeIndex}` to `user-${battalion.type}-${index}` but movement logic may still be using old format
-**Impact**: Battalion refs not found, attack animations and damage effects may not work
-**Files Affected**: 
-- `BattleUnits.tsx` - Changed ref key format
-- `useBattleMovementAndAttacks.ts` - May still reference old format in attack logic
-**Status**: Fixed & Tested - Using array index for battalion ID generation to match ref key format. Logs show consistent IDs like `user-breacher-0`, `user-guardian-1`, etc.
+#### **Position Animation (Lines 80-90)**
+- **Lines 80-90**: `transform: [{ translateX: position.x }, { translateY: position.y }]` - Core position animation
+- **Lines 50-70**: `triggerAttackAnimation` and `triggerDamageAnimation` for combat feedback
 
-### 2. Target Validation Logic Broken ✅ TESTED
-**Issue**: Path-based movement may have broken the target validation that prevents targeting captured nodes
-**Impact**: Battalions continue moving toward already captured nodes instead of finding new targets
-**Evidence**: Logs show "No valid targets found" but battalions still move to captured nodes
-**Files Affected**: 
-- `useBattleMovementAndAttacks.ts` - Modified `moveBattalionAlongPath` function
-**Status**: Minimal test implemented - checking target node state before movement for node targets
+#### **Animation Refs (Lines 15-25)**
+- **Lines 15-25**: `BattalionRef` type definition for external animation control
+- **Lines 70-75**: `useImperativeHandle` to expose animation methods
 
-### 3. Network Line Movement Not Implemented ✅ TESTED
-**Issue**: Path-based movement calculates paths but doesn't actually move battalions along network lines
-**Impact**: Battalions move in straight lines instead of following network connections
-**Evidence**: Movement logs show path calculation but visual movement is off-network
-**Files Affected**: 
-- `useBattleMovementAndAttacks.ts` - `moveBattalionAlongPath` moves to node coordinates directly
-**Status**: Minimal test implemented - using first step of calculated path for node targets
+### 3. **pathfinding.ts** - Pathfinding Algorithm
+**File:** `mobile/src/utils/pathfinding.ts`
 
-### 4. Battalion Index Finding Logic ✅ TESTED
-**Issue**: Using `findIndex(b => b === battalion)` may not work reliably if battalion objects are recreated
-**Impact**: Wrong battalion IDs generated, causing ref mismatches and broken functionality
-**Files Affected**: 
-- `useBattleMovementAndAttacks.ts` - Modified battalion ID generation in multiple functions
-**Status**: Tested - Battalion ID generation using findIndex is working correctly. Logs show consistent IDs and no ref errors.
+#### **Dijkstra's Algorithm (Lines 15-65)**
+- **Lines 15-25**: `findShortestPaths` function - Core pathfinding implementation
+- **Lines 30-45**: Priority queue implementation for node exploration
+- **Lines 45-65**: Distance calculation and path reconstruction
+- **Lines 65-90**: `reconstructPath` function - Path reconstruction from previous nodes
 
-### 5. Path Following Logic Incomplete ✅ TESTED
-**Issue**: Path calculation works but actual movement doesn't follow the calculated path segments
-**Impact**: Battalions jump between nodes instead of moving smoothly along network lines
-**Files Affected**: 
-- `useBattleMovementAndAttacks.ts` - `moveBattalionAlongPath` needs to move segment by segment
-**Status**: Minimal test implemented - path following logic with remainingPath and finalTarget properties
+#### **Network Integration (Lines 40-50)**
+- **Lines 40-50**: Uses `getConnectedNodes(currentIndex)` to respect network topology
+- **Lines 50-60**: Physical distance calculation between connected nodes
 
-### 6. Removed Critical Target Validation Logic ✅ TESTED
-**Issue**: Removed the original target validation that checked `node.controlState !== 'neutral'` before movement
-**Impact**: Battalions move toward captured nodes because validation only happens after reaching the node
-**Evidence**: Old code had validation before movement, new code only validates after reaching target
-**Files Affected**: 
-- `useBattleMovementAndAttacks.ts` - Removed pre-movement target validation
-**Status**: Tested - Added minimal pre-movement target validation test. No validation errors in logs, battalions properly retarget when nodes are captured.
+### 4. **networkConstants.ts** - Network Topology
+**File:** `mobile/src/utils/networkConstants.ts`
 
-### 7. Removed Range-Based Movement Logic ✅ TESTED
-**Issue**: Removed the original logic that calculated optimal attack range positions and movement distances
-**Impact**: Battalions move directly to node centers instead of stopping at attack range
-**Evidence**: Old code had `moveDistance = Math.max(0, distance - range)` logic
-**Files Affected**: 
-- `useBattleMovementAndAttacks.ts` - Removed range calculation and optimal positioning
-**Status**: Tested - Added minimal range-based movement test. Logs show proper range calculations: distance=103.0, range=75.0, moveDistance=28.0. Battalions now stop at attack range instead of node centers.
+#### **Network Connections (Lines 15-30)**
+- **Lines 15-30**: `NETWORK_CONNECTIONS` array defining valid node connections
+- **Lines 35-40**: `getConnectedNodes` function for pathfinding integration
 
-### 8. Removed Pre-Movement Attack Range Checks ✅ TESTED
-**Issue**: Removed the original logic that checked if battalion was already in range before moving
-**Impact**: Battalions may move unnecessarily when already in attack range
-**Evidence**: Old code had `if (distance <= range)` checks before movement
-**Files Affected**: 
-- `useBattleMovementAndAttacks.ts` - Removed pre-movement range validation
-**Status**: Tested - Added minimal pre-movement range check test. Logs show battalions starting attacks immediately when in range: "Already in range (135.0 <= 135.0), starting attacks immediately". No unnecessary movement when already positioned correctly.
+#### **Network Layout**
+```
+Node layout:
+0 1 2
+3 4 5  
+6 7 8
 
-### 9. Battalion vs Node Targeting Logic Confusion ✅ TESTED
-**Issue**: Path-based movement treats all targets as nodes, but original logic distinguished between node and battalion targets
-**Impact**: Battalion vs battalion combat may not work correctly
-**Evidence**: Old code had separate logic for `target.type === 'node'` vs `target.type === 'battalion'`
-**Files Affected**: 
-- `useBattleMovementAndAttacks.ts` - Simplified targeting logic may break battalion combat
-**Status**: Tested - Added minimal battalion targeting test. Logs show battalion targeting working correctly: "[Battalion Targeting] enemy-phreak-2 - Moving directly to enemy battalion 1 at position (313.2, 256.9)". Battalion vs battalion combat is functioning properly with direct movement to target positions.
+Connections:
+- Horizontal: [0,3], [3,6], [1,4], [4,7], [2,5], [5,8]
+- Diagonal: [0,4], [1,3], [1,5], [2,4], [3,7], [4,6], [4,8], [5,7]
+```
 
-### 10. Network Path Following Not Working - Straight Line Movement ✅ TESTED
-**Issue**: Battalions are still moving in straight lines instead of following network paths, even though path calculation is working
-**Impact**: Visual movement doesn't follow network connections, making the game look unrealistic
-**Evidence**: 
-- Path calculation works: "[Pathfinder] For user-breacher-0 to target node 3: Path = [0 -> 3]"
-- Movement diagnostic shows straight line movement: "Current pos: (269.7, 170.9) -> Target pos: (297.9, 165.3)"
-- Path information is available: "Path: [3]" but not being used for movement
-**Root Cause**: The movement calculation uses straight line direction vectors instead of following the calculated network paths
-**Files Affected**: 
-- `useBattleMovementAndAttacks.ts` - Movement calculation doesn't use network paths
-**Status**: Tested - Added diagnostic test to understand movement calculations. Path calculation works but movement uses straight line vectors instead of network paths.
+### 5. **battle.ts** - Type Definitions
+**File:** `mobile/src/types/battle.ts`
 
+#### **Movement-Related Types (Lines 15-25)**
+- **Lines 15-25**: `BattalionPosition` interface with movement properties:
+  - `remainingPath?: number[]` - For path following logic
+  - `finalTarget?: number` - For path following logic
+  - `position: any` - Animated.ValueXY for smooth movement
+- **Lines 25-35**: `BattleTarget` type for targeting system
+
+### 6. **battleUtils.ts** - Movement Calculations
+**File:** `mobile/src/utils/battleUtils.ts`
+
+#### **Movement Duration (Lines 15-25)**
+- **Lines 15-25**: `calculateMovementDuration` function based on battalion speed
+- **Lines 30-40**: `calculateAttackRange` function for range-based movement
+- **Lines 50-70**: `getAvailableNodes` function for direct node connections
+
+### 7. **battleConstants.ts** - Movement Constants
+**File:** `mobile/src/utils/battleConstants.ts`
+
+#### **Movement Timing (Lines 5-15)**
+- **Lines 5-15**: `BASE_DURATION`, `RETARGET_COOLDOWN`, `CAPTURE_MEMORY_DURATION`
+- **Lines 20-30**: `RANGE_MULTIPLIER`, `BATTALION_CENTER_OFFSET`
+
+### 8. **BattleUnits.tsx** - Battalion Rendering
+**File:** `mobile/src/components/battle/BattleUnits.tsx`
+
+#### **Position Integration (Lines 50-80)**
+- **Lines 50-80**: Renders `AnimatedBattalion` components with position props
+- **Lines 60-70**: Health percentage calculation for visual feedback
+
+### 9. **BattleScreen.tsx** - Battle Orchestration
+**File:** `mobile/src/screens/BattleScreen.tsx`
+
+#### **Movement Hook Integration (Lines 80-100)**
+- **Lines 80-100**: Uses `useBattleMovementAndAttacks` hook for movement logic
+- **Lines 100-120**: Node control change handling with `handleNodeCapture`
+
+### 10. **battleCalculator.ts** - Range Calculations
+**File:** `mobile/src/utils/battleCalculator.ts`
+
+#### **Range Checking (Lines 70-80)**
+- **Lines 70-80**: `checkRangeIntersection` function for attack range validation
+
+## Current Issues Identified
+
+### **1. Pathfinding Integration Issues**
+- **Problem**: Pathfinding is calculated but not fully enforced in movement
+- **Location**: `useBattleMovementAndAttacks.ts` Lines 290-350
+- **Issue**: Battalion can still move directly to targets instead of following calculated paths
+
+### **2. Network Line Following**
+- **Problem**: Battalions don't follow network connections between nodes
+- **Location**: `moveBattalionAlongPath` function
+- **Issue**: Movement is direct rather than node-to-node along network lines
+
+### **3. Path Continuation Logic**
+- **Problem**: Path following stops after first node
+- **Location**: Lines 360-380 in `useBattleMovementAndAttacks.ts`
+- **Issue**: `remainingPath` logic is incomplete
+
+## Required Changes
+
+### **1. Enforce Pathfinding Movement**
+- Modify `moveBattalionAlongPath` to always follow calculated paths
+- Remove direct movement to targets
+- Ensure battalions move node-to-node along network connections
+
+### **2. Complete Path Following**
+- Implement proper `remainingPath` continuation logic
+- Update battalion `nodeIndex` as they move between nodes
+- Handle path completion and target arrival
+
+### **3. Network Line Visualization**
+- Add visual indicators for battalion movement along network lines
+- Show path preview during movement planning
+
+## Associated Files Summary
+
+| File | Primary Purpose | Key Lines | Status |
+|------|----------------|-----------|---------|
+| `useBattleMovementAndAttacks.ts` | Core movement logic | 200-450, 920-1080 | Needs pathfinding enforcement |
+| `AnimatedBattalion.tsx` | Animation system | 80-90, 50-75 | Working correctly |
+| `pathfinding.ts` | Pathfinding algorithm | 15-90 | Working correctly |
+| `networkConstants.ts` | Network topology | 15-40 | Working correctly |
+| `battle.ts` | Type definitions | 15-35 | Working correctly |
+| `battleUtils.ts` | Movement calculations | 15-70 | Working correctly |
+| `battleConstants.ts` | Movement constants | 5-30 | Working correctly |
+| `BattleUnits.tsx` | Battalion rendering | 50-80 | Working correctly |
+| `BattleScreen.tsx` | Battle orchestration | 80-120 | Working correctly |
+| `battleCalculator.ts` | Range calculations | 70-80 | Working correctly |
+
+## Next Steps
+1. **Enforce pathfinding in movement logic**
+2. **Complete path following implementation**
+3. **Add network line movement visualization**
+4. **Test battalion movement along network connections**
