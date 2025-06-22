@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createListenerMiddleware } from '@reduxjs/toolkit';
+import { RootState } from '../index';
 
 const STORAGE_KEY = 'redux-persist';
 
@@ -15,7 +16,7 @@ storageListener.startListening({
            action.type.startsWith('balance/');
   },
   effect: async (action, listenerApi) => {
-    const state = listenerApi.getState();
+    const state = listenerApi.getState() as RootState;
     
     // Only persist specific parts of state
     const stateToPersist = {
