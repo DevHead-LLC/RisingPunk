@@ -5,6 +5,9 @@ import { AnimatedBattalion } from './AnimatedBattalion';
 import { BattalionPosition } from '../../types/battle';
 import { BOT_CATEGORIES } from '../../screens/DigitalBarracksScreen';
 
+// CLARIFICATION: This component handles battalion-to-battalion attacks and animations only. Battalion-to-node attack logic is handled elsewhere.
+// TODO: Ensure that attack logic for battalions and neutral nodes is set up in a consistent, proximity-based way across the battle system. If not, revisit and refactor for consistency.
+
 type Props = {
   deploymentOpacity?: Animated.Value;
   battalionOpacity: Animated.Value;

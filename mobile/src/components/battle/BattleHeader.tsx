@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
-import { COLORS, SIZING } from '../../styles/theme';
 
 type Props = {
   timeRemaining?: number;

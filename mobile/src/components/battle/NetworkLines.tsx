@@ -12,6 +12,8 @@ type Props = {
 };
 
 export const NetworkLines = React.memo(({ nodes, width, height }: Props) => {
+  // Node positions should always remain the same height, width, and (x, y) coordinate locations throughout the battle.
+  // Only the appearance (color/ownership) should change, not the positions.
   const { lines, dataStreams } = useMemo(() => {
     const lineElements = NETWORK_CONNECTIONS.map(([from, to], index) => (
       <Line
