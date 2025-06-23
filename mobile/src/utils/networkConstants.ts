@@ -19,6 +19,7 @@
  * - Horizontal: [0,3], [3,6], [1,4], [4,7], [2,5], [5,8]
  * - Diagonal: [0,4], [1,3], [1,5], [2,4], [3,7], [4,6], [4,8], [5,7]
  */
+// CLARIFICATION: NETWORK_CONNECTIONS is the single source of truth for node connections and should remain.
 export const NETWORK_CONNECTIONS: [number, number][] = [
   // Horizontal connections
   [0, 3], [3, 6], // Top row
@@ -32,6 +33,7 @@ export const NETWORK_CONNECTIONS: [number, number][] = [
 /**
  * Active connections for data streams (connections involving user-controlled nodes 0,1,2)
  */
+// TODO: ACTIVE_CONNECTIONS is not intended for use in the current application. We should look across the codebase and remove this and any related logic in the future.
 export const ACTIVE_CONNECTIONS = new Set(
   NETWORK_CONNECTIONS
     .filter(([from, to]) => from < 3 || to < 3)
@@ -43,6 +45,7 @@ export const ACTIVE_CONNECTIONS = new Set(
  * @param nodeIndex - The node to find connections for
  * @returns Array of connected node indices
  */
+// CLARIFICATION: getConnectedNodes is useful and should remain for network logic and pathfinding.
 export const getConnectedNodes = (nodeIndex: number): number[] => {
   return NETWORK_CONNECTIONS
     .filter(([from, to]) => from === nodeIndex || to === nodeIndex)

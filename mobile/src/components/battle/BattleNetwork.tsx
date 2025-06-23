@@ -7,14 +7,12 @@
  * @performance Critical for battle visualization performance
  */
 
-import React, { useMemo } from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
+import React from 'react';
+import { StyleSheet, Animated } from 'react-native';
 import { NetworkNode } from './NetworkNode';
 import { NetworkLines } from './NetworkLines';
 import { BattleNode } from '../../types/battle';
 import { BattlePhase } from '../../hooks/useBattleStateMachine';
-import { COLORS } from '../../styles/theme';
-import { NETWORK_CONNECTIONS } from '../../utils/networkConstants';
 
 type Props = {
   nodes: BattleNode[];
@@ -50,6 +48,7 @@ export const BattleNetwork = React.memo(({
         height={height}
       />
       {nodes.map((node, index) => (
+        // TODO: Only pass health to NetworkNode for nodes 3, 4, 5 while neutral. See clarification in design doc/image.
         <NetworkNode 
           key={index}
           ref={(el) => nodeRefs.current[index] = el}
@@ -57,7 +56,7 @@ export const BattleNetwork = React.memo(({
           y={node.y}
           isActive={controlledNodes.includes(index)}
           controlState={node.controlState}
-          health={node.health}
+          health={node.health} // <-- See above TODO
           controlProgress={node.controlProgress}
           isLocked={node.isLocked}
           onControlStateChange={(newState) => onNodeControlChange(index, newState)}

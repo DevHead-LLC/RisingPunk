@@ -10,7 +10,10 @@ type Props = {
   active?: boolean;
 };
 
+// TODO: This component currently only provides a visual particle animation and does not conditionally render anything.
+// TODO: The 'active' prop is not relevant at this time; all particles use the same opacity and animation. If conditional rendering or different opacity/animation is needed in the future, update logic here.
 export const DataStream = React.memo(({ startX, startY, endX, endY, active = false }: Props) => {
+  // TODO: If we ever want to use the 'active' flag for conditional logic (e.g., different opacity or animation for active/inactive), implement that here.
   const progress = useRef(new Animated.Value(0)).current;
   
   useEffect(() => {

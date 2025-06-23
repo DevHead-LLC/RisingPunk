@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
-import { SIZING } from '../../styles/theme';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
