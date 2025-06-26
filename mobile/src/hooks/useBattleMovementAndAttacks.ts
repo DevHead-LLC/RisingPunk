@@ -24,7 +24,7 @@ import {
 } from '../utils/battleUtils';
 import { findShortestPaths, reconstructPath } from '../utils/pathfinding';
 import { debugLog } from './useBattalionRefsAndState';
-import { checkForInfiniteLoop } from './useMovement';
+import { checkForInfiniteLoop, getAnimatedPosition } from './useMovement';
 import type { BattalionRefs, NodeRefs, AttackIntervals, OnBattalionLoss } from './useBattalionRefsAndState';
 
 export const useBattleMovementAndAttacks = (
@@ -64,12 +64,7 @@ export const useBattleMovementAndAttacks = (
   }, []);
 
   // Position calculation
-  const getAnimatedPosition = useCallback((position: Animated.ValueXY) => {
-    return {
-      x: (position.x as any)._value || 0,
-      y: (position.y as any)._value || 0
-    };
-  }, []);
+  // getAnimatedPosition is now imported from useMovement hook
 
   // TODO: Clean up this function so it finds the nearest available target (node or battalion) equally, without prioritizing nodes first.
   // It should use a pathfinding algorithm to determine the closest target of any type, and select that as the target.
@@ -141,7 +136,7 @@ export const useBattleMovementAndAttacks = (
       .sort((a, b) => a.distance - b.distance);
     
     return validTargets;
-  }, [nodes, getAnimatedPosition]);
+  }, [nodes]);
 
   // Movement with improved validation
   const moveBattalionAlongPath = useCallback((
@@ -493,7 +488,7 @@ export const useBattleMovementAndAttacks = (
         }
       }
     });
-  }, [nodes, cleanupBattalion, findAvailableTargets, getAnimatedPosition]);
+  }, [nodes, cleanupBattalion, findAvailableTargets]);
 
   // Setup attacks with improved cleanup and node capture handling
   const setupAttacks = useCallback((
@@ -1031,7 +1026,6 @@ export const useBattleMovementAndAttacks = (
     findNewTarget,
     setupAttacks,
     setupBattalionAttacks,
-    getAnimatedPosition,
     findAvailableTargets,
     calculateMovementDuration,
     moveBattalionAlongPath,
