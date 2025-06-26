@@ -1,3 +1,6 @@
+import { useCallback } from 'react';
+import { Animated } from 'react-native';
+
 // Infinite loop detection
 const loopDetection = new Map<string, { count: number, lastTime: number }>();
 const checkForInfiniteLoop = (battalionId: string, action: string) => {
@@ -17,4 +20,12 @@ const checkForInfiniteLoop = (battalionId: string, action: string) => {
   return false;
 };
 
-export { checkForInfiniteLoop }; 
+// Position calculation
+const getAnimatedPosition = (position: Animated.ValueXY) => {
+  return {
+    x: (position.x as any)._value || 0,
+    y: (position.y as any)._value || 0
+  };
+};
+
+export { checkForInfiniteLoop, getAnimatedPosition }; 
