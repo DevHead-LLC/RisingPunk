@@ -41,4 +41,40 @@ type OnBattalionLoss = (
 ) => void;
 
 export { DEBUG_BATTLE, debugLog };
-export type { BattalionRefs, NodeRefs, AttackIntervals, OnBattalionLoss }; 
+export type { BattalionRefs, NodeRefs, AttackIntervals, OnBattalionLoss };
+
+// ============================================================================
+// BATTALION ID GENERATION LOGIC
+// ============================================================================
+
+/**
+ * Generate a consistent battalion ID based on array index or node index
+ */
+const generateBattalionId = (
+  battalion: { type: string; nodeIndex: number },
+  isUser: boolean,
+  battalionArray: any[],
+  battalionIndex: number
+): string => {
+  return battalionIndex >= 0 
+    ? `${isUser ? 'user' : 'enemy'}-${battalion.type}-${battalionIndex}`
+    : `${isUser ? 'user' : 'enemy'}-${battalion.type}-${battalion.nodeIndex}`; // fallback
+};
+
+/**
+ * Find battalion index and generate ID
+ */
+const findBattalionIndexAndId = (
+  battalion: { type: string; nodeIndex: number },
+  isUser: boolean,
+  userBattalions?: any[],
+  enemyBattalions?: any[]
+): { battalionIndex: number; battalionId: string } => {
+  const battalionArray = isUser ? (userBattalions || []) : (enemyBattalions || []);
+  const battalionIndex = battalionArray.findIndex(b => b === battalion);
+  const battalionId = generateBattalionId(battalion, isUser, battalionArray, battalionIndex);
+  
+  return { battalionIndex, battalionId };
+};
+
+export { generateBattalionId, findBattalionIndexAndId }; 
