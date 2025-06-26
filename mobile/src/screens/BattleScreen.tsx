@@ -1,17 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, SafeAreaView, Dimensions, Animated } from 'react-native';
-import { COLORS, SIZING } from '../styles/theme';
+import { View, StyleSheet, SafeAreaView, Dimensions } from 'react-native';
+import { COLORS } from '../styles/theme';
 import { BattleNetwork } from '../components/battle/BattleNetwork';
 import { BattleHeader } from '../components/battle/BattleHeader';
 import { BattleUnits } from '../components/battle/BattleUnits';
 import { BattleOverlays } from '../components/battle/BattleOverlays';
 import { useBattleStateMachine } from '../hooks/useBattleStateMachine';
-import { SafeComponent } from '../components/common/SafeComponent';
 import { useBattleMovementAndAttacks } from '../hooks/useBattleMovementAndAttacks';
-import { BOT_CATEGORIES } from './DigitalBarracksScreen';
-import { BattleNode, BattalionPosition } from '../types/battle';
+import { BattalionPosition } from '../types/battle';
 import { useBattleInitialization } from '../hooks/useBattleInitialization';
-import { calculateInitialNodeHealth } from '../utils/healthUtils';
 
 type Props = {
   onClose: () => void;

@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { useEffect, useRef, useMemo, useCallback } from 'react';
 import { Animated } from 'react-native';
 import { BOT_CATEGORIES } from '../screens/DigitalBarracksScreen';
 import { checkRangeIntersection } from '../utils/battleCalculator';
 import { BattleNode, BattalionPosition, BattleTarget } from '../types/battle';
-import { BattalionRef } from '../components/battle/AnimatedBattalion';
 import { getConnectedNodes } from '../utils/networkConstants';
 import { updateBattalionHealth } from '../utils/healthUtils';
 import {
@@ -24,81 +23,10 @@ import {
   sortBattalionsByPriority
 } from '../utils/battleUtils';
 import { findShortestPaths, reconstructPath } from '../utils/pathfinding';
+import { debugLog } from './useBattalionRefsAndState';
+import { checkForInfiniteLoop } from './useMovement';
+import type { BattalionRefs, NodeRefs, AttackIntervals, OnBattalionLoss } from './useBattalionRefsAndState';
 
-// Debug flag - set to false to disable all debugging
-const DEBUG_BATTLE = true;
-
-// Debug function
-const debugLog = (message: string) => {
-  if (DEBUG_BATTLE) {
-    console.log(message);
-  }
-};
-
-// Infinite loop detection
-const loopDetection = new Map<string, { count: number, lastTime: number }>();
-const checkForInfiniteLoop = (battalionId: string, action: string) => {
-  const key = `${battalionId}-${action}`;
-  const now = Date.now();
-  const record = loopDetection.get(key);
-  
-  if (record && now - record.lastTime < 1000) {
-    record.count++;
-    if (record.count > 10) {
-      console.log(`[INFINITE LOOP DETECTED] ${battalionId} - ${action} repeated ${record.count} times`);
-      return true;
-    }
-  } else {
-    loopDetection.set(key, { count: 1, lastTime: now });
-  }
-  return false;
-};
-
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
-
-/** Battalion references for animations */
-interface BattalionRefs {
-  [key: string]: BattalionRef;
-}
-
-/** Node references for damage animations */
-interface NodeRefs {
-  [key: string]: {
-    triggerDamageAnimation: () => void;
-    applyDamage: (damage: number, isUser: boolean) => boolean;
-  } | null;
-}
-
-/** Attack intervals tracking */
-interface AttackIntervals {
-  [key: string]: NodeJS.Timeout;
-}
-
-/** Battalion loss callback type */
-type OnBattalionLoss = (
-  side: 'user' | 'enemy',
-  battalionId: string,
-  quantity: number,
-  mark: number
-) => void;
-
-// ============================================================================
-// MAIN HOOK
-// ============================================================================
-
-/**
- * Hook managing all battalion movement and attack logic
- * @param battleStarted - Whether battle has started
- * @param nodes - Array of battle nodes
- * @param userBattalions - User battalion positions
- * @param enemyBattalions - Enemy battalion positions
- * @param setUserBattalions - Function to update user battalions
- * @param setEnemyBattalions - Function to update enemy battalions
- * @param onBattalionLoss - Callback for battalion losses
- * @returns Object with refs and utility functions
- */
 export const useBattleMovementAndAttacks = (
   battleStarted: boolean,
   nodes: BattleNode[],
@@ -143,7 +71,9 @@ export const useBattleMovementAndAttacks = (
     };
   }, []);
 
-  // Target finding with improved validation and coordination
+  // TODO: Clean up this function so it finds the nearest available target (node or battalion) equally, without prioritizing nodes first.
+  // It should use a pathfinding algorithm to determine the closest target of any type, and select that as the target.
+  // Remove the current logic that always prioritizes nodes over battalions.
   const findAvailableTargets = useCallback((
     battalion: BattalionPosition,
     isUser: boolean,
