@@ -28,4 +28,15 @@ const getAnimatedPosition = (position: Animated.ValueXY) => {
   };
 };
 
-export { checkForInfiniteLoop, getAnimatedPosition }; 
+// Cleanup protocol with enhanced validation
+const cleanupBattalion = (battalionId: string, attackIntervals: { [key: string]: NodeJS.Timeout }) => {
+  // Clean up all intervals related to this battalion
+  Object.keys(attackIntervals).forEach(key => {
+    if (key.includes(battalionId)) {
+      clearInterval(attackIntervals[key]);
+      delete attackIntervals[key];
+    }
+  });
+};
+
+export { checkForInfiniteLoop, getAnimatedPosition, cleanupBattalion }; 
