@@ -25,6 +25,7 @@ import {
 import { findShortestPaths, reconstructPath } from '../utils/pathfinding';
 import { debugLog } from './useBattalionRefsAndState';
 import { checkForInfiniteLoop, getAnimatedPosition, cleanupBattalion } from './useMovement';
+import { useTargeting } from './useTargeting';
 import type { BattalionRefs, NodeRefs, AttackIntervals, OnBattalionLoss } from './useBattalionRefsAndState';
 
 export const useBattleMovementAndAttacks = (
@@ -48,86 +49,9 @@ export const useBattleMovementAndAttacks = (
   const retargetCooldowns = useRef<{[key: string]: number}>({});
   const recentlyCapturedNodes = useRef<Set<number>>(new Set());
 
-  // ============================================================================
-  // FUNCTIONS FROM useBattleMovement.ts
-  // ============================================================================
+  // Use targeting hook
+  const { findAvailableTargets } = useTargeting(nodes);
 
-  // Position calculation
-  // getAnimatedPosition is now imported from useMovement hook
-
-  // TODO: Clean up this function so it finds the nearest available target (node or battalion) equally, without prioritizing nodes first.
-  // It should use a pathfinding algorithm to determine the closest target of any type, and select that as the target.
-  // Remove the current logic that always prioritizes nodes over battalions.
-  const findAvailableTargets = useCallback((
-    battalion: BattalionPosition,
-    isUser: boolean,
-    userBattalions: BattalionPosition[],
-    enemyBattalions: BattalionPosition[]
-  ): BattleTarget[] => {
-    if (battalion.quantity <= 0 || battalion.currentHealth <= 0) return [];
-    
-    const currentPos = getAnimatedPosition(battalion.position);
-    const allTargets: BattleTarget[] = [];
-    
-    // Check neutral nodes first (primary targets)
-    const connectedNodeIndices = getConnectedNodes(battalion.nodeIndex);
-    
-    nodes.forEach((node, index) => {
-      if (!connectedNodeIndices.includes(index)) return;
-      // Only target neutral nodes
-      if (node.controlState !== 'neutral') return;
-      if (index === battalion.nodeIndex) return;
-      
-      const distance = Math.sqrt(
-        Math.pow(node.x - currentPos.x, 2) + 
-        Math.pow(node.y - currentPos.y, 2)
-      );
-      
-      if (!isNaN(distance)) {
-        allTargets.push({
-          type: 'node',
-          index,
-          distance,
-          position: { x: node.x, y: node.y }
-        });
-      }
-    });
-
-    // If no neutral nodes found, check enemy battalions
-    if (allTargets.length === 0) {
-      const enemyBatts = isUser ? enemyBattalions : userBattalions;
-      
-      enemyBatts.forEach((enemyBattalion, index) => {
-        if (!enemyBattalion || enemyBattalion.quantity <= 0 || enemyBattalion.currentHealth <= 0) {
-          return;
-        }
-        
-        const enemyPos = getAnimatedPosition(enemyBattalion.position);
-        const distance = Math.sqrt(
-          Math.pow(enemyPos.x - currentPos.x, 2) + 
-          Math.pow(enemyPos.y - currentPos.y, 2)
-        );
-        
-        if (!isNaN(distance)) {
-          allTargets.push({
-            type: 'battalion',
-            index,
-            distance,
-            position: enemyPos
-          });
-        }
-      });
-    }
-    
-    // Sort targets by distance only - priority is handled by order of checking
-    const validTargets = allTargets
-      .filter(target => !isNaN(target.distance))
-      .sort((a, b) => a.distance - b.distance);
-    
-    return validTargets;
-  }, [nodes]);
-
-  // Movement with improved validation
   const moveBattalionAlongPath = useCallback((
     battalion: BattalionPosition,
     target: BattleTarget,
