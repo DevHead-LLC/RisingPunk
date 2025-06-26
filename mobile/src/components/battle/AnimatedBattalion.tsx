@@ -29,7 +29,6 @@ export const AnimatedBattalion = React.memo(React.forwardRef<BattalionRef, Props
     health,
     mark = 1,
     onAttackComplete,
-    onTargetBattalion,
   } = props;
 
   // Force re-render when health changes

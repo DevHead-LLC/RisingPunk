@@ -52,7 +52,7 @@ export const BOT_CATEGORIES = {
   }
 };
 
-// Enemy bot categories with much higher attack stats
+// TODO: Enemy bot stats are temporarily increased for quicker battle results during testing. Revisit and clean this up after battle functionality is complete.
 export const ENEMY_BOT_CATEGORIES = {
   guardian: { // Cavalry
     role: 'Cavalry',
