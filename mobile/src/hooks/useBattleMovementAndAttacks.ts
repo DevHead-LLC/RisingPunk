@@ -24,6 +24,7 @@ import {
 } from '../utils/battleUtils';
 import { findShortestPaths, reconstructPath } from '../utils/pathfinding';
 import { debugLog } from './useBattalionRefsAndState';
+import { findBattalionIndexAndId } from './useBattalionRefsAndState';
 import { checkForInfiniteLoop, getAnimatedPosition, cleanupBattalion } from './useMovement';
 import { useTargeting } from './useTargeting';
 import type { BattalionRefs, NodeRefs, AttackIntervals, OnBattalionLoss } from './useBattalionRefsAndState';
@@ -59,14 +60,8 @@ export const useBattleMovementAndAttacks = (
     userBattalions?: BattalionPosition[],
     enemyBattalions?: BattalionPosition[]
   ): void => {
-    // --- START: Minimal Battalion ID Fix Test ---
-    // Find the battalion's array index to generate consistent ID
-    const battalionArray = isUser ? (userBattalions || []) : (enemyBattalions || []);
-    const battalionIndex = battalionArray.findIndex(b => b === battalion);
-    const battalionId = battalionIndex >= 0 
-      ? `${isUser ? 'user' : 'enemy'}-${battalion.type}-${battalionIndex}`
-      : `${isUser ? 'user' : 'enemy'}-${battalion.type}-${battalion.nodeIndex}`; // fallback
-    // --- END: Minimal Battalion ID Fix Test ---
+    // Generate battalion ID
+    const { battalionId } = findBattalionIndexAndId(battalion, isUser, userBattalions, enemyBattalions);
     
     // Check if battalion is destroyed
     if (battalion.quantity <= 0 || battalion.currentHealth <= 0) {
