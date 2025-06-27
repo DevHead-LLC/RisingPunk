@@ -836,14 +836,8 @@ export const useBattleMovementAndAttacks = (
 
   // Strategic target selection with unified logic
   const findNewTarget = (battalion: BattalionPosition, isUser: boolean) => {
-    // --- START: Minimal Battalion ID Fix Test ---
-    // Find the battalion's array index to generate consistent ID
-    const battalionArray = isUser ? battalionsRef.current.user : battalionsRef.current.enemy;
-    const battalionIndex = battalionArray.findIndex(b => b === battalion);
-    const battalionId = battalionIndex >= 0 
-      ? `${isUser ? 'user' : 'enemy'}-${battalion.type}-${battalionIndex}`
-      : `${isUser ? 'user' : 'enemy'}-${battalion.type}-${battalion.nodeIndex}`; // fallback
-    // --- END: Minimal Battalion ID Fix Test ---
+    // Generate battalion ID
+    const { battalionId } = findBattalionIndexAndId(battalion, isUser, battalionsRef.current.user, battalionsRef.current.enemy);
     
     // Check cooldown
     const now = Date.now();
