@@ -39,6 +39,10 @@ import {
 } from './useMovement';
 import { useTargeting } from './useTargeting';
 import type { BattalionRefs, NodeRefs, AttackIntervals, OnBattalionLoss } from './useBattalionRefsAndState';
+import { 
+  setupAttacks as setupAttacksFromCombat,
+  handleBattalionDamage as handleBattalionDamageFromCombat
+} from './useCombat';
 
 export const useBattleMovementAndAttacks = (
   battleStarted: boolean,
@@ -108,7 +112,22 @@ export const useBattleMovementAndAttacks = (
     
     // If in range, start attacking
     if (validation.inRange) {
-      setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
+      setupAttacksFromCombat(
+        battalion,
+        target,
+        isUser,
+        battalionId,
+        attackIntervals.current,
+        cleanupBattalion,
+        nodeRefs.current,
+        nodes,
+        findAvailableTargets,
+        moveBattalionAlongPath,
+        setUserBattalions,
+        setEnemyBattalions,
+        userBattalions,
+        enemyBattalions
+      );
       return;
     }
     
@@ -120,11 +139,18 @@ export const useBattleMovementAndAttacks = (
         nodes,
         findShortestPaths,
         reconstructPath,
-        setupAttacks,
+        setupAttacksFromCombat,
         battalionId,
         isUser,
         userBattalions,
-        enemyBattalions
+        enemyBattalions,
+        attackIntervals.current,
+        cleanupBattalion,
+        nodeRefs.current,
+        findAvailableTargets,
+        moveBattalionAlongPath,
+        setUserBattalions,
+        setEnemyBattalions
       );
       
       if (!pathResult.shouldContinue) {
@@ -187,7 +213,22 @@ export const useBattleMovementAndAttacks = (
     
     // If we're already in range but the moveDistance calculation is wrong, start attacking anyway
     if (updatedDistance <= range) {
-      setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
+      setupAttacksFromCombat(
+        battalion,
+        target,
+        isUser,
+        battalionId,
+        attackIntervals.current,
+        cleanupBattalion,
+        nodeRefs.current,
+        nodes,
+        findAvailableTargets,
+        moveBattalionAlongPath,
+        setUserBattalions,
+        setEnemyBattalions,
+        userBattalions,
+        enemyBattalions
+      );
       return;
     }
 
@@ -211,148 +252,21 @@ export const useBattleMovementAndAttacks = (
           battalionId,
           findAvailableTargets,
           moveBattalionAlongPath,
-          setupAttacks,
+          setupAttacksFromCombat,
           debugLog,
           userBattalions,
-          enemyBattalions
+          enemyBattalions,
+          attackIntervals.current,
+          cleanupBattalion,
+          nodeRefs.current,
+          setUserBattalions,
+          setEnemyBattalions
         );
       }
     );
   }, [nodes, findAvailableTargets]);
 
-  // Setup attacks with improved cleanup and node capture handling
-  const setupAttacks = useCallback((
-    battalion: BattalionPosition,
-    target: BattleTarget,
-    isUser: boolean,
-    battalionId: string,
-    userBattalions?: BattalionPosition[],
-    enemyBattalions?: BattalionPosition[]
-  ): void => {
-    if (battalion.quantity <= 0 || battalion.currentHealth <= 0) {
-      cleanupBattalion(battalionId, attackIntervals.current);
-      return;
-    }
-
-    const attackSpeed = BOT_CATEGORIES[battalion.type].stats.speed;
-    const attackInterval = 2000 * (5 / attackSpeed);
-    const attackPower = BOT_CATEGORIES[battalion.type].stats.offense;
-    const totalDamage = attackPower * battalion.quantity;
-    
-    cleanupBattalion(battalionId, attackIntervals.current);
-
-    setTimeout(() => {
-      if (target.type === 'node') {
-        const nodeRef = nodeRefs.current[target.index];
-        if (!nodeRef || battalion.quantity <= 0 || battalion.currentHealth <= 0) {
-          cleanupBattalion(battalionId, attackIntervals.current);
-          return;
-        }
-
-        // Set up recurring attacks
-        const intervalKey = `${battalionId}-node-${target.index}`;
-        const attackFn = () => {
-          if (battalion.quantity <= 0 || battalion.currentHealth <= 0) {
-            cleanupBattalion(battalionId, attackIntervals.current);
-            return;
-          }
-
-          const node = nodes[target.index];
-          // Only retarget if node is not neutral (captured)
-          if (node.controlState !== 'neutral') {
-            cleanupBattalion(battalionId, attackIntervals.current);
-            battalion.targetNode = undefined;
-            const newTargets = findAvailableTargets(battalion, isUser, userBattalions || [], enemyBattalions || []);
-            if (newTargets.length > 0) {
-              moveBattalionAlongPath(battalion, newTargets[0], isUser, userBattalions, enemyBattalions);
-            }
-          }
-
-          // Apply damage
-          const damageApplied = nodeRef.applyDamage(totalDamage, isUser);
-          if (!damageApplied) {
-            cleanupBattalion(battalionId, attackIntervals.current);
-            battalion.targetNode = undefined;
-            const newTargets = findAvailableTargets(battalion, isUser, userBattalions || [], enemyBattalions || []);
-            if (newTargets.length > 0) {
-              moveBattalionAlongPath(battalion, newTargets[0], isUser, userBattalions, enemyBattalions);
-            }
-          }
-        };
-
-        attackIntervals.current[intervalKey] = setInterval(attackFn, attackInterval);
-        // Execute first attack immediately
-        attackFn();
-      } else if (target.type === 'battalion') {
-        const enemyBatts = isUser ? enemyBattalions : userBattalions;
-        if (!enemyBatts) return;
-
-        const enemyBattalion = enemyBatts[target.index];
-        if (!enemyBattalion || enemyBattalion.quantity <= 0 || enemyBattalion.currentHealth <= 0) {
-          const newTargets = findAvailableTargets(battalion, isUser, userBattalions || [], enemyBattalions || []);
-          if (newTargets.length > 0) {
-            moveBattalionAlongPath(battalion, newTargets[0], isUser, userBattalions, enemyBattalions);
-          }
-          return;
-        }
-
-        const enemyId = `${!isUser ? 'user' : 'enemy'}-${enemyBattalion.type}-${enemyBattalion.nodeIndex}`;
-        const intervalKey = `${battalionId}-${enemyId}`;
-        
-        const attackFn = () => {
-          if (battalion.quantity <= 0 || battalion.currentHealth <= 0) {
-            cleanupBattalion(battalionId, attackIntervals.current);
-            return;
-          }
-
-          const updateStateFn = (prevBatts: BattalionPosition[]) => {
-            const updatedBatts = [...prevBatts];
-            const targetBatt = updatedBatts[target.index];
-            
-            if (!targetBatt || targetBatt.quantity <= 0 || targetBatt.currentHealth <= 0) {
-              cleanupBattalion(battalionId, attackIntervals.current);
-              return prevBatts;
-            }
-
-            const wasDestroyed = updateBattalionHealth(targetBatt, targetBatt.currentHealth - totalDamage);
-            
-            // Schedule retargeting if target was destroyed
-            if (wasDestroyed) {
-              setTimeout(() => {
-                const newTargets = findAvailableTargets(
-                  battalion,
-                  isUser,
-                  isUser ? userBattalions! : updatedBatts,
-                  isUser ? updatedBatts : enemyBattalions!
-                );
-                if (newTargets.length > 0) {
-                  moveBattalionAlongPath(
-                    battalion,
-                    newTargets[0],
-                    isUser,
-                    isUser ? userBattalions : updatedBatts,
-                    isUser ? updatedBatts : enemyBattalions
-                  );
-                }
-              }, 0);
-            }
-            
-            return updatedBatts;
-          };
-
-          if (isUser) {
-            setEnemyBattalions(updateStateFn);
-          } else {
-            setUserBattalions(updateStateFn);
-          }
-        };
-
-        attackIntervals.current[intervalKey] = setInterval(attackFn, attackInterval);
-        // Execute first attack immediately
-        attackFn();
-      }
-    }, 150);
-  }, [findAvailableTargets, moveBattalionAlongPath, nodes]);
+  // Combat logic has been moved to useCombat.ts hook
 
   // Memoized calculations for performance optimization
   const memoizedCalculations = useMemo(() => {
@@ -748,7 +662,6 @@ export const useBattleMovementAndAttacks = (
     nodeRefs,
     attackIntervals,
     findNewTarget,
-    setupAttacks,
     setupBattalionAttacks,
     findAvailableTargets,
     calculateMovementDuration,
