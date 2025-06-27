@@ -35,7 +35,9 @@ import {
   checkForInfiniteLoop,
   calculateMovementDistance,
   executeBattalionMovement,
-  handlePostMovementActions
+  handlePostMovementActions,
+  handleMovementValidation,
+  handleMovementDecision
 } from './useMovement';
 import { useTargeting } from './useTargeting';
 import { useBattleEngine } from './useBattleEngine';
@@ -83,8 +85,8 @@ export const useBattleMovementAndAttacks = (
     const currentPos = getAnimatedPosition(battalion.position);
     const range = BOT_CATEGORIES[battalion.type].stats.range * RANGE_MULTIPLIER;
     
-    // Validate battalion and target
-    const validation = validateBattalionAndTarget(
+    // Handle movement validation and retargeting
+    const validationResult = handleMovementValidation(
       battalion,
       target,
       nodes,
@@ -92,43 +94,33 @@ export const useBattleMovementAndAttacks = (
       range,
       cleanupBattalion,
       battalionId,
-      attackIntervals.current
+      attackIntervals.current,
+      findAvailableTargets,
+      isUser,
+      moveBattalionAlongPath,
+      userBattalions,
+      enemyBattalions
     );
     
-    if (!validation.isValid) {
-      if (validation.shouldRetarget) {
-        const newTargets = findAvailableTargets(battalion, isUser, userBattalions || [], enemyBattalions || []);
-        if (newTargets.length > 0) {
-          // Prevent targeting the same node again
-          const validTarget = newTargets.find(t => 
-            t.type === 'node' ? nodes[t.index].controlState === 'neutral' : true
-          );
-          if (validTarget) {
-            moveBattalionAlongPath(battalion, validTarget, isUser, userBattalions, enemyBattalions);
-          }
-        }
+    if (!validationResult.shouldContinue) {
+      if (validationResult.shouldAttack) {
+        setupAttacksFromCombat(
+          battalion,
+          target,
+          isUser,
+          battalionId,
+          attackIntervals.current,
+          cleanupBattalion,
+          nodeRefs.current,
+          nodes,
+          findAvailableTargets,
+          moveBattalionAlongPath,
+          setUserBattalions,
+          setEnemyBattalions,
+          userBattalions,
+          enemyBattalions
+        );
       }
-      return;
-    }
-    
-    // If in range, start attacking
-    if (validation.inRange) {
-      setupAttacksFromCombat(
-        battalion,
-        target,
-        isUser,
-        battalionId,
-        attackIntervals.current,
-        cleanupBattalion,
-        nodeRefs.current,
-        nodes,
-        findAvailableTargets,
-        moveBattalionAlongPath,
-        setUserBattalions,
-        setEnemyBattalions,
-        userBattalions,
-        enemyBattalions
-      );
       return;
     }
     
@@ -200,8 +192,8 @@ export const useBattleMovementAndAttacks = (
       );
     }
     
-    // Calculate movement distance and direction
-    const movementResult = calculateMovementDistance(
+    // Handle movement decision logic
+    const decisionResult = handleMovementDecision(
       currentPos,
       target,
       range,
@@ -210,10 +202,7 @@ export const useBattleMovementAndAttacks = (
       enemyBattalions
     );
     
-    const { moveDistance, updatedDistance, rangePosition } = movementResult;
-    
-    // If we're already in range but the moveDistance calculation is wrong, start attacking anyway
-    if (updatedDistance <= range) {
+    if (decisionResult.shouldAttack) {
       setupAttacksFromCombat(
         battalion,
         target,
@@ -236,8 +225,8 @@ export const useBattleMovementAndAttacks = (
     // Execute movement animation
     executeBattalionMovement(
       battalion,
-      rangePosition,
-      moveDistance,
+      decisionResult.rangePosition,
+      calculateMovementDistance(currentPos, target, range, isUser, userBattalions, enemyBattalions).moveDistance,
       battalionId,
       attackIntervals.current,
       cleanupBattalion,
