@@ -5,8 +5,8 @@ import { BattleNetwork } from '../components/battle/BattleNetwork';
 import { BattleHeader } from '../components/battle/BattleHeader';
 import { BattleUnits } from '../components/battle/BattleUnits';
 import { BattleOverlays } from '../components/battle/BattleOverlays';
+import { useBattleCoordination } from '../hooks/useBattleCoordination';
 import { useBattleStateMachine } from '../hooks/useBattleStateMachine';
-import { useBattleMovementAndAttacks } from '../hooks/useBattleMovementAndAttacks';
 import { BattalionPosition } from '../types/battle';
 import { useBattleInitialization } from '../hooks/useBattleInitialization';
 
@@ -90,7 +90,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     });
   };
 
-  // CLARIFICATION_COMMENT: The movement and targeting logic in the useBattleMovementAndAttacks hook must respect node ownership.
+  // CLARIFICATION_COMMENT: The movement and targeting logic in the useBattleCoordination hook must respect node ownership.
   // Once a node is owned (not neutral), it cannot be targeted by anyone nor can it be captured by the opposing party.
   // KEY_FEATURE_COMMENT: Battalions SHOULD move according to pathfinding. Currently, initial node targeting is random.
   // Upon retargeting, they should follow pathfinding logic within the hook.
@@ -103,7 +103,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     setupBattalionAttacks,
     findNewTarget,
     handleNodeCapture
-  } = useBattleMovementAndAttacks(
+  } = useBattleCoordination(
     battleStarted,
     nodes,
     userBattalions,
@@ -239,7 +239,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   // Add cleanup on unmount
   useEffect(() => {
     return () => {
-      // Cleanup is handled by the useBattleMovementAndAttacks hook
+      // Cleanup is handled by the useBattleCoordination hook
     };
   }, []);
 
