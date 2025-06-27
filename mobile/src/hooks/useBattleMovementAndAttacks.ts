@@ -70,8 +70,13 @@ export const useBattleMovementAndAttacks = (
   const retargetCooldowns = useRef<{[key: string]: number}>({});
   const recentlyCapturedNodes = useRef<Set<number>>(new Set());
 
-  // Use targeting hook
-  const { findAvailableTargets } = useTargeting(nodes);
+  // Ref to store the real findAvailableTargets function
+  const findAvailableTargetsRef = useRef<(
+    battalion: BattalionPosition,
+    isUser: boolean,
+    userBattalions: BattalionPosition[],
+    enemyBattalions: BattalionPosition[]
+  ) => any[]>(() => []);
 
   const moveBattalionAlongPath = useCallback((
     battalion: BattalionPosition,
@@ -81,7 +86,7 @@ export const useBattleMovementAndAttacks = (
     enemyBattalions?: BattalionPosition[]
   ): void => {
     // Generate battalion ID
-    const { battalionId } = findBattalionIndexAndId(battalion, isUser, userBattalions, enemyBattalions);
+    const { battalionId } = findBattalionIndexAndId(battalion, isUser, userBattalions || [], enemyBattalions || []);
     
     // Get current position and range for validation
     const currentPos = getAnimatedPosition(battalion.position);
@@ -97,7 +102,7 @@ export const useBattleMovementAndAttacks = (
       cleanupBattalion,
       battalionId,
       attackIntervals.current,
-      findAvailableTargets,
+      findAvailableTargetsRef.current,
       isUser,
       moveBattalionAlongPath,
       userBattalions,
@@ -115,7 +120,7 @@ export const useBattleMovementAndAttacks = (
           cleanupBattalion,
           nodeRefs.current,
           nodes,
-          findAvailableTargets,
+          findAvailableTargetsRef.current,
           moveBattalionAlongPath,
           setUserBattalions,
           setEnemyBattalions,
@@ -141,7 +146,7 @@ export const useBattleMovementAndAttacks = (
       attackIntervals.current,
       cleanupBattalion,
       nodeRefs.current,
-      findAvailableTargets,
+      findAvailableTargetsRef.current,
       moveBattalionAlongPath,
       setUserBattalions,
       setEnemyBattalions,
@@ -170,7 +175,7 @@ export const useBattleMovementAndAttacks = (
       setupAttacksFromCombat,
       nodeRefs.current,
       nodes,
-      findAvailableTargets,
+      findAvailableTargetsRef.current,
       moveBattalionAlongPath,
       userBattalions,
       enemyBattalions,
@@ -178,7 +183,22 @@ export const useBattleMovementAndAttacks = (
       setEnemyBattalions,
       debugLog
     );
-  }, [nodes, findAvailableTargets]);
+  }, [nodes]);
+
+  // Use targeting hook (after moveBattalionAlongPath is defined)
+  const { findAvailableTargets, findNewTarget } = useTargeting(
+    nodes,
+    retargetCooldowns,
+    recentlyCapturedNodes,
+    battalionsRef,
+    findBattalionIndexAndId,
+    moveBattalionAlongPath
+  );
+
+  // Update the ref with the real function
+  useEffect(() => {
+    findAvailableTargetsRef.current = findAvailableTargets;
+  }, [findAvailableTargets]);
 
   // Use battle engine for orchestration
   const { memoizedCalculations } = useBattleEngine(
@@ -208,68 +228,6 @@ export const useBattleMovementAndAttacks = (
   useEffect(() => {
     nodesRef.current = nodes;
   }, [nodes]);
-
-  // Strategic target selection with unified logic
-  const findNewTarget = (battalion: BattalionPosition, isUser: boolean) => {
-    // Generate battalion ID
-    const { battalionId } = findBattalionIndexAndId(battalion, isUser, battalionsRef.current.user, battalionsRef.current.enemy);
-    
-    // Check cooldown
-    const now = Date.now();
-    const lastRetarget = retargetCooldowns.current[battalionId] || 0;
-    if (now - lastRetarget < RETARGET_COOLDOWN) {
-      return; // Still in cooldown
-    }
-    
-    // Get all available targets
-    const allTargets = findAvailableTargets(
-      battalion,
-      isUser,
-      battalionsRef.current.user,
-      battalionsRef.current.enemy
-    );
-
-    // Unified target selection - all battalion types behave identically
-    let targets: typeof allTargets = [];
-    
-    // All battalions prioritize neutral nodes, then enemy battalions
-    targets = allTargets.filter(target => {
-      if (target.type === 'node') {
-        const node = nodesRef.current[target.index];
-        // Only target neutral nodes, not captured ones
-        return node.controlState === 'neutral' && !recentlyCapturedNodes.current.has(target.index);
-      }
-      return false;
-    });
-    
-    // If no neutral nodes, attack enemy battalions
-    if (targets.length === 0) {
-      targets = allTargets.filter(target => target.type === 'battalion');
-    }
-    
-    if (targets.length > 0) {
-      const target = targets[0];
-      
-      // Set cooldown
-      retargetCooldowns.current[battalionId] = now;
-      
-      // If targeting a node, mark it as recently captured
-      if (target.type === 'node') {
-        recentlyCapturedNodes.current.add(target.index);
-        setTimeout(() => {
-          recentlyCapturedNodes.current.delete(target.index);
-        }, CAPTURE_MEMORY_DURATION);
-      }
-      
-      moveBattalionAlongPath(
-        battalion,
-        target,
-        isUser,
-        battalionsRef.current.user,
-        battalionsRef.current.enemy
-      );
-    }
-  };
 
   // Battle initialization - find initial targets for all battalions
   useEffect(() => {
