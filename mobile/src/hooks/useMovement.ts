@@ -585,4 +585,196 @@ const handleMovementDecision = (
   return { shouldAttack: false, rangePosition };
 };
 
-export { handleMovementValidation, handleMovementDecision }; 
+export { handleMovementValidation, handleMovementDecision };
+
+// ============================================================================
+// PATH COORDINATION LOGIC
+// ============================================================================
+
+/**
+ * Handle path coordination for both node and battalion targets
+ */
+const handlePathCoordination = (
+  battalion: any,
+  target: any,
+  nodes: any[],
+  findShortestPaths: (startNode: number, nodes: any[]) => { distances: { [key: number]: number }; previousNodes: { [key: number]: number | null } },
+  reconstructPath: (startNode: number, endNode: number, previousNodes: { [key: number]: number | null }) => number[],
+  setupAttacksFromCombat: (battalion: any, target: any, isUser: boolean, battalionId: string, attackIntervals: any, cleanupBattalion: any, nodeRefs: any, nodes: any, findAvailableTargets: any, moveBattalionAlongPath: any, setUserBattalions?: any, setEnemyBattalions?: any, userBattalions?: any[], enemyBattalions?: any[]) => void,
+  battalionId: string,
+  isUser: boolean,
+  userBattalions?: any[],
+  enemyBattalions?: any[],
+  attackIntervals?: any,
+  cleanupBattalion?: any,
+  nodeRefs?: any,
+  findAvailableTargets?: any,
+  moveBattalionAlongPath?: any,
+  setUserBattalions?: any,
+  setEnemyBattalions?: any,
+  checkForInfiniteLoop?: (battalionId: string, action: string) => boolean,
+  debugLog?: (message: string) => void
+): { shouldContinue: boolean; updatedTarget?: any } => {
+  // Only for node targets, try using the calculated path
+  if (target.type === 'node') {
+    const pathResult = handleNodePathCalculation(
+      battalion,
+      target,
+      nodes,
+      findShortestPaths,
+      reconstructPath,
+      setupAttacksFromCombat,
+      battalionId,
+      isUser,
+      userBattalions,
+      enemyBattalions,
+      attackIntervals,
+      cleanupBattalion,
+      nodeRefs,
+      findAvailableTargets,
+      moveBattalionAlongPath,
+      setUserBattalions,
+      setEnemyBattalions
+    );
+    
+    if (!pathResult.shouldContinue) {
+      return { shouldContinue: false };
+    }
+    
+    return { shouldContinue: true, updatedTarget: pathResult.updatedTarget };
+  } else if (target.type === 'battalion') {
+    // Handle battalion path following
+    const pathFollowingResult = handleBattalionPathFollowing(
+      battalion,
+      target,
+      nodes,
+      battalionId,
+      checkForInfiniteLoop || (() => false),
+      debugLog || (() => {}),
+      moveBattalionAlongPath || (() => {}),
+      isUser,
+      userBattalions,
+      enemyBattalions
+    );
+    
+    if (!pathFollowingResult.shouldContinue) {
+      return { shouldContinue: false };
+    }
+    
+    const enemyBatts = isUser ? enemyBattalions : userBattalions;
+    const enemyBattalion = enemyBatts?.[target.index];
+    
+    if (!enemyBattalion) {
+      return { shouldContinue: false };
+    }
+    
+    // Setup path following for battalion targets
+    setupBattalionPathFollowing(
+      battalion,
+      target,
+      enemyBattalion,
+      nodes,
+      findShortestPaths,
+      reconstructPath,
+      battalionId,
+      debugLog || (() => {})
+    );
+  }
+  
+  return { shouldContinue: true };
+};
+
+export { handlePathCoordination };
+
+// ============================================================================
+// MOVEMENT EXECUTION COORDINATION
+// ============================================================================
+
+/**
+ * Handle movement execution coordination
+ */
+const handleMovementExecution = (
+  battalion: any,
+  target: any,
+  currentPos: { x: number; y: number },
+  range: number,
+  isUser: boolean,
+  battalionId: string,
+  attackIntervals: any,
+  cleanupBattalion: (battalionId: string, attackIntervals: any) => void,
+  setupAttacksFromCombat: (battalion: any, target: any, isUser: boolean, battalionId: string, attackIntervals: any, cleanupBattalion: any, nodeRefs: any, nodes: any, findAvailableTargets: any, moveBattalionAlongPath: any, setUserBattalions?: any, setEnemyBattalions?: any, userBattalions?: any[], enemyBattalions?: any[]) => void,
+  nodeRefs: any,
+  nodes: any,
+  findAvailableTargets: any,
+  moveBattalionAlongPath: any,
+  userBattalions?: any[],
+  enemyBattalions?: any[],
+  setUserBattalions?: any,
+  setEnemyBattalions?: any,
+  debugLog?: (message: string) => void
+): void => {
+  // Handle movement decision logic
+  const decisionResult = handleMovementDecision(
+    currentPos,
+    target,
+    range,
+    isUser,
+    userBattalions,
+    enemyBattalions
+  );
+  
+  if (decisionResult.shouldAttack) {
+    setupAttacksFromCombat(
+      battalion,
+      target,
+      isUser,
+      battalionId,
+      attackIntervals,
+      cleanupBattalion,
+      nodeRefs,
+      nodes,
+      findAvailableTargets,
+      moveBattalionAlongPath,
+      setUserBattalions,
+      setEnemyBattalions,
+      userBattalions,
+      enemyBattalions
+    );
+    return;
+  }
+
+  // Execute movement animation
+  executeBattalionMovement(
+    battalion,
+    decisionResult.rangePosition,
+    calculateMovementDistance(currentPos, target, range, isUser, userBattalions, enemyBattalions).moveDistance,
+    battalionId,
+    attackIntervals,
+    cleanupBattalion,
+    () => {
+      // Post-movement actions
+      handlePostMovementActions(
+        battalion,
+        target,
+        nodes,
+        currentPos,
+        range,
+        isUser,
+        battalionId,
+        findAvailableTargets,
+        moveBattalionAlongPath,
+        setupAttacksFromCombat,
+        debugLog || (() => {}),
+        userBattalions,
+        enemyBattalions,
+        attackIntervals,
+        cleanupBattalion,
+        nodeRefs,
+        setUserBattalions,
+        setEnemyBattalions
+      );
+    }
+  );
+};
+
+export { handleMovementExecution }; 

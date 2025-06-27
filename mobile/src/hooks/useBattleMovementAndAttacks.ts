@@ -37,7 +37,9 @@ import {
   executeBattalionMovement,
   handlePostMovementActions,
   handleMovementValidation,
-  handleMovementDecision
+  handleMovementDecision,
+  handlePathCoordination,
+  handleMovementExecution
 } from './useMovement';
 import { useTargeting } from './useTargeting';
 import { useBattleEngine } from './useBattleEngine';
@@ -124,135 +126,57 @@ export const useBattleMovementAndAttacks = (
       return;
     }
     
-    // Only for node targets, try using the calculated path
-    if (target.type === 'node') {
-      const pathResult = handleNodePathCalculation(
-        battalion,
-        target,
-        nodes,
-        findShortestPaths,
-        reconstructPath,
-        setupAttacksFromCombat,
-        battalionId,
-        isUser,
-        userBattalions,
-        enemyBattalions,
-        attackIntervals.current,
-        cleanupBattalion,
-        nodeRefs.current,
-        findAvailableTargets,
-        moveBattalionAlongPath,
-        setUserBattalions,
-        setEnemyBattalions
-      );
-      
-      if (!pathResult.shouldContinue) {
-        return;
-      }
-      
-      if (pathResult.updatedTarget) {
-        target.position = pathResult.updatedTarget.position;
-      }
-    } else if (target.type === 'battalion') {
-      // Handle battalion path following
-      const pathFollowingResult = handleBattalionPathFollowing(
-        battalion,
-        target,
-        nodes,
-        battalionId,
-        checkForInfiniteLoop,
-        debugLog,
-        moveBattalionAlongPath,
-        isUser,
-        userBattalions,
-        enemyBattalions
-      );
-      
-      if (!pathFollowingResult.shouldContinue) {
-        return;
-      }
-      
-      const enemyBatts = isUser ? enemyBattalions : userBattalions;
-      const enemyBattalion = enemyBatts?.[target.index];
-      
-      if (!enemyBattalion) return;
-      
-      const enemyRange = BOT_CATEGORIES[enemyBattalion.type].stats.range * RANGE_MULTIPLIER;
-      
-      // Setup path following for battalion targets
-      setupBattalionPathFollowing(
-        battalion,
-        target,
-        enemyBattalion,
-        nodes,
-        findShortestPaths,
-        reconstructPath,
-        battalionId,
-        debugLog
-      );
-    }
-    
-    // Handle movement decision logic
-    const decisionResult = handleMovementDecision(
-      currentPos,
+    // Handle path coordination
+    const pathResult = handlePathCoordination(
+      battalion,
       target,
-      range,
+      nodes,
+      findShortestPaths,
+      reconstructPath,
+      setupAttacksFromCombat,
+      battalionId,
       isUser,
       userBattalions,
-      enemyBattalions
+      enemyBattalions,
+      attackIntervals.current,
+      cleanupBattalion,
+      nodeRefs.current,
+      findAvailableTargets,
+      moveBattalionAlongPath,
+      setUserBattalions,
+      setEnemyBattalions,
+      checkForInfiniteLoop,
+      debugLog
     );
     
-    if (decisionResult.shouldAttack) {
-      setupAttacksFromCombat(
-        battalion,
-        target,
-        isUser,
-        battalionId,
-        attackIntervals.current,
-        cleanupBattalion,
-        nodeRefs.current,
-        nodes,
-        findAvailableTargets,
-        moveBattalionAlongPath,
-        setUserBattalions,
-        setEnemyBattalions,
-        userBattalions,
-        enemyBattalions
-      );
+    if (!pathResult.shouldContinue) {
       return;
     }
-
-    // Execute movement animation
-    executeBattalionMovement(
+    
+    if (pathResult.updatedTarget) {
+      target.position = pathResult.updatedTarget.position;
+    }
+    
+    // Handle movement execution
+    handleMovementExecution(
       battalion,
-      decisionResult.rangePosition,
-      calculateMovementDistance(currentPos, target, range, isUser, userBattalions, enemyBattalions).moveDistance,
+      target,
+      currentPos,
+      range,
+      isUser,
       battalionId,
       attackIntervals.current,
       cleanupBattalion,
-      () => {
-        // Post-movement actions
-        handlePostMovementActions(
-          battalion,
-          target,
-          nodes,
-          currentPos,
-          range,
-          isUser,
-          battalionId,
-          findAvailableTargets,
-          moveBattalionAlongPath,
-          setupAttacksFromCombat,
-          debugLog,
-          userBattalions,
-          enemyBattalions,
-          attackIntervals.current,
-          cleanupBattalion,
-          nodeRefs.current,
-          setUserBattalions,
-          setEnemyBattalions
-        );
-      }
+      setupAttacksFromCombat,
+      nodeRefs.current,
+      nodes,
+      findAvailableTargets,
+      moveBattalionAlongPath,
+      userBattalions,
+      enemyBattalions,
+      setUserBattalions,
+      setEnemyBattalions,
+      debugLog
     );
   }, [nodes, findAvailableTargets]);
 
