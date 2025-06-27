@@ -198,5 +198,14 @@ export const useTargeting = (
     }
   }, [battalionsRef, findNewTarget]);
 
-  return { findAvailableTargets, findNewTarget, handleNodeCapture, retargetAllBattalions };
+  // Create a wrapper function for handleNodeCapture with the correct signature
+  const createHandleNodeCaptureWrapper = useCallback((
+    nodesRef: React.MutableRefObject<BattleNode[]>,
+    CAPTURE_MEMORY_DURATION: number
+  ) => {
+    return (nodeIndex: number, newControlState: 'user' | 'enemy') => 
+      handleNodeCapture(nodeIndex, newControlState, nodesRef, CAPTURE_MEMORY_DURATION);
+  }, [handleNodeCapture]);
+
+  return { findAvailableTargets, findNewTarget, handleNodeCapture, retargetAllBattalions, createHandleNodeCaptureWrapper };
 }; 
