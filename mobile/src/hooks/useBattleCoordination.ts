@@ -19,7 +19,7 @@ import {
 import { useTargeting } from './useTargeting';
 import { useBattleEngine } from './useBattleEngine';
 
-export const useBattleMovementAndAttacks = (
+export const useBattleCoordination = (
   battleStarted: boolean,
   nodes: BattleNode[],
   userBattalions: BattalionPosition[],
@@ -149,7 +149,7 @@ export const useBattleMovementAndAttacks = (
       setEnemyBattalions,
       debugLog
     );
-  }, [nodes]);
+  }, [nodes, attackIntervals, findAvailableTargetsRef, nodeRefs, setUserBattalions, setEnemyBattalions, debugLog]);
 
   // Use targeting hook (after moveBattalionAlongPath is defined)
   const { findAvailableTargets, findNewTarget, handleNodeCapture, retargetAllBattalions, createHandleNodeCaptureWrapper } = useTargeting(
