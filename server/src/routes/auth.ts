@@ -37,7 +37,6 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
   '/register', 
   async (req, res): Promise<void> => {
     try {
-      console.log('Registration attempt:', req.body);
       const { email, handle, accessKey } = req.body;
       
       // Check for existing user
@@ -46,7 +45,6 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
       });
       
       if (existingUser) {
-        console.log('User already exists:', existingUser.handle);
         res.status(400).json({ 
           error: existingUser.email === email ? 'Email already exists' : 'Handle already exists'
         });
@@ -61,7 +59,6 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
       });
 
       await user.save();
-      console.log('New user created:', user.handle);
 
       // Generate token
       const token = jwt.sign(

@@ -9,16 +9,6 @@ import { BattleNode, BattalionPosition, BattleTarget } from '../types/battle';
 const ATTACK_DELAY = 300;
 const CAPTURE_MEMORY_DURATION = 5000;
 
-// Debug flag - set to false to disable all debugging
-const DEBUG_BATTLE = true;
-
-// Debug function
-const debugLog = (message: string) => {
-  if (DEBUG_BATTLE) {
-    console.log(message);
-  }
-};
-
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
@@ -49,7 +39,7 @@ type OnBattalionLoss = (
   mark: number
 ) => void;
 
-export { DEBUG_BATTLE, debugLog, ATTACK_DELAY, CAPTURE_MEMORY_DURATION };
+export { ATTACK_DELAY, CAPTURE_MEMORY_DURATION };
 export type { BattalionRefs, NodeRefs, AttackIntervals, OnBattalionLoss };
 
 // ============================================================================
@@ -167,9 +157,7 @@ export const useBattalionRefsAndState = (
     
     // Constants
     ATTACK_DELAY,
-    CAPTURE_MEMORY_DURATION,
-    DEBUG_BATTLE,
-    debugLog
+    CAPTURE_MEMORY_DURATION
   };
 };
 

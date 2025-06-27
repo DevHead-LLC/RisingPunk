@@ -14,7 +14,6 @@ const checkForInfiniteLoop = (battalionId: string, action: string) => {
   if (record && now - record.lastTime < 1000) {
     record.count++;
     if (record.count > 10) {
-      console.log(`[INFINITE LOOP DETECTED] ${battalionId} - ${action} repeated ${record.count} times`);
       return true;
     }
   } else {
@@ -194,7 +193,6 @@ const handleBattalionPathFollowing = (
         // Clear path data to break the loop
         battalion.remainingPath = undefined;
         battalion.finalTarget = undefined;
-        console.log(`[LOOP BREAK] ${battalionId} - Cleared path data to break infinite loop`);
         return { shouldContinue: false };
       }
       
