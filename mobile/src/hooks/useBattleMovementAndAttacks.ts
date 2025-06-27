@@ -38,6 +38,7 @@ import {
   handlePostMovementActions
 } from './useMovement';
 import { useTargeting } from './useTargeting';
+import { useBattleEngine } from './useBattleEngine';
 import type { BattalionRefs, NodeRefs, AttackIntervals, OnBattalionLoss } from './useBattalionRefsAndState';
 import { 
   setupAttacks as setupAttacksFromCombat,
@@ -266,68 +267,24 @@ export const useBattleMovementAndAttacks = (
     );
   }, [nodes, findAvailableTargets]);
 
-  // Combat logic has been moved to useCombat.ts hook
-
-  // Memoized calculations for performance optimization
-  const memoizedCalculations = useMemo(() => {
-    const calculations: { [key: string]: any } = {};
-    
-    // Cache bot category stats to avoid repeated lookups
-    const botStats = new Map<string, any>();
-    const getBotStats = (type: string, isUser: boolean = true) => {
-      const key = `${type}-${isUser ? 'user' : 'enemy'}`;
-      if (!botStats.has(key)) {
-        const baseStats = BOT_CATEGORIES[type].stats;
-        if (isUser) {
-          botStats.set(key, baseStats);
-        } else {
-          // Enemy bots have much higher attack power
-          botStats.set(key, {
-            ...baseStats,
-            offense: baseStats.offense * 4, // 4x higher attack power
-            health: baseStats.health * 2    // 2x higher health
-          });
-        }
-      }
-      return botStats.get(key);
-    };
-
-    // Cache attack intervals by battalion type and speed
-    const attackIntervals = new Map<string, number>();
-    const getAttackInterval = (type: string) => {
-      const key = `attack-${type}`;
-      if (!attackIntervals.has(key)) {
-        const speed = getBotStats(type).speed;
-        attackIntervals.set(key, calculateAttackInterval(speed));
-      }
-      return attackIntervals.get(key);
-    };
-
-    // Cache attack ranges by battalion type
-    const attackRanges = new Map<string, number>();
-    const getAttackRange = (type: string) => {
-      if (!attackRanges.has(type)) {
-        attackRanges.set(type, calculateAttackRange(type));
-      }
-      return attackRanges.get(type);
-    };
-
-    // Cache movement durations by speed
-    const movementDurations = new Map<number, number>();
-    const getMovementDuration = (speed: number) => {
-      if (!movementDurations.has(speed)) {
-        movementDurations.set(speed, calculateMovementDuration(speed));
-      }
-      return movementDurations.get(speed);
-    };
-
-    return {
-      getBotStats,
-      getAttackInterval,
-      getAttackRange,
-      getMovementDuration
-    };
-  }, []);
+  // Use battle engine for orchestration
+  const { memoizedCalculations } = useBattleEngine(
+    battleStarted,
+    nodes,
+    userBattalions,
+    enemyBattalions,
+    setUserBattalions,
+    setEnemyBattalions,
+    onBattalionLoss,
+    battalionRefs,
+    attackIntervals,
+    nodeRefs,
+    battleInitializedRef,
+    battalionsRef,
+    nodesRef,
+    findAvailableTargets,
+    moveBattalionAlongPath
+  );
 
   // Update refs when battalions change
   useEffect(() => {
@@ -339,7 +296,69 @@ export const useBattleMovementAndAttacks = (
     nodesRef.current = nodes;
   }, [nodes]);
 
-  // IMPORTANT: Handle battalion movement and attacks
+  // Strategic target selection with unified logic
+  const findNewTarget = (battalion: BattalionPosition, isUser: boolean) => {
+    // Generate battalion ID
+    const { battalionId } = findBattalionIndexAndId(battalion, isUser, battalionsRef.current.user, battalionsRef.current.enemy);
+    
+    // Check cooldown
+    const now = Date.now();
+    const lastRetarget = retargetCooldowns.current[battalionId] || 0;
+    if (now - lastRetarget < RETARGET_COOLDOWN) {
+      return; // Still in cooldown
+    }
+    
+    // Get all available targets
+    const allTargets = findAvailableTargets(
+      battalion,
+      isUser,
+      battalionsRef.current.user,
+      battalionsRef.current.enemy
+    );
+
+    // Unified target selection - all battalion types behave identically
+    let targets: typeof allTargets = [];
+    
+    // All battalions prioritize neutral nodes, then enemy battalions
+    targets = allTargets.filter(target => {
+      if (target.type === 'node') {
+        const node = nodesRef.current[target.index];
+        // Only target neutral nodes, not captured ones
+        return node.controlState === 'neutral' && !recentlyCapturedNodes.current.has(target.index);
+      }
+      return false;
+    });
+    
+    // If no neutral nodes, attack enemy battalions
+    if (targets.length === 0) {
+      targets = allTargets.filter(target => target.type === 'battalion');
+    }
+    
+    if (targets.length > 0) {
+      const target = targets[0];
+      
+      // Set cooldown
+      retargetCooldowns.current[battalionId] = now;
+      
+      // If targeting a node, mark it as recently captured
+      if (target.type === 'node') {
+        recentlyCapturedNodes.current.add(target.index);
+        setTimeout(() => {
+          recentlyCapturedNodes.current.delete(target.index);
+        }, CAPTURE_MEMORY_DURATION);
+      }
+      
+      moveBattalionAlongPath(
+        battalion,
+        target,
+        isUser,
+        battalionsRef.current.user,
+        battalionsRef.current.enemy
+      );
+    }
+  };
+
+  // Battle initialization - find initial targets for all battalions
   useEffect(() => {
     if (battleStarted && !battleInitializedRef.current) {
       battleInitializedRef.current = true;
@@ -348,14 +367,24 @@ export const useBattleMovementAndAttacks = (
       const selectTargetNode = (battalion: BattalionPosition, isUser: boolean, targetedNodes: Set<number>) => {
         let availableNodes = getConnectedNodes(battalion.nodeIndex);
         
-        // Filter out already targeted nodes
+        // Filter out already targeted nodes AND non-neutral nodes
         availableNodes = availableNodes.filter(nodeIndex => {
-          return !targetedNodes.has(nodeIndex);
+          const node = nodesRef.current[nodeIndex];
+          // Only target neutral nodes, not controlled ones
+          return !targetedNodes.has(nodeIndex) && node.controlState === 'neutral';
         });
 
-        // If no untargeted nodes available, expand search
+        // If no untargeted neutral nodes available, expand search to any neutral nodes
         if (availableNodes.length === 0) {
-          availableNodes = getConnectedNodes(battalion.nodeIndex);
+          availableNodes = getConnectedNodes(battalion.nodeIndex).filter(nodeIndex => {
+            const node = nodesRef.current[nodeIndex];
+            return node.controlState === 'neutral';
+          });
+        }
+
+        // If still no neutral nodes, return undefined (no valid target)
+        if (availableNodes.length === 0) {
+          return undefined;
         }
 
         return availableNodes[Math.floor(Math.random() * availableNodes.length)];
@@ -412,6 +441,12 @@ export const useBattleMovementAndAttacks = (
 
         sortedBattalions.forEach(battalion => {
           const targetNodeIndex = selectTargetNode(battalion, isUser, targetedNodes);
+          
+          // Skip if no valid neutral target found
+          if (targetNodeIndex === undefined) {
+            return;
+          }
+          
           targetedNodes.add(targetNodeIndex);
 
           const targetNode = nodesRef.current[targetNodeIndex];
@@ -465,7 +500,7 @@ export const useBattleMovementAndAttacks = (
         battleInitializedRef.current = false;
       };
     }
-  }, [battleStarted]); // Only depend on battleStarted
+  }, [battleStarted, memoizedCalculations, findAvailableTargets, moveBattalionAlongPath]);
 
   const handleBattalionDamage = (
     battalion: BattalionPosition,
@@ -561,68 +596,6 @@ export const useBattleMovementAndAttacks = (
     
     // Set up interval for subsequent attacks
     attackIntervals.current[intervalKey] = setInterval(performBattalionAttack, attackInterval);
-  };
-
-  // Strategic target selection with unified logic
-  const findNewTarget = (battalion: BattalionPosition, isUser: boolean) => {
-    // Generate battalion ID
-    const { battalionId } = findBattalionIndexAndId(battalion, isUser, battalionsRef.current.user, battalionsRef.current.enemy);
-    
-    // Check cooldown
-    const now = Date.now();
-    const lastRetarget = retargetCooldowns.current[battalionId] || 0;
-    if (now - lastRetarget < RETARGET_COOLDOWN) {
-      return; // Still in cooldown
-    }
-    
-    // Get all available targets
-    const allTargets = findAvailableTargets(
-      battalion,
-      isUser,
-      battalionsRef.current.user,
-      battalionsRef.current.enemy
-    );
-
-    // Unified target selection - all battalion types behave identically
-    let targets: typeof allTargets = [];
-    
-    // All battalions prioritize neutral nodes, then enemy battalions
-    targets = allTargets.filter(target => {
-      if (target.type === 'node') {
-        const node = nodesRef.current[target.index];
-        // Only target neutral nodes, not captured ones
-        return node.controlState === 'neutral' && !recentlyCapturedNodes.current.has(target.index);
-      }
-      return false;
-    });
-    
-    // If no neutral nodes, attack enemy battalions
-    if (targets.length === 0) {
-      targets = allTargets.filter(target => target.type === 'battalion');
-    }
-    
-    if (targets.length > 0) {
-      const target = targets[0];
-      
-      // Set cooldown
-      retargetCooldowns.current[battalionId] = now;
-      
-      // If targeting a node, mark it as recently captured
-      if (target.type === 'node') {
-        recentlyCapturedNodes.current.add(target.index);
-        setTimeout(() => {
-          recentlyCapturedNodes.current.delete(target.index);
-        }, CAPTURE_MEMORY_DURATION);
-      }
-      
-      moveBattalionAlongPath(
-        battalion,
-        target,
-        isUser,
-        battalionsRef.current.user,
-        battalionsRef.current.enemy
-      );
-    }
   };
 
   // Node capture handling with retargeting
