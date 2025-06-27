@@ -25,7 +25,7 @@ import {
 import { findShortestPaths, reconstructPath } from '../utils/pathfinding';
 import { debugLog } from './useBattalionRefsAndState';
 import { findBattalionIndexAndId } from './useBattalionRefsAndState';
-import { checkForInfiniteLoop, getAnimatedPosition, cleanupBattalion } from './useMovement';
+import { checkForInfiniteLoop, getAnimatedPosition, cleanupBattalion, validateBattalionAndTarget } from './useMovement';
 import { useTargeting } from './useTargeting';
 import type { BattalionRefs, NodeRefs, AttackIntervals, OnBattalionLoss } from './useBattalionRefsAndState';
 
@@ -63,18 +63,24 @@ export const useBattleMovementAndAttacks = (
     // Generate battalion ID
     const { battalionId } = findBattalionIndexAndId(battalion, isUser, userBattalions, enemyBattalions);
     
-    // Check if battalion is destroyed
-    if (battalion.quantity <= 0 || battalion.currentHealth <= 0) {
-      cleanupBattalion(battalionId, attackIntervals.current);
-      return;
-    }
-
-    // Validate node target before proceeding
-    if (target.type === 'node') {
-      const node = nodes[target.index];
-      // Only retarget if node is not neutral (captured)
-      if (node.controlState !== 'neutral') {
-        battalion.targetNode = undefined;
+    // Get current position and range for validation
+    const currentPos = getAnimatedPosition(battalion.position);
+    const range = BOT_CATEGORIES[battalion.type].stats.range * RANGE_MULTIPLIER;
+    
+    // Validate battalion and target
+    const validation = validateBattalionAndTarget(
+      battalion,
+      target,
+      nodes,
+      currentPos,
+      range,
+      cleanupBattalion,
+      battalionId,
+      attackIntervals.current
+    );
+    
+    if (!validation.isValid) {
+      if (validation.shouldRetarget) {
         const newTargets = findAvailableTargets(battalion, isUser, userBattalions || [], enemyBattalions || []);
         if (newTargets.length > 0) {
           // Prevent targeting the same node again
@@ -85,28 +91,12 @@ export const useBattleMovementAndAttacks = (
             moveBattalionAlongPath(battalion, validTarget, isUser, userBattalions, enemyBattalions);
           }
         }
-        return;
       }
-    }
-
-    if (!target || !target.position) return;
-    
-    // Check target validity before any movement or path calculation
-    if (target.type === 'node') {
-      const targetNode = nodes[target.index];
-      if (targetNode.controlState !== 'neutral') {
-        return;
-      }
+      return;
     }
     
-    // Check if battalion is already in attack range before any movement calculations
-    const currentPos = getAnimatedPosition(battalion.position);
-    const dx = target.position.x - currentPos.x;
-    const dy = target.position.y - currentPos.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    const range = BOT_CATEGORIES[battalion.type].stats.range * RANGE_MULTIPLIER;
-    
-    if (distance <= range) {
+    // If in range, start attacking
+    if (validation.inRange) {
       setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
       return;
     }
@@ -275,7 +265,7 @@ export const useBattleMovementAndAttacks = (
     }
     
     // If in range, start attacking
-    if (moveDistance < 0.5 && Math.abs(dx) < 0.1 && Math.abs(dy) < 0.1) {
+    if (moveDistance < 0.5 && Math.abs(updatedDx) < 0.1 && Math.abs(updatedDy) < 0.1) {
       setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
       return;
     }

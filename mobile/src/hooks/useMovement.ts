@@ -39,4 +39,65 @@ const cleanupBattalion = (battalionId: string, attackIntervals: { [key: string]:
   });
 };
 
-export { checkForInfiniteLoop, getAnimatedPosition, cleanupBattalion }; 
+export { checkForInfiniteLoop, getAnimatedPosition, cleanupBattalion };
+
+// ============================================================================
+// TARGET VALIDATION LOGIC
+// ============================================================================
+
+/**
+ * Validate if a battalion can move and if the target is valid
+ */
+const validateBattalionAndTarget = (
+  battalion: { quantity: number; currentHealth?: number; targetNode?: number },
+  target: { type: string; index: number; position?: { x: number; y: number } },
+  nodes: { controlState: string }[],
+  currentPos: { x: number; y: number },
+  range: number,
+  cleanupBattalion: (battalionId: string, attackIntervals: any) => void,
+  battalionId: string,
+  attackIntervals: any
+): { isValid: boolean; shouldRetarget: boolean; distance: number; inRange: boolean } => {
+  // Check if battalion is destroyed
+  if (battalion.quantity <= 0 || (battalion.currentHealth ?? 0) <= 0) {
+    cleanupBattalion(battalionId, attackIntervals);
+    return { isValid: false, shouldRetarget: false, distance: 0, inRange: false };
+  }
+
+  // Validate node target before proceeding
+  if (target.type === 'node') {
+    const node = nodes[target.index];
+    // Only retarget if node is not neutral (captured)
+    if (node.controlState !== 'neutral') {
+      battalion.targetNode = undefined;
+      return { isValid: false, shouldRetarget: true, distance: 0, inRange: false };
+    }
+  }
+
+  if (!target || !target.position) {
+    return { isValid: false, shouldRetarget: false, distance: 0, inRange: false };
+  }
+  
+  // Check target validity before any movement or path calculation
+  if (target.type === 'node') {
+    const targetNode = nodes[target.index];
+    if (targetNode.controlState !== 'neutral') {
+      return { isValid: false, shouldRetarget: false, distance: 0, inRange: false };
+    }
+  }
+  
+  // Check if battalion is already in attack range before any movement calculations
+  const dx = target.position.x - currentPos.x;
+  const dy = target.position.y - currentPos.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  const inRange = distance <= range;
+  
+  // If in range, battalion is valid for attacking but not for moving
+  if (inRange) {
+    return { isValid: true, shouldRetarget: false, distance, inRange: true };
+  }
+
+  return { isValid: true, shouldRetarget: false, distance, inRange: false };
+};
+
+export { validateBattalionAndTarget }; 
