@@ -21,7 +21,8 @@ export const useTargeting = (
     userBattalions: BattalionPosition[],
     enemyBattalions: BattalionPosition[]
   ): BattleTarget[] => {
-    if (battalion.quantity <= 0 || battalion.currentHealth <= 0) return [];
+    if (!battalion || battalion.quantity <= 0 || battalion.currentHealth <= 0) return [];
+    if (!nodes || !Array.isArray(nodes)) return [];
     
     const currentPos = getAnimatedPosition(battalion.position);
     const allTargets: BattleTarget[] = [];
@@ -32,7 +33,7 @@ export const useTargeting = (
     const connectedNodeIndices = getConnectedNodes(battalion.nodeIndex);
     
     nodes.forEach((node, index) => {
-      if (!connectedNodeIndices.includes(index)) return;
+      if (!node || !connectedNodeIndices.includes(index)) return;
       // Only target neutral nodes - controlled nodes are permanent
       if (node.controlState !== 'neutral') return;
       if (index === battalion.nodeIndex) return;
@@ -57,26 +58,28 @@ export const useTargeting = (
     if (allTargets.length === 0) {
       const enemyBatts = isUser ? enemyBattalions : userBattalions;
       
-      enemyBatts.forEach((enemyBattalion, index) => {
-        if (!enemyBattalion || enemyBattalion.quantity <= 0 || enemyBattalion.currentHealth <= 0) {
-          return;
-        }
-        
-        const enemyPos = getAnimatedPosition(enemyBattalion.position);
-        const distance = Math.sqrt(
-          Math.pow(enemyPos.x - currentPos.x, 2) + 
-          Math.pow(enemyPos.y - currentPos.y, 2)
-        );
-        
-        if (!isNaN(distance)) {
-          allTargets.push({
-            type: 'battalion',
-            index,
-            distance,
-            position: enemyPos
-          });
-        }
-      });
+      if (enemyBatts && Array.isArray(enemyBatts)) {
+        enemyBatts.forEach((enemyBattalion, index) => {
+          if (!enemyBattalion || enemyBattalion.quantity <= 0 || enemyBattalion.currentHealth <= 0) {
+            return;
+          }
+          
+          const enemyPos = getAnimatedPosition(enemyBattalion.position);
+          const distance = Math.sqrt(
+            Math.pow(enemyPos.x - currentPos.x, 2) + 
+            Math.pow(enemyPos.y - currentPos.y, 2)
+          );
+          
+          if (!isNaN(distance)) {
+            allTargets.push({
+              type: 'battalion',
+              index,
+              distance,
+              position: enemyPos
+            });
+          }
+        });
+      }
     }
     
     // Sort targets by distance only - priority is handled by order of checking
@@ -88,6 +91,8 @@ export const useTargeting = (
   }, [nodes]);
 
   const findNewTarget = useCallback((battalion: BattalionPosition, isUser: boolean) => {
+    if (!battalion || !battalionsRef.current) return;
+    
     // Generate battalion ID
     const { battalionId } = findBattalionIndexAndId(battalion, isUser, battalionsRef.current.user, battalionsRef.current.enemy);
     
@@ -116,7 +121,7 @@ export const useTargeting = (
       if (target.type === 'node') {
         const node = nodes[target.index];
         // Only target neutral nodes, not captured ones
-        return node.controlState === 'neutral' && !recentlyCapturedNodes.current.has(target.index);
+        return node && node.controlState === 'neutral' && !recentlyCapturedNodes.current.has(target.index);
       }
       return false;
     });
@@ -172,19 +177,25 @@ export const useTargeting = (
 
   // Retarget all battalions after node capture
   const retargetAllBattalions = useCallback(() => {
+    if (!battalionsRef.current) return;
+    
     // Retarget user battalions
-    battalionsRef.current.user.forEach((battalion, index) => {
-      if (battalion && battalion.quantity > 0 && battalion.currentHealth > 0) {
-        findNewTarget(battalion, true);
-      }
-    });
+    if (battalionsRef.current.user && Array.isArray(battalionsRef.current.user)) {
+      battalionsRef.current.user.forEach((battalion, index) => {
+        if (battalion && battalion.quantity > 0 && battalion.currentHealth > 0) {
+          findNewTarget(battalion, true);
+        }
+      });
+    }
     
     // Retarget enemy battalions
-    battalionsRef.current.enemy.forEach((battalion, index) => {
-      if (battalion && battalion.quantity > 0 && battalion.currentHealth > 0) {
-        findNewTarget(battalion, false);
-      }
-    });
+    if (battalionsRef.current.enemy && Array.isArray(battalionsRef.current.enemy)) {
+      battalionsRef.current.enemy.forEach((battalion, index) => {
+        if (battalion && battalion.quantity > 0 && battalion.currentHealth > 0) {
+          findNewTarget(battalion, false);
+        }
+      });
+    }
   }, [battalionsRef, findNewTarget]);
 
   return { findAvailableTargets, findNewTarget, handleNodeCapture, retargetAllBattalions };

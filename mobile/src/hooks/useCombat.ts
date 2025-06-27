@@ -1,9 +1,11 @@
-import { useCallback } from 'react';
 import { BOT_CATEGORIES, getBotStats } from '../screens/DigitalBarracksScreen';
 import { RANGE_MULTIPLIER } from '../utils/battleConstants';
 import { updateBattalionHealth } from '../utils/healthUtils';
 import type { BattalionPosition, BattleTarget, BattleNode } from '../types/battle';
 import { calculateTotalDamage } from '../utils/battleUtils';
+import { BattalionRef } from '../components/battle/AnimatedBattalion';
+import { findBattalionIndexAndId } from './useBattalionRefsAndState';
+import { cleanupBattalion } from './useMovement';
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -363,7 +365,7 @@ const setupBattalionAttacks = (
   memoizedCalculations: any,
   findAvailableTargets: (battalion: BattalionPosition, isUser: boolean, userBattalions: BattalionPosition[], enemyBattalions: BattalionPosition[]) => any[],
   moveBattalionAlongPath: (battalion: BattalionPosition, target: any, isUser: boolean, userBattalions?: BattalionPosition[], enemyBattalions?: BattalionPosition[]) => void,
-  battalionsRef: { current: { user: BattalionPosition[], enemy: BattalionPosition[] } },
+  battalionsRef: { current: { user: BattalionPosition[]; enemy: BattalionPosition[] } },
   ATTACK_DELAY: number
 ): void => {
   const attackerKey = createBattalionKey(isUser, battalion.nodeIndex);
@@ -441,31 +443,92 @@ const setupBattalionAttacksWrapper = (
   targetBattalion: BattalionPosition,
   isUser: boolean,
   attackIntervals: { [key: string]: NodeJS.Timeout },
-  battalionRefs: { [key: string]: any },
+  battalionRefs: { [key: string]: BattalionRef },
   setUserBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
   setEnemyBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
   onBattalionLoss: (type: string, name: string, quantity: number, mark?: number) => void,
   memoizedCalculations: any,
-  findAvailableTargets: (battalion: BattalionPosition, isUser: boolean, userBattalions: BattalionPosition[], enemyBattalions: BattalionPosition[]) => any[],
-  moveBattalionAlongPath: (battalion: BattalionPosition, target: any, isUser: boolean, userBattalions?: BattalionPosition[], enemyBattalions?: BattalionPosition[]) => void,
-  battalionsRef: { current: { user: BattalionPosition[], enemy: BattalionPosition[] } },
+  findAvailableTargets: (battalion: BattalionPosition, isUser: boolean, userBattalions: BattalionPosition[], enemyBattalions: BattalionPosition[]) => BattleTarget[],
+  moveBattalionAlongPath: (battalion: BattalionPosition, target: BattleTarget, isUser: boolean, userBattalions?: BattalionPosition[], enemyBattalions?: BattalionPosition[]) => void,
+  battalionsRef: React.MutableRefObject<{ user: BattalionPosition[]; enemy: BattalionPosition[] }>,
   ATTACK_DELAY: number
 ) => {
-  setupBattalionAttacks(
-    battalion,
-    targetBattalion,
-    isUser,
-    attackIntervals,
-    battalionRefs,
-    setUserBattalions,
-    setEnemyBattalions,
-    onBattalionLoss,
-    memoizedCalculations,
-    findAvailableTargets,
-    moveBattalionAlongPath,
-    battalionsRef,
-    ATTACK_DELAY
-  );
+  // Generate battalion ID
+  const { battalionId } = findBattalionIndexAndId(battalion, isUser, battalionsRef.current.user, battalionsRef.current.enemy);
+  
+  // Clear any existing attack interval for this battalion
+  if (attackIntervals[battalionId]) {
+    clearInterval(attackIntervals[battalionId]);
+    delete attackIntervals[battalionId];
+  }
+  
+  // Set up continuous attacks
+  attackIntervals[battalionId] = setInterval(() => {
+    // Check if battalion still exists and is healthy
+    const currentBattalion = isUser 
+      ? battalionsRef.current.user.find(b => b && b.type === battalion.type && b.nodeIndex === battalion.nodeIndex && b.mark === battalion.mark)
+      : battalionsRef.current.enemy.find(b => b && b.type === battalion.type && b.nodeIndex === battalion.nodeIndex && b.mark === battalion.mark);
+    
+    if (!currentBattalion || currentBattalion.quantity <= 0 || currentBattalion.currentHealth <= 0) {
+      cleanupBattalion(battalionId, attackIntervals);
+      return;
+    }
+    
+    // Check if target still exists and is healthy
+    const targetBattalionCurrent = isUser 
+      ? battalionsRef.current.enemy.find(b => b && b.type === targetBattalion.type && b.nodeIndex === targetBattalion.nodeIndex && b.mark === targetBattalion.mark)
+      : battalionsRef.current.user.find(b => b && b.type === targetBattalion.type && b.nodeIndex === targetBattalion.nodeIndex && b.mark === targetBattalion.mark);
+    
+    if (!targetBattalionCurrent || targetBattalionCurrent.quantity <= 0 || targetBattalionCurrent.currentHealth <= 0) {
+      cleanupBattalion(battalionId, attackIntervals);
+      return;
+    }
+    
+    // Perform attack
+    const totalDamage = calculateTotalDamage(currentBattalion, isUser);
+    performBattalionAttack(
+      currentBattalion,
+      targetBattalionCurrent,
+      isUser,
+      totalDamage,
+      ATTACK_DELAY,
+      battalionRefs,
+      setUserBattalions,
+      setEnemyBattalions,
+      onBattalionLoss
+    );
+  }, ATTACK_DELAY);
+};
+
+// Create a wrapper function for setupBattalionAttacks with the correct signature
+const createSetupBattalionAttacksWrapper = (
+  attackIntervals: { [key: string]: NodeJS.Timeout },
+  battalionRefs: { [key: string]: BattalionRef },
+  setUserBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
+  setEnemyBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
+  onBattalionLoss: (type: string, name: string, quantity: number, mark?: number) => void,
+  memoizedCalculations: any,
+  findAvailableTargets: (battalion: BattalionPosition, isUser: boolean, userBattalions: BattalionPosition[], enemyBattalions: BattalionPosition[]) => BattleTarget[],
+  moveBattalionAlongPath: (battalion: BattalionPosition, target: BattleTarget, isUser: boolean, userBattalions?: BattalionPosition[], enemyBattalions?: BattalionPosition[]) => void,
+  battalionsRef: React.MutableRefObject<{ user: BattalionPosition[]; enemy: BattalionPosition[] }>,
+  ATTACK_DELAY: number
+) => {
+  return (battalion: BattalionPosition, targetBattalion: BattalionPosition, isUser: boolean) => 
+    setupBattalionAttacksWrapper(
+      battalion,
+      targetBattalion,
+      isUser,
+      attackIntervals,
+      battalionRefs,
+      setUserBattalions,
+      setEnemyBattalions,
+      onBattalionLoss,
+      memoizedCalculations,
+      findAvailableTargets,
+      moveBattalionAlongPath,
+      battalionsRef,
+      ATTACK_DELAY
+    );
 };
 
 export { 
@@ -477,5 +540,6 @@ export {
   createBattalionKey,
   performBattalionAttack,
   setupBattalionAttacks,
-  setupBattalionAttacksWrapper
+  setupBattalionAttacksWrapper,
+  createSetupBattalionAttacksWrapper
 }; 
