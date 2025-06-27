@@ -494,4 +494,95 @@ const handlePostMovementActions = (
   }
 };
 
-export { calculateMovementDistance, executeBattalionMovement, handlePostMovementActions }; 
+export { calculateMovementDistance, executeBattalionMovement, handlePostMovementActions };
+
+// ============================================================================
+// MOVEMENT VALIDATION AND DECISION LOGIC
+// ============================================================================
+
+/**
+ * Handle movement validation and retargeting logic
+ */
+const handleMovementValidation = (
+  battalion: any,
+  target: any,
+  nodes: any[],
+  currentPos: { x: number; y: number },
+  range: number,
+  cleanupBattalion: (battalionId: string, attackIntervals: any) => void,
+  battalionId: string,
+  attackIntervals: any,
+  findAvailableTargets: (battalion: any, isUser: boolean, userBattalions: any[], enemyBattalions: any[]) => any[],
+  isUser: boolean,
+  moveBattalionAlongPath: (battalion: any, target: any, isUser: boolean, userBattalions?: any[], enemyBattalions?: any[]) => void,
+  userBattalions?: any[],
+  enemyBattalions?: any[]
+): { shouldContinue: boolean; shouldAttack: boolean } => {
+  // Validate battalion and target
+  const validation = validateBattalionAndTarget(
+    battalion,
+    target,
+    nodes,
+    currentPos,
+    range,
+    cleanupBattalion,
+    battalionId,
+    attackIntervals
+  );
+  
+  if (!validation.isValid) {
+    if (validation.shouldRetarget) {
+      const newTargets = findAvailableTargets(battalion, isUser, userBattalions || [], enemyBattalions || []);
+      if (newTargets.length > 0) {
+        // Prevent targeting the same node again
+        const validTarget = newTargets.find(t => 
+          t.type === 'node' ? nodes[t.index].controlState === 'neutral' : true
+        );
+        if (validTarget) {
+          moveBattalionAlongPath(battalion, validTarget, isUser, userBattalions, enemyBattalions);
+        }
+      }
+    }
+    return { shouldContinue: false, shouldAttack: false };
+  }
+  
+  // If in range, start attacking
+  if (validation.inRange) {
+    return { shouldContinue: false, shouldAttack: true };
+  }
+  
+  return { shouldContinue: true, shouldAttack: false };
+};
+
+/**
+ * Handle movement decision logic (attack vs move)
+ */
+const handleMovementDecision = (
+  currentPos: { x: number; y: number },
+  target: any,
+  range: number,
+  isUser: boolean,
+  userBattalions?: any[],
+  enemyBattalions?: any[]
+): { shouldAttack: boolean; rangePosition: { x: number; y: number } } => {
+  // Calculate movement distance and direction
+  const movementResult = calculateMovementDistance(
+    currentPos,
+    target,
+    range,
+    isUser,
+    userBattalions,
+    enemyBattalions
+  );
+  
+  const { updatedDistance, rangePosition } = movementResult;
+  
+  // If we're already in range but the moveDistance calculation is wrong, start attacking anyway
+  if (updatedDistance <= range) {
+    return { shouldAttack: true, rangePosition };
+  }
+  
+  return { shouldAttack: false, rangePosition };
+};
+
+export { handleMovementValidation, handleMovementDecision }; 
