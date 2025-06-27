@@ -227,44 +227,6 @@ export const useBattleMovementAndAttacks = (
     nodesRef.current = nodes;
   }, [nodes]);
 
-  const handleBattalionDamage = (
-    battalion: BattalionPosition,
-    damage: number,
-    isUser: boolean
-  ) => {
-    const healthPerBot = memoizedCalculations.getBotStats(battalion.type, isUser).health;
-    const botsLost = Math.floor(damage / healthPerBot);
-    
-    if (botsLost > 0) {
-      const newQuantity = Math.max(0, battalion.quantity - botsLost);
-      
-      if (isUser) {
-        setUserBattalions(prev => prev.map(b => 
-          b.nodeIndex === battalion.nodeIndex 
-            ? { ...b, quantity: newQuantity }
-            : b
-        ));
-      } else {
-        setEnemyBattalions(prev => prev.map(b => 
-          b.nodeIndex === battalion.nodeIndex 
-            ? { ...b, quantity: newQuantity }
-            : b
-        ));
-      }
-
-      // Record the loss
-      onBattalionLoss(
-        isUser ? 'user' : 'enemy',
-        `${battalion.type}-${battalion.nodeIndex}`,
-        botsLost,
-        battalion.mark || 1 // Default to mark 1 if not specified
-      );
-
-      return newQuantity === 0; // Return true if battalion is destroyed
-    }
-    return false;
-  };
-
   // Optimized battalion vs battalion attack setup
   const setupBattalionAttacks = (
     battalion: BattalionPosition,
@@ -289,7 +251,14 @@ export const useBattleMovementAndAttacks = (
       
       setTimeout(() => {
         battalionRefs.current[targetKey]?.triggerDamageAnimation();
-        const isDestroyed = handleBattalionDamage(targetBattalion, totalDamage, !isUser);
+        const isDestroyed = handleBattalionDamageFromCombat(
+          targetBattalion, 
+          totalDamage, 
+          !isUser,
+          setUserBattalions,
+          setEnemyBattalions,
+          onBattalionLoss
+        );
         
         if (isDestroyed) {
           clearInterval(attackIntervals.current[intervalKey]);

@@ -228,6 +228,7 @@ const setupBattalionAttack = (
 
 /**
  * Handle battalion damage and destruction
+ * Consolidated version that combines the best parts from all implementations
  */
 const handleBattalionDamage = (
   battalion: BattalionPosition,
@@ -235,36 +236,43 @@ const handleBattalionDamage = (
   isUser: boolean,
   setUserBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
   setEnemyBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
-  onBattalionLoss: (battalion: BattalionPosition, isUser: boolean) => void
-): void => {
-  const updateStateFn = (prevBatts: BattalionPosition[]) => {
-    const updatedBatts = [...prevBatts];
-    const battalionIndex = updatedBatts.findIndex(b => 
-      b.type === battalion.type && 
-      b.nodeIndex === battalion.nodeIndex &&
-      b.quantity === battalion.quantity
-    );
+  onBattalionLoss: (type: string, name: string, quantity: number, mark?: number) => void
+): boolean => {
+  const healthPerBot = BOT_CATEGORIES[battalion.type].stats.health;
+  const botsLost = Math.floor(damage / healthPerBot);
+  
+  if (botsLost > 0) {
+    const newQuantity = Math.max(0, battalion.quantity - botsLost);
     
-    if (battalionIndex === -1) return prevBatts;
-    
-    const targetBattalion = updatedBatts[battalionIndex];
-    const wasDestroyed = updateBattalionHealth(targetBattalion, (targetBattalion.currentHealth ?? 0) - damage);
-    
-    if (wasDestroyed) {
-      // Remove battalion from array
-      updatedBatts.splice(battalionIndex, 1);
-      // Call loss callback
-      onBattalionLoss(targetBattalion, isUser);
-    }
-    
-    return updatedBatts;
-  };
+    const updateStateFn = (prevBatts: BattalionPosition[]) => {
+      return prevBatts.map(b => 
+        b.nodeIndex === battalion.nodeIndex 
+          ? { 
+              ...b, 
+              quantity: newQuantity,
+              currentHealth: Math.max(0, (b.currentHealth || 0) - damage)
+            }
+          : b
+      );
+    };
 
-  if (isUser) {
-    setUserBattalions(updateStateFn);
-  } else {
-    setEnemyBattalions(updateStateFn);
+    if (isUser) {
+      setUserBattalions(updateStateFn);
+    } else {
+      setEnemyBattalions(updateStateFn);
+    }
+
+    // Record the loss
+    onBattalionLoss(
+      isUser ? 'user' : 'enemy',
+      `${battalion.type}-${battalion.nodeIndex}`,
+      botsLost,
+      battalion.mark || 1 // Default to mark 1 if not specified
+    );
+
+    return newQuantity === 0; // Return true if battalion is destroyed
   }
+  return false;
 };
 
 /**
