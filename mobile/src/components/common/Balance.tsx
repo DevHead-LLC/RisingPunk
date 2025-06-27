@@ -17,14 +17,11 @@ export const Balance = memo(() => {
   // Force re-render every 10 seconds to update balance display
   useEffect(() => {
     const interval = setInterval(() => {
-      console.log('Balance: Triggering update, current balance:', balance);
       setUpdateTrigger(prev => prev + 1);
     }, 10000);
 
     return () => clearInterval(interval);
   }, [balance]);
-
-  console.log('Balance: Rendering with balance:', balance);
 
   return (
     <View style={styles.balanceContainer}>
