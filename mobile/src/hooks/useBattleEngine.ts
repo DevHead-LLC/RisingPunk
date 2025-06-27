@@ -111,10 +111,6 @@ export const useBattleEngine = (
     };
   }, []);
 
-  return {
-    memoizedCalculations
-  };
-
   // Battle initialization - find initial targets for all battalions
   useEffect(() => {
     if (battleStarted && !battleInitializedRef.current) {
@@ -127,7 +123,6 @@ export const useBattleEngine = (
         // Filter out already targeted nodes AND non-neutral nodes
         availableNodes = availableNodes.filter(nodeIndex => {
           const node = nodesRef.current[nodeIndex];
-          // Only target neutral nodes, not controlled ones
           return !targetedNodes.has(nodeIndex) && node.controlState === 'neutral';
         });
 
@@ -153,6 +148,12 @@ export const useBattleEngine = (
         targetNodeIndex: number,
         isUser: boolean
       ) => {
+        // Validate that the target node is still neutral before setting up attacks
+        const targetNode = nodesRef.current[targetNodeIndex];
+        if (targetNode.controlState !== 'neutral') {
+          return;
+        }
+
         const existingKey = createAttackIntervalKey(isUser, battalion.nodeIndex, targetNodeIndex);
         
         // Clear any existing attack interval
@@ -257,7 +258,7 @@ export const useBattleEngine = (
         battleInitializedRef.current = false;
       };
     }
-  }, [battleStarted, memoizedCalculations, findAvailableTargets, moveBattalionAlongPath, nodesRef, battalionsRef, attackIntervals, battalionRefs, nodeRefs]);
+  }, [battleStarted]);
 
   return {
     memoizedCalculations
