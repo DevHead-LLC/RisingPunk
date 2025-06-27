@@ -89,6 +89,20 @@ export const ENEMY_BOT_CATEGORIES = {
   }
 };
 
+/**
+ * Get bot stats based on whether it's a user or enemy battalion
+ * @param botType - The type of bot (guardian, breacher, phreak)
+ * @param isUser - Whether this is a user battalion (true) or enemy battalion (false)
+ * @returns The bot stats for the specified type and side
+ */
+export const getBotStats = (botType: string, isUser: boolean) => {
+  if (isUser) {
+    return BOT_CATEGORIES[botType as keyof typeof BOT_CATEGORIES];
+  } else {
+    return ENEMY_BOT_CATEGORIES[botType as keyof typeof ENEMY_BOT_CATEGORIES];
+  }
+};
+
 export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
   const botCounts = useAppSelector((state) => state.bots.botCounts);
   const [selectedMark, setSelectedMark] = useState<MarkLevel>(1);
