@@ -87,6 +87,30 @@ const findBattalionIndexAndId = (
 };
 
 // ============================================================================
+// REF UPDATE FUNCTIONS
+// ============================================================================
+
+/**
+ * Update the findAvailableTargetsRef with the current function
+ */
+const updateFindAvailableTargetsRef = (
+  findAvailableTargetsRef: React.MutableRefObject<(
+    battalion: BattalionPosition,
+    isUser: boolean,
+    userBattalions: BattalionPosition[],
+    enemyBattalions: BattalionPosition[]
+  ) => any[]>,
+  findAvailableTargets: (
+    battalion: BattalionPosition,
+    isUser: boolean,
+    userBattalions: BattalionPosition[],
+    enemyBattalions: BattalionPosition[]
+  ) => any[]
+) => {
+  findAvailableTargetsRef.current = findAvailableTargets;
+};
+
+// ============================================================================
 // REFS AND STATE MANAGEMENT
 // ============================================================================
 
@@ -149,4 +173,4 @@ export const useBattalionRefsAndState = (
   };
 };
 
-export { generateBattalionId, findBattalionIndexAndId }; 
+export { generateBattalionId, findBattalionIndexAndId, updateFindAvailableTargetsRef }; 

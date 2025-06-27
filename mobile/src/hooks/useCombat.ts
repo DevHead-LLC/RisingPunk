@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { BOT_CATEGORIES } from '../screens/DigitalBarracksScreen';
+import { BOT_CATEGORIES, getBotStats } from '../screens/DigitalBarracksScreen';
 import { RANGE_MULTIPLIER } from '../utils/battleConstants';
 import { updateBattalionHealth } from '../utils/healthUtils';
 import type { BattalionPosition, BattleTarget, BattleNode } from '../types/battle';
@@ -43,9 +43,9 @@ const setupAttacks = (
     return;
   }
 
-  const attackSpeed = BOT_CATEGORIES[battalion.type].stats.speed;
+  const attackSpeed = getBotStats(battalion.type, isUser).stats.speed;
   const attackInterval = 2000 * (5 / attackSpeed);
-  const attackPower = BOT_CATEGORIES[battalion.type].stats.offense;
+  const attackPower = getBotStats(battalion.type, isUser).stats.offense;
   const totalDamage = attackPower * battalion.quantity;
   
   cleanupBattalion(battalionId, attackIntervals);
@@ -249,7 +249,7 @@ const handleBattalionDamage = (
   setEnemyBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
   onBattalionLoss: (type: string, name: string, quantity: number, mark?: number) => void
 ): boolean => {
-  const healthPerBot = BOT_CATEGORIES[battalion.type].stats.health;
+  const healthPerBot = getBotStats(battalion.type, isUser).stats.health;
   const botsLost = Math.floor(damage / healthPerBot);
   
   if (botsLost > 0) {
@@ -292,9 +292,10 @@ const handleBattalionDamage = (
 const isInAttackRange = (
   battalion: BattalionPosition,
   target: BattleTarget,
-  nodes: BattleNode[]
+  nodes: BattleNode[],
+  isUser: boolean
 ): boolean => {
-  const battalionRange = BOT_CATEGORIES[battalion.type].stats.range * RANGE_MULTIPLIER;
+  const battalionRange = getBotStats(battalion.type, isUser).stats.range * RANGE_MULTIPLIER;
   
   if (target.type === 'node') {
     const node = nodes[target.index];
@@ -374,8 +375,8 @@ const setupBattalionAttacks = (
     clearInterval(attackIntervals[intervalKey]);
   }
 
-  const attackSpeed = memoizedCalculations.getBotStats(battalion.type).speed;
-  const attackInterval = memoizedCalculations.getAttackInterval(battalion.type);
+  const attackSpeed = getBotStats(battalion.type, isUser).stats.speed;
+  const attackInterval = 2000 * (5 / attackSpeed);
   const totalDamage = calculateTotalDamage(battalion, isUser);
 
   const onTargetDestroyed = (battalion: BattalionPosition, isUser: boolean) => {
@@ -432,6 +433,41 @@ const setupBattalionAttacks = (
   }, attackInterval);
 };
 
+/**
+ * Wrapper for setupBattalionAttacks that provides the correct parameters
+ */
+const setupBattalionAttacksWrapper = (
+  battalion: BattalionPosition,
+  targetBattalion: BattalionPosition,
+  isUser: boolean,
+  attackIntervals: { [key: string]: NodeJS.Timeout },
+  battalionRefs: { [key: string]: any },
+  setUserBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
+  setEnemyBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
+  onBattalionLoss: (type: string, name: string, quantity: number, mark?: number) => void,
+  memoizedCalculations: any,
+  findAvailableTargets: (battalion: BattalionPosition, isUser: boolean, userBattalions: BattalionPosition[], enemyBattalions: BattalionPosition[]) => any[],
+  moveBattalionAlongPath: (battalion: BattalionPosition, target: any, isUser: boolean, userBattalions?: BattalionPosition[], enemyBattalions?: BattalionPosition[]) => void,
+  battalionsRef: { current: { user: BattalionPosition[], enemy: BattalionPosition[] } },
+  ATTACK_DELAY: number
+) => {
+  setupBattalionAttacks(
+    battalion,
+    targetBattalion,
+    isUser,
+    attackIntervals,
+    battalionRefs,
+    setUserBattalions,
+    setEnemyBattalions,
+    onBattalionLoss,
+    memoizedCalculations,
+    findAvailableTargets,
+    moveBattalionAlongPath,
+    battalionsRef,
+    ATTACK_DELAY
+  );
+};
+
 export { 
   setupAttacks, 
   setupNodeAttack, 
@@ -440,5 +476,6 @@ export {
   isInAttackRange,
   createBattalionKey,
   performBattalionAttack,
-  setupBattalionAttacks
+  setupBattalionAttacks,
+  setupBattalionAttacksWrapper
 }; 

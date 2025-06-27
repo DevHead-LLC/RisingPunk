@@ -1,4 +1,4 @@
-import { BOT_CATEGORIES } from '../screens/DigitalBarracksScreen';
+import { BOT_CATEGORIES, getBotStats } from '../screens/DigitalBarracksScreen';
 import { BattalionPosition } from '../types/battle';
 import {
   BASE_DURATION,
@@ -45,11 +45,8 @@ export const calculateAttackRange = (battalionType: string): number => {
  * @returns Total damage value
  */
 export const calculateTotalDamage = (battalion: BattalionPosition, isUser: boolean = true): number => {
-  const attackPower = BOT_CATEGORIES[battalion.type].stats.offense;
-  const baseDamage = attackPower * battalion.quantity;
-  
-  // Enemy battalions deal 4x damage
-  return isUser ? baseDamage : baseDamage * 4;
+  const attackPower = getBotStats(battalion.type, isUser).stats.offense;
+  return attackPower * battalion.quantity;
 };
 
 /**

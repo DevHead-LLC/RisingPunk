@@ -27,11 +27,13 @@ export const useTargeting = (
     const allTargets: BattleTarget[] = [];
     
     // Check neutral nodes first (primary targets)
+    // CLARIFICATION: Only neutral nodes can be targeted. Once a node is controlled by either party, 
+    // it cannot be retargeted or changed for the rest of the battle.
     const connectedNodeIndices = getConnectedNodes(battalion.nodeIndex);
     
     nodes.forEach((node, index) => {
       if (!connectedNodeIndices.includes(index)) return;
-      // Only target neutral nodes
+      // Only target neutral nodes - controlled nodes are permanent
       if (node.controlState !== 'neutral') return;
       if (index === battalion.nodeIndex) return;
       
@@ -51,6 +53,7 @@ export const useTargeting = (
     });
 
     // If no neutral nodes found, check enemy battalions
+    // CLARIFICATION: When no neutral nodes are available, battalions attack enemy battalions directly
     if (allTargets.length === 0) {
       const enemyBatts = isUser ? enemyBattalions : userBattalions;
       
@@ -104,6 +107,8 @@ export const useTargeting = (
     );
 
     // Unified target selection - all battalion types behave identically
+    // CLARIFICATION: Both user and enemy battalions prioritize neutral nodes first, then enemy battalions
+    // Once a node is controlled by either party, it cannot be retargeted for the rest of the battle
     let targets: typeof allTargets = [];
     
     // All battalions prioritize neutral nodes, then enemy battalions
@@ -145,5 +150,42 @@ export const useTargeting = (
     }
   }, [nodes, findAvailableTargets, retargetCooldowns, recentlyCapturedNodes, battalionsRef, findBattalionIndexAndId, moveBattalionAlongPath]);
 
-  return { findAvailableTargets, findNewTarget };
+  // Node capture handling with retargeting
+  const handleNodeCapture = useCallback((
+    nodeIndex: number, 
+    newControlState: 'user' | 'enemy',
+    nodesRef: React.MutableRefObject<BattleNode[]>,
+    CAPTURE_MEMORY_DURATION: number
+  ) => {
+    // Update node control state
+    nodesRef.current[nodeIndex].controlState = newControlState;
+    
+    // Mark as recently captured to prevent immediate retargeting
+    recentlyCapturedNodes.current.add(nodeIndex);
+    setTimeout(() => {
+      recentlyCapturedNodes.current.delete(nodeIndex);
+    }, CAPTURE_MEMORY_DURATION);
+    
+    // Retarget all battalions
+    retargetAllBattalions();
+  }, [recentlyCapturedNodes, retargetCooldowns, battalionsRef, findBattalionIndexAndId, moveBattalionAlongPath]);
+
+  // Retarget all battalions after node capture
+  const retargetAllBattalions = useCallback(() => {
+    // Retarget user battalions
+    battalionsRef.current.user.forEach((battalion, index) => {
+      if (battalion && battalion.quantity > 0 && battalion.currentHealth > 0) {
+        findNewTarget(battalion, true);
+      }
+    });
+    
+    // Retarget enemy battalions
+    battalionsRef.current.enemy.forEach((battalion, index) => {
+      if (battalion && battalion.quantity > 0 && battalion.currentHealth > 0) {
+        findNewTarget(battalion, false);
+      }
+    });
+  }, [battalionsRef, findNewTarget]);
+
+  return { findAvailableTargets, findNewTarget, handleNodeCapture, retargetAllBattalions };
 }; 
