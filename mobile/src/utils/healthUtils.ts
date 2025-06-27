@@ -25,32 +25,6 @@ export function updateBattalionHealth(battalion: BattalionPosition, newHealth: n
 }
 
 /**
- * Handles battalion damage, updates state, and returns true if destroyed
- * Optionally calls a loss callback
- */
-export function handleBattalionDamage(
-  battalion: BattalionPosition,
-  damage: number,
-  setBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
-  onBattalionLoss?: (battalionId: string, quantity: number, mark: number) => void
-): boolean {
-  const healthPerBot = BOT_CATEGORIES[battalion.type].stats.health;
-  const botsLost = Math.floor(damage / healthPerBot);
-  if (botsLost > 0) {
-    setBattalions(prev => prev.map(b =>
-      b.nodeIndex === battalion.nodeIndex
-        ? { ...b, quantity: Math.max(0, b.quantity - botsLost), currentHealth: Math.max(0, (b.currentHealth || 0) - damage) }
-        : b
-    ));
-    if (onBattalionLoss) {
-      onBattalionLoss(`${battalion.type}-${battalion.nodeIndex}`, botsLost, battalion.mark || 1);
-    }
-    return (battalion.quantity - botsLost) <= 0;
-  }
-  return false;
-}
-
-/**
  * Calculates initial node health based on all battalions
  */
 export function calculateInitialNodeHealth(userBattalions: BattalionPosition[], enemyBattalions: BattalionPosition[]): number {
