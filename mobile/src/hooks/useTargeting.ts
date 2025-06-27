@@ -3,7 +3,18 @@ import { BattleNode, BattalionPosition, BattleTarget } from '../types/battle';
 import { getConnectedNodes } from '../utils/networkConstants';
 import { getAnimatedPosition } from './useMovement';
 
-export const useTargeting = (nodes: BattleNode[]) => {
+// Constants for targeting
+const RETARGET_COOLDOWN = 2000; // 2 seconds
+const CAPTURE_MEMORY_DURATION = 5000; // 5 seconds
+
+export const useTargeting = (
+  nodes: BattleNode[],
+  retargetCooldowns: React.MutableRefObject<{ [key: string]: number }>,
+  recentlyCapturedNodes: React.MutableRefObject<Set<number>>,
+  battalionsRef: React.MutableRefObject<{ user: BattalionPosition[]; enemy: BattalionPosition[] }>,
+  findBattalionIndexAndId: (battalion: BattalionPosition, isUser: boolean, userBattalions: BattalionPosition[], enemyBattalions: BattalionPosition[]) => { battalionIndex: number; battalionId: string },
+  moveBattalionAlongPath: (battalion: BattalionPosition, target: BattleTarget, isUser: boolean, userBattalions?: BattalionPosition[], enemyBattalions?: BattalionPosition[]) => void
+) => {
   const findAvailableTargets = useCallback((
     battalion: BattalionPosition,
     isUser: boolean,
@@ -73,5 +84,66 @@ export const useTargeting = (nodes: BattleNode[]) => {
     return validTargets;
   }, [nodes]);
 
-  return { findAvailableTargets };
+  const findNewTarget = useCallback((battalion: BattalionPosition, isUser: boolean) => {
+    // Generate battalion ID
+    const { battalionId } = findBattalionIndexAndId(battalion, isUser, battalionsRef.current.user, battalionsRef.current.enemy);
+    
+    // Check cooldown
+    const now = Date.now();
+    const lastRetarget = retargetCooldowns.current[battalionId] || 0;
+    if (now - lastRetarget < RETARGET_COOLDOWN) {
+      return; // Still in cooldown
+    }
+    
+    // Get all available targets
+    const allTargets = findAvailableTargets(
+      battalion,
+      isUser,
+      battalionsRef.current.user,
+      battalionsRef.current.enemy
+    );
+
+    // Unified target selection - all battalion types behave identically
+    let targets: typeof allTargets = [];
+    
+    // All battalions prioritize neutral nodes, then enemy battalions
+    targets = allTargets.filter(target => {
+      if (target.type === 'node') {
+        const node = nodes[target.index];
+        // Only target neutral nodes, not captured ones
+        return node.controlState === 'neutral' && !recentlyCapturedNodes.current.has(target.index);
+      }
+      return false;
+    });
+    
+    // If no neutral nodes, attack enemy battalions
+    if (targets.length === 0) {
+      targets = allTargets.filter(target => target.type === 'battalion');
+    }
+    
+    if (targets.length > 0) {
+      const target = targets[0];
+      
+      // Set cooldown
+      retargetCooldowns.current[battalionId] = now;
+      
+      // If targeting a node, mark it as recently captured
+      if (target.type === 'node') {
+        recentlyCapturedNodes.current.add(target.index);
+        setTimeout(() => {
+          recentlyCapturedNodes.current.delete(target.index);
+        }, CAPTURE_MEMORY_DURATION);
+      }
+      
+      moveBattalionAlongPath(
+        battalion,
+        target,
+        isUser,
+        battalionsRef.current.user,
+        battalionsRef.current.enemy
+      );
+    }
+  }, [nodes, findAvailableTargets, retargetCooldowns, recentlyCapturedNodes, battalionsRef, findBattalionIndexAndId, moveBattalionAlongPath]);
+
+  return { findAvailableTargets, findNewTarget };
 }; 
