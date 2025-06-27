@@ -6,7 +6,8 @@ import { findShortestPaths, reconstructPath } from '../utils/pathfinding';
 import { useBattalionRefsAndState, findBattalionIndexAndId, updateFindAvailableTargetsRef } from './useBattalionRefsAndState';
 import { 
   setupAttacks,
-  setupBattalionAttacksWrapper
+  setupBattalionAttacksWrapper,
+  createSetupBattalionAttacksWrapper
 } from './useCombat';
 import { 
   checkForInfiniteLoop, 
@@ -183,27 +184,40 @@ export const useBattleMovementAndAttacks = (
     moveBattalionAlongPath
   );
 
+  // Create the setupBattalionAttacks wrapper function
+  const setupBattalionAttacks = useCallback(
+    createSetupBattalionAttacksWrapper(
+      attackIntervals.current,
+      battalionRefs.current,
+      setUserBattalions,
+      setEnemyBattalions,
+      onBattalionLoss,
+      memoizedCalculations,
+      findAvailableTargets,
+      moveBattalionAlongPath,
+      battalionsRef,
+      ATTACK_DELAY
+    ),
+    [
+      attackIntervals.current,
+      battalionRefs.current,
+      setUserBattalions,
+      setEnemyBattalions,
+      onBattalionLoss,
+      memoizedCalculations,
+      findAvailableTargets,
+      moveBattalionAlongPath,
+      battalionsRef,
+      ATTACK_DELAY
+    ]
+  );
+
   return {
     battalionRefs,
     nodeRefs,
     attackIntervals,
     findNewTarget,
-    setupBattalionAttacks: (battalion: BattalionPosition, targetBattalion: BattalionPosition, isUser: boolean) => 
-      setupBattalionAttacksWrapper(
-        battalion,
-        targetBattalion,
-        isUser,
-        attackIntervals.current,
-        battalionRefs.current,
-        setUserBattalions,
-        setEnemyBattalions,
-        onBattalionLoss,
-        memoizedCalculations,
-        findAvailableTargets,
-        moveBattalionAlongPath,
-        battalionsRef,
-        ATTACK_DELAY
-      ),
+    setupBattalionAttacks,
     findAvailableTargets,
     moveBattalionAlongPath,
     handleNodeCapture: (nodeIndex: number, newControlState: 'user' | 'enemy') => 
