@@ -1,38 +1,24 @@
-import { useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useCallback, useRef, useEffect } from 'react';
 import { Animated } from 'react-native';
-import { BOT_CATEGORIES } from '../screens/DigitalBarracksScreen';
 import { checkRangeIntersection } from '../utils/battleCalculator';
+import { BOT_CATEGORIES } from '../screens/DigitalBarracksScreen';
+import { RANGE_MULTIPLIER } from '../utils/battleConstants';
 import { BattleNode, BattalionPosition, BattleTarget } from '../types/battle';
-import { getConnectedNodes } from '../utils/networkConstants';
-import { updateBattalionHealth } from '../utils/healthUtils';
-import {
-  RETARGET_COOLDOWN,
-  CAPTURE_MEMORY_DURATION,
-  ATTACK_DELAY,
-  INITIAL_ATTACK_DELAY,
-  BATTALION_CENTER_OFFSET,
-  RANGE_MULTIPLIER
-} from '../utils/battleConstants';
-import {
-  calculateMovementDuration,
-  calculateAttackInterval,
-  calculateAttackRange,
-  calculateTotalDamage,
-  createBattalionKey,
-  createAttackIntervalKey,
-  sortBattalionsByPriority
-} from '../utils/battleUtils';
 import { findShortestPaths, reconstructPath } from '../utils/pathfinding';
-import { debugLog } from './useBattalionRefsAndState';
-import { findBattalionIndexAndId } from './useBattalionRefsAndState';
+import { getConnectedNodes } from '../utils/networkConstants';
+import { findBattalionIndexAndId, type BattalionRefs, type AttackIntervals, type NodeRefs, type OnBattalionLoss } from './useBattalionRefsAndState';
 import { 
+  setupAttacks as setupAttacksFromCombat,
+  handleBattalionDamage as handleBattalionDamageFromCombat
+} from './useCombat';
+import { 
+  checkForInfiniteLoop, 
   getAnimatedPosition, 
-  cleanupBattalion,
+  cleanupBattalion, 
   validateBattalionAndTarget,
   handleNodePathCalculation,
   handleBattalionPathFollowing,
   setupBattalionPathFollowing,
-  checkForInfiniteLoop,
   calculateMovementDistance,
   executeBattalionMovement,
   handlePostMovementActions,
@@ -43,11 +29,23 @@ import {
 } from './useMovement';
 import { useTargeting } from './useTargeting';
 import { useBattleEngine } from './useBattleEngine';
-import type { BattalionRefs, NodeRefs, AttackIntervals, OnBattalionLoss } from './useBattalionRefsAndState';
-import { 
-  setupAttacks as setupAttacksFromCombat,
-  handleBattalionDamage as handleBattalionDamageFromCombat
-} from './useCombat';
+import { calculateTotalDamage, calculateMovementDuration } from '../utils/battleUtils';
+
+// Constants
+const ATTACK_DELAY = 300;
+const CAPTURE_MEMORY_DURATION = 5000;
+
+// Helper functions
+const createBattalionKey = (isUser: boolean, nodeIndex: number) => 
+  `${isUser ? 'user' : 'enemy'}-${nodeIndex}`;
+
+// Debug flag and logging
+const DEBUG_BATTLE = true;
+const debugLog = (message: string) => {
+  if (DEBUG_BATTLE) {
+    console.log(message);
+  }
+};
 
 export const useBattleMovementAndAttacks = (
   battleStarted: boolean,
@@ -56,7 +54,7 @@ export const useBattleMovementAndAttacks = (
   enemyBattalions: BattalionPosition[],
   setUserBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
   setEnemyBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
-  onBattalionLoss: OnBattalionLoss
+  onBattalionLoss: (type: string, name: string, quantity: number, mark?: number) => void
 ) => {
   // IMPORTANT: Keep refs for animations and intervals
   const battalionRefs = useRef<BattalionRefs>({});
@@ -200,7 +198,7 @@ export const useBattleMovementAndAttacks = (
     findAvailableTargetsRef.current = findAvailableTargets;
   }, [findAvailableTargets]);
 
-  // Use battle engine for orchestration
+  // Use battle engine for memoized calculations
   const { memoizedCalculations } = useBattleEngine(
     battleStarted,
     nodes,
@@ -299,10 +297,23 @@ export const useBattleMovementAndAttacks = (
         };
 
         // Initial attack
-        setTimeout(performNodeAttack, INITIAL_ATTACK_DELAY);
+        setTimeout(performNodeAttack, 500); // INITIAL_ATTACK_DELAY
         
         // Set up interval for subsequent attacks
         attackIntervals.current[existingKey] = setInterval(performNodeAttack, attackInterval);
+      };
+
+      // Helper function for attack interval key
+      const createAttackIntervalKey = (isUser: boolean, battalionNodeIndex: number, targetNodeIndex: number) => 
+        `${isUser ? 'user' : 'enemy'}-${battalionNodeIndex}-${targetNodeIndex}`;
+
+      // Sort battalions by priority
+      const sortBattalionsByPriority = (battalions: BattalionPosition[]) => {
+        const typePriority = { guardian: 3, breacher: 2, phreak: 1 };
+        return [...battalions].sort((a, b) => 
+          (typePriority[b.type as keyof typeof typePriority] || 0) - 
+          (typePriority[a.type as keyof typeof typePriority] || 0)
+        );
       };
 
       // Consolidated function to handle battalion actions for both sides
@@ -329,8 +340,8 @@ export const useBattleMovementAndAttacks = (
           
           const anim = Animated.timing(battalion.position, {
             toValue: { 
-              x: targetNode.x - BATTALION_CENTER_OFFSET,
-              y: targetNode.y - BATTALION_CENTER_OFFSET
+              x: targetNode.x - 25, // BATTALION_CENTER_OFFSET
+              y: targetNode.y - 25
             },
             duration: duration,
             useNativeDriver: true
@@ -338,8 +349,8 @@ export const useBattleMovementAndAttacks = (
 
           const listener = battalion.position.addListener(({ x, y }: { x: number; y: number }) => {
             const battalionCenter = {
-              x: x + BATTALION_CENTER_OFFSET,
-              y: y + BATTALION_CENTER_OFFSET
+              x: x + 25, // BATTALION_CENTER_OFFSET
+              y: y + 25
             };
             
             const inRange = checkRangeIntersection(
