@@ -1,13 +1,11 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { BattleNode, BattalionPosition, BattleTarget } from '../types/battle';
 import { getBotStats } from '../screens/DigitalBarracksScreen';
 import { RANGE_MULTIPLIER } from '../utils/battleConstants';
 import { findShortestPaths, reconstructPath } from '../utils/pathfinding';
-import { useBattalionRefsAndState, findBattalionIndexAndId, updateFindAvailableTargetsRef } from './useBattalionRefsAndState';
+import { useBattalionRefsAndState, findBattalionIndexAndId } from './useBattalionRefsAndState';
 import { 
   setupAttacks,
-  setupBattalionAttacksWrapper,
-  createSetupBattalionAttacksWrapper,
   createSetupBattalionAttacksWrapperHook
 } from './useCombat';
 import { 
@@ -164,7 +162,11 @@ export const useBattleMovementAndAttacks = (
   );
 
   // Update the ref with the real function
-  updateFindAvailableTargetsRef(findAvailableTargetsRef, findAvailableTargets);
+  useEffect(() => {
+    if (findAvailableTargets) {
+      findAvailableTargetsRef.current = findAvailableTargets;
+    }
+  }, [findAvailableTargets, findAvailableTargetsRef]);
 
   // Use battle engine for memoized calculations
   const { memoizedCalculations } = useBattleEngine(

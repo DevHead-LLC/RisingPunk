@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { BattalionRef } from '../components/battle/AnimatedBattalion';
-import { BattleNode, BattalionPosition } from '../types/battle';
+import { BattleNode, BattalionPosition, BattleTarget } from '../types/battle';
 
 // ============================================================================
 // CONSTANTS
