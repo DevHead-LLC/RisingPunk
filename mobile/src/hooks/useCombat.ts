@@ -3,6 +3,17 @@ import { BOT_CATEGORIES } from '../screens/DigitalBarracksScreen';
 import { RANGE_MULTIPLIER } from '../utils/battleConstants';
 import { updateBattalionHealth } from '../utils/healthUtils';
 import type { BattalionPosition, BattleTarget, BattleNode } from '../types/battle';
+import { calculateTotalDamage } from '../utils/battleUtils';
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+/**
+ * Create a battalion key for identifying battalions in refs and intervals
+ */
+const createBattalionKey = (isUser: boolean, nodeIndex: number): string => 
+  `${isUser ? 'user' : 'enemy'}-${nodeIndex}`;
 
 // ============================================================================
 // COMBAT LOGIC
@@ -299,10 +310,135 @@ const isInAttackRange = (
   }
 };
 
+/**
+ * Perform a single battalion attack with animations and damage
+ */
+const performBattalionAttack = (
+  battalion: BattalionPosition,
+  targetBattalion: BattalionPosition,
+  isUser: boolean,
+  totalDamage: number,
+  attackDelay: number,
+  battalionRefs: { [key: string]: any },
+  setUserBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
+  setEnemyBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
+  onBattalionLoss: (type: string, name: string, quantity: number, mark?: number) => void,
+  onTargetDestroyed?: (battalion: BattalionPosition, isUser: boolean) => void
+): void => {
+  const attackerKey = createBattalionKey(isUser, battalion.nodeIndex);
+  const targetKey = createBattalionKey(!isUser, targetBattalion.nodeIndex);
+  
+  battalionRefs[attackerKey]?.triggerAttackAnimation();
+  
+  setTimeout(() => {
+    battalionRefs[targetKey]?.triggerDamageAnimation();
+    const isDestroyed = handleBattalionDamage(
+      targetBattalion, 
+      totalDamage, 
+      !isUser,
+      setUserBattalions,
+      setEnemyBattalions,
+      onBattalionLoss
+    );
+    
+    if (isDestroyed && onTargetDestroyed) {
+      onTargetDestroyed(battalion, isUser);
+    }
+  }, attackDelay);
+};
+
+/**
+ * Setup battalion vs battalion attacks with intervals and retargeting
+ */
+const setupBattalionAttacks = (
+  battalion: BattalionPosition,
+  targetBattalion: BattalionPosition,
+  isUser: boolean,
+  attackIntervals: { [key: string]: NodeJS.Timeout },
+  battalionRefs: { [key: string]: any },
+  setUserBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
+  setEnemyBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
+  onBattalionLoss: (type: string, name: string, quantity: number, mark?: number) => void,
+  memoizedCalculations: any,
+  findAvailableTargets: (battalion: BattalionPosition, isUser: boolean, userBattalions: BattalionPosition[], enemyBattalions: BattalionPosition[]) => any[],
+  moveBattalionAlongPath: (battalion: BattalionPosition, target: any, isUser: boolean, userBattalions?: BattalionPosition[], enemyBattalions?: BattalionPosition[]) => void,
+  battalionsRef: { current: { user: BattalionPosition[], enemy: BattalionPosition[] } },
+  ATTACK_DELAY: number
+): void => {
+  const attackerKey = createBattalionKey(isUser, battalion.nodeIndex);
+  const targetKey = createBattalionKey(!isUser, targetBattalion.nodeIndex);
+  const intervalKey = `${attackerKey}-${targetBattalion.nodeIndex}`;
+
+  // Clear any existing attack interval
+  if (attackIntervals[intervalKey]) {
+    clearInterval(attackIntervals[intervalKey]);
+  }
+
+  const attackSpeed = memoizedCalculations.getBotStats(battalion.type).speed;
+  const attackInterval = memoizedCalculations.getAttackInterval(battalion.type);
+  const totalDamage = calculateTotalDamage(battalion, isUser);
+
+  const onTargetDestroyed = (battalion: BattalionPosition, isUser: boolean) => {
+    clearInterval(attackIntervals[intervalKey]);
+    delete attackIntervals[intervalKey];
+    
+    // Find new target
+    const newTargets = findAvailableTargets(
+      battalion,
+      isUser,
+      battalionsRef.current.user,
+      battalionsRef.current.enemy
+    );
+    
+    if (newTargets.length > 0) {
+      moveBattalionAlongPath(
+        battalion,
+        newTargets[0],
+        isUser,
+        battalionsRef.current.user,
+        battalionsRef.current.enemy
+      );
+    } 
+  };
+
+  // Initial attack
+  performBattalionAttack(
+    battalion,
+    targetBattalion,
+    isUser,
+    totalDamage,
+    ATTACK_DELAY,
+    battalionRefs,
+    setUserBattalions,
+    setEnemyBattalions,
+    onBattalionLoss,
+    onTargetDestroyed
+  );
+  
+  // Set up interval for subsequent attacks
+  attackIntervals[intervalKey] = setInterval(() => {
+    performBattalionAttack(
+      battalion,
+      targetBattalion,
+      isUser,
+      totalDamage,
+      ATTACK_DELAY,
+      battalionRefs,
+      setUserBattalions,
+      setEnemyBattalions,
+      onBattalionLoss,
+      onTargetDestroyed
+    );
+  }, attackInterval);
+};
+
 export { 
   setupAttacks, 
   setupNodeAttack, 
   setupBattalionAttack, 
   handleBattalionDamage, 
-  isInAttackRange 
+  isInAttackRange,
+  createBattalionKey,
+  performBattalionAttack,
+  setupBattalionAttacks
 }; 

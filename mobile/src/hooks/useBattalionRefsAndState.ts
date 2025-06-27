@@ -1,4 +1,13 @@
+import React, { useRef, useEffect } from 'react';
 import { BattalionRef } from '../components/battle/AnimatedBattalion';
+import { BattleNode, BattalionPosition } from '../types/battle';
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+const ATTACK_DELAY = 300;
+const CAPTURE_MEMORY_DURATION = 5000;
 
 // Debug flag - set to false to disable all debugging
 const DEBUG_BATTLE = true;
@@ -40,7 +49,7 @@ type OnBattalionLoss = (
   mark: number
 ) => void;
 
-export { DEBUG_BATTLE, debugLog };
+export { DEBUG_BATTLE, debugLog, ATTACK_DELAY, CAPTURE_MEMORY_DURATION };
 export type { BattalionRefs, NodeRefs, AttackIntervals, OnBattalionLoss };
 
 // ============================================================================
@@ -75,6 +84,69 @@ const findBattalionIndexAndId = (
   const battalionId = generateBattalionId(battalion, isUser, battalionArray, battalionIndex);
   
   return { battalionIndex, battalionId };
+};
+
+// ============================================================================
+// REFS AND STATE MANAGEMENT
+// ============================================================================
+
+export const useBattalionRefsAndState = (
+  nodes: BattleNode[],
+  userBattalions: BattalionPosition[],
+  enemyBattalions: BattalionPosition[]
+) => {
+  // IMPORTANT: Keep refs for animations and intervals
+  const battalionRefs = useRef<BattalionRefs>({});
+  const attackIntervals = useRef<AttackIntervals>({});
+  const nodeRefs = useRef<NodeRefs>({});
+  const battleInitializedRef = useRef(false);
+  const battalionsRef = useRef({ user: userBattalions, enemy: enemyBattalions });
+  const nodesRef = useRef(nodes);
+
+  // Add retargeting cooldown tracking
+  const retargetCooldowns = useRef<{[key: string]: number}>({});
+  const recentlyCapturedNodes = useRef<Set<number>>(new Set());
+
+  // Ref to store the real findAvailableTargets function
+  const findAvailableTargetsRef = useRef<(
+    battalion: BattalionPosition,
+    isUser: boolean,
+    userBattalions: BattalionPosition[],
+    enemyBattalions: BattalionPosition[]
+  ) => any[]>(() => []);
+
+  // Update refs when battalions change
+  useEffect(() => {
+    battalionsRef.current = { user: userBattalions, enemy: enemyBattalions };
+  }, [userBattalions, enemyBattalions]);
+
+  // Update nodes ref when nodes change
+  useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
+
+  return {
+    // Refs
+    battalionRefs,
+    attackIntervals,
+    nodeRefs,
+    battleInitializedRef,
+    battalionsRef,
+    nodesRef,
+    retargetCooldowns,
+    recentlyCapturedNodes,
+    findAvailableTargetsRef,
+    
+    // Utility functions
+    generateBattalionId,
+    findBattalionIndexAndId,
+    
+    // Constants
+    ATTACK_DELAY,
+    CAPTURE_MEMORY_DURATION,
+    DEBUG_BATTLE,
+    debugLog
+  };
 };
 
 export { generateBattalionId, findBattalionIndexAndId }; 
