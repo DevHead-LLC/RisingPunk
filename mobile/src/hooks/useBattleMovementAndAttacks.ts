@@ -25,7 +25,15 @@ import {
 import { findShortestPaths, reconstructPath } from '../utils/pathfinding';
 import { debugLog } from './useBattalionRefsAndState';
 import { findBattalionIndexAndId } from './useBattalionRefsAndState';
-import { checkForInfiniteLoop, getAnimatedPosition, cleanupBattalion, validateBattalionAndTarget } from './useMovement';
+import { 
+  getAnimatedPosition, 
+  cleanupBattalion,
+  validateBattalionAndTarget,
+  handleNodePathCalculation,
+  handleBattalionPathFollowing,
+  setupBattalionPathFollowing,
+  checkForInfiniteLoop
+} from './useMovement';
 import { useTargeting } from './useTargeting';
 import type { BattalionRefs, NodeRefs, AttackIntervals, OnBattalionLoss } from './useBattalionRefsAndState';
 
@@ -103,85 +111,44 @@ export const useBattleMovementAndAttacks = (
     
     // Only for node targets, try using the calculated path
     if (target.type === 'node') {
-      const targetNode = nodes[target.index];
-      if (targetNode.controlState !== 'neutral') {
+      const pathResult = handleNodePathCalculation(
+        battalion,
+        target,
+        nodes,
+        findShortestPaths,
+        reconstructPath,
+        setupAttacks,
+        battalionId,
+        isUser,
+        userBattalions,
+        enemyBattalions
+      );
+      
+      if (!pathResult.shouldContinue) {
         return;
       }
       
-      const { distances, previousNodes } = findShortestPaths(battalion.nodeIndex, nodes);
-      const path = reconstructPath(battalion.nodeIndex, target.index, previousNodes);
-      
-      // Validate that we have a valid path before allowing any movement
-      if (path.length === 0) {
-        return;
-      }
-      
-      if (path.length === 1) {
-        setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
-        return;
-      }
-      
-      // If we have a valid path with more than 1 step, use the first step
-      if (path.length >= 2) {
-        const nextNodeIndex = path[1];
-        const nextNode = nodes[nextNodeIndex];
-        if (nextNode) {
-          // Use the next node's position instead of target position
-          target.position = { x: nextNode.x, y: nextNode.y };
-          
-          // Store the remaining path for continuation
-          battalion.remainingPath = path.slice(1);
-          battalion.finalTarget = target.index;
-        }
+      if (pathResult.updatedTarget) {
+        target.position = pathResult.updatedTarget.position;
       }
     } else if (target.type === 'battalion') {
-      // --- START: Step 3 - Battalion Path Following Check ---
-      // Check if we have a remaining path to follow (same as node targets)
-      if (battalion.remainingPath && battalion.remainingPath.length > 0 && battalion.finalTarget !== undefined) {
-        const nextNodeIndex = battalion.remainingPath[0];
-        const nextNode = nodes[nextNodeIndex];
-        
-        if (nextNode) {
-          // Check for infinite loop
-          if (checkForInfiniteLoop(battalionId, 'battalion-path-following')) {
-            // Clear path data to break the loop
-            battalion.remainingPath = undefined;
-            battalion.finalTarget = undefined;
-            console.log(`[LOOP BREAK] ${battalionId} - Cleared path data to break infinite loop`);
-            return;
-          }
-          
-          debugLog(`[Step 3 Battalion Path Following] ${battalionId} - Continuing path: [${battalion.remainingPath.join(' -> ')}] to final target ${battalion.finalTarget}`);
-          
-          // Update battalion position to the current node
-          battalion.nodeIndex = target.index;
-          
-          // Remove the current node from remaining path
-          battalion.remainingPath = battalion.remainingPath.slice(1);
-          
-          debugLog(`[Step 3 Battalion Path Update] ${battalionId} - Updated to node ${target.index}, remaining path: [${battalion.remainingPath.join(' -> ')}]`);
-          
-          // Move to the next node in the path
-          const nextTarget = {
-            type: 'node' as const,
-            index: nextNodeIndex,
-            distance: 0,
-            position: { x: nextNode.x, y: nextNode.y }
-          };
-          
-          debugLog(`[Step 3 Battalion Movement] ${battalionId} - Moving to next node ${nextNodeIndex} at position (${nextNode.x.toFixed(1)}, ${nextNode.y.toFixed(1)})`);
-          
-          moveBattalionAlongPath(battalion, nextTarget, isUser, userBattalions, enemyBattalions);
-          return;
-        }
-      }
+      // Handle battalion path following
+      const pathFollowingResult = handleBattalionPathFollowing(
+        battalion,
+        target,
+        nodes,
+        battalionId,
+        checkForInfiniteLoop,
+        debugLog,
+        moveBattalionAlongPath,
+        isUser,
+        userBattalions,
+        enemyBattalions
+      );
       
-      // If we've reached the final target, clear path data
-      if (battalion.finalTarget !== undefined && target.index === battalion.finalTarget) {
-        battalion.remainingPath = undefined;
-        battalion.finalTarget = undefined;
+      if (!pathFollowingResult.shouldContinue) {
+        return;
       }
-      // --- END: Step 3 - Battalion Path Following Check ---
       
       const enemyBatts = isUser ? enemyBattalions : userBattalions;
       const enemyBattalion = enemyBatts?.[target.index];
@@ -190,30 +157,17 @@ export const useBattleMovementAndAttacks = (
       
       const enemyRange = BOT_CATEGORIES[enemyBattalion.type].stats.range * RANGE_MULTIPLIER;
       
-      // Calculate path to enemy battalion's node position
-      const targetNodeIndex = enemyBattalion.nodeIndex;
-      
-      const { distances, previousNodes } = findShortestPaths(battalion.nodeIndex, nodes);
-      const battalionPath = reconstructPath(battalion.nodeIndex, targetNodeIndex, previousNodes);
-      
-      // --- START: Step 3 - Battalion Targeting Debug ---
-      debugLog(`[Step 3 Battalion Debug] ${battalionId} - Battalion targeting: path=[${battalionPath.join(' -> ')}], targetNode=${targetNodeIndex}`);
-      // --- END: Step 3 - Battalion Targeting Debug ---
-      
-      // --- START: Step 3 - Battalion Path Following Implementation ---
-      // Set path following data for battalion targets (same as node targets)
-      if (battalionPath.length >= 2) {
-        const nextNodeIndex = battalionPath[1];
-        const nextNode = nodes[nextNodeIndex];
-        if (nextNode) {
-          // Store the remaining path for continuation
-          battalion.remainingPath = battalionPath.slice(1);
-          battalion.finalTarget = targetNodeIndex;
-          
-          debugLog(`[Step 3 Battalion Path Set] ${battalionId} - Set remainingPath=[${battalion.remainingPath.join(' -> ')}], finalTarget=${battalion.finalTarget}`);
-        }
-      }
-      // --- END: Step 3 - Battalion Path Following Implementation ---
+      // Setup path following for battalion targets
+      setupBattalionPathFollowing(
+        battalion,
+        target,
+        enemyBattalion,
+        nodes,
+        findShortestPaths,
+        reconstructPath,
+        battalionId,
+        debugLog
+      );
     }
     
     // Recalculate distance and direction after potential target position updates
