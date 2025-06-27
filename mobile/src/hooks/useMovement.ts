@@ -1,5 +1,8 @@
 import { useCallback } from 'react';
 import { Animated } from 'react-native';
+import { BOT_CATEGORIES } from '../screens/DigitalBarracksScreen';
+import { RANGE_MULTIPLIER } from '../utils/battleConstants';
+import { calculateMovementDuration } from '../utils/battleUtils';
 
 // Infinite loop detection
 const loopDetection = new Map<string, { count: number, lastTime: number }>();
@@ -257,4 +260,226 @@ const setupBattalionPathFollowing = (
   }
 };
 
-export { handleNodePathCalculation, handleBattalionPathFollowing, setupBattalionPathFollowing }; 
+export { handleNodePathCalculation, handleBattalionPathFollowing, setupBattalionPathFollowing };
+
+// ============================================================================
+// MOVEMENT CALCULATION AND ANIMATION LOGIC
+// ============================================================================
+
+/**
+ * Calculate movement distance and direction
+ */
+const calculateMovementDistance = (
+  currentPos: { x: number; y: number },
+  target: { type: string; index: number; position: { x: number; y: number } },
+  range: number,
+  isUser: boolean,
+  userBattalions?: any[],
+  enemyBattalions?: any[]
+): { 
+  moveDistance: number; 
+  directionX: number; 
+  directionY: number; 
+  updatedDistance: number;
+  rangePosition: { x: number; y: number };
+} => {
+  // Recalculate distance and direction after potential target position updates
+  const updatedDx = target.position.x - currentPos.x;
+  const updatedDy = target.position.y - currentPos.y;
+  const updatedDistance = Math.sqrt(updatedDx * updatedDx + updatedDy * updatedDy);
+  
+  if (isNaN(updatedDistance) || updatedDistance === 0) {
+    return { moveDistance: 0, directionX: 0, directionY: 0, updatedDistance: 0, rangePosition: currentPos };
+  }
+
+  const directionX = updatedDx / updatedDistance;
+  const directionY = updatedDy / updatedDistance;
+  
+  // Calculate movement distance based on target type
+  let moveDistance: number;
+  if (target.type === 'node') {
+    // For nodes, move to attack range, not to the center
+    const optimalDistance = range; // We want to be at our attack range from the node
+    if (updatedDistance <= range) {
+      // Already in range, don't move
+      moveDistance = 0;
+    } else {
+      // Move to our attack range from the node
+      moveDistance = updatedDistance - optimalDistance;
+    }
+  } else {
+    // For enemy battalions, we need to consider both attack ranges
+    // Get the enemy battalion's attack range
+    const enemyBatts = isUser ? enemyBattalions : userBattalions;
+    const enemyBattalion = enemyBatts?.[target.index];
+    
+    if (!enemyBattalion) {
+      return { moveDistance: 0, directionX: 0, directionY: 0, updatedDistance: 0, rangePosition: currentPos };
+    }
+    
+    const enemyRange = BOT_CATEGORIES[enemyBattalion.type].stats.range * RANGE_MULTIPLIER;
+    
+    // We want to be at our attack range from the enemy, but not so close that we're in their attack range
+    // The optimal position is at our range from them, but we need to ensure we're not overlapping ranges
+    const combinedRange = range + enemyRange;
+    const optimalDistance = range; // We want to be at our attack range from the enemy
+    
+    // If the enemy is too close (within our range), we don't need to move
+    if (updatedDistance <= range) {
+      moveDistance = 0;
+    } else {
+      // Move to our attack range from the enemy
+      moveDistance = updatedDistance - optimalDistance;
+    }
+  }
+  
+  const rangePosition = {
+    x: currentPos.x + (directionX * moveDistance),
+    y: currentPos.y + (directionY * moveDistance)
+  };
+  
+  return { moveDistance, directionX, directionY, updatedDistance, rangePosition };
+};
+
+/**
+ * Execute battalion movement animation
+ */
+const executeBattalionMovement = (
+  battalion: { position: any; type: string; quantity: number; currentHealth?: number },
+  rangePosition: { x: number; y: number },
+  moveDistance: number,
+  battalionId: string,
+  attackIntervals: any,
+  cleanupBattalion: (battalionId: string, attackIntervals: any) => void,
+  onMovementComplete: () => void
+): void => {
+  cleanupBattalion(battalionId, attackIntervals);
+
+  const speed = BOT_CATEGORIES[battalion.type].stats.speed;
+  // Calculate duration based on distance and speed
+  const baseDuration = calculateMovementDuration(speed);
+  const movementDuration = (moveDistance / 100) * baseDuration; // Scale by distance
+  
+  Animated.timing(battalion.position, {
+    toValue: rangePosition,
+    duration: movementDuration,
+    useNativeDriver: true
+  }).start(({ finished }) => {
+    if (!finished) return;
+    
+    // Check if battalion was destroyed during movement
+    if (battalion.quantity <= 0 || (battalion.currentHealth ?? 0) <= 0) {
+      cleanupBattalion(battalionId, attackIntervals);
+      return;
+    }
+    
+    onMovementComplete();
+  });
+};
+
+/**
+ * Handle post-movement validation and continuation
+ */
+const handlePostMovementActions = (
+  battalion: { quantity: number; currentHealth?: number; targetNode?: number; remainingPath?: number[]; finalTarget?: number; nodeIndex: number },
+  target: { type: string; index: number; position: { x: number; y: number } },
+  nodes: { controlState: string; x: number; y: number }[],
+  currentPos: { x: number; y: number },
+  range: number,
+  isUser: boolean,
+  battalionId: string,
+  findAvailableTargets: (battalion: any, isUser: boolean, userBattalions: any[], enemyBattalions: any[]) => any[],
+  moveBattalionAlongPath: (battalion: any, target: any, isUser: boolean, userBattalions?: any[], enemyBattalions?: any[]) => void,
+  setupAttacks: (battalion: any, target: any, isUser: boolean, battalionId: string, userBattalions?: any[], enemyBattalions?: any[]) => void,
+  debugLog: (message: string) => void,
+  userBattalions?: any[],
+  enemyBattalions?: any[]
+): void => {
+  if (target.type === 'node') {
+    const node = nodes[target.index];
+    // Only retarget if node is not neutral (captured)
+    if (node.controlState !== 'neutral') {
+      battalion.targetNode = undefined;
+      const newTargets = findAvailableTargets(battalion, isUser, userBattalions || [], enemyBattalions || []);
+      if (newTargets.length > 0) {
+        // Prevent targeting the same node again
+        const validTarget = newTargets.find(t => 
+          t.type === 'node' ? nodes[t.index].controlState === 'neutral' : true
+        );
+        if (validTarget) {
+          moveBattalionAlongPath(battalion, validTarget, isUser, userBattalions, enemyBattalions);
+        }
+      }
+      return;
+    }
+    
+    // Check if we have a remaining path to follow
+    if (battalion.remainingPath && battalion.remainingPath.length > 0 && battalion.finalTarget !== undefined) {
+      const nextNodeIndex = battalion.remainingPath[0];
+      const nextNode = nodes[nextNodeIndex];
+      
+      if (nextNode) {
+        debugLog(`[Step 3 Path Following] ${battalionId} - Continuing path: [${battalion.remainingPath.join(' -> ')}] to final target ${battalion.finalTarget}`);
+        
+        // Update battalion position to the current node
+        battalion.nodeIndex = target.index;
+        
+        // Remove the current node from remaining path
+        battalion.remainingPath = battalion.remainingPath.slice(1);
+        
+        debugLog(`[Step 3 Path Update] ${battalionId} - Updated to node ${target.index}, remaining path: [${battalion.remainingPath.join(' -> ')}]`);
+        
+        // Move to the next node in the path
+        const nextTarget = {
+          type: 'node' as const,
+          index: nextNodeIndex,
+          distance: 0,
+          position: { x: nextNode.x, y: nextNode.y }
+        };
+        
+        debugLog(`[Step 3 Movement] ${battalionId} - Moving to next node ${nextNodeIndex} at position (${nextNode.x.toFixed(1)}, ${nextNode.y.toFixed(1)})`);
+        
+        moveBattalionAlongPath(battalion, nextTarget, isUser, userBattalions, enemyBattalions);
+        return;
+      }
+    }
+    
+    // If we've reached the final target, clear path data and start attacking
+    if (battalion.finalTarget !== undefined && target.index === battalion.finalTarget) {
+      battalion.remainingPath = undefined;
+      battalion.finalTarget = undefined;
+    }
+    
+    // Continue attacking neutral node
+    setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
+  } else if (target.type === 'battalion') {
+    const enemyBatts = isUser ? enemyBattalions : userBattalions;
+    const enemyBattalion = enemyBatts?.[target.index];
+    
+    // Check if target battalion was destroyed
+    if (!enemyBattalion || enemyBattalion.quantity <= 0 || (enemyBattalion.currentHealth ?? 0) <= 0) {
+      battalion.targetNode = undefined;
+      const newTargets = findAvailableTargets(battalion, isUser, userBattalions || [], enemyBattalions || []);
+      if (newTargets.length > 0) {
+        moveBattalionAlongPath(battalion, newTargets[0], isUser, userBattalions, enemyBattalions);
+      }
+      return;
+    }
+
+    const enemyPos = getAnimatedPosition(enemyBattalion.position);
+    const currentDistance = Math.sqrt(
+      Math.pow(enemyPos.x - currentPos.x, 2) + 
+      Math.pow(enemyPos.y - currentPos.y, 2)
+    );
+    
+    // Check if target is in range
+    if (currentDistance <= range) {
+      setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
+    } else {
+      // Target moved, follow it
+      moveBattalionAlongPath(battalion, { ...target, position: enemyPos }, isUser, userBattalions, enemyBattalions);
+    }
+  }
+};
+
+export { calculateMovementDistance, executeBattalionMovement, handlePostMovementActions }; 
