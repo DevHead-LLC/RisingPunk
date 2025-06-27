@@ -118,11 +118,18 @@ const handleNodePathCalculation = (
   nodes: { x: number; y: number; controlState: string }[],
   findShortestPaths: (startNode: number, nodes: any[]) => { distances: { [key: number]: number }; previousNodes: { [key: number]: number | null } },
   reconstructPath: (startNode: number, endNode: number, previousNodes: { [key: number]: number | null }) => number[],
-  setupAttacks: (battalion: any, target: any, isUser: boolean, battalionId: string, userBattalions?: any[], enemyBattalions?: any[]) => void,
+  setupAttacks: (battalion: any, target: any, isUser: boolean, battalionId: string, attackIntervals: any, cleanupBattalion: any, nodeRefs: any, nodes: any, findAvailableTargets: any, moveBattalionAlongPath: any, setUserBattalions?: any, setEnemyBattalions?: any, userBattalions?: any[], enemyBattalions?: any[]) => void,
   battalionId: string,
   isUser: boolean,
   userBattalions?: any[],
-  enemyBattalions?: any[]
+  enemyBattalions?: any[],
+  attackIntervals?: any,
+  cleanupBattalion?: any,
+  nodeRefs?: any,
+  findAvailableTargets?: any,
+  moveBattalionAlongPath?: any,
+  setUserBattalions?: any,
+  setEnemyBattalions?: any
 ): { shouldContinue: boolean; updatedTarget?: { type: string; index: number; position: { x: number; y: number } } } => {
   const targetNode = nodes[target.index];
   if (targetNode.controlState !== 'neutral') {
@@ -138,7 +145,7 @@ const handleNodePathCalculation = (
   }
   
   if (path.length === 1) {
-    setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
+    setupAttacks(battalion, target, isUser, battalionId, attackIntervals, cleanupBattalion, nodeRefs, nodes, findAvailableTargets, moveBattalionAlongPath, setUserBattalions, setEnemyBattalions, userBattalions, enemyBattalions);
     return { shouldContinue: false };
   }
   
@@ -390,10 +397,15 @@ const handlePostMovementActions = (
   battalionId: string,
   findAvailableTargets: (battalion: any, isUser: boolean, userBattalions: any[], enemyBattalions: any[]) => any[],
   moveBattalionAlongPath: (battalion: any, target: any, isUser: boolean, userBattalions?: any[], enemyBattalions?: any[]) => void,
-  setupAttacks: (battalion: any, target: any, isUser: boolean, battalionId: string, userBattalions?: any[], enemyBattalions?: any[]) => void,
+  setupAttacks: (battalion: any, target: any, isUser: boolean, battalionId: string, attackIntervals: any, cleanupBattalion: any, nodeRefs: any, nodes: any, findAvailableTargets: any, moveBattalionAlongPath: any, setUserBattalions?: any, setEnemyBattalions?: any, userBattalions?: any[], enemyBattalions?: any[]) => void,
   debugLog: (message: string) => void,
   userBattalions?: any[],
-  enemyBattalions?: any[]
+  enemyBattalions?: any[],
+  attackIntervals?: any,
+  cleanupBattalion?: any,
+  nodeRefs?: any,
+  setUserBattalions?: any,
+  setEnemyBattalions?: any
 ): void => {
   if (target.type === 'node') {
     const node = nodes[target.index];
@@ -451,7 +463,7 @@ const handlePostMovementActions = (
     }
     
     // Continue attacking neutral node
-    setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
+    setupAttacks(battalion, target, isUser, battalionId, attackIntervals, cleanupBattalion, nodeRefs, nodes, findAvailableTargets, moveBattalionAlongPath, setUserBattalions, setEnemyBattalions, userBattalions, enemyBattalions);
   } else if (target.type === 'battalion') {
     const enemyBatts = isUser ? enemyBattalions : userBattalions;
     const enemyBattalion = enemyBatts?.[target.index];
@@ -474,7 +486,7 @@ const handlePostMovementActions = (
     
     // Check if target is in range
     if (currentDistance <= range) {
-      setupAttacks(battalion, target, isUser, battalionId, userBattalions, enemyBattalions);
+      setupAttacks(battalion, target, isUser, battalionId, attackIntervals, cleanupBattalion, nodeRefs, nodes, findAvailableTargets, moveBattalionAlongPath, setUserBattalions, setEnemyBattalions, userBattalions, enemyBattalions);
     } else {
       // Target moved, follow it
       moveBattalionAlongPath(battalion, { ...target, position: enemyPos }, isUser, userBattalions, enemyBattalions);
