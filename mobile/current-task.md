@@ -1,91 +1,97 @@
-## Step 1: Plan to make a new hook called `useBattalionRefsAndState.ts`
+# Complete Refactor Plan: Eliminate useBattleMovementAndAttacks.ts
 
-### battalionRefs
-**References:** `BattalionRefs > interface definition`
+## Goal
+Move ALL logic from `useBattleMovementAndAttacks.ts` into specialized hooks and delete the file entirely.
 
-### attackIntervals
-**References:** `AttackIntervals > interface definition`
+## Current State Analysis
+The file currently contains:
+- **Refs & State Management**: battalionRefs, attackIntervals, nodeRefs, battleInitializedRef, battalionsRef, nodesRef, retargetCooldowns, recentlyCapturedNodes, findAvailableTargetsRef
+- **Main Logic**: moveBattalionAlongPath (already mostly extracted)
+- **Combat Logic**: setupBattalionAttacks (partially extracted)
+- **Node Capture Logic**: handleNodeCapture, retargetAllBattalions
+- **Debug Logic**: debugLog, DEBUG_BATTLE flag
+- **Constants**: ATTACK_DELAY, CAPTURE_MEMORY_DURATION
+- **useEffect hooks**: for ref updates
 
-### nodeRefs
-**References:** `NodeRefs > interface definition`
+## Target Distribution
 
-### battleInitializedRef
+### 1. useBattalionRefsAndState.ts
+**Move to this file:**
+- All refs: battalionRefs, attackIntervals, nodeRefs, battleInitializedRef, battalionsRef, nodesRef, retargetCooldowns, recentlyCapturedNodes, findAvailableTargetsRef
+- Constants: ATTACK_DELAY, CAPTURE_MEMORY_DURATION
+- Debug logic: debugLog, DEBUG_BATTLE flag
+- useEffect hooks for ref updates
+- Return all refs and state management functions
 
-### retargetCooldowns
+### 2. useCombat.ts
+**Move to this file:**
+- setupBattalionAttacks function (already partially extracted)
+- Any remaining combat-related logic
 
-### recentlyCapturedNodes
+### 3. useMovement.ts
+**Already contains:**
+- moveBattalionAlongPath logic (already extracted)
+- Movement validation and execution
 
-### battalionsRef, nodesRef
+### 4. useTargeting.ts
+**Move to this file:**
+- handleNodeCapture function
+- retargetAllBattalions function
+- Node capture and retargeting logic
 
-### Type definitions
-**References:** `BattalionRefs > interface`, `NodeRefs > interface`, `AttackIntervals > interface`, `OnBattalionLoss > type definition`
+### 5. useBattleEngine.ts
+**Already contains:**
+- memoizedCalculations
+- Battle calculations and stats
 
-### Battalion ID generation logic
+## Step-by-Step Plan
 
-**Why: This keeps all shared ref containers and non-render state in one place. You return them from this custom hook and use them across others.**
+### Phase 1: Move Refs & State Management
+1. **Move all refs to useBattalionRefsAndState.ts**
+   - Add all refs as exports
+   - Move constants (ATTACK_DELAY, CAPTURE_MEMORY_DURATION)
+   - Move debug logic (debugLog, DEBUG_BATTLE)
+   - Move useEffect hooks for ref updates
 
-## Step 2: useTargeting.ts
+2. **Update useBattalionRefsAndState.ts exports**
+   - Export all refs and state management functions
+   - Export constants and debug utilities
 
-### findAvailableTargets
+### Phase 2: Move Combat Logic
+3. **Complete setupBattalionAttacks extraction**
+   - Move remaining parts to useCombat.ts
+   - Ensure all combat logic is centralized
 
-### findNewTarget
+### Phase 3: Move Targeting Logic
+4. **Move node capture logic to useTargeting.ts**
+   - Move handleNodeCapture function
+   - Move retargetAllBattalions function
+   - Update useTargeting.ts to handle node capture events
 
-### retargetAllBattalions
+### Phase 4: Update All Imports
+5. **Update all files that import useBattleMovementAndAttacks**
+   - Update BattleScreen.tsx
+   - Update any other files using this hook
+   - Import from appropriate specialized hooks instead
 
-### handleNodeCapture
+### Phase 5: Delete File
+6. **Delete useBattleMovementAndAttacks.ts entirely**
+   - Verify all functionality is preserved
+   - Confirm no broken imports remain
 
-### Target validation and retargeting logic
+## Expected Result
+- `useBattleMovementAndAttacks.ts` is completely deleted
+- All logic is properly distributed to specialized hooks
+- Clean separation of concerns:
+  - **useBattalionRefsAndState.ts**: Refs, state, constants, debug
+  - **useCombat.ts**: Combat logic, attacks, damage
+  - **useMovement.ts**: Movement logic, pathfinding
+  - **useTargeting.ts**: Targeting logic, node capture, retargeting
+  - **useBattleEngine.ts**: Battle calculations, stats, memoization
 
-**Why: These are all concerned with target acquisition, prioritization, cooldowns, and retargeting.**
-
-## Step 3: useMovement.ts
-
-### moveBattalionAlongPath
-
-### getAnimatedPosition
-
-### calculateMovementDuration
-
-### cleanupBattalion
-
-### Path calculation and following
-
-### Movement animation and positioning
-
-### Post-movement validation and continuation
-
-### Debug flag and logging system
-**References:** `DEBUG_BATTLE > debug flag constant`, `debugLog > debug logging function`
-
-### Infinite loop detection system
-**References:** `checkForInfiniteLoop > infinite loop detection function`, `loopDetection > loop tracking Map`
-
-**Why: These functions are all related to how battalions move and when they should be repositioned. This domain also handles infinite loop protection and debugging.**
-
-## Step 4: useCombat.ts
-
-### setupAttacks
-
-### setupBattalionAttacks
-
-### handleBattalionDamage
-
-### Range checking and attack triggering
-
-**Why: This contains all combat resolution logic, from attack intervals to damage application and follow-up retargeting.**
-
-## Step 5: useBattleEngine.ts
-
-### The actual useBattleMovementAndAttacks hook
-
-### useEffect that handles:
-
-### Battle initialization
-
-### Attack scheduling
-
-### Target node selection
-
-### Cleanup
-
-### Pulls in all the sub-hooks above
+## Benefits
+- Eliminates the monolithic hook
+- Clear separation of concerns
+- Easier to test individual pieces
+- More maintainable and modular codebase
+- Follows single responsibility principle
