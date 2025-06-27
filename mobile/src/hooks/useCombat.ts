@@ -6,6 +6,7 @@ import { calculateTotalDamage } from '../utils/battleUtils';
 import { BattalionRef } from '../components/battle/AnimatedBattalion';
 import { findBattalionIndexAndId } from './useBattalionRefsAndState';
 import { cleanupBattalion } from './useMovement';
+import { useCallback } from 'react';
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -531,6 +532,47 @@ const createSetupBattalionAttacksWrapper = (
     );
 };
 
+// Create a useCallback wrapper for setupBattalionAttacks
+const createSetupBattalionAttacksWrapperHook = (
+  attackIntervals: { [key: string]: NodeJS.Timeout },
+  battalionRefs: { [key: string]: BattalionRef },
+  setUserBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
+  setEnemyBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
+  onBattalionLoss: (type: string, name: string, quantity: number, mark?: number) => void,
+  memoizedCalculations: any,
+  findAvailableTargets: (battalion: BattalionPosition, isUser: boolean, userBattalions: BattalionPosition[], enemyBattalions: BattalionPosition[]) => BattleTarget[],
+  moveBattalionAlongPath: (battalion: BattalionPosition, target: BattleTarget, isUser: boolean, userBattalions?: BattalionPosition[], enemyBattalions?: BattalionPosition[]) => void,
+  battalionsRef: React.MutableRefObject<{ user: BattalionPosition[]; enemy: BattalionPosition[] }>,
+  ATTACK_DELAY: number
+) => {
+  return useCallback(
+    createSetupBattalionAttacksWrapper(
+      attackIntervals,
+      battalionRefs,
+      setUserBattalions,
+      setEnemyBattalions,
+      onBattalionLoss,
+      memoizedCalculations,
+      findAvailableTargets,
+      moveBattalionAlongPath,
+      battalionsRef,
+      ATTACK_DELAY
+    ),
+    [
+      attackIntervals,
+      battalionRefs,
+      setUserBattalions,
+      setEnemyBattalions,
+      onBattalionLoss,
+      memoizedCalculations,
+      findAvailableTargets,
+      moveBattalionAlongPath,
+      battalionsRef,
+      ATTACK_DELAY
+    ]
+  );
+};
+
 export { 
   setupAttacks, 
   setupNodeAttack, 
@@ -541,5 +583,6 @@ export {
   performBattalionAttack,
   setupBattalionAttacks,
   setupBattalionAttacksWrapper,
-  createSetupBattalionAttacksWrapper
+  createSetupBattalionAttacksWrapper,
+  createSetupBattalionAttacksWrapperHook
 }; 

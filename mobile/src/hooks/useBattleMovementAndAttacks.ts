@@ -7,7 +7,8 @@ import { useBattalionRefsAndState, findBattalionIndexAndId, updateFindAvailableT
 import { 
   setupAttacks,
   setupBattalionAttacksWrapper,
-  createSetupBattalionAttacksWrapper
+  createSetupBattalionAttacksWrapper,
+  createSetupBattalionAttacksWrapperHook
 } from './useCombat';
 import { 
   checkForInfiniteLoop, 
@@ -153,7 +154,7 @@ export const useBattleMovementAndAttacks = (
   }, [nodes]);
 
   // Use targeting hook (after moveBattalionAlongPath is defined)
-  const { findAvailableTargets, findNewTarget, handleNodeCapture, retargetAllBattalions } = useTargeting(
+  const { findAvailableTargets, findNewTarget, handleNodeCapture, retargetAllBattalions, createHandleNodeCaptureWrapper } = useTargeting(
     nodes,
     retargetCooldowns,
     recentlyCapturedNodes,
@@ -185,31 +186,17 @@ export const useBattleMovementAndAttacks = (
   );
 
   // Create the setupBattalionAttacks wrapper function
-  const setupBattalionAttacks = useCallback(
-    createSetupBattalionAttacksWrapper(
-      attackIntervals.current,
-      battalionRefs.current,
-      setUserBattalions,
-      setEnemyBattalions,
-      onBattalionLoss,
-      memoizedCalculations,
-      findAvailableTargets,
-      moveBattalionAlongPath,
-      battalionsRef,
-      ATTACK_DELAY
-    ),
-    [
-      attackIntervals.current,
-      battalionRefs.current,
-      setUserBattalions,
-      setEnemyBattalions,
-      onBattalionLoss,
-      memoizedCalculations,
-      findAvailableTargets,
-      moveBattalionAlongPath,
-      battalionsRef,
-      ATTACK_DELAY
-    ]
+  const setupBattalionAttacks = createSetupBattalionAttacksWrapperHook(
+    attackIntervals.current,
+    battalionRefs.current,
+    setUserBattalions,
+    setEnemyBattalions,
+    onBattalionLoss,
+    memoizedCalculations,
+    findAvailableTargets,
+    moveBattalionAlongPath,
+    battalionsRef,
+    ATTACK_DELAY
   );
 
   return {
@@ -220,7 +207,6 @@ export const useBattleMovementAndAttacks = (
     setupBattalionAttacks,
     findAvailableTargets,
     moveBattalionAlongPath,
-    handleNodeCapture: (nodeIndex: number, newControlState: 'user' | 'enemy') => 
-      handleNodeCapture(nodeIndex, newControlState, nodesRef, CAPTURE_MEMORY_DURATION)
+    handleNodeCapture: createHandleNodeCaptureWrapper(nodesRef, CAPTURE_MEMORY_DURATION)
   };
 }; 
