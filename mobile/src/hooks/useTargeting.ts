@@ -111,28 +111,19 @@ export const useTargeting = (
       battalionsRef.current.enemy
     );
 
-    // Unified target selection - all battalion types behave identically
-    // CLARIFICATION: Both user and enemy battalions prioritize neutral nodes first, then enemy battalions
-    // Once a node is controlled by either party, it cannot be retargeted for the rest of the battle
-    let targets: typeof allTargets = [];
-    
-    // All battalions prioritize neutral nodes, then enemy battalions
-    targets = allTargets.filter(target => {
+    // Pure proximity-based targeting - no priority between nodes vs battalions
+    // Filter out recently captured nodes and sort by distance
+    const availableTargets = allTargets.filter(target => {
       if (target.type === 'node') {
         const node = nodes[target.index];
         // Only target neutral nodes, not captured ones
         return node && node.controlState === 'neutral' && !recentlyCapturedNodes.current.has(target.index);
       }
-      return false;
+      return true; // Include all battalion targets
     });
     
-    // If no neutral nodes, attack enemy battalions
-    if (targets.length === 0) {
-      targets = allTargets.filter(target => target.type === 'battalion');
-    }
-    
-    if (targets.length > 0) {
-      const target = targets[0];
+    if (availableTargets.length > 0) {
+      const target = availableTargets[0]; // Closest target (already sorted by distance)
       
       // Set cooldown
       retargetCooldowns.current[battalionId] = now;
