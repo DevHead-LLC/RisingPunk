@@ -24,8 +24,13 @@ const createBattalionKey = (isUser: boolean, nodeIndex: number) =>
 const createAttackIntervalKey = (isUser: boolean, battalionNodeIndex: number, targetNodeIndex: number) => 
   `${isUser ? 'user' : 'enemy'}-${battalionNodeIndex}-${targetNodeIndex}`;
 
+// TODO: REMOVE PRIORITY SYSTEM - All battalions should have equal targeting priority
+// This function currently gives Guardian battalions first choice of targets, then Breacher, then Phreak
+// This creates unfair targeting advantages and should be removed
+// All battalions should target neutral nodes randomly without type-based priority
 const sortBattalionsByPriority = (battalions: BattalionPosition[]) => {
   // Sort by type priority: guardian > breacher > phreak
+  // ISSUE: This gives certain battalion types unfair targeting advantages
   const typePriority = { guardian: 3, breacher: 2, phreak: 1 };
   return [...battalions].sort((a, b) => 
     (typePriority[b.type as keyof typeof typePriority] || 0) - 

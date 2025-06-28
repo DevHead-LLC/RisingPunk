@@ -14,6 +14,7 @@ import { NetworkLines } from './NetworkLines';
 import { BattleNode } from '../../types/battle';
 import { BattlePhase } from '../../hooks/useBattleStateMachine';
 
+// Props for the network component
 type Props = {
   nodes: BattleNode[];
   controlledNodes: number[];
@@ -30,6 +31,7 @@ type Props = {
   phase: BattlePhase;
 };
 
+// Main component that draws the network of connected nodes and lines
 export const BattleNetwork = React.memo(({ 
   nodes,
   controlledNodes,
@@ -42,11 +44,13 @@ export const BattleNetwork = React.memo(({
 }: Props) => {
   return (
     <Animated.View style={[styles.container, { opacity }]}>
+      {/* Draws the connection lines between network nodes */}
       <NetworkLines 
         nodes={nodes}
         width={width}
         height={height}
       />
+      {/* Creates each individual network node */}
       {nodes.map((node, index) => (
         // TODO: Only pass health to NetworkNode for nodes 3, 4, 5 while neutral. See clarification in design doc/image.
         <NetworkNode 
@@ -66,6 +70,7 @@ export const BattleNetwork = React.memo(({
   );
 });
 
+// Styles for the network container - positions it at the bottom layer
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
