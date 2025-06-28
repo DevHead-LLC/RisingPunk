@@ -17,24 +17,28 @@ type Props = {
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+// Tracks how many units of each battalion type were lost
 interface BattalionLosses {
   quantity: number;
   mark: number;
 }
 
+// Keeps track of all losses for both sides during the battle
 interface BattleLossTracker {
   user: { [battalionId: string]: BattalionLosses };
   enemy: { [battalionId: string]: BattalionLosses };
 }
 
+// Converts battalion losses into victory points (higher mark = more points)
 const calculateLossPoints = (losses: BattalionLosses) => {
   // Mark values: Mark 1 = 1pt, Mark 2 = 2pts, Mark 3 = 4pts, Mark 4 = 8pts
   return losses.quantity * Math.pow(2, losses.mark - 1);
 };
 
+// Main battle screen that manages the entire battle flow
 export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) => {
-  // CORRECTION_COMMENT: This screen should handle battles between a human player and an AI opponent.
-  // Use the state machine as the single source of truth for animations and state
+  
+  // Controls battle animations and state transitions
   const {
     // Animation values
     networkOpacity,
@@ -52,6 +56,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     showBattleResults,
   } = useBattleStateMachine();
 
+  // Sets up initial battle data (nodes, battalions, health)
   const {
     nodes,
     setNodes,
@@ -62,6 +67,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     calculateInitialHealth,
   } = useBattleInitialization();
 
+  // Battle timer and state management
   const [timeRemaining, setTimeRemaining] = useState(20);
   const timerRef = useRef<NodeJS.Timeout>();
   const [showResults, setShowResults] = useState(false);
@@ -74,6 +80,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     enemy: {}
   });
 
+  // Records when battalions are destroyed for victory calculation
   const recordBattalionLoss = (
     side: 'user' | 'enemy',
     battalionId: string,
@@ -89,19 +96,12 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       return newLosses;
     });
   };
-
-  // CLARIFICATION_COMMENT: The movement and targeting logic in the useBattleCoordination hook must respect node ownership.
-  // Once a node is owned (not neutral), it cannot be targeted by anyone nor can it be captured by the opposing party.
-  // KEY_FEATURE_COMMENT: Battalions SHOULD move according to pathfinding. Currently, initial node targeting is random.
-  // Upon retargeting, they should follow pathfinding logic within the hook.
-
-  // IMPORTANT: Use the new battle movement and attacks hook
+  
+  // Handles all battalion movement, attacks, and targeting logic
   const {
     battalionRefs,
     nodeRefs,
-    attackIntervals,
     setupBattalionAttacks,
-    findNewTarget,
     handleNodeCapture
   } = useBattleCoordination(
     battleStarted,
@@ -113,7 +113,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     recordBattalionLoss
   );
 
-  // Create a wrapper function that adapts the signature for BattleUnits
+  // Connects BattleUnits component to the battle coordination hook
   const setupAttacks = (
     battalion: BattalionPosition,
     targetBattalion: BattalionPosition,
@@ -123,6 +123,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     setupBattalionAttacks(battalion, targetBattalion, isUser);
   };
 
+  // Sets up the battle when the screen first loads
   const initializeBattle = () => {
     if (battleInitializedRef.current) return;
     battleInitializedRef.current = true;
@@ -134,11 +135,12 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     startBattle();
   };
 
+  // Runs once when component mounts to start the battle
   useEffect(() => {
     initializeBattle();
   }, []);
 
-  // Listen for phase changes from state machine
+  // Starts the battle timer when the countdown finishes
   useEffect(() => {
     if (phase === 'active' && !battleStarted) {
       setBattleStarted(true);
@@ -146,6 +148,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     }
   }, [phase, battleStarted]);
 
+  // Creates a 20-second countdown timer for the battle
   const startBattleTimer = () => {
     setTimeRemaining(20);
     timerRef.current = setInterval(() => {
@@ -160,14 +163,14 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     }, 1000);
   };
 
+  // Adds up all loss points for one side
   const calculateTotalLossPoints = (side: 'user' | 'enemy'): number => {
     return Object.values(battleLosses[side]).reduce((total, loss) => {
       return total + calculateLossPoints(loss);
     }, 0);
   };
-
-  // MAIN_PURPOSE_COMMENT: The main purpose of the battle is to defeat enemy battalions.
-  // Victory is determined by which side has sustained fewer losses when the battle ends.
+  
+  // Determines who won based on total loss points
   const determineVictor = () => {
     // Calculate loss points for each side
     const userPoints = calculateTotalLossPoints('user');
@@ -180,6 +183,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     return userPoints < enemyPoints ? 'user' : 'enemy';
   };
 
+  // Ends the battle and shows results
   const handleBattleComplete = () => {
     // KEY_FEATURE_COMMENT: The battle SHOULD also end if all of one side's battalions are defeated.
     // This is not yet implemented. The battle currently only ends when the timer runs out.
@@ -192,16 +196,15 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     });
   };
 
-  // Modify the countdown effect to initialize node health
+  // Sets up node health when countdown is 3
   useEffect(() => {
     if (countdown === 3) {
-      // Use the centralized health calculation from useBattleInitialization
       const nodeHealth = calculateInitialHealth();
-      // CLARIFICATION_COMMENT: Users "own" their initial nodes (left side), and enemies "own" theirs (right side). This initial ownership is permanent.
-      // Initialize all nodes with health and control progress
+      
+      // Only neutral nodes get health - controlled nodes get 0 health
       setNodes(prevNodes => prevNodes.map(node => ({
         ...node,
-        health: nodeHealth,
+        health: node.controlState === 'neutral' ? nodeHealth : 0,
         controlProgress: node.controlState === 'neutral' ? 0 : 
                         node.controlState === 'user' ? 100 : -100,
         isLocked: node.controlState !== 'neutral'
@@ -209,6 +212,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     }
   }, [countdown, userBattalions, enemyBattalions, calculateInitialHealth]);
 
+  // Handles when a node is captured by either side
   const handleNodeControlChange = (nodeIndex: number, newState: 'user' | 'enemy') => {
     // CLARIFICATION_COMMENT: When a neutral node is captured, ownership becomes permanent for the rest of the battle.
     // Owned nodes cannot be targeted or controlled by the opposing party.
@@ -236,7 +240,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     handleNodeCapture(nodeIndex, newState);
   };
 
-  // Add cleanup on unmount
+  // Cleans up when component unmounts
   useEffect(() => {
     return () => {
       // Cleanup is handled by the useBattleCoordination hook
@@ -245,6 +249,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Shows battle timer and countdown */}
       <BattleHeader
         timeRemaining={timeRemaining}
         isCountdown={countdown > 0}
@@ -252,6 +257,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       />
       
       <View style={styles.networkContainer}>
+        {/* Shows the network of nodes and connections */}
         <BattleNetwork
           nodes={nodes}
           controlledNodes={controlledNodes}
@@ -263,6 +269,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
           phase={phase}
         />
 
+        {/* Shows all the battalions and handles their attacks */}
         <BattleUnits
           deploymentOpacity={deploymentOpacity}
           battalionOpacity={battalionOpacity}
@@ -272,6 +279,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
           setupAttacks={setupAttacks}
         />
 
+        {/* Shows countdown overlay and battle results */}
         <BattleOverlays
           countdown={countdown}
           showResults={showResults}
@@ -287,6 +295,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   );
 });
 
+// Styles for the battle screen layout
 const styles = StyleSheet.create({
   container: {
     flex: 1,

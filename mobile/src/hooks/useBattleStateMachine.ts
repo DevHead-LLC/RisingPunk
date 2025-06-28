@@ -6,6 +6,7 @@
 import { useCallback, useState, useRef } from 'react';
 import { Animated } from 'react-native';
 
+// Different stages the battle goes through
 export type BattlePhase = 
   | 'initializing'  // Initial setup
   | 'deployment'    // Unit placement
@@ -14,20 +15,24 @@ export type BattlePhase =
   | 'complete'      // Battle ended
   | 'results';      // Showing results
 
+// Manages the battle flow and animations between different phases
 export const useBattleStateMachine = () => {
-  // Create and own all animation values
+  // Animation values that control what's visible on screen
   const networkOpacity = useRef(new Animated.Value(0)).current;
   const deploymentOpacity = useRef(new Animated.Value(1)).current;
   const battalionOpacity = useRef(new Animated.Value(0)).current;
   const countdownOpacity = useRef(new Animated.Value(1)).current;
   const resultsOpacity = useRef(new Animated.Value(0)).current;
 
+  // Current battle phase and countdown timer
   const [phase, setPhase] = useState<BattlePhase>('initializing');
   const [countdown, setCountdown] = useState(3);
 
+  // Changes the battle phase and plays appropriate animations
   const transitionTo = useCallback((newPhase: BattlePhase) => {
     switch (newPhase) {
       case 'deployment':
+        // Shows deployment zone
         Animated.timing(deploymentOpacity, {
           toValue: 1,
           duration: 500,
@@ -36,6 +41,7 @@ export const useBattleStateMachine = () => {
         break;
 
       case 'countdown':
+        // Hides deployment, shows network and battalions
         Animated.parallel([
           Animated.timing(deploymentOpacity, {
             toValue: 0,
@@ -56,6 +62,7 @@ export const useBattleStateMachine = () => {
         break;
 
       case 'complete':
+        // Shows results overlay
         Animated.timing(resultsOpacity, {
           toValue: 1,
           duration: 500,
@@ -66,6 +73,7 @@ export const useBattleStateMachine = () => {
     setPhase(newPhase);
   }, [deploymentOpacity, battalionOpacity, networkOpacity, resultsOpacity]);
 
+  // Starts the battle with a 3-second countdown
   const startBattle = useCallback(() => {
     transitionTo('countdown');
     const timer = setInterval(() => {
@@ -80,6 +88,7 @@ export const useBattleStateMachine = () => {
     }, 1000);
   }, [transitionTo]);
 
+  // Ends the battle and shows results after a delay
   const endBattle = useCallback((winner: 'user' | 'enemy') => {
     transitionTo('complete');
     setTimeout(() => {
@@ -87,12 +96,12 @@ export const useBattleStateMachine = () => {
     }, 1000);
   }, [transitionTo]);
 
-  // Utility function for showing network immediately
+  // Shows the network immediately without animation
   const showNetwork = useCallback(() => {
     networkOpacity.setValue(1);
   }, [networkOpacity]);
 
-  // Utility function for showing battle results
+  // Shows battle results with optional callback when done
   const showBattleResults = useCallback((onComplete?: () => void) => {
     Animated.timing(resultsOpacity, {
       toValue: 1,
