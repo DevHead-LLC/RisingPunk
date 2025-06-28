@@ -27,13 +27,18 @@ export const useTargeting = (
     const currentPos = getAnimatedPosition(battalion.position);
     const allTargets: BattleTarget[] = [];
     
+    // TODO: FIX TARGETING LOGIC - Battalion might be between nodes on network lines
+    // Current logic assumes battalion is at a specific node, but they can be in transit
     // Check neutral nodes first (primary targets)
     // CLARIFICATION: Only neutral nodes can be targeted. Once a node is controlled by either party, 
     // it cannot be retargeted or changed for the rest of the battle.
     const connectedNodeIndices = getConnectedNodes(battalion.nodeIndex);
     
     nodes.forEach((node, index) => {
-      if (!node || !connectedNodeIndices.includes(index)) return;
+      // TODO: REMOVE connected node restriction - target any neutral node by proximity
+      // if (!node || !connectedNodeIndices.includes(index)) return;
+      if (!node) return;
+      
       // Only target neutral nodes - controlled nodes are permanent
       if (node.controlState !== 'neutral') return;
       if (index === battalion.nodeIndex) return;
@@ -112,12 +117,15 @@ export const useTargeting = (
     );
 
     // Pure proximity-based targeting - no priority between nodes vs battalions
+    // TODO: REVIEW - Should we prevent targeting recently captured nodes?
+    // This might prevent multiple battalions from attacking the same node
     // Filter out recently captured nodes and sort by distance
     const availableTargets = allTargets.filter(target => {
       if (target.type === 'node') {
         const node = nodes[target.index];
+        // REMOVED: recently captured nodes filtering - allow multiple battalions to attack same node
         // Only target neutral nodes, not captured ones
-        return node && node.controlState === 'neutral' && !recentlyCapturedNodes.current.has(target.index);
+        return node && node.controlState === 'neutral';
       }
       return true; // Include all battalion targets
     });
@@ -128,13 +136,14 @@ export const useTargeting = (
       // Set cooldown
       retargetCooldowns.current[battalionId] = now;
       
+      // REMOVED: Marking nodes as recently captured - allow multiple battalions to attack same node
       // If targeting a node, mark it as recently captured
-      if (target.type === 'node') {
-        recentlyCapturedNodes.current.add(target.index);
-        setTimeout(() => {
-          recentlyCapturedNodes.current.delete(target.index);
-        }, CAPTURE_MEMORY_DURATION);
-      }
+      // if (target.type === 'node') {
+      //   recentlyCapturedNodes.current.add(target.index);
+      //   setTimeout(() => {
+      //     recentlyCapturedNodes.current.delete(target.index);
+      //   }, CAPTURE_MEMORY_DURATION);
+      // }
       
       moveBattalionAlongPath(
         battalion,

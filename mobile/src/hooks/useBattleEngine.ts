@@ -112,15 +112,21 @@ export const useBattleEngine = (
         battleInitializedRef.current = true;
 
         // Strategic target selection function
+        // TODO: REFACTOR TARGETING LOGIC - Remove "claimed targets" concept
+        // Multiple battalions should be able to target the same node simultaneously
+        // No priority system - pure proximity-based targeting
         const selectTargetNode = (battalion: BattalionPosition, isUser: boolean, targetedNodes: Set<number>) => {
           let availableNodes = getConnectedNodes(battalion.nodeIndex);
           
+          // TODO: REMOVE "targetedNodes" filtering - allow multiple battalions to target same node
           // Filter out already targeted nodes AND non-neutral nodes
           availableNodes = availableNodes.filter(nodeIndex => {
             const node = nodesRef.current[nodeIndex];
-            return !targetedNodes.has(nodeIndex) && node.controlState === 'neutral';
+            // REMOVED: !targetedNodes.has(nodeIndex) && 
+            return node.controlState === 'neutral';
           });
 
+          // TODO: SIMPLIFY - Just filter for neutral nodes, ignore targeting status
           // If no untargeted neutral nodes available, expand search to any neutral nodes
           if (availableNodes.length === 0) {
             availableNodes = getConnectedNodes(battalion.nodeIndex).filter(nodeIndex => {
@@ -189,18 +195,17 @@ export const useBattleEngine = (
 
         // Consolidated function to handle battalion actions for both sides
         const handleBattalionActions = (battalions: BattalionPosition[], isUser: boolean) => {
-          const targetedNodes = new Set<number>();
-          
-          battalions.forEach(battalion => {
-            const targetNodeIndex = selectTargetNode(battalion, isUser, targetedNodes);
+          battalions.forEach((battalion, index) => {
+            const targetNodeIndex = selectTargetNode(battalion, isUser, new Set<number>()); // Pass empty set
             
             // Skip if no valid neutral target found
             if (targetNodeIndex === undefined) {
               return;
             }
             
-            targetedNodes.add(targetNodeIndex);
-
+            // TODO: REMOVE this line - don't track targeted nodes
+            // targetedNodes.add(targetNodeIndex);
+            
             const targetNode = nodesRef.current[targetNodeIndex];
             const range = memoizedCalculations.getAttackRange(battalion.type);
             
