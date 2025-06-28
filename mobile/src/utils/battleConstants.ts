@@ -24,4 +24,12 @@ export const ATTACK_INTERVAL_BASE = 2000; // 2 seconds base
 export const RANGE_MULTIPLIER = 15;
 
 /** Battalion center offset for positioning */
-export const BATTALION_CENTER_OFFSET = 10; 
+export const BATTALION_CENTER_OFFSET = 10;
+
+// TODO: CLARIFY CONSTANT RELATIONSHIPS - These constants affect attack range positioning
+// RANGE_MULTIPLIER = 15: Multiplies bot base range to get actual attack range in pixels
+// BATTALION_CENTER_OFFSET = 10: Offset from battalion visual position to battalion center
+// For proper attack positioning: battalion_center should be exactly attack_range distance from target_center
+// This means: battalion_position = target_center - attack_range - battalion_center_offset
+// The visual range indicator uses bot_range * 30, which is 2x the actual attack range
+// This mismatch might be causing the overshooting issue you're observing 

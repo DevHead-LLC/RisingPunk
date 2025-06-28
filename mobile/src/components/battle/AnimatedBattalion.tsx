@@ -37,6 +37,15 @@ export const AnimatedBattalion = React.memo(React.forwardRef<BattalionRef, Props
 
   const rangeSize = BOT_CATEGORIES[type].stats.range * 30;
   const offset = rangeSize / 2 - 10; // Half of range size minus half of battalion size (20/2)
+  
+  // TODO: VERIFY VISUAL RANGE INDICATOR CALCULATION - This is for visual display only
+  // rangeSize = bot_range * 30 (visual scaling factor)
+  // offset = (rangeSize / 2) - 10 (centers the range indicator around the battalion)
+  // The visual range indicator should match the actual attack range used in positioning logic
+  // Actual attack range = bot_range * RANGE_MULTIPLIER (15)
+  // Visual range = bot_range * 30
+  // This means visual range is 2x the actual attack range - this might be causing confusion
+  // Consider making visual range match actual attack range for consistency
   const attackFlash = useRef(new Animated.Value(0)).current;
   const damageFlash = useRef(new Animated.Value(0)).current;
 

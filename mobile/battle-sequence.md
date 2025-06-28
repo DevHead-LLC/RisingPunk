@@ -44,18 +44,38 @@
 - Retry mechanism with 5-second timeout prevents infinite waiting
 - Both user and enemy battalions must be available before proceeding
 
-**b) Target Selection Process**
-- Each battalion calls `selectTargetNode()` function with a `targetedNodes` Set to track claimed targets
-- Available nodes filtered by: connected to battalion's current node AND neutral state AND not already targeted
-- If no untargeted neutral nodes available, expands search to any neutral nodes
+**b) Initial Target Selection Process**
+- Each battalion calls `selectTargetNode()` function for initial movement only
+- **NETWORK-BASED TARGETING**: Battalion must target neutral nodes connected to their starting node via network lines
+- Available nodes filtered by: connected to battalion's starting node AND neutral state
+- **NO TARGETING RESTRICTIONS**: Multiple battalions can target the same neutral node simultaneously
 - Random selection from available nodes using `Math.floor(Math.random() * availableNodes.length)`
-- First-come-first-served targeting: first battalion to process gets first choice
+- **BATTALION POSITION**: Battalion is at their starting node (not between nodes) during initial targeting
 
-**c) Movement and Attack Setup**
+**c) Initial Movement and Attack Setup**
 - Battalions move toward target node using `Animated.timing()` with speed-based duration
 - Movement stops when battalion reaches attack range (determined by `checkRangeIntersection()`)
 - Attack setup begins immediately when in range with `setupNodeAttack()` function
 - Attack intervals and damage calculations are configured for ongoing combat
+
+**d) Node Capture and Retargeting Trigger**
+**File:** `useBattleEngine.ts` > `setupNodeAttack()` and `useTargeting.ts` > `handleNodeCapture()`
+
+- When a node's health reaches 0, `nodeRef.applyDamage()` returns false
+- This triggers retargeting logic: `findAvailableTargets()` finds new targets
+- `moveBattalionAlongPath()` is called to move battalion to new target
+- **NODE CAPTURE EVENT**: When node is captured, `handleNodeCapture()` is called
+- **GLOBAL RETARGETING**: `retargetAllBattalions()` forces all battalions to find new targets
+
+**e) Subsequent Targeting (After Initial Movement)**
+**File:** `useTargeting.ts` > `findAvailableTargets()` and `findNewTarget()`
+
+- **PROXIMITY-BASED ONLY**: All subsequent targeting ignores network connections
+- **BATTALION POSITION**: Battalion can be between nodes on network lines during movement
+- **TARGET PRIORITY**: No priority between nodes vs enemy battalions - pure distance-based selection
+- **MULTIPLE TARGETING**: Multiple battalions can target same node/battalion simultaneously
+- **RETARGETING TRIGGERS**: When current target is destroyed, captured, or out of range
+- **COOLDOWN SYSTEM**: Prevents excessive retargeting with 2-second cooldown per battalion
 
 ## Step 4: [To be determined]
 **File:** [file] > [function]
