@@ -24,7 +24,4 @@ export const ATTACK_INTERVAL_BASE = 2000; // 2 seconds base
 export const RANGE_MULTIPLIER = 15;
 
 /** Battalion center offset for positioning */
-export const BATTALION_CENTER_OFFSET = 10;
-
-/** Battalion type priority order for targeting */
-export const BATTALION_TYPE_PRIORITY = { guardian: 0, breacher: 1, phreak: 2 }; 
+export const BATTALION_CENTER_OFFSET = 10; 
