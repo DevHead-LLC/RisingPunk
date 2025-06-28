@@ -3,8 +3,7 @@ import { BattalionPosition } from '../types/battle';
 import {
   BASE_DURATION,
   ATTACK_INTERVAL_BASE,
-  RANGE_MULTIPLIER,
-  BATTALION_TYPE_PRIORITY
+  RANGE_MULTIPLIER
 } from './battleConstants';
 
 // ============================================================================
@@ -85,15 +84,4 @@ export const createBattalionKey = (isUser: boolean, nodeIndex: number): string =
  */
 export const createAttackIntervalKey = (isUser: boolean, attackerNodeIndex: number, targetNodeIndex: number): string => {
   return `${isUser ? 'user' : 'enemy'}-${attackerNodeIndex}-${targetNodeIndex}`;
-};
-
-/**
- * Sort battalions by type priority
- * @param battalions - Array of battalions to sort
- * @returns Sorted array of battalions
- */
-export const sortBattalionsByPriority = (battalions: BattalionPosition[]): BattalionPosition[] => {
-  return [...battalions].sort((a, b) => {
-    return BATTALION_TYPE_PRIORITY[a.type] - BATTALION_TYPE_PRIORITY[b.type];
-  });
 }; 
