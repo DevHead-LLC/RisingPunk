@@ -171,12 +171,6 @@ export const useBattleCoordination = (
   // Use battle engine for memoized calculations
   const { memoizedCalculations } = useBattleEngine(
     battleStarted,
-    nodes,
-    userBattalions,
-    enemyBattalions,
-    setUserBattalions,
-    setEnemyBattalions,
-    onBattalionLoss,
     battalionRefs,
     attackIntervals,
     nodeRefs,

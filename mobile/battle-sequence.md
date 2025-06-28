@@ -43,7 +43,6 @@
 - Battle engine waits for `battalionsRef.current` to be properly initialized
 - Retry mechanism with 5-second timeout prevents infinite waiting
 - Both user and enemy battalions must be available before proceeding
-- Debug logging tracks initialization status
 
 **b) Target Selection Process**
 - Each battalion calls `selectTargetNode()` function with a `targetedNodes` Set to track claimed targets
