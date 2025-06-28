@@ -39,20 +39,24 @@
 ## Step 3: Initial Targeting and Movement Setup
 **File:** `useBattleEngine.ts` > `useEffect([battleStarted])`
 
-**a) Battalion Priority Sorting**
-- Battalions are sorted by priority: Guardian > Breacher > Phreak
-- Higher priority battalions get first choice of targets
-- Both user and enemy battalions are processed simultaneously
+**a) Battalion Initialization Check**
+- Battle engine waits for `battalionsRef.current` to be properly initialized
+- Retry mechanism with 5-second timeout prevents infinite waiting
+- Both user and enemy battalions must be available before proceeding
+- Debug logging tracks initialization status
 
-**b) Target Selection**
-- Each battalion finds available neutral nodes (3, 4, 5) that are connected to their current position
-- Battalions avoid targeting nodes already chosen by higher priority battalions
-- If no connected neutral nodes are available, battalions expand their search
+**b) Target Selection Process**
+- Each battalion calls `selectTargetNode()` function with a `targetedNodes` Set to track claimed targets
+- Available nodes filtered by: connected to battalion's current node AND neutral state AND not already targeted
+- If no untargeted neutral nodes available, expands search to any neutral nodes
+- Random selection from available nodes using `Math.floor(Math.random() * availableNodes.length)`
+- First-come-first-served targeting: first battalion to process gets first choice
 
-**c) Movement Initiation**
-- Battalions begin moving toward their selected neutral nodes
-- Movement speed is based on each battalion's speed stat
-- Battalions move along the shortest path to their target
+**c) Movement and Attack Setup**
+- Battalions move toward target node using `Animated.timing()` with speed-based duration
+- Movement stops when battalion reaches attack range (determined by `checkRangeIntersection()`)
+- Attack setup begins immediately when in range with `setupNodeAttack()` function
+- Attack intervals and damage calculations are configured for ongoing combat
 
 ## Step 4: [To be determined]
 **File:** [file] > [function]

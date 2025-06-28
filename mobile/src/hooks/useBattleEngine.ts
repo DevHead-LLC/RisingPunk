@@ -24,19 +24,8 @@ const createBattalionKey = (isUser: boolean, nodeIndex: number) =>
 const createAttackIntervalKey = (isUser: boolean, battalionNodeIndex: number, targetNodeIndex: number) => 
   `${isUser ? 'user' : 'enemy'}-${battalionNodeIndex}-${targetNodeIndex}`;
 
-// Debug flag for conditional logging - set to true to enable priority system removal logs
-const DEBUG_PRIORITY_REMOVAL = true;
-// Maximum retry attempts to prevent infinite loops
-const MAX_RETRY_ATTEMPTS = 50; // 5 seconds max (50 * 100ms)
-
 export const useBattleEngine = (
   battleStarted: boolean,
-  nodes: BattleNode[],
-  userBattalions: BattalionPosition[],
-  enemyBattalions: BattalionPosition[],
-  setUserBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
-  setEnemyBattalions: React.Dispatch<React.SetStateAction<BattalionPosition[]>>,
-  onBattalionLoss: (type: string, name: string, quantity: number, mark?: number) => void,
   battalionRefs: React.MutableRefObject<BattalionRefs>,
   attackIntervals: React.MutableRefObject<AttackIntervals>,
   nodeRefs: React.MutableRefObject<NodeRefs>,
@@ -46,13 +35,6 @@ export const useBattleEngine = (
   findAvailableTargets: (battalion: any, isUser: boolean, userBattalions: any[], enemyBattalions: any[]) => any[],
   moveBattalionAlongPath: (battalion: any, target: any, isUser: boolean, userBattalions?: any[], enemyBattalions?: any[]) => void
 ) => {
-  if (DEBUG_PRIORITY_REMOVAL) {
-    console.log('[PRIORITY_REMOVAL] useBattleEngine called with:');
-    console.log('[PRIORITY_REMOVAL] userBattalions:', userBattalions?.length || 0);
-    console.log('[PRIORITY_REMOVAL] enemyBattalions:', enemyBattalions?.length || 0);
-    console.log('[PRIORITY_REMOVAL] battalionsRef.current:', battalionsRef.current);
-  }
-
   // Memoized calculations for performance optimization
   const memoizedCalculations = useMemo(() => {
     
@@ -116,39 +98,15 @@ export const useBattleEngine = (
   // Battle initialization - find initial targets for all battalions
   useEffect(() => {
     if (battleStarted && !battleInitializedRef.current) {
-      if (DEBUG_PRIORITY_REMOVAL) {
-        console.log('[PRIORITY_REMOVAL] Battle engine initializing - priority system removed');
-        console.log('[PRIORITY_REMOVAL] battalionsRef.current:', battalionsRef.current);
-        console.log('[PRIORITY_REMOVAL] user battalions:', battalionsRef.current?.user?.length || 0);
-        console.log('[PRIORITY_REMOVAL] enemy battalions:', battalionsRef.current?.enemy?.length || 0);
-      }
-      
       // Wait for battalions to be initialized before starting
       const initializeBattle = (retryCount = 0) => {
-        if (retryCount >= MAX_RETRY_ATTEMPTS) {
-          if (DEBUG_PRIORITY_REMOVAL) {
-            console.log('[PRIORITY_REMOVAL] ERROR: Max retry attempts reached. Battalions never initialized!');
-            console.log('[PRIORITY_REMOVAL] battalionsRef.current:', battalionsRef.current);
-            console.log('[PRIORITY_REMOVAL] battleStarted:', battleStarted);
-            console.log('[PRIORITY_REMOVAL] battleInitializedRef.current:', battleInitializedRef.current);
-          }
+        if (retryCount >= 50) {
           return;
         }
         
         if (!battalionsRef.current || !battalionsRef.current.user || !battalionsRef.current.enemy) {
-          if (DEBUG_PRIORITY_REMOVAL && retryCount % 10 === 0) { // Log every 10th retry to reduce spam
-            console.log(`[PRIORITY_REMOVAL] Battalions not ready yet, retry ${retryCount}/${MAX_RETRY_ATTEMPTS}...`);
-            console.log('[PRIORITY_REMOVAL] battalionsRef.current:', battalionsRef.current);
-            console.log('[PRIORITY_REMOVAL] battalionsRef.current?.user:', battalionsRef.current?.user);
-            console.log('[PRIORITY_REMOVAL] battalionsRef.current?.enemy:', battalionsRef.current?.enemy);
-          }
-          // Retry after a short delay if battalions aren't ready yet
           setTimeout(() => initializeBattle(retryCount + 1), 100);
           return;
-        }
-        
-        if (DEBUG_PRIORITY_REMOVAL) {
-          console.log('[PRIORITY_REMOVAL] Battalions ready, starting battle initialization');
         }
         
         battleInitializedRef.current = true;
@@ -233,22 +191,11 @@ export const useBattleEngine = (
         const handleBattalionActions = (battalions: BattalionPosition[], isUser: boolean) => {
           const targetedNodes = new Set<number>();
           
-          if (DEBUG_PRIORITY_REMOVAL) {
-            console.log(`[PRIORITY_REMOVAL] Processing ${battalions.length} ${isUser ? 'user' : 'enemy'} battalions without priority sorting`);
-          }
-
           battalions.forEach(battalion => {
             const targetNodeIndex = selectTargetNode(battalion, isUser, targetedNodes);
             
-            if (DEBUG_PRIORITY_REMOVAL) {
-              console.log(`[PRIORITY_REMOVAL] ${battalion.type} battalion at node ${battalion.nodeIndex} targeting node ${targetNodeIndex}`);
-            }
-            
             // Skip if no valid neutral target found
             if (targetNodeIndex === undefined) {
-              if (DEBUG_PRIORITY_REMOVAL) {
-                console.log(`[PRIORITY_REMOVAL] No valid target found for ${battalion.type} battalion`);
-              }
               return;
             }
             
@@ -294,10 +241,6 @@ export const useBattleEngine = (
         };
 
         // Handle both user and enemy battalions with the same function
-        if (DEBUG_PRIORITY_REMOVAL) {
-          console.log('[PRIORITY_REMOVAL] Starting battalion actions - all types have equal priority');
-        }
-        
         handleBattalionActions(battalionsRef.current.user, true);
         handleBattalionActions(battalionsRef.current.enemy, false);
 
