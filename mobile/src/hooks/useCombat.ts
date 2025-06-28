@@ -306,6 +306,16 @@ const isInAttackRange = (
       Math.pow(node.x - battalion.position.x._value, 2) + 
       Math.pow(node.y - battalion.position.y._value, 2)
     );
+    
+    // TODO: VERIFY ATTACK RANGE CHECKING - This checks if battalion is within attack range of node
+    // battalion.position.x._value = battalion visual position (not center)
+    // node.x = node center position
+    // battalionRange = actual attack range in pixels
+    // For proper positioning: battalion center should be exactly attack_range distance from node center
+    // This means: distance(battalion_center, node_center) should equal attack_range
+    // Current logic: returns true if distance <= range (battalion is within range)
+    // This is correct for determining if battalion can attack, but positioning logic should ensure
+    // battalion stops exactly at attack range edge touching node center
     return distance <= battalionRange;
   } else {
     // For battalion targets, we'd need the target battalion's position

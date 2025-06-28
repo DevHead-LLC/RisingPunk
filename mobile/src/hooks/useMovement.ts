@@ -303,7 +303,12 @@ const calculateMovementDistance = (
   // Calculate movement distance based on target type
   let moveDistance: number;
   if (target.type === 'node') {
-    // For nodes, move to attack range, not to the center
+    // TODO: FIX NODE ATTACK RANGE POSITIONING - This logic is correct in principle but needs verification
+    // For nodes, we want battalion to stop at attack range edge touching node center
+    // Current: optimalDistance = range (battalion attack range)
+    // This means: battalion_center should be exactly 'range' distance from node_center
+    // The battalion attack range edge will then touch the node center
+    // This appears correct, but the issue might be in how the final position is calculated
     const optimalDistance = range; // We want to be at our attack range from the node
     if (updatedDistance <= range) {
       // Already in range, don't move
@@ -338,6 +343,10 @@ const calculateMovementDistance = (
     }
   }
   
+  // TODO: VERIFY RANGE POSITION CALCULATION - This calculates where battalion should end up
+  // The rangePosition should be such that: distance(rangePosition, target.position) = range
+  // This means the battalion attack range edge touches the target center
+  // Need to verify this calculation is correct for the visual positioning
   const rangePosition = {
     x: currentPos.x + (directionX * moveDistance),
     y: currentPos.y + (directionY * moveDistance)

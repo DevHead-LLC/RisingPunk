@@ -10,10 +10,10 @@ import {
   calculateAttackRange,
   calculateTotalDamage
 } from '../utils/battleUtils';
+import { BATTALION_CENTER_OFFSET } from '../utils/battleConstants';
 import type { BattalionRefs, NodeRefs, AttackIntervals, OnBattalionLoss } from './useBattalionRefsAndState';
 
 // Constants
-const BATTALION_CENTER_OFFSET = 25;
 const ATTACK_DELAY = 300;
 const INITIAL_ATTACK_DELAY = 500;
 
@@ -23,6 +23,20 @@ const createBattalionKey = (isUser: boolean, nodeIndex: number) =>
 
 const createAttackIntervalKey = (isUser: boolean, battalionNodeIndex: number, targetNodeIndex: number) => 
   `${isUser ? 'user' : 'enemy'}-${battalionNodeIndex}-${targetNodeIndex}`;
+
+// Utility: Calculate the point along the line from start to end that is 'range' away from end
+function getAttackRangeIntersectionPoint(start, end, range) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  if (distance === 0) return { x: end.x, y: end.y };
+  // Move from end toward start by 'range' units
+  const ratio = (distance - range) / distance;
+  return {
+    x: start.x + dx * ratio,
+    y: start.y + dy * ratio
+  };
+}
 
 export const useBattleEngine = (
   battleStarted: boolean,
@@ -118,11 +132,8 @@ export const useBattleEngine = (
         const selectTargetNode = (battalion: BattalionPosition, isUser: boolean, targetedNodes: Set<number>) => {
           let availableNodes = getConnectedNodes(battalion.nodeIndex);
           
-          // TODO: REMOVE "targetedNodes" filtering - allow multiple battalions to target same node
-          // Filter out already targeted nodes AND non-neutral nodes
           availableNodes = availableNodes.filter(nodeIndex => {
             const node = nodesRef.current[nodeIndex];
-            // REMOVED: !targetedNodes.has(nodeIndex) && 
             return node.controlState === 'neutral';
           });
 
@@ -213,27 +224,43 @@ export const useBattleEngine = (
             const speedStat = memoizedCalculations.getBotStats(battalion.type).speed;
             const duration = memoizedCalculations.getMovementDuration(speedStat);
             
+            // Get battalion's current node position (start)
+            const startNode = nodesRef.current[battalion.nodeIndex];
+            const endNode = targetNode;
+            // Calculate intersection point along the network line
+            let intersection = getAttackRangeIntersectionPoint(
+              { x: startNode.x, y: startNode.y },
+              { x: endNode.x, y: endNode.y },
+              range
+            );
+            // Adjust for battalion's visual center offset
+            intersection = {
+              x: intersection.x - BATTALION_CENTER_OFFSET,
+              y: intersection.y - BATTALION_CENTER_OFFSET
+            };
             const anim = Animated.timing(battalion.position, {
-              toValue: { 
-                x: targetNode.x - BATTALION_CENTER_OFFSET,
-                y: targetNode.y - BATTALION_CENTER_OFFSET
-              },
+              toValue: intersection,
               duration: duration,
               useNativeDriver: true
             });
 
             const listener = battalion.position.addListener(({ x, y }: { x: number; y: number }) => {
+              // FIXED: More precise range checking with tolerance for floating point precision
+              // Battalion should stop when its attack range edge touches the node center
               const battalionCenter = {
                 x: x + BATTALION_CENTER_OFFSET,
                 y: y + BATTALION_CENTER_OFFSET
               };
               
-              const inRange = checkRangeIntersection(
-                battalionCenter,
-                { x: targetNode.x, y: targetNode.y },
-                range
+              const distanceToNode = Math.sqrt(
+                Math.pow(battalionCenter.x - targetNode.x, 2) + 
+                Math.pow(battalionCenter.y - targetNode.y, 2)
               );
-
+              
+              // Use tolerance for floating point precision (within 2 pixels of exact range)
+              const tolerance = 2;
+              const inRange = Math.abs(distanceToNode - range) <= tolerance;
+              
               if (inRange) {
                 anim.stop();
                 battalion.position.removeListener(listener);
