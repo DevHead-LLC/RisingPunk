@@ -1,66 +1,49 @@
-**NOTE: For the latest architectural decisions and action items, see recent-assessment.md.**
+# Current Task: Battle Sequence Intention Translation
 
-**NOTE: User will manually run and test all changes. AI will not execute any commands. User will report logs and visual verification results.**
+## Task Overview
+We are translating the actual battle sequence implementation (documented in `battle-sequence.md`) into the intended battle sequence design (to be documented in `intended-battle-sequence.md`).
 
-# Battle Sequence Alignment: Initial Targeting Restrictions
+## Context
+- **Source**: `battle-sequence.md` - Documents how the battle system actually works today (technical implementation)
+- **Target**: `intended-battle-sequence.md` - Will document how the battle system should work according to user's design goals
+- **Process**: User will provide step-by-step updates on intended behavior, and we'll translate these into the intended sequence document
 
-**NOTE: This file tracks the alignment of battle-sequence.md with intended-battle-sequence.md**
+## Current Status
+- ✅ Completed comprehensive technical documentation of actual battle sequence in `battle-sequence.md`
+- ✅ Step 1a: Screen Setup and Initial State - Translated with neutral node array targeting requirements
+- ✅ Step 1b: Pre-Battle Countdown Sequence - Copied as is from actual implementation
+- 🔄 Ready to receive user's requirements for next steps (1c, 1d, or Step 2+)
+- ⏳ Will continue translating user requirements into `intended-battle-sequence.md` using same format/structure
 
-## Current Situation
-The battle sequence documentation describes how the battle currently works, but we need to align it with the intended behavior that uses the proper node ownership system (arrays instead of controlState).
+## Task Requirements
+1. **Match Format**: Use identical structure and formatting as `battle-sequence.md`
+2. **Translate Intent**: Convert from "what it is" to "what it should be"
+3. **Preserve Detail Level**: Maintain same level of technical detail and specificity
+4. **Step-by-Step Process**: User will provide requirements for each step, we'll update accordingly
 
-## Key Focus: Initial Targeting Restrictions
+## Document Structure to Maintain
+- 7 major steps (Step 1-7)
+- File references and function names
+- Technical implementation details
+- Timing and coordination specifics
+- Visual and animation systems
+- Architecture summary
 
-### Step 1a: Battle Initialization - Targeting Scope
-**Current (battle-sequence.md):**
-- "All nodes start with `controlState: 'neutral'` but only nodes 3, 4, 5 are actually targetable"
+## Progress Summary
+- **Step 1a**: ✅ Complete - Neutral node array targeting, elimination of controlState, network-based targeting restrictions
+- **Step 1b**: ✅ Complete - Pre-battle countdown sequence (copied as is)
+- **Step 1c**: ⏳ Pending - Node Health Assignment (Countdown = 3)
+- **Step 1d**: ⏳ Pending - Battle State Preparation
+- **Steps 2-7**: ⏳ Pending - Awaiting user requirements
 
-**Intended (intended-battle-sequence.md):**
-- "`neutralNodes = [3, 4, 5]` - ONLY these nodes can be targeted for capture during initial targeting"
-- "User/enemy controlled nodes are completely off-limits for targeting"
-- "Battalions can ONLY target nodes in the `neutralNodes` array"
+## Next Actions
+1. Wait for user's requirements for next step (1c, 1d, or Step 2+)
+2. Translate requirements into intended sequence format
+3. Update `intended-battle-sequence.md` with translated content
+4. Continue for each step as user provides requirements
 
-**Core Requirement:**
-- During initial targeting phase, battalions should ONLY be able to target neutral nodes (3, 4, 5)
-- User nodes (0, 1, 2) and enemy nodes (6, 7, 8) should NEVER be targetable
-- This is about the initial "tug-of-war" targeting, not retargeting (which comes later)
-
-## Phase 1: Step 1a Initial Targeting Restrictions (Small Testable Batch)
-
-**Goal:** Ensure only neutral nodes are targetable during initial battle targeting phase
-
-**Tasks:**
-1. **Update BattleNode type** - Remove `controlProgress` and `isLocked` properties (not needed for initial targeting)
-2. **Update useBattleInitialization** - Remove `isLocked` setting during health assignment (only neutral nodes get health)
-3. **Update NetworkNode component** - Remove `controlProgress` and `isLocked` props, use array-based logic only
-4. **Update BattleNetwork component** - Remove `controlProgress` and `isLocked` prop passing
-5. **Update battle-sequence.md step 1a** - Remove controlState references, add array initialization and targeting restrictions
-
-**Testing Criteria:**
-- Battle screen loads without errors
-- Nodes display correct colors (user/enemy/neutral) based on array membership
-- Neutral nodes (3, 4, 5) show health bars, controlled nodes don't
-- No console errors related to missing properties
-- **CRITICAL:** Only neutral nodes (3, 4, 5) appear as potential targets during initial targeting
-- User nodes (0, 1, 2) and enemy nodes (6, 7, 8) are completely excluded from targeting
-
-**Files to Modify:**
-- `src/types/battle.ts` - Remove controlProgress and isLocked
-- `src/hooks/useBattleInitialization.ts` - Remove isLocked setting
-- `src/components/battle/NetworkNode.tsx` - Remove controlProgress/isLocked props
-- `src/components/battle/BattleNetwork.tsx` - Remove prop passing
-- `battle-sequence.md` - Update step 1a description
-
-## Success Criteria
-- Step 1a in both files matches exactly
-- No controlState references in step 1a code
-- Battle initialization works identically to before
-- **CRITICAL:** Only neutral nodes (3, 4, 5) are targetable during initial targeting
-- Ready to proceed to step 1b
-
-## Notes
-- Focus ONLY on initial targeting restrictions - don't touch retargeting logic yet
-- Keep changes minimal and testable
-- Maintain backward compatibility where possible
-- Document any breaking changes clearly
-- This is about the "tug-of-war" initial targeting phase only
+## Key Files
+- `battle-sequence.md` - Current technical implementation (reference)
+- `intended-battle-sequence.md` - Target document for intended design (Step 1a & 1b complete)
+- `current-task.md` - This file (task tracking)
+- `recent-assessment.md` - Context and assessment updates
