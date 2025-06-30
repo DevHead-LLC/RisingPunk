@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Animated } from 'react-native';
 import { COLORS } from '../../styles/theme';
+import { isNeutral, isUserControlled, isEnemyControlled } from '../../utils/nodeOwnership';
 
 type Props = {
   x: number;
   y: number;
   size?: number;
   isActive?: boolean;
-  controlState: 'user' | 'enemy' | 'neutral';
+  nodeIndex: number;
   health?: number;
   controlProgress?: number;
   isLocked?: boolean;
@@ -21,12 +22,15 @@ type NodeRef = {
 
 // CLARIFICATION: Control state is only relevant to neutral nodes (3, 4, 5).
 // User starts with 0, 1, 2; enemy with 6, 7, 8. Once owned, control cannot be taken by the other party.
-export const NetworkNode = React.forwardRef<NodeRef, Props>(({ x, y, size = 12, isActive = false, controlState, health, controlProgress = 0, isLocked = false, onControlStateChange }, ref) => {
+export const NetworkNode = React.forwardRef<NodeRef, Props>(({ x, y, size = 12, isActive = false, nodeIndex, health, controlProgress = 0, isLocked = false, onControlStateChange }, ref) => {
   // CHECK: Ensure there is only one source of truth for control state and progress bar/capture logic.
   // This should not be duplicated between NetworkNode, BattleNetwork, and BattleScreen.
   const [currentProgress, setCurrentProgress] = useState(controlProgress);
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const damageFlash = useRef(new Animated.Value(0)).current;
+
+  // Determine node state using the new utilities
+  const controlState = isUserControlled(nodeIndex) ? 'user' : isEnemyControlled(nodeIndex) ? 'enemy' : 'neutral';
 
   const triggerDamageAnimation = () => {
     // Create two separate animations for center and border

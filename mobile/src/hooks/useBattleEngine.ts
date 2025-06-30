@@ -11,6 +11,7 @@ import {
   calculateTotalDamage
 } from '../utils/battleUtils';
 import { BATTALION_CENTER_OFFSET } from '../utils/battleConstants';
+import { isNeutral } from '../utils/nodeOwnership';
 import type { BattalionRefs, NodeRefs, AttackIntervals, OnBattalionLoss } from './useBattalionRefsAndState';
 
 // Constants
@@ -133,16 +134,14 @@ export const useBattleEngine = (
           let availableNodes = getConnectedNodes(battalion.nodeIndex);
           
           availableNodes = availableNodes.filter(nodeIndex => {
-            const node = nodesRef.current[nodeIndex];
-            return node.controlState === 'neutral';
+            return isNeutral(nodeIndex);
           });
 
           // TODO: SIMPLIFY - Just filter for neutral nodes, ignore targeting status
           // If no untargeted neutral nodes available, expand search to any neutral nodes
           if (availableNodes.length === 0) {
             availableNodes = getConnectedNodes(battalion.nodeIndex).filter(nodeIndex => {
-              const node = nodesRef.current[nodeIndex];
-              return node.controlState === 'neutral';
+              return isNeutral(nodeIndex);
             });
           }
 
@@ -161,8 +160,7 @@ export const useBattleEngine = (
           isUser: boolean
         ) => {
           // Validate that the target node is still neutral before setting up attacks
-          const targetNode = nodesRef.current[targetNodeIndex];
-          if (targetNode.controlState !== 'neutral') {
+          if (!isNeutral(targetNodeIndex)) {
             return;
           }
 

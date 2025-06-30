@@ -9,6 +9,7 @@ import { useBattleCoordination } from '../hooks/useBattleCoordination';
 import { useBattleStateMachine } from '../hooks/useBattleStateMachine';
 import { BattalionPosition } from '../types/battle';
 import { useBattleInitialization } from '../hooks/useBattleInitialization';
+import { isNeutral, captureNode, getUserNodes, isUserControlled } from '../utils/nodeOwnership';
 
 type Props = {
   onClose: () => void;
@@ -73,7 +74,6 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   const [showResults, setShowResults] = useState(false);
   const [battleWinner, setBattleWinner] = useState<'user' | 'enemy'>('user');
   const [battleStarted, setBattleStarted] = useState(false);
-  const [controlledNodes, setControlledNodes] = useState<number[]>([0, 1, 2]); // User starts controlling left nodes
   const battleInitializedRef = useRef(false);
   const [battleLosses, setBattleLosses] = useState<BattleLossTracker>({
     user: {},
@@ -101,8 +101,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   const {
     battalionRefs,
     nodeRefs,
-    setupBattalionAttacks,
-    handleNodeCapture
+    setupBattalionAttacks
   } = useBattleCoordination(
     battleStarted,
     nodes,
@@ -202,12 +201,10 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       const nodeHealth = calculateInitialHealth();
       
       // Only neutral nodes get health - controlled nodes get 0 health
-      setNodes(prevNodes => prevNodes.map(node => ({
+      setNodes(prevNodes => prevNodes.map((node, index) => ({
         ...node,
-        health: node.controlState === 'neutral' ? nodeHealth : 0,
-        controlProgress: node.controlState === 'neutral' ? 0 : 
-                        node.controlState === 'user' ? 100 : -100,
-        isLocked: node.controlState !== 'neutral'
+        health: isNeutral(index) ? nodeHealth : 0,
+        isLocked: !isNeutral(index)
       })));
     }
   }, [countdown, userBattalions, enemyBattalions, calculateInitialHealth]);
@@ -216,28 +213,20 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   const handleNodeControlChange = (nodeIndex: number, newState: 'user' | 'enemy') => {
     // CLARIFICATION_COMMENT: When a neutral node is captured, ownership becomes permanent for the rest of the battle.
     // Owned nodes cannot be targeted or controlled by the opposing party.
-    // Update node control state
-    setControlledNodes(prev => {
-      const newControlled = newState === 'user' 
-        ? [...prev, nodeIndex]
-        : prev.filter(n => n !== nodeIndex);
-      return newControlled;
-    });
-
+    
+    // Use the new capture function to update node ownership
+    captureNode(nodeIndex, newState);
+    
+    // Update node state for backward compatibility (visual components still expect this)
     setNodes(prev => {
       const updated = [...prev];
       updated[nodeIndex] = {
         ...updated[nodeIndex],
-        controlState: newState,
-        controlProgress: newState === 'user' ? 100 : -100,
         isLocked: true, // Lock the node once captured
         health: updated[nodeIndex].health // Preserve current health
       };
       return updated;
     });
-
-    // Use the centralized node capture handler from the hook
-    handleNodeCapture(nodeIndex, newState);
   };
 
   // Cleans up when component unmounts
@@ -260,7 +249,6 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
         {/* Shows the network of nodes and connections */}
         <BattleNetwork
           nodes={nodes}
-          controlledNodes={controlledNodes}
           opacity={networkOpacity}
           width={SCREEN_WIDTH}
           height={SCREEN_HEIGHT * 0.8}

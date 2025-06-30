@@ -1,97 +1,178 @@
-# Complete Refactor Plan: Eliminate useBattleMovementAndAttacks.ts
+# ControlState to Array-Based Node Ownership Refactor
 
-## Goal
-Move ALL logic from `useBattleMovementAndAttacks.ts` into specialized hooks and delete the file entirely.
+**NOTE: For the latest architectural decisions and action items, see recent-assessment.md.**
 
-## Current State Analysis
-The file currently contains:
-- **Refs & State Management**: battalionRefs, attackIntervals, nodeRefs, battleInitializedRef, battalionsRef, nodesRef, retargetCooldowns, recentlyCapturedNodes, findAvailableTargetsRef
-- **Main Logic**: moveBattalionAlongPath (already mostly extracted)
-- **Combat Logic**: setupBattalionAttacks (partially extracted)
-- **Node Capture Logic**: handleNodeCapture, retargetAllBattalions
-- **Debug Logic**: debugLog, DEBUG_BATTLE flag
-- **Constants**: ATTACK_DELAY, CAPTURE_MEMORY_DURATION
-- **useEffect hooks**: for ref updates
+**NOTE: User will manually run and test all changes. AI will not execute any commands. User will report logs and visual verification results.**
 
-## Target Distribution
+## Overview
+Replace the current `controlState` property system with simple arrays for node ownership tracking. This eliminates redundant checks, improves performance, and centralizes node ownership logic.
 
-### 1. useBattalionRefsAndState.ts
-**Move to this file:**
-- All refs: battalionRefs, attackIntervals, nodeRefs, battleInitializedRef, battalionsRef, nodesRef, retargetCooldowns, recentlyCapturedNodes, findAvailableTargetsRef
-- Constants: ATTACK_DELAY, CAPTURE_MEMORY_DURATION
-- Debug logic: debugLog, DEBUG_BATTLE flag
-- useEffect hooks for ref updates
-- Return all refs and state management functions
+## Current Issues
+- 15+ redundant `controlState !== 'neutral'` checks across files
+- O(n) array filtering operations during battle
+- Logic duplication in node capture handling
+- Complex state management with multiple sources of truth
+- Type safety issues with string comparisons
 
-### 2. useCombat.ts
-**Move to this file:**
-- setupBattalionAttacks function (already partially extracted)
-- Any remaining combat-related logic
+## Target Architecture
+```typescript
+// Replace controlState with arrays
+const neutralNodes = [3, 4, 5];  // Start with middle nodes
+const userNodes = [0, 1, 2];     // Fixed user nodes  
+const enemyNodes = [6, 7, 8];    // Fixed enemy nodes
 
-### 3. useMovement.ts
-**Already contains:**
-- moveBattalionAlongPath logic (already extracted)
-- Movement validation and execution
+// Simple utility functions
+const isNeutral = (nodeIndex: number) => neutralNodes.includes(nodeIndex);
+const isUserControlled = (nodeIndex: number) => userNodes.includes(nodeIndex);
+const isEnemyControlled = (nodeIndex: number) => enemyNodes.includes(nodeIndex);
+```
 
-### 4. useTargeting.ts
-**Move to this file:**
-- handleNodeCapture function
-- retargetAllBattalions function
-- Node capture and retargeting logic
+## Phase 1: Create New Node Ownership System
+**Goal**: Add new array-based system alongside existing controlState (no breaking changes)
 
-### 5. useBattleEngine.ts
-**Already contains:**
-- memoizedCalculations
-- Battle calculations and stats
+### Changes:
+1. **Create utility functions** in new file `src/utils/nodeOwnership.ts`
+   - `isNeutral(nodeIndex)`, `isUserControlled(nodeIndex)`, `isEnemyControlled(nodeIndex)`
+   - `captureNode(nodeIndex, newOwner)`
+   - `getNodeOwner(nodeIndex)`
 
-## Step-by-Step Plan
+2. **Add logging** to verify function behavior
+   - Log when nodes are captured
+   - Log current neutral nodes array
 
-### Phase 1: Move Refs & State Management
-1. **Move all refs to useBattalionRefsAndState.ts**
-   - Add all refs as exports
-   - Move constants (ATTACK_DELAY, CAPTURE_MEMORY_DURATION)
-   - Move debug logic (debugLog, DEBUG_BATTLE)
-   - Move useEffect hooks for ref updates
+### Test:
+- Verify utility functions return correct ownership status
+- Verify capture function moves nodes between arrays correctly
+- Check logs show expected behavior
 
-2. **Update useBattalionRefsAndState.ts exports**
-   - Export all refs and state management functions
-   - Export constants and debug utilities
+## Phase 2: Update Targeting Logic
+**Goal**: Replace controlState checks in targeting functions with new utility functions
 
-### Phase 2: Move Combat Logic
-3. **Complete setupBattalionAttacks extraction**
-   - Move remaining parts to useCombat.ts
-   - Ensure all combat logic is centralized
+### Changes:
+1. **Update `useTargeting.ts`**
+   - Replace `node.controlState !== 'neutral'` with `!isNeutral(index)`
+   - Replace `node.controlState === 'neutral'` with `isNeutral(index)`
+   - Update `handleNodeCapture` to use new capture function
 
-### Phase 3: Move Targeting Logic
-4. **Move node capture logic to useTargeting.ts**
-   - Move handleNodeCapture function
-   - Move retargetAllBattalions function
-   - Update useTargeting.ts to handle node capture events
+2. **Add logging** to verify targeting behavior
+   - Log when targets are filtered out
+   - Log available targets found
 
-### Phase 4: Update All Imports
-5. **Update all files that import useBattleMovementAndAttacks**
-   - Update BattleScreen.tsx
-   - Update any other files using this hook
-   - Import from appropriate specialized hooks instead
+### Test:
+- Verify battalions only target neutral nodes
+- Verify targeting stops when node is captured
+- Check logs show correct targeting decisions
 
-### Phase 5: Delete File
-6. **Delete useBattleMovementAndAttacks.ts entirely**
-   - Verify all functionality is preserved
-   - Confirm no broken imports remain
+## Phase 3: Update Movement Logic
+**Goal**: Replace controlState checks in movement validation
 
-## Expected Result
-- `useBattleMovementAndAttacks.ts` is completely deleted
-- All logic is properly distributed to specialized hooks
-- Clean separation of concerns:
-  - **useBattalionRefsAndState.ts**: Refs, state, constants, debug
-  - **useCombat.ts**: Combat logic, attacks, damage
-  - **useMovement.ts**: Movement logic, pathfinding
-  - **useTargeting.ts**: Targeting logic, node capture, retargeting
-  - **useBattleEngine.ts**: Battle calculations, stats, memoization
+### Changes:
+1. **Update `useMovement.ts`**
+   - Replace all `node.controlState !== 'neutral'` checks with `!isNeutral(index)`
+   - Update movement validation functions
 
-## Benefits
-- Eliminates the monolithic hook
-- Clear separation of concerns
-- Easier to test individual pieces
-- More maintainable and modular codebase
-- Follows single responsibility principle
+2. **Add logging** to verify movement behavior
+   - Log when movement is blocked due to node ownership
+   - Log path validation results
+
+### Test:
+- Verify battalions can't move to controlled nodes
+- Verify pathfinding respects node ownership
+- Check logs show correct movement decisions
+
+## Phase 4: Update Combat Logic
+**Goal**: Replace controlState checks in attack setup
+
+### Changes:
+1. **Update `useCombat.ts`**
+   - Replace `node.controlState !== 'neutral'` with `!isNeutral(index)`
+   - Update `setupNewNodeAttack` validation
+
+2. **Update `useBattleEngine.ts`**
+   - Replace controlState checks in `setupNodeAttack`
+   - Update `selectTargetNode` function
+
+3. **Add logging** to verify combat behavior
+   - Log when attacks are stopped due to node capture
+   - Log retargeting decisions
+
+### Test:
+- Verify attacks stop when node is captured
+- Verify retargeting works correctly
+- Check logs show correct combat decisions
+
+## Phase 5: Update Visual Components
+**Goal**: Replace controlState-based rendering with array-based logic
+
+### Changes:
+1. **Update `NetworkNode.tsx`**
+   - Replace controlState prop with nodeIndex prop
+   - Use utility functions for color/state determination
+
+2. **Update `BattleNetwork.tsx`**
+   - Pass nodeIndex instead of controlState
+   - Update node rendering logic
+
+3. **Add logging** to verify visual behavior
+   - Log node color changes
+   - Log capture visual updates
+
+### Test:
+- Verify nodes display correct colors
+- Verify capture animations work
+- Check logs show correct visual updates
+
+## Phase 6: Update Battle Screen Logic
+**Goal**: Replace controlState in main battle coordination
+
+### Changes:
+1. **Update `BattleScreen.tsx`**
+   - Replace controlState checks with utility functions
+   - Update `handleNodeControlChange`
+   - Remove `controlledNodes` state (use arrays instead)
+
+2. **Update `useBattleControl.ts`**
+   - Replace controlState-based logic with array-based logic
+   - Update victory condition checking
+
+3. **Add logging** to verify battle coordination
+   - Log node capture events
+   - Log victory condition checks
+
+### Test:
+- Verify node captures work correctly
+- Verify victory conditions trigger properly
+- Check logs show correct battle flow
+
+## Phase 7: Clean Up and Remove Old System
+**Goal**: Remove all controlState references and clean up
+
+### Changes:
+1. **Remove controlState from types**
+   - Update `BattleNode` interface
+   - Remove controlState from node initialization
+
+2. **Remove old utility functions**
+   - Clean up any remaining controlState references
+   - Remove unused imports
+
+3. **Remove logging**
+   - Clean up all debug logs added during refactor
+
+### Test:
+- Verify all functionality still works
+- Verify no console errors
+- Verify performance improvement
+
+## Success Criteria
+- All 15+ controlState checks replaced with array-based logic
+- Performance improvement (no more O(n) filtering)
+- Single source of truth for node ownership
+- No breaking changes to battle functionality
+- Clean, maintainable codebase
+
+## Notes
+- Each phase should be tested independently
+- Logs will be added and removed as we progress
+- User will manually verify each phase before proceeding
+- Focus only on controlState refactor - no other changes 

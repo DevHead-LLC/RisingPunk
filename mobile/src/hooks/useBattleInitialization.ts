@@ -19,19 +19,19 @@ export const useBattleInitialization = () => {
   // Initialize nodes with proper positioning and states
   const [nodes, setNodes] = useState<BattleNode[]>([
     // Left side (user) nodes
-    { x: SCREEN_WIDTH * 0.0347, y: SCREEN_HEIGHT * 0.25, controlState: 'user' },     // 0
-    { x: SCREEN_WIDTH * 0.0347, y: SCREEN_HEIGHT * 0.525, controlState: 'user' },    // 1
-    { x: SCREEN_WIDTH * 0.0347, y: SCREEN_HEIGHT * 0.8, controlState: 'user' },      // 2
+    { x: SCREEN_WIDTH * 0.0347, y: SCREEN_HEIGHT * 0.25 },     // 0
+    { x: SCREEN_WIDTH * 0.0347, y: SCREEN_HEIGHT * 0.525 },    // 1
+    { x: SCREEN_WIDTH * 0.0347, y: SCREEN_HEIGHT * 0.8 },      // 2
     
     // Middle nodes (neutral)
-    { x: SCREEN_WIDTH * 0.425, y: SCREEN_HEIGHT * 0.375, controlState: 'neutral' },  // 3
-    { x: SCREEN_WIDTH * 0.425, y: SCREEN_HEIGHT * 0.525, controlState: 'neutral' },  // 4
-    { x: SCREEN_WIDTH * 0.425, y: SCREEN_HEIGHT * 0.675, controlState: 'neutral' },  // 5
+    { x: SCREEN_WIDTH * 0.425, y: SCREEN_HEIGHT * 0.375 },  // 3
+    { x: SCREEN_WIDTH * 0.425, y: SCREEN_HEIGHT * 0.525 },  // 4
+    { x: SCREEN_WIDTH * 0.425, y: SCREEN_HEIGHT * 0.675 },  // 5
     
     // Right side (enemy) nodes
-    { x: SCREEN_WIDTH * 0.8225, y: SCREEN_HEIGHT * 0.25, controlState: 'enemy' },    // 6
-    { x: SCREEN_WIDTH * 0.8225, y: SCREEN_HEIGHT * 0.525, controlState: 'enemy' },   // 7
-    { x: SCREEN_WIDTH * 0.8225, y: SCREEN_HEIGHT * 0.8, controlState: 'enemy' },     // 8
+    { x: SCREEN_WIDTH * 0.8225, y: SCREEN_HEIGHT * 0.25 },    // 6
+    { x: SCREEN_WIDTH * 0.8225, y: SCREEN_HEIGHT * 0.525 },   // 7
+    { x: SCREEN_WIDTH * 0.8225, y: SCREEN_HEIGHT * 0.8 },     // 8
   ]);
 
   // Initialize battalions with proper positioning

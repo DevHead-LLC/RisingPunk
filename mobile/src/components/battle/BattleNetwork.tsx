@@ -13,11 +13,11 @@ import { NetworkNode } from './NetworkNode';
 import { NetworkLines } from './NetworkLines';
 import { BattleNode } from '../../types/battle';
 import { BattlePhase } from '../../hooks/useBattleStateMachine';
+import { isNeutral, isUserControlled } from '../../utils/nodeOwnership';
 
 // Props for the network component
 type Props = {
   nodes: BattleNode[];
-  controlledNodes: number[];
   opacity: Animated.Value;
   width: number;
   height: number;
@@ -34,7 +34,6 @@ type Props = {
 // Main component that draws the network of connected nodes and lines
 export const BattleNetwork = React.memo(({ 
   nodes,
-  controlledNodes,
   opacity,
   width,
   height,
@@ -51,21 +50,25 @@ export const BattleNetwork = React.memo(({
         height={height}
       />
       {/* Creates each individual network node */}
-      {nodes.map((node, index) => (
-        // TODO: Only pass health to NetworkNode for nodes 3, 4, 5 while neutral. See clarification in design doc/image.
-        <NetworkNode 
-          key={index}
-          ref={(el) => nodeRefs.current[index] = el}
-          x={node.x}
-          y={node.y}
-          isActive={controlledNodes.includes(index)}
-          controlState={node.controlState}
-          health={node.health} // <-- See above TODO
-          controlProgress={node.controlProgress}
-          isLocked={node.isLocked}
-          onControlStateChange={(newState) => onNodeControlChange(index, newState)}
-        />
-      ))}
+      {nodes.map((node, index) => {
+        // Only pass health and controlProgress for neutral nodes (3, 4, 5) while they are neutral
+        const shouldShowHealth = isNeutral(index);
+        
+        return (
+          <NetworkNode 
+            key={index}
+            ref={(el) => nodeRefs.current[index] = el}
+            x={node.x}
+            y={node.y}
+            isActive={isUserControlled(index)}
+            nodeIndex={index}
+            health={shouldShowHealth ? node.health : undefined}
+            controlProgress={shouldShowHealth ? node.controlProgress : 0}
+            isLocked={node.isLocked}
+            onControlStateChange={(newState) => onNodeControlChange(index, newState)}
+          />
+        );
+      })}
     </Animated.View>
   );
 });

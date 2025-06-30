@@ -7,6 +7,7 @@ import { BattalionRef } from '../components/battle/AnimatedBattalion';
 import { findBattalionIndexAndId } from './useBattalionRefsAndState';
 import { cleanupBattalion } from './useMovement';
 import { useCallback } from 'react';
+import { isNeutral } from '../utils/nodeOwnership';
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -55,7 +56,7 @@ const setupAttacks = (
 
   setTimeout(() => {
     if (target.type === 'node') {
-      setupNodeAttack(
+      setupNewNodeAttack(
         battalion,
         target,
         isUser,
@@ -95,7 +96,7 @@ const setupAttacks = (
 /**
  * Setup node attack logic
  */
-const setupNodeAttack = (
+const setupNewNodeAttack = (
   battalion: BattalionPosition,
   target: { type: string; index: number },
   isUser: boolean,
@@ -125,15 +126,17 @@ const setupNodeAttack = (
       return;
     }
 
-    const node = nodes[target.index];
-    // Only retarget if node is not neutral (captured)
-    if (node.controlState !== 'neutral') {
+    // Only check isNeutral for node targets
+    if (target.type === 'node' && !isNeutral(target.index)) {
+      console.log(`[Combat] Attack stopped: node ${target.index} is no longer neutral. Retargeting...`);
       cleanupBattalion(battalionId, attackIntervals);
       battalion.targetNode = undefined;
       const newTargets = findAvailableTargets(battalion, isUser, userBattalions || [], enemyBattalions || []);
       if (newTargets.length > 0) {
+        console.log(`[Combat] Retargeting to ${newTargets[0].type} ${newTargets[0].index}`);
         moveBattalionAlongPath(battalion, newTargets[0], isUser, userBattalions, enemyBattalions);
       }
+      return;
     }
 
     // Apply damage
@@ -143,6 +146,7 @@ const setupNodeAttack = (
       battalion.targetNode = undefined;
       const newTargets = findAvailableTargets(battalion, isUser, userBattalions || [], enemyBattalions || []);
       if (newTargets.length > 0) {
+        console.log(`[Combat] Retargeting to ${newTargets[0].type} ${newTargets[0].index}`);
         moveBattalionAlongPath(battalion, newTargets[0], isUser, userBattalions, enemyBattalions);
       }
     }
@@ -585,7 +589,7 @@ const createSetupBattalionAttacksWrapperHook = (
 
 export { 
   setupAttacks, 
-  setupNodeAttack, 
+  setupNewNodeAttack, 
   setupBattalionAttack, 
   handleBattalionDamage, 
   isInAttackRange,

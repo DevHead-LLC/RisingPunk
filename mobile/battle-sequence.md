@@ -1,3 +1,7 @@
+# Battle Targeting Expectations
+
+**NOTE: For the latest architectural decisions and action items, see recent-assessment.md.**
+
 # Battle Sequence Flow
 
 ## Step 1: Battle Initialization
@@ -40,46 +44,58 @@
 **File:** `useBattleEngine.ts` > `useEffect([battleStarted])`
 
 **a) Battalion Initialization Check**
-- Battle engine waits for `battalionsRef.current` to be properly initialized
-- Retry mechanism with 5-second timeout prevents infinite waiting
-- Both user and enemy battalions must be available before proceeding
+- The battle engine waits for both user and enemy battalions to be fully initialized (`battalionsRef.current.user` and `.enemy`).
+- A retry mechanism (up to 5 seconds) ensures battalions are available before proceeding.
 
-**b) Initial Target Selection Process**
-- Each battalion calls `selectTargetNode()` function for initial movement only
-- **NETWORK-BASED TARGETING**: Battalion must target neutral nodes connected to their starting node via network lines
-- Available nodes filtered by: connected to battalion's starting node AND neutral state
-- **NO TARGETING RESTRICTIONS**: Multiple battalions can target the same neutral node simultaneously
-- Random selection from available nodes using `Math.floor(Math.random() * availableNodes.length)`
-- **BATTALION POSITION**: Battalion is at their starting node (not between nodes) during initial targeting
+**b) Initial Target Selection**
+- Each battalion (user and enemy) selects its initial target using `selectTargetNode()`.
+- **Network-based targeting:** Only neutral nodes directly connected to the battalion's current node (via network lines) are considered.
+- If no connected neutral nodes are available, the search is expanded to any neutral node.
+- Multiple battalions can target the same neutral node; there are no restrictions or priorities.
+- The target is chosen randomly from the available options.
 
-**c) Initial Movement and Attack Setup**
-- Battalions move toward target node using `Animated.timing()` with speed-based duration
-- Movement stops when battalion reaches attack range (determined by `checkRangeIntersection()`)
-- Attack setup begins immediately when in range with `setupNodeAttack()` function
-- Attack intervals and damage calculations are configured for ongoing combat
+**c) Movement to Attack Range Intersection**
+- Each battalion calculates the path from its current node to the selected target node.
+- The battalion animates along the network line toward the target node.
+- **Precise stopping:** Movement stops at the exact point along the network line where the battalion's attack range edge intersects the center of the target node. This is calculated using the `getAttackRangeIntersectionPoint` utility, adjusted for the battalion's visual center offset.
+- The battalion never leaves the network line during this movement.
 
-**d) Node Capture and Retargeting Trigger**
-**File:** `useBattleEngine.ts` > `setupNodeAttack()` and `useTargeting.ts` > `handleNodeCapture()`
+**d) Initial Attack Setup**
+- Once in position (attack range intersection), the battalion immediately begins attacking the target node.
+- Attack intervals and damage calculations are set up using `setupNodeAttack()`.
+- Both user and enemy battalions follow this process for their first attack.
 
-- When a node's health reaches 0, `nodeRef.applyDamage()` returns false
-- This triggers retargeting logic: `findAvailableTargets()` finds new targets
-- `moveBattalionAlongPath()` is called to move battalion to new target
-- **NODE CAPTURE EVENT**: When node is captured, `handleNodeCapture()` is called
-- **GLOBAL RETARGETING**: `retargetAllBattalions()` forces all battalions to find new targets
+## Step 4: Ongoing Battle Phase - Node Attacks and Retargeting
+**File:** `useBattleEngine.ts` > `setupNodeAttack()` and `useCombat.ts` > `setupNewNodeAttack()` and `useTargeting.ts` > `handleNodeCapture()`
 
-**e) Subsequent Targeting (After Initial Movement)**
-**File:** `useTargeting.ts` > `findAvailableTargets()` and `findNewTarget()`
+**a) Continuous Node Attacks**
+- Once in position at attack range intersection, battalions begin attacking their target nodes using `setupNodeAttack()` (initial) or `setupNewNodeAttack()` (ongoing)
+- **Attack timing:** Initial attack occurs after `INITIAL_ATTACK_DELAY` (500ms), then subsequent attacks follow the battalion's attack interval (based on speed stat)
+- **Damage application:** Each attack applies damage to the target node using `nodeRef.applyDamage()`, which reduces the node's health
+- **Visual feedback:** Battalion triggers attack animation, then node triggers damage animation after `ATTACK_DELAY` (300ms)
 
-- **PROXIMITY-BASED ONLY**: All subsequent targeting ignores network connections
-- **BATTALION POSITION**: Battalion can be between nodes on network lines during movement
-- **TARGET PRIORITY**: No priority between nodes vs enemy battalions - pure distance-based selection
-- **MULTIPLE TARGETING**: Multiple battalions can target same node/battalion simultaneously
-- **RETARGETING TRIGGERS**: When current target is destroyed, captured, or out of range
-- **COOLDOWN SYSTEM**: Prevents excessive retargeting with 2-second cooldown per battalion
+**b) Node Capture and Control Change**
+- When a node's health reaches 0, it gets captured by the attacking side (user or enemy)
+- **Control state update:** Node's `controlState` changes from 'neutral' to 'user' or 'enemy' permanently
+- **Visual indication:** Captured nodes show the controlling side's color and cannot be retargeted
+- **Capture memory:** Recently captured nodes are tracked for 5 seconds to prevent immediate retargeting
 
-## Step 4: [To be determined]
-**File:** [file] > [function]
-- [description]
+**c) Battalion Retargeting Triggers**
+- **Node capture:** When any node gets captured, `handleNodeCapture()` triggers retargeting for all battalions
+- **Target validation:** During attacks, battalions check if their target node is still neutral using `node.controlState !== 'neutral'`
+- **Cooldown system:** Each battalion has a 2-second retarget cooldown to prevent excessive retargeting
+
+**d) Retargeting Logic**
+- **Available targets:** Battalions can target any neutral node (not connected-node restricted) or enemy battalions
+- **Proximity-based selection:** Targets are sorted by distance - closest neutral node or enemy battalion is selected
+- **No priority system:** Neutral nodes and enemy battalions are treated equally based on distance only
+- **Multiple attackers:** Multiple battalions can target the same neutral node simultaneously
+
+**e) Movement to New Targets**
+- When retargeting, battalions use `moveBattalionAlongPath()` to move toward their new target
+- **Path calculation:** Uses `findShortestPaths()` and `reconstructPath()` to find optimal route to target
+- **Range positioning:** Stops at attack range intersection point, just like initial movement
+- **Attack setup:** Once in position, immediately begins attacking the new target
 
 ## Step 5: [To be determined]
 **File:** [file] > [function]
