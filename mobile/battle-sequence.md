@@ -5,22 +5,41 @@
 # Battle Sequence Flow
 
 ## Step 1: Battle Initialization
-**File:** `BattleScreen.tsx` > `initializeBattle()`
+**File:** `BattleScreen.tsx` > `initializeBattle()` and `useBattleInitialization.ts`
 
-**a) Screen Setup**
-- Battle screen loads and immediately shows the network of connected nodes
-- User sees their battalions on the left side (nodes 0, 1, 2) and enemy battalions on the right side (nodes 6, 7, 8)
-- Neutral nodes (3, 4, 5) appear in the center, ready to be captured
+**a) Screen Setup and Initial State**
+- Battle screen loads and immediately shows the network of connected nodes using `showNetwork()`
+- User sees their battalions positioned on the left side (nodes 0, 1, 2) with specific bot types and quantities:
+  - Node 0: 5 Breacher bots
+  - Node 1: 3 Guardian bots  
+  - Node 2: 4 Phreak bots
+- Enemy battalions appear on the right side (nodes 6, 7, 8) with larger quantities:
+  - Node 6: 24 Breacher bots
+  - Node 7: 21 Guardian bots
+  - Node 8: 18 Phreak bots
+- Neutral nodes (3, 4, 5) appear in the center, initially without health values
+- All nodes start with `controlState: 'neutral'` but only nodes 3, 4, 5 are actually targetable
 
-**b) Pre-Battle Countdown**
-- A 3-second countdown overlay appears on screen
-- User sees "3... 2... 1..." before the actual battle begins
+**b) Pre-Battle Countdown Sequence**
+- State machine transitions to 'countdown' phase using `startBattle()`
+- A 3-second countdown overlay appears on screen showing "3... 2... 1..."
 - During countdown, all battalions are visible but not yet moving or attacking
+- Network lines and node connections are fully visible
+- User can see the battlefield layout but cannot interact yet
 
-**c) Battle State Preparation**
-- Node health is calculated and assigned only to neutral nodes (3, 4, 5)
-- Controlled nodes (user/enemy owned) are locked and cannot be targeted
-- Battle timer is set to 20 seconds for the actual battle phase
+**c) Node Health Assignment (Countdown = 3)**
+- When countdown reaches exactly 3, `useEffect([countdown])` triggers node health calculation
+- `calculateInitialHealth()` computes health as 75% of total army strength (user + enemy)
+- Health is only assigned to neutral nodes (3, 4, 5) using `isNeutral()` utility
+- User-controlled nodes (0, 1, 2) and enemy-controlled nodes (6, 7, 8) get 0 health and `isLocked: true`
+- This ensures only neutral nodes can be targeted for capture
+
+**d) Battle State Preparation**
+- All nodes are now properly configured with ownership states
+- Neutral nodes have health and are unlocked for targeting
+- Controlled nodes are locked and cannot be targeted
+- Battalion positions are finalized at their starting nodes
+- Battle timer is prepared but not yet started (waits for countdown completion)
 
 ## Step 2: Battle Phase Activation
 **File:** `BattleScreen.tsx` > `useEffect([phase, battleStarted])` and `useBattleStateMachine.ts` > `startBattle()`

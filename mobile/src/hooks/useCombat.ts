@@ -128,12 +128,10 @@ const setupNewNodeAttack = (
 
     // Only check isNeutral for node targets
     if (target.type === 'node' && !isNeutral(target.index)) {
-      console.log(`[Combat] Attack stopped: node ${target.index} is no longer neutral. Retargeting...`);
       cleanupBattalion(battalionId, attackIntervals);
       battalion.targetNode = undefined;
       const newTargets = findAvailableTargets(battalion, isUser, userBattalions || [], enemyBattalions || []);
       if (newTargets.length > 0) {
-        console.log(`[Combat] Retargeting to ${newTargets[0].type} ${newTargets[0].index}`);
         moveBattalionAlongPath(battalion, newTargets[0], isUser, userBattalions, enemyBattalions);
       }
       return;
@@ -146,7 +144,6 @@ const setupNewNodeAttack = (
       battalion.targetNode = undefined;
       const newTargets = findAvailableTargets(battalion, isUser, userBattalions || [], enemyBattalions || []);
       if (newTargets.length > 0) {
-        console.log(`[Combat] Retargeting to ${newTargets[0].type} ${newTargets[0].index}`);
         moveBattalionAlongPath(battalion, newTargets[0], isUser, userBattalions, enemyBattalions);
       }
     }

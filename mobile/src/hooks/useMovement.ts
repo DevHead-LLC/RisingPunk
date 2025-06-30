@@ -75,7 +75,6 @@ const validateBattalionAndTarget = (
     const distance = Math.sqrt((dx ?? 0) * (dx ?? 0) + (dy ?? 0) * (dy ?? 0));
     const inRange = distance <= range;
     if (inRange && !isNeutral(target.index)) {
-      console.log(`[Movement] Attack/capture blocked: node ${target.index} is not neutral`);
       battalion.targetNode = undefined;
       return { isValid: false, shouldRetarget: true, distance, inRange };
     }
@@ -134,14 +133,12 @@ const handleNodePathCalculation = (
   
   // Validate that we have a valid path before allowing any movement
   if (path.length === 0) {
-    console.log(`[Movement] No valid path found from node ${battalion.nodeIndex} to node ${target.index}`);
     return { shouldContinue: false };
   }
   
   // Only check isNeutral for node targets
   if (target.type === 'node' && path.length === 1) {
     if (!isNeutral(target.index)) {
-      console.log(`[Movement] Attack/capture blocked at node ${target.index} (not neutral)`);
       return { shouldContinue: false };
     }
   }
@@ -149,7 +146,6 @@ const handleNodePathCalculation = (
   if (path.length === 1) {
     // At the target node, check if we can attack/capture
     if (target.type === 'node' && !isNeutral(target.index)) {
-      console.log(`[Movement] Attack/capture blocked at node ${target.index} (not neutral)`);
       return { shouldContinue: false };
     }
     setupAttacks(battalion, target, isUser, battalionId, attackIntervals, cleanupBattalion, nodeRefs, nodes, findAvailableTargets, moveBattalionAlongPath, setUserBattalions, setEnemyBattalions, userBattalions, enemyBattalions);

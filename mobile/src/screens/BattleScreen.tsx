@@ -203,8 +203,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       // Only neutral nodes get health - controlled nodes get 0 health
       setNodes(prevNodes => prevNodes.map((node, index) => ({
         ...node,
-        health: isNeutral(index) ? nodeHealth : 0,
-        isLocked: !isNeutral(index)
+        health: isNeutral(index) ? nodeHealth : 0
       })));
     }
   }, [countdown, userBattalions, enemyBattalions, calculateInitialHealth]);
@@ -222,7 +221,6 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
       const updated = [...prev];
       updated[nodeIndex] = {
         ...updated[nodeIndex],
-        isLocked: true, // Lock the node once captured
         health: updated[nodeIndex].health // Preserve current health
       };
       return updated;
