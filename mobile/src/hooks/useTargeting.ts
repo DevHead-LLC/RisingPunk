@@ -2,10 +2,14 @@ import { useCallback } from 'react';
 import { BattleNode, BattalionPosition, BattleTarget } from '../types/battle';
 import { getConnectedNodes } from '../utils/networkConstants';
 import { getAnimatedPosition } from './useMovement';
+import { isNeutral, captureNode } from '../utils/nodeOwnership';
 
 // Constants for targeting
 const RETARGET_COOLDOWN = 2000; // 2 seconds
 const CAPTURE_MEMORY_DURATION = 5000; // 5 seconds
+
+// Add a DEBUG flag to control logging verbosity
+const DEBUG = false;
 
 export const useTargeting = (
   nodes: BattleNode[],
@@ -27,27 +31,15 @@ export const useTargeting = (
     const currentPos = getAnimatedPosition(battalion.position);
     const allTargets: BattleTarget[] = [];
     
-    // TODO: FIX TARGETING LOGIC - Battalion might be between nodes on network lines
-    // Current logic assumes battalion is at a specific node, but they can be in transit
-    // Check neutral nodes first (primary targets)
-    // CLARIFICATION: Only neutral nodes can be targeted. Once a node is controlled by either party, 
-    // it cannot be retargeted or changed for the rest of the battle.
-    const connectedNodeIndices = getConnectedNodes(battalion.nodeIndex);
-    
+    // Collect all neutral nodes as possible targets
     nodes.forEach((node, index) => {
-      // TODO: REMOVE connected node restriction - target any neutral node by proximity
-      // if (!node || !connectedNodeIndices.includes(index)) return;
       if (!node) return;
-      
-      // Only target neutral nodes - controlled nodes are permanent
-      if (node.controlState !== 'neutral') return;
+      if (!isNeutral(index)) return;
       if (index === battalion.nodeIndex) return;
-      
       const distance = Math.sqrt(
         Math.pow(node.x - currentPos.x, 2) + 
         Math.pow(node.y - currentPos.y, 2)
       );
-      
       if (!isNaN(distance)) {
         allTargets.push({
           type: 'node',
@@ -55,39 +47,35 @@ export const useTargeting = (
           distance,
           position: { x: node.x, y: node.y }
         });
+        if (DEBUG) console.log(`[Targeting] (DEBUG) Added neutral node ${index} as target with distance ${distance.toFixed(2)}`);
       }
     });
 
-    // If no neutral nodes found, check enemy battalions
-    // CLARIFICATION: When no neutral nodes are available, battalions attack enemy battalions directly
-    if (allTargets.length === 0) {
-      const enemyBatts = isUser ? enemyBattalions : userBattalions;
-      
-      if (enemyBatts && Array.isArray(enemyBatts)) {
-        enemyBatts.forEach((enemyBattalion, index) => {
-          if (!enemyBattalion || enemyBattalion.quantity <= 0 || enemyBattalion.currentHealth <= 0) {
-            return;
-          }
-          
-          const enemyPos = getAnimatedPosition(enemyBattalion.position);
-          const distance = Math.sqrt(
-            Math.pow(enemyPos.x - currentPos.x, 2) + 
-            Math.pow(enemyPos.y - currentPos.y, 2)
-          );
-          
-          if (!isNaN(distance)) {
-            allTargets.push({
-              type: 'battalion',
-              index,
-              distance,
-              position: enemyPos
-            });
-          }
-        });
-      }
+    // Collect all valid enemy battalions as possible targets
+    const enemyBatts = isUser ? enemyBattalions : userBattalions;
+    if (enemyBatts && Array.isArray(enemyBatts)) {
+      enemyBatts.forEach((enemyBattalion, index) => {
+        if (!enemyBattalion || enemyBattalion.quantity <= 0 || enemyBattalion.currentHealth <= 0) {
+          return;
+        }
+        const enemyPos = getAnimatedPosition(enemyBattalion.position);
+        const distance = Math.sqrt(
+          Math.pow(enemyPos.x - currentPos.x, 2) + 
+          Math.pow(enemyPos.y - currentPos.y, 2)
+        );
+        if (!isNaN(distance)) {
+          allTargets.push({
+            type: 'battalion',
+            index,
+            distance,
+            position: enemyPos
+          });
+          if (DEBUG) console.log(`[Targeting] (DEBUG) Added enemy battalion ${index} as target with distance ${distance.toFixed(2)}`);
+        }
+      });
     }
     
-    // Sort targets by distance only - priority is handled by order of checking
+    // Sort all targets by distance
     const validTargets = allTargets
       .filter(target => !isNaN(target.distance))
       .sort((a, b) => a.distance - b.distance);
@@ -116,35 +104,11 @@ export const useTargeting = (
       battalionsRef.current.enemy
     );
 
-    // Pure proximity-based targeting - no priority between nodes vs battalions
-    // TODO: REVIEW - Should we prevent targeting recently captured nodes?
-    // This might prevent multiple battalions from attacking the same node
-    // Filter out recently captured nodes and sort by distance
-    const availableTargets = allTargets.filter(target => {
-      if (target.type === 'node') {
-        const node = nodes[target.index];
-        // REMOVED: recently captured nodes filtering - allow multiple battalions to attack same node
-        // Only target neutral nodes, not captured ones
-        return node && node.controlState === 'neutral';
-      }
-      return true; // Include all battalion targets
-    });
-    
-    if (availableTargets.length > 0) {
-      const target = availableTargets[0]; // Closest target (already sorted by distance)
-      
+    if (allTargets.length > 0) {
+      const target = allTargets[0]; // Closest target (already sorted by distance)
       // Set cooldown
       retargetCooldowns.current[battalionId] = now;
-      
-      // REMOVED: Marking nodes as recently captured - allow multiple battalions to attack same node
-      // If targeting a node, mark it as recently captured
-      // if (target.type === 'node') {
-      //   recentlyCapturedNodes.current.add(target.index);
-      //   setTimeout(() => {
-      //     recentlyCapturedNodes.current.delete(target.index);
-      //   }, CAPTURE_MEMORY_DURATION);
-      // }
-      
+      console.log(`[Targeting] Selected target: ${target.type} ${target.index} at distance ${target.distance.toFixed(2)}`);
       moveBattalionAlongPath(
         battalion,
         target,
@@ -152,6 +116,8 @@ export const useTargeting = (
         battalionsRef.current.user,
         battalionsRef.current.enemy
       );
+    } else {
+      console.log(`[Targeting] No available targets found for battalion ${battalionId}`);
     }
   }, [nodes, findAvailableTargets, retargetCooldowns, recentlyCapturedNodes, battalionsRef, findBattalionIndexAndId, moveBattalionAlongPath]);
 
@@ -162,8 +128,11 @@ export const useTargeting = (
     nodesRef: React.MutableRefObject<BattleNode[]>,
     CAPTURE_MEMORY_DURATION: number
   ) => {
-    // Update node control state
-    nodesRef.current[nodeIndex].controlState = newControlState;
+    // Only log major event
+    console.log(`[Targeting] Node ${nodeIndex} captured by ${newControlState}`);
+    
+    // Use new capture function
+    captureNode(nodeIndex, newControlState);
     
     // Mark as recently captured to prevent immediate retargeting
     recentlyCapturedNodes.current.add(nodeIndex);
@@ -199,7 +168,7 @@ export const useTargeting = (
   }, [battalionsRef, findNewTarget]);
 
   // Create a wrapper function for handleNodeCapture with the correct signature
-  const createHandleNodeCaptureWrapper = useCallback((
+  const createSimplifiedNodeCaptureHandler = useCallback((
     nodesRef: React.MutableRefObject<BattleNode[]>,
     CAPTURE_MEMORY_DURATION: number
   ) => {
@@ -207,5 +176,5 @@ export const useTargeting = (
       handleNodeCapture(nodeIndex, newControlState, nodesRef, CAPTURE_MEMORY_DURATION);
   }, [handleNodeCapture]);
 
-  return { findAvailableTargets, findNewTarget, handleNodeCapture, retargetAllBattalions, createHandleNodeCaptureWrapper };
+  return { findAvailableTargets, findNewTarget, handleNodeCapture, retargetAllBattalions, createSimplifiedNodeCaptureHandler };
 }; 

@@ -6,16 +6,15 @@
  * @dependencies BattleNode, NETWORK_CONNECTIONS
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { BattleNode } from '../types/battle';
 import { NETWORK_CONNECTIONS, getConnectedNodes } from '../utils/networkConstants';
+import { isNeutral, getUserNodes, getEnemyNodes } from '../utils/nodeOwnership';
 
 export const useBattleControl = (
   nodes: BattleNode[],
   setNodes: (nodes: BattleNode[]) => void
 ) => {
-  const [controlledNodes, setControlledNodes] = useState<number[]>([0, 1, 2]);
-
   /**
    * @function updateNodeControl
    * @description Updates node control state based on damage and current controller
@@ -28,26 +27,21 @@ export const useBattleControl = (
     const node = nodes[nodeIndex];
     if (!node || node.isLocked) return false;
 
-    if (node.controlState === 'neutral') {
+    if (isNeutral(nodeIndex)) {
       const newProgress = (node.controlProgress || 0) + (damage * (isUser ? 1 : -1));
       const maxControl = node.health || 1000; // Fallback value
       
       if (Math.abs(newProgress) >= maxControl) {
-        // Node captured
+        // Node captured - update node state for backward compatibility only
         setNodes(nodes.map((n, i) => 
           i === nodeIndex ? {
             ...n,
-            controlState: isUser ? 'user' : 'enemy',
             isLocked: true,
             controlProgress: undefined,
             health: undefined
           } : n
         ));
         
-        // Update controlled nodes list
-        if (isUser) {
-          setControlledNodes(prev => [...prev, nodeIndex]);
-        }
         return false; // Stop attacks on captured node
       } else {
         // Update control progress
@@ -65,16 +59,15 @@ export const useBattleControl = (
    * @description Checks if either side has won the battle
    */
   const checkVictoryCondition = useCallback((): 'user' | 'enemy' | null => {
-    const userNodes = nodes.filter(n => n.controlState === 'user').length;
-    const enemyNodes = nodes.filter(n => n.controlState === 'enemy').length;
+    const userNodes = getUserNodes();
+    const enemyNodes = getEnemyNodes();
     
-    if (userNodes >= 6) return 'user';
-    if (enemyNodes >= 6) return 'enemy';
+    if (userNodes.length >= 6) return 'user';
+    if (enemyNodes.length >= 6) return 'enemy';
     return null;
-  }, [nodes]);
+  }, []);
 
   return {
-    controlledNodes,
     getConnectedNodes,
     updateNodeControl,
     checkVictoryCondition

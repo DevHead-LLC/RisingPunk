@@ -36,7 +36,6 @@ export type BattleTarget = {
 export type BattleNode = {
   x: number;
   y: number;
-  controlState: 'user' | 'enemy' | 'neutral';
   health?: number;
   controlProgress?: number;
   isLocked?: boolean;

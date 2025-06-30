@@ -3,6 +3,7 @@ import { Animated } from 'react-native';
 import { BOT_CATEGORIES } from '../screens/DigitalBarracksScreen';
 import { RANGE_MULTIPLIER } from '../utils/battleConstants';
 import { calculateMovementDuration } from '../utils/battleUtils';
+import { isNeutral } from '../utils/nodeOwnership';
 
 // Infinite loop detection
 const loopDetection = new Map<string, { count: number, lastTime: number }>();
@@ -53,7 +54,7 @@ export { checkForInfiniteLoop, getAnimatedPosition, cleanupBattalion };
 const validateBattalionAndTarget = (
   battalion: { quantity: number; currentHealth?: number; targetNode?: number },
   target: { type: string; index: number; position?: { x: number; y: number } },
-  nodes: { controlState: string }[],
+  nodes: { x: number; y: number }[],
   currentPos: { x: number; y: number },
   range: number,
   cleanupBattalion: (battalionId: string, attackIntervals: any) => void,
@@ -66,26 +67,23 @@ const validateBattalionAndTarget = (
     return { isValid: false, shouldRetarget: false, distance: 0, inRange: false };
   }
 
-  // Validate node target before proceeding
+  // Only block attacking/capturing non-neutral nodes, not movement
   if (target.type === 'node') {
-    const node = nodes[target.index];
-    // Only retarget if node is not neutral (captured)
-    if (node.controlState !== 'neutral') {
+    // Only block if we're in range (i.e., about to attack/capture)
+    const dx = target.position?.x - currentPos.x;
+    const dy = target.position?.y - currentPos.y;
+    const distance = Math.sqrt((dx ?? 0) * (dx ?? 0) + (dy ?? 0) * (dy ?? 0));
+    const inRange = distance <= range;
+    if (inRange && !isNeutral(target.index)) {
+      console.log(`[Movement] Attack/capture blocked: node ${target.index} is not neutral`);
       battalion.targetNode = undefined;
-      return { isValid: false, shouldRetarget: true, distance: 0, inRange: false };
+      return { isValid: false, shouldRetarget: true, distance, inRange };
     }
+    // Otherwise, allow movement/pathfinding
   }
 
   if (!target || !target.position) {
     return { isValid: false, shouldRetarget: false, distance: 0, inRange: false };
-  }
-  
-  // Check target validity before any movement or path calculation
-  if (target.type === 'node') {
-    const targetNode = nodes[target.index];
-    if (targetNode.controlState !== 'neutral') {
-      return { isValid: false, shouldRetarget: false, distance: 0, inRange: false };
-    }
   }
   
   // Check if battalion is already in attack range before any movement calculations
@@ -114,7 +112,7 @@ export { validateBattalionAndTarget };
 const handleNodePathCalculation = (
   battalion: { nodeIndex: number; remainingPath?: number[]; finalTarget?: number },
   target: { type: string; index: number; position: { x: number; y: number } },
-  nodes: { x: number; y: number; controlState: string }[],
+  nodes: { x: number; y: number }[],
   findShortestPaths: (startNode: number, nodes: any[]) => { distances: { [key: number]: number }; previousNodes: { [key: number]: number | null } },
   reconstructPath: (startNode: number, endNode: number, previousNodes: { [key: number]: number | null }) => number[],
   setupAttacks: (battalion: any, target: any, isUser: boolean, battalionId: string, attackIntervals: any, cleanupBattalion: any, nodeRefs: any, nodes: any, findAvailableTargets: any, moveBattalionAlongPath: any, setUserBattalions?: any, setEnemyBattalions?: any, userBattalions?: any[], enemyBattalions?: any[]) => void,
@@ -130,20 +128,30 @@ const handleNodePathCalculation = (
   setUserBattalions?: any,
   setEnemyBattalions?: any
 ): { shouldContinue: boolean; updatedTarget?: { type: string; index: number; position: { x: number; y: number } } } => {
-  const targetNode = nodes[target.index];
-  if (targetNode.controlState !== 'neutral') {
-    return { shouldContinue: false };
-  }
-  
+  // Allow pathfinding through any node; only block attack/capture at the end
   const { distances, previousNodes } = findShortestPaths(battalion.nodeIndex, nodes);
   const path = reconstructPath(battalion.nodeIndex, target.index, previousNodes);
   
   // Validate that we have a valid path before allowing any movement
   if (path.length === 0) {
+    console.log(`[Movement] No valid path found from node ${battalion.nodeIndex} to node ${target.index}`);
     return { shouldContinue: false };
   }
   
+  // Only check isNeutral for node targets
+  if (target.type === 'node' && path.length === 1) {
+    if (!isNeutral(target.index)) {
+      console.log(`[Movement] Attack/capture blocked at node ${target.index} (not neutral)`);
+      return { shouldContinue: false };
+    }
+  }
+  
   if (path.length === 1) {
+    // At the target node, check if we can attack/capture
+    if (target.type === 'node' && !isNeutral(target.index)) {
+      console.log(`[Movement] Attack/capture blocked at node ${target.index} (not neutral)`);
+      return { shouldContinue: false };
+    }
     setupAttacks(battalion, target, isUser, battalionId, attackIntervals, cleanupBattalion, nodeRefs, nodes, findAvailableTargets, moveBattalionAlongPath, setUserBattalions, setEnemyBattalions, userBattalions, enemyBattalions);
     return { shouldContinue: false };
   }
@@ -208,7 +216,7 @@ const handleBattalionPathFollowing = (
       
       // Move to the next node in the path
       const nextTarget = {
-        type: 'node' as const,
+        type: target.type,
         index: nextNodeIndex,
         distance: 0,
         position: { x: nextNode.x, y: nextNode.y }
@@ -397,7 +405,7 @@ const executeBattalionMovement = (
 const handlePostMovementActions = (
   battalion: { quantity: number; currentHealth?: number; targetNode?: number; remainingPath?: number[]; finalTarget?: number; nodeIndex: number },
   target: { type: string; index: number; position: { x: number; y: number } },
-  nodes: { controlState: string; x: number; y: number }[],
+  nodes: { x: number; y: number }[],
   currentPos: { x: number; y: number },
   range: number,
   isUser: boolean,
@@ -417,13 +425,13 @@ const handlePostMovementActions = (
   if (target.type === 'node') {
     const node = nodes[target.index];
     // Only retarget if node is not neutral (captured)
-    if (node.controlState !== 'neutral') {
+    if (!isNeutral(target.index)) {
       battalion.targetNode = undefined;
       const newTargets = findAvailableTargets(battalion, isUser, userBattalions || [], enemyBattalions || []);
       if (newTargets.length > 0) {
         // Prevent targeting the same node again
         const validTarget = newTargets.find(t => 
-          t.type === 'node' ? nodes[t.index].controlState === 'neutral' : true
+          t.type === 'node' ? isNeutral(t.index) : true
         );
         if (validTarget) {
           moveBattalionAlongPath(battalion, validTarget, isUser, userBattalions, enemyBattalions);
@@ -450,7 +458,7 @@ const handlePostMovementActions = (
         
         // Move to the next node in the path
         const nextTarget = {
-          type: 'node' as const,
+          type: target.type,
           index: nextNodeIndex,
           distance: 0,
           position: { x: nextNode.x, y: nextNode.y }
@@ -543,7 +551,7 @@ const handleMovementValidation = (
       if (newTargets.length > 0) {
         // Prevent targeting the same node again
         const validTarget = newTargets.find(t => 
-          t.type === 'node' ? nodes[t.index].controlState === 'neutral' : true
+          t.type === 'node' ? isNeutral(t.index) : true
         );
         if (validTarget) {
           moveBattalionAlongPath(battalion, validTarget, isUser, userBattalions, enemyBattalions);

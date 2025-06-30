@@ -40,8 +40,7 @@ export const useBattleCoordination = (
     recentlyCapturedNodes,
     findAvailableTargetsRef,
     ATTACK_DELAY,
-    CAPTURE_MEMORY_DURATION,
-    debugLog
+    CAPTURE_MEMORY_DURATION
   } = useBattalionRefsAndState(nodes, userBattalions, enemyBattalions);
 
   const moveBattalionAlongPath = useCallback((
@@ -117,7 +116,7 @@ export const useBattleCoordination = (
       setUserBattalions,
       setEnemyBattalions,
       checkForInfiniteLoop,
-      debugLog
+      () => {}
     );
     
     if (!pathResult.shouldContinue) {
@@ -147,12 +146,12 @@ export const useBattleCoordination = (
       enemyBattalions,
       setUserBattalions,
       setEnemyBattalions,
-      debugLog
+      () => {}
     );
-  }, [nodes, attackIntervals, findAvailableTargetsRef, nodeRefs, setUserBattalions, setEnemyBattalions, debugLog]);
+  }, [nodes, attackIntervals, findAvailableTargetsRef, nodeRefs, setUserBattalions, setEnemyBattalions]);
 
   // Use targeting hook (after moveBattalionAlongPath is defined)
-  const { findAvailableTargets, findNewTarget, handleNodeCapture, retargetAllBattalions, createHandleNodeCaptureWrapper } = useTargeting(
+  const { findAvailableTargets, findNewTarget, retargetAllBattalions } = useTargeting(
     nodes,
     retargetCooldowns,
     recentlyCapturedNodes,
@@ -202,7 +201,6 @@ export const useBattleCoordination = (
     findNewTarget,
     setupBattalionAttacks,
     findAvailableTargets,
-    moveBattalionAlongPath,
-    handleNodeCapture: createHandleNodeCaptureWrapper(nodesRef, CAPTURE_MEMORY_DURATION)
+    moveBattalionAlongPath
   };
 }; 
