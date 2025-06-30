@@ -47,7 +47,6 @@ export const useTargeting = (
           distance,
           position: { x: node.x, y: node.y }
         });
-        if (DEBUG) console.log(`[Targeting] (DEBUG) Added neutral node ${index} as target with distance ${distance.toFixed(2)}`);
       }
     });
 
@@ -70,7 +69,6 @@ export const useTargeting = (
             distance,
             position: enemyPos
           });
-          if (DEBUG) console.log(`[Targeting] (DEBUG) Added enemy battalion ${index} as target with distance ${distance.toFixed(2)}`);
         }
       });
     }
@@ -108,7 +106,6 @@ export const useTargeting = (
       const target = allTargets[0]; // Closest target (already sorted by distance)
       // Set cooldown
       retargetCooldowns.current[battalionId] = now;
-      console.log(`[Targeting] Selected target: ${target.type} ${target.index} at distance ${target.distance.toFixed(2)}`);
       moveBattalionAlongPath(
         battalion,
         target,
@@ -116,8 +113,6 @@ export const useTargeting = (
         battalionsRef.current.user,
         battalionsRef.current.enemy
       );
-    } else {
-      console.log(`[Targeting] No available targets found for battalion ${battalionId}`);
     }
   }, [nodes, findAvailableTargets, retargetCooldowns, recentlyCapturedNodes, battalionsRef, findBattalionIndexAndId, moveBattalionAlongPath]);
 
@@ -128,9 +123,6 @@ export const useTargeting = (
     nodesRef: React.MutableRefObject<BattleNode[]>,
     CAPTURE_MEMORY_DURATION: number
   ) => {
-    // Only log major event
-    console.log(`[Targeting] Node ${nodeIndex} captured by ${newControlState}`);
-    
     // Use new capture function
     captureNode(nodeIndex, newControlState);
     

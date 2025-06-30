@@ -37,6 +37,4 @@ export type BattleNode = {
   x: number;
   y: number;
   health?: number;
-  controlProgress?: number;
-  isLocked?: boolean;
 }; 

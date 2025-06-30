@@ -10,8 +10,6 @@ type Props = {
   isActive?: boolean;
   nodeIndex: number;
   health?: number;
-  controlProgress?: number;
-  isLocked?: boolean;
   onControlStateChange?: (newState: 'user' | 'enemy') => void;
 };
 
@@ -22,10 +20,10 @@ type NodeRef = {
 
 // CLARIFICATION: Control state is only relevant to neutral nodes (3, 4, 5).
 // User starts with 0, 1, 2; enemy with 6, 7, 8. Once owned, control cannot be taken by the other party.
-export const NetworkNode = React.forwardRef<NodeRef, Props>(({ x, y, size = 12, isActive = false, nodeIndex, health, controlProgress = 0, isLocked = false, onControlStateChange }, ref) => {
+export const NetworkNode = React.forwardRef<NodeRef, Props>(({ x, y, size = 12, isActive = false, nodeIndex, health, onControlStateChange }, ref) => {
   // CHECK: Ensure there is only one source of truth for control state and progress bar/capture logic.
   // This should not be duplicated between NetworkNode, BattleNetwork, and BattleScreen.
-  const [currentProgress, setCurrentProgress] = useState(controlProgress);
+  const [currentProgress, setCurrentProgress] = useState(0);
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const damageFlash = useRef(new Animated.Value(0)).current;
 
@@ -65,7 +63,8 @@ export const NetworkNode = React.forwardRef<NodeRef, Props>(({ x, y, size = 12, 
   };
 
   const applyDamage = (damage: number, isUser: boolean) => {
-    if (isLocked) return false;
+    // Prevent damage to already captured nodes (not neutral)
+    if (!isNeutral(nodeIndex)) return false;
     
     const progressChange = (damage / (health || 1)) * 100;
     const newProgress = currentProgress + (isUser ? progressChange : -progressChange);
