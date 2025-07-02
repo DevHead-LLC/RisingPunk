@@ -63,9 +63,7 @@ export const BattleNetwork = React.memo(({
             isActive={isUserControlled(index)}
             nodeIndex={index}
             health={shouldShowHealth ? node.health : undefined}
-            controlProgress={shouldShowHealth ? node.controlProgress : 0}
-            isLocked={node.isLocked}
-            onControlStateChange={(newState) => onNodeControlChange(index, newState)}
+            onNodeCapture={(newOwner) => onNodeControlChange(index, newOwner)}
           />
         );
       })}

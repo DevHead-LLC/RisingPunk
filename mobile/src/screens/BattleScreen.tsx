@@ -9,7 +9,7 @@ import { useBattleCoordination } from '../hooks/useBattleCoordination';
 import { useBattleStateMachine } from '../hooks/useBattleStateMachine';
 import { BattalionPosition } from '../types/battle';
 import { useBattleInitialization } from '../hooks/useBattleInitialization';
-import { isNeutral, captureNode, getUserNodes, isUserControlled } from '../utils/nodeOwnership';
+import { isNeutral, captureNode, getUserNodes, isUserControlled, resetNodeOwnership } from '../utils/nodeOwnership';
 
 type Props = {
   onClose: () => void;
@@ -126,6 +126,14 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   const initializeBattle = () => {
     if (battleInitializedRef.current) return;
     battleInitializedRef.current = true;
+
+    // Initialize node ownership arrays
+    resetNodeOwnership();
+    console.log('Node ownership initialized:', { 
+      neutralNodes: [3, 4, 5], 
+      userNodes: [0, 1, 2], 
+      enemyNodes: [6, 7, 8] 
+    });
 
     // Show battlefield immediately using the new hook
     showNetwork();

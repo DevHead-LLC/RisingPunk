@@ -10,7 +10,7 @@ type Props = {
   isActive?: boolean;
   nodeIndex: number;
   health?: number;
-  onControlStateChange?: (newState: 'user' | 'enemy') => void;
+  onNodeCapture?: (newOwner: 'user' | 'enemy') => void;
 };
 
 type NodeRef = {
@@ -20,7 +20,7 @@ type NodeRef = {
 
 // CLARIFICATION: Control state is only relevant to neutral nodes (3, 4, 5).
 // User starts with 0, 1, 2; enemy with 6, 7, 8. Once owned, control cannot be taken by the other party.
-export const NetworkNode = React.forwardRef<NodeRef, Props>(({ x, y, size = 12, isActive = false, nodeIndex, health, onControlStateChange }, ref) => {
+export const NetworkNode = React.forwardRef<NodeRef, Props>(({ x, y, size = 12, isActive = false, nodeIndex, health, onNodeCapture }, ref) => {
   // CHECK: Ensure there is only one source of truth for control state and progress bar/capture logic.
   // This should not be duplicated between NetworkNode, BattleNetwork, and BattleScreen.
   const [currentProgress, setCurrentProgress] = useState(0);
@@ -70,8 +70,8 @@ export const NetworkNode = React.forwardRef<NodeRef, Props>(({ x, y, size = 12, 
     const newProgress = currentProgress + (isUser ? progressChange : -progressChange);
     
     if (Math.abs(newProgress) >= 100) {
-      const newState = newProgress > 0 ? 'user' : 'enemy';
-      onControlStateChange?.(newState);
+      const newOwner = newProgress > 0 ? 'user' : 'enemy';
+      onNodeCapture?.(newOwner);
       return false;
     }
     

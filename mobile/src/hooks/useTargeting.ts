@@ -119,12 +119,12 @@ export const useTargeting = (
   // Node capture handling with retargeting
   const handleNodeCapture = useCallback((
     nodeIndex: number, 
-    newControlState: 'user' | 'enemy',
+    newOwner: 'user' | 'enemy',
     nodesRef: React.MutableRefObject<BattleNode[]>,
     CAPTURE_MEMORY_DURATION: number
   ) => {
     // Use new capture function
-    captureNode(nodeIndex, newControlState);
+    captureNode(nodeIndex, newOwner);
     
     // Mark as recently captured to prevent immediate retargeting
     recentlyCapturedNodes.current.add(nodeIndex);
@@ -164,8 +164,8 @@ export const useTargeting = (
     nodesRef: React.MutableRefObject<BattleNode[]>,
     CAPTURE_MEMORY_DURATION: number
   ) => {
-    return (nodeIndex: number, newControlState: 'user' | 'enemy') => 
-      handleNodeCapture(nodeIndex, newControlState, nodesRef, CAPTURE_MEMORY_DURATION);
+    return (nodeIndex: number, newOwner: 'user' | 'enemy') => 
+      handleNodeCapture(nodeIndex, newOwner, nodesRef, CAPTURE_MEMORY_DURATION);
   }, [handleNodeCapture]);
 
   return { findAvailableTargets, findNewTarget, handleNodeCapture, retargetAllBattalions, createSimplifiedNodeCaptureHandler };
