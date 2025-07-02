@@ -26,7 +26,11 @@ let enemyNodes: number[] = [6, 7, 8];
  * @returns true if the node is neutral, false otherwise
  */
 export const isNeutral = (nodeIndex: number): boolean => {
-  return neutralNodes.includes(nodeIndex);
+  const result = neutralNodes.includes(nodeIndex);
+  if (DEBUG) {
+    console.log('isNeutral check:', nodeIndex, result);
+  }
+  return result;
 };
 
 /**
