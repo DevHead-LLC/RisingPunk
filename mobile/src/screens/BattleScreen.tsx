@@ -129,11 +129,6 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
 
     // Initialize node ownership arrays
     resetNodeOwnership();
-    console.log('Node ownership initialized:', { 
-      neutralNodes: [3, 4, 5], 
-      userNodes: [0, 1, 2], 
-      enemyNodes: [6, 7, 8] 
-    });
 
     // Show battlefield immediately using the new hook
     showNetwork();

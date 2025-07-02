@@ -26,11 +26,7 @@ let enemyNodes: number[] = [6, 7, 8];
  * @returns true if the node is neutral, false otherwise
  */
 export const isNeutral = (nodeIndex: number): boolean => {
-  const result = neutralNodes.includes(nodeIndex);
-  if (DEBUG) {
-    console.log('isNeutral check:', nodeIndex, result);
-  }
-  return result;
+  return neutralNodes.includes(nodeIndex);
 };
 
 /**
@@ -57,6 +53,9 @@ export const isEnemyControlled = (nodeIndex: number): boolean => {
  * @param newOwner - The new owner ('user' or 'enemy')
  */
 export const captureNode = (nodeIndex: number, newOwner: 'user' | 'enemy'): void => {
+  // Get old state before capture
+  const oldState = getNodeOwner(nodeIndex);
+  
   // Remove from current arrays
   neutralNodes = neutralNodes.filter(node => node !== nodeIndex);
   userNodes = userNodes.filter(node => node !== nodeIndex);
@@ -68,6 +67,8 @@ export const captureNode = (nodeIndex: number, newOwner: 'user' | 'enemy'): void
   } else {
     enemyNodes.push(nodeIndex);
   }
+  
+
 };
 
 /**

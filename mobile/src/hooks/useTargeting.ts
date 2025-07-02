@@ -78,6 +78,8 @@ export const useTargeting = (
       .filter(target => !isNaN(target.distance))
       .sort((a, b) => a.distance - b.distance);
     
+
+    
     return validTargets;
   }, [nodes]);
 
