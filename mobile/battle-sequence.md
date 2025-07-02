@@ -113,7 +113,13 @@
 - **Visual feedback:** Battalion triggers attack animation via `battalionRefs.current[createBattalionKey(isUser, battalion.nodeIndex)]?.triggerAttackAnimation()`, then node triggers damage animation after `ATTACK_DELAY` (300ms)
 
 **b) Node Capture and Control Change**
-- When a node's health reaches 0, it gets captured by the attacking side (user or enemy)
+- **Node health system:** Neutral nodes have health equal to 75% of the total combined army health (user + enemy battalions)
+- **Health calculation:** `Math.floor(total * 0.75)` where total = sum of all battalion health values (`BOT_CATEGORIES[type].stats.health * quantity`)
+- **Tug-of-war system:** Neutral nodes use a control progress system where user attacks add positive progress and enemy attacks add negative progress
+- **Progress calculation:** Each attack adds `(damage / nodeHealth) * 100` percentage points to the control progress, where `damage = attackPower * battalion.quantity`
+- **Progress range:** Control progress ranges from -100% to +100%, starting at 0% (neutral)
+- **Capture threshold:** When the absolute progress reaches 100%, the node is captured by the side that pushed it over the threshold
+- **Capture determination:** When progress reaches +100%, user captures. When progress reaches -100%, enemy captures
 - **Control state update:** Node's ownership changes via `captureNode(nodeIndex, newState)` which updates the ownership arrays in `nodeOwnership.ts`
 - **Visual indication:** Captured nodes show the controlling side's color and cannot be retargeted
 - **Capture memory:** Recently captured nodes are tracked for 5 seconds to prevent immediate retargeting via `recentlyCapturedNodes.current.add(nodeIndex)`
@@ -160,7 +166,6 @@
 
 **a) Battle End Triggers**
 - **Timer expiration:** Battle ends when 20-second timer reaches 0
-- **Future feature:** Battle should also end if all of one side's battalions are defeated (not yet implemented)
 
 **b) Victory Point Calculation**
 - **Loss tracking:** Each destroyed battalion unit contributes points based on mark value

@@ -126,19 +126,13 @@ export const useBattleEngine = (
         
         battleInitializedRef.current = true;
 
-        // Strategic target selection function
-        // TODO: REFACTOR TARGETING LOGIC - Remove "claimed targets" concept
-        // Multiple battalions should be able to target the same node simultaneously
-        // No priority system - pure proximity-based targeting
-        const selectTargetNode = (battalion: BattalionPosition, isUser: boolean, targetedNodes: Set<number>) => {
+        const selectTargetNode = (battalion: BattalionPosition) => {
           let availableNodes = getConnectedNodes(battalion.nodeIndex);
           
           availableNodes = availableNodes.filter(nodeIndex => {
             return isNeutral(nodeIndex);
           });
 
-          // TODO: SIMPLIFY - Just filter for neutral nodes, ignore targeting status
-          // If no untargeted neutral nodes available, expand search to any neutral nodes
           if (availableNodes.length === 0) {
             availableNodes = getConnectedNodes(battalion.nodeIndex).filter(nodeIndex => {
               return isNeutral(nodeIndex);
@@ -205,7 +199,7 @@ export const useBattleEngine = (
         // Consolidated function to handle battalion actions for both sides
         const handleBattalionActions = (battalions: BattalionPosition[], isUser: boolean) => {
           battalions.forEach((battalion, index) => {
-            const targetNodeIndex = selectTargetNode(battalion, isUser, new Set<number>()); // Pass empty set
+            const targetNodeIndex = selectTargetNode(battalion);
             
             // Skip if no valid neutral target found
             if (targetNodeIndex === undefined) {
