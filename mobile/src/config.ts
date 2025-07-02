@@ -5,3 +5,5 @@ export const API_URL = __DEV__
 
 // For Android simulator
 // export const API_URL = 'http://10.0.2.2:5001'; 
+
+export const REGRESSION_DEBUG = false; // Set to true to enable regression debug logs 
