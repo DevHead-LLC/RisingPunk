@@ -55,6 +55,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     endBattle,
     showNetwork,
     showBattleResults,
+    cleanup,
   } = useBattleStateMachine();
 
   // Sets up initial battle data (nodes, battalions, health)
@@ -140,6 +141,14 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   // Runs once when component mounts to start the battle
   useEffect(() => {
     initializeBattle();
+    
+    // Cleanup function to prevent memory leaks
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      cleanup();
+    };
   }, []);
 
   // Starts the battle timer when the countdown finishes

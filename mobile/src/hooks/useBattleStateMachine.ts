@@ -28,21 +28,34 @@ export const useBattleStateMachine = () => {
   const [phase, setPhase] = useState<BattlePhase>('initializing');
   const [countdown, setCountdown] = useState(3);
 
+  // Track animation cleanup to prevent memory leaks
+  const animationCleanupRef = useRef<(() => void) | null>(null);
+
   // Changes the battle phase and plays appropriate animations
   const transitionTo = useCallback((newPhase: BattlePhase) => {
+    const oldPhase = phase;
+    
+    // Clean up any existing animations to prevent memory leaks
+    if (animationCleanupRef.current) {
+      animationCleanupRef.current();
+      animationCleanupRef.current = null;
+    }
+
     switch (newPhase) {
       case 'deployment':
         // Shows deployment zone
-        Animated.timing(deploymentOpacity, {
+        const deploymentAnimation = Animated.timing(deploymentOpacity, {
           toValue: 1,
           duration: 500,
           useNativeDriver: true
-        }).start();
+        });
+        deploymentAnimation.start();
+        animationCleanupRef.current = () => deploymentAnimation.stop();
         break;
 
       case 'countdown':
         // Hides deployment, shows network and battalions
-        Animated.parallel([
+        const countdownAnimations = Animated.parallel([
           Animated.timing(deploymentOpacity, {
             toValue: 0,
             duration: 300,
@@ -58,24 +71,40 @@ export const useBattleStateMachine = () => {
             duration: 500,
             useNativeDriver: true
           })
-        ]).start();
+        ]);
+        countdownAnimations.start();
+        animationCleanupRef.current = () => countdownAnimations.stop();
+        break;
+
+      case 'active':
+        // Ensure countdown overlay disappears smoothly
+        const countdownFadeAnimation = Animated.timing(countdownOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true
+        });
+        countdownFadeAnimation.start();
+        animationCleanupRef.current = () => countdownFadeAnimation.stop();
         break;
 
       case 'complete':
         // Shows results overlay
-        Animated.timing(resultsOpacity, {
+        const completeAnimation = Animated.timing(resultsOpacity, {
           toValue: 1,
           duration: 500,
           useNativeDriver: true
-        }).start();
+        });
+        completeAnimation.start();
+        animationCleanupRef.current = () => completeAnimation.stop();
         break;
     }
     setPhase(newPhase);
-  }, [deploymentOpacity, battalionOpacity, networkOpacity, resultsOpacity]);
+  }, [phase, deploymentOpacity, battalionOpacity, networkOpacity, countdownOpacity, resultsOpacity]);
 
   // Starts the battle with a 3-second countdown
   const startBattle = useCallback(() => {
     transitionTo('countdown');
+    
     const timer = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) {
@@ -86,6 +115,12 @@ export const useBattleStateMachine = () => {
         return prev - 1;
       });
     }, 1000);
+
+    // Store cleanup function
+    const cleanupInterval = () => {
+      clearInterval(timer);
+    };
+    animationCleanupRef.current = cleanupInterval;
   }, [transitionTo]);
 
   // Ends the battle and shows results after a delay
@@ -103,14 +138,24 @@ export const useBattleStateMachine = () => {
 
   // Shows battle results with optional callback when done
   const showBattleResults = useCallback((onComplete?: () => void) => {
-    Animated.timing(resultsOpacity, {
+    const resultsAnimation = Animated.timing(resultsOpacity, {
       toValue: 1,
       duration: 500,
       useNativeDriver: true,
-    }).start(() => {
+    });
+    resultsAnimation.start(() => {
       onComplete?.();
     });
+    animationCleanupRef.current = () => resultsAnimation.stop();
   }, [resultsOpacity]);
+
+  // Cleanup function to prevent memory leaks
+  const cleanup = useCallback(() => {
+    if (animationCleanupRef.current) {
+      animationCleanupRef.current();
+      animationCleanupRef.current = null;
+    }
+  }, []);
 
   return {
     // Animation values
@@ -128,5 +173,6 @@ export const useBattleStateMachine = () => {
     endBattle,
     showNetwork,
     showBattleResults,
+    cleanup,
   };
 }; 
