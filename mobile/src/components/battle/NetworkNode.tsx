@@ -28,9 +28,6 @@ export const NetworkNode = React.memo(React.forwardRef<NodeRef, Props>(({ x, y, 
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const damageFlash = useRef(new Animated.Value(0)).current;
 
-  // Determine node state using the new utilities
-  const controlState = isUserControlled(nodeIndex) ? 'user' : isEnemyControlled(nodeIndex) ? 'enemy' : 'neutral';
-
   const triggerDamageAnimation = () => {
     // Create two separate animations for center and border
     const centerFlash = Animated.sequence([
@@ -106,9 +103,9 @@ export const NetworkNode = React.memo(React.forwardRef<NodeRef, Props>(({ x, y, 
         width: size,
         height: size,
         borderWidth: 2,
-        borderColor: controlState === 'user'
+        borderColor: isUserControlled(nodeIndex)
           ? '#4717F6'  // User blue border
-          : controlState === 'enemy'
+          : isEnemyControlled(nodeIndex)
           ? '#FF4141'  // Enemy red border
           : COLORS.primary,  // Neutral border
       }
@@ -117,9 +114,9 @@ export const NetworkNode = React.memo(React.forwardRef<NodeRef, Props>(({ x, y, 
       <Animated.View style={[
         StyleSheet.absoluteFill,
         {
-          backgroundColor: controlState === 'user' 
+          backgroundColor: isUserControlled(nodeIndex) 
             ? 'rgba(71, 23, 246, 0.9)'  // User blue
-            : controlState === 'enemy'
+            : isEnemyControlled(nodeIndex)
             ? 'rgba(255, 65, 65, 0.9)'  // Enemy red
             : COLORS.secondary,          // Neutral color
           borderRadius: 999,
@@ -165,7 +162,7 @@ export const NetworkNode = React.memo(React.forwardRef<NodeRef, Props>(({ x, y, 
       }]} />
       
       {/* Control Progress Bar - Only show for neutral nodes */}
-      {controlState === 'neutral' && (
+      {isNeutral(nodeIndex) && (
         <View style={[styles.progressBarContainer, {
           width: size * 4,
           left: -(size * 1.6), // This centers it since width is 4x size and node is at center

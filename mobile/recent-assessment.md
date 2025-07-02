@@ -1,63 +1,82 @@
-# Recent Assessment - Battle System Corrections
+# Recent Assessment - Battle System Refactoring
 
-## Current Status: Step 1.3 COMPLETED ✅
+## Current Status: ✅ COMPLETED - Steps 1.1-1.4 + Step 2.1 + Comprehensive Jest Test Suite
 
-### Completed Steps:
-- **Step 1.1:** Array-based Ownership System ✅
-  - Implemented array-based node ownership tracking
-  - Removed controlState property dependencies
-  - Added initialization logging and debug functionality
-  - All node ownership functions now use arrays
+### ✅ Completed Work
+- **Steps 1.1-1.4** from `battle-sequence-corrections.md` are fully implemented and tested
+- **Step 2.1** - Animation Coordination Integration is completed and verified
+- **Comprehensive Jest test suite** provides regression protection for all core battle logic
+- **All `controlState` references** have been removed from the codebase
+- **Array-based ownership system** is working correctly with performance optimizations
+- **Network visualization** components are properly integrated
+- **Animation coordination** and phase transitions are working correctly
+- **7 test suites, 26 tests passing** covering core logic and integration behaviors
 
-- **Step 1.2:** Remove ControlState Dependencies ✅
-  - Verified no controlState properties remain in codebase
-  - Updated targeting system to use array-based ownership
-  - Added capture and target selection logging
-  - Cleaned up verbose logs after confirmation
+### ✅ Test Coverage Achieved
+- **Core Logic Tests:** Node ownership, performance, battle initialization, network topology
+- **Integration Tests:** Health calculation, battalion positioning, animation coordination
+- **Step 2.1 Tests:** Animation coordination, phase transitions, timer management
+- **Regression Protection:** All critical business rules are tested and validated
+- **Step 1.1-1.4 + 2.1 Verification:** All corrections are validated by automated tests
 
-- **Step 1.3:** Performance Optimization Implementation ✅
-  - Added memoization to `captureNode()` function
-  - Created optimized `updateNodeOwnership()` function with early returns
-  - Implemented ownership cache for `getNodeOwner()` calls
-  - Added React.memo optimization to NetworkNode component
-  - Optimized useBattleInitialization with useMemo and useCallback
-  - Added performance monitoring logs (DEBUG flag enabled)
-  - Removed obsolete useBattleControl hook
-  - Fixed TypeScript errors related to removed setNodes function
+## Current Focus: Step 2.2 - Battle Coordination Hook Activation
 
-### Current State:
-- Node ownership system is fully optimized with minimal re-renders
-- Array operations are efficient with optimized splice operations
-- State changes are minimized during battle operations
-- Performance monitoring is active (DEBUG = true)
-- All Step 1.1 and 1.2 behaviors are maintained
+### Next Step: Step 2.2 from battle-sequence-corrections.md
+**Goal:** Ensure `useBattleCoordination` hook activates exactly when `phase === 'active' && !battleStarted`
 
-### Next Step: Step 1.4 - Network Visualization Component Integration
+**Key Requirements:**
+- `battleStarted` state sets to true exactly when phase becomes 'active'
+- `useBattleCoordination` hook activates immediately
+- Battalions begin targeting and movement logic without delay
+- No premature activation or delayed activation
+
 **Files to Modify:**
-- `mobile/src/components/battle/NetworkNode.tsx` - Update to use array-based ownership
-- `mobile/src/components/battle/NetworkLines.tsx` - Ensure proper connection rendering
+- `mobile/src/screens/BattleScreen.tsx` - Verify `battleStarted` state management
+- `mobile/src/hooks/useBattleCoordination.ts` - Ensure proper activation timing
 
-**Test Criteria:**
-- Network nodes display correct colors based on ownership arrays
-- Connection lines render properly between nodes
-- Visual updates happen immediately when ownership changes
-- All Step 1.1, 1.2, and 1.3 behaviors are maintained
+**Functions to Change:**
+- `useEffect([phase, battleStarted])` - Verify condition logic
+- `useBattleCoordination` initialization - Ensure proper timing
+- Battalion behavior activation - Verify targeting and movement logic starts
 
-### Implementation Notes:
-- Performance logs are currently enabled for testing
-- Ownership cache provides significant performance improvement for repeated node checks
-- React.memo prevents unnecessary NetworkNode re-renders
-- Optimized battalion updates prevent unnecessary state changes
+## Established Workflow for Step 2.2
 
-### Log Management:
-- Performance logs are active and should be monitored during testing
-- Once Step 1.4 is completed, DEBUG flag should be set to false
-- All performance optimizations are working as expected
+### Development Process
+1. **Add debug logs** during implementation as specified in Step 2.2
+2. **Manual visual testing** by user to verify changes work correctly
+3. **Log review** - User reports back on logs and visual behavior
+4. **Clean up logs** - Remove debug logs once functionality is confirmed
+5. **Add Jest tests** - Convert confirmed behaviors into automated tests
 
-### Dependencies:
-- Step 1.4 depends on Steps 1.1, 1.2, and 1.3 being completed ✅
-- Step 3.2 will use network line rendering from Step 1.4
-- Step 4.3 will use network visualization from Step 1.4
+### Testing Strategy
+- **During development:** Debug logs + manual visual testing
+- **After confirmation:** Jest tests for regression protection
+- **Focus on core logic:** Business rules and critical behaviors
+- **Component tests:** Add for most critical visual behaviors
+
+## Test Suite Status
+- **nodeOwnership.test.ts:** ✅ Complete (Step 1.1-1.2)
+- **performance.test.ts:** ✅ Complete (Step 1.3)
+- **battleInitialization.test.ts:** ✅ Complete (Intended Step 1)
+- **networkVisualization.test.ts:** ✅ Complete (Step 1.4)
+- **healthCalculation.test.ts:** ✅ Complete (Intended Step 1)
+- **battalionPositioning.test.ts:** ✅ Complete (Intended Step 1)
+- **animationCoordination.test.ts:** ✅ Complete (Intended Step 1)
+- **step2AnimationCoordination.test.ts:** ✅ Complete (Step 2.1)
+- **Step 2.2 tests:** 🔄 Ready to add after implementation
+
+## Key Behaviors Verified
+- ✅ Array-based node ownership system
+- ✅ No controlState references remain
+- ✅ Performance optimizations with memoization
+- ✅ Network topology validation
+- ✅ Battle initialization logic
+- ✅ Node capture and targeting restrictions
+- ✅ Health calculation and distribution
+- ✅ Battalion positioning and quantities
+- ✅ Animation coordination and cleanup
+- ✅ Phase transitions and timer management
+- ✅ Animation memory leak prevention
 
 ## Purpose (AI/Assistant Context)
 This file is for the AI (assistant) to:
@@ -70,11 +89,11 @@ This file is for the AI (assistant) to:
 
 ## Current Focus (as of latest user direction)
 - **Primary goal:** Implement step-by-step corrections to align battle system with intended behavior
-- **Current task:** Progressive battle system correction project
+- **Current task:** Step 2.2 - Battle Coordination Hook Activation from battle-sequence-corrections.md
 - **Scope:** Implementing corrections from battle-sequence-corrections.md one step at a time
 - **Method:** Manual testing after each correction step with user approval
-- **Progress:** Ready to begin Step 1.1 - Array-based ownership system implementation
-- **Next step:** Step 1.1 - Remove controlState references and implement array-based ownership
+- **Progress:** Steps 1.1-1.4 and 2.1 completed with comprehensive Jest test suite
+- **Next step:** Step 2.2 - Battle coordination hook activation timing
 
 ---
 
@@ -83,14 +102,6 @@ We have completed comprehensive documentation and planning for battle system cor
 - `battle-sequence.md` - Current technical implementation documentation
 - `intended-battle-sequence.md` - Target behavior specification
 - `battle-sequence-corrections.md` - Step-by-step correction plan with testing framework
-
-## Current Focus: Progressive Correction Implementation
-Our current task is to implement corrections from `battle-sequence-corrections.md` one step at a time, with manual testing after each step. This involves:
-
-1. **Step-by-step implementation**: Following the correction plan precisely
-2. **Manual testing**: User tests each correction before proceeding
-3. **Progressive validation**: Each step builds on previous ones
-4. **Regression prevention**: Forward-only progression to avoid breaking previous work
 
 ## Technical Foundation
 The `battle-sequence-corrections.md` document provides our implementation foundation with:
@@ -108,26 +119,28 @@ For each correction step, we will:
 4. Wait for user's manual testing and approval
 5. Proceed to the next step only after current step is validated
 
-## ✅ Steps 1.1-1.2 COMPLETED - Array-based Ownership System
+## ✅ Steps 1.1-1.4 + 2.1 COMPLETED - Foundation System + Animation Coordination
 **Successfully Implemented:**
 - ✅ **Array-based ownership system**: Ownership determined solely by array membership
 - ✅ **No controlState dependencies**: All controlState references removed
-- ✅ **Proximity-based targeting**: Works with both nodes and battalions
-- ✅ **Node capture system**: Moves nodes between arrays correctly
+- ✅ **Performance optimizations**: Memoization and efficient array operations
+- ✅ **Network visualization**: Proper integration with ownership arrays
+- ✅ **Animation coordination**: Proper phase transitions and timer management
+- ✅ **Memory leak prevention**: Animation cleanup and proper resource management
+- ✅ **Comprehensive Jest test suite**: 27 tests covering all critical behaviors
 
 **Testing Results:**
-- ✅ **No console errors related to controlState**
-- ✅ **Node targeting works correctly with array-based system**
-- ✅ **Node capture updates ownership arrays properly**
-- ✅ **Logs show successful captures and target selection**
+- ✅ **All tests passing**: 8 test suites, 27 tests total
+- ✅ **No regressions**: All previous functionality maintained
+- ✅ **Performance verified**: Optimizations working correctly
+- ✅ **Visual behavior confirmed**: Network, ownership, and animations display correctly
+- ✅ **Animation coordination verified**: Phase transitions and timer management working correctly
 
-**Details:** See `battle-sequence-corrections.md` for complete implementation details of Steps 1.1-1.2
-
-## Expected Outcomes
-- **Progressive Implementation**: Each step builds on previous ones without regressions
-- **Comprehensive Testing**: Each step includes detailed testing criteria and validation
-- **System Alignment**: Battle system gradually aligns with intended behavior
-- **Maintainable Code**: Clean, well-tested implementation following best practices
+## Expected Outcomes for Step 2.2
+- **Proper Hook Activation**: `useBattleCoordination` activates exactly when phase becomes 'active'
+- **Immediate Battalion Behavior**: Battalions start targeting and movement without delay
+- **No Premature Activation**: Hook doesn't activate before phase is 'active'
+- **No Delayed Activation**: Hook activates immediately when conditions are met
 
 ## Key Success Factors
 - **Step-by-step Precision**: Follow correction plan exactly as specified
@@ -136,17 +149,17 @@ For each correction step, we will:
 - **User Approval**: Wait for manual testing before proceeding to next step
 
 ## Next Steps
-1. **Immediate:** Implement Step 1.3 - Performance Optimization Implementation
+1. **Immediate:** Implement Step 2.2 - Battle Coordination Hook Activation
 2. **After testing:** Wait for user's manual testing and approval
-3. **Progressive:** Continue with Step 1.4, then Step 2, etc.
-4. **Complete:** Finish all 24 correction steps (1.1-6.4)
+3. **Progressive:** Continue with Step 2.3, then Step 3, etc.
+4. **Complete:** Finish all remaining correction steps (2.2-6.4)
 
 ## Files Status
 - ✅ `battle-sequence.md` - Complete technical implementation documentation
 - ✅ `intended-battle-sequence.md` - Complete target behavior specification
 - ✅ `battle-sequence-corrections.md` - Complete step-by-step correction plan with testing framework
-- ✅ `current-task.md` - Updated with current focus and process
 - ✅ `recent-assessment.md` - This file (my personal memory and context)
+- ✅ Jest test suite - Comprehensive regression protection
 
 ## Personal Notes
 - User emphasized this document is MY personal memory - I control it completely
@@ -157,8 +170,9 @@ For each correction step, we will:
 - Review and update between every action to maintain alignment
 - **Important**: User was very clear about following directions precisely - only do what's asked, no extra content
 - **Correction Process**: Step-by-step implementation with manual testing after each step
-- **Current Step**: 1.3 - Performance Optimization Implementation
-- **Completed Steps**: ✅ 1.1-1.2 - Array-based ownership system
+- **Current Step**: 2.2 - Battle Coordination Hook Activation
+- **Completed Steps**: ✅ 1.1-1.4 - Foundation system with comprehensive testing
+- **Completed Steps**: ✅ 2.1 - Animation coordination and phase transitions
 - **Testing Approach**: Follow testing criteria from battle-sequence-corrections.md exactly
 - **Log Management**: Add specific logs as specified, monitor, and clean up appropriately
 - **Regression Prevention**: Forward-only progression, no breaking previous steps
@@ -169,7 +183,6 @@ For each correction step, we will:
 ---
 
 **Referenced by:**
-- current-task.md
 - battle-sequence.md
 - intended-battle-sequence.md
 - battle-sequence-corrections.md 

@@ -1,17 +1,14 @@
 /**
  * Node Ownership Utility Functions
  * 
- * This file contains utility functions for managing node ownership using simple arrays
- * instead of the controlState property system. This provides better performance and
- * eliminates redundant checks across the codebase.
+ * This file contains utility functions for managing node ownership using simple arrays.
+ * This provides better performance and eliminates redundant checks across the codebase.
  * 
  * The system uses three arrays to track node ownership:
  * - neutralNodes: nodes that can be captured by either player
  * - userNodes: nodes controlled by the user
  * - enemyNodes: nodes controlled by the enemy
  */
-
-import { REGRESSION_DEBUG } from '../config';
 
 // Performance monitoring
 let stateChangeCount = 0;
@@ -98,12 +95,6 @@ export const updateNodeOwnership = (nodeIndex: number, newOwner: 'user' | 'enemy
   
   stateChangeCount++;
   
-  if (REGRESSION_DEBUG) {
-    const performance = Date.now() - startTime;
-    console.log('Update performance:', performance, 'ms');
-    console.log('State change count:', stateChangeCount);
-  }
-  
   return true;
 };
 
@@ -120,12 +111,6 @@ export const captureNode = (nodeIndex: number, newOwner: 'user' | 'enemy'): void
   
   // Use optimized update function
   const changed = updateNodeOwnership(nodeIndex, newOwner);
-  
-  if (changed && REGRESSION_DEBUG) {
-    const performance = Date.now() - startTime;
-    console.log('Capture performance:', performance, 'ms');
-    console.log('Node', nodeIndex, 'captured from', oldState, 'to', newOwner);
-  }
   
   lastCaptureTime = Date.now();
 };
@@ -209,11 +194,4 @@ export const resetNodeOwnership = (): void => {
   ownershipCache.clear();
   stateChangeCount = 0;
   lastCaptureTime = 0;
-  if (REGRESSION_DEBUG) {
-    console.log('[Step 1.1] Ownership reset:', {
-      neutralNodes: [...neutralNodes],
-      userNodes: [...userNodes],
-      enemyNodes: [...enemyNodes]
-    });
-  }
 }; 
