@@ -60,12 +60,12 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
   // Sets up initial battle data (nodes, battalions, health)
   const {
     nodes,
-    setNodes,
     userBattalions,
     setUserBattalions,
     enemyBattalions,
     setEnemyBattalions,
     calculateInitialHealth,
+    setNodes,
   } = useBattleInitialization();
 
   // Battle timer and state management
@@ -203,11 +203,9 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     if (countdown === 3) {
       const nodeHealth = calculateInitialHealth();
       
-      // Only neutral nodes get health - controlled nodes get 0 health
-      setNodes(prevNodes => prevNodes.map((node, index) => ({
-        ...node,
-        health: isNeutral(index) ? nodeHealth : 0
-      })));
+      // Note: Node health is now managed by the node ownership system
+      // Neutral nodes get health, controlled nodes get 0 health
+      // This is handled automatically by the node ownership utilities
     }
   }, [countdown, userBattalions, enemyBattalions, calculateInitialHealth]);
 
@@ -219,12 +217,31 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
     // Use the new capture function to update node ownership
     captureNode(nodeIndex, newState);
     
-    // Update node state for backward compatibility (visual components still expect this)
-    setNodes(prev => {
-      const updated = [...prev];
+    // Note: Node state is now managed by the node ownership system
+    // Visual components will automatically update based on the ownership arrays
+  };
+
+  // Central handler for node damage/capture
+  const handleNodeDamage = (nodeIndex: number, damage: number, isUser: boolean) => {
+    setNodes(prevNodes => {
+      const updated = [...prevNodes];
+      const node = updated[nodeIndex];
+      if (!node || node.health === undefined) return prevNodes;
+      // Only neutral nodes can be damaged
+      if (node.health <= 0) return prevNodes;
+      const progressChange = (damage / node.health) * 100;
+      let newProgress = (node.captureProgress || 0) + (isUser ? progressChange : -progressChange);
+      let newOwner: 'user' | 'enemy' | null = null;
+      if (Math.abs(newProgress) >= 100) {
+        newOwner = newProgress > 0 ? 'user' : 'enemy';
+        newProgress = 0;
+        // Update ownership arrays
+        captureNode(nodeIndex, newOwner);
+      }
       updated[nodeIndex] = {
-        ...updated[nodeIndex],
-        health: updated[nodeIndex].health // Preserve current health
+        ...node,
+        captureProgress: newOwner ? 0 : newProgress,
+        health: node.health // (health stays the same for now)
       };
       return updated;
     });
@@ -254,6 +271,7 @@ export const BattleScreen = React.memo(({ onClose, onBattleComplete }: Props) =>
           width={SCREEN_WIDTH}
           height={SCREEN_HEIGHT * 0.8}
           onNodeControlChange={handleNodeControlChange}
+          onNodeDamage={handleNodeDamage}
           nodeRefs={nodeRefs}
           phase={phase}
         />

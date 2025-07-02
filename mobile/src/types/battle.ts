@@ -37,4 +37,5 @@ export type BattleNode = {
   x: number;
   y: number;
   health?: number;
+  captureProgress?: number;
 }; 

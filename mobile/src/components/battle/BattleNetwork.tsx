@@ -22,6 +22,7 @@ type Props = {
   width: number;
   height: number;
   onNodeControlChange: (nodeIndex: number, newState: 'user' | 'enemy') => void;
+  onNodeDamage: (nodeIndex: number, damage: number, isUser: boolean) => void;
   nodeRefs: React.MutableRefObject<{
     [key: string]: {
       triggerDamageAnimation: () => void;
@@ -38,6 +39,7 @@ export const BattleNetwork = React.memo(({
   width,
   height,
   onNodeControlChange,
+  onNodeDamage,
   nodeRefs,
   phase
 }: Props) => {
@@ -51,7 +53,7 @@ export const BattleNetwork = React.memo(({
       />
       {/* Creates each individual network node */}
       {nodes.map((node, index) => {
-        // Only pass health and controlProgress for neutral nodes (3, 4, 5) while they are neutral
+        // Only pass health and captureProgress for neutral nodes (3, 4, 5) while they are neutral
         const shouldShowHealth = isNeutral(index);
         
         return (
@@ -63,7 +65,9 @@ export const BattleNetwork = React.memo(({
             isActive={isUserControlled(index)}
             nodeIndex={index}
             health={shouldShowHealth ? node.health : undefined}
+            captureProgress={shouldShowHealth ? node.captureProgress : undefined}
             onNodeCapture={(newOwner) => onNodeControlChange(index, newOwner)}
+            onNodeDamage={(damage, isUser) => onNodeDamage(index, damage, isUser)}
           />
         );
       })}

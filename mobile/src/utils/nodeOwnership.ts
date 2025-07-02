@@ -11,14 +11,20 @@
  * - enemyNodes: nodes controlled by the enemy
  */
 
-// Add a DEBUG flag to control logging verbosity
-const DEBUG = false;
+import { REGRESSION_DEBUG } from '../config';
+
+// Performance monitoring
+let stateChangeCount = 0;
+let lastCaptureTime = 0;
 
 // Initial node ownership arrays
 // Start with middle nodes as neutral, user gets left side, enemy gets right side
 let neutralNodes: number[] = [3, 4, 5];
 let userNodes: number[] = [0, 1, 2];
 let enemyNodes: number[] = [6, 7, 8];
+
+// Memoization cache for node ownership checks
+const ownershipCache = new Map<number, 'neutral' | 'user' | 'enemy'>();
 
 /**
  * Check if a node is neutral (can be captured)
@@ -48,18 +54,40 @@ export const isEnemyControlled = (nodeIndex: number): boolean => {
 };
 
 /**
- * Capture a node and transfer ownership
- * @param nodeIndex - The index of the node to capture
+ * Optimized node ownership update function
+ * @param nodeIndex - The index of the node to update
  * @param newOwner - The new owner ('user' or 'enemy')
+ * @returns true if ownership changed, false if no change needed
  */
-export const captureNode = (nodeIndex: number, newOwner: 'user' | 'enemy'): void => {
-  // Get old state before capture
-  const oldState = getNodeOwner(nodeIndex);
+export const updateNodeOwnership = (nodeIndex: number, newOwner: 'user' | 'enemy'): boolean => {
+  const startTime = Date.now();
+  const currentOwner = getNodeOwner(nodeIndex);
   
-  // Remove from current arrays
-  neutralNodes = neutralNodes.filter(node => node !== nodeIndex);
-  userNodes = userNodes.filter(node => node !== nodeIndex);
-  enemyNodes = enemyNodes.filter(node => node !== nodeIndex);
+  // Early return if no change needed
+  if (currentOwner === newOwner) {
+    return false;
+  }
+  
+  // Clear cache for this node
+  ownershipCache.delete(nodeIndex);
+  
+  // Remove from current arrays (optimized array operations)
+  if (currentOwner === 'neutral') {
+    const neutralIndex = neutralNodes.indexOf(nodeIndex);
+    if (neutralIndex > -1) {
+      neutralNodes.splice(neutralIndex, 1);
+    }
+  } else if (currentOwner === 'user') {
+    const userIndex = userNodes.indexOf(nodeIndex);
+    if (userIndex > -1) {
+      userNodes.splice(userIndex, 1);
+    }
+  } else if (currentOwner === 'enemy') {
+    const enemyIndex = enemyNodes.indexOf(nodeIndex);
+    if (enemyIndex > -1) {
+      enemyNodes.splice(enemyIndex, 1);
+    }
+  }
   
   // Add to new owner's array
   if (newOwner === 'user') {
@@ -68,22 +96,63 @@ export const captureNode = (nodeIndex: number, newOwner: 'user' | 'enemy'): void
     enemyNodes.push(nodeIndex);
   }
   
-
+  stateChangeCount++;
+  
+  if (REGRESSION_DEBUG) {
+    const performance = Date.now() - startTime;
+    console.log('Update performance:', performance, 'ms');
+    console.log('State change count:', stateChangeCount);
+  }
+  
+  return true;
 };
 
 /**
- * Get the current owner of a node
+ * Capture a node and transfer ownership (with memoization)
+ * @param nodeIndex - The index of the node to capture
+ * @param newOwner - The new owner ('user' or 'enemy')
+ */
+export const captureNode = (nodeIndex: number, newOwner: 'user' | 'enemy'): void => {
+  const startTime = Date.now();
+  
+  // Get old state before capture
+  const oldState = getNodeOwner(nodeIndex);
+  
+  // Use optimized update function
+  const changed = updateNodeOwnership(nodeIndex, newOwner);
+  
+  if (changed && REGRESSION_DEBUG) {
+    const performance = Date.now() - startTime;
+    console.log('Capture performance:', performance, 'ms');
+    console.log('Node', nodeIndex, 'captured from', oldState, 'to', newOwner);
+  }
+  
+  lastCaptureTime = Date.now();
+};
+
+/**
+ * Get the current owner of a node (with memoization)
  * @param nodeIndex - The index of the node to check
  * @returns 'neutral', 'user', or 'enemy'
  */
 export const getNodeOwner = (nodeIndex: number): 'neutral' | 'user' | 'enemy' => {
-  if (isUserControlled(nodeIndex)) {
-    return 'user';
-  } else if (isEnemyControlled(nodeIndex)) {
-    return 'enemy';
-  } else {
-    return 'neutral';
+  // Check cache first
+  if (ownershipCache.has(nodeIndex)) {
+    return ownershipCache.get(nodeIndex)!;
   }
+  
+  let owner: 'neutral' | 'user' | 'enemy';
+  if (isUserControlled(nodeIndex)) {
+    owner = 'user';
+  } else if (isEnemyControlled(nodeIndex)) {
+    owner = 'enemy';
+  } else {
+    owner = 'neutral';
+  }
+  
+  // Cache the result
+  ownershipCache.set(nodeIndex, owner);
+  return owner;
 };
 
 /**
@@ -111,6 +180,25 @@ export const getEnemyNodes = (): number[] => {
 };
 
 /**
+ * Clear ownership cache (useful for testing or when arrays are modified externally)
+ */
+export const clearOwnershipCache = (): void => {
+  ownershipCache.clear();
+};
+
+/**
+ * Get performance metrics
+ * @returns Performance statistics
+ */
+export const getPerformanceMetrics = () => {
+  return {
+    stateChangeCount,
+    lastCaptureTime,
+    cacheSize: ownershipCache.size
+  };
+};
+
+/**
  * Reset node ownership to initial state
  * Used for testing and battle reset
  */
@@ -118,4 +206,14 @@ export const resetNodeOwnership = (): void => {
   neutralNodes = [3, 4, 5];
   userNodes = [0, 1, 2];
   enemyNodes = [6, 7, 8];
+  ownershipCache.clear();
+  stateChangeCount = 0;
+  lastCaptureTime = 0;
+  if (REGRESSION_DEBUG) {
+    console.log('[Step 1.1] Ownership reset:', {
+      neutralNodes: [...neutralNodes],
+      userNodes: [...userNodes],
+      enemyNodes: [...enemyNodes]
+    });
+  }
 }; 
