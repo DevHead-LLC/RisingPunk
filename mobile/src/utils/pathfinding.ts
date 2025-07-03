@@ -1,5 +1,5 @@
 import { BattleNode } from '../types/battle';
-import { getConnectedNodes } from './networkConstants';
+import { getConnectedNodes, NETWORK_CONNECTIONS } from './networkConstants';
 
 /**
  * Finds the shortest path between a start node and all other nodes using Dijkstra's algorithm.
@@ -88,4 +88,155 @@ export const reconstructPath = (
   }
   
   return []; // No path found
+};
+
+/**
+ * Validates that a movement path follows network lines exactly
+ * @param path Array of node indices representing the movement path
+ * @returns Object with validation results
+ */
+export const validateNetworkLinePath = (path: number[]): { isValid: boolean; connectionCount: number; invalidConnections: [number, number][] } => {
+  if (path.length < 2) {
+    return { isValid: true, connectionCount: 0, invalidConnections: [] };
+  }
+
+  let connectionCount = 0;
+  const invalidConnections: [number, number][] = [];
+
+  for (let i = 0; i < path.length - 1; i++) {
+    const fromNode = path[i];
+    const toNode = path[i + 1];
+    
+    // Check if this connection exists in NETWORK_CONNECTIONS
+    const isValidConnection = NETWORK_CONNECTIONS.some(([from, to]) => 
+      (from === fromNode && to === toNode) || (from === toNode && to === fromNode)
+    );
+
+    if (isValidConnection) {
+      connectionCount++;
+    } else {
+      invalidConnections.push([fromNode, toNode]);
+    }
+  }
+
+  const isValid = invalidConnections.length === 0;
+  return { isValid, connectionCount, invalidConnections };
+};
+
+/**
+ * Finds the nearest valid network line to a given position
+ * @param position Current battalion position
+ * @param nodes Array of all nodes
+ * @returns Object with nearest line info
+ */
+export const findNearestNetworkLine = (
+  position: { x: number; y: number },
+  nodes: BattleNode[]
+): { nearestLine: [number, number] | null; distance: number; nearestPoint: { x: number; y: number } | null } => {
+  let nearestLine: [number, number] | null = null;
+  let minDistance = Infinity;
+  let nearestPoint: { x: number; y: number } | null = null;
+
+  // Check each network connection
+  for (const [fromIndex, toIndex] of NETWORK_CONNECTIONS) {
+    const fromNode = nodes[fromIndex];
+    const toNode = nodes[toIndex];
+    
+    if (!fromNode || !toNode) continue;
+
+    // Calculate distance from position to this line segment
+    const distance = distanceToLineSegment(
+      position,
+      { x: fromNode.x, y: fromNode.y },
+      { x: toNode.x, y: toNode.y }
+    );
+
+    if (distance < minDistance) {
+      minDistance = distance;
+      nearestLine = [fromIndex, toIndex];
+      
+      // Calculate the nearest point on this line
+      nearestPoint = nearestPointOnLineSegment(
+        position,
+        { x: fromNode.x, y: fromNode.y },
+        { x: toNode.x, y: toNode.y }
+      );
+    }
+  }
+
+  return { nearestLine, distance: minDistance, nearestPoint };
+};
+
+/**
+ * Calculates distance from a point to a line segment
+ */
+const distanceToLineSegment = (
+  point: { x: number; y: number },
+  lineStart: { x: number; y: number },
+  lineEnd: { x: number; y: number }
+): number => {
+  const A = point.x - lineStart.x;
+  const B = point.y - lineStart.y;
+  const C = lineEnd.x - lineStart.x;
+  const D = lineEnd.y - lineStart.y;
+
+  const dot = A * C + B * D;
+  const lenSq = C * C + D * D;
+  
+  if (lenSq === 0) {
+    // Line segment is actually a point
+    return Math.sqrt(A * A + B * B);
+  }
+
+  let param = dot / lenSq;
+
+  let xx, yy;
+  if (param < 0) {
+    xx = lineStart.x;
+    yy = lineStart.y;
+  } else if (param > 1) {
+    xx = lineEnd.x;
+    yy = lineEnd.y;
+  } else {
+    xx = lineStart.x + param * C;
+    yy = lineStart.y + param * D;
+  }
+
+  const dx = point.x - xx;
+  const dy = point.y - yy;
+  return Math.sqrt(dx * dx + dy * dy);
+};
+
+/**
+ * Finds the nearest point on a line segment to a given point
+ */
+const nearestPointOnLineSegment = (
+  point: { x: number; y: number },
+  lineStart: { x: number; y: number },
+  lineEnd: { x: number; y: number }
+): { x: number; y: number } => {
+  const A = point.x - lineStart.x;
+  const B = point.y - lineStart.y;
+  const C = lineEnd.x - lineStart.x;
+  const D = lineEnd.y - lineStart.y;
+
+  const dot = A * C + B * D;
+  const lenSq = C * C + D * D;
+  
+  if (lenSq === 0) {
+    return { x: lineStart.x, y: lineStart.y };
+  }
+
+  let param = dot / lenSq;
+
+  if (param < 0) {
+    return { x: lineStart.x, y: lineStart.y };
+  } else if (param > 1) {
+    return { x: lineEnd.x, y: lineEnd.y };
+  } else {
+    return {
+      x: lineStart.x + param * C,
+      y: lineStart.y + param * D
+    };
+  }
 }; 
