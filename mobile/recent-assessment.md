@@ -1,9 +1,9 @@
 # Recent Assessment - Battle System Refactoring
 
-## Current Status: ✅ Steps 1.1–3.2 Complete, All Automated and Manual Checks Aligned
+## Current Status: ✅ Steps 1.1–4.1 Complete, All Automated and Manual Checks Aligned
 
 ### ✅ Automated Test Coverage
-- All meaningful, topology-accurate logic for Steps 1.1–3.2 is now covered by Jest tests.
+- All meaningful, topology-accurate logic for Steps 1.1–4.1 is now covered by Jest tests.
 - All Jest tests pass for:
   - Node ownership
   - Performance
@@ -16,6 +16,7 @@
   - Health calculation
   - Step 3.1: Attack range intersection precision
   - Step 3.2: Network line path validation utilities
+  - Step 4.1: Event-driven retargeting system
 - Only tests that are meaningful and accurate for the current network topology are included in Jest.
 
 ### ✅ Manual Regression Checklist
@@ -35,51 +36,56 @@
   5. Only move forward when all Jest tests pass and manual checks are up to date.
 
 ### ✅ Current Alignment
-- Steps 1.1–3.2 are fully covered by a combination of Jest tests and manual regression checklist.
+- Steps 1.1–4.1 are fully covered by a combination of Jest tests and manual regression checklist.
 - No ambiguous or untestable logic remains in Jest.
 - All future steps will follow this workflow for maximum clarity and regression protection.
 
 ---
 
 ## Next Step
-- Proceed to the next correction step in battle-sequence-corrections.md, following the workflow above.
+- Proceed to Step 4.2 in battle-sequence-corrections.md: "Implement Periodic Target Monitoring During Movement Only"
+- This step will add periodic target monitoring during movement (not during attacks) to check for defeated/captured targets
 
-## Current Focus: Step 3.1 - Attack Range Intersection Precision
+## Current Focus: Step 4.1 - Event-Driven Retargeting System
 
-### Next Step: Step 3.1 from battle-sequence-corrections.md
-**Goal:** Ensure battalions stop exactly at attack range edge intersection with node center
+### Next Step: Step 4.1 from battle-sequence-corrections.md
+**Goal:** Remove continuous target validation during attacks, implement event-driven retargeting only
 
 **Key Requirements:**
-- Battalions must stop exactly at attack range edge, not overshooting node targets
-- Visual verification that battalions are positioned correctly relative to nodes
-- No movement beyond the calculated intersection point
-- Precise intersection calculation with proper battalion center offset
+- No periodic `isNeutral()` checks during attack intervals
+- Retargeting only occurs when triggered by node capture events
+- Attack intervals run without interruption from validation checks
+- Event-driven retargeting system properly integrated
 
-**Files to Modify:**
-- `mobile/src/hooks/useMovement.ts` - Attack range intersection calculation
-- `mobile/src/utils/battleCalculator.ts` - Range calculation utilities
+**Files Modified:**
+- `mobile/src/hooks/useCombat.ts` - Removed continuous validation from attack intervals
+- `mobile/src/hooks/useTargeting.ts` - Enhanced event-driven retargeting with debug logs
+- `mobile/src/config.ts` - Added Step 4.1 debug configuration
 
-**Functions to Change:**
-- `getAttackRangeIntersectionPoint()` - Ensure precise intersection calculation
-- `checkRangeIntersection()` - Verify range checking logic
-- Movement position monitoring in `moveBattalionAlongPath()`
+**Functions Changed:**
+- `setupNodeAttack()` - Removed periodic `isNeutral()` checks during attack intervals
+- `handleNodeCapture()` - Enhanced with retargeting trigger logs
+- `retargetAllBattalions()` - Enhanced with event-driven retargeting logs
 
 **Specific Changes:**
-- Add comments explaining battalion center offset logic
-- Ensure `BATTALION_CENTER_OFFSET` is properly applied in intersection calculation
-- Verify 2-pixel tolerance is working correctly in position monitoring
+- Removed continuous target validation from `attackFn` in `setupNodeAttack()`
+- Added event-driven retargeting logs for debugging
+- Added attack interval tracking logs
+- Maintained existing event-driven retargeting system
 
 **Implementation Status:**
-- ✅ **Step 3.1 implemented** with precise intersection calculations
-- ✅ **Debug logs cleaned up** - now conditional and non-intrusive
-- ✅ **Jest tests created** - 13 tests covering all precision scenarios
-- ✅ **All tests passing** - 66 tests total across 11 test suites
-- 🔄 **Ready for manual verification** - logs can be enabled via `DEBUG_CONFIG.STEP_3_1 = true`
+- ✅ **Step 4.1 implemented** with event-driven retargeting only
+- ✅ **Continuous validation removed** - no more periodic `isNeutral()` checks during attacks
+- ✅ **Debug logs added** - conditional logging for retargeting triggers and attack intervals
+- ✅ **Event system enhanced** - proper logging for node capture triggers and battalion retargeting
+- 🔄 **Ready for manual verification** - logs can be enabled via `DEBUG_CONFIG.STEP_4_1 = true`
 
 **Log Management:**
-- **Conditional logging:** Debug logs only show when `DEBUG_CONFIG.STEP_3_1 = true`
-- **Essential logs only:** Removed excessive logging, kept only key verification points
-- **Easy toggle:** Set `DEBUG_CONFIG.STEP_3_1 = true` in `src/config.ts` to enable logs
+- **Conditional logging:** Debug logs only show when `DEBUG_CONFIG.STEP_4_1 = true`
+- **Retargeting triggers:** Logs when node capture triggers retargeting
+- **Attack intervals:** Logs when attack intervals are created
+- **Event-driven retargeting:** Logs affected battalions during retargeting
+- **Easy toggle:** Set `DEBUG_CONFIG.STEP_4_1 = true` in `src/config.ts` to enable logs
 
 ## Important Pathfinding Requirements Added
 

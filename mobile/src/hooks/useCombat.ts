@@ -101,22 +101,14 @@ const setupNodeAttack = (
   }
 
   const intervalKey = `${battalionId}-node-${target.index}`;
+  
   const attackFn = () => {
     if (battalion.quantity <= 0 || (battalion.currentHealth ?? 0) <= 0) {
       cleanupBattalion(battalionId, attackIntervals);
       return;
     }
 
-    if (target.type === 'node' && !isNeutral(target.index)) {
-      cleanupBattalion(battalionId, attackIntervals);
-      battalion.targetNode = undefined;
-      const newTargets = findAvailableTargets(battalion, isUser, userBattalions || [], enemyBattalions || []);
-      if (newTargets.length > 0) {
-        moveBattalionAlongPath(battalion, newTargets[0], isUser, userBattalions, enemyBattalions);
-      }
-      return;
-    }
-
+    // Event-driven retargeting only - no continuous target validation during attacks
     const damageApplied = nodeRef.applyDamage(totalDamage, isUser);
     if (!damageApplied) {
       cleanupBattalion(battalionId, attackIntervals);
