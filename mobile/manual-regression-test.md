@@ -1,5 +1,5 @@
 # Manual Regression Test Checklist
-## Steps 1.1 - 3.2
+## Steps 1.1 - 4.2
 
 ### Step 1.1: Node Ownership System
 **Jest Coverage:** ✅ Array system, ownership logic, color updates
@@ -84,6 +84,24 @@
 - [ ] **Attack Initiation:** Confirm battalions immediately begin attacking once in position at attack range intersection.
 - [ ] **Multiple Targeting:** Verify multiple battalions can target the same neutral node simultaneously.
 - [ ] **Fallback Targeting:** If no connected neutral nodes are available, verify battalions target any available neutral node.
+
+### Step 4.1: Event-Driven Retargeting (Manual Verification)
+**Jest Coverage:** ✅ Core retargeting behavior, no continuous validation during attacks
+**Manual Checks Needed:**
+- [ ] **No Continuous Validation:** During attacks, battalions should not continuously check if targets are neutral - they should only retarget when specific events occur (target destroyed, new target available, etc.)
+- [ ] **Event-Driven Retargeting:** Battalions should retarget immediately when their current target is destroyed or when a better target becomes available
+- [ ] **Attack Continuity:** Battalions should maintain their attack rhythm without interruption from unnecessary validation checks
+- [ ] **Performance:** No performance degradation from excessive validation calls during attack phases
+
+### Step 4.2: Movement Monitoring (Manual Verification)
+**Jest Coverage:** ✅ Monitoring start/stop, periodic retargeting during movement
+**Manual Checks Needed:**
+- [ ] **Movement-Only Monitoring:** Periodic target validation should only occur during battalion movement, not during attacks or idle states
+- [ ] **Monitoring Frequency:** Target validation should occur every 2 seconds during movement (not continuously)
+- [ ] **Monitoring Cessation:** When movement completes and battalions reach their targets, periodic monitoring should stop
+- [ ] **Retargeting During Movement:** If a battalion's target becomes invalid during movement, it should retarget to a new valid target
+- [ ] **No Monitoring During Attacks:** Once battalions are in attack range and attacking, periodic monitoring should not interfere with attack behavior
+- [ ] **Multiple Battalion Monitoring:** All moving battalions should be monitored simultaneously without conflicts
 
 ---
 
