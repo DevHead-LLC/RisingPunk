@@ -154,3 +154,93 @@ export const setupBattalionPathFollowing = (
     }
   }
 }; 
+
+export const handlePathCoordination = (
+  battalion: any,
+  target: any,
+  nodes: any[],
+  findShortestPaths: (startNode: number, nodes: any[]) => { distances: { [key: number]: number }; previousNodes: { [key: number]: number | null } },
+  reconstructPath: (startNode: number, endNode: number, previousNodes: { [key: number]: number | null }) => number[],
+  setupAttacksFromCombat: (battalion: any, target: any, isUser: boolean, battalionId: string, attackIntervals: any, cleanupBattalion: any, nodeRefs: any, nodes: any, findAvailableTargets: any, moveBattalionAlongPath: any, setUserBattalions?: any, setEnemyBattalions?: any, userBattalions?: any[], enemyBattalions?: any[]) => void,
+  battalionId: string,
+  isUser: boolean,
+  userBattalions?: any[],
+  enemyBattalions?: any[],
+  attackIntervals?: any,
+  cleanupBattalion?: any,
+  nodeRefs?: any,
+  findAvailableTargets?: any,
+  moveBattalionAlongPath?: any,
+  setUserBattalions?: any,
+  setEnemyBattalions?: any,
+  checkForInfiniteLoop?: (battalionId: string, action: string) => boolean,
+  debugLog?: (message: string) => void
+): { shouldContinue: boolean; updatedTarget?: any } => {
+  // Only for node targets, try using the calculated path
+  if (target.type === 'node') {
+    const pathResult = handleNodePathCalculation(
+      battalion,
+      target,
+      nodes,
+      findShortestPaths,
+      reconstructPath,
+      setupAttacksFromCombat,
+      battalionId,
+      isUser,
+      userBattalions,
+      enemyBattalions,
+      attackIntervals,
+      cleanupBattalion,
+      nodeRefs,
+      findAvailableTargets,
+      moveBattalionAlongPath,
+      setUserBattalions,
+      setEnemyBattalions
+    );
+    
+    if (!pathResult.shouldContinue) {
+      return { shouldContinue: false };
+    }
+    
+    return { shouldContinue: true, updatedTarget: pathResult.updatedTarget };
+  } else if (target.type === 'battalion') {
+    // Handle battalion path following
+    const pathFollowingResult = handleBattalionPathFollowing(
+      battalion,
+      target,
+      nodes,
+      battalionId,
+      checkForInfiniteLoop || (() => false),
+      debugLog || (() => {}),
+      moveBattalionAlongPath || (() => {}),
+      isUser,
+      userBattalions,
+      enemyBattalions
+    );
+    
+    if (!pathFollowingResult.shouldContinue) {
+      return { shouldContinue: false };
+    }
+    
+    const enemyBatts = isUser ? enemyBattalions : userBattalions;
+    const enemyBattalion = enemyBatts?.[target.index];
+    
+    if (!enemyBattalion) {
+      return { shouldContinue: false };
+    }
+    
+    // Setup path following for battalion targets
+    setupBattalionPathFollowing(
+      battalion,
+      target,
+      enemyBattalion,
+      nodes,
+      findShortestPaths,
+      reconstructPath,
+      battalionId,
+      debugLog || (() => {})
+    );
+  }
+  
+  return { shouldContinue: true };
+};

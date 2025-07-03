@@ -12,11 +12,11 @@ import {
   getAnimatedPosition, 
   cleanupBattalion, 
   handleMovementValidation,
-  handlePathCoordination,
   handleMovementExecution
 } from './useMovement';
 import { useTargeting } from './useTargeting';
 import { useBattleEngine } from './useBattleEngine';
+import { handlePathCoordination } from './usePathFollowing';
 
 // Infinite loop detection
 const loopDetection = new Map<string, { count: number, lastTime: number }>();
