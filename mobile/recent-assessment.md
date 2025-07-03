@@ -1,25 +1,48 @@
 # Recent Assessment - Battle System Refactoring
 
-## Current Status: ✅ COMPLETED - Steps 1.1-1.4 + Steps 2.1-2.3 + Comprehensive Jest Test Suite
+## Current Status: ✅ Steps 1.1–3.2 Complete, All Automated and Manual Checks Aligned
 
-### ✅ Completed Work
-- **Steps 1.1-1.4** from `battle-sequence-corrections.md` are fully implemented and tested
-- **Steps 2.1-2.3** - Animation Coordination, Battle Coordination Hook Activation, and Visual Transitions are completed and verified
-- **Comprehensive Jest test suite** provides regression protection for all core battle logic
-- **All `controlState` references** have been removed from the codebase
-- **Array-based ownership system** is working correctly with performance optimizations
-- **Network visualization** components are properly integrated
-- **Animation coordination** and phase transitions are working correctly
-- **Battle coordination hook activation** timing is precise and verified
-- **Visual transitions** are smooth and properly timed
-- **10 test suites, 53 tests passing** covering core logic and integration behaviors
+### ✅ Automated Test Coverage
+- All meaningful, topology-accurate logic for Steps 1.1–3.2 is now covered by Jest tests.
+- All Jest tests pass for:
+  - Node ownership
+  - Performance
+  - Battle initialization
+  - Network visualization
+  - Animation coordination (structural)
+  - Battle overlays
+  - Battle phase transitions
+  - Battalion positioning
+  - Health calculation
+  - Step 3.1: Attack range intersection precision
+  - Step 3.2: Network line path validation utilities
+- Only tests that are meaningful and accurate for the current network topology are included in Jest.
 
-### ✅ Test Coverage Achieved
-- **Core Logic Tests:** Node ownership, performance, battle initialization, network topology
-- **Integration Tests:** Health calculation, battalion positioning, animation coordination
-- **Step 2 Tests:** Animation coordination, phase transitions, timer management, hook activation, visual transitions
-- **Regression Protection:** All critical business rules are tested and validated
-- **Step 1.1-1.4 + 2.1-2.3 Verification:** All corrections are validated by automated tests
+### ✅ Manual Regression Checklist
+- All checks that are difficult, visual, or not meaningful to automate are now in manual-regression-test.md.
+- This includes:
+  - Animation/visual transitions
+  - Multi-step or ambiguous movement paths
+  - Any scenario where Jest cannot reliably simulate or verify the behavior
+- manual-regression-test.md is the single source of truth for all manual/visual checks.
+
+### 🔄 Ongoing Workflow
+- For each new correction step (from battle-sequence-corrections.md):
+  1. Implement the correction.
+  2. Add Jest tests for all logic that can be meaningfully automated.
+  3. Add manual checks for anything else to manual-regression-test.md.
+  4. Update both files after each step.
+  5. Only move forward when all Jest tests pass and manual checks are up to date.
+
+### ✅ Current Alignment
+- Steps 1.1–3.2 are fully covered by a combination of Jest tests and manual regression checklist.
+- No ambiguous or untestable logic remains in Jest.
+- All future steps will follow this workflow for maximum clarity and regression protection.
+
+---
+
+## Next Step
+- Proceed to the next correction step in battle-sequence-corrections.md, following the workflow above.
 
 ## Current Focus: Step 3.1 - Attack Range Intersection Precision
 

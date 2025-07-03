@@ -4,6 +4,7 @@ import { BOT_CATEGORIES } from '../screens/DigitalBarracksScreen';
 import { RANGE_MULTIPLIER } from '../utils/battleConstants';
 import { calculateMovementDuration } from '../utils/battleUtils';
 import { isNeutral } from '../utils/nodeOwnership';
+import { validateNetworkLinePath, findNearestNetworkLine } from '../utils/pathfinding';
 
 // Infinite loop detection
 const loopDetection = new Map<string, { count: number, lastTime: number }>();
@@ -789,3 +790,59 @@ const handleMovementExecution = (
 };
 
 export { handleMovementExecution }; 
+
+// ============================================================================
+// NETWORK LINE MOVEMENT VALIDATION (Step 3.2)
+// ============================================================================
+
+/**
+ * Validates that battalion movement follows network lines exactly
+ * @param battalionPos Current battalion position
+ * @param targetPos Target position
+ * @param nodes Array of all nodes
+ * @param path Current movement path
+ * @returns Validation results with debug info
+ */
+const validateNetworkLineMovement = (
+  battalionPos: { x: number; y: number },
+  targetPos: { x: number; y: number },
+  nodes: { x: number; y: number }[],
+  path: number[]
+): { isValid: boolean; nearestLine: [number, number] | null; distance: number; debugInfo: any } => {
+  // Validate the path follows network lines
+  const pathValidation = validateNetworkLinePath(path);
+  
+  // Find nearest network line to current position
+  const nearestLineInfo = findNearestNetworkLine(battalionPos, nodes);
+  
+  // Check if battalion is within tolerance of a network line (5 pixels)
+  const tolerance = 5;
+  const isOnNetworkLine = nearestLineInfo.distance <= tolerance;
+  
+  const debugInfo = {
+    pathValidation,
+    nearestLineInfo,
+    isOnNetworkLine,
+    tolerance,
+    battalionPos,
+    targetPos
+  };
+
+  // Log network line adherence for Step 3.2
+  console.log('Network line adherence:', {
+    battalionPos,
+    nearestLine: nearestLineInfo.nearestLine,
+    distance: nearestLineInfo.distance,
+    isOnNetworkLine,
+    pathValid: pathValidation.isValid
+  });
+
+  return {
+    isValid: pathValidation.isValid && isOnNetworkLine,
+    nearestLine: nearestLineInfo.nearestLine,
+    distance: nearestLineInfo.distance,
+    debugInfo
+  };
+};
+
+export { validateNetworkLineMovement };
