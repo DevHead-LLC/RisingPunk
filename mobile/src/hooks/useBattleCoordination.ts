@@ -16,6 +16,7 @@ import {
 } from './useMovement';
 import { useTargeting } from './useTargeting';
 import { useBattleEngine } from './useBattleEngine';
+import { useMovingTargetHandling } from './useMovingTargetHandling';
 import { handlePathCoordination } from './usePathFollowing';
 
 // Infinite loop detection
@@ -59,6 +60,13 @@ export const useBattleCoordination = (
     ATTACK_DELAY,
     CAPTURE_MEMORY_DURATION
   } = useBattalionRefsAndState(nodes, userBattalions, enemyBattalions);
+
+  // Use moving target handling hook
+  const {
+    startMovingTargetTracking,
+    stopMovingTargetTracking,
+    setCurrentAnimation
+  } = useMovingTargetHandling();
 
   const moveBattalionAlongPath = useCallback((
     battalion: BattalionPosition,
@@ -144,6 +152,48 @@ export const useBattleCoordination = (
       target.position = pathResult.updatedTarget.position;
     }
     
+    // Start moving target tracking if targeting a battalion
+    if (target.type === 'battalion') {
+      startMovingTargetTracking(
+        {
+          target,
+          isUser,
+          userBattalions,
+          enemyBattalions,
+          onPathAdjustment: (newIntersection: { x: number, y: number }) => {
+            console.log('[Step 4.3 Moving Target] Executing path adjustment:', {
+              battalionId,
+              oldTargetPos: target.position,
+              newIntersection
+            });
+            
+            // Recalculate movement with new intersection point
+            const newMovementResult = handleMovementExecution(
+              battalion,
+              { ...target, position: newIntersection },
+              currentPos,
+              range,
+              isUser,
+              battalionId,
+              attackIntervals.current,
+              cleanupBattalion,
+              setupAttacks,
+              nodeRefs.current,
+              nodes,
+              findAvailableTargetsRef.current,
+              moveBattalionAlongPath,
+              userBattalions,
+              enemyBattalions,
+              setUserBattalions,
+              setEnemyBattalions,
+              () => {}
+            );
+          }
+        },
+        battalion
+      );
+    }
+
     // Handle movement execution
     handleMovementExecution(
       battalion,
@@ -163,9 +213,12 @@ export const useBattleCoordination = (
       enemyBattalions,
       setUserBattalions,
       setEnemyBattalions,
-      () => {}
+      () => {
+        // Stop moving target tracking when movement completes
+        stopMovingTargetTracking();
+      }
     );
-  }, [nodes, attackIntervals, findAvailableTargetsRef, nodeRefs, setUserBattalions, setEnemyBattalions]);
+  }, [nodes, attackIntervals, findAvailableTargetsRef, nodeRefs, setUserBattalions, setEnemyBattalions, startMovingTargetTracking, stopMovingTargetTracking]);
 
   // Use targeting hook (after moveBattalionAlongPath is defined)
   const { findAvailableTargets, findNewTarget, retargetAllBattalions } = useTargeting(
