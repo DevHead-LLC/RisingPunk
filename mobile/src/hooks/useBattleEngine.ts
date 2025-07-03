@@ -26,17 +26,21 @@ const createAttackIntervalKey = (isUser: boolean, battalionNodeIndex: number, ta
   `${isUser ? 'user' : 'enemy'}-${battalionNodeIndex}-${targetNodeIndex}`;
 
 // Utility: Calculate the point along the line from start to end that is 'range' away from end
-function getAttackRangeIntersectionPoint(start, end, range) {
+export function getAttackRangeIntersectionPoint(start, end, range) {
   const dx = end.x - start.x;
   const dy = end.y - start.y;
   const distance = Math.sqrt(dx * dx + dy * dy);
   if (distance === 0) return { x: end.x, y: end.y };
+  
   // Move from end toward start by 'range' units
+  // This calculates where the battalion's attack range edge should intersect with the target center
   const ratio = (distance - range) / distance;
-  return {
+  const intersectionPoint = {
     x: start.x + dx * ratio,
     y: start.y + dy * ratio
   };
+  
+  return intersectionPoint;
 }
 
 export const useBattleEngine = (
@@ -230,6 +234,7 @@ export const useBattleEngine = (
               x: intersection.x - BATTALION_CENTER_OFFSET,
               y: intersection.y - BATTALION_CENTER_OFFSET
             };
+            
             const anim = Animated.timing(battalion.position, {
               toValue: intersection,
               duration: duration,

@@ -598,7 +598,66 @@
 - **Step 5.1 impact:** Moving target handling will work with battalion targeting in Step 5.1
 - **Step 5.2 impact:** Moving target tracking will use separate battalion arrays from Step 5.2
 
-### Step 4.4: Add Delayed Attack Initiation for Retargeting
+### Step 4.4: Implement Complex Network Pathfinding for Battalion-to-Battalion Targeting
+**Current State:** Simple direct movement between nodes, no complex pathfinding for battalion-to-battalion targeting
+**Intended State:** Multi-node pathfinding through network topology when targeting battalions on different network lines
+
+**Files to Modify:**
+- `mobile/src/utils/pathfinding.ts` - Enhance pathfinding for complex scenarios
+- `mobile/src/hooks/useMovement.ts` - Implement multi-node movement logic
+- `mobile/src/hooks/useTargeting.ts` - Add pathfinding to target selection
+
+**Functions to Change:**
+- `findShortestPaths()` - Ensure proper handling of complex network topology
+- `reconstructPath()` - Handle multi-node path reconstruction
+- `moveBattalionAlongPath()` - Support multi-node sequential movement
+- `findAvailableTargets()` - Include pathfinding distance calculations
+
+**Specific Changes:**
+- Implement Dijkstra's algorithm for finding shortest paths through network nodes
+- Support multi-node traversal when targeting battalions on different network lines
+- Example: Battalion on 8-5 line targeting battalion on 0-3 line must choose:
+  - Path 1: 8→4→0 (then attack battalion on 0-3 line)
+  - Path 2: 8→5→1→3 (then attack battalion on 0-3 line)
+- Select shortest path with fewest node transitions and shortest total distance
+- Ensure all movement follows `NETWORK_CONNECTIONS` array topology
+- Node-to-node movement when traversing between network lines
+- Final positioning at attack range intersection once on target's network line
+
+**Test Criteria:**
+- **Primary:** Battalions find optimal paths through network nodes when targeting distant battalions
+- **Primary:** Multi-node traversal works correctly (e.g., 8→4→0 or 8→5→1→3)
+- **Primary:** Pathfinding selects shortest route with fewest node transitions
+- **Primary:** All movement adheres to network topology and connections
+- **Baseline:** All Step 1, 2, 3, 4.1, 4.2, and 4.3 behaviors are maintained
+- **Baseline:** Moving target handling and attack timing work correctly
+
+**Known Temporary Regressions:**
+- **Attack timing may be off:** Attack timing will be corrected in Step 4.5
+- **Visual feedback may be limited:** Visual feedback will be enhanced in Step 5.5
+
+**Critical Failures:**
+- **Pathfinding fails:** If battalions cannot find valid paths through network nodes
+- **Direct movement:** If battalions move directly between non-connected nodes
+- **Network topology violation:** If movement doesn't follow `NETWORK_CONNECTIONS`
+- **Pathfinding system broken:** If pathfinding system fails entirely
+
+**Log Management:**
+- **Add:** `console.log('Complex pathfinding:', { startNode, targetNode, path, distance })`
+- **Add:** `console.log('Path options:', { path1, path2, selectedPath, reason })`
+- **Add:** `console.log('Multi-node movement:', { currentNode, nextNode, progress })`
+- **Monitor:** Complex pathfinding, path selection, multi-node movement
+- **Clean up:** Remove pathfinding logs once Step 4.5 is completed
+
+**CONFLICT NOTES:**
+- **Step 3.1 dependency:** Must be completed AFTER Step 3.1 intersection precision is working
+- **Step 3.2 dependency:** Must be completed AFTER Step 3.2 network line validation is working
+- **Step 4.2 dependency:** Must be completed AFTER Step 4.2 monitoring is implemented
+- **Step 4.3 dependency:** Must be completed AFTER Step 4.3 moving target handling is implemented
+- **Step 4.5 impact:** Pathfinding will affect attack timing in Step 4.5
+- **Step 5.1 impact:** Complex pathfinding will be used for battalion targeting in Step 5.1
+
+### Step 4.5: Add Delayed Attack Initiation for Retargeting
 **Current State:** Immediate attack setup after positioning
 **Intended State:** Wait `INITIAL_ATTACK_DELAY` (500ms) before beginning attacks after retargeting
 
@@ -642,6 +701,7 @@
 **CONFLICT NOTES:**
 - **Step 3.1 dependency:** Must be completed AFTER Step 3.1 positioning precision is working
 - **Step 4.1 dependency:** Must be completed AFTER Step 4.1 event-driven retargeting is working
+- **Step 4.4 dependency:** Must be completed AFTER Step 4.4 complex pathfinding is implemented
 - **Step 5.5 impact:** Attack timing will affect visual feedback in Step 5.5
 - **Step 6.4 impact:** Attack timing will affect victory point calculation in Step 6.4
 

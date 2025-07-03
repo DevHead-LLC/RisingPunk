@@ -1,48 +1,81 @@
 # Recent Assessment - Battle System Refactoring
 
-## Current Status: ✅ COMPLETED - Steps 1.1-1.4 + Step 2.1 + Comprehensive Jest Test Suite
+## Current Status: ✅ COMPLETED - Steps 1.1-1.4 + Steps 2.1-2.3 + Comprehensive Jest Test Suite
 
 ### ✅ Completed Work
 - **Steps 1.1-1.4** from `battle-sequence-corrections.md` are fully implemented and tested
-- **Step 2.1** - Animation Coordination Integration is completed and verified
+- **Steps 2.1-2.3** - Animation Coordination, Battle Coordination Hook Activation, and Visual Transitions are completed and verified
 - **Comprehensive Jest test suite** provides regression protection for all core battle logic
 - **All `controlState` references** have been removed from the codebase
 - **Array-based ownership system** is working correctly with performance optimizations
 - **Network visualization** components are properly integrated
 - **Animation coordination** and phase transitions are working correctly
-- **7 test suites, 26 tests passing** covering core logic and integration behaviors
+- **Battle coordination hook activation** timing is precise and verified
+- **Visual transitions** are smooth and properly timed
+- **10 test suites, 53 tests passing** covering core logic and integration behaviors
 
 ### ✅ Test Coverage Achieved
 - **Core Logic Tests:** Node ownership, performance, battle initialization, network topology
 - **Integration Tests:** Health calculation, battalion positioning, animation coordination
-- **Step 2.1 Tests:** Animation coordination, phase transitions, timer management
+- **Step 2 Tests:** Animation coordination, phase transitions, timer management, hook activation, visual transitions
 - **Regression Protection:** All critical business rules are tested and validated
-- **Step 1.1-1.4 + 2.1 Verification:** All corrections are validated by automated tests
+- **Step 1.1-1.4 + 2.1-2.3 Verification:** All corrections are validated by automated tests
 
-## Current Focus: Step 2.2 - Battle Coordination Hook Activation
+## Current Focus: Step 3.1 - Attack Range Intersection Precision
 
-### Next Step: Step 2.2 from battle-sequence-corrections.md
-**Goal:** Ensure `useBattleCoordination` hook activates exactly when `phase === 'active' && !battleStarted`
+### Next Step: Step 3.1 from battle-sequence-corrections.md
+**Goal:** Ensure battalions stop exactly at attack range edge intersection with node center
 
 **Key Requirements:**
-- `battleStarted` state sets to true exactly when phase becomes 'active'
-- `useBattleCoordination` hook activates immediately
-- Battalions begin targeting and movement logic without delay
-- No premature activation or delayed activation
+- Battalions must stop exactly at attack range edge, not overshooting node targets
+- Visual verification that battalions are positioned correctly relative to nodes
+- No movement beyond the calculated intersection point
+- Precise intersection calculation with proper battalion center offset
 
 **Files to Modify:**
-- `mobile/src/screens/BattleScreen.tsx` - Verify `battleStarted` state management
-- `mobile/src/hooks/useBattleCoordination.ts` - Ensure proper activation timing
+- `mobile/src/hooks/useMovement.ts` - Attack range intersection calculation
+- `mobile/src/utils/battleCalculator.ts` - Range calculation utilities
 
 **Functions to Change:**
-- `useEffect([phase, battleStarted])` - Verify condition logic
-- `useBattleCoordination` initialization - Ensure proper timing
-- Battalion behavior activation - Verify targeting and movement logic starts
+- `getAttackRangeIntersectionPoint()` - Ensure precise intersection calculation
+- `checkRangeIntersection()` - Verify range checking logic
+- Movement position monitoring in `moveBattalionAlongPath()`
 
-## Established Workflow for Step 2.2
+**Specific Changes:**
+- Add comments explaining battalion center offset logic
+- Ensure `BATTALION_CENTER_OFFSET` is properly applied in intersection calculation
+- Verify 2-pixel tolerance is working correctly in position monitoring
+
+**Implementation Status:**
+- ✅ **Step 3.1 implemented** with precise intersection calculations
+- ✅ **Debug logs cleaned up** - now conditional and non-intrusive
+- ✅ **Jest tests created** - 13 tests covering all precision scenarios
+- ✅ **All tests passing** - 66 tests total across 11 test suites
+- 🔄 **Ready for manual verification** - logs can be enabled via `DEBUG_CONFIG.STEP_3_1 = true`
+
+**Log Management:**
+- **Conditional logging:** Debug logs only show when `DEBUG_CONFIG.STEP_3_1 = true`
+- **Essential logs only:** Removed excessive logging, kept only key verification points
+- **Easy toggle:** Set `DEBUG_CONFIG.STEP_3_1 = true` in `src/config.ts` to enable logs
+
+## Important Pathfinding Requirements Added
+
+**Complex Network Pathfinding (Step 4.4):** 
+- **Multi-node pathfinding:** When targeting enemy battalions on different network lines, battalions must traverse through network nodes
+- **Example scenario:** Battalion on 8-5 line targeting battalion on 0-3 line must choose:
+  - Path 1: 8→4→0 (then attack battalion on 0-3 line)
+  - Path 2: 8→5→1→3 (then attack battalion on 0-3 line)
+- **Shortest path selection:** Algorithm selects path with fewest node transitions and shortest total distance
+- **Network topology adherence:** All movement must follow `NETWORK_CONNECTIONS` array
+- **Node-to-node movement:** When traversing between network lines, battalions move directly to node positions
+- **Final positioning:** Once on target's network line, battalion moves to attack range intersection point
+
+**This pathfinding is most critical during retargeting** when battalions need to find optimal routes to enemy battalions on different network lines.
+
+## Established Workflow for Step 3.1
 
 ### Development Process
-1. **Add debug logs** during implementation as specified in Step 2.2
+1. **Add debug logs** during implementation as specified in Step 3.1
 2. **Manual visual testing** by user to verify changes work correctly
 3. **Log review** - User reports back on logs and visual behavior
 4. **Clean up logs** - Remove debug logs once functionality is confirmed
@@ -63,7 +96,9 @@
 - **battalionPositioning.test.ts:** ✅ Complete (Intended Step 1)
 - **animationCoordination.test.ts:** ✅ Complete (Intended Step 1)
 - **step2AnimationCoordination.test.ts:** ✅ Complete (Step 2.1)
-- **Step 2.2 tests:** 🔄 Ready to add after implementation
+- **battleOverlays.test.tsx:** ✅ Complete (Step 2.3)
+- **step2BattlePhase.test.ts:** ✅ Complete (Step 2.1-2.3)
+- **Step 3.1 tests:** 🔄 Ready to add after implementation
 
 ## Key Behaviors Verified
 - ✅ Array-based node ownership system
@@ -77,6 +112,8 @@
 - ✅ Animation coordination and cleanup
 - ✅ Phase transitions and timer management
 - ✅ Animation memory leak prevention
+- ✅ Battle coordination hook activation timing
+- ✅ Visual transition logic and overlay management
 
 ## Purpose (AI/Assistant Context)
 This file is for the AI (assistant) to:
@@ -89,11 +126,11 @@ This file is for the AI (assistant) to:
 
 ## Current Focus (as of latest user direction)
 - **Primary goal:** Implement step-by-step corrections to align battle system with intended behavior
-- **Current task:** Step 2.2 - Battle Coordination Hook Activation from battle-sequence-corrections.md
+- **Current task:** Step 3.1 - Attack Range Intersection Precision from battle-sequence-corrections.md
 - **Scope:** Implementing corrections from battle-sequence-corrections.md one step at a time
 - **Method:** Manual testing after each correction step with user approval
-- **Progress:** Steps 1.1-1.4 and 2.1 completed with comprehensive Jest test suite
-- **Next step:** Step 2.2 - Battle coordination hook activation timing
+- **Progress:** Steps 1.1-1.4 and 2.1-2.3 completed with comprehensive Jest test suite
+- **Next step:** Step 3.1 - Attack range intersection precision
 
 ---
 
@@ -119,7 +156,7 @@ For each correction step, we will:
 4. Wait for user's manual testing and approval
 5. Proceed to the next step only after current step is validated
 
-## ✅ Steps 1.1-1.4 + 2.1 COMPLETED - Foundation System + Animation Coordination
+## ✅ Steps 1.1-1.4 + 2.1-2.3 COMPLETED - Foundation System + Animation Coordination + Hook Activation + Visual Transitions
 **Successfully Implemented:**
 - ✅ **Array-based ownership system**: Ownership determined solely by array membership
 - ✅ **No controlState dependencies**: All controlState references removed
@@ -127,20 +164,24 @@ For each correction step, we will:
 - ✅ **Network visualization**: Proper integration with ownership arrays
 - ✅ **Animation coordination**: Proper phase transitions and timer management
 - ✅ **Memory leak prevention**: Animation cleanup and proper resource management
-- ✅ **Comprehensive Jest test suite**: 27 tests covering all critical behaviors
+- ✅ **Battle coordination hook activation**: Precise timing when phase becomes 'active'
+- ✅ **Visual transitions**: Smooth overlay transitions and UI element visibility
+- ✅ **Comprehensive Jest test suite**: 53 tests covering all critical behaviors
 
 **Testing Results:**
-- ✅ **All tests passing**: 8 test suites, 27 tests total
+- ✅ **All tests passing**: 10 test suites, 53 tests total
 - ✅ **No regressions**: All previous functionality maintained
 - ✅ **Performance verified**: Optimizations working correctly
 - ✅ **Visual behavior confirmed**: Network, ownership, and animations display correctly
 - ✅ **Animation coordination verified**: Phase transitions and timer management working correctly
+- ✅ **Hook activation verified**: Battle coordination activates at correct time
+- ✅ **Visual transitions verified**: Overlays and UI elements transition correctly
 
-## Expected Outcomes for Step 2.2
-- **Proper Hook Activation**: `useBattleCoordination` activates exactly when phase becomes 'active'
-- **Immediate Battalion Behavior**: Battalions start targeting and movement without delay
-- **No Premature Activation**: Hook doesn't activate before phase is 'active'
-- **No Delayed Activation**: Hook activates immediately when conditions are met
+## Expected Outcomes for Step 3.1
+- **Precise Positioning**: Battalions stop exactly at attack range edge intersection
+- **No Overshooting**: Battalions don't move beyond calculated intersection point
+- **Visual Accuracy**: Battalions appear positioned correctly relative to nodes
+- **Proper Offset**: Battalion center offset is correctly applied in calculations
 
 ## Key Success Factors
 - **Step-by-step Precision**: Follow correction plan exactly as specified
@@ -149,10 +190,10 @@ For each correction step, we will:
 - **User Approval**: Wait for manual testing before proceeding to next step
 
 ## Next Steps
-1. **Immediate:** Implement Step 2.2 - Battle Coordination Hook Activation
+1. **Immediate:** Implement Step 3.1 - Attack Range Intersection Precision
 2. **After testing:** Wait for user's manual testing and approval
-3. **Progressive:** Continue with Step 2.3, then Step 3, etc.
-4. **Complete:** Finish all remaining correction steps (2.2-6.4)
+3. **Progressive:** Continue with Step 3.2, then Step 4, etc.
+4. **Complete:** Finish all remaining correction steps (3.1-6.4)
 
 ## Files Status
 - ✅ `battle-sequence.md` - Complete technical implementation documentation
@@ -170,9 +211,9 @@ For each correction step, we will:
 - Review and update between every action to maintain alignment
 - **Important**: User was very clear about following directions precisely - only do what's asked, no extra content
 - **Correction Process**: Step-by-step implementation with manual testing after each step
-- **Current Step**: 2.2 - Battle Coordination Hook Activation
+- **Current Step**: 3.1 - Attack Range Intersection Precision
 - **Completed Steps**: ✅ 1.1-1.4 - Foundation system with comprehensive testing
-- **Completed Steps**: ✅ 2.1 - Animation coordination and phase transitions
+- **Completed Steps**: ✅ 2.1-2.3 - Animation coordination, hook activation, and visual transitions
 - **Testing Approach**: Follow testing criteria from battle-sequence-corrections.md exactly
 - **Log Management**: Add specific logs as specified, monitor, and clean up appropriately
 - **Regression Prevention**: Forward-only progression, no breaking previous steps
