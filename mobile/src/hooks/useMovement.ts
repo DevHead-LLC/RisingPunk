@@ -6,6 +6,7 @@ import { calculateMovementDuration } from '../utils/battleUtils';
 import { isNeutral } from '../utils/nodeOwnership';
 import { validateNetworkLinePath, findNearestNetworkLine } from '../utils/pathfinding';
 import { validateBattalionAndTarget } from '../utils/battleUtils';
+import { createMovementMonitoring, clearMovementMonitoring } from '../utils/movementMonitoring';
 
 const getAnimatedPosition = (position: Animated.ValueXY) => {
   return {
@@ -94,7 +95,13 @@ const executeBattalionMovement = (
   battalionId: string,
   attackIntervals: any,
   cleanupBattalion: (battalionId: string, attackIntervals: any) => void,
-  onMovementComplete: () => void
+  onMovementComplete: () => void,
+  target?: any,
+  isUser?: boolean,
+  userBattalions?: any[],
+  enemyBattalions?: any[],
+  findAvailableTargets?: (battalion: any, isUser: boolean, userBattalions: any[], enemyBattalions: any[]) => any[],
+  moveBattalionAlongPath?: (battalion: any, target: any, isUser: boolean, userBattalions?: any[], enemyBattalions?: any[]) => void
 ): void => {
   cleanupBattalion(battalionId, attackIntervals);
 
@@ -102,11 +109,30 @@ const executeBattalionMovement = (
   const baseDuration = calculateMovementDuration(speed);
   const movementDuration = (moveDistance / 100) * baseDuration;
   
+  // Step 4.2: Add periodic target monitoring during movement
+  let monitoringInterval: NodeJS.Timeout | null = null;
+  
+  if (target && findAvailableTargets && moveBattalionAlongPath) {
+    monitoringInterval = createMovementMonitoring({
+      battalionId,
+      target,
+      isUser: isUser!,
+      userBattalions,
+      enemyBattalions,
+      findAvailableTargets,
+      moveBattalionAlongPath,
+      battalion
+    });
+  }
+  
   Animated.timing(battalion.position, {
     toValue: rangePosition,
     duration: movementDuration,
     useNativeDriver: true
   }).start(({ finished }) => {
+    // Clear monitoring interval when movement completes
+    clearMovementMonitoring(monitoringInterval);
+    
     if (!finished) return;
     
     if (battalion.quantity <= 0 || (battalion.currentHealth ?? 0) <= 0) {
@@ -369,7 +395,13 @@ const handleMovementExecution = (
         setUserBattalions,
         setEnemyBattalions
       );
-    }
+    },
+    target,
+    isUser,
+    userBattalions,
+    enemyBattalions,
+    findAvailableTargets,
+    moveBattalionAlongPath
   );
 };
 
