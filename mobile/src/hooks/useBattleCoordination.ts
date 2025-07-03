@@ -8,8 +8,7 @@ import {
   setupAttacks,
   createSetupBattalionAttacksWrapperHook
 } from './useCombat';
-import { 
-  checkForInfiniteLoop, 
+import {
   getAnimatedPosition, 
   cleanupBattalion, 
   handleMovementValidation,
@@ -18,6 +17,24 @@ import {
 } from './useMovement';
 import { useTargeting } from './useTargeting';
 import { useBattleEngine } from './useBattleEngine';
+
+// Infinite loop detection
+const loopDetection = new Map<string, { count: number, lastTime: number }>();
+const checkForInfiniteLoop = (battalionId: string, action: string) => {
+  const key = `${battalionId}-${action}`;
+  const now = Date.now();
+  const record = loopDetection.get(key);
+  
+  if (record && now - record.lastTime < 1000) {
+    record.count++;
+    if (record.count > 10) {
+      return true;
+    }
+  } else {
+    loopDetection.set(key, { count: 1, lastTime: now });
+  }
+  return false;
+};
 
 export const useBattleCoordination = (
   battleStarted: boolean,

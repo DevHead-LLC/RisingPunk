@@ -5,16 +5,8 @@ import {
   ATTACK_INTERVAL_BASE,
   RANGE_MULTIPLIER
 } from './battleConstants';
+import { isNeutral } from './nodeOwnership';
 
-// ============================================================================
-// BATTLE UTILITY FUNCTIONS
-// ============================================================================
-
-/**
- * Calculate movement duration based on battalion speed
- * @param speedStat - Battalion speed stat
- * @returns Duration in milliseconds
- */
 export const calculateMovementDuration = (speedStat: number): number => {
   return BASE_DURATION * (5 / speedStat);
 };
@@ -84,4 +76,52 @@ export const createBattalionKey = (isUser: boolean, nodeIndex: number): string =
  */
 export const createAttackIntervalKey = (isUser: boolean, attackerNodeIndex: number, targetNodeIndex: number): string => {
   return `${isUser ? 'user' : 'enemy'}-${attackerNodeIndex}-${targetNodeIndex}`;
+};
+
+export const validateBattalionAndTarget = (
+  battalion: { quantity: number; currentHealth?: number; targetNode?: number },
+  target: { type: string; index: number; position?: { x: number; y: number } },
+  nodes: { x: number; y: number }[],
+  currentPos: { x: number; y: number },
+  range: number,
+  cleanupBattalion: (battalionId: string, attackIntervals: any) => void,
+  battalionId: string,
+  attackIntervals: any
+): { isValid: boolean; shouldRetarget: boolean; distance: number; inRange: boolean } => {
+  // Check if battalion is destroyed
+  if (battalion.quantity <= 0 || (battalion.currentHealth ?? 0) <= 0) {
+    cleanupBattalion(battalionId, attackIntervals);
+    return { isValid: false, shouldRetarget: false, distance: 0, inRange: false };
+  }
+
+  // Only block attacking/capturing non-neutral nodes, not movement
+  if (target.type === 'node') {
+    // Only block if we're in range (i.e., about to attack/capture)
+    const dx = target.position?.x - currentPos.x;
+    const dy = target.position?.y - currentPos.y;
+    const distance = Math.sqrt((dx ?? 0) * (dx ?? 0) + (dy ?? 0) * (dy ?? 0));
+    const inRange = distance <= range;
+    if (inRange && !isNeutral(target.index)) {
+      battalion.targetNode = undefined;
+      return { isValid: false, shouldRetarget: true, distance, inRange };
+    }
+    // Otherwise, allow movement/pathfinding
+  }
+
+  if (!target || !target.position) {
+    return { isValid: false, shouldRetarget: false, distance: 0, inRange: false };
+  }
+  
+  // Check if battalion is already in attack range before any movement calculations
+  const dx = target.position.x - currentPos.x;
+  const dy = target.position.y - currentPos.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  const inRange = distance <= range;
+  
+  // If in range, battalion is valid for attacking but not for moving
+  if (inRange) {
+    return { isValid: true, shouldRetarget: false, distance, inRange: true };
+  }
+
+  return { isValid: true, shouldRetarget: false, distance, inRange: false };
 }; 
