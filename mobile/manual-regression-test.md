@@ -103,6 +103,20 @@
 - [ ] **No Monitoring During Attacks:** Once battalions are in attack range and attacking, periodic monitoring should not interfere with attack behavior
 - [ ] **Multiple Battalion Monitoring:** All moving battalions should be monitored simultaneously without conflicts
 
+### Step 4.3: Moving Target Handling (Manual Verification)
+**Jest Coverage:** ✅ Core moving target logic, position tracking, intersection recalculation
+**Manual Checks Needed:**
+- [ ] **Battalion-to-Battalion Targeting:** Confirm that battalions can target enemy battalions (not just nodes)
+- [ ] **Moving Target Detection:** When a target battalion moves, the attacking battalion should detect the movement
+- [ ] **Path Adjustment:** Attacking battalions should recalculate their movement path when target battalions move
+- [ ] **No Outdated Attacks:** Attacking battalions should not attack from their old position after target moves
+- [ ] **Smooth Path Updates:** Path adjustments should be smooth without jerky movement or teleportation
+- [ ] **Multiple Moving Targets:** Multiple battalions should be able to track different moving targets simultaneously
+- [ ] **Tracking Cleanup:** Moving target tracking should stop when movement completes or target is destroyed
+- [ ] **Console Logs:** Verify `[Step 4.3 Moving Target]` logs appear when targets move and paths are adjusted
+- [ ] **Performance:** Moving target handling should not cause performance degradation or excessive CPU usage
+- [ ] **Edge Cases:** Test scenarios where target battalions move rapidly or change direction frequently
+
 ---
 
 ## How to Run This Checklist
