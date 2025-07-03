@@ -164,7 +164,21 @@
 - **Dynamic target updates:** If a closer target becomes available or the current target moves/is defeated/captured, battalions recalculate pathfinding and intersection point
 - **Moving target handling:** When targeting a moving battalion, the attacker updates its intersection point as the target moves - cannot attack from old positions
 - **Path recalculation:** New targets or target movement triggers fresh pathfinding via `findShortestPaths()` and `reconstructPath()`
-- **Attack setup:** Once in final position, immediately begins attacking the new target via `setupAttacks()` (in `useCombat.ts`) using same initial attack delay like initial targeting.
+- **Attack setup:** Once in final position, immediately begins attacking the new target via `setupAttacks()` (in `useCombat.ts`) using same initial attack delay like initial targeting
+
+**f) Complex Network Pathfinding for Battalion-to-Battalion Targeting**
+- **Multi-node pathfinding:** When targeting enemy battalions on different network lines, battalions must traverse through network nodes to reach the target's network line
+- **Pathfinding algorithm:** Uses Dijkstra's algorithm via `findShortestPaths()` to find optimal route through network topology
+- **Example scenario:** Battalion on 8-5 line targeting battalion on 0-3 line must choose between:
+  - Path 1: 8→4→0 (then attack battalion on 0-3 line)
+  - Path 2: 8→5→1→3 (then attack battalion on 0-3 line)
+- **Shortest path selection:** Algorithm selects the path with fewest node transitions and shortest total distance
+- **Network topology adherence:** All movement must follow `NETWORK_CONNECTIONS` array: `[0,3], [3,6], [1,4], [4,7], [2,5], [5,8], [0,4], [1,3], [1,5], [2,4], [3,7], [4,6], [4,8], [5,7]`
+- **Node-to-node movement:** When traversing between network lines, battalions move directly to node positions, not using attack range calculations
+- **Final positioning:** Once on target's network line, battalion moves to attack range intersection point for combat
+- **Path reconstruction:** `reconstructPath()` converts shortest path results into sequential node movements
+- **Dynamic path updates:** If target battalion moves to different network line during pursuit, path is recalculated
+- **Movement efficiency:** Pathfinding ensures battalions take optimal routes through network topology
 
 ## Step 5: Battalion-to-Battalion Combat
 **File:** `useCombat.ts` > `setupBattalionAttack()` and `performBattalionAttack()`

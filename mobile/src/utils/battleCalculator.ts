@@ -73,11 +73,10 @@ export const checkRangeIntersection = (
   const dy = position1.y - position2.y;
   const distance = Math.sqrt(dx * dx + dy * dy);
   
-  // TODO: CLARIFY RANGE INTERSECTION LOGIC - This function checks if two positions are within range
   // For attack range positioning: position1 = battalion_center, position2 = target_center, range = attack_range
-  // Current logic: returns true if battalion center is within attack range of target center
-  // For proper attack positioning: we want battalion attack range edge to touch target center
+  // We want battalion attack range edge to touch target center
   // This means: distance(battalion_center, target_center) should equal attack_range
-  // Consider adding a tolerance for floating point precision: Math.abs(distance - range) < tolerance
-  return distance <= range;
+  // Add 2-pixel tolerance for floating point precision
+  const tolerance = 2;
+  return Math.abs(distance - range) <= tolerance;
 }; 
