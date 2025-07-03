@@ -9,23 +9,9 @@ import { cleanupBattalion } from './useMovement';
 import { useCallback } from 'react';
 import { isNeutral } from '../utils/nodeOwnership';
 
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
-
-/**
- * Create a battalion key for identifying battalions in refs and intervals
- */
 const createBattalionKey = (isUser: boolean, nodeIndex: number): string => 
   `${isUser ? 'user' : 'enemy'}-${nodeIndex}`;
 
-// ============================================================================
-// COMBAT LOGIC
-// ============================================================================
-
-/**
- * Setup attacks for a battalion against a target
- */
 const setupAttacks = (
   battalion: BattalionPosition,
   target: BattleTarget,
@@ -93,9 +79,6 @@ const setupAttacks = (
   }, 150);
 };
 
-/**
- * Setup node attack logic
- */
 const setupNewNodeAttack = (
   battalion: BattalionPosition,
   target: { type: string; index: number },
@@ -118,7 +101,6 @@ const setupNewNodeAttack = (
     return;
   }
 
-  // Set up recurring attacks
   const intervalKey = `${battalionId}-node-${target.index}`;
   const attackFn = () => {
     if (battalion.quantity <= 0 || (battalion.currentHealth ?? 0) <= 0) {
@@ -126,7 +108,6 @@ const setupNewNodeAttack = (
       return;
     }
 
-    // Only check isNeutral for node targets
     if (target.type === 'node' && !isNeutral(target.index)) {
       cleanupBattalion(battalionId, attackIntervals);
       battalion.targetNode = undefined;
@@ -137,7 +118,6 @@ const setupNewNodeAttack = (
       return;
     }
 
-    // Apply damage
     const damageApplied = nodeRef.applyDamage(totalDamage, isUser);
     if (!damageApplied) {
       cleanupBattalion(battalionId, attackIntervals);
@@ -150,13 +130,9 @@ const setupNewNodeAttack = (
   };
 
   attackIntervals[intervalKey] = setInterval(attackFn, attackInterval);
-  // Execute first attack immediately
   attackFn();
 };
 
-/**
- * Setup battalion attack logic
- */
 const setupBattalionAttack = (
   battalion: BattalionPosition,
   target: { type: string; index: number },
@@ -241,10 +217,6 @@ const setupBattalionAttack = (
   attackFn();
 };
 
-/**
- * Handle battalion damage and destruction
- * Consolidated version that combines the best parts from all implementations
- */
 const handleBattalionDamage = (
   battalion: BattalionPosition,
   damage: number,
@@ -290,9 +262,6 @@ const handleBattalionDamage = (
   return false;
 };
 
-/**
- * Check if a battalion is in attack range of a target
- */
 const isInAttackRange = (
   battalion: BattalionPosition,
   target: BattleTarget,
@@ -307,27 +276,13 @@ const isInAttackRange = (
       Math.pow(node.x - battalion.position.x._value, 2) + 
       Math.pow(node.y - battalion.position.y._value, 2)
     );
-    
-    // TODO: VERIFY ATTACK RANGE CHECKING - This checks if battalion is within attack range of node
-    // battalion.position.x._value = battalion visual position (not center)
-    // node.x = node center position
-    // battalionRange = actual attack range in pixels
-    // For proper positioning: battalion center should be exactly attack_range distance from node center
-    // This means: distance(battalion_center, node_center) should equal attack_range
-    // Current logic: returns true if distance <= range (battalion is within range)
-    // This is correct for determining if battalion can attack, but positioning logic should ensure
-    // battalion stops exactly at attack range edge touching node center
+
     return distance <= battalionRange;
   } else {
-    // For battalion targets, we'd need the target battalion's position
-    // This is handled in the movement logic
     return false;
   }
 };
 
-/**
- * Perform a single battalion attack with animations and damage
- */
 const performBattalionAttack = (
   battalion: BattalionPosition,
   targetBattalion: BattalionPosition,
@@ -362,9 +317,6 @@ const performBattalionAttack = (
   }, attackDelay);
 };
 
-/**
- * Setup battalion vs battalion attacks with intervals and retargeting
- */
 const setupBattalionAttacks = (
   battalion: BattalionPosition,
   targetBattalion: BattalionPosition,
@@ -397,7 +349,6 @@ const setupBattalionAttacks = (
     clearInterval(attackIntervals[intervalKey]);
     delete attackIntervals[intervalKey];
     
-    // Find new target
     const newTargets = findAvailableTargets(
       battalion,
       isUser,
@@ -416,7 +367,6 @@ const setupBattalionAttacks = (
     } 
   };
 
-  // Initial attack
   performBattalionAttack(
     battalion,
     targetBattalion,
@@ -430,7 +380,6 @@ const setupBattalionAttacks = (
     onTargetDestroyed
   );
   
-  // Set up interval for subsequent attacks
   attackIntervals[intervalKey] = setInterval(() => {
     performBattalionAttack(
       battalion,
@@ -447,9 +396,6 @@ const setupBattalionAttacks = (
   }, attackInterval);
 };
 
-/**
- * Wrapper for setupBattalionAttacks that provides the correct parameters
- */
 const setupBattalionAttacksWrapper = (
   battalion: BattalionPosition,
   targetBattalion: BattalionPosition,
@@ -465,18 +411,14 @@ const setupBattalionAttacksWrapper = (
   battalionsRef: React.MutableRefObject<{ user: BattalionPosition[]; enemy: BattalionPosition[] }>,
   ATTACK_DELAY: number
 ) => {
-  // Generate battalion ID
   const { battalionId } = findBattalionIndexAndId(battalion, isUser, battalionsRef.current.user, battalionsRef.current.enemy);
   
-  // Clear any existing attack interval for this battalion
   if (attackIntervals[battalionId]) {
     clearInterval(attackIntervals[battalionId]);
     delete attackIntervals[battalionId];
   }
   
-  // Set up continuous attacks
   attackIntervals[battalionId] = setInterval(() => {
-    // Check if battalion still exists and is healthy
     const currentBattalion = isUser 
       ? battalionsRef.current.user.find(b => b && b.type === battalion.type && b.nodeIndex === battalion.nodeIndex && b.mark === battalion.mark)
       : battalionsRef.current.enemy.find(b => b && b.type === battalion.type && b.nodeIndex === battalion.nodeIndex && b.mark === battalion.mark);
@@ -486,7 +428,6 @@ const setupBattalionAttacksWrapper = (
       return;
     }
     
-    // Check if target still exists and is healthy
     const targetBattalionCurrent = isUser 
       ? battalionsRef.current.enemy.find(b => b && b.type === targetBattalion.type && b.nodeIndex === targetBattalion.nodeIndex && b.mark === targetBattalion.mark)
       : battalionsRef.current.user.find(b => b && b.type === targetBattalion.type && b.nodeIndex === targetBattalion.nodeIndex && b.mark === targetBattalion.mark);
@@ -496,7 +437,6 @@ const setupBattalionAttacksWrapper = (
       return;
     }
     
-    // Perform attack
     const totalDamage = calculateTotalDamage(currentBattalion, isUser);
     performBattalionAttack(
       currentBattalion,
@@ -512,7 +452,6 @@ const setupBattalionAttacksWrapper = (
   }, ATTACK_DELAY);
 };
 
-// Create a wrapper function for setupBattalionAttacks with the correct signature
 const createSetupBattalionAttacksWrapper = (
   attackIntervals: { [key: string]: NodeJS.Timeout },
   battalionRefs: { [key: string]: BattalionRef },
@@ -543,7 +482,6 @@ const createSetupBattalionAttacksWrapper = (
     );
 };
 
-// Create a useCallback wrapper for setupBattalionAttacks
 const createSetupBattalionAttacksWrapperHook = (
   attackIntervals: { [key: string]: NodeJS.Timeout },
   battalionRefs: { [key: string]: BattalionRef },
