@@ -262,7 +262,7 @@ export const findOptimalBattalionPath = (
   pathOptions: { path: number[]; distance: number; transitions: number }[];
   selectedReason: string;
 } => {
-  console.log('Complex pathfinding:', { startNode: startNodeIndex, targetNode: targetNodeIndex });
+
   
   // Get all possible paths using Dijkstra's algorithm
   const { distances, previousNodes } = findShortestPaths(startNodeIndex, nodes);
@@ -300,12 +300,7 @@ export const findOptimalBattalionPath = (
     ? `Selected path with ${selectedPath.transitions} transitions over ${pathOptions.length} options`
     : 'Single path available';
   
-  console.log('Path options:', { 
-    path1: pathOptions[0]?.path, 
-    path2: pathOptions[1]?.path, 
-    selectedPath: selectedPath?.path, 
-    reason: selectedReason 
-  });
+
   
   return {
     path: selectedPath?.path || [],

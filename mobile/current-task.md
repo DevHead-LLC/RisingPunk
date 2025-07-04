@@ -1,136 +1,154 @@
-# Current Task: Step 4.4 - Complex Network Pathfinding for Battalion-to-Battalion Targeting
+# Current Task: Network Line Adherence Enforcement
 
-## Overview
-Implement multi-node pathfinding through network topology when targeting battalions on different network lines.
+## Problem Statement
+Battalions are moving directly to their targets rather than staying on network lines, especially during retargeting after neutral node capture. The retargeting system should use pathfinding to find a new target while also designing the path that the battalion should move on with the network.
 
-## Current State
-- Simple direct movement between nodes
-- No complex pathfinding for battalion-to-battalion targeting
+## Root Cause Analysis
+- **Initial movement**: Pathfinding is used, battalions move node-to-node ✅
+- **Retargeting**: System calls `moveBattalionAlongPath` with new target but doesn't always reconstruct node-to-node paths ❌
+- **Movement execution**: If `remainingPath` is not set, battalion moves directly to target position (off-network) ❌
 
-## Intended State
-- Multi-node pathfinding through network topology
-- Battalions follow network connections when targeting distant battalions
-- Example: Battalion on 8-5 line targeting battalion on 0-3 line must choose:
-  - Path 1: 8→4→0 (then attack battalion on 0-3 line)
-  - Path 2: 8→5→1→3 (then attack battalion on 0-3 line)
-- Select shortest path with fewest node transitions and shortest total distance
+## Design Requirements (from intended-battle-sequence.md)
+- "Battalions must stay on network lines during movement and never leave the network structure"
+- "Node-based pathfinding: When transferring between network lines, battalions move directly to the node position"
+- "All movement must follow `NETWORK_CONNECTIONS` array"
+- "When retargeting, battalions use `moveBattalionAlongPath()` to move toward their new target"
 
-## Files to Modify
-- `mobile/src/utils/pathfinding.ts` - Enhance pathfinding for complex scenarios ✅ (IN PROGRESS)
-- `mobile/src/hooks/useMovement.ts` - Implement multi-node movement logic
-- `mobile/src/hooks/useTargeting.ts` - Add pathfinding to target selection
+## Implementation Plan
 
-## Functions to Change
-- `findShortestPaths()` - Ensure proper handling of complex network topology ✅ (ENHANCED)
-- `reconstructPath()` - Handle multi-node path reconstruction ✅ (ENHANCED)
-- `moveBattalionAlongPath()` - Support multi-node sequential movement
-- `findAvailableTargets()` - Include pathfinding distance calculations
+### Batch 1: Pathfinding on Retarget ⏳
+**Goal:** Ensure every retarget reconstructs a node-to-node path
 
-## Implementation Progress
+**Files to Modify:**
+- `mobile/src/hooks/useTargeting.ts` - `findNewTarget()` function
+- `mobile/src/utils/targetValidation.ts` - `validateAndRetarget()` function
+- `mobile/src/utils/movementMonitoring.ts` - `createMovementMonitoring()` function
+- `mobile/src/hooks/useBattleCoordination.ts` - `moveBattalionAlongPath()` function
 
-### ✅ Phase 1: Enhanced Pathfinding Utilities (COMPLETED)
-- Added `findOptimalBattalionPath()` function for complex battalion-to-battalion targeting
-- Added `findAlternativePaths()` helper function to consider different network line approaches
-- Added `validateBattalionPath()` enhanced validation function
-- Added comprehensive debug logging for pathfinding decisions
-- Path selection prioritizes shortest distance, then fewest transitions
+**Functions to Change:**
+- `findNewTarget()` - Always reconstruct path when assigning new target
+- `validateAndRetarget()` - Use pathfinding for retargeting, not direct movement
+- `createMovementMonitoring()` - Ensure retargeting uses pathfinding
+- `moveBattalionAlongPath()` - Always set up `remainingPath` and `finalTarget`
 
-### ✅ Phase 2: Integration with Movement System (COMPLETED)
-- Updated `moveBattalionAlongPath()` to use new pathfinding utilities
-- Enhanced `handlePathCoordination()` for battalion targets
-- Added multi-node movement tracking and progress logging
-- Updated `setupBattalionPathFollowing()` to use complex pathfinding
-- Added comprehensive debug logging for multi-node movement
+**Specific Changes:**
+1. When a new target is assigned, determine battalion's current node
+2. Reconstruct node-to-node path from current node to target's node using Dijkstra's
+3. Set `remainingPath` and `finalTarget` for node-to-node traversal
+4. Only after reaching final node, move to attack range intersection point
 
-### ✅ Phase 3: Targeting System Integration (COMPLETED)
-- ✅ Updated `findAvailableTargets()` to include pathfinding distance calculations
-- ✅ Enhanced BattleTarget type to include pathInfo for complex pathfinding data
-- ✅ Integrated complex pathfinding into target selection logic
-- ✅ Added path validation to targeting decisions
-- ✅ Added comprehensive debug logging for complex targeting scenarios
+**Test Criteria:**
+- **Primary:** Every retarget creates a new node-to-node path
+- **Primary:** Battalions move through intermediate nodes, not directly to target
+- **Primary:** `remainingPath` and `finalTarget` are always set for new targets
+- **Baseline:** All existing pathfinding functionality is maintained
 
-## Specific Implementation Requirements
-1. ✅ Implement Dijkstra's algorithm for finding shortest paths through network nodes
-2. ✅ Support multi-node traversal when targeting battalions on different network lines
-3. ✅ Ensure all movement follows `NETWORK_CONNECTIONS` array topology
-4. ✅ Node-to-node movement when traversing between network lines
-5. ✅ Final positioning at attack range intersection once on target's network line
+**Debug Logs to Add:**
+- `console.log('Retarget pathfinding:', { battalionId, oldTarget, newTarget, path })`
+- `console.log('Path reconstruction:', { startNode, endNode, path, remainingPath })`
 
-## Test Criteria
-- **Primary:** Battalions find optimal paths through network nodes when targeting distant battalions ✅
-- **Primary:** Multi-node traversal works correctly (e.g., 8→4→0 or 8→5→1→3) ✅
-- **Primary:** Pathfinding selects shortest route with fewest node transitions ✅
-- **Primary:** All movement adheres to network topology and connections ✅
-- **Baseline:** All Step 1, 2, 3, 4.1, 4.2, and 4.3 behaviors are maintained ✅
+### Batch 2: Enforce Path Adherence in Movement ⏳
+**Goal:** Ensure all movement is along valid network segments
 
-## Debug Logs Added
-- ✅ `console.log('Complex pathfinding:', { startNode, targetNode, path, distance })`
-- ✅ `console.log('Path options:', { path1, path2, selectedPath, reason })`
-- ✅ `console.log('Multi-node movement:', { currentNode, nextNode, progress })`
-- ✅ `console.log('Complex pathfinding targeting:', { battalionId, targetId, path, pathDistance, transitions })`
-- ✅ `console.log('Direct targeting (no path found):', { battalionId, targetId, directDistance })`
+**Files to Modify:**
+- `mobile/src/hooks/useMovement.ts` - Movement execution logic
+- `mobile/src/utils/movementWrapper.ts` - Movement animation logic
+- `mobile/src/hooks/usePathFollowing.ts` - Path following logic
 
-## Implementation Status: ✅ COMPLETED WITH FIXES
+**Functions to Change:**
+- `handleMovementExecution()` - Validate movement is along network lines
+- `executeMovementWithCleanup()` - Enforce path adherence during animation
+- `handleBattalionPathFollowing()` - Ensure movement stays on current network segment
 
-### ✅ Step 4.4 Successfully Implemented
-- **Complex pathfinding working perfectly** - All logs show optimal paths being found
-- **Multi-node movement functioning** - Battalions traverse through intermediate nodes correctly
-- **Network topology compliance** - All movement follows NETWORK_CONNECTIONS
-- **Optimal path selection** - System correctly prioritizes shortest distance, then fewest transitions
+**Specific Changes:**
+1. Only allow movement along current network segment (between two connected nodes)
+2. If battalion is not on a node, snap to nearest valid network segment
+3. Validate battalion position is always on or near a network line
+4. Prevent direct movement to arbitrary positions off the network
 
-### 🔧 Critical Fix Applied: Infinite Loop Prevention
-- **Issue identified**: Battalion `user-2` was oscillating between nodes 2→5→2→8→2→5...
-- **Root cause**: Path following logic wasn't detecting oscillation patterns
-- **Fix implemented**: 
-  - Enhanced infinite loop detection with oscillation checking
-  - Added path validation to prevent oscillating paths from being created
-  - Added aggressive loop breaking when oscillation is detected
+**Test Criteria:**
+- **Primary:** All movement is along valid network segments
+- **Primary:** Battalion positions never deviate from network lines
+- **Primary:** Invalid movement is prevented and logged
+- **Baseline:** Movement speed and animation quality is maintained
 
-### What to Test:
-1. **✅ Complex Pathfinding:** Working perfectly - see logs showing optimal paths like 8→4→0, 2→5→8, etc.
-2. **✅ Multi-node Movement:** Working correctly - see "Multi-node movement" logs with progress tracking
-3. **✅ Debug Logs:** Comprehensive logging showing path options and selections
-4. **✅ Network Topology:** All movement follows network connections correctly
-5. **🔧 Infinite Loop Fix:** Verify no more oscillating behavior between nodes
+**Debug Logs to Add:**
+- `console.log('Movement validation:', { battalionPos, nearestLine, distance, isValid })`
+- `console.log('Network snap:', { oldPos, newPos, nearestNode })`
 
-### Expected Behaviors (All Working):
-- Battalions on node 8 targeting battalions on node 0 should follow path 8→4→0 ✅
-- Battalions on node 8 targeting battalions on node 3 should follow path 8→5→1→3 ✅
-- Console shows "Complex pathfinding:" logs with path options ✅
-- Console shows "Multi-node movement:" logs with progress tracking ✅
-- All movement follows network topology (no diagonal jumps) ✅
-- **NEW**: No infinite oscillation between nodes ✅
+### Batch 3: Add Validation and Debug Logging ⏳
+**Goal:** Comprehensive validation and logging of network adherence
 
-### Known Temporary Regressions:
-- **Attack timing may be off:** Attack timing will be corrected in Step 4.5
-- **Visual feedback may be limited:** Visual feedback will be enhanced in Step 5.5
+**Files to Modify:**
+- `mobile/src/utils/pathfinding.ts` - Add validation utilities
+- `mobile/src/hooks/useMovement.ts` - Add validation checks
+- `mobile/src/utils/battleUtils.ts` - Add movement validation
 
-## Next Steps:
-1. **Verify the infinite loop fix works** - Test that battalions no longer oscillate
-2. **Confirm all pathfinding continues to work** - Ensure the fix didn't break existing functionality
-3. **Proceed to Step 4.5** - Attack timing corrections once everything is stable
+**Functions to Change:**
+- `validateBattalionPath()` - Enhanced validation for all movement
+- `findNearestNetworkLine()` - Use for position validation
+- `validateBattalionAndTarget()` - Add network adherence checks
 
-## Dependencies
-- **Step 3.1 dependency:** Must be completed AFTER Step 3.1 intersection precision is working
-- **Step 3.2 dependency:** Must be completed AFTER Step 3.2 network line validation is working
-- **Step 4.2 dependency:** Must be completed AFTER Step 4.2 monitoring is implemented
-- **Step 4.3 dependency:** Must be completed AFTER Step 4.3 moving target handling is implemented
+**Specific Changes:**
+1. Add validation before and during movement using `validateBattalionPath`
+2. Use `findNearestNetworkLine` to validate battalion positions
+3. Add comprehensive debug logging for network adherence
+4. Log errors if battalion is ever off-network
 
-## Implementation Strategy
-1. ✅ Start with enhancing `pathfinding.ts` utilities
-2. 🔄 Update movement logic to handle multi-node paths
-3. ⏳ Integrate pathfinding into targeting system
-4. ✅ Add comprehensive debug logging
-5. ⏳ Test with manual verification
+**Test Criteria:**
+- **Primary:** All movement is validated for network adherence
+- **Primary:** Off-network positions are detected and logged
+- **Primary:** Debug logs provide clear information about network adherence
+- **Baseline:** Performance is not significantly impacted
+
+**Debug Logs to Add:**
+- `console.log('Network line adherence:', { battalionPos, nearestLine, distance })`
+- `console.log('Path validation:', { path, isValid, violations })`
+- `console.log('Position validation:', { position, onNetwork, distance })`
+
+### Batch 4: Manual and Automated Testing ⏳
+**Goal:** Comprehensive testing of all movement scenarios
+
+**Test Scenarios:**
+1. **Initial movement** - Battalions move to neutral nodes along network lines
+2. **Retargeting after node capture** - Battalions find new targets using pathfinding
+3. **Retargeting after battalion destruction** - Battalions retarget using pathfinding
+4. **Moving target handling** - Battalions follow moving targets along network lines
+5. **Complex pathfinding** - Multi-node traversal for distant targets
+6. **Edge cases** - No valid paths, invalid targets, etc.
+
+**Manual Testing:**
+- Visual confirmation that battalions never move off network lines
+- Console log verification for all debug messages
+- Performance testing to ensure no significant slowdown
+
+**Automated Testing:**
+- Unit tests for all validation functions
+- Integration tests for complete movement flows
+- Regression tests to ensure existing functionality is maintained
+
+## Success Criteria
+- **All movement follows network lines** - No direct movement between non-connected nodes
+- **Pathfinding used for all retargeting** - Every new target gets a reconstructed path
+- **Comprehensive validation** - All movement is validated for network adherence
+- **Clear debug logging** - Easy to verify network adherence via console logs
+- **No performance regression** - Movement remains smooth and responsive
+
+## Known Dependencies
+- **Step 4.4 dependency:** Complex pathfinding must be working (✅ completed)
+- **Step 3.2 dependency:** Network line validation must be implemented
+- **Step 4.2 dependency:** Movement monitoring must be working
 
 ## Notes for Implementation
 - Focus on small batches that can be tested independently
-- Preserve existing functionality while adding new capabilities
-- Use debug logs to verify pathfinding is working correctly
-- Ensure network topology is respected at all times
+- Preserve existing functionality while adding network adherence
+- Use debug logs to verify each step is working correctly
+- Test thoroughly after each batch to catch issues early
+- Ensure all movement scenarios are covered (initial, retargeting, moving targets, etc.)
 
 ## Next Steps
-1. Test the enhanced pathfinding utilities manually
-2. Integrate new pathfinding into movement system
-3. Update targeting system to use complex pathfinding
-4. Add comprehensive testing and validation
+1. Start with Batch 1: Pathfinding on Retarget
+2. Test thoroughly after Batch 1 completion
+3. Proceed to Batch 2: Enforce Path Adherence in Movement
+4. Continue through all batches with testing between each
+5. Final validation that all movement stays on network lines 

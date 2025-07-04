@@ -72,16 +72,7 @@ export const useTargeting = (
           const enemyPos = getAnimatedPosition(enemyBattalion.position);
           
           if (!isNaN(pathDistance)) {
-            console.log('Complex pathfinding targeting:', {
-              battalionId: `${isUser ? 'user' : 'enemy'}-${battalion.nodeIndex}`,
-              targetId: `${isUser ? 'enemy' : 'user'}-${index}`,
-              startNode: battalion.nodeIndex,
-              targetNode: enemyBattalion.nodeIndex,
-              path: pathResult.path,
-              pathDistance: pathDistance.toFixed(1),
-              transitions: pathResult.nodeTransitions,
-              pathOptions: pathResult.pathOptions.length
-            });
+
             
             allTargets.push({
               type: 'battalion',
@@ -103,13 +94,7 @@ export const useTargeting = (
             Math.pow(enemyPos.y - currentPos.y, 2)
           );
           if (!isNaN(directDistance)) {
-            console.log('Direct targeting (no path found):', {
-              battalionId: `${isUser ? 'user' : 'enemy'}-${battalion.nodeIndex}`,
-              targetId: `${isUser ? 'enemy' : 'user'}-${index}`,
-              startNode: battalion.nodeIndex,
-              targetNode: enemyBattalion.nodeIndex,
-              directDistance: directDistance.toFixed(1)
-            });
+
             
             allTargets.push({
               type: 'battalion',

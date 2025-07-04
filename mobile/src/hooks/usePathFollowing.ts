@@ -90,28 +90,19 @@ export const handleBattalionPathFollowing = (
         // Clear path data to break the loop
         battalion.remainingPath = undefined;
         battalion.finalTarget = undefined;
-        debugLog(`[Step 4.4 Battalion Loop Break] ${battalionId} - Breaking infinite loop/oscillation, clearing path data`);
         return { shouldContinue: false };
       }
       
       const progress = battalion.remainingPath.length;
       const totalPath = [battalion.nodeIndex, ...battalion.remainingPath];
       
-      console.log('Multi-node movement:', { 
-        currentNode: battalion.nodeIndex, 
-        nextNode: nextNodeIndex, 
-        progress: `${totalPath.length - progress}/${totalPath.length}` 
-      });
-      
-      debugLog(`[Step 4.4 Battalion Path Following] ${battalionId} - Continuing path: [${battalion.remainingPath.join(' -> ')}] to final target ${battalion.finalTarget}, progress: ${totalPath.length - progress}/${totalPath.length}`);
+
       
       // Update battalion position to the current node
       battalion.nodeIndex = target.index;
       
       // Remove the current node from remaining path
       battalion.remainingPath = battalion.remainingPath.slice(1);
-      
-      debugLog(`[Step 4.4 Battalion Path Update] ${battalionId} - Updated to node ${target.index}, remaining path: [${battalion.remainingPath.join(' -> ')}]`);
       
       // Move to the next node in the path
       const nextTarget = {
@@ -120,8 +111,6 @@ export const handleBattalionPathFollowing = (
         distance: 0,
         position: { x: nextNode.x, y: nextNode.y }
       };
-      
-      debugLog(`[Step 4.4 Battalion Movement] ${battalionId} - Moving to next node ${nextNodeIndex} at position (${nextNode.x.toFixed(1)}, ${nextNode.y.toFixed(1)})`);
       
       moveBattalionAlongPath(battalion, nextTarget, isUser, userBattalions, enemyBattalions);
       return { shouldContinue: false };
@@ -132,7 +121,6 @@ export const handleBattalionPathFollowing = (
   if (battalion.finalTarget !== undefined && target.index === battalion.finalTarget) {
     battalion.remainingPath = undefined;
     battalion.finalTarget = undefined;
-    debugLog(`[Step 4.4 Battalion Complete] ${battalionId} - Reached final target ${target.index}, path complete`);
   }
   
   return { shouldContinue: true };
@@ -158,12 +146,7 @@ export const setupBattalionPathFollowing = (
   // Validate the path follows network topology
   const validation = validateBattalionPath(battalionPath, battalion.nodeIndex, targetNodeIndex);
   
-  debugLog(`[Step 4.4 Battalion Debug] ${battalionId} - Complex pathfinding: path=[${battalionPath.join(' -> ')}], targetNode=${targetNodeIndex}, distance=${pathResult.distance.toFixed(1)}, transitions=${pathResult.nodeTransitions}`);
-  
-  if (!validation.isValid) {
-    debugLog(`[Step 4.4 Battalion Error] ${battalionId} - Invalid path: ${validation.networkViolations.join(', ')}`);
-    return;
-  }
+
   
   // Check for potential oscillation in the path
   const hasOscillation = battalionPath.length > 2 && battalionPath.some((node, index) => {
@@ -174,7 +157,6 @@ export const setupBattalionPathFollowing = (
   });
   
   if (hasOscillation) {
-    debugLog(`[Step 4.4 Battalion Warning] ${battalionId} - Path contains oscillation, using direct movement instead`);
     battalion.remainingPath = [];
     battalion.finalTarget = targetNodeIndex;
     return;
@@ -189,15 +171,13 @@ export const setupBattalionPathFollowing = (
       battalion.remainingPath = battalionPath.slice(1);
       battalion.finalTarget = targetNodeIndex;
       
-      debugLog(`[Step 4.4 Battalion Path Set] ${battalionId} - Set remainingPath=[${battalion.remainingPath.join(' -> ')}], finalTarget=${battalion.finalTarget}, reason=${pathResult.selectedReason}`);
+
     }
   } else if (battalionPath.length === 1) {
     // Direct path to target node
     battalion.remainingPath = [];
     battalion.finalTarget = targetNodeIndex;
-    debugLog(`[Step 4.4 Battalion Direct] ${battalionId} - Direct path to target node ${targetNodeIndex}`);
   } else {
-    debugLog(`[Step 4.4 Battalion Error] ${battalionId} - No valid path found to target node ${targetNodeIndex}`);
   }
 };
 
