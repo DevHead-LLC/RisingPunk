@@ -417,35 +417,3 @@ const handleMovementExecution = (
 };
 
 export { handleMovementExecution }; 
-
-const validateNetworkLineMovement = (
-  battalionPos: { x: number; y: number },
-  targetPos: { x: number; y: number },
-  nodes: { x: number; y: number }[],
-  path: number[]
-): { isValid: boolean; nearestLine: [number, number] | null; distance: number; debugInfo: any } => {
-  const pathValidation = validateNetworkLinePath(path);
-  
-  const nearestLineInfo = findNearestNetworkLine(battalionPos, nodes);
-  
-  const tolerance = 5;
-  const isOnNetworkLine = nearestLineInfo.distance <= tolerance;
-  
-  const debugInfo = {
-    pathValidation,
-    nearestLineInfo,
-    isOnNetworkLine,
-    tolerance,
-    battalionPos,
-    targetPos
-  };
-
-  return {
-    isValid: pathValidation.isValid && isOnNetworkLine,
-    nearestLine: nearestLineInfo.nearestLine,
-    distance: nearestLineInfo.distance,
-    debugInfo
-  };
-};
-
-export { validateNetworkLineMovement };
