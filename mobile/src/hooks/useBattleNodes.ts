@@ -1,6 +1,6 @@
 /**
  * @file useBattleNodes.ts
- * @description Single source of truth for battle node state and positions
+ * @description Single source of truth for battle node state, positions, and rendering
  */
 
 import { useMemo } from 'react';
@@ -48,4 +48,27 @@ export function useInitialBattleNodes({ width, height }: GetInitialNodesParams) 
     ];
     return initialNodes;
   }, [width, height]);
+}
+
+// Node rendering utilities
+export function getNodeColor(owner: NodeOwner): string {
+  switch (owner) {
+    case 'user':
+      return '#4717F6'; // User blue
+    case 'enemy':
+      return '#FF4141'; // Enemy red
+    default:
+      return '#666666'; // Neutral gray
+  }
+}
+
+export function getNodeBorderColor(owner: NodeOwner): string {
+  switch (owner) {
+    case 'user':
+      return '#7C3AED'; // Lighter blue border
+    case 'enemy':
+      return '#EF4444'; // Lighter red border
+    default:
+      return '#9CA3AF'; // Light gray border
+  }
 } 

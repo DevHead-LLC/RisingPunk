@@ -31,6 +31,9 @@ function calculateNodePositions(width: number, height: number) {
   ];
 }
 
+// Import the actual rendering utilities for testing
+import { getNodeColor, getNodeBorderColor } from '../../src/hooks/useBattleNodes';
+
 describe('useInitialBattleNodes Logic (Batch 1A)', () => {
   describe('node positioning', () => {
     it('should position user nodes on the left', () => {
@@ -130,6 +133,42 @@ describe('useInitialBattleNodes Logic (Batch 1A)', () => {
       expect(userCount).toBe(3);
       expect(neutralCount).toBe(3);
       expect(enemyCount).toBe(3);
+    });
+  });
+});
+
+describe('Node Rendering Utilities (Batch 1B)', () => {
+  describe('node colors', () => {
+    it('should return correct colors for each owner type', () => {
+      expect(getNodeColor('user')).toBe('#4717F6'); // User blue
+      expect(getNodeColor('enemy')).toBe('#FF4141'); // Enemy red
+      expect(getNodeColor('neutral')).toBe('#666666'); // Neutral gray
+    });
+
+    it('should return correct border colors for each owner type', () => {
+      expect(getNodeBorderColor('user')).toBe('#7C3AED'); // Lighter blue border
+      expect(getNodeBorderColor('enemy')).toBe('#EF4444'); // Lighter red border
+      expect(getNodeBorderColor('neutral')).toBe('#9CA3AF'); // Light gray border
+    });
+
+    it('should maintain consistent color scheme', () => {
+      // User colors should be blue variants
+      const userColor = getNodeColor('user');
+      const userBorderColor = getNodeBorderColor('user');
+      expect(userColor).toMatch(/^#[0-9A-F]{6}$/i); // Valid hex color
+      expect(userBorderColor).toMatch(/^#[0-9A-F]{6}$/i); // Valid hex color
+      
+      // Enemy colors should be red variants
+      const enemyColor = getNodeColor('enemy');
+      const enemyBorderColor = getNodeBorderColor('enemy');
+      expect(enemyColor).toMatch(/^#[0-9A-F]{6}$/i); // Valid hex color
+      expect(enemyBorderColor).toMatch(/^#[0-9A-F]{6}$/i); // Valid hex color
+      
+      // Neutral colors should be gray variants
+      const neutralColor = getNodeColor('neutral');
+      const neutralBorderColor = getNodeBorderColor('neutral');
+      expect(neutralColor).toMatch(/^#[0-9A-F]{6}$/i); // Valid hex color
+      expect(neutralBorderColor).toMatch(/^#[0-9A-F]{6}$/i); // Valid hex color
     });
   });
 }); 

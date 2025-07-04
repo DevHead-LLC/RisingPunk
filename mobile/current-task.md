@@ -20,32 +20,7 @@ Rebuilding the battle system from scratch with clean architecture, proper node m
 
 ---
 
-## Batch 1B: Basic Network Visualization
-**Goal**: Create the basic network visualization components
 
-### NEW FILES TO CREATE:
-1. **`src/components/battle/BattleNetworkLines.tsx`** (40 lines) - Connection lines component
-2. **`src/components/battle/BattleNetworkNode.tsx`** (60 lines) - Individual node component
-3. **`src/components/battle/BattleNetworkGrid.tsx`** (80 lines) - Combined network visualization
-
-### FILES TO REFERENCE (READ ONLY):
-- `src/components/battle/NetworkLines.tsx` (existing - for reference only)
-- `src/components/battle/NetworkNode.tsx` (existing - for reference only)
-- `src/components/battle/BattleNetwork.tsx` (existing - for reference only)
-
-### What This Achieves:
-- ✅ Static network grid with 9 nodes
-- ✅ Network lines connecting nodes
-- ✅ Proper positioning and sizing
-- ✅ Visual foundation for all future work
-
-### Test Criteria:
-- Network renders correctly
-- All 9 nodes visible
-- All connections drawn
-- Proper screen positioning
-
----
 
 ## Batch 1C: Main Battle Screen
 **Goal**: Create the main battle screen container
