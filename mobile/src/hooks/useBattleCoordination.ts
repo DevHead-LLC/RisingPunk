@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect } from 'react';
 import { BattleNode, BattalionPosition, BattleTarget } from '../types/battle';
-import { getBotStats } from '../screens/DigitalBarracksScreen';
+import { getBotStats } from '../utils/battleConstants';
 import { RANGE_MULTIPLIER } from '../utils/battleConstants';
 import { findShortestPaths, reconstructPath } from '../utils/pathfinding';
 import { useBattalionRefsAndState, findBattalionIndexAndId } from './useBattalionRefsAndState';
@@ -161,14 +161,7 @@ export const useBattleCoordination = (
           userBattalions,
           enemyBattalions,
           onPathAdjustment: (newIntersection: { x: number, y: number }) => {
-            console.log('[Step 4.3 Moving Target] Executing path adjustment:', {
-              battalionId,
-              oldTargetPos: target.position,
-              newIntersection
-            });
-            
-            // Recalculate movement with new intersection point
-            const newMovementResult = handleMovementExecution(
+            handleMovementExecution(
               battalion,
               { ...target, position: newIntersection },
               currentPos,
@@ -186,7 +179,10 @@ export const useBattleCoordination = (
               enemyBattalions,
               setUserBattalions,
               setEnemyBattalions,
-              () => {}
+              () => {
+                // Stop moving target tracking when movement completes
+                stopMovingTargetTracking();
+              }
             );
           }
         },

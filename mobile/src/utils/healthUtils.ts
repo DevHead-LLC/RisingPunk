@@ -3,14 +3,14 @@
  * @description Centralized health management and calculation utilities for the battle system
  */
 
-import { BOT_CATEGORIES } from '../screens/DigitalBarracksScreen';
+import { BOT_CATEGORIES } from './battleConstants';
 import { BattalionPosition } from '../types/battle';
 
 /**
  * Calculates the max health for a battalion based on type and quantity
  */
 export function calculateBattalionHealth(type: string, quantity: number): number {
-  return BOT_CATEGORIES[type].stats.health * quantity;
+  return BOT_CATEGORIES?.[type]?.stats?.health * quantity || 0;
 }
 
 /**
@@ -18,7 +18,7 @@ export function calculateBattalionHealth(type: string, quantity: number): number
  * Returns true if the battalion is destroyed (health <= 0)
  */
 export function updateBattalionHealth(battalion: BattalionPosition, newHealth: number): boolean {
-  const healthPerUnit = BOT_CATEGORIES[battalion.type].stats.health;
+  const healthPerUnit = BOT_CATEGORIES?.[battalion.type]?.stats?.health || 0;
   battalion.currentHealth = Math.max(0, newHealth);
   battalion.quantity = Math.ceil(battalion.currentHealth / healthPerUnit);
   return battalion.currentHealth <= 0;

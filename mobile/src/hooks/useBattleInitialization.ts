@@ -9,7 +9,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Animated, Dimensions } from 'react-native';
 import { BattleNode, BattalionPosition } from '../types/battle';
-import { BOT_CATEGORIES } from '../screens/DigitalBarracksScreen';
+import { BOT_CATEGORIES } from '../utils/battleConstants';
 import { calculateBattalionHealth, calculateInitialNodeHealth } from '../utils/healthUtils';
 import { BattalionType } from '../types/battle';
 
@@ -48,7 +48,7 @@ export const useBattleInitialization = () => {
       quantity: 5, 
       nodeIndex: 0, 
       position: new Animated.ValueXY({ x: nodes[0].x - 10, y: nodes[0].y - 10 }),
-      currentHealth: BOT_CATEGORIES['breacher'].stats.health * 5,
+              currentHealth: BOT_CATEGORIES?.['breacher']?.stats?.health * 5 || 0,
       mark: 0
     },
     { 
@@ -56,7 +56,7 @@ export const useBattleInitialization = () => {
       quantity: 3, 
       nodeIndex: 1, 
       position: new Animated.ValueXY({ x: nodes[1].x - 10, y: nodes[1].y - 10 }),
-      currentHealth: BOT_CATEGORIES['guardian'].stats.health * 3,
+              currentHealth: BOT_CATEGORIES?.['guardian']?.stats?.health * 3 || 0,
       mark: 0
     },
     { 
@@ -64,7 +64,7 @@ export const useBattleInitialization = () => {
       quantity: 4, 
       nodeIndex: 2, 
       position: new Animated.ValueXY({ x: nodes[2].x - 10, y: nodes[2].y - 10 }),
-      currentHealth: BOT_CATEGORIES['phreak'].stats.health * 4,
+              currentHealth: BOT_CATEGORIES?.['phreak']?.stats?.health * 4 || 0,
       mark: 0
     }
   ], [nodes]);
@@ -75,7 +75,7 @@ export const useBattleInitialization = () => {
       quantity: 24,
       nodeIndex: 6, 
       position: new Animated.ValueXY({ x: nodes[6].x - 10, y: nodes[6].y - 10 }),
-      currentHealth: BOT_CATEGORIES['breacher'].stats.health * 24,
+              currentHealth: BOT_CATEGORIES?.['breacher']?.stats?.health * 24 || 0,
       mark: 0
     },
     { 
@@ -83,7 +83,7 @@ export const useBattleInitialization = () => {
       quantity: 21,
       nodeIndex: 7, 
       position: new Animated.ValueXY({ x: nodes[7].x - 10, y: nodes[7].y - 10 }),
-      currentHealth: BOT_CATEGORIES['guardian'].stats.health * 21,
+              currentHealth: BOT_CATEGORIES?.['guardian']?.stats?.health * 21 || 0,
       mark: 0
     },
     { 
@@ -91,7 +91,7 @@ export const useBattleInitialization = () => {
       quantity: 18,
       nodeIndex: 8, 
       position: new Animated.ValueXY({ x: nodes[8].x - 10, y: nodes[8].y - 10 }),
-      currentHealth: BOT_CATEGORIES['phreak'].stats.health * 18,
+              currentHealth: BOT_CATEGORIES?.['phreak']?.stats?.health * 18 || 0,
       mark: 0
     }
   ], [nodes]);
@@ -108,10 +108,10 @@ export const useBattleInitialization = () => {
   const calculateInitialHealth = useCallback(() => {
     let total = 0;
     userBattalions.forEach(battalion => {
-      total += BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity;
+      total += BOT_CATEGORIES?.[battalion.type]?.stats?.health * battalion.quantity || 0;
     });
     enemyBattalions.forEach(battalion => {
-      total += BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity;
+      total += BOT_CATEGORIES?.[battalion.type]?.stats?.health * battalion.quantity || 0;
     });
     return Math.floor(total * 0.75); // 75% of total army health
   }, [userBattalions, enemyBattalions]);

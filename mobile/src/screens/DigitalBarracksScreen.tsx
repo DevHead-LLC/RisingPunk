@@ -12,96 +12,10 @@ import { CloseButton } from '../components/common/CloseButton';
 import { useAppSelector } from '../store/hooks';
 import { SIZING } from '../styles/theme';
 import { COLORS } from '../styles/theme';
+import { BOT_CATEGORIES } from '../utils/battleConstants';
 
 type MarkLevel = 1 | 2 | 3 | 4;
 type BotType = 'breacher' | 'guardian' | 'phreak';
-
-export const BOT_CATEGORIES = {
-  guardian: { // Cavalry
-    role: 'Cavalry',
-    stats: {
-      health: 14,
-      speed: 9,
-      range: 4,
-      offense: 8,
-      defense: 6
-    },
-    advantage: 'Strong vs. Infantry, Weak vs. Ranged'
-  },
-  breacher: { // Infantry
-    role: 'Infantry',
-    stats: {
-      health: 18,
-      speed: 5,
-      range: 5,
-      offense: 7,
-      defense: 8
-    },
-    advantage: 'Strong vs. Ranged, Weak vs. Cavalry'
-  },
-  phreak: { // Ranged
-    role: 'Ranged',
-    stats: {
-      health: 12,
-      speed: 7,
-      range: 9,
-      offense: 6,
-      defense: 5
-    },
-    advantage: 'Strong vs. Cavalry, Weak vs. Infantry'
-  }
-};
-
-// TODO: Enemy bot stats are temporarily increased for quicker battle results during testing. Revisit and clean this up after battle functionality is complete.
-export const ENEMY_BOT_CATEGORIES = {
-  guardian: { // Cavalry
-    role: 'Cavalry',
-    stats: {
-      health: 14,
-      speed: 9,
-      range: 4,
-      offense: 32, // 4x higher attack
-      defense: 6
-    },
-    advantage: 'Strong vs. Infantry, Weak vs. Ranged'
-  },
-  breacher: { // Infantry
-    role: 'Infantry',
-    stats: {
-      health: 18,
-      speed: 5,
-      range: 5,
-      offense: 28, // 4x higher attack
-      defense: 8
-    },
-    advantage: 'Strong vs. Ranged, Weak vs. Cavalry'
-  },
-  phreak: { // Ranged
-    role: 'Ranged',
-    stats: {
-      health: 12,
-      speed: 7,
-      range: 9,
-      offense: 24, // 4x higher attack
-      defense: 5
-    },
-    advantage: 'Strong vs. Cavalry, Weak vs. Infantry'
-  }
-};
-
-/**
- * Get bot stats based on whether it's a user or enemy battalion
- * @param botType - The type of bot (guardian, breacher, phreak)
- * @param isUser - Whether this is a user battalion (true) or enemy battalion (false)
- * @returns The bot stats for the specified type and side
- */
-export const getBotStats = (botType: string, isUser: boolean) => {
-  if (isUser) {
-    return BOT_CATEGORIES[botType as keyof typeof BOT_CATEGORIES];
-  } else {
-    return ENEMY_BOT_CATEGORIES[botType as keyof typeof ENEMY_BOT_CATEGORIES];
-  }
-};
 
 export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
   const botCounts = useAppSelector((state) => state.bots.botCounts);
@@ -118,13 +32,13 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
       <View style={styles.botCard}>
         <View style={styles.botHeader}>
           <Text style={styles.botName}>{type.toUpperCase()}</Text>
-          <Text style={styles.botRole}>{BOT_CATEGORIES[type].role}</Text>
+          <Text style={styles.botRole}>{BOT_CATEGORIES?.[type]?.role || 'Unknown'}</Text>
         </View>
         
         <View style={styles.botContent}>
           <View style={styles.countRow}>
             <Text style={styles.countLabel}>Available:</Text>
-            <Text style={styles.countValue}>{botCounts[type]}</Text>
+            <Text style={styles.countValue}>{botCounts?.[type] || 0}</Text>
             <View style={styles.deployedContainer}>
               <Text style={styles.countLabel}>Deployed: 0</Text>
             </View>
@@ -133,11 +47,11 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
           <View style={styles.infoContainer}>
             <View style={styles.loreContainer}>
               <Text style={styles.hackerLore}>{hackerLore[type]}</Text>
-              <Text style={styles.advantageText}>{BOT_CATEGORIES[type].advantage}</Text>
+              <Text style={styles.advantageText}>{BOT_CATEGORIES?.[type]?.advantage || 'No advantage data'}</Text>
             </View>
 
             <View style={styles.statsContainer}>
-              {Object.entries(BOT_CATEGORIES[type].stats).map(([stat, value]) => (
+              {BOT_CATEGORIES?.[type]?.stats ? Object.entries(BOT_CATEGORIES[type].stats).map(([stat, value]) => (
                 <View key={stat} style={styles.statRow}>
                   <Text style={styles.statLabel}>
                     {stat === 'range' ? 'ATTACK DISTANCE' :
@@ -147,7 +61,9 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
                   </Text>
                   <Text style={styles.statValue}>{value}</Text>
                 </View>
-              ))}
+              )) : (
+                <Text style={styles.lockedText}>No stats available</Text>
+              )}
             </View>
           </View>
         </View>
@@ -156,6 +72,8 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
   };
 
   const ArmyComposition = () => {
+    if (!botCounts) return null;
+    
     const total = Object.values(botCounts).reduce((a, b) => a + b, 0);
     if (total === 0) return null;
 
@@ -232,7 +150,7 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total Army Size:</Text>
             <Text style={styles.totalCount}>
-              {Object.values(botCounts).reduce((a, b) => a + b, 0)}
+              {botCounts ? Object.values(botCounts).reduce((a, b) => a + b, 0) : 0}
             </Text>
           </View>
           <ArmyComposition />
@@ -240,9 +158,11 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
 
         <View style={styles.botsContainer}>
           {selectedMark === 1 ? (
-            Object.keys(BOT_CATEGORIES).map((type) => (
+            BOT_CATEGORIES ? Object.keys(BOT_CATEGORIES).map((type) => (
               <BotCard key={type} type={type as BotType} />
-            ))
+            )) : (
+              <Text style={styles.lockedText}>Loading...</Text>
+            )
           ) : (
             <Text style={styles.lockedText}>🔒 MARK {selectedMark} UNITS LOCKED</Text>
           )}
@@ -383,7 +303,12 @@ const styles = StyleSheet.create({
   },
   loreContainer: {
     flex: 3,
-    justifyContent: 'center',
+  },
+  lockedText: {
+    color: COLORS.text.secondary,
+    fontSize: SIZING.font.body,
+    textAlign: 'center',
+    marginVertical: SIZING.spacing.lg,
   },
   hackerLore: {
     color: 'rgba(255, 255, 255, 0.8)',
@@ -393,6 +318,12 @@ const styles = StyleSheet.create({
     borderLeftColor: '#4717F6',
     paddingLeft: SIZING.spacing.xs,
     marginBottom: SIZING.spacing.lg,
+  },
+  advantageText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: SIZING.font.small,
+    fontStyle: 'italic',
+    paddingLeft: SIZING.spacing.xs,
   },
   statsContainer: {
     flex: 2,
@@ -413,12 +344,6 @@ const styles = StyleSheet.create({
     fontSize: SIZING.font.body,
     fontWeight: 'bold',
     marginLeft: SIZING.spacing.sm,
-  },
-  lockedText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
   },
   compositionContainer: {
     marginTop: SIZING.spacing.sm,
@@ -452,11 +377,5 @@ const styles = StyleSheet.create({
   legendText: {
     color: 'rgba(255, 255, 255, 0.6)',
     fontSize: SIZING.font.small,
-  },
-  advantageText: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: SIZING.font.small,
-    fontStyle: 'italic',
-    paddingLeft: SIZING.spacing.xs,
   },
 }); 

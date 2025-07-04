@@ -1,4 +1,4 @@
-import { BOT_CATEGORIES } from '../screens/DigitalBarracksScreen';
+import { BOT_CATEGORIES } from './battleConstants';
 import { RANGE_MULTIPLIER } from './battleConstants';
 import { getAttackRangeIntersectionPoint } from '../hooks/useBattleEngine';
 
@@ -79,7 +79,7 @@ export function handleMovingTargetUpdates(
   const positionUpdate = movingTargetTracker.updateTargetPosition();
   
   if (positionUpdate.hasChanged) {
-    const attackRange = BOT_CATEGORIES[attackerBattalion.type].stats.range * RANGE_MULTIPLIER;
+    const attackRange = BOT_CATEGORIES?.[attackerBattalion.type]?.stats?.range * RANGE_MULTIPLIER || 0;
     
     // Recalculate intersection point with new target position
     const newIntersection = movingTargetTracker.recalculateIntersection(currentAttackerPos, attackRange);
@@ -92,26 +92,6 @@ export function handleMovingTargetUpdates(
     );
     
     if (!positionValidation.isValid) {
-      console.log('[Step 4.3 Moving Target] Target moved:', { 
-        targetId: movingTargetTracker.targetBattalion.id || 'unknown',
-        oldPos: movingTargetTracker.lastPosition, 
-        newPos: positionUpdate.newPos, 
-        intersectionPoint: newIntersection 
-      });
-      
-      console.log('[Step 4.3 Moving Target] Path adjustment:', { 
-        oldPath: currentAttackerPos, 
-        newPath: newIntersection, 
-        reason: 'Target moved, recalculating intersection' 
-      });
-      
-      console.log('[Step 4.3 Moving Target] Position validation:', { 
-        attackerPos: currentAttackerPos, 
-        targetPos: positionUpdate.newPos, 
-        isValid: positionValidation.isValid,
-        reason: positionValidation.reason 
-      });
-      
       // Adjust movement path to new intersection point
       onPathAdjustment(newIntersection);
       return true; // Path was adjusted

@@ -1,7 +1,7 @@
 import { useRef, useCallback } from 'react';
 import { Animated } from 'react-native';
 import { createMovingTargetTracker, handleMovingTargetUpdates, MovingTargetTracker } from '../utils/movingTargetHandler';
-import { BOT_CATEGORIES } from '../screens/DigitalBarracksScreen';
+import { BOT_CATEGORIES } from '../utils/battleConstants';
 import { RANGE_MULTIPLIER } from '../utils/battleConstants';
 
 export interface MovingTargetHandlingConfig {
@@ -48,12 +48,6 @@ export function useMovingTargetHandling() {
       config.enemyBattalions || []
     );
 
-    console.log('[Step 4.3 Moving Target] Starting tracking for battalion:', {
-      battalionId: attackerBattalion.id || 'unknown',
-      targetType: config.target.type,
-      targetId: config.target.index
-    });
-
     // Start monitoring target position changes
     movingTargetIntervalRef.current = setInterval(() => {
       if (!movingTargetTrackerRef.current) return;
@@ -68,7 +62,6 @@ export function useMovingTargetHandling() {
       );
 
       if (pathAdjusted) {
-        console.log('[Step 4.3 Moving Target] Path adjusted, stopping current animation');
         // Stop current animation if path was adjusted
         if (currentAnimationRef.current) {
           currentAnimationRef.current.stop();
@@ -79,7 +72,6 @@ export function useMovingTargetHandling() {
 
   const stopMovingTargetTracking = useCallback(() => {
     if (movingTargetIntervalRef.current) {
-      console.log('[Step 4.3 Moving Target] Stopping tracking');
       clearInterval(movingTargetIntervalRef.current);
       movingTargetIntervalRef.current = null;
     }

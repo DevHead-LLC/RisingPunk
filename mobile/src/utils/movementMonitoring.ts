@@ -53,10 +53,13 @@ export const createMovementMonitoring = (config: MovementMonitoringConfig): Node
       // Clear monitoring interval
       clearInterval(monitoringInterval);
       
-      // Find new target and retarget immediately
-      const newTargets = findAvailableTargets(battalion, isUser, userBattalions || [], enemyBattalions || []);
-      if (newTargets.length > 0) {
-        moveBattalionAlongPath(battalion, newTargets[0], isUser, userBattalions, enemyBattalions);
+      // Only retarget if battalion is still alive and not already moving to a new target
+      if (battalion.quantity > 0 && (battalion.currentHealth ?? 0) > 0) {
+        const newTargets = findAvailableTargets(battalion, isUser, userBattalions || [], enemyBattalions || []);
+        if (newTargets.length > 0) {
+          // Call immediately for tests, but in production this might need a small delay
+          moveBattalionAlongPath(battalion, newTargets[0], isUser, userBattalions, enemyBattalions);
+        }
       }
     }
   }, 2000); // Check every 2 seconds during movement

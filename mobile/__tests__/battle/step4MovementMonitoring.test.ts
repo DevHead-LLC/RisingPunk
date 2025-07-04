@@ -29,7 +29,7 @@ describe('Step 4.2: Movement Monitoring', () => {
       enemyBattalions: [],
       findAvailableTargets: mockFindAvailableTargets,
       moveBattalionAlongPath: mockMoveBattalionAlongPath,
-      battalion: { id: '1', position: { x: 0, y: 0 } }
+      battalion: { id: '1', position: { x: 0, y: 0 }, quantity: 10, currentHealth: 100 }
     };
 
     const interval = createMovementMonitoring(config);
@@ -56,7 +56,7 @@ describe('Step 4.2: Movement Monitoring', () => {
       enemyBattalions: [],
       findAvailableTargets: mockFindAvailableTargets,
       moveBattalionAlongPath: mockMoveBattalionAlongPath,
-      battalion: { id: '1', position: { x: 0, y: 0 } }
+      battalion: { id: '1', position: { x: 0, y: 0 }, quantity: 10, currentHealth: 100 }
     };
 
     const interval = createMovementMonitoring(config);
@@ -86,7 +86,7 @@ describe('Step 4.2: Movement Monitoring', () => {
       enemyBattalions: [],
       findAvailableTargets: mockFindAvailableTargets,
       moveBattalionAlongPath: mockMoveBattalionAlongPath,
-      battalion: { id: '1', position: { x: 0, y: 0 } }
+      battalion: { id: '1', position: { x: 0, y: 0 }, quantity: 10, currentHealth: 100 }
     };
 
     createMovementMonitoring(config);

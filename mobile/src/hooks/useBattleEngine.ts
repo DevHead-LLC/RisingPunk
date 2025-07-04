@@ -1,6 +1,6 @@
 import { useMemo, useEffect } from 'react';
 import { Animated } from 'react-native';
-import { BOT_CATEGORIES } from '../screens/DigitalBarracksScreen';
+import { BOT_CATEGORIES } from '../utils/battleConstants';
 import { BattleNode, BattalionPosition } from '../types/battle';
 import { getConnectedNodes } from '../utils/networkConstants';
 import { checkRangeIntersection } from '../utils/battleCalculator';
@@ -62,7 +62,7 @@ export const useBattleEngine = (
     const getBotStats = (type: string, isUser: boolean = true) => {
       const key = `${type}-${isUser ? 'user' : 'enemy'}`;
       if (!botStats.has(key)) {
-        const baseStats = BOT_CATEGORIES[type].stats;
+        const baseStats = BOT_CATEGORIES?.[type]?.stats;
         if (isUser) {
           botStats.set(key, baseStats);
         } else {
@@ -274,10 +274,16 @@ export const useBattleEngine = (
         handleBattalionActions(battalionsRef.current.enemy, false);
 
         return () => {
-          Object.values(attackIntervals.current).forEach(interval => clearInterval(interval));
-          attackIntervals.current = {};
-          battalionsRef.current.user.forEach(battalion => battalion.position.removeAllListeners());
-          battalionsRef.current.enemy.forEach(battalion => battalion.position.removeAllListeners());
+          if (attackIntervals.current) {
+            Object.values(attackIntervals.current).forEach(interval => clearInterval(interval));
+            attackIntervals.current = {};
+          }
+          if (battalionsRef.current?.user) {
+            battalionsRef.current.user.forEach(battalion => battalion.position.removeAllListeners());
+          }
+          if (battalionsRef.current?.enemy) {
+            battalionsRef.current.enemy.forEach(battalion => battalion.position.removeAllListeners());
+          }
           battleInitializedRef.current = false;
         };
       };

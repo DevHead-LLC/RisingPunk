@@ -1,4 +1,4 @@
-import { BOT_CATEGORIES, getBotStats } from '../screens/DigitalBarracksScreen';
+import { BOT_CATEGORIES, getBotStats } from './battleConstants';
 import { BattalionPosition } from '../types/battle';
 import {
   BASE_DURATION,
@@ -26,7 +26,7 @@ export const calculateAttackInterval = (speedStat: number): number => {
  * @returns Range in pixels
  */
 export const calculateAttackRange = (battalionType: string): number => {
-  return BOT_CATEGORIES[battalionType].stats.range * RANGE_MULTIPLIER;
+  return BOT_CATEGORIES?.[battalionType]?.stats?.range * RANGE_MULTIPLIER || 0;
 };
 
 /**
