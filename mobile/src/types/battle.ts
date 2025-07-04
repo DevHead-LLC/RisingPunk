@@ -31,6 +31,11 @@ export type BattleTarget = {
   distance: number;
   position: { x: number; y: number };
   path?: Path;
+  pathInfo?: {
+    path: number[];
+    nodeTransitions: number;
+    pathOptions: number;
+  };
 };
 
 export type BattleNode = {

@@ -3,6 +3,7 @@ import { BattleNode, BattalionPosition, BattleTarget } from '../types/battle';
 import { getConnectedNodes } from '../utils/networkConstants';
 import { getAnimatedPosition } from './useMovement';
 import { isNeutral, captureNode } from '../utils/nodeOwnership';
+import { findOptimalBattalionPath } from '../utils/pathfinding';
 
 // Constants for targeting
 const RETARGET_COOLDOWN = 2000; // 2 seconds
@@ -50,35 +51,86 @@ export const useTargeting = (
       }
     });
 
-    // Collect all valid enemy battalions as possible targets
+    // Collect all valid enemy battalions as possible targets with complex pathfinding
     const enemyBatts = isUser ? enemyBattalions : userBattalions;
     if (enemyBatts && Array.isArray(enemyBatts)) {
       enemyBatts.forEach((enemyBattalion, index) => {
         if (!enemyBattalion || enemyBattalion.quantity <= 0 || enemyBattalion.currentHealth <= 0) {
           return;
         }
-        const enemyPos = getAnimatedPosition(enemyBattalion.position);
-        const distance = Math.sqrt(
-          Math.pow(enemyPos.x - currentPos.x, 2) + 
-          Math.pow(enemyPos.y - currentPos.y, 2)
+        
+        // Use complex pathfinding for battalion-to-battalion targeting
+        const pathResult = findOptimalBattalionPath(
+          battalion.nodeIndex,
+          enemyBattalion.nodeIndex,
+          nodes
         );
-        if (!isNaN(distance)) {
-          allTargets.push({
-            type: 'battalion',
-            index,
-            distance,
-            position: enemyPos
-          });
+        
+        if (pathResult.path.length > 0) {
+          // Use pathfinding distance instead of direct distance
+          const pathDistance = pathResult.distance;
+          const enemyPos = getAnimatedPosition(enemyBattalion.position);
+          
+          if (!isNaN(pathDistance)) {
+            console.log('Complex pathfinding targeting:', {
+              battalionId: `${isUser ? 'user' : 'enemy'}-${battalion.nodeIndex}`,
+              targetId: `${isUser ? 'enemy' : 'user'}-${index}`,
+              startNode: battalion.nodeIndex,
+              targetNode: enemyBattalion.nodeIndex,
+              path: pathResult.path,
+              pathDistance: pathDistance.toFixed(1),
+              transitions: pathResult.nodeTransitions,
+              pathOptions: pathResult.pathOptions.length
+            });
+            
+            allTargets.push({
+              type: 'battalion',
+              index,
+              distance: pathDistance, // Use pathfinding distance
+              position: enemyPos,
+              pathInfo: {
+                path: pathResult.path,
+                nodeTransitions: pathResult.nodeTransitions,
+                pathOptions: pathResult.pathOptions.length
+              }
+            });
+          }
+        } else {
+          // Fallback to direct distance if no path found
+          const enemyPos = getAnimatedPosition(enemyBattalion.position);
+          const directDistance = Math.sqrt(
+            Math.pow(enemyPos.x - currentPos.x, 2) + 
+            Math.pow(enemyPos.y - currentPos.y, 2)
+          );
+          if (!isNaN(directDistance)) {
+            console.log('Direct targeting (no path found):', {
+              battalionId: `${isUser ? 'user' : 'enemy'}-${battalion.nodeIndex}`,
+              targetId: `${isUser ? 'enemy' : 'user'}-${index}`,
+              startNode: battalion.nodeIndex,
+              targetNode: enemyBattalion.nodeIndex,
+              directDistance: directDistance.toFixed(1)
+            });
+            
+            allTargets.push({
+              type: 'battalion',
+              index,
+              distance: directDistance,
+              position: enemyPos,
+              pathInfo: {
+                path: [],
+                nodeTransitions: 0,
+                pathOptions: 0
+              }
+            });
+          }
         }
       });
     }
     
-    // Sort all targets by distance
+    // Sort all targets by distance (now using pathfinding distance for battalions)
     const validTargets = allTargets
       .filter(target => !isNaN(target.distance))
       .sort((a, b) => a.distance - b.distance);
-    
-
     
     return validTargets;
   }, [nodes]);

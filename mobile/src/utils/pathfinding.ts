@@ -239,4 +239,166 @@ const nearestPointOnLineSegment = (
       y: lineStart.y + param * D
     };
   }
+};
+
+/**
+ * Finds the optimal path for battalion-to-battalion targeting through network nodes
+ * This function handles complex scenarios where battalions are on different network lines
+ * and need to traverse through intermediate nodes to reach their target
+ * 
+ * @param startNodeIndex The starting node index
+ * @param targetNodeIndex The target node index  
+ * @param nodes Array of all nodes in the battle network
+ * @returns Object containing optimal path and debug information
+ */
+export const findOptimalBattalionPath = (
+  startNodeIndex: number,
+  targetNodeIndex: number,
+  nodes: BattleNode[]
+): { 
+  path: number[]; 
+  distance: number; 
+  nodeTransitions: number;
+  pathOptions: { path: number[]; distance: number; transitions: number }[];
+  selectedReason: string;
+} => {
+  console.log('Complex pathfinding:', { startNode: startNodeIndex, targetNode: targetNodeIndex });
+  
+  // Get all possible paths using Dijkstra's algorithm
+  const { distances, previousNodes } = findShortestPaths(startNodeIndex, nodes);
+  const primaryPath = reconstructPath(startNodeIndex, targetNodeIndex, previousNodes);
+  
+  // Calculate alternative paths by considering different network line approaches
+  const pathOptions: { path: number[]; distance: number; transitions: number }[] = [];
+  
+  // Primary path (direct shortest path)
+  if (primaryPath.length > 0) {
+    const primaryDistance = distances[targetNodeIndex];
+    const primaryTransitions = primaryPath.length - 1;
+    pathOptions.push({
+      path: primaryPath,
+      distance: primaryDistance,
+      transitions: primaryTransitions
+    });
+  }
+  
+  // Find alternative paths through different network lines
+  const alternativePaths = findAlternativePaths(startNodeIndex, targetNodeIndex, nodes);
+  pathOptions.push(...alternativePaths);
+  
+  // Sort by distance first, then by number of transitions
+  pathOptions.sort((a, b) => {
+    if (Math.abs(a.distance - b.distance) < 0.1) {
+      // If distances are very close, prefer fewer transitions
+      return a.transitions - b.transitions;
+    }
+    return a.distance - b.distance;
+  });
+  
+  const selectedPath = pathOptions[0];
+  const selectedReason = pathOptions.length > 1 
+    ? `Selected path with ${selectedPath.transitions} transitions over ${pathOptions.length} options`
+    : 'Single path available';
+  
+  console.log('Path options:', { 
+    path1: pathOptions[0]?.path, 
+    path2: pathOptions[1]?.path, 
+    selectedPath: selectedPath?.path, 
+    reason: selectedReason 
+  });
+  
+  return {
+    path: selectedPath?.path || [],
+    distance: selectedPath?.distance || 0,
+    nodeTransitions: selectedPath?.transitions || 0,
+    pathOptions,
+    selectedReason
+  };
+};
+
+/**
+ * Finds alternative paths through different network lines
+ * This helps when the direct path might not be optimal due to network topology
+ */
+const findAlternativePaths = (
+  startNodeIndex: number,
+  targetNodeIndex: number,
+  nodes: BattleNode[]
+): { path: number[]; distance: number; transitions: number }[] => {
+  const alternatives: { path: number[]; distance: number; transitions: number }[] = [];
+  
+  // Get all nodes that connect to the target node
+  const targetConnections = getConnectedNodes(targetNodeIndex);
+  
+  // For each connection to the target, try finding a path through that connection
+  for (const connectionNode of targetConnections) {
+    if (connectionNode === startNodeIndex) continue; // Skip if it's the start node
+    
+    const { distances, previousNodes } = findShortestPaths(startNodeIndex, nodes);
+    const pathToConnection = reconstructPath(startNodeIndex, connectionNode, previousNodes);
+    
+    if (pathToConnection.length > 0) {
+      // Add the target node to complete the path
+      const fullPath = [...pathToConnection, targetNodeIndex];
+      const totalDistance = distances[connectionNode] + 
+        Math.sqrt(
+          Math.pow(nodes[connectionNode].x - nodes[targetNodeIndex].x, 2) + 
+          Math.pow(nodes[connectionNode].y - nodes[targetNodeIndex].y, 2)
+        );
+      
+      alternatives.push({
+        path: fullPath,
+        distance: totalDistance,
+        transitions: fullPath.length - 1
+      });
+    }
+  }
+  
+  return alternatives;
+};
+
+/**
+ * Validates that a battalion path follows network topology correctly
+ * Enhanced version that provides detailed validation for complex paths
+ */
+export const validateBattalionPath = (
+  path: number[],
+  startNodeIndex: number,
+  targetNodeIndex: number
+): { 
+  isValid: boolean; 
+  connectionCount: number; 
+  invalidConnections: [number, number][];
+  networkViolations: string[];
+  debugInfo: any;
+} => {
+  const validation = validateNetworkLinePath(path);
+  const networkViolations: string[] = [];
+  
+  // Additional validation for battalion paths
+  if (path.length > 0) {
+    if (path[0] !== startNodeIndex) {
+      networkViolations.push(`Path does not start at start node ${startNodeIndex}`);
+    }
+    if (path[path.length - 1] !== targetNodeIndex) {
+      networkViolations.push(`Path does not end at target node ${targetNodeIndex}`);
+    }
+  }
+  
+  const debugInfo = {
+    path,
+    startNodeIndex,
+    targetNodeIndex,
+    pathLength: path.length,
+    expectedStart: startNodeIndex,
+    expectedEnd: targetNodeIndex
+  };
+  
+  return {
+    isValid: validation.isValid && networkViolations.length === 0,
+    connectionCount: validation.connectionCount,
+    invalidConnections: validation.invalidConnections,
+    networkViolations,
+    debugInfo
+  };
 }; 
