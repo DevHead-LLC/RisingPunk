@@ -5,57 +5,17 @@
 
 import React from 'react';
 import { View, StyleSheet, SafeAreaView, Dimensions, Text } from 'react-native';
-import { NodeIndex } from '../types/battleTypes';
+import { useInitialBattleNodes } from '../hooks/useBattleNodes';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-const H_PADDING = 64; // horizontal padding for safe area
-const V_PADDING = 40; // reduced vertical padding for more height usage
-
-// Dynamically calculate node positions for 3 columns and 3 rows
-function getDynamicNodePositions() {
-  const colWidth = (SCREEN_WIDTH - 2 * H_PADDING) / 2; // 3 columns: left, center, right
-  const rowHeight = (SCREEN_HEIGHT - 2 * V_PADDING) / 2; // 3 rows: top, middle, bottom
-
-  const X_LEFT = H_PADDING;
-  const X_CENTER = H_PADDING + colWidth;
-  const X_RIGHT = H_PADDING + 2 * colWidth;
-  const Y_TOP = V_PADDING;
-  const Y_MIDDLE = V_PADDING + rowHeight;
-  const Y_BOTTOM = V_PADDING + 2 * rowHeight;
-
-  return {
-    0: { x: X_LEFT, y: Y_TOP },
-    1: { x: X_LEFT, y: Y_MIDDLE },
-    2: { x: X_LEFT, y: Y_BOTTOM },
-    3: { x: X_CENTER, y: Y_TOP },
-    4: { x: X_CENTER, y: Y_MIDDLE },
-    5: { x: X_CENTER, y: Y_BOTTOM },
-    6: { x: X_RIGHT, y: Y_TOP },
-    7: { x: X_RIGHT, y: Y_MIDDLE },
-    8: { x: X_RIGHT, y: Y_BOTTOM },
-  } as Record<NodeIndex, { x: number; y: number }>;
-}
 
 type Props = {
   onClose?: () => void;
 };
 
 export const BattleGridScreen = React.memo(({ onClose }: Props) => {
-  // Initial node ownership setup
-  const initialNodeOwners: Record<NodeIndex, 'neutral' | 'user' | 'enemy'> = {
-    0: 'user',    // Top left - user
-    1: 'user',    // Middle left - user
-    2: 'user',    // Bottom left - user
-    3: 'neutral', // Top center - neutral
-    4: 'neutral', // Middle center - neutral
-    5: 'neutral', // Bottom center - neutral
-    6: 'enemy',   // Top right - enemy
-    7: 'enemy',   // Middle right - enemy
-    8: 'enemy',   // Bottom right - enemy
-  };
-
-  const nodePositions = getDynamicNodePositions();
+  // Use the single source of truth for node state/positions
+  const nodes = useInitialBattleNodes({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
 
   return (
     <SafeAreaView style={styles.container}>
@@ -63,12 +23,9 @@ export const BattleGridScreen = React.memo(({ onClose }: Props) => {
         {/* Temporary network visualization */}
         <View style={styles.networkContainer}>
           {/* Draw nodes */}
-          {Object.entries(nodePositions).map(([index, position]) => {
-            const nodeIndex = parseInt(index) as NodeIndex;
-            const owner = initialNodeOwners[nodeIndex];
-            
+          {nodes.map((node) => {
             const getNodeColor = () => {
-              switch (owner) {
+              switch (node.owner) {
                 case 'user':
                   return '#4717F6'; // User blue
                 case 'enemy':
@@ -80,17 +37,17 @@ export const BattleGridScreen = React.memo(({ onClose }: Props) => {
 
             return (
               <View
-                key={nodeIndex}
+                key={node.index}
                 style={[
                   styles.node,
                   {
-                    left: position.x - 10,
-                    top: position.y - 10,
+                    left: node.position.x - 10,
+                    top: node.position.y - 10,
                     backgroundColor: getNodeColor(),
                   }
                 ]}
               >
-                <Text style={styles.nodeLabel}>{nodeIndex}</Text>
+                <Text style={styles.nodeLabel}>{node.index}</Text>
               </View>
             );
           })}
