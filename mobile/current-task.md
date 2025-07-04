@@ -1,154 +1,570 @@
-# Current Task: Network Line Adherence Enforcement
+# Battle System Rebuild - Detailed Implementation Plan
 
-## Problem Statement
-Battalions are moving directly to their targets rather than staying on network lines, especially during retargeting after neutral node capture. The retargeting system should use pathfinding to find a new target while also designing the path that the battalion should move on with the network.
+## Overview
+Rebuilding the battle system from scratch with clean architecture, proper node management, and network-constrained movement. Each batch is small and testable with specific file names and clear references.
 
-## Root Cause Analysis
-- **Initial movement**: Pathfinding is used, battalions move node-to-node ✅
-- **Retargeting**: System calls `moveBattalionAlongPath` with new target but doesn't always reconstruct node-to-node paths ❌
-- **Movement execution**: If `remainingPath` is not set, battalion moves directly to target position (off-network) ❌
+## Core Architecture Principles
+- **Single Source of Truth**: Each concept has one authoritative location
+- **File Size Limit**: No file exceeds 300 lines
+- **Network-Constrained Movement**: Battalions must follow network lines
+- **Clean Separation**: Logic, state, and UI are properly separated
+- **Testable Components**: Each piece can be tested independently
 
-## Design Requirements (from intended-battle-sequence.md)
-- "Battalions must stay on network lines during movement and never leave the network structure"
-- "Node-based pathfinding: When transferring between network lines, battalions move directly to the node position"
-- "All movement must follow `NETWORK_CONNECTIONS` array"
-- "When retargeting, battalions use `moveBattalionAlongPath()` to move toward their new target"
+## Node Management Strategy
+- **Array-Based Ownership**: Use separate arrays for neutral, user, and enemy nodes
+- **Dynamic Transfers**: Nodes move between arrays when captured
+- **Color Coding**: Blue (user), Red (enemy), Secondary (neutral)
+- **Network Topology**: Fixed connections defined in `networkConstants.ts`
 
-## Implementation Plan
+---
 
-### Batch 1: Pathfinding on Retarget ⏳
-**Goal:** Ensure every retarget reconstructs a node-to-node path
+## Batch 1A: Core Types and Constants (Foundation)
+**Goal**: Create the foundational types and network constants
 
-**Files to Modify:**
-- `mobile/src/hooks/useTargeting.ts` - `findNewTarget()` function
-- `mobile/src/utils/targetValidation.ts` - `validateAndRetarget()` function
-- `mobile/src/utils/movementMonitoring.ts` - `createMovementMonitoring()` function
-- `mobile/src/hooks/useBattleCoordination.ts` - `moveBattalionAlongPath()` function
+### NEW FILES TO CREATE:
+1. **`src/types/battleTypes.ts`** (30 lines) - Core type definitions
+2. **`src/utils/battleNetworkConstants.ts`** (20 lines) - Network topology constants
 
-**Functions to Change:**
-- `findNewTarget()` - Always reconstruct path when assigning new target
-- `validateAndRetarget()` - Use pathfinding for retargeting, not direct movement
-- `createMovementMonitoring()` - Ensure retargeting uses pathfinding
-- `moveBattalionAlongPath()` - Always set up `remainingPath` and `finalTarget`
+### FILES TO REFERENCE (READ ONLY):
+- `src/types/battle.ts` (existing - for reference only)
+- `src/utils/networkConstants.ts` (existing - for reference only)
 
-**Specific Changes:**
-1. When a new target is assigned, determine battalion's current node
-2. Reconstruct node-to-node path from current node to target's node using Dijkstra's
-3. Set `remainingPath` and `finalTarget` for node-to-node traversal
-4. Only after reaching final node, move to attack range intersection point
+### What This Achieves:
+- ✅ Core type definitions for nodes, battalions, battle state
+- ✅ Network topology with fixed node connections
+- ✅ Foundation for all future development
 
-**Test Criteria:**
-- **Primary:** Every retarget creates a new node-to-node path
-- **Primary:** Battalions move through intermediate nodes, not directly to target
-- **Primary:** `remainingPath` and `finalTarget` are always set for new targets
-- **Baseline:** All existing pathfinding functionality is maintained
+### Test Criteria:
+- Types compile correctly
+- Network constants are properly defined
+- No TypeScript errors
 
-**Debug Logs to Add:**
-- `console.log('Retarget pathfinding:', { battalionId, oldTarget, newTarget, path })`
-- `console.log('Path reconstruction:', { startNode, endNode, path, remainingPath })`
+---
 
-### Batch 2: Enforce Path Adherence in Movement ⏳
-**Goal:** Ensure all movement is along valid network segments
+## Batch 1B: Basic Network Visualization
+**Goal**: Create the basic network visualization components
 
-**Files to Modify:**
-- `mobile/src/hooks/useMovement.ts` - Movement execution logic
-- `mobile/src/utils/movementWrapper.ts` - Movement animation logic
-- `mobile/src/hooks/usePathFollowing.ts` - Path following logic
+### NEW FILES TO CREATE:
+1. **`src/components/battle/BattleNetworkLines.tsx`** (40 lines) - Connection lines component
+2. **`src/components/battle/BattleNetworkNode.tsx`** (60 lines) - Individual node component
+3. **`src/components/battle/BattleNetworkGrid.tsx`** (80 lines) - Combined network visualization
 
-**Functions to Change:**
-- `handleMovementExecution()` - Validate movement is along network lines
-- `executeMovementWithCleanup()` - Enforce path adherence during animation
-- `handleBattalionPathFollowing()` - Ensure movement stays on current network segment
+### FILES TO REFERENCE (READ ONLY):
+- `src/components/battle/NetworkLines.tsx` (existing - for reference only)
+- `src/components/battle/NetworkNode.tsx` (existing - for reference only)
+- `src/components/battle/BattleNetwork.tsx` (existing - for reference only)
 
-**Specific Changes:**
-1. Only allow movement along current network segment (between two connected nodes)
-2. If battalion is not on a node, snap to nearest valid network segment
-3. Validate battalion position is always on or near a network line
-4. Prevent direct movement to arbitrary positions off the network
+### What This Achieves:
+- ✅ Static network grid with 9 nodes
+- ✅ Network lines connecting nodes
+- ✅ Proper positioning and sizing
+- ✅ Visual foundation for all future work
 
-**Test Criteria:**
-- **Primary:** All movement is along valid network segments
-- **Primary:** Battalion positions never deviate from network lines
-- **Primary:** Invalid movement is prevented and logged
-- **Baseline:** Movement speed and animation quality is maintained
+### Test Criteria:
+- Network renders correctly
+- All 9 nodes visible
+- All connections drawn
+- Proper screen positioning
 
-**Debug Logs to Add:**
-- `console.log('Movement validation:', { battalionPos, nearestLine, distance, isValid })`
-- `console.log('Network snap:', { oldPos, newPos, nearestNode })`
+---
 
-### Batch 3: Add Validation and Debug Logging ⏳
-**Goal:** Comprehensive validation and logging of network adherence
+## Batch 1C: Main Battle Screen
+**Goal**: Create the main battle screen container
 
-**Files to Modify:**
-- `mobile/src/utils/pathfinding.ts` - Add validation utilities
-- `mobile/src/hooks/useMovement.ts` - Add validation checks
-- `mobile/src/utils/battleUtils.ts` - Add movement validation
+### NEW FILES TO CREATE:
+1. **`src/screens/BattleGridScreen.tsx`** (50 lines) - Main battle screen container
 
-**Functions to Change:**
-- `validateBattalionPath()` - Enhanced validation for all movement
-- `findNearestNetworkLine()` - Use for position validation
-- `validateBattalionAndTarget()` - Add network adherence checks
+### FILES TO REFERENCE (READ ONLY):
+- `src/screens/BattleScreen.tsx` (existing - for reference only)
+- `src/screens/TurfScreen.tsx` (existing - to see navigation structure)
 
-**Specific Changes:**
-1. Add validation before and during movement using `validateBattalionPath`
-2. Use `findNearestNetworkLine` to validate battalion positions
-3. Add comprehensive debug logging for network adherence
-4. Log errors if battalion is ever off-network
+### What This Achieves:
+- ✅ Main battle screen with black background
+- ✅ Network visualization integration
+- ✅ Proper screen layout and styling
 
-**Test Criteria:**
-- **Primary:** All movement is validated for network adherence
-- **Primary:** Off-network positions are detected and logged
-- **Primary:** Debug logs provide clear information about network adherence
-- **Baseline:** Performance is not significantly impacted
+### Test Criteria:
+- Screen renders with black background
+- Network visualization displays correctly
+- No layout issues
 
-**Debug Logs to Add:**
-- `console.log('Network line adherence:', { battalionPos, nearestLine, distance })`
-- `console.log('Path validation:', { path, isValid, violations })`
-- `console.log('Position validation:', { position, onNetwork, distance })`
+---
 
-### Batch 4: Manual and Automated Testing ⏳
-**Goal:** Comprehensive testing of all movement scenarios
+## Batch 1D: Navigation Integration
+**Goal**: Update navigation to use new battle screen
 
-**Test Scenarios:**
-1. **Initial movement** - Battalions move to neutral nodes along network lines
-2. **Retargeting after node capture** - Battalions find new targets using pathfinding
-3. **Retargeting after battalion destruction** - Battalions retarget using pathfinding
-4. **Moving target handling** - Battalions follow moving targets along network lines
-5. **Complex pathfinding** - Multi-node traversal for distant targets
-6. **Edge cases** - No valid paths, invalid targets, etc.
+### FILES TO MODIFY:
+1. **`src/screens/TurfScreen.tsx`** (update navigation button)
 
-**Manual Testing:**
-- Visual confirmation that battalions never move off network lines
-- Console log verification for all debug messages
-- Performance testing to ensure no significant slowdown
+### FILES TO REFERENCE (READ ONLY):
+- `src/screens/TurfScreen.tsx` (existing - to see current navigation)
 
-**Automated Testing:**
-- Unit tests for all validation functions
-- Integration tests for complete movement flows
-- Regression tests to ensure existing functionality is maintained
+### What This Achieves:
+- ✅ Navigation button points to new battle screen
+- ✅ Old battle screen is no longer used
 
-## Success Criteria
-- **All movement follows network lines** - No direct movement between non-connected nodes
-- **Pathfinding used for all retargeting** - Every new target gets a reconstructed path
-- **Comprehensive validation** - All movement is validated for network adherence
-- **Clear debug logging** - Easy to verify network adherence via console logs
-- **No performance regression** - Movement remains smooth and responsive
+### Test Criteria:
+- Navigation button works correctly
+- New battle screen loads properly
 
-## Known Dependencies
-- **Step 4.4 dependency:** Complex pathfinding must be working (✅ completed)
-- **Step 3.2 dependency:** Network line validation must be implemented
-- **Step 4.2 dependency:** Movement monitoring must be working
+---
 
-## Notes for Implementation
-- Focus on small batches that can be tested independently
-- Preserve existing functionality while adding network adherence
-- Use debug logs to verify each step is working correctly
-- Test thoroughly after each batch to catch issues early
-- Ensure all movement scenarios are covered (initial, retargeting, moving targets, etc.)
+## Batch 2A: Node Ownership Types and State
+**Goal**: Create node ownership management types and state
+
+### NEW FILES TO CREATE:
+1. **`src/types/nodeOwnership.ts`** (30 lines) - Node ownership types
+2. **`src/hooks/useNodeOwnership.ts`** (60 lines) - Node ownership React hook
+
+### FILES TO REFERENCE (READ ONLY):
+- `src/utils/nodeOwnership.ts` (existing - for reference only)
+- `src/hooks/useBattalionRefsAndState.ts` (existing - for reference only)
+
+### What This Achieves:
+- ✅ Node ownership type definitions
+- ✅ Ownership state management (neutral, user, enemy arrays)
+- ✅ Dynamic ownership transfer functions
+
+### Test Criteria:
+- Ownership arrays work correctly
+- Transfers between arrays function
+- State persists properly
+
+---
+
+## Batch 2B: Node Ownership Visualization
+**Goal**: Update network nodes to show ownership colors
+
+### FILES TO MODIFY:
+1. **`src/components/battle/BattleNetworkNode.tsx`** (update to show ownership colors)
+
+### FILES TO REFERENCE (READ ONLY):
+- `src/components/battle/NetworkNode.tsx` (existing - to see current implementation)
+
+### What This Achieves:
+- ✅ Nodes display correct colors based on ownership
+- ✅ Color coding: Blue (user), Red (enemy), Secondary (neutral)
+
+### Test Criteria:
+- Nodes display correct colors
+- Color changes when ownership changes
+
+---
+
+## Batch 3A: Battle State Types and Management
+**Goal**: Create battle state management system
+
+### NEW FILES TO CREATE:
+1. **`src/types/battleState.ts`** (30 lines) - Battle state types
+2. **`src/hooks/useBattleState.ts`** (80 lines) - Battle state management hook
+
+### FILES TO REFERENCE (READ ONLY):
+- `src/hooks/useBattleStateMachine.ts` (existing - for reference only)
+- `src/hooks/useBattleInitialization.ts` (existing - for reference only)
+
+### What This Achieves:
+- ✅ Battle phases (initializing, countdown, active, complete)
+- ✅ 3-second start countdown
+- ✅ 20-second battle timer
+- ✅ State transitions
+
+### Test Criteria:
+- State transitions work correctly
+- Timer counts down properly
+- Countdown displays correctly
+
+---
+
+## Batch 3B: Battle Overlay Components
+**Goal**: Create countdown and timer overlay components
+
+### NEW FILES TO CREATE:
+1. **`src/components/battle/BattleCountdownOverlay.tsx`** (70 lines) - Countdown overlay
+2. **`src/components/battle/BattleTimerDisplay.tsx`** (50 lines) - Battle timer display
+
+### FILES TO REFERENCE (READ ONLY):
+- `src/components/battle/CountdownOverlay.tsx` (existing - for reference only)
+- `src/components/battle/BattleHeader.tsx` (existing - for reference only)
+
+### What This Achieves:
+- ✅ Visual countdown overlay
+- ✅ Battle timer display
+- ✅ Proper overlay positioning
+
+### Test Criteria:
+- Countdown displays correctly
+- Timer counts down properly
+- Overlay renders correctly
+
+---
+
+## Batch 4A: Deployment Zone Types and Positions
+**Goal**: Create deployment zone system foundation
+
+### NEW FILES TO CREATE:
+1. **`src/types/deployment.ts`** (30 lines) - Deployment zone types
+2. **`src/utils/deploymentPositions.ts`** (40 lines) - Deployment position calculations
+
+### FILES TO REFERENCE (READ ONLY):
+- `src/components/battle/BattalionDeploymentZone.tsx` (existing - for reference only)
+- `src/utils/battleConstants.ts` (existing - for reference only)
+
+### What This Achieves:
+- ✅ Deployment zone type definitions
+- ✅ Position calculations for user/enemy zones
+- ✅ Zone sizing and positioning logic
+
+### Test Criteria:
+- Position calculations are accurate
+- Zones are properly sized
+- Types compile correctly
+
+---
+
+## Batch 4B: Deployment Zone Visualization
+**Goal**: Create visual deployment zone components
+
+### NEW FILES TO CREATE:
+1. **`src/components/battle/BattleDeploymentZone.tsx`** (60 lines) - Deployment zone component
+
+### FILES TO REFERENCE (READ ONLY):
+- `src/components/battle/BattalionDeploymentZone.tsx` (existing - for reference only)
+
+### What This Achieves:
+- ✅ Visual deployment zones
+- ✅ Proper positioning for user/enemy sides
+- ✅ Zone styling and indicators
+
+### Test Criteria:
+- Zones render correctly
+- Positioning is accurate
+- Styling matches design
+
+---
+
+## Batch 5A: Battalion Types and Data
+**Goal**: Create battalion data management system
+
+### NEW FILES TO CREATE:
+1. **`src/types/battalion.ts`** (40 lines) - Battalion type definitions
+2. **`src/hooks/useBattalionData.ts`** (60 lines) - Battalion data management hook
+
+### FILES TO REFERENCE (READ ONLY):
+- `src/types/bots.ts` (existing - for reference only)
+- `src/hooks/useBattalionRefsAndState.ts` (existing - for reference only)
+
+### What This Achieves:
+- ✅ Battalion type definitions
+- ✅ Battalion data management
+- ✅ Bot type and quantity tracking
+
+### Test Criteria:
+- Battalion data is managed correctly
+- Bot types are properly tracked
+- Quantities are accurate
+
+---
+
+## Batch 5B: Battalion Visualization
+**Goal**: Create static battalion visualization components
+
+### NEW FILES TO CREATE:
+1. **`src/components/battle/BattleBattalion.tsx`** (80 lines) - Battalion component
+
+### FILES TO REFERENCE (READ ONLY):
+- `src/components/battle/AnimatedBattalion.tsx` (existing - for reference only)
+- `src/components/battle/BattalionSlot.tsx` (existing - for reference only)
+
+### What This Achieves:
+- ✅ Static battalion visualization
+- ✅ Bot type indicators
+- ✅ Quantity displays
+- ✅ Health bars (static)
+
+### Test Criteria:
+- Battalions render correctly
+- Bot types are distinguishable
+- Quantities display properly
+- Health bars show correctly
+
+---
+
+## Batch 6A: Movement Types and Utilities
+**Goal**: Create movement system foundation
+
+### NEW FILES TO CREATE:
+1. **`src/types/movement.ts`** (30 lines) - Movement type definitions
+2. **`src/utils/networkMovement.ts`** (80 lines) - Movement utilities
+
+### FILES TO REFERENCE (READ ONLY):
+- `src/utils/movementUtils.ts` (existing - for reference only)
+- `src/utils/pathfinding.ts` (existing - for reference only)
+
+### What This Achieves:
+- ✅ Movement type definitions
+- ✅ Network line validation
+- ✅ Path calculation between nodes
+- ✅ Movement constraint enforcement
+
+### Test Criteria:
+- Paths follow network lines
+- Invalid paths are rejected
+- Movement constraints enforced
+
+---
+
+## Batch 6B: Movement Hook and Logic
+**Goal**: Create movement React hook and logic
+
+### NEW FILES TO CREATE:
+1. **`src/hooks/useNetworkMovement.ts`** (70 lines) - Movement hook
+
+### FILES TO REFERENCE (READ ONLY):
+- `src/hooks/useMovement.ts` (existing - for reference only)
+- `src/hooks/usePathFollowing.ts` (existing - for reference only)
+
+### What This Achieves:
+- ✅ Movement state management
+- ✅ Path following logic
+- ✅ Position projection onto lines
+
+### Test Criteria:
+- Movement state is managed correctly
+- Position projection works
+- Path following is accurate
+
+---
+
+## Batch 7A: Targeting Types and Logic
+**Goal**: Create targeting system foundation
+
+### NEW FILES TO CREATE:
+1. **`src/types/targeting.ts`** (30 lines) - Targeting type definitions
+2. **`src/utils/targeting.ts`** (80 lines) - Targeting logic
+
+### FILES TO REFERENCE (READ ONLY):
+- `src/hooks/useTargeting.ts` (existing - for reference only)
+- `src/utils/targetValidation.ts` (existing - for reference only)
+
+### What This Achieves:
+- ✅ Targeting type definitions
+- ✅ Target selection logic
+- ✅ Range calculations
+- ✅ Target validation
+
+### Test Criteria:
+- Targets are selected correctly
+- Range calculations are accurate
+- Invalid targets are rejected
+
+---
+
+## Batch 7B: Targeting Hook and Visualization
+**Goal**: Create targeting React hook and visual components
+
+### NEW FILES TO CREATE:
+1. **`src/hooks/useBattleTargeting.ts`** (70 lines) - Targeting hook
+2. **`src/components/battle/BattleTargeting.tsx`** (60 lines) - Targeting visualization
+
+### FILES TO REFERENCE (READ ONLY):
+- `src/hooks/useTargeting.ts` (existing - for reference only)
+
+### What This Achieves:
+- ✅ Targeting state management
+- ✅ Visual targeting indicators
+- ✅ Target highlighting
+
+### Test Criteria:
+- Targeting state is managed correctly
+- Visual indicators work
+- Target highlighting is accurate
+
+---
+
+## Batch 8A: Attack Types and Logic
+**Goal**: Create attack system foundation
+
+### NEW FILES TO CREATE:
+1. **`src/types/attacks.ts`** (30 lines) - Attack type definitions
+2. **`src/utils/attacks.ts`** (80 lines) - Attack logic
+
+### FILES TO REFERENCE (READ ONLY):
+- `src/hooks/useCombat.ts` (existing - for reference only)
+- `src/utils/battleCalculator.ts` (existing - for reference only)
+
+### What This Achieves:
+- ✅ Attack type definitions
+- ✅ Attack calculations
+- ✅ Damage application
+- ✅ Health updates
+
+### Test Criteria:
+- Attacks calculate correctly
+- Damage is applied properly
+- Health updates accurately
+
+---
+
+## Batch 8B: Attack Hook and Effects
+**Goal**: Create attack React hook and visual effects
+
+### NEW FILES TO CREATE:
+1. **`src/hooks/useAttacks.ts`** (70 lines) - Attack hook
+2. **`src/components/battle/AttackEffects.tsx`** (60 lines) - Attack effects
+
+### FILES TO REFERENCE (READ ONLY):
+- `src/hooks/useCombat.ts` (existing - for reference only)
+
+### What This Achieves:
+- ✅ Attack state management
+- ✅ Attack animations
+- ✅ Visual attack effects
+
+### Test Criteria:
+- Attack state is managed correctly
+- Animations play correctly
+- Effects render properly
+
+---
+
+## Batch 9A: Animation Types and Utilities
+**Goal**: Create animation system foundation
+
+### NEW FILES TO CREATE:
+1. **`src/types/animation.ts`** (30 lines) - Animation type definitions
+2. **`src/utils/animationUtils.ts`** (60 lines) - Animation utilities
+
+### FILES TO REFERENCE (READ ONLY):
+- `src/hooks/useBattleCoordination.ts` (existing - for reference only)
+
+### What This Achieves:
+- ✅ Animation type definitions
+- ✅ Animation timing utilities
+- ✅ Animation coordination logic
+
+### Test Criteria:
+- Animation timing is correct
+- Coordination works properly
+- Utilities function correctly
+
+---
+
+## Batch 9B: Battalion Movement Animation
+**Goal**: Create animated battalion movement
+
+### NEW FILES TO CREATE:
+1. **`src/hooks/useBattalionMovement.ts`** (80 lines) - Movement animation hook
+
+### FILES TO MODIFY:
+1. **`src/components/battle/BattleBattalion.tsx`** (update to add animation)
+
+### FILES TO REFERENCE (READ ONLY):
+- `src/hooks/useBattleCoordination.ts` (existing - for reference only)
+
+### What This Achieves:
+- ✅ Smooth battalion movement
+- ✅ Network-constrained paths
+- ✅ Movement timing
+- ✅ Animation coordination
+
+### Test Criteria:
+- Movement is smooth
+- Paths follow network lines
+- Timing is correct
+- Animations coordinate properly
+
+---
+
+## Batch 10A: Integration Types and Validation
+**Goal**: Create system integration and validation
+
+### NEW FILES TO CREATE:
+1. **`src/types/integration.ts`** (30 lines) - Integration type definitions
+2. **`src/utils/battleValidation.ts`** (60 lines) - Validation utilities
+
+### FILES TO REFERENCE (READ ONLY):
+- `src/hooks/useBattleEngine.ts` (existing - for reference only)
+
+### What This Achieves:
+- ✅ Integration type definitions
+- ✅ System validation utilities
+- ✅ Error handling
+
+### Test Criteria:
+- Validation works correctly
+- Errors are handled properly
+- Types compile correctly
+
+---
+
+## Batch 10B: Final Integration
+**Goal**: Integrate all systems into main battle screen
+
+### FILES TO MODIFY:
+1. **`src/screens/BattleGridScreen.tsx`** (update with full integration)
+
+### NEW FILES TO CREATE:
+1. **`src/hooks/useBattleIntegration.ts`** (80 lines) - System integration hook
+
+### FILES TO REFERENCE (READ ONLY):
+- `src/hooks/useBattleEngine.ts` (existing - for reference only)
+
+### What This Achieves:
+- ✅ Complete battle system
+- ✅ All systems integrated
+- ✅ Error handling
+- ✅ Performance optimization
+
+### Test Criteria:
+- All systems work together
+- No errors or crashes
+- Performance is acceptable
+- Battle flow is complete
+
+---
+
+## Implementation Notes
+
+### Node Ownership Arrays:
+```typescript
+// Initial state
+neutralNodes: [3, 4, 5]
+userNodes: [0, 1, 2] 
+enemyNodes: [6, 7, 8]
+
+// When node 3 is captured by user
+neutralNodes: [4, 5]
+userNodes: [0, 1, 2, 3]
+enemyNodes: [6, 7, 8]
+```
+
+### Network Topology:
+- Fixed connections defined in `networkConstants.ts`
+- All movement must follow these connections
+- No direct movement between non-connected nodes
+
+### File Organization:
+- Each concept has its own file
+- Hooks for React state management
+- Utils for pure functions
+- Components for UI rendering
+- Types for type safety
+
+### Testing Strategy:
+- Test each batch before moving to next
+- Verify visual appearance
+- Check state management
+- Validate logic correctness
+- Ensure performance
+
+---
 
 ## Next Steps
-1. Start with Batch 1: Pathfinding on Retarget
-2. Test thoroughly after Batch 1 completion
-3. Proceed to Batch 2: Enforce Path Adherence in Movement
-4. Continue through all batches with testing between each
-5. Final validation that all movement stays on network lines 
+1. Start with **Batch 1A: Core Types and Constants**
+2. Test thoroughly before proceeding
+3. Iterate on each batch as needed
+4. Maintain clean architecture throughout
+5. Keep files under 300 lines
+6. Document any deviations from plan
+
+This plan provides a clear path to rebuild the battle system with proper architecture and network-constrained movement, with small, testable batches and specific file names.

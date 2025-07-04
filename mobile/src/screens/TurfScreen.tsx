@@ -12,7 +12,7 @@ import {ProfileLocation} from '../components/turf/ProfileLocation';
 import {HomeLocation} from '../components/turf/HomeLocation';
 import {DigitalBarracksLocation} from '../components/turf/DigitalBarracksLocation';
 import {BattlePreparationScreen} from './BattlePreparationScreen';
-import {BattleScreen} from './BattleScreen';
+import {BattleGridScreen} from './BattleGridScreen';
 import {ErrorBoundary} from '../components/common/ErrorBoundary';
 
 const DiagonalLines = memo(() => (
@@ -111,7 +111,7 @@ export function TurfScreen(): React.JSX.Element {
       case 'profile':
         return <ProfileScreen onClose={() => navigateToScreen('turf')} />;
       case 'battle':
-        return <BattleScreen onClose={() => {
+        return <BattleGridScreen onClose={() => {
           navigateToScreen('turf');
           setTimeout(() => navigateToScreen('hackRig'), 0);
         }} />;
