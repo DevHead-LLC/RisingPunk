@@ -18,7 +18,7 @@ export const BattleGridScreen = React.memo(({ onClose }: Props) => {
   const nodes = useInitialBattleNodes({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} testID="battle-grid-screen">
       <View style={styles.battleArea}>
         {/* Temporary network visualization */}
         <View style={styles.networkContainer}>
