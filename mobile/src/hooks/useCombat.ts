@@ -1,4 +1,4 @@
-import { BOT_CATEGORIES, getBotStats } from '../screens/DigitalBarracksScreen';
+import { BOT_CATEGORIES, getBotStats } from '../utils/battleConstants';
 import { RANGE_MULTIPLIER } from '../utils/battleConstants';
 import { updateBattalionHealth } from '../utils/healthUtils';
 import type { BattalionPosition, BattleTarget, BattleNode } from '../types/battle';

@@ -48,6 +48,9 @@ export default balanceSlice.reducer;
 // Selector to get the current balance (with time-based accrual)
 // Updates every 10 seconds to match API polling interval
 export const getCurrentBalance = (state: { balance: BalanceState }) => {
+  // Safety check for undefined state
+  if (!state || !state.balance) return 0;
+  
   const { total, ratePerSecond, lastUpdated, updateTrigger } = state.balance;
   if (total === null || lastUpdated === null) return 0;
   

@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { Animated, StyleSheet, View, Text } from 'react-native';
-import { BOT_CATEGORIES } from '../../screens/DigitalBarracksScreen';
+import { BOT_CATEGORIES } from '../../utils/battleConstants';
 
 type Props = {
   type: 'breacher' | 'guardian' | 'phreak';
@@ -35,7 +35,7 @@ export const AnimatedBattalion = React.memo(React.forwardRef<BattalionRef, Props
   const healthPercentage = Math.max(0, Math.min(100, health || 100));
   const battalionId = `${isUser ? 'user' : 'enemy'}-${type}-mk${mark}`;
 
-  const rangeSize = BOT_CATEGORIES[type].stats.range * 30;
+      const rangeSize = BOT_CATEGORIES?.[type]?.stats?.range * 30 || 0;
   const offset = rangeSize / 2 - 10; // Half of range size minus half of battalion size (20/2)
   
   // TODO: VERIFY VISUAL RANGE INDICATOR CALCULATION - This is for visual display only

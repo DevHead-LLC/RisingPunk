@@ -1,12 +1,13 @@
 import { useCallback } from 'react';
 import { Animated } from 'react-native';
-import { BOT_CATEGORIES } from '../screens/DigitalBarracksScreen';
-import { RANGE_MULTIPLIER } from '../utils/battleConstants';
-import { calculateMovementDuration } from '../utils/battleUtils';
+import { RANGE_MULTIPLIER, BOT_CATEGORIES } from '../utils/battleConstants';
 import { isNeutral } from '../utils/nodeOwnership';
 import { validateNetworkLinePath, findNearestNetworkLine } from '../utils/pathfinding';
 import { validateBattalionAndTarget } from '../utils/battleUtils';
-import { createMovementMonitoring, clearMovementMonitoring } from '../utils/movementMonitoring';
+import { validateAndRetarget, isInRange } from '../utils/targetValidation';
+import { setupAttackIfInRange } from '../utils/attackSetup';
+import { continuePathIfNeeded } from '../utils/pathFollowing';
+import { executeMovementWithCleanup } from '../utils/movementWrapper';
 
 const getAnimatedPosition = (position: Animated.ValueXY) => {
   return {
@@ -16,6 +17,8 @@ const getAnimatedPosition = (position: Animated.ValueXY) => {
 };
 
 const cleanupBattalion = (battalionId: string, attackIntervals: { [key: string]: NodeJS.Timeout }) => {
+  if (!attackIntervals) return;
+  
   Object.keys(attackIntervals).forEach(key => {
     if (key.includes(battalionId)) {
       clearInterval(attackIntervals[key]);
@@ -68,7 +71,7 @@ const calculateMovementDistance = (
       return { moveDistance: 0, directionX: 0, directionY: 0, updatedDistance: 0, rangePosition: currentPos };
     }
     
-    const enemyRange = BOT_CATEGORIES[enemyBattalion.type].stats.range * RANGE_MULTIPLIER;
+    const enemyRange = BOT_CATEGORIES?.[enemyBattalion.type]?.stats?.range * RANGE_MULTIPLIER || 0;
     
     const combinedRange = range + enemyRange;
     const optimalDistance = range;
@@ -103,44 +106,22 @@ const executeBattalionMovement = (
   findAvailableTargets?: (battalion: any, isUser: boolean, userBattalions: any[], enemyBattalions: any[]) => any[],
   moveBattalionAlongPath?: (battalion: any, target: any, isUser: boolean, userBattalions?: any[], enemyBattalions?: any[]) => void
 ): void => {
-  cleanupBattalion(battalionId, attackIntervals);
-
-  const speed = BOT_CATEGORIES[battalion.type].stats.speed;
-  const baseDuration = calculateMovementDuration(speed);
-  const movementDuration = (moveDistance / 100) * baseDuration;
-  
-  // Step 4.2: Add periodic target monitoring during movement
-  let monitoringInterval: NodeJS.Timeout | null = null;
-  
-  if (target && findAvailableTargets && moveBattalionAlongPath) {
-    monitoringInterval = createMovementMonitoring({
-      battalionId,
-      target,
-      isUser: isUser!,
-      userBattalions,
-      enemyBattalions,
-      findAvailableTargets,
-      moveBattalionAlongPath,
-      battalion
-    });
-  }
-  
-  Animated.timing(battalion.position, {
-    toValue: rangePosition,
-    duration: movementDuration,
-    useNativeDriver: true
-  }).start(({ finished }) => {
-    // Clear monitoring interval when movement completes
-    clearMovementMonitoring(monitoringInterval);
-    
-    if (!finished) return;
-    
-    if (battalion.quantity <= 0 || (battalion.currentHealth ?? 0) <= 0) {
-      cleanupBattalion(battalionId, attackIntervals);
-      return;
-    }
-    
-    onMovementComplete();
+  executeMovementWithCleanup(
+    battalion,
+    rangePosition,
+    moveDistance,
+    battalionId,
+    attackIntervals,
+    cleanupBattalion,
+    onMovementComplete,
+    target,
+    isUser,
+    userBattalions,
+    enemyBattalions,
+    findAvailableTargets,
+    moveBattalionAlongPath
+  ).catch((error) => {
+    // Silenced: Battalion death or movement interruption is expected and not an error
   });
 };
 
@@ -166,77 +147,102 @@ const handlePostMovementActions = (
 ): void => {
   if (target.type === 'node') {
     const node = nodes[target.index];
-    if (!isNeutral(target.index)) {
-      battalion.targetNode = undefined;
-      const newTargets = findAvailableTargets(battalion, isUser, userBattalions || [], enemyBattalions || []);
-      if (newTargets.length > 0) {
-        const validTarget = newTargets.find(t => 
-          t.type === 'node' ? isNeutral(t.index) : true
-        );
-        if (validTarget) {
-          moveBattalionAlongPath(battalion, validTarget, isUser, userBattalions, enemyBattalions);
-        }
-      }
-      return;
-    }
-    
-    if (battalion.remainingPath && battalion.remainingPath.length > 0 && battalion.finalTarget !== undefined) {
-      const nextNodeIndex = battalion.remainingPath[0];
-      const nextNode = nodes[nextNodeIndex];
-      
-      if (nextNode) {
-        debugLog(`[Step 3 Path Following] ${battalionId} - Continuing path: [${battalion.remainingPath.join(' -> ')}] to final target ${battalion.finalTarget}`);
-        
-        battalion.nodeIndex = target.index;
-        
-        battalion.remainingPath = battalion.remainingPath.slice(1);
-        
-        debugLog(`[Step 3 Path Update] ${battalionId} - Updated to node ${target.index}, remaining path: [${battalion.remainingPath.join(' -> ')}]`);
-        
-        const nextTarget = {
-          type: target.type,
-          index: nextNodeIndex,
-          distance: 0,
-          position: { x: nextNode.x, y: nextNode.y }
-        };
-        
-        debugLog(`[Step 3 Movement] ${battalionId} - Moving to next node ${nextNodeIndex} at position (${nextNode.x.toFixed(1)}, ${nextNode.y.toFixed(1)})`);
-        
-        moveBattalionAlongPath(battalion, nextTarget, isUser, userBattalions, enemyBattalions);
-        return;
-      }
-    }
-    
-    if (battalion.finalTarget !== undefined && target.index === battalion.finalTarget) {
-      battalion.remainingPath = undefined;
-      battalion.finalTarget = undefined;
-    }
-    
-    setupAttacks(battalion, target, isUser, battalionId, attackIntervals, cleanupBattalion, nodeRefs, nodes, findAvailableTargets, moveBattalionAlongPath, setUserBattalions, setEnemyBattalions, userBattalions, enemyBattalions);
-  } else if (target.type === 'battalion') {
-    const enemyBatts = isUser ? enemyBattalions : userBattalions;
-    const enemyBattalion = enemyBatts?.[target.index];
-    
-    if (!enemyBattalion || enemyBattalion.quantity <= 0 || (enemyBattalion.currentHealth ?? 0) <= 0) {
-      battalion.targetNode = undefined;
-      const newTargets = findAvailableTargets(battalion, isUser, userBattalions || [], enemyBattalions || []);
-      if (newTargets.length > 0) {
-        moveBattalionAlongPath(battalion, newTargets[0], isUser, userBattalions, enemyBattalions);
-      }
-      return;
-    }
-
-    const enemyPos = getAnimatedPosition(enemyBattalion.position);
-    const currentDistance = Math.sqrt(
-      Math.pow(enemyPos.x - currentPos.x, 2) + 
-      Math.pow(enemyPos.y - currentPos.y, 2)
+    const validation = validateAndRetarget(
+      battalion,
+      target,
+      nodes,
+      currentPos,
+      range,
+      isUser,
+      userBattalions || [],
+      enemyBattalions || [],
+      findAvailableTargets,
+      moveBattalionAlongPath,
+      cleanupBattalion || (() => {}),
+      battalionId,
+      attackIntervals || {}
     );
     
-    if (currentDistance <= range) {
-      setupAttacks(battalion, target, isUser, battalionId, attackIntervals, cleanupBattalion, nodeRefs, nodes, findAvailableTargets, moveBattalionAlongPath, setUserBattalions, setEnemyBattalions, userBattalions, enemyBattalions);
-    } else {
-      moveBattalionAlongPath(battalion, { ...target, position: enemyPos }, isUser, userBattalions, enemyBattalions);
+    if (!validation.isValid) {
+      return;
     }
+    
+    const pathResult = continuePathIfNeeded(
+      battalion,
+      target,
+      nodes,
+      moveBattalionAlongPath,
+      isUser,
+      userBattalions || [],
+      enemyBattalions || [],
+      debugLog,
+      battalionId
+    );
+    
+    // If path was continued, don't proceed with attack setup
+    if (pathResult.pathContinued) {
+      return;
+    }
+    
+    setupAttackIfInRange(
+      battalion,
+      target,
+      currentPos,
+      range,
+      isUser,
+      userBattalions || [],
+      enemyBattalions || [],
+      setupAttacks,
+      moveBattalionAlongPath,
+      battalionId,
+      attackIntervals || {},
+      cleanupBattalion || (() => {}),
+      nodeRefs,
+      nodes,
+      findAvailableTargets,
+      setUserBattalions,
+      setEnemyBattalions
+    );
+  } else if (target.type === 'battalion') {
+    const validation = validateAndRetarget(
+      battalion,
+      target,
+      nodes,
+      currentPos,
+      range,
+      isUser,
+      userBattalions || [],
+      enemyBattalions || [],
+      findAvailableTargets,
+      moveBattalionAlongPath,
+      cleanupBattalion || (() => {}),
+      battalionId,
+      attackIntervals || {}
+    );
+    
+    if (!validation.isValid) {
+      return;
+    }
+    
+    setupAttackIfInRange(
+      battalion,
+      target,
+      currentPos,
+      range,
+      isUser,
+      userBattalions || [],
+      enemyBattalions || [],
+      setupAttacks,
+      moveBattalionAlongPath,
+      battalionId,
+      attackIntervals || {},
+      cleanupBattalion || (() => {}),
+      nodeRefs,
+      nodes,
+      findAvailableTargets,
+      setUserBattalions,
+      setEnemyBattalions
+    );
   }
 };
 
@@ -257,33 +263,28 @@ const handleMovementValidation = (
   userBattalions?: any[],
   enemyBattalions?: any[]
 ): { shouldContinue: boolean; shouldAttack: boolean } => {
-  const validation = validateBattalionAndTarget(
+  const validation = validateAndRetarget(
     battalion,
     target,
     nodes,
     currentPos,
     range,
+    isUser,
+    userBattalions || [],
+    enemyBattalions || [],
+    findAvailableTargets,
+    moveBattalionAlongPath,
     cleanupBattalion,
     battalionId,
     attackIntervals
   );
   
   if (!validation.isValid) {
-    if (validation.shouldRetarget) {
-      const newTargets = findAvailableTargets(battalion, isUser, userBattalions || [], enemyBattalions || []);
-      if (newTargets.length > 0) {
-        const validTarget = newTargets.find(t => 
-          t.type === 'node' ? isNeutral(t.index) : true
-        );
-        if (validTarget) {
-          moveBattalionAlongPath(battalion, validTarget, isUser, userBattalions, enemyBattalions);
-        }
-      }
-    }
     return { shouldContinue: false, shouldAttack: false };
   }
   
-  if (validation.inRange) {
+  // Check if battalion is in range
+  if (isInRange(currentPos, target, range, isUser, userBattalions || [], enemyBattalions || [])) {
     return { shouldContinue: false, shouldAttack: true };
   }
   
@@ -297,7 +298,14 @@ const handleMovementDecision = (
   isUser: boolean,
   userBattalions?: any[],
   enemyBattalions?: any[]
-): { shouldAttack: boolean; rangePosition: { x: number; y: number } } => {
+): {
+  shouldAttack: boolean;
+  moveDistance: number;
+  directionX: number;
+  directionY: number;
+  updatedDistance: number;
+  rangePosition: { x: number; y: number };
+} => {
   const movementResult = calculateMovementDistance(
     currentPos,
     target,
@@ -306,14 +314,17 @@ const handleMovementDecision = (
     userBattalions,
     enemyBattalions
   );
-  
-  const { updatedDistance, rangePosition } = movementResult;
-  
-  if (updatedDistance <= range) {
-    return { shouldAttack: true, rangePosition };
-  }
-  
-  return { shouldAttack: false, rangePosition };
+
+  const { updatedDistance, rangePosition, moveDistance, directionX, directionY } = movementResult;
+
+  return {
+    shouldAttack: updatedDistance <= range,
+    moveDistance,
+    directionX,
+    directionY,
+    updatedDistance,
+    rangePosition
+  };
 };
 
 export { handleMovementValidation, handleMovementDecision };
@@ -370,7 +381,7 @@ const handleMovementExecution = (
   executeBattalionMovement(
     battalion,
     decisionResult.rangePosition,
-    calculateMovementDistance(currentPos, target, range, isUser, userBattalions, enemyBattalions).moveDistance,
+    decisionResult.moveDistance,
     battalionId,
     attackIntervals,
     cleanupBattalion,
@@ -428,14 +439,6 @@ const validateNetworkLineMovement = (
     battalionPos,
     targetPos
   };
-
-  console.log('Network line adherence:', {
-    battalionPos,
-    nearestLine: nearestLineInfo.nearestLine,
-    distance: nearestLineInfo.distance,
-    isOnNetworkLine,
-    pathValid: pathValidation.isValid
-  });
 
   return {
     isValid: pathValidation.isValid && isOnNetworkLine,

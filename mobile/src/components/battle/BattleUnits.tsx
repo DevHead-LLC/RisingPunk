@@ -3,7 +3,7 @@ import { Animated, StyleSheet, View } from 'react-native';
 import { BattalionDeploymentZone } from './BattalionDeploymentZone';
 import { AnimatedBattalion } from './AnimatedBattalion';
 import { BattalionPosition } from '../../types/battle';
-import { BOT_CATEGORIES } from '../../screens/DigitalBarracksScreen';
+import { BOT_CATEGORIES } from '../../utils/battleConstants';
 
 // CLARIFICATION: This component handles battalion-to-battalion attacks and animations only. Battalion-to-node attack logic is handled elsewhere.
 // TODO: Ensure that attack logic for battalions and neutral nodes is set up in a consistent, proximity-based way across the battle system. If not, revisit and refactor for consistency.
@@ -55,7 +55,7 @@ export const BattleUnits = React.memo(({
         <Animated.View style={{ opacity: battalionOpacity }}>
           {userBattalions.filter(battalion => battalion.quantity > 0).map((battalion, index) => {
             const healthPercent = battalion.currentHealth !== undefined ? 
-              (battalion.currentHealth / (BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity)) * 100 : 100;
+              (battalion.currentHealth / (BOT_CATEGORIES?.[battalion.type]?.stats?.health * battalion.quantity || 1)) * 100 : 100;
             
             return (
               <AnimatedBattalion
@@ -76,7 +76,7 @@ export const BattleUnits = React.memo(({
           
           {enemyBattalions.filter(battalion => battalion.quantity > 0).map((battalion, index) => {
             const healthPercent = battalion.currentHealth !== undefined ? 
-              (battalion.currentHealth / (BOT_CATEGORIES[battalion.type].stats.health * battalion.quantity)) * 100 : 100;
+              (battalion.currentHealth / (BOT_CATEGORIES?.[battalion.type]?.stats?.health * battalion.quantity || 1)) * 100 : 100;
             
             return (
               <AnimatedBattalion
