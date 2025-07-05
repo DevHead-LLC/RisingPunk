@@ -178,3 +178,32 @@
 - ✅ Overlay renders correctly with proper visibility controls
 
 ---
+
+## Batch 3C: Overlay Integration
+**Goal**: Integrate countdown and timer overlays into the main battle screen with clean, single-source layout logic
+
+### NEW FILES CREATED:
+1. **`src/components/battle/BattleOverlayManager.tsx`** - Manages all overlays for the battle screen
+
+### FILES MODIFIED:
+1. **`src/screens/BattleGridScreen.tsx`** - Uses BattleOverlayManager, passes full dimensions
+2. **`src/hooks/useBattleNodes.ts`** - Now single source of truth for all node/network layout, including header/overlay space
+3. **`__tests__/hooks/useBattleNodes.test.ts`** - Added meaningful regression tests for node positioning and layout
+
+### What This Achieves:
+- ✅ Overlays (countdown, timer) are managed in a dedicated, non-legacy component
+- ✅ All node/network layout logic is controlled in useBattleNodes (single source of truth)
+- ✅ Responsive, liquid layout for all screen sizes
+- ✅ Overlay/header space is reserved and managed in one place
+- ✅ No legacy code or unused logic remains
+- ✅ Regression tests protect against accidental layout breakage
+
+### Test Criteria:
+- ✅ Countdown overlay appears for 3 seconds on screen load
+- ✅ Timer overlay appears for 20 seconds after countdown
+- ✅ Overlays disappear when phase is `complete`
+- ✅ Node Y positions are always within bounds and stacked correctly
+- ✅ Changing top margin shifts nodes as expected
+- ✅ All tests pass
+
+---
