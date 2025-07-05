@@ -50,28 +50,7 @@ AI MUST READ SECTION ABOVE! END.
 
 
 
-## Batch 3B: Battle Overlay Components
-**Goal**: Create countdown and timer overlay components
 
-### NEW FILES TO CREATE:
-1. **`src/components/battle/BattleCountdownOverlay.tsx`** (70 lines) - Countdown overlay
-2. **`src/components/battle/BattleTimerDisplay.tsx`** (50 lines) - Battle timer display
-
-### FILES TO REFERENCE (READ ONLY):
-- `src/components/battle/CountdownOverlay.tsx` (existing - for reference only)
-- `src/components/battle/BattleHeader.tsx` (existing - for reference only)
-
-### What This Achieves:
-- ✅ Visual countdown overlay
-- ✅ Battle timer display
-- ✅ Proper overlay positioning
-
-### Test Criteria:
-- Countdown displays correctly
-- Timer counts down properly
-- Overlay renders correctly
-
----
 
 ## Batch 4A: Deployment Zone Types and Positions
 **Goal**: Create deployment zone system foundation
