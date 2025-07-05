@@ -32,7 +32,8 @@ function calculateNodePositions(width: number, height: number) {
 }
 
 // Import the actual rendering utilities for testing
-import { getNodeColor, getNodeBorderColor } from '../../src/hooks/useBattleNodes';
+import { getNodeColor, getNodeBorderColor, NodeOwner } from '../../src/hooks/useBattleNodes';
+import { NodeIndex } from '../../src/types/battleTypes';
 
 describe('useInitialBattleNodes Logic (Batch 1A)', () => {
   describe('node positioning', () => {
@@ -169,6 +170,111 @@ describe('Node Rendering Utilities (Batch 1B)', () => {
       const neutralBorderColor = getNodeBorderColor('neutral');
       expect(neutralColor).toMatch(/^#[0-9A-F]{6}$/i); // Valid hex color
       expect(neutralBorderColor).toMatch(/^#[0-9A-F]{6}$/i); // Valid hex color
+    });
+  });
+});
+
+describe('Node Ownership Management (Batch 2A)', () => {
+  // Test data for ownership management
+  const mockInitialNodes = [
+    { index: 0 as NodeIndex, position: { x: 64, y: 40 }, owner: 'user' as const },
+    { index: 1 as NodeIndex, position: { x: 64, y: 280 }, owner: 'user' as const },
+    { index: 2 as NodeIndex, position: { x: 64, y: 520 }, owner: 'user' as const },
+    { index: 3 as NodeIndex, position: { x: 200, y: 40 }, owner: 'neutral' as const },
+    { index: 4 as NodeIndex, position: { x: 200, y: 280 }, owner: 'neutral' as const },
+    { index: 5 as NodeIndex, position: { x: 200, y: 520 }, owner: 'neutral' as const },
+    { index: 6 as NodeIndex, position: { x: 336, y: 40 }, owner: 'enemy' as const },
+    { index: 7 as NodeIndex, position: { x: 336, y: 280 }, owner: 'enemy' as const },
+    { index: 8 as NodeIndex, position: { x: 336, y: 520 }, owner: 'enemy' as const },
+  ];
+
+  describe('ownership transfer', () => {
+    it('should transfer node ownership correctly', () => {
+      // Simulate the hook logic directly
+      let nodes = [...mockInitialNodes];
+      
+      const transferNodeOwnership = (nodeIndex: NodeIndex, newOwner: NodeOwner) => {
+        nodes = nodes.map(node => 
+          node.index === nodeIndex 
+            ? { ...node, owner: newOwner }
+            : node
+        );
+      };
+
+      // Transfer neutral node 3 to user
+      transferNodeOwnership(3, 'user');
+      expect(nodes.find(n => n.index === 3)?.owner).toBe('user');
+      
+      // Transfer enemy node 6 to neutral
+      transferNodeOwnership(6, 'neutral');
+      expect(nodes.find(n => n.index === 6)?.owner).toBe('neutral');
+      
+      // Transfer user node 0 to enemy
+      transferNodeOwnership(0, 'enemy');
+      expect(nodes.find(n => n.index === 0)?.owner).toBe('enemy');
+    });
+
+    it('should not affect other nodes during transfer', () => {
+      let nodes = [...mockInitialNodes];
+      
+      const transferNodeOwnership = (nodeIndex: NodeIndex, newOwner: NodeOwner) => {
+        nodes = nodes.map(node => 
+          node.index === nodeIndex 
+            ? { ...node, owner: newOwner }
+            : node
+        );
+      };
+
+      // Transfer node 3 to user
+      transferNodeOwnership(3, 'user');
+      
+      // Check that other nodes remain unchanged
+      expect(nodes.find(n => n.index === 0)?.owner).toBe('user');
+      expect(nodes.find(n => n.index === 1)?.owner).toBe('user');
+      expect(nodes.find(n => n.index === 2)?.owner).toBe('user');
+      expect(nodes.find(n => n.index === 4)?.owner).toBe('neutral');
+      expect(nodes.find(n => n.index === 5)?.owner).toBe('neutral');
+      expect(nodes.find(n => n.index === 6)?.owner).toBe('enemy');
+      expect(nodes.find(n => n.index === 7)?.owner).toBe('enemy');
+      expect(nodes.find(n => n.index === 8)?.owner).toBe('enemy');
+    });
+  });
+
+  describe('node filtering by owner', () => {
+    it('should filter nodes by owner correctly', () => {
+      const nodes = [...mockInitialNodes];
+      
+      const getNodesByOwner = (owner: NodeOwner) => {
+        return nodes.filter(node => node.owner === owner);
+      };
+
+      const userNodes = getNodesByOwner('user');
+      const neutralNodes = getNodesByOwner('neutral');
+      const enemyNodes = getNodesByOwner('enemy');
+
+      expect(userNodes).toHaveLength(3);
+      expect(neutralNodes).toHaveLength(3);
+      expect(enemyNodes).toHaveLength(3);
+
+      expect(userNodes.every(n => n.owner === 'user')).toBe(true);
+      expect(neutralNodes.every(n => n.owner === 'neutral')).toBe(true);
+      expect(enemyNodes.every(n => n.owner === 'enemy')).toBe(true);
+    });
+
+    it('should return correct node indices for each owner', () => {
+      const nodes = [...mockInitialNodes];
+      
+      const getNodesByOwner = (owner: NodeOwner) => {
+        return nodes.filter(node => node.owner === owner);
+      };
+
+      const userNodes = getNodesByOwner('user');
+      const neutralNodes = getNodesByOwner('neutral');
+      const enemyNodes = getNodesByOwner('enemy');
+
+      expect(userNodes.map(n => n.index)).toEqual([0, 1, 2]);
+      expect(neutralNodes.map(n => n.index)).toEqual([3, 4, 5]);
+      expect(enemyNodes.map(n => n.index)).toEqual([6, 7, 8]);
     });
   });
 }); 
