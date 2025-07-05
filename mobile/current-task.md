@@ -27,11 +27,6 @@ AI MUST READ SECTION BELOW! START.
 
 ## Conflict Resolution
 **INTENTIONS DOCUMENTS ALWAYS WIN**: If any batch description conflicts with the intentions documents, the intentions documents take precedence. The batch description must be updated to align with intentions before implementation proceeds.
-====================================
-AI MUST READ SECTION ABOVE! END.
-====================================
-
-=====================================================================================================================================================================
 
 # Battle System Rebuild - Detailed Implementation Plan
 
@@ -45,34 +40,13 @@ Rebuilding the battle system from scratch with clean architecture, proper node m
 - **Clean Separation**: Logic, state, and UI are properly separated
 - **Testable Components**: Each piece can be tested independently
 
-## Node Management Strategy
-- **Array-Based Ownership**: Use separate arrays for neutral, user, and enemy nodes
-- **Dynamic Transfers**: Nodes move between arrays when captured
-- **Color Coding**: Blue (user), Red (enemy), Secondary (neutral)
-- **Network Topology**: Fixed connections defined in `networkConstants.ts`
-
----
+====================================
+AI MUST READ SECTION ABOVE! END.
+====================================
+=====================================================================================================================================================================
+=====================================================================================================================================================================
 
 
-
-## Batch 2B: Node Ownership Visualization
-**Goal**: Update network nodes to show ownership colors
-
-### FILES TO MODIFY:
-1. **`src/components/battle/BattleNetworkNode.tsx`** (update to show ownership colors)
-
-### FILES TO REFERENCE (READ ONLY):
-- `src/components/battle/NetworkNode.tsx` (existing - to see current implementation)
-
-### What This Achieves:
-- ✅ Nodes display correct colors based on ownership
-- ✅ Color coding: Blue (user), Red (enemy), Secondary (neutral)
-
-### Test Criteria:
-- Nodes display correct colors
-- Color changes when ownership changes
-
----
 
 ## Batch 3A: Battle State Types and Management
 **Goal**: Create battle state management system
