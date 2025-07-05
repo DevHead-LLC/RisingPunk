@@ -15,34 +15,36 @@ A strategic battle system where bot battalions compete to destroy the opposing a
 ### Phase 1: Setup (3 seconds)
 - Battle screen loads showing the network
 - Your battalions appear on the left side
-- Enemy battalions appear on the right side (bigger numbers)
+- Enemy battalions appear on the right side
 - Neutral nodes in center get health equal to 75% of total army strength
 - 3-second countdown begins
 
 ### Phase 2: Initial Targeting
-- Each battalion picks a neutral node to attack
+- Each battalion picks a neutral node to attack at random
 - Can only target neutral nodes connected to their current position
 - Battalions move along network lines toward their targets
 - Stop at exact attack range distance from target
+- Multiple battalions can target the same node, however battalions can only target and attack a single target (not multiple targets)
 
 ### Phase 3: Node Combat (Tug-of-War)
 - Battalions attack neutral nodes continuously
 - Each attack pushes the node toward your side or enemy side
 - Progress bar goes from -100% (enemy control) to +100% (your control)
 - When progress reaches ±100%, the node is captured
-- Captured nodes change color and can't be attacked anymore
-- Captured nodes provide advantages to controlling army
+- Captured nodes change color to appropriate controlling party color and can't be attacked anymore
 
-### Phase 4: Retargeting
+### Phase 4: Retargeting and Movement
 - When a neutral node is captured, attacking battalions need new targets
 - They pick the closest available target (neutral nodes or enemy battalions)
-- If targeting enemy battalions, they use complex pathfinding through the network
 - Movement follows the same rules - along network lines to attack range
+- Retareting is based on proximity using the network lines and a pathfinding algorithm which sets up their movement path
+- If targeting battalions, a connection is made to notify the 'attacking' battalion if their the 'defending' target is destroyed or moves from the anticipated position to keep target destination position up to date
+- Attacking battalions movement stop to begin attack sequence when target center and attack range intersect (or target is within attack range)
 
 ### Phase 5: Battalion Combat
 - Battalions can attack each other directly
 - Damage calculation: (Bot type strength + bonuses) * number of bots = total damage per attack
-- When a battalion takes damage, bot quantity is reduced
+- When a battalion takes damage, bot quantity is reduced in coordination with health
 - Reduced quantity = less health and attack power
 - When all units are lost, the battalion is destroyed
 - Destroyed battalions are removed from the battle
@@ -58,34 +60,31 @@ A strategic battle system where bot battalions compete to destroy the opposing a
 
 ### Movement
 - Battalions always stay on network lines
-- Can't move diagonally or off the network
-- Must move through nodes to reach different network lines
-- Stop at exact attack range distance from targets
+- Can't move off the network
+- Must move onto nodes to reach different network lines
+- Stop at exact attack range distance from targets (or if target is 'within' attack range distance)
 
 ### Targeting
 - Always pick the closest available target
 - No preference between neutral nodes and enemy battalions
 - Multiple battalions can attack the same target
 - Retarget immediately when current target is captured/destroyed
+- Battalions can only pick a single target and attack a single target at a time
 
 ### Combat
 - **Attack Power**: (Bot type strength + bonuses) * number of bots = total damage per attack
 - **Defense**: Percentage reduction based on bot type + bonuses
 - **Damage**: Attack power reduced by defender's defense %
-- **Unit Loss**: Damage reduces bot quantity, weakening the battalion
+- **Unit Loss**: Damage reduces bot quantity, weakening the battalion; calculated by damage caused minus health which takes the total health of the battalion and divides by the health per unit for bot type, rounded, to determine and adjust remaining quantity of bots in battalion and subsequent remaining attack power
 - Neutral nodes use tug-of-war progress system
 - Battalion combat reduces health until units are lost
 
 ### Strategy
-- Control neutral nodes for tactical advantages
-- Block enemy access to neutral nodes
-- Use network topology to your advantage
-- Manage battalion health and positioning
 - Destroy opposing army completely
 
 ## Network Layout
 - **Left side**: Your nodes (0,1,2) - permanent control
-- **Center**: Neutral nodes (3,4,5) - provide advantages when controlled
+- **Center**: Neutral nodes (3,4,5) - open to target intially, permanent after control is taken
 - **Right side**: Enemy nodes (6,7,8) - permanent enemy control
 - **Connections**: Lines between nodes that battalions must follow
 
@@ -107,5 +106,5 @@ A strategic battle system where bot battalions compete to destroy the opposing a
 - **Timer**: 20-second time limit
 - **Elimination**: Destroy all enemy battalions completely
 - **Points**: Fewer losses wins (based on bot mark values)
-- **Tie**: Enemy wins automatically
-- **Rewards**: Victor gains money, items, and other benefits 
+- **Tie**: Enemy wins automatically && a single unit is 'saved' (lowest mark brought to battle)
+- **Rewards**: Victor gains money, items, and other benefits tbd at a later time
