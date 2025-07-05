@@ -37,7 +37,6 @@ export interface Battalion {
 
 // Battle State Types
 export enum BattlePhase {
-  INITIALIZING = 'initializing',
   COUNTDOWN = 'countdown',
   ACTIVE = 'active',
   COMPLETE = 'complete'

@@ -1,7 +1,7 @@
 ====================================
 AI MUST READ SECTION BELOW! START.
 ====================================
-# IMPORTANT RULE: Only do what is necessary for the current batch/step.
+# IMPORTANT RULE: Only do what is necessary for the current batch/step && DO NOT USE legacy files - create new ones with unique names.
 
 # CRITICAL AI DIRECTIVES - READ BEFORE IMPLEMENTING ANY BATCH
 
@@ -48,29 +48,7 @@ AI MUST READ SECTION ABOVE! END.
 
 
 
-## Batch 3A: Battle State Types and Management
-**Goal**: Create battle state management system
 
-### NEW FILES TO CREATE:
-1. **`src/types/battleState.ts`** (30 lines) - Battle state types
-2. **`src/hooks/useBattleState.ts`** (80 lines) - Battle state management hook
-
-### FILES TO REFERENCE (READ ONLY):
-- `src/hooks/useBattleStateMachine.ts` (existing - for reference only)
-- `src/hooks/useBattleInitialization.ts` (existing - for reference only)
-
-### What This Achieves:
-- ✅ Battle phases (initializing, countdown, active, complete)
-- ✅ 3-second start countdown
-- ✅ 20-second battle timer
-- ✅ State transitions
-
-### Test Criteria:
-- State transitions work correctly
-- Timer counts down properly
-- Countdown displays correctly
-
----
 
 ## Batch 3B: Battle Overlay Components
 **Goal**: Create countdown and timer overlay components

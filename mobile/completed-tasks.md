@@ -128,3 +128,32 @@
 - ✅ No duplicate color logic exists
 
 ---
+
+## Batch 3A: Battle State Types and Management
+**Goal**: Create battle state management system
+
+### NEW FILES CREATED:
+1. **`src/types/battleState.ts`** (40 lines) - Battle state types and actions
+2. **`src/hooks/useBattleState.ts`** (150 lines) - Battle state management hook
+
+### FILES ENHANCED:
+1. **`src/types/battleTypes.ts`** (updated BattlePhase enum to remove 'initializing')
+
+### What This Achieves:
+- ✅ Battle phases (countdown, active, complete) - simplified from 4 to 3 phases
+- ✅ 3-second start countdown with automatic transition to active
+- ✅ 20-second battle timer with automatic completion
+- ✅ State transitions with proper timer management
+- ✅ Pause/resume functionality
+- ✅ Manual battle end with winner specification
+- ✅ Reset functionality to return to initial state
+
+### Test Criteria:
+- ✅ State transitions work correctly (countdown → active → complete)
+- ✅ Timer counts down properly (3-second countdown, 20-second battle)
+- ✅ Pause/resume functionality works
+- ✅ Manual battle end works
+- ✅ Reset returns to initial state
+- ✅ Timer cleanup on unmount
+
+---

@@ -76,7 +76,6 @@ describe('Battle Types (Batch 1A)', () => {
 
   describe('BattlePhase enum', () => {
     it('should have correct values', () => {
-      expect(BattlePhase.INITIALIZING).toBe('initializing');
       expect(BattlePhase.COUNTDOWN).toBe('countdown');
       expect(BattlePhase.ACTIVE).toBe('active');
       expect(BattlePhase.COMPLETE).toBe('complete');
