@@ -1,4 +1,37 @@
+====================================
+AI MUST READ SECTION BELOW! START.
+====================================
 # IMPORTANT RULE: Only do what is necessary for the current batch/step.
+
+# CRITICAL AI DIRECTIVES - READ BEFORE IMPLEMENTING ANY BATCH
+
+## Intentions Document Requirements
+**MANDATORY**: Before implementing any batch, AI must read and understand the relevant intentions documents:
+
+- **For ALL battle mechanics**: Read [battle-intentions.md](./battle-intentions.md) - Core battle flow, rules, and victory conditions
+- **For node-related work**: Read [node-behaviors.md](./node-behaviors.md) - Node types, capture mechanics, advantages, network topology
+- **For battalion/bot work**: Read [battalion-bot-behaviors.md](./battalion-bot-behaviors.md) - Bot types, combat mechanics, movement, targeting
+
+## Strict Implementation Rules
+- **NO INVENTION**: Do not create, imagine, or add features not specified in intentions documents
+- **NO GAPS**: If anything falls outside intentions documents, STOP and ask clarifying questions
+- **NO ROGUE LOGIC**: Every piece of logic must align with documented intentions or direct user specifications
+- **DISCUSS FIRST**: Any deviation from intentions requires explicit user approval before implementation
+
+## Implementation Process
+1. Read relevant intentions documents for the batch
+2. Implement ONLY what is specified in the batch description
+3. If batch description conflicts with intentions documents, ask for clarification
+4. If batch requires logic not covered in intentions, ask for specification
+5. Never assume or fill in gaps - ask questions instead
+
+## Conflict Resolution
+**INTENTIONS DOCUMENTS ALWAYS WIN**: If any batch description conflicts with the intentions documents, the intentions documents take precedence. The batch description must be updated to align with intentions before implementation proceeds.
+====================================
+AI MUST READ SECTION ABOVE! END.
+====================================
+
+=====================================================================================================================================================================
 
 # Battle System Rebuild - Detailed Implementation Plan
 
