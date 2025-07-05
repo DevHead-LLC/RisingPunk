@@ -157,3 +157,24 @@
 - ✅ Timer cleanup on unmount
 
 ---
+
+## Batch 3B: Battle Overlay Components
+**Goal**: Create countdown and timer overlay components
+
+### NEW FILES CREATED:
+1. **`src/components/battle/BattleCountdownOverlay.tsx`** (90 lines) - Full-screen countdown overlay with animations
+2. **`src/components/battle/BattleTimerDisplay.tsx`** (80 lines) - Battle timer display with progress bar
+
+### What This Achieves:
+- ✅ Visual countdown overlay with fade-in/scale animations for 3-second countdown
+- ✅ Battle timer display with progress bar for 20-second battle timer
+- ✅ Proper overlay positioning and z-index management
+- ✅ Responsive design with proper styling and text shadows
+- ✅ Visibility controls for proper component lifecycle management
+
+### Test Criteria:
+- ✅ Countdown displays correctly with animations
+- ✅ Timer counts down properly with progress visualization
+- ✅ Overlay renders correctly with proper visibility controls
+
+---
