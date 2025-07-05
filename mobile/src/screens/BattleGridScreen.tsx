@@ -31,7 +31,12 @@ export const BattleGridScreen = React.memo(({ onClose }: Props) => {
         {/* Network visualization */}
         <View style={styles.networkContainer}>
           <BattleNetworkGrid
-            nodes={nodes}
+            nodes={nodes.map(node => ({
+              ...node,
+              // Ensure index is NodeIndex and owner is NodeOwner
+              index: node.index as any, // TypeScript: treat as NodeIndex
+              owner: (node.owner === 'user' || node.owner === 'enemy' || node.owner === 'neutral') ? node.owner : 'neutral',
+            })) as any}
             connections={connections}
             nodeSize={20}
             lineColor="#666666"

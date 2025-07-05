@@ -207,3 +207,13 @@
 - ✅ All tests pass
 
 ---
+
+## Batch 4A: Deployment Zone Types and Positions (Skipped)
+**Status:** Skipped for now. Will revisit and redesign deployment zone system at a later time.
+
+---
+
+## Batch 4B: Deployment Zone Visualization (Skipped)
+**Status:** Skipped for now. Will revisit and redesign deployment zone visualization at a later time.
+
+---

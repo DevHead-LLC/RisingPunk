@@ -1,37 +1,35 @@
 ====================================
 AI MUST READ SECTION BELOW! START.
 ====================================
-# IMPORTANT RULE: Only do what is necessary for the current batch/step && DO NOT USE legacy files - create new ones with unique names.
 
-# CRITICAL AI DIRECTIVES - READ BEFORE IMPLEMENTING ANY BATCH
+# CRITICAL AI DIRECTIVES - READ BEFORE ANY BATCH IMPLEMENTATION
+
+## MANDATORY FILE CHECK
+**BEFORE ANY FILE CREATION OR MODIFICATION**: Check [current-battlegrid-connections.md](./current-battlegrid-connections.md) to ensure ALL work stays focused on BattleGridScreen.tsx workflow. DO NOT work on BattleScreen.tsx or associated files.
 
 ## Intentions Document Requirements
-**MANDATORY**: Before implementing any batch, AI must read and understand the relevant intentions documents:
+**MANDATORY**: Before implementing any batch, read relevant intentions documents:
+- **Battle mechanics**: [battle-intentions.md](./battle-intentions.md)
+- **Node work**: [node-behaviors.md](./node-behaviors.md) 
+- **Battalion/bot work**: [battalion-bot-behaviors.md](./battalion-bot-behaviors.md)
 
-- **For ALL battle mechanics**: Read [battle-intentions.md](./battle-intentions.md) - Core battle flow, rules, and victory conditions
-- **For node-related work**: Read [node-behaviors.md](./node-behaviors.md) - Node types, capture mechanics, advantages, network topology
-- **For battalion/bot work**: Read [battalion-bot-behaviors.md](./battalion-bot-behaviors.md) - Bot types, combat mechanics, movement, targeting
+## Implementation Rules
+- **NO INVENTION**: Only implement features specified in intentions documents
+- **NO LEGACY FILES**: Create new files with unique names, don't modify existing ones
+- **NO GAPS**: If batch requires logic not in intentions, STOP and ask for specification
+- **BATTLEGRID FOCUS**: All work must connect to BattleGridScreen.tsx workflow
 
-## Strict Implementation Rules
-- **NO INVENTION**: Do not create, imagine, or add features not specified in intentions documents
-- **NO GAPS**: If anything falls outside intentions documents, STOP and ask clarifying questions
-- **NO ROGUE LOGIC**: Every piece of logic must align with documented intentions or direct user specifications
-- **DISCUSS FIRST**: Any deviation from intentions requires explicit user approval before implementation
-
-## Implementation Process
-1. Read relevant intentions documents for the batch
-2. Implement ONLY what is specified in the batch description
-3. If batch description conflicts with intentions documents, ask for clarification
-4. If batch requires logic not covered in intentions, ask for specification
-5. Never assume or fill in gaps - ask questions instead
-
-## Conflict Resolution
-**INTENTIONS DOCUMENTS ALWAYS WIN**: If any batch description conflicts with the intentions documents, the intentions documents take precedence. The batch description must be updated to align with intentions before implementation proceeds.
+## Process
+1. Check current-battlegrid-connections.md for file scope
+2. Read relevant intentions documents
+3. Implement ONLY what's specified in batch description
+4. If conflicts exist, intentions documents take precedence
+5. Ask for clarification before proceeding with any deviation
 
 # Battle System Rebuild - Detailed Implementation Plan
 
 ## Overview
-Rebuilding the battle system from scratch with clean architecture, proper node management, and network-constrained movement. Each batch is small and testable with specific file names and clear references.
+Rebuilding the battle system from scratch with clean architecture, proper node management, and network-constrained movement. Each batch is small and testable with unique file names and clear references.
 
 ## Core Architecture Principles
 - **Single Source of Truth**: Each concept has one authoritative location
@@ -46,51 +44,8 @@ AI MUST READ SECTION ABOVE! END.
 =====================================================================================================================================================================
 =====================================================================================================================================================================
 
-## Batch 4A: Deployment Zone Types and Positions
-**Goal**: Create deployment zone system foundation
-
-### NEW FILES TO CREATE:
-1. **`src/types/deployment.ts`** (30 lines) - Deployment zone types
-2. **`src/utils/deploymentPositions.ts`** (40 lines) - Deployment position calculations
-
-### FILES TO REFERENCE (READ ONLY):
-- `src/components/battle/BattalionDeploymentZone.tsx` (existing - for reference only)
-- `src/utils/battleConstants.ts` (existing - for reference only)
-
-### What This Achieves:
-- ✅ Deployment zone type definitions
-- ✅ Position calculations for user/enemy zones
-- ✅ Zone sizing and positioning logic
-
-### Test Criteria:
-- Position calculations are accurate
-- Zones are properly sized
-- Types compile correctly
-
----
-
-## Batch 4B: Deployment Zone Visualization
-**Goal**: Create visual deployment zone components
-
-### NEW FILES TO CREATE:
-1. **`src/components/battle/BattleDeploymentZone.tsx`** (60 lines) - Deployment zone component
-
-### FILES TO REFERENCE (READ ONLY):
-- `src/components/battle/BattalionDeploymentZone.tsx` (existing - for reference only)
-
-### What This Achieves:
-- ✅ Visual deployment zones
-- ✅ Proper positioning for user/enemy sides
-- ✅ Zone styling and indicators
-
-### Test Criteria:
-- Zones render correctly
-- Positioning is accurate
-- Styling matches design
-
----
-
 ## Batch 5A: Battalion Types and Data
+REVIEW AI MUST READ 
 **Goal**: Create battalion data management system
 
 ### NEW FILES TO CREATE:
@@ -134,6 +89,52 @@ AI MUST READ SECTION ABOVE! END.
 - Bot types are distinguishable
 - Quantities display properly
 - Health bars show correctly
+
+---
+
+## Batch 5C: Server-Driven Battalion Initialization and Stats
+**Goal:** Move battalion initialization and stat calculations to the server for authoritative state.
+
+### What This Will Do:
+- Server exposes endpoint to provide initial battle state (battalions, health, node positions, etc.)
+- Client fetches this data on battle start
+- All health/stat calculations are performed on the server, not the client
+- Client only displays what the server sends
+
+### TODO/Comments:
+- Add TODOs in useBattalionData and related files to remind future devs to fetch from server, not calculate locally
+- Server: Implement endpoint `/api/battle/init` (or similar)
+- Client: Replace local battalion initialization with server fetch
+
+---
+
+## Batch 5D: Periodic Server Sync for Live Battle State
+**Goal:** Sync frontend with server every 1s for live battle state updates
+
+### What This Will Do:
+- Server updates battle state as often as needed (every action, attack, etc.)
+- Client polls server every 1s (or uses websockets) to get latest state
+- Frontend only updates visuals once per second for health, quantity, etc.
+- Ensures frontend is always in sync with server
+
+### TODO/Comments:
+- Add TODOs in battle screen and useBattalionData to replace local state with server-driven updates
+- Server: Implement endpoint `/api/battle/state` (or websocket event)
+- Client: Set up polling or websocket subscription
+
+---
+
+## Batch 5E: Code Comments and Future Integration Points
+**Goal:** Add comments and TODOs in code and current-task.md for future server integration
+
+### What This Will Do:
+- Mark all places in code where server logic should eventually live
+- Add clear comments in hooks/components (e.g., useBattalionData, BattleBattalion) for future devs
+- Document API endpoints and expected data structures
+
+### TODO/Comments:
+- Add `// TODO: Move to server` comments in relevant files
+- Document endpoints and data contracts in current-task.md
 
 ---
 
