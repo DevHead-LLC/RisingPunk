@@ -3,33 +3,46 @@
  * @description Tests for useInitialBattleNodes hook logic (Batch 1A)
  */
 
-// Extract the positioning logic from the hook for testing
-function calculateNodePositions(width: number, height: number) {
-  const H_PADDING = 64;
-  const V_PADDING = 40;
+import { useInitialBattleNodes, calculateNodePositions } from '../../src/hooks/useBattleNodes';
 
-  const colWidth = (width - 2 * H_PADDING) / 2;
-  const rowHeight = (height - 2 * V_PADDING) / 2;
+describe('useInitialBattleNodes regression protection', () => {
+  it('should keep all node Y positions within bounds for various screen sizes', () => {
+    const testCases = [
+      { width: 400, height: 600 },
+      { width: 800, height: 1200 },
+      { width: 375, height: 812 }, // iPhone X
+      { width: 360, height: 780 }, // Android
+    ];
+    testCases.forEach(({ width, height }) => {
+      const nodes = calculateNodePositions(width, height, undefined);
+      nodes.forEach(node => {
+        expect(node.position.y).toBeGreaterThanOrEqual(0);
+        expect(node.position.y).toBeLessThanOrEqual(height);
+      });
+    });
+  });
 
-  const X_LEFT = H_PADDING;
-  const X_CENTER = H_PADDING + colWidth;
-  const X_RIGHT = H_PADDING + 2 * colWidth;
-  const Y_TOP = V_PADDING;
-  const Y_MIDDLE = V_PADDING + rowHeight;
-  const Y_BOTTOM = V_PADDING + 2 * rowHeight;
+  it('should always have top < middle < bottom for Y positions (with tolerance)', () => {
+    const nodes = calculateNodePositions(400, 600, undefined);
+    const yPositions = nodes.map(n => n.position.y).sort((a, b) => a - b);
+    // There should be 3 unique Y positions (within 1px tolerance), strictly increasing
+    const uniqueYs = [];
+    yPositions.forEach(y => {
+      if (!uniqueYs.some(u => Math.abs(u - y) < 1)) uniqueYs.push(y);
+    });
+    expect(uniqueYs.length).toBe(3);
+    expect(uniqueYs[0]).toBeLessThan(uniqueYs[1]);
+    expect(uniqueYs[1]).toBeLessThan(uniqueYs[2]);
+  });
 
-  return [
-    { index: 0, position: { x: X_LEFT, y: Y_TOP }, owner: 'user' },
-    { index: 1, position: { x: X_LEFT, y: Y_MIDDLE }, owner: 'user' },
-    { index: 2, position: { x: X_LEFT, y: Y_BOTTOM }, owner: 'user' },
-    { index: 3, position: { x: X_CENTER, y: Y_TOP }, owner: 'neutral' },
-    { index: 4, position: { x: X_CENTER, y: Y_MIDDLE }, owner: 'neutral' },
-    { index: 5, position: { x: X_CENTER, y: Y_BOTTOM }, owner: 'neutral' },
-    { index: 6, position: { x: X_RIGHT, y: Y_TOP }, owner: 'enemy' },
-    { index: 7, position: { x: X_RIGHT, y: Y_MIDDLE }, owner: 'enemy' },
-    { index: 8, position: { x: X_RIGHT, y: Y_BOTTOM }, owner: 'enemy' },
-  ];
-}
+  it('should shift all nodes down when topMargin increases', () => {
+    const nodesDefault = calculateNodePositions(400, 600, undefined);
+    const nodesShifted = calculateNodePositions(400, 600, 200);
+    nodesDefault.forEach((node, i) => {
+      expect(nodesShifted[i].position.y).toBeGreaterThan(node.position.y);
+    });
+  });
+});
 
 // Import the actual rendering utilities for testing
 import { getNodeColor, getNodeBorderColor, NodeOwner } from '../../src/hooks/useBattleNodes';
@@ -72,23 +85,19 @@ describe('useInitialBattleNodes Logic (Batch 1A)', () => {
       });
     });
 
-    it('should stack nodes vertically in each column', () => {
-      const nodes = calculateNodePositions(400, 600);
-      
-      // Calculate expected Y positions
-      const V_PADDING = 40;
-      const rowHeight = (600 - 2 * V_PADDING) / 2;
-      const Y_TOP = V_PADDING;
-      const Y_MIDDLE = V_PADDING + rowHeight;
-      const Y_BOTTOM = V_PADDING + 2 * rowHeight;
-      
-      const topNodes = nodes.filter(node => node.position.y === Y_TOP);
-      const middleNodes = nodes.filter(node => node.position.y === Y_MIDDLE);
-      const bottomNodes = nodes.filter(node => node.position.y === Y_BOTTOM);
-      
-      expect(topNodes).toHaveLength(3);
-      expect(middleNodes).toHaveLength(3);
-      expect(bottomNodes).toHaveLength(3);
+    it('should stack nodes vertically in each column (with tolerance)', () => {
+      const nodes = calculateNodePositions(400, 600, undefined);
+      const yVals = nodes.map(n => n.position.y);
+      // Find unique Y positions with 1px tolerance
+      const uniqueYs = [];
+      yVals.forEach(y => {
+        if (!uniqueYs.some(u => Math.abs(u - y) < 1)) uniqueYs.push(y);
+      });
+      // For each unique Y, count how many nodes are close to it
+      uniqueYs.forEach(y => {
+        const count = nodes.filter(n => Math.abs(n.position.y - y) < 1).length;
+        expect(count).toBe(3);
+      });
     });
   });
 

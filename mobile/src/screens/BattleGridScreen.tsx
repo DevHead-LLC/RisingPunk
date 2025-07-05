@@ -8,6 +8,7 @@ import { View, StyleSheet, SafeAreaView, Dimensions, Text } from 'react-native';
 import { useInitialBattleNodes } from '../hooks/useBattleNodes';
 import { useBattleNetworkConnections } from '../hooks/useBattleNetwork';
 import { BattleNetworkGrid } from '../components/battle/BattleNetworkGrid';
+import { BattleOverlayManager } from '../components/battle/BattleOverlayManager';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -25,6 +26,8 @@ export const BattleGridScreen = React.memo(({ onClose }: Props) => {
   return (
     <SafeAreaView style={styles.container} testID="battle-grid-screen">
       <View style={styles.battleArea}>
+        {/* Overlays (countdown, timer) */}
+        <BattleOverlayManager />
         {/* Network visualization */}
         <View style={styles.networkContainer}>
           <BattleNetworkGrid
