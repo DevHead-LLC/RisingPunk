@@ -3,7 +3,7 @@
  * @description Single source of truth for battle node state, positions, and rendering
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { NodeIndex } from '../types/battleTypes';
 
 export type NodeOwner = 'user' | 'enemy' | 'neutral';
@@ -48,6 +48,38 @@ export function useInitialBattleNodes({ width, height }: GetInitialNodesParams) 
     ];
     return initialNodes;
   }, [width, height]);
+}
+
+// Dynamic ownership management hook
+export function useNodeOwnership(initialNodes: BattleNodeState[]) {
+  const [nodes, setNodes] = useState<BattleNodeState[]>(initialNodes);
+
+  const transferNodeOwnership = useCallback((nodeIndex: NodeIndex, newOwner: NodeOwner) => {
+    setNodes(prevNodes => 
+      prevNodes.map(node => 
+        node.index === nodeIndex 
+          ? { ...node, owner: newOwner }
+          : node
+      )
+    );
+  }, []);
+
+  const getNodesByOwner = useCallback((owner: NodeOwner): BattleNodeState[] => {
+    return nodes.filter(node => node.owner === owner);
+  }, [nodes]);
+
+  const getUserNodes = useCallback(() => getNodesByOwner('user'), [getNodesByOwner]);
+  const getEnemyNodes = useCallback(() => getNodesByOwner('enemy'), [getNodesByOwner]);
+  const getNeutralNodes = useCallback(() => getNodesByOwner('neutral'), [getNodesByOwner]);
+
+  return {
+    nodes,
+    transferNodeOwnership,
+    getUserNodes,
+    getEnemyNodes,
+    getNeutralNodes,
+    getNodesByOwner,
+  };
 }
 
 // Node rendering utilities

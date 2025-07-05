@@ -65,6 +65,12 @@ export const updateNodeOwnership = (nodeIndex: number, newOwner: 'user' | 'enemy
     return false;
   }
   
+  // Prevent changing ownership of permanent nodes (user nodes 0,1,2 and enemy nodes 6,7,8)
+  if ((nodeIndex >= 0 && nodeIndex <= 2) || (nodeIndex >= 6 && nodeIndex <= 8)) {
+    console.warn(`Attempted to change ownership of permanent node ${nodeIndex}. User nodes (0,1,2) and enemy nodes (6,7,8) cannot change ownership.`);
+    return false;
+  }
+  
   // Clear cache for this node
   ownershipCache.delete(nodeIndex);
   
@@ -105,6 +111,12 @@ export const updateNodeOwnership = (nodeIndex: number, newOwner: 'user' | 'enemy
  */
 export const captureNode = (nodeIndex: number, newOwner: 'user' | 'enemy'): void => {
   const startTime = Date.now();
+  
+  // Only allow capturing neutral nodes
+  if (!isNeutral(nodeIndex)) {
+    console.warn(`Attempted to capture non-neutral node ${nodeIndex}. Only neutral nodes can be captured.`);
+    return;
+  }
   
   // Get old state before capture
   const oldState = getNodeOwner(nodeIndex);

@@ -21,29 +21,87 @@
 
 ---
 
-## Batch 1B: Basic Network Visualization
-**Goal**: Create the basic network visualization components
+## Batch 1B: Network Visualization with Single Source of Truth
+**Goal**: Create network visualization with consolidated architecture
 
 ### NEW FILES CREATED:
-1. **`src/components/battle/BattleNetworkLines.tsx`** (40 lines) - Connection lines component
-2. **`src/components/battle/BattleNetworkNode.tsx`** (60 lines) - Individual node component
-3. **`src/components/battle/BattleNetworkGrid.tsx`** (80 lines) - Combined network visualization
+1. **`src/hooks/useBattleNodes.ts`** (80 lines) - Single source of truth for node state and positioning
+2. **`src/hooks/useBattleNetwork.ts`** (60 lines) - Single source of truth for network connections and line calculations
+3. **`src/components/battle/BattleNetworkGrid.tsx`** (140 lines) - Consolidated network visualization component
 
-### FILES REFERENCED (READ ONLY):
-- `src/components/battle/NetworkLines.tsx` (existing - for reference only)
-- `src/components/battle/NetworkNode.tsx` (existing - for reference only)
-- `src/components/battle/BattleNetwork.tsx` (existing - for reference only)
+### FILES DELETED (consolidation):
+- `src/components/battle/BattleNetworkLines.tsx` (moved logic to useBattleNetwork.ts)
+- `src/components/battle/BattleNetworkNode.tsx` (moved logic to useBattleNodes.ts)
+- `src/utils/battleNetworkConstants.ts` (unused prep work)
 
 ### What This Achieves:
-- ✅ Static network grid with 9 nodes
-- ✅ Network lines connecting nodes
-- ✅ Proper positioning and sizing
-- ✅ Visual foundation for all future work
+- ✅ Single source of truth for node state (positions, ownership, health, capture progress)
+- ✅ Single source of truth for network connections and line rendering
+- ✅ Consolidated component that renders both nodes and lines
+- ✅ Responsive node positioning (user left, neutral center, enemy right)
+- ✅ Network topology with neutral nodes as central hubs
+- ✅ Proper color coding and styling utilities
 
 ### Test Criteria:
-- Network renders correctly
-- All 9 nodes visible
-- All connections drawn
-- Proper screen positioning
+- ✅ Network topology tests (user/enemy connections, neutral hubs, no direct user-enemy)
+- ✅ Line calculation tests (horizontal, vertical, diagonal)
+- ✅ Node positioning tests (column layout, responsive behavior, ownership)
+- ✅ Node rendering tests (colors, borders, consistency)
+
+---
+
+## Batch 1C: Main Battle Screen
+**Goal**: Create the main battle screen container
+
+### NEW FILES CREATED:
+1. **`src/screens/BattleGridScreen.tsx`** (75 lines) - Main battle screen container
+
+### What This Achieves:
+- ✅ Main battle screen with black background
+- ✅ Network visualization integration using BattleNetworkGrid
+- ✅ Proper screen layout and styling with SafeAreaView
+- ✅ Title and subtitle display
+- ✅ Single source of truth integration (useBattleNodes, useBattleNetwork)
+
+### Test Criteria:
+- ✅ Screen renders with black background
+- ✅ Network visualization displays correctly
+- ✅ No layout issues
+
+---
+
+## Batch 1D: Navigation Integration
+**Goal**: Update navigation to use new battle screen
+
+### FILES MODIFIED:
+1. **`src/screens/TurfScreen.tsx`** (updated navigation button)
+
+### What This Achieves:
+- ✅ Navigation button points to new BattleGridScreen
+- ✅ Old battle screen is no longer used
+- ✅ Proper import and integration
+
+### Test Criteria:
+- ✅ Navigation button works correctly
+- ✅ New battle screen loads properly
+
+---
+
+## Batch 2A: Node Ownership Management
+**Goal**: Add dynamic ownership transfer functionality to existing node system
+
+### FILES ENHANCED:
+1. **`src/hooks/useBattleNodes.ts`** (enhanced with ownership management)
+
+### What This Achieves:
+- ✅ Dynamic ownership transfer functions (neutral ↔ user ↔ enemy)
+- ✅ Node filtering by owner (getUserNodes, getEnemyNodes, getNeutralNodes)
+- ✅ State management with React hooks
+- ✅ Maintains single source of truth principle
+
+### Test Criteria:
+- ✅ Ownership transfer tests (correct transfers, no side effects)
+- ✅ Node filtering tests (correct grouping by owner)
+- ✅ State persistence tests
 
 ---
