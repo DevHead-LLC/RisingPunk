@@ -45,7 +45,7 @@ AI MUST READ SECTION ABOVE! END.
 =====================================================================================================================================================================
 
 ## Batch 5A: Battalion Types and Data
-REVIEW AI MUST READ 
+REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
 **Goal**: Create battalion data management system
 
 ### NEW FILES TO CREATE:
@@ -69,6 +69,7 @@ REVIEW AI MUST READ
 ---
 
 ## Batch 5B: Battalion Visualization
+REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
 **Goal**: Create static battalion visualization components
 
 ### NEW FILES TO CREATE:
@@ -93,6 +94,7 @@ REVIEW AI MUST READ
 ---
 
 ## Batch 5C: Server-Driven Battalion Initialization and Stats
+REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
 **Goal:** Move battalion initialization and stat calculations to the server for authoritative state.
 
 ### What This Will Do:
@@ -109,6 +111,7 @@ REVIEW AI MUST READ
 ---
 
 ## Batch 5D: Periodic Server Sync for Live Battle State
+REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
 **Goal:** Sync frontend with server every 1s for live battle state updates
 
 ### What This Will Do:
@@ -125,6 +128,7 @@ REVIEW AI MUST READ
 ---
 
 ## Batch 5E: Code Comments and Future Integration Points
+REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
 **Goal:** Add comments and TODOs in code and current-task.md for future server integration
 
 ### What This Will Do:
@@ -139,6 +143,7 @@ REVIEW AI MUST READ
 ---
 
 ## Batch 6A: Movement Types and Utilities
+REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
 **Goal**: Create movement system foundation
 
 ### NEW FILES TO CREATE:
@@ -163,6 +168,7 @@ REVIEW AI MUST READ
 ---
 
 ## Batch 6B: Movement Hook and Logic
+REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
 **Goal**: Create movement React hook and logic
 
 ### NEW FILES TO CREATE:
@@ -185,6 +191,7 @@ REVIEW AI MUST READ
 ---
 
 ## Batch 7A: Targeting Types and Logic
+REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
 **Goal**: Create targeting system foundation
 
 ### NEW FILES TO CREATE:
@@ -209,6 +216,7 @@ REVIEW AI MUST READ
 ---
 
 ## Batch 7B: Targeting Hook and Visualization
+REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
 **Goal**: Create targeting React hook and visual components
 
 ### NEW FILES TO CREATE:
@@ -231,6 +239,7 @@ REVIEW AI MUST READ
 ---
 
 ## Batch 8A: Attack Types and Logic
+REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
 **Goal**: Create attack system foundation
 
 ### NEW FILES TO CREATE:
@@ -255,6 +264,7 @@ REVIEW AI MUST READ
 ---
 
 ## Batch 8B: Attack Hook and Effects
+REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
 **Goal**: Create attack React hook and visual effects
 
 ### NEW FILES TO CREATE:
@@ -277,6 +287,7 @@ REVIEW AI MUST READ
 ---
 
 ## Batch 9A: Animation Types and Utilities
+REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
 **Goal**: Create animation system foundation
 
 ### NEW FILES TO CREATE:
@@ -299,6 +310,7 @@ REVIEW AI MUST READ
 ---
 
 ## Batch 9B: Battalion Movement Animation
+REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
 **Goal**: Create animated battalion movement
 
 ### NEW FILES TO CREATE:
@@ -325,6 +337,7 @@ REVIEW AI MUST READ
 ---
 
 ## Batch 10A: Integration Types and Validation
+REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
 **Goal**: Create system integration and validation
 
 ### NEW FILES TO CREATE:
@@ -347,6 +360,7 @@ REVIEW AI MUST READ
 ---
 
 ## Batch 10B: Final Integration
+REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
 **Goal**: Integrate all systems into main battle screen
 
 ### FILES TO MODIFY:
@@ -371,49 +385,3 @@ REVIEW AI MUST READ
 - Battle flow is complete
 
 ---
-
-## Implementation Notes
-
-### Node Ownership Arrays:
-```typescript
-// Initial state
-neutralNodes: [3, 4, 5]
-userNodes: [0, 1, 2] 
-enemyNodes: [6, 7, 8]
-
-// When node 3 is captured by user
-neutralNodes: [4, 5]
-userNodes: [0, 1, 2, 3]
-enemyNodes: [6, 7, 8]
-```
-
-### Network Topology:
-- Fixed connections defined in `networkConstants.ts`
-- All movement must follow these connections
-- No direct movement between non-connected nodes
-
-### File Organization:
-- Each concept has its own file
-- Hooks for React state management
-- Utils for pure functions
-- Components for UI rendering
-- Types for type safety
-
-### Testing Strategy:
-- Test each batch before moving to next
-- Verify visual appearance
-- Check state management
-- Validate logic correctness
-- Ensure performance
-
----
-
-## Next Steps
-1. Start with **Batch 1A: Core Types and Constants**
-2. Test thoroughly before proceeding
-3. Iterate on each batch as needed
-4. Maintain clean architecture throughout
-5. Keep files under 300 lines
-6. Document any deviations from plan
-
-This plan provides a clear path to rebuild the battle system with proper architecture and network-constrained movement, with small, testable batches and specific file names.
