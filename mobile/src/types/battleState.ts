@@ -20,25 +20,17 @@ export interface BattleStateData {
   isPaused: boolean;
 }
 
-// Battle state actions
+// Battle state actions - only the ones actually used in BattleGridScreen workflow
 export type BattleStateAction = 
   | { type: 'START_COUNTDOWN' }
   | { type: 'START_BATTLE' }
-  | { type: 'END_BATTLE'; winner: 'user' | 'enemy' }
-  | { type: 'UPDATE_TIMER'; time: number }
-  | { type: 'UPDATE_COUNTDOWN'; countdown: number }
-  | { type: 'PAUSE_BATTLE' }
-  | { type: 'RESUME_BATTLE' }
-  | { type: 'RESET_BATTLE' };
+  | { type: 'END_BATTLE'; winner: 'user' | 'enemy' };
 
-// Battle state context
+// Battle state context - only the functions actually used
 export interface BattleStateContext {
   state: BattleStateData;
   dispatch: (action: BattleStateAction) => void;
   startCountdown: () => void;
   startBattle: () => void;
   endBattle: (winner: 'user' | 'enemy') => void;
-  pauseBattle: () => void;
-  resumeBattle: () => void;
-  resetBattle: () => void;
 } 

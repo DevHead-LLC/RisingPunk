@@ -3,7 +3,7 @@
  * @description Battle state management hook with timer functionality
  */
 
-import { useReducer, useCallback, useRef, useEffect } from 'react';
+import { useReducer, useCallback, useRef, useEffect, useState } from 'react';
 import { BattlePhase } from '../types/battleTypes';
 import { 
   BattleStateData, 
@@ -26,7 +26,7 @@ const initialState: BattleStateData = {
   isPaused: false
 };
 
-// State reducer
+// State reducer - only the actions actually used in BattleGridScreen workflow
 function battleStateReducer(state: BattleStateData, action: BattleStateAction): BattleStateData {
   switch (action.type) {
     case 'START_COUNTDOWN':
@@ -54,33 +54,6 @@ function battleStateReducer(state: BattleStateData, action: BattleStateAction): 
         isPaused: true
       };
 
-    case 'UPDATE_TIMER':
-      return {
-        ...state,
-        battleTime: action.time
-      };
-
-    case 'UPDATE_COUNTDOWN':
-      return {
-        ...state,
-        countdown: action.countdown
-      };
-
-    case 'PAUSE_BATTLE':
-      return {
-        ...state,
-        isPaused: true
-      };
-
-    case 'RESUME_BATTLE':
-      return {
-        ...state,
-        isPaused: false
-      };
-
-    case 'RESET_BATTLE':
-      return initialState;
-
     default:
       return state;
   }
@@ -88,11 +61,12 @@ function battleStateReducer(state: BattleStateData, action: BattleStateAction): 
 
 export function useBattleState() {
   const [state, dispatch] = useReducer(battleStateReducer, initialState);
+  const [countdown, setCountdown] = useState(initialState.countdown);
+  const [battleTime, setBattleTime] = useState(initialState.battleTime);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const countdownValueRef = useRef(initialState.countdown);
   const battleTimeRef = useRef(initialState.battleTime);
-  const isPausedRef = useRef(initialState.isPaused);
 
   // Cleanup timers
   const cleanupTimers = useCallback(() => {
@@ -111,6 +85,7 @@ export function useBattleState() {
     cleanupTimers();
     dispatch({ type: 'START_COUNTDOWN' });
     countdownValueRef.current = TIMER_CONFIG.countdownDuration;
+    setCountdown(TIMER_CONFIG.countdownDuration);
 
     countdownRef.current = setInterval(() => {
       countdownValueRef.current -= 1;
@@ -121,8 +96,10 @@ export function useBattleState() {
           countdownRef.current = null;
         }
         dispatch({ type: 'START_BATTLE' });
+        setCountdown(0);
       } else {
-        dispatch({ type: 'UPDATE_COUNTDOWN', countdown: countdownValueRef.current });
+        // Update countdown internally
+        setCountdown(countdownValueRef.current);
       }
     }, 1000);
   }, [cleanupTimers]);
@@ -132,11 +109,9 @@ export function useBattleState() {
     cleanupTimers();
     dispatch({ type: 'START_BATTLE' });
     battleTimeRef.current = 0;
-    isPausedRef.current = false;
+    setBattleTime(0);
 
     timerRef.current = setInterval(() => {
-      if (isPausedRef.current) return;
-      
       battleTimeRef.current += 1;
       if (battleTimeRef.current >= TIMER_CONFIG.battleDuration) {
         // Battle time expired
@@ -146,7 +121,8 @@ export function useBattleState() {
         }
         dispatch({ type: 'END_BATTLE', winner: 'enemy' }); // Default to enemy win on timeout
       } else {
-        dispatch({ type: 'UPDATE_TIMER', time: battleTimeRef.current });
+        // Update timer internally
+        setBattleTime(battleTimeRef.current);
       }
     }, 1000);
   }, [cleanupTimers]);
@@ -157,41 +133,24 @@ export function useBattleState() {
     dispatch({ type: 'END_BATTLE', winner });
   }, [cleanupTimers]);
 
-  // Pause battle
-  const pauseBattle = useCallback(() => {
-    isPausedRef.current = true;
-    dispatch({ type: 'PAUSE_BATTLE' });
-  }, []);
-
-  // Resume battle
-  const resumeBattle = useCallback(() => {
-    isPausedRef.current = false;
-    dispatch({ type: 'RESUME_BATTLE' });
-  }, []);
-
-  // Reset battle
-  const resetBattle = useCallback(() => {
-    cleanupTimers();
-    countdownValueRef.current = initialState.countdown;
-    battleTimeRef.current = initialState.battleTime;
-    isPausedRef.current = initialState.isPaused;
-    dispatch({ type: 'RESET_BATTLE' });
-  }, [cleanupTimers]);
-
   // Cleanup on unmount
   useEffect(() => {
     return cleanupTimers;
   }, [cleanupTimers]);
 
+  // Combine state with local timer values
+  const combinedState = {
+    ...state,
+    countdown,
+    battleTime
+  };
+
   return {
-    state,
+    state: combinedState,
     dispatch,
     startCountdown,
     startBattle,
     endBattle,
-    pauseBattle,
-    resumeBattle,
-    resetBattle,
     timerConfig: TIMER_CONFIG
   };
 } 

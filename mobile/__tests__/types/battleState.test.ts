@@ -42,23 +42,11 @@ describe('BattleState Types', () => {
       const startCountdown: BattleStateAction = { type: 'START_COUNTDOWN' };
       const startBattle: BattleStateAction = { type: 'START_BATTLE' };
       const endBattle: BattleStateAction = { type: 'END_BATTLE', winner: 'user' };
-      const updateTimer: BattleStateAction = { type: 'UPDATE_TIMER', time: 5 };
-      const updateCountdown: BattleStateAction = { type: 'UPDATE_COUNTDOWN', countdown: 2 };
-      const pauseBattle: BattleStateAction = { type: 'PAUSE_BATTLE' };
-      const resumeBattle: BattleStateAction = { type: 'RESUME_BATTLE' };
-      const resetBattle: BattleStateAction = { type: 'RESET_BATTLE' };
 
       expect(startCountdown.type).toBe('START_COUNTDOWN');
       expect(startBattle.type).toBe('START_BATTLE');
       expect(endBattle.type).toBe('END_BATTLE');
       expect(endBattle.winner).toBe('user');
-      expect(updateTimer.type).toBe('UPDATE_TIMER');
-      expect(updateTimer.time).toBe(5);
-      expect(updateCountdown.type).toBe('UPDATE_COUNTDOWN');
-      expect(updateCountdown.countdown).toBe(2);
-      expect(pauseBattle.type).toBe('PAUSE_BATTLE');
-      expect(resumeBattle.type).toBe('RESUME_BATTLE');
-      expect(resetBattle.type).toBe('RESET_BATTLE');
     });
   });
 }); 

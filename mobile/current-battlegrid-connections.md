@@ -1,41 +1,169 @@
-# Battle Grid File Connections Map
+# BattleGridScreen.tsx Workflow Connections
 
-_This file tracks the direct file connections for the current BattleGridScreen.tsx workflow. Use this to quickly see which files are actively involved and how they relate._
+**Last Updated:** Current session  
+**Purpose:** Track all files directly connected to BattleGridScreen.tsx workflow through imports  
+**Scope:** Only files that are actually imported/used in the BattleGridScreen workflow  
 
-## Diagram: File Connection Flow
-
-```mermaid
-graph TD
-  A["BattleGridScreen.tsx"]
-  B["useBattleNodes.ts"]
-  C["useBattleNetwork.ts"]
-  D["BattleNetworkGrid.tsx"]
-  E["BattleOverlayManager.tsx"]
-  F["TurfScreen.tsx"]
-  G["calculateNodePositions (in useBattleNodes.ts)"]
-  H["getNetworkConnections (in useBattleNetwork.ts)"]
-
-  F --> A
-  A --> B
-  A --> C
-  A --> D
-  A --> E
-  B --> G
-  C --> H
-  D --> C
+## Navigation Flow
+```
+TurfScreen.tsx → BattleGridScreen.tsx
 ```
 
-## Connection Notes
+## Core Files
 
-- **[TurfScreen.tsx](./src/screens/TurfScreen.tsx) → [BattleGridScreen.tsx](./src/screens/BattleGridScreen.tsx)**: TurfScreen renders BattleGridScreen as the main entry point for the battle grid UI.
-- **[BattleGridScreen.tsx](./src/screens/BattleGridScreen.tsx) → [useBattleNodes.ts](./src/hooks/useBattleNodes.ts)**: Uses `useInitialBattleNodes` to get node positions for the grid.
-- **[BattleGridScreen.tsx](./src/screens/BattleGridScreen.tsx) → [useBattleNetwork.ts](./src/hooks/useBattleNetwork.ts)**: Uses `useBattleNetworkConnections` to get network connection data.
-- **[BattleGridScreen.tsx](./src/screens/BattleGridScreen.tsx) → [BattleNetworkGrid.tsx](./src/components/battle/BattleNetworkGrid.tsx)**: Renders the network grid visualization.
-- **[BattleGridScreen.tsx](./src/screens/BattleGridScreen.tsx) → [BattleOverlayManager.tsx](./src/components/battle/BattleOverlayManager.tsx)**: Renders overlays (UI elements above the grid).
-- **[useBattleNodes.ts](./src/hooks/useBattleNodes.ts) → calculateNodePositions**: The hook calls this function to compute node positions.
-- **[useBattleNetwork.ts](./src/hooks/useBattleNetwork.ts) → getNetworkConnections**: The hook calls this function to compute network connections.
-- **[BattleNetworkGrid.tsx](./src/components/battle/BattleNetworkGrid.tsx) → [useBattleNetwork.ts](./src/hooks/useBattleNetwork.ts)**: Imports types and helpers for rendering connections.
+### 1. BattleGridScreen.tsx
+- **Location:** `mobile/src/screens/BattleGridScreen.tsx`
+- **Purpose:** Main battle screen container with network visualization
+- **Imports:**
+  - `useInitialBattleNodes` from `../hooks/useBattleNodes`
+  - `useBattleNetworkConnections` from `../hooks/useBattleNetwork`
+  - `BattleNetworkGrid` from `../components/battle/BattleNetworkGrid`
+  - `BattleOverlayManager` from `../components/battle/BattleOverlayManager`
 
----
+### 2. TurfScreen.tsx
+- **Location:** `mobile/src/screens/TurfScreen.tsx`
+- **Purpose:** Navigation container that renders BattleGridScreen
+- **Connection:** Imports and renders `BattleGridScreen` component
+- **Navigation:** `case 'battle': return <BattleGridScreen onClose={...} />`
 
-_This file is intended to be used alongside [current-task.md](./current-task.md) to keep track of the active files and their relationships in the battle grid workflow._ 
+## Hooks
+
+### 3. useBattleNodes.ts
+- **Location:** `mobile/src/hooks/useBattleNodes.ts`
+- **Purpose:** Single source of truth for battle node state, positions, and rendering
+- **Imports:**
+  - `NodeIndex` from `../types/battleTypes`
+- **Exports:**
+  - `useInitialBattleNodes` (used by BattleGridScreen)
+  - `calculateNodePositions`
+  - `useNodeOwnership`
+  - `getNodeColor`, `getNodeBorderColor`
+  - `NodeOwner` type
+
+### 4. useBattleNetwork.ts
+- **Location:** `mobile/src/hooks/useBattleNetwork.ts`
+- **Purpose:** Hook for managing battle network connections and line calculations
+- **Imports:**
+  - `NodeIndex` from `../types/battleTypes`
+- **Exports:**
+  - `useBattleNetworkConnections` (used by BattleGridScreen)
+  - `getNetworkConnections`
+  - `calculateLineProperties`
+  - `NetworkConnection` interface
+  - `LineProperties` interface
+
+### 5. useBattleState.ts
+- **Location:** `mobile/src/hooks/useBattleState.ts`
+- **Purpose:** Battle state management hook with timer functionality
+- **Imports:**
+  - `BattlePhase` from `../types/battleTypes`
+  - `BattleStateData`, `BattleStateAction`, `BattleTimerConfig` from `../types/battleState`
+- **Exports:**
+  - `useBattleState` (used by BattleOverlayManager)
+
+## Components
+
+### 6. BattleNetworkGrid.tsx
+- **Location:** `mobile/src/components/battle/BattleNetworkGrid.tsx`
+- **Purpose:** Single network visualization component that renders nodes and connections
+- **Imports:**
+  - `NodeIndex` from `../../types/battleTypes`
+  - `NetworkConnection`, `calculateLineProperties` from `../../hooks/useBattleNetwork`
+  - `BattleNodeState`, `getNodeColor`, `getNodeBorderColor` from `../../hooks/useBattleNodes`
+- **Used by:** BattleGridScreen.tsx
+
+### 7. BattleOverlayManager.tsx
+- **Location:** `mobile/src/components/battle/BattleOverlayManager.tsx`
+- **Purpose:** Manages and displays battle overlays (countdown, timer)
+- **Imports:**
+  - `useBattleState` from `../../hooks/useBattleState`
+  - `BattlePhase` from `../../types/battleTypes`
+  - `BattleCountdownOverlay` from `./BattleCountdownOverlay`
+  - `BattleTimerDisplay` from `./BattleTimerDisplay`
+- **Used by:** BattleGridScreen.tsx
+
+### 8. BattleCountdownOverlay.tsx
+- **Location:** `mobile/src/components/battle/BattleCountdownOverlay.tsx`
+- **Purpose:** Full-screen countdown overlay for battle initialization
+- **Imports:** Only React Native imports (no custom imports)
+- **Used by:** BattleOverlayManager.tsx
+
+### 9. BattleTimerDisplay.tsx
+- **Location:** `mobile/src/components/battle/BattleTimerDisplay.tsx`
+- **Purpose:** Battle timer display for active battle phase
+- **Imports:** Only React Native imports (no custom imports)
+- **Used by:** BattleOverlayManager.tsx
+
+## Types
+
+### 10. battleTypes.ts
+- **Location:** `mobile/src/types/battleTypes.ts`
+- **Purpose:** Core type definitions for the battle system
+- **Imports:** None (pure types file)
+- **Exports:**
+  - `NodeIndex` type (used by useBattleNodes, useBattleNetwork, BattleNetworkGrid)
+  - `BattlePhase` enum (used by useBattleState, BattleOverlayManager)
+  - `NodePosition` type
+  - `BattleNode` interface
+  - `BattalionType` enum
+  - `Battalion` interface
+  - `BattleState` interface
+  - `Path` type
+  - `NetworkConnection` type
+  - `MovementTarget` interface
+
+### 11. battleState.ts
+- **Location:** `mobile/src/types/battleState.ts`
+- **Purpose:** Battle state management types
+- **Imports:**
+  - `BattlePhase` from `./battleTypes`
+- **Exports:**
+  - `BattleTimerConfig` interface (used by useBattleState)
+  - `BattleStateData` interface (used by useBattleState)
+  - `BattleStateAction` type (used by useBattleState)
+  - `BattleStateContext` interface
+
+## Test Files
+
+### 12. useBattleNetwork.test.ts
+- **Location:** `mobile/__tests__/hooks/useBattleNetwork.test.ts`
+- **Purpose:** Tests for useBattleNetworkConnections hook
+- **Imports:**
+  - `getNetworkConnections`, `calculateLineProperties` from `../../src/hooks/useBattleNetwork`
+
+### 13. useBattleNodes.test.ts
+- **Location:** `mobile/__tests__/hooks/useBattleNodes.test.ts`
+- **Purpose:** Tests for useInitialBattleNodes hook logic
+- **Imports:**
+  - `useInitialBattleNodes`, `calculateNodePositions` from `../../src/hooks/useBattleNodes`
+  - `getNodeColor`, `getNodeBorderColor`, `NodeOwner` from `../../src/hooks/useBattleNodes`
+  - `NodeIndex` from `../../src/types/battleTypes`
+
+### 14. useBattleState.test.ts
+- **Location:** `mobile/__tests__/hooks/useBattleState.test.ts`
+- **Purpose:** Tests for useBattleState hook
+- **Imports:**
+  - `useBattleState` from `../../src/hooks/useBattleState`
+  - `BattlePhase` from `../../src/types/battleTypes`
+
+### 15. battleState.test.ts
+- **Location:** `mobile/__tests__/types/battleState.test.ts`
+- **Purpose:** Tests for battle state types
+- **Imports:**
+  - `BattleTimerConfig`, `BattleStateData`, `BattleStateAction` from `../../src/types/battleState`
+  - `BattlePhase` from `../../src/types/battleTypes`
+
+## Import Chain Summary
+
+**BattleGridScreen.tsx** imports:
+1. `useInitialBattleNodes` → **useBattleNodes.ts** → imports `NodeIndex` from **battleTypes.ts**
+2. `useBattleNetworkConnections` → **useBattleNetwork.ts** → imports `NodeIndex` from **battleTypes.ts**
+3. `BattleNetworkGrid` → **BattleNetworkGrid.tsx** → imports from **battleTypes.ts**, **useBattleNetwork.ts**, **useBattleNodes.ts**
+4. `BattleOverlayManager` → **BattleOverlayManager.tsx** → imports from **useBattleState.ts**, **battleTypes.ts**, **BattleCountdownOverlay.tsx**, **BattleTimerDisplay.tsx**
+
+**TurfScreen.tsx** imports:
+- `BattleGridScreen` → **BattleGridScreen.tsx**
+
+## Total Files: 15
+
+This represents the complete, verified import chain for the BattleGridScreen.tsx workflow. All connections are based on actual import statements, and no legacy files are included. 
