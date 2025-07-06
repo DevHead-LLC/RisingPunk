@@ -46,7 +46,7 @@ Damage = Attack Power / (Defense % * 100)
 - **Speed**: Movement speed along network lines
 - **Range**: Attack range from current position
 
-### Bot Categories (Legacy System)
+### Bot Categories
 
 #### Guardian (Cavalry)
 - **Role**: Cavalry
