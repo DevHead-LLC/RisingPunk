@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { CloseButton } from '../components/common/CloseButton';
+import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { API_URL } from '../config';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { toggleLegend } from '../store/slices/uiSlice';
