@@ -12,14 +12,14 @@ import { CloseButton } from '../components/common/CloseButton';
 import { useAppSelector } from '../store/hooks';
 import { SIZING } from '../styles/theme';
 import { COLORS } from '../styles/theme';
-import { BOT_CATEGORIES } from '../utils/battleConstants';
+import { useBots, BotType } from '../hooks/useBots';
 
 type MarkLevel = 1 | 2 | 3 | 4;
-type BotType = 'breacher' | 'guardian' | 'phreak';
 
 export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
   const botCounts = useAppSelector((state) => state.bots.botCounts);
   const [selectedMark, setSelectedMark] = useState<MarkLevel>(1);
+  const { BOT_CATEGORIES, getBotRole, getBotAdvantage, getBotStatsForType } = useBots();
 
   const BotCard = ({ type }: { type: BotType }) => {
     const hackerLore = {
@@ -32,7 +32,7 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
       <View style={styles.botCard}>
         <View style={styles.botHeader}>
           <Text style={styles.botName}>{type.toUpperCase()}</Text>
-          <Text style={styles.botRole}>{BOT_CATEGORIES?.[type]?.role || 'Unknown'}</Text>
+          <Text style={styles.botRole}>{getBotRole(type)}</Text>
         </View>
         
         <View style={styles.botContent}>
@@ -47,11 +47,11 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
           <View style={styles.infoContainer}>
             <View style={styles.loreContainer}>
               <Text style={styles.hackerLore}>{hackerLore[type]}</Text>
-              <Text style={styles.advantageText}>{BOT_CATEGORIES?.[type]?.advantage || 'No advantage data'}</Text>
+              <Text style={styles.advantageText}>{getBotAdvantage(type)}</Text>
             </View>
 
             <View style={styles.statsContainer}>
-              {BOT_CATEGORIES?.[type]?.stats ? Object.entries(BOT_CATEGORIES[type].stats).map(([stat, value]) => (
+              {getBotStatsForType(type) ? Object.entries(getBotStatsForType(type)!).map(([stat, value]) => (
                 <View key={stat} style={styles.statRow}>
                   <Text style={styles.statLabel}>
                     {stat === 'range' ? 'ATTACK DISTANCE' :
