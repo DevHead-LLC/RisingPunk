@@ -3,17 +3,17 @@
  * @description Tests for core battle type definitions (Batch 1A)
  */
 
-import { 
-  NodeIndex, 
-  NodePosition, 
-  BattleNode, 
-  BattalionType, 
-  Battalion, 
-  BattlePhase, 
+import {
+  NodeIndex,
+  NodePosition,
+  BattleNode,
+  BattalionType,
+  Battalion,
+  BattlePhase,
   BattleState,
   Path,
   NetworkConnection,
-  MovementTarget
+  MovementTarget,
 } from '../../src/types/battleTypes';
 
 describe('Battle Types (Batch 1A)', () => {
@@ -45,9 +45,9 @@ describe('Battle Types (Batch 1A)', () => {
         position: { x: 100, y: 200 },
         owner: 'user',
         health: 100,
-        captureProgress: 0
+        captureProgress: 0,
       };
-      
+
       expect(node.index).toBe(0);
       expect(node.owner).toBe('user');
       expect(node.health).toBe(100);
@@ -57,9 +57,9 @@ describe('Battle Types (Batch 1A)', () => {
       const node: BattleNode = {
         index: 1,
         position: { x: 150, y: 250 },
-        owner: 'neutral'
+        owner: 'neutral',
       };
-      
+
       expect(node.index).toBe(1);
       expect(node.owner).toBe('neutral');
       expect(node.health).toBeUndefined();
@@ -93,4 +93,4 @@ describe('Battle Types (Batch 1A)', () => {
       expect(connection).toEqual([0, 3]);
     });
   });
-}); 
+});

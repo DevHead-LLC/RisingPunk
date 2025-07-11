@@ -12,18 +12,18 @@ type HomeScreenProps = {
   onNavigateToBattle: () => void;
 };
 
-export const HomeScreen = memo(function HomeScreen({ 
-  onClose, 
+export const HomeScreen = memo(function HomeScreen({
+  onClose,
   onNavigateToMap,
   onNavigateToBotAssembly,
-  onNavigateToBattle
+  onNavigateToBattle,
 }: HomeScreenProps): React.JSX.Element {
   return (
     <View style={styles.container}>
       <CloseButton onPress={onClose} />
       <View style={styles.content}>
-        <HackRigDisplay 
-          onPress={onNavigateToMap} 
+        <HackRigDisplay
+          onPress={onNavigateToMap}
           onNavigateToBattle={onNavigateToBattle}
         />
         <BotAssembly onPress={onNavigateToBotAssembly} />
@@ -44,4 +44,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SIZING.spacing.lg,
   },
-}); 
+});

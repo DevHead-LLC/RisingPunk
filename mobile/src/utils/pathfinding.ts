@@ -34,7 +34,7 @@ export const findShortestPaths = (
     const { index: currentIndex } = pq.shift()!;
 
     if (distances[currentIndex] === Infinity) {
-      break; 
+      break;
     }
 
     const connectedNodeIndices = getConnectedNodes(currentIndex);
@@ -44,10 +44,10 @@ export const findShortestPaths = (
       const neighborNode = nodes[neighborIndex];
       // The 'cost' to travel between nodes is their direct physical distance.
       const distance = Math.sqrt(
-        Math.pow(currentNode.x - neighborNode.x, 2) + 
+        Math.pow(currentNode.x - neighborNode.x, 2) +
         Math.pow(currentNode.y - neighborNode.y, 2)
       );
-      
+
       const newDist = distances[currentIndex] + distance;
 
       if (newDist < distances[neighborIndex]) {
@@ -86,7 +86,7 @@ export const reconstructPath = (
     path.unshift(startNodeIndex);
     return path;
   }
-  
+
   return []; // No path found
 };
 
@@ -106,9 +106,9 @@ export const validateNetworkLinePath = (path: number[]): { isValid: boolean; con
   for (let i = 0; i < path.length - 1; i++) {
     const fromNode = path[i];
     const toNode = path[i + 1];
-    
+
     // Check if this connection exists in NETWORK_CONNECTIONS
-    const isValidConnection = NETWORK_CONNECTIONS.some(([from, to]) => 
+    const isValidConnection = NETWORK_CONNECTIONS.some(([from, to]) =>
       (from === fromNode && to === toNode) || (from === toNode && to === fromNode)
     );
 
@@ -141,8 +141,8 @@ export const findNearestNetworkLine = (
   for (const [fromIndex, toIndex] of NETWORK_CONNECTIONS) {
     const fromNode = nodes[fromIndex];
     const toNode = nodes[toIndex];
-    
-    if (!fromNode || !toNode) continue;
+
+    if (!fromNode || !toNode) {continue;}
 
     // Calculate distance from position to this line segment
     const distance = distanceToLineSegment(
@@ -154,7 +154,7 @@ export const findNearestNetworkLine = (
     if (distance < minDistance) {
       minDistance = distance;
       nearestLine = [fromIndex, toIndex];
-      
+
       // Calculate the nearest point on this line
       nearestPoint = nearestPointOnLineSegment(
         position,
@@ -182,7 +182,7 @@ const distanceToLineSegment = (
 
   const dot = A * C + B * D;
   const lenSq = C * C + D * D;
-  
+
   if (lenSq === 0) {
     // Line segment is actually a point
     return Math.sqrt(A * A + B * B);
@@ -222,7 +222,7 @@ const nearestPointOnLineSegment = (
 
   const dot = A * C + B * D;
   const lenSq = C * C + D * D;
-  
+
   if (lenSq === 0) {
     return { x: lineStart.x, y: lineStart.y };
   }
@@ -236,7 +236,7 @@ const nearestPointOnLineSegment = (
   } else {
     return {
       x: lineStart.x + param * C,
-      y: lineStart.y + param * D
+      y: lineStart.y + param * D,
     };
   }
 };
@@ -245,9 +245,9 @@ const nearestPointOnLineSegment = (
  * Finds the optimal path for battalion-to-battalion targeting through network nodes
  * This function handles complex scenarios where battalions are on different network lines
  * and need to traverse through intermediate nodes to reach their target
- * 
+ *
  * @param startNodeIndex The starting node index
- * @param targetNodeIndex The target node index  
+ * @param targetNodeIndex The target node index
  * @param nodes Array of all nodes in the battle network
  * @returns Object containing optimal path and debug information
  */
@@ -255,22 +255,22 @@ export const findOptimalBattalionPath = (
   startNodeIndex: number,
   targetNodeIndex: number,
   nodes: BattleNode[]
-): { 
-  path: number[]; 
-  distance: number; 
+): {
+  path: number[];
+  distance: number;
   nodeTransitions: number;
   pathOptions: { path: number[]; distance: number; transitions: number }[];
   selectedReason: string;
 } => {
 
-  
+
   // Get all possible paths using Dijkstra's algorithm
   const { distances, previousNodes } = findShortestPaths(startNodeIndex, nodes);
   const primaryPath = reconstructPath(startNodeIndex, targetNodeIndex, previousNodes);
-  
+
   // Calculate alternative paths by considering different network line approaches
   const pathOptions: { path: number[]; distance: number; transitions: number }[] = [];
-  
+
   // Primary path (direct shortest path)
   if (primaryPath.length > 0) {
     const primaryDistance = distances[targetNodeIndex];
@@ -278,14 +278,14 @@ export const findOptimalBattalionPath = (
     pathOptions.push({
       path: primaryPath,
       distance: primaryDistance,
-      transitions: primaryTransitions
+      transitions: primaryTransitions,
     });
   }
-  
+
   // Find alternative paths through different network lines
   const alternativePaths = findAlternativePaths(startNodeIndex, targetNodeIndex, nodes);
   pathOptions.push(...alternativePaths);
-  
+
   // Sort by distance first, then by number of transitions
   pathOptions.sort((a, b) => {
     if (Math.abs(a.distance - b.distance) < 0.1) {
@@ -294,20 +294,20 @@ export const findOptimalBattalionPath = (
     }
     return a.distance - b.distance;
   });
-  
+
   const selectedPath = pathOptions[0];
-  const selectedReason = pathOptions.length > 1 
+  const selectedReason = pathOptions.length > 1
     ? `Selected path with ${selectedPath.transitions} transitions over ${pathOptions.length} options`
     : 'Single path available';
-  
 
-  
+
+
   return {
     path: selectedPath?.path || [],
     distance: selectedPath?.distance || 0,
     nodeTransitions: selectedPath?.transitions || 0,
     pathOptions,
-    selectedReason
+    selectedReason,
   };
 };
 
@@ -321,34 +321,34 @@ const findAlternativePaths = (
   nodes: BattleNode[]
 ): { path: number[]; distance: number; transitions: number }[] => {
   const alternatives: { path: number[]; distance: number; transitions: number }[] = [];
-  
+
   // Get all nodes that connect to the target node
   const targetConnections = getConnectedNodes(targetNodeIndex);
-  
+
   // For each connection to the target, try finding a path through that connection
   for (const connectionNode of targetConnections) {
-    if (connectionNode === startNodeIndex) continue; // Skip if it's the start node
-    
+    if (connectionNode === startNodeIndex) {continue;} // Skip if it's the start node
+
     const { distances, previousNodes } = findShortestPaths(startNodeIndex, nodes);
     const pathToConnection = reconstructPath(startNodeIndex, connectionNode, previousNodes);
-    
+
     if (pathToConnection.length > 0) {
       // Add the target node to complete the path
       const fullPath = [...pathToConnection, targetNodeIndex];
-      const totalDistance = distances[connectionNode] + 
+      const totalDistance = distances[connectionNode] +
         Math.sqrt(
-          Math.pow(nodes[connectionNode].x - nodes[targetNodeIndex].x, 2) + 
+          Math.pow(nodes[connectionNode].x - nodes[targetNodeIndex].x, 2) +
           Math.pow(nodes[connectionNode].y - nodes[targetNodeIndex].y, 2)
         );
-      
+
       alternatives.push({
         path: fullPath,
         distance: totalDistance,
-        transitions: fullPath.length - 1
+        transitions: fullPath.length - 1,
       });
     }
   }
-  
+
   return alternatives;
 };
 
@@ -360,16 +360,16 @@ export const validateBattalionPath = (
   path: number[],
   startNodeIndex: number,
   targetNodeIndex: number
-): { 
-  isValid: boolean; 
-  connectionCount: number; 
+): {
+  isValid: boolean;
+  connectionCount: number;
   invalidConnections: [number, number][];
   networkViolations: string[];
   debugInfo: any;
 } => {
   const validation = validateNetworkLinePath(path);
   const networkViolations: string[] = [];
-  
+
   // Additional validation for battalion paths
   if (path.length > 0) {
     if (path[0] !== startNodeIndex) {
@@ -379,21 +379,21 @@ export const validateBattalionPath = (
       networkViolations.push(`Path does not end at target node ${targetNodeIndex}`);
     }
   }
-  
+
   const debugInfo = {
     path,
     startNodeIndex,
     targetNodeIndex,
     pathLength: path.length,
     expectedStart: startNodeIndex,
-    expectedEnd: targetNodeIndex
+    expectedEnd: targetNodeIndex,
   };
-  
+
   return {
     isValid: validation.isValid && networkViolations.length === 0,
     connectionCount: validation.connectionCount,
     invalidConnections: validation.invalidConnections,
     networkViolations,
-    debugInfo
+    debugInfo,
   };
-}; 
+};

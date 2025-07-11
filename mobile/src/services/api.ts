@@ -22,7 +22,7 @@ export const api = {
         },
         body: JSON.stringify(credentials),
       });
-      
+
       if (!response.ok) {
         try {
           const error = await response.json();
@@ -57,7 +57,7 @@ export const api = {
         },
         body: JSON.stringify(credentials),
       });
-      
+
       if (!response.ok) {
         try {
           const error = await response.json();
@@ -82,4 +82,4 @@ export const api = {
       throw error;
     }
   },
-}; 
+};

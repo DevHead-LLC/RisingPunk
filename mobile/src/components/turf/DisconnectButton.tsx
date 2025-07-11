@@ -30,4 +30,4 @@ const styles = StyleSheet.create({
     fontSize: SIZING.font.small,
     letterSpacing: 1,
   },
-}); 
+});

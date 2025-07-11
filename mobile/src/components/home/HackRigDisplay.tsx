@@ -1,8 +1,7 @@
-import React, {memo, useRef, useState} from 'react';
+import React, {useRef, useState} from 'react';
 import {View, StyleSheet, TouchableOpacity, Image, Text, Animated, Alert} from 'react-native';
 import { COLORS, SIZING } from '../../styles/theme';
-import { useAppSelector, useAppDispatch } from '../../store/hooks';
-import { unlockHackRig } from '../../store/slices/authSlice';
+import { useAppSelector } from '../../store/hooks';
 
 type Props = {
   onPress: () => void;
@@ -11,10 +10,10 @@ type Props = {
 
 export const HackRigDisplay = ({ onPress, onNavigateToBattle }: Props) => {
   const user = useAppSelector((state) => state.auth.user);
-  const dispatch = useAppDispatch();
+
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  
+
   const isLocked = !user?.unlockedFeatures?.hackRig;
 
   const startPulseAnimation = () => {
@@ -51,23 +50,23 @@ export const HackRigDisplay = ({ onPress, onNavigateToBattle }: Props) => {
 
     // TODO: system alert is scary, redesign for in-game alert look for cyberpunk style
     Alert.alert(
-      "System Breach Detected",
-      "TESLA_GRID has root access to your system. Shell injection detected in Hack Rig kernel.\n\nInitiate countermeasures to regain control.",
+      'System Breach Detected',
+      'TESLA_GRID has root access to your system. Shell injection detected in Hack Rig kernel.\n\nInitiate countermeasures to regain control.',
       [
         {
-          text: "Cancel",
-          style: "cancel",
+          text: 'Cancel',
+          style: 'cancel',
           onPress: () => {
             setIsAlertOpen(false);
             pulseAnim.stopAnimation();
             pulseAnim.setValue(1);
-          }
+          },
         },
         {
-          text: "EXECUTE EXPLOIT",
+          text: 'EXECUTE EXPLOIT',
           onPress: handleExploit,
-          style: "destructive"
-        }
+          style: 'destructive',
+        },
       ]
     );
   };
@@ -78,15 +77,15 @@ export const HackRigDisplay = ({ onPress, onNavigateToBattle }: Props) => {
         styles.moduleContainer,
         isLocked && styles.moduleDisabled,
         isAlertOpen && styles.warningBorder,
-        { transform: [{ scale: pulseAnim }] }
+        { transform: [{ scale: pulseAnim }] },
       ]}
     >
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.touchable}
         onPress={isLocked ? handlePress : onPress}
       >
         <View style={styles.imageContainer}>
-          <Image 
+          <Image
             source={require('../../assets/images/hacker-rig.png')}
             style={styles.moduleImage}
           />
@@ -168,5 +167,5 @@ const styles = StyleSheet.create({
   },
   moduleDisabled: {
     opacity: 0.5,
-  }
-}); 
+  },
+});

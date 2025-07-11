@@ -1,13 +1,13 @@
 import React, {useState, useRef, useEffect, useCallback, memo} from 'react';
-import {View, StyleSheet, TouchableOpacity, Text, ScrollView, Dimensions} from 'react-native';
+import {View, StyleSheet, ScrollView, Dimensions} from 'react-native';
 import {Balance} from '../components/common/Balance';
 import {HomeScreen} from './HomeScreen';
 import {DigitalBarracksScreen} from './DigitalBarracksScreen';
 import {ProfileScreen} from './ProfileScreen';
 import {HackMapScreen} from './HackMapScreen';
 import {BotAssemblyScreen} from './BotAssemblyScreen';
-import { useAppDispatch } from '../store/hooks';
-import {COLORS, SIZING} from '../styles/theme';
+
+import {COLORS} from '../styles/theme';
 import {ProfileLocation} from '../components/turf/ProfileLocation';
 import {HomeLocation} from '../components/turf/HomeLocation';
 import {DigitalBarracksLocation} from '../components/turf/DigitalBarracksLocation';
@@ -27,7 +27,7 @@ const DiagonalLines = memo(() => (
 
 const ScrollViewMemo = memo(function ScrollViewMemo({
   children,
-  horizontalScrollRef
+  horizontalScrollRef,
 }: {
   children: React.ReactNode;
   horizontalScrollRef: React.RefObject<ScrollView>;
@@ -37,7 +37,7 @@ const ScrollViewMemo = memo(function ScrollViewMemo({
   const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
 
   return (
-    <ScrollView 
+    <ScrollView
       ref={horizontalScrollRef}
       horizontal={true}
       showsHorizontalScrollIndicator={false}
@@ -59,9 +59,7 @@ const ScrollViewMemo = memo(function ScrollViewMemo({
 
 export function TurfScreen(): React.JSX.Element {
   const [currentScreen, setCurrentScreen] = useState('turf');
-  const dispatch = useAppDispatch();
   const horizontalScrollRef = useRef<ScrollView>(null);
-  const verticalScrollRef = useRef<ScrollView>(null);
 
   const navigateToScreen = useCallback((screen: string) => {
     setCurrentScreen(screen);
@@ -71,12 +69,12 @@ export function TurfScreen(): React.JSX.Element {
     const SCREEN_WIDTH = Dimensions.get('window').width;
     const CONTENT_WIDTH = 2000;
     const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
-    
+
     // Set initial scroll position without animation
     horizontalScrollRef.current?.scrollTo({
       x: CENTER_X,
       y: 0,
-      animated: false
+      animated: false,
     });
   }, []);
 
@@ -88,14 +86,14 @@ export function TurfScreen(): React.JSX.Element {
   const renderScreen = useCallback(() => {
     switch (currentScreen) {
       case 'hackRig':
-        return <HomeScreen 
+        return <HomeScreen
           onClose={() => navigateToScreen('turf')}
           onNavigateToMap={() => navigateToScreen('map')}
           onNavigateToBotAssembly={() => navigateToScreen('botAssembly')}
           onNavigateToBattle={() => navigateToScreen('battlePrep')}
         />;
       case 'battlePrep':
-        return <BattlePreparationScreen 
+        return <BattlePreparationScreen
           onClose={() => {
             navigateToScreen('turf');
             setTimeout(() => navigateToScreen('hackRig'), 0);
@@ -246,4 +244,4 @@ const styles = StyleSheet.create({
     top: '70%',
     left: '-50%',
   },
-}); 
+});

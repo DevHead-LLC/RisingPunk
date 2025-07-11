@@ -16,23 +16,23 @@ type Props = {
   assignment?: BattalionAssignment;
 };
 
-export const BattalionSlot = React.memo(({ 
-  name, 
+export const BattalionSlot = React.memo(({
+  name,
   isLocked = false,
   isEnemy = false,
   onPress,
-  assignment 
+  assignment,
 }: Props) => {
   const slotStyle = [
     styles.slot,
     isEnemy ? styles.enemySlot : styles.activeSlot,
-    isLocked && (isEnemy ? styles.lockedEnemySlot : styles.lockedSlot)
+    isLocked && (isEnemy ? styles.lockedEnemySlot : styles.lockedSlot),
   ];
 
   const textStyle = [
     styles.slotText,
     isEnemy && styles.enemyText,
-    isLocked && styles.lockedText
+    isLocked && styles.lockedText,
   ];
 
   if (isLocked && !isEnemy) {
@@ -67,7 +67,7 @@ export const BattalionSlot = React.memo(({
   return isEnemy ? (
     <View style={slotStyle}>{content}</View>
   ) : (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={slotStyle}
       onPress={onPress}
       disabled={isLocked || isEnemy}
@@ -144,4 +144,4 @@ const styles = StyleSheet.create({
 const toRomanNumeral = (num: number): string => {
   const romanNumerals = ['I', 'II', 'III', 'IV'];
   return romanNumerals[num - 1] || '';
-}; 
+};

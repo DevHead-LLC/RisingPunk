@@ -109,4 +109,4 @@ describe('useBattleState', () => {
     expect(result.current.timerConfig.countdownDuration).toBe(3);
     expect(result.current.timerConfig.battleDuration).toBe(20);
   });
-}); 
+});

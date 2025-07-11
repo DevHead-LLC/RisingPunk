@@ -13,10 +13,10 @@ interface AuthInputsProps {
   handleInputChange: (field: string) => (value: string) => void;
 }
 
-export const AuthInputs = memo(function AuthInputs({ 
-  formType, 
-  formData, 
-  handleInputChange 
+export const AuthInputs = memo(function AuthInputs({
+  formType,
+  formData,
+  handleInputChange,
 }: AuthInputsProps) {
   if (formType === 'login') {
     return (
@@ -35,4 +35,4 @@ export const AuthInputs = memo(function AuthInputs({
       {renderInputWithCorner('VERIFY_ACCESS_KEY', formData.verifyAccessKey, handleInputChange('verifyAccessKey'), true)}
     </View>
   );
-}); 
+});

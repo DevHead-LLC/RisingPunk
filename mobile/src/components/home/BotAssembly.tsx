@@ -10,7 +10,7 @@ export const BotAssembly = memo(function BotAssembly({ onPress }: BotAssemblyPro
   return (
     <TouchableOpacity style={styles.moduleContainer} onPress={onPress}>
       <View style={styles.imageContainer}>
-        <Image 
+        <Image
           source={require('../../assets/images/bot-making.png')}
           style={styles.moduleImage}
         />
@@ -63,5 +63,5 @@ const styles = StyleSheet.create({
     color: '#9C27B0',
     fontSize: SIZING.font.small,
     marginTop: SIZING.spacing.xs,
-  }
-}); 
+  },
+});

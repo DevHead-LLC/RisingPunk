@@ -8,12 +8,12 @@ type DigitalBarracksLocationProps = {
 
 export const DigitalBarracksLocation = memo(function DigitalBarracksLocation({ onPress }: DigitalBarracksLocationProps) {
   return (
-    <TouchableOpacity 
-      style={[styles.location, styles.barracksPosition]} 
+    <TouchableOpacity
+      style={[styles.location, styles.barracksPosition]}
       onPress={onPress}
     >
       <View style={styles.iconContainer}>
-        <Image 
+        <Image
           source={require('../../assets/images/digital-barracks.png')}
           style={styles.locationIcon}
         />
@@ -43,9 +43,9 @@ const styles = StyleSheet.create({
     padding: SIZING.spacing.xs,
   },
   locationIcon: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'contain',
+    width: 100,
+    height: 100,
+    resizeMode: 'contain' as const,
   },
   locationLabel: {
     color: COLORS.secondary,
@@ -64,5 +64,5 @@ const styles = StyleSheet.create({
     right: '25%',
     transform: [{translateX: 60}, {translateY: -80}],
     zIndex: 3,
-  }
+  },
 });

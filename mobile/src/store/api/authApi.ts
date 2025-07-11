@@ -36,11 +36,11 @@ export const authApi = createApi({
     prepareHeaders: (headers, { getState }) => {
       const state = getState() as RootState;
       const token = state.auth?.token;
-      
+
       if (token) {
         headers.set('authorization', `Bearer ${token}`);
       }
-      
+
       headers.set('Content-Type', 'application/json');
       return headers;
     },
@@ -55,7 +55,7 @@ export const authApi = createApi({
       }),
       invalidatesTags: ['User'],
     }),
-    
+
     register: builder.mutation<AuthResponse, RegisterRequest>({
       query: (userData) => ({
         url: '/api/auth/register',
@@ -64,12 +64,12 @@ export const authApi = createApi({
       }),
       invalidatesTags: ['User'],
     }),
-    
+
     getProfile: builder.query<ProfileResponse, void>({
       query: () => '/api/user/profile',
       providesTags: ['User'],
     }),
-    
+
     unlockHackRig: builder.mutation<void, void>({
       query: () => ({
         url: '/api/users/unlock-hack-rig',
@@ -85,4 +85,4 @@ export const {
   useRegisterMutation,
   useGetProfileQuery,
   useUnlockHackRigMutation,
-} = authApi; 
+} = authApi;

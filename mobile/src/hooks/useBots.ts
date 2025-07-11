@@ -26,9 +26,9 @@ export const BOT_CATEGORIES: Record<BotType, BotCategory> = {
       speed: 9,
       range: 4,
       offense: 8,
-      defense: 6
+      defense: 6,
     },
-    advantage: 'Strong vs. Infantry, Weak vs. Ranged'
+    advantage: 'Strong vs. Infantry, Weak vs. Ranged',
   },
   breacher: { // Infantry
     role: 'Infantry',
@@ -37,9 +37,9 @@ export const BOT_CATEGORIES: Record<BotType, BotCategory> = {
       speed: 5,
       range: 5,
       offense: 7,
-      defense: 8
+      defense: 8,
     },
-    advantage: 'Strong vs. Ranged, Weak vs. Cavalry'
+    advantage: 'Strong vs. Ranged, Weak vs. Cavalry',
   },
   phreak: { // Ranged
     role: 'Ranged',
@@ -48,10 +48,10 @@ export const BOT_CATEGORIES: Record<BotType, BotCategory> = {
       speed: 7,
       range: 9,
       offense: 6,
-      defense: 5
+      defense: 5,
     },
-    advantage: 'Strong vs. Cavalry, Weak vs. Infantry'
-  }
+    advantage: 'Strong vs. Cavalry, Weak vs. Infantry',
+  },
 };
 
 // TODO: Enemy bot stats are temporarily increased for quicker battle results during testing. Revisit and clean this up after battle functionality is complete.
@@ -63,9 +63,9 @@ export const ENEMY_BOT_CATEGORIES: Record<BotType, BotCategory> = {
       speed: 9,
       range: 4,
       offense: 32, // 4x higher attack
-      defense: 6
+      defense: 6,
     },
-    advantage: 'Strong vs. Infantry, Weak vs. Ranged'
+    advantage: 'Strong vs. Infantry, Weak vs. Ranged',
   },
   breacher: { // Infantry
     role: 'Infantry',
@@ -74,9 +74,9 @@ export const ENEMY_BOT_CATEGORIES: Record<BotType, BotCategory> = {
       speed: 5,
       range: 5,
       offense: 28, // 4x higher attack
-      defense: 8
+      defense: 8,
     },
-    advantage: 'Strong vs. Ranged, Weak vs. Cavalry'
+    advantage: 'Strong vs. Ranged, Weak vs. Cavalry',
   },
   phreak: { // Ranged
     role: 'Ranged',
@@ -85,10 +85,10 @@ export const ENEMY_BOT_CATEGORIES: Record<BotType, BotCategory> = {
       speed: 7,
       range: 9,
       offense: 24, // 4x higher attack
-      defense: 5
+      defense: 5,
     },
-    advantage: 'Strong vs. Cavalry, Weak vs. Infantry'
-  }
+    advantage: 'Strong vs. Cavalry, Weak vs. Infantry',
+  },
 };
 
 /**
@@ -113,14 +113,14 @@ export const useBots = () => {
     // Bot categories
     BOT_CATEGORIES,
     ENEMY_BOT_CATEGORIES,
-    
+
     // Utility functions
     getBotStats,
-    
+
     // Helper functions
     getBotTypes: (): BotType[] => Object.keys(BOT_CATEGORIES) as BotType[],
     getBotRole: (type: BotType): string => BOT_CATEGORIES[type]?.role || 'Unknown',
     getBotAdvantage: (type: BotType): string => BOT_CATEGORIES[type]?.advantage || 'No advantage data',
     getBotStatsForType: (type: BotType): BotStats | undefined => BOT_CATEGORIES[type]?.stats,
   };
-}; 
+};

@@ -8,4 +8,4 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       {children}
     </Provider>
   );
-} 
+}

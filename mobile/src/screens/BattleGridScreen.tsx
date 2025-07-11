@@ -19,7 +19,7 @@ type Props = {
 export const BattleGridScreen = React.memo(({ onClose }: Props) => {
   // Use the single source of truth for node state/positions
   const nodes = useInitialBattleNodes({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
-  
+
   // Use the single source of truth for network connections
   const connections = useBattleNetworkConnections();
 
@@ -44,7 +44,7 @@ export const BattleGridScreen = React.memo(({ onClose }: Props) => {
             showNodeLabels={true}
           />
         </View>
-        
+
         {/* Title */}
         <Text style={styles.title}>Battle Grid Screen</Text>
         <Text style={styles.subtitle}>Network visualization complete</Text>
@@ -80,4 +80,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     opacity: 0.7,
   },
-}); 
+});

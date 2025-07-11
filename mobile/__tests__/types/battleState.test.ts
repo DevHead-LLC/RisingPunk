@@ -11,7 +11,7 @@ describe('BattleState Types', () => {
     it('should have correct structure', () => {
       const config: BattleTimerConfig = {
         countdownDuration: 3,
-        battleDuration: 20
+        battleDuration: 20,
       };
 
       expect(config.countdownDuration).toBe(3);
@@ -26,7 +26,7 @@ describe('BattleState Types', () => {
         countdown: 3,
         battleTime: 0,
         maxBattleTime: 20,
-        isPaused: false
+        isPaused: false,
       };
 
       expect(state.phase).toBe(BattlePhase.COUNTDOWN);
@@ -49,4 +49,4 @@ describe('BattleState Types', () => {
       expect(endBattle.winner).toBe('user');
     });
   });
-}); 
+});

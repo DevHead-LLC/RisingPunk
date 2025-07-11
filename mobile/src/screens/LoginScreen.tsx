@@ -23,10 +23,10 @@ const WelcomeMessage = memo(function WelcomeMessage({ formType }: { formType: Fo
   );
 });
 
-const ToggleFormButton = memo(function ToggleFormButton({ 
-  formType, 
-  onPress 
-}: { 
+const ToggleFormButton = memo(function ToggleFormButton({
+  formType,
+  onPress,
+}: {
   formType: FormType;
   onPress: () => void;
 }) {
@@ -40,7 +40,7 @@ const ToggleFormButton = memo(function ToggleFormButton({
 });
 
 const ErrorMessage = memo(function ErrorMessage({ error }: { error: string | null }) {
-  if (!error) return null;
+  if (!error) {return null;}
   return <Text style={styles.errorText}>{error}</Text>;
 });
 
@@ -69,7 +69,7 @@ export const LoginScreen = () => {
 
   const validateForm = () => {
     setError('');
-    
+
     if (formType === 'login') {
       if (!formData.handle || !formData.accessKey) {
         setError('ACCESS_DENIED: CREDENTIALS_REQUIRED');
@@ -120,7 +120,7 @@ export const LoginScreen = () => {
       } catch (err) {
         // Convert technical errors to user-friendly messages
         let userMessage = 'ACCESS_DENIED: ';
-        
+
         if (err instanceof Error) {
           if (err.message.includes('Network error')) {
             userMessage += 'SERVER_UNAVAILABLE';
@@ -134,7 +134,7 @@ export const LoginScreen = () => {
         } else {
           userMessage += 'UNKNOWN_ERROR';
         }
-        
+
         setError(userMessage);
       } finally {
         setLoading(false);
@@ -146,15 +146,15 @@ export const LoginScreen = () => {
     if (formType === 'login') {
       return formData.handle.trim().length > 0 && formData.accessKey.trim().length > 0;
     }
-    return formData.email.trim().length > 0 && 
-           formData.handle.trim().length > 0 && 
-           formData.accessKey.trim().length > 0 && 
+    return formData.email.trim().length > 0 &&
+           formData.handle.trim().length > 0 &&
+           formData.accessKey.trim().length > 0 &&
            formData.verifyAccessKey.trim().length > 0;
   }, [formType, formData]);
 
   // Update button disabled state
   const isSubmitDisabled = isLoading || !isFormValid;
-  
+
   const toggleFormType = useCallback(() => {
     setFormType(prev => prev === 'login' ? 'register' : 'login');
     clearFormError();
@@ -187,11 +187,11 @@ export const LoginScreen = () => {
     <View style={styles.formContainer}>
       {renderInputWithCorner('HANDLE', formData.handle, handleInputChange('handle'))}
       {renderInputWithCorner('ACCESS_KEY', formData.accessKey, handleInputChange('accessKey'), true)}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[
-          styles.jackInButton, 
-          isSubmitDisabled && styles.buttonDisabled
-        ]} 
+          styles.jackInButton,
+          isSubmitDisabled && styles.buttonDisabled,
+        ]}
         onPress={handleSubmit}
         disabled={isSubmitDisabled}
       >
@@ -207,12 +207,12 @@ export const LoginScreen = () => {
       {renderInputWithCorner('SELECT_HANDLE', formData.handle, handleInputChange('handle'))}
       {renderInputWithCorner('SET_ACCESS_KEY', formData.accessKey, handleInputChange('accessKey'), true)}
       {renderInputWithCorner('VERIFY_ACCESS_KEY', formData.verifyAccessKey, handleInputChange('verifyAccessKey'), true)}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[
-          styles.jackInButton, 
+          styles.jackInButton,
           styles.createButton,
-          isSubmitDisabled && styles.buttonDisabled
-        ]} 
+          isSubmitDisabled && styles.buttonDisabled,
+        ]}
         onPress={handleSubmit}
         disabled={isSubmitDisabled}
       >
@@ -239,7 +239,7 @@ export const LoginScreen = () => {
       </View>
     </ScreenContainer>
   );
-}
+};
 
 const styles = StyleSheet.create({
   content: {
@@ -352,4 +352,4 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     backgroundColor: COLORS.buttonDisabled,
   },
-}); 
+});

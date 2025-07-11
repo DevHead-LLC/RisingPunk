@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { COLORS, SIZING } from '../../../styles/theme';
+import { SIZING } from '../../../styles/theme';
 
 export const styles = StyleSheet.create({
   modalOverlay: {
@@ -75,4 +75,4 @@ export const styles = StyleSheet.create({
   deployButtonTextDisabled: {
     color: 'rgba(71, 23, 246, 0.3)',
   },
-}); 
+});

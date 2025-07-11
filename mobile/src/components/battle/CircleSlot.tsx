@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, SIZING } from '../../styles/theme';
+import { SIZING } from '../../styles/theme';
 
 type Props = {
   isEnemy?: boolean;
@@ -36,5 +36,5 @@ const styles = StyleSheet.create({
   },
   enemyText: {
     color: 'rgba(255, 65, 65, 0.5)',
-  }
-}); 
+  },
+});

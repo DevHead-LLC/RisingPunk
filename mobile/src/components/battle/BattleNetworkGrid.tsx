@@ -19,14 +19,14 @@ interface Props {
   showNodeLabels?: boolean;
 }
 
-export const BattleNetworkGrid = React.memo(({ 
-  nodes, 
-  connections, 
-  onNodePress, 
-  nodeSize = 20, 
-  lineColor = '#666666', 
-  lineWidth = 2, 
-  showNodeLabels = true 
+export const BattleNetworkGrid = React.memo(({
+  nodes,
+  connections,
+  onNodePress,
+  nodeSize = 20,
+  lineColor = '#666666',
+  lineWidth = 2,
+  showNodeLabels = true,
 }: Props) => {
   // Convert nodes array to positions record for line calculations
   const nodePositions = nodes.reduce((acc, node) => {
@@ -40,11 +40,11 @@ export const BattleNetworkGrid = React.memo(({
       {connections.map((connection, index) => {
         const fromPos = nodePositions[connection.from];
         const toPos = nodePositions[connection.to];
-        
-        if (!fromPos || !toPos) return null;
-        
+
+        if (!fromPos || !toPos) {return null;}
+
         const lineProps = calculateLineProperties(fromPos, toPos);
-        
+
         return (
           <View
             key={`${connection.from}-${connection.to}-${index}`}
@@ -58,12 +58,12 @@ export const BattleNetworkGrid = React.memo(({
                 top: lineProps.top - lineWidth / 2,
                 transform: [{ rotate: `${lineProps.angle}deg` }],
                 transformOrigin: '0 50%',
-              }
+              },
             ]}
           />
         );
       })}
-      
+
       {/* Render nodes on top */}
       {nodes.map((node) => {
         const NodeContent = () => (
@@ -78,7 +78,7 @@ export const BattleNetworkGrid = React.memo(({
                 borderColor: getNodeBorderColor(node.owner),
                 left: node.position.x - nodeSize / 2,
                 top: node.position.y - nodeSize / 2,
-              }
+              },
             ]}
           >
             {showNodeLabels && (
@@ -135,4 +135,4 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
   },
-}); 
+});

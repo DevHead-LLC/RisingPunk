@@ -57,9 +57,9 @@ export function useNodeOwnership(initialNodes: BattleNodeState[]) {
   const [nodes, setNodes] = useState<BattleNodeState[]>(initialNodes);
 
   const transferNodeOwnership = useCallback((nodeIndex: NodeIndex, newOwner: NodeOwner) => {
-    setNodes(prevNodes => 
-      prevNodes.map(node => 
-        node.index === nodeIndex 
+    setNodes(prevNodes =>
+      prevNodes.map(node =>
+        node.index === nodeIndex
           ? { ...node, owner: newOwner }
           : node
       )
@@ -105,4 +105,4 @@ export function getNodeBorderColor(owner: NodeOwner): string {
     default:
       return '#9CA3AF'; // Light gray border
   }
-} 
+}

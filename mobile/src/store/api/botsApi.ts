@@ -8,7 +8,7 @@ export const botsApi = createApi({
     baseUrl: API_URL,
     prepareHeaders: (headers, { getState }) => {
       const token = (getState() as any)?.auth?.token;
-      if (token) headers.set('Authorization', `Bearer ${token}`);
+      if (token) {headers.set('Authorization', `Bearer ${token}`);}
       return headers;
     },
   }),
@@ -41,4 +41,4 @@ export const botsApi = createApi({
   }),
 });
 
-export const { useFetchBotsQuery, useFetchBuildStateQuery, useStartBuildMutation, useAssignToBattalionMutation } = botsApi; 
+export const { useFetchBotsQuery, useFetchBuildStateQuery, useStartBuildMutation, useAssignToBattalionMutation } = botsApi;

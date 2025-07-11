@@ -11,20 +11,20 @@ export const storageListener = createListenerMiddleware();
 storageListener.startListening({
   predicate: (action) => {
     // Only persist certain actions (we'll customize this per slice)
-    return action.type.startsWith('ui/') || 
-           action.type.startsWith('auth/') || 
+    return action.type.startsWith('ui/') ||
+           action.type.startsWith('auth/') ||
            action.type.startsWith('balance/');
   },
   effect: async (action, listenerApi) => {
     const state = listenerApi.getState() as RootState;
-    
+
     // Only persist specific parts of state
     const stateToPersist = {
       ui: state.ui,
       auth: state.auth,
       balance: state.balance,
     };
-    
+
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(stateToPersist));
     } catch (error) {
@@ -53,4 +53,4 @@ export const clearPersistedState = async () => {
   } catch (error) {
     console.warn('Failed to clear persisted state:', error);
   }
-}; 
+};

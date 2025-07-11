@@ -6,13 +6,13 @@ import { SIZING, COLORS } from '../../styles/theme';
 
 // Utility function for formatting balance
 export function formatBalance(amount: number): string {
-  if (amount === undefined || amount === null) return '0';
+  if (amount === undefined || amount === null) {return '0';}
   return amount.toLocaleString();
 }
 
 export const Balance = memo(() => {
   const balance = useAppSelector(getCurrentBalance);
-  const [updateTrigger, setUpdateTrigger] = useState(0);
+  const [, setUpdateTrigger] = useState(0);
 
   // Force re-render every 10 seconds to update balance display
   useEffect(() => {
@@ -57,4 +57,4 @@ const styles = StyleSheet.create({
     fontSize: SIZING.font.small,
     fontWeight: 'bold',
   },
-}); 
+});

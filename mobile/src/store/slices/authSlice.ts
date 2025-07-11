@@ -40,11 +40,11 @@ export const loginUser = createAsyncThunk(
       }
 
       const data = await response.json();
-      
+
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
-      
+
       // Fetch initial data after successful login
       try {
         // Fetch balance
@@ -89,7 +89,7 @@ export const loginUser = createAsyncThunk(
         // Don't fail login if data fetching fails
         console.warn('Failed to fetch initial data:', fetchError);
       }
-      
+
       return data;
     } catch (error) {
       if (error instanceof TypeError && error.message.includes('Network request failed')) {
@@ -118,11 +118,11 @@ export const registerUser = createAsyncThunk(
       }
 
       const data = await response.json();
-      
+
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
-      
+
       return data;
     } catch (error) {
       if (error instanceof TypeError && error.message.includes('Network request failed')) {
@@ -139,7 +139,7 @@ export const unlockHackRig = createAsyncThunk(
     try {
       const state = getState() as { auth: AuthState };
       const { token, user } = state.auth;
-      
+
       if (!token || !user) {
         return rejectWithValue('No authentication token');
       }
@@ -148,8 +148,8 @@ export const unlockHackRig = createAsyncThunk(
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+        },
       });
 
       if (!response.ok) {
@@ -157,10 +157,10 @@ export const unlockHackRig = createAsyncThunk(
       }
 
       const updatedUser = await response.json();
-      
+
       // Update AsyncStorage
       await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
-      
+
       return updatedUser;
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
@@ -183,14 +183,14 @@ export const loadStoredAuth = createAsyncThunk(
       AsyncStorage.getItem('token'),
       AsyncStorage.getItem('user'),
     ]);
-    
+
     if (storedToken && storedUser) {
       return {
         token: storedToken,
         user: JSON.parse(storedUser) as User,
       };
     }
-    
+
     return null;
   }
 );
@@ -201,7 +201,7 @@ export const fetchInitialData = createAsyncThunk(
     try {
       const state = getState() as { auth: AuthState };
       const { token } = state.auth;
-      
+
       if (!token) {
         return rejectWithValue('No authentication token');
       }
@@ -352,7 +352,7 @@ export const authSlice = createSlice({
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(fetchInitialData.fulfilled, (state, action) => {
+      .addCase(fetchInitialData.fulfilled, (state, _action) => {
         state.isLoading = false;
         state.error = null;
       })
@@ -365,4 +365,4 @@ export const authSlice = createSlice({
 
 export const { clearError, setCredentials } = authSlice.actions;
 export const logout = logoutUser;
-export default authSlice.reducer; 
+export default authSlice.reducer;

@@ -7,7 +7,7 @@ export const balanceApi = createApi({
     baseUrl: API_URL,
     prepareHeaders: (headers, { getState }) => {
       const token = (getState() as any)?.auth?.token;
-      if (token) headers.set('Authorization', `Bearer ${token}`);
+      if (token) {headers.set('Authorization', `Bearer ${token}`);}
       return headers;
     },
   }),
@@ -20,4 +20,4 @@ export const balanceApi = createApi({
   }),
 });
 
-export const { useFetchBalanceQuery } = balanceApi; 
+export const { useFetchBalanceQuery } = balanceApi;

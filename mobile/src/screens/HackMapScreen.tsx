@@ -5,12 +5,9 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { CloseButton } from '../components/common/CloseButton';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
-import { API_URL } from '../config';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { toggleLegend } from '../store/slices/uiSlice';
 import { setGrid, setLoading } from '../store/slices/mapSlice';
@@ -20,8 +17,7 @@ const GRID_SIZE = 25;
 const CELL_SIZE = 60;
 const TOTAL_SIZE = GRID_SIZE * CELL_SIZE;
 const MARGIN_SIZE = 80;
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const SCREEN_HEIGHT = Dimensions.get('window').height;
+
 
 type TerrainType = 'plain' | 'mountain' | 'water' | 'forest';
 type EntityType = 'empty' | 'player' | 'npc' | 'house';
@@ -29,13 +25,13 @@ type EntityType = 'empty' | 'player' | 'npc' | 'house';
 const FRIENDLY_NAMES = [
   'Alpha', 'Beta', 'Gamma', 'Delta', 'Echo', 'Foxtrot',
   'Helix', 'Iris', 'Jupiter', 'Kilo', 'Lima', 'Matrix',
-  'Nova', 'Omega', 'Pulse', 'Quantum', 'Razor', 'Sigma'
+  'Nova', 'Omega', 'Pulse', 'Quantum', 'Razor', 'Sigma',
 ];
 
 const HOSTILE_NAMES = [
   'Cipher', 'Shadow', 'Wraith', 'Phantom', 'Specter', 'Ghost',
   'Virus', 'Trojan', 'Malware', 'Breach', 'Havoc', 'Chaos',
-  'Doom', 'Eclipse', 'Fang', 'Glitch', 'Hex', 'Inferno'
+  'Doom', 'Eclipse', 'Fang', 'Glitch', 'Hex', 'Inferno',
 ];
 
 type CellData = {
@@ -47,126 +43,6 @@ type CellData = {
 
 type GridData = CellData[][];
 
-const generateInitialGrid = (): GridData => {
-  // Start with all plains
-  const grid = Array(GRID_SIZE).fill(null).map(() =>
-    Array(GRID_SIZE).fill(null).map((): CellData => ({
-      terrain: 'plain',
-      entity: 'empty'
-    }))
-  );
-
-  // Generate forest clusters
-  for (let i = 0; i < 5; i++) {
-    const centerX = Math.floor(Math.random() * GRID_SIZE);
-    const centerY = Math.floor(Math.random() * GRID_SIZE);
-    const size = 3 + Math.floor(Math.random() * 4);
-
-    for (let dy = -size; dy <= size; dy++) {
-      for (let dx = -size; dx <= size; dx++) {
-        const x = centerX + dx;
-        const y = centerY + dy;
-        if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
-          if (Math.random() < 0.7 && (dx * dx + dy * dy <= size * size)) {
-            grid[y][x].terrain = 'forest';
-          }
-        }
-      }
-    }
-  }
-
-  // Generate mountain ranges
-  for (let i = 0; i < 3; i++) {
-    let x = Math.floor(Math.random() * GRID_SIZE);
-    let y = Math.floor(Math.random() * GRID_SIZE);
-    const length = 5 + Math.floor(Math.random() * 8);
-
-    for (let j = 0; j < length; j++) {
-      if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
-        grid[y][x].terrain = 'mountain';
-        // Add some random adjacent mountains
-        if (Math.random() < 0.4) {
-          const adjY = y + (Math.random() < 0.5 ? 1 : -1);
-          if (adjY >= 0 && adjY < GRID_SIZE) grid[adjY][x].terrain = 'mountain';
-        }
-      }
-      // Move in a general direction
-      x += Math.floor(Math.random() * 3) - 1;
-      y += Math.floor(Math.random() * 3) - 1;
-    }
-  }
-
-  // Generate rivers
-  for (let i = 0; i < 2; i++) {
-    let x = Math.floor(Math.random() * GRID_SIZE);
-    let y = 0;
-    while (y < GRID_SIZE) {
-      if (x >= 0 && x < GRID_SIZE) {
-        grid[y][x].terrain = 'water';
-      }
-      x += Math.floor(Math.random() * 3) - 1; // Meander left or right
-      x = Math.max(0, Math.min(x, GRID_SIZE - 1)); // Keep within bounds
-      y++;
-    }
-  }
-
-  // Add player at 0,0
-  grid[0][0] = {
-    terrain: 'plain',
-    entity: 'player',
-    owner: 'player',
-    name: 'YOU'
-  };
-
-  // Add other entities
-  const addEntities = (entityType: 'player' | 'npc', owner: 'player' | 'enemy', count: number) => {
-    const names = owner === 'player' ? FRIENDLY_NAMES : HOSTILE_NAMES;
-    let placed = 0;
-    while (placed < count) {
-      const x = Math.floor(Math.random() * GRID_SIZE);
-      const y = Math.floor(Math.random() * GRID_SIZE);
-      
-      if (grid[y][x].entity !== 'empty' || (x === 0 && y === 0)) {
-        continue;
-      }
-
-      const name = names[Math.floor(Math.random() * names.length)];
-      grid[y][x] = {
-        ...grid[y][x],
-        entity: entityType,
-        owner: owner,
-        name: name
-      };
-      placed++;
-    }
-  };
-
-  addEntities('player', 'player', 8);
-  addEntities('npc', 'enemy', 12);
-
-  return grid;
-};
-
-const CellContent = memo(({ data }: { data: CellData }) => {
-  return (
-    <View style={[styles.cellContent, getTerrainStyle(data.terrain)]}>
-      {getTerrainIcon(data.terrain)}
-      {data.entity !== 'empty' && (
-        <View style={styles.entityContainer}>
-          <Text style={[
-            styles.terrainSymbol,
-            data.name === 'YOU' ? styles.playerSymbol : 
-            data.owner === 'player' ? styles.friendlySymbol : 
-            styles.hostileSymbol
-          ]}>
-            {data.name === 'YOU' ? '⚡' : data.owner === 'player' ? '◉' : '⊗'}
-          </Text>
-        </View>
-      )}
-    </View>
-  );
-});
-
 type Props = {
   onClose: () => void;
 };
@@ -175,7 +51,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
   const dispatch = useAppDispatch();
   const grid = useAppSelector((state) => state.map.grid);
   const loading = useAppSelector((state) => state.map.loading);
-  const token = useAppSelector((state) => state.auth.token);
+
   const [selectedCell, setSelectedCell] = useState<{x: number, y: number, info: CellData} | null>(null);
   const isLegendExpanded = useAppSelector((state) => state.ui.map.legendExpanded);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -194,7 +70,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
 
   const renderLegend = () => (
     <View style={[styles.legend, !isLegendExpanded && styles.legendCollapsed]}>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.legendTitleContainer}
         onPress={() => dispatch(toggleLegend())}
       >
@@ -230,11 +106,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
   );
 
   const renderInfoPanel = () => {
-    if (!selectedCell) return null;
-    
+    if (!selectedCell) {return null;}
+
     return (
       <View style={styles.infoPanel}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.infoPanelClose}
           onPress={() => setSelectedCell(null)}
         >
@@ -253,7 +129,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
             </Text>
             <Text style={[
               styles.statusText,
-              selectedCell.info.owner === 'player' ? styles.friendlyText : styles.hostileText
+              selectedCell.info.owner === 'player' ? styles.friendlyText : styles.hostileText,
             ]}>
               STATUS: {selectedCell.info.owner === 'player' ? 'FRIENDLY' : 'HOSTILE'}
             </Text>
@@ -270,9 +146,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
   return (
     <View style={styles.container}>
       <CloseButton onPress={onClose} />
-      
+
       {renderLegend()}
-      
+
       {renderInfoPanel()}
 
       <ScrollView
@@ -297,7 +173,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
                       key={`${x}-${y}`}
                       style={[
                         styles.cell,
-                        selectedCell?.x === x && selectedCell?.y === y && styles.selectedCell
+                        selectedCell?.x === x && selectedCell?.y === y && styles.selectedCell,
                       ]}
                       onPress={() => handleCellPress(x, y, cell)}
                     >
@@ -307,9 +183,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
                           <View style={styles.entityContainer}>
                             <Text style={[
                               styles.terrainSymbol,
-                              cell.name === 'YOU' ? styles.playerSymbol : 
-                              cell.owner === 'player' ? styles.friendlySymbol : 
-                              styles.hostileSymbol
+                              cell.name === 'YOU' ? styles.playerSymbol :
+                              cell.owner === 'player' ? styles.friendlySymbol :
+                              styles.hostileSymbol,
                             ]}>
                               {cell.name === 'YOU' ? '⚡' : cell.owner === 'player' ? '◉' : '⊗'}
                             </Text>
@@ -585,4 +461,4 @@ const styles = StyleSheet.create({
     width: TOTAL_SIZE + (MARGIN_SIZE * 2),    // Exact width of grid + margins
     height: TOTAL_SIZE + (MARGIN_SIZE * 2),   // Exact height of grid + margins
   },
-}); 
+});

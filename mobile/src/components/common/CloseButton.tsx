@@ -7,8 +7,8 @@ interface CloseButtonProps {
 }
 
 export const CloseButton = ({ onPress }: CloseButtonProps) => (
-  <TouchableOpacity 
-    style={styles.closeButton} 
+  <TouchableOpacity
+    style={styles.closeButton}
     onPress={onPress}
     testID="close-button"
   >
@@ -36,4 +36,4 @@ const styles = StyleSheet.create({
     color: COLORS.background,
     marginTop: -2,
   },
-}); 
+});

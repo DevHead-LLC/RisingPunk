@@ -8,10 +8,9 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { CloseButton } from '../components/common/CloseButton';
-import { DisconnectButton } from '../components/turf/DisconnectButton';
 import { useAppDispatch } from '../store/hooks';
 import { logout } from '../store/slices/authSlice';
-import { COLORS, SIZING } from '../styles/theme';
+import { SIZING } from '../styles/theme';
 import { Balance } from '../components/common/Balance';
 
 interface UserProfile {
@@ -39,14 +38,14 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
 
   useEffect(() => {
     setProfile({
-      username: "Bert Toast",
+      username: 'Bert Toast',
       level: 1,
       experience: { current: 0, nextLevel: 1000 },
-      armyBonus: { strength: 0, defense: 0, speed: 0, health: 0 }
+      armyBonus: { strength: 0, defense: 0, speed: 0, health: 0 },
     });
   }, []);
 
-  if (!profile) return <></>;
+  if (!profile) {return <></>;}
 
   const experiencePercentage = (profile.experience.current / profile.experience.nextLevel) * 100;
 
@@ -225,4 +224,4 @@ const styles = StyleSheet.create({
     fontSize: SIZING.font.body,
     fontWeight: 'bold',
   },
-}); 
+});

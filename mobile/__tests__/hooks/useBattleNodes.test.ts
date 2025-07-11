@@ -28,7 +28,7 @@ describe('useInitialBattleNodes regression protection', () => {
     // There should be 3 unique Y positions (within 1px tolerance), strictly increasing
     const uniqueYs = [];
     yPositions.forEach(y => {
-      if (!uniqueYs.some(u => Math.abs(u - y) < 1)) uniqueYs.push(y);
+      if (!uniqueYs.some(u => Math.abs(u - y) < 1)) {uniqueYs.push(y);}
     });
     expect(uniqueYs.length).toBe(3);
     expect(uniqueYs[0]).toBeLessThan(uniqueYs[1]);
@@ -53,7 +53,7 @@ describe('useInitialBattleNodes Logic (Batch 1A)', () => {
     it('should position user nodes on the left', () => {
       const nodes = calculateNodePositions(400, 600);
       const userNodes = nodes.filter(node => node.owner === 'user');
-      
+
       expect(userNodes).toHaveLength(3);
       userNodes.forEach(node => {
         expect(node.index).toBeLessThan(3);
@@ -64,7 +64,7 @@ describe('useInitialBattleNodes Logic (Batch 1A)', () => {
     it('should position neutral nodes in the center', () => {
       const nodes = calculateNodePositions(400, 600);
       const neutralNodes = nodes.filter(node => node.owner === 'neutral');
-      
+
       expect(neutralNodes).toHaveLength(3);
       neutralNodes.forEach(node => {
         expect(node.index).toBeGreaterThanOrEqual(3);
@@ -76,7 +76,7 @@ describe('useInitialBattleNodes Logic (Batch 1A)', () => {
     it('should position enemy nodes on the right', () => {
       const nodes = calculateNodePositions(400, 600);
       const enemyNodes = nodes.filter(node => node.owner === 'enemy');
-      
+
       expect(enemyNodes).toHaveLength(3);
       enemyNodes.forEach(node => {
         expect(node.index).toBeGreaterThanOrEqual(6);
@@ -91,7 +91,7 @@ describe('useInitialBattleNodes Logic (Batch 1A)', () => {
       // Find unique Y positions with 1px tolerance
       const uniqueYs = [];
       yVals.forEach(y => {
-        if (!uniqueYs.some(u => Math.abs(u - y) < 1)) uniqueYs.push(y);
+        if (!uniqueYs.some(u => Math.abs(u - y) < 1)) {uniqueYs.push(y);}
       });
       // For each unique Y, count how many nodes are close to it
       uniqueYs.forEach(y => {
@@ -105,12 +105,12 @@ describe('useInitialBattleNodes Logic (Batch 1A)', () => {
     it('should adjust positions based on screen dimensions', () => {
       const nodes1 = calculateNodePositions(400, 600);
       const nodes2 = calculateNodePositions(800, 1200);
-      
+
       // For different screen sizes, the X positions should be different
       // because colWidth changes: (width - 2 * H_PADDING) / 2
       const colWidth1 = (400 - 2 * 64) / 2; // 136
       const colWidth2 = (800 - 2 * 64) / 2; // 336
-      
+
       expect(nodes1[3].position.x).toBe(64 + colWidth1); // 200
       expect(nodes2[3].position.x).toBe(64 + colWidth2); // 400
       expect(nodes1[3].position.x).not.toBe(nodes2[3].position.x);
@@ -118,14 +118,14 @@ describe('useInitialBattleNodes Logic (Batch 1A)', () => {
 
     it('should maintain proper spacing ratios', () => {
       const nodes = calculateNodePositions(400, 600);
-      
+
       const leftX = nodes[0].position.x;
       const centerX = nodes[3].position.x;
       const rightX = nodes[6].position.x;
-      
+
       const leftToCenter = centerX - leftX;
       const centerToRight = rightX - centerX;
-      
+
       expect(leftToCenter).toBe(centerToRight);
     });
   });
@@ -133,13 +133,13 @@ describe('useInitialBattleNodes Logic (Batch 1A)', () => {
   describe('node ownership', () => {
     it('should assign correct ownership to all nodes', () => {
       const nodes = calculateNodePositions(400, 600);
-      
+
       expect(nodes).toHaveLength(9);
-      
+
       const userCount = nodes.filter(n => n.owner === 'user').length;
       const neutralCount = nodes.filter(n => n.owner === 'neutral').length;
       const enemyCount = nodes.filter(n => n.owner === 'enemy').length;
-      
+
       expect(userCount).toBe(3);
       expect(neutralCount).toBe(3);
       expect(enemyCount).toBe(3);
@@ -167,13 +167,13 @@ describe('Node Rendering Utilities (Batch 1B)', () => {
       const userBorderColor = getNodeBorderColor('user');
       expect(userColor).toMatch(/^#[0-9A-F]{6}$/i); // Valid hex color
       expect(userBorderColor).toMatch(/^#[0-9A-F]{6}$/i); // Valid hex color
-      
+
       // Enemy colors should be red variants
       const enemyColor = getNodeColor('enemy');
       const enemyBorderColor = getNodeBorderColor('enemy');
       expect(enemyColor).toMatch(/^#[0-9A-F]{6}$/i); // Valid hex color
       expect(enemyBorderColor).toMatch(/^#[0-9A-F]{6}$/i); // Valid hex color
-      
+
       // Neutral colors should be gray variants
       const neutralColor = getNodeColor('neutral');
       const neutralBorderColor = getNodeBorderColor('neutral');
@@ -201,10 +201,10 @@ describe('Node Ownership Management (Batch 2A)', () => {
     it('should transfer node ownership correctly', () => {
       // Simulate the hook logic directly
       let nodes = [...mockInitialNodes];
-      
+
       const transferNodeOwnership = (nodeIndex: NodeIndex, newOwner: NodeOwner) => {
-        nodes = nodes.map(node => 
-          node.index === nodeIndex 
+        nodes = nodes.map(node =>
+          node.index === nodeIndex
             ? { ...node, owner: newOwner }
             : node
         );
@@ -213,11 +213,11 @@ describe('Node Ownership Management (Batch 2A)', () => {
       // Transfer neutral node 3 to user
       transferNodeOwnership(3, 'user');
       expect(nodes.find(n => n.index === 3)?.owner).toBe('user');
-      
+
       // Transfer enemy node 6 to neutral
       transferNodeOwnership(6, 'neutral');
       expect(nodes.find(n => n.index === 6)?.owner).toBe('neutral');
-      
+
       // Transfer user node 0 to enemy
       transferNodeOwnership(0, 'enemy');
       expect(nodes.find(n => n.index === 0)?.owner).toBe('enemy');
@@ -225,10 +225,10 @@ describe('Node Ownership Management (Batch 2A)', () => {
 
     it('should not affect other nodes during transfer', () => {
       let nodes = [...mockInitialNodes];
-      
+
       const transferNodeOwnership = (nodeIndex: NodeIndex, newOwner: NodeOwner) => {
-        nodes = nodes.map(node => 
-          node.index === nodeIndex 
+        nodes = nodes.map(node =>
+          node.index === nodeIndex
             ? { ...node, owner: newOwner }
             : node
         );
@@ -236,7 +236,7 @@ describe('Node Ownership Management (Batch 2A)', () => {
 
       // Transfer node 3 to user
       transferNodeOwnership(3, 'user');
-      
+
       // Check that other nodes remain unchanged
       expect(nodes.find(n => n.index === 0)?.owner).toBe('user');
       expect(nodes.find(n => n.index === 1)?.owner).toBe('user');
@@ -252,7 +252,7 @@ describe('Node Ownership Management (Batch 2A)', () => {
   describe('node filtering by owner', () => {
     it('should filter nodes by owner correctly', () => {
       const nodes = [...mockInitialNodes];
-      
+
       const getNodesByOwner = (owner: NodeOwner) => {
         return nodes.filter(node => node.owner === owner);
       };
@@ -272,7 +272,7 @@ describe('Node Ownership Management (Batch 2A)', () => {
 
     it('should return correct node indices for each owner', () => {
       const nodes = [...mockInitialNodes];
-      
+
       const getNodesByOwner = (owner: NodeOwner) => {
         return nodes.filter(node => node.owner === owner);
       };
@@ -286,4 +286,4 @@ describe('Node Ownership Management (Batch 2A)', () => {
       expect(enemyNodes.map(n => n.index)).toEqual([6, 7, 8]);
     });
   });
-}); 
+});

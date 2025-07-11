@@ -8,12 +8,12 @@ type ProfileLocationProps = {
 
 export const ProfileLocation = memo(function ProfileLocation({ onPress }: ProfileLocationProps) {
   return (
-    <TouchableOpacity 
-      style={[styles.location, styles.profilePosition]} 
+    <TouchableOpacity
+      style={[styles.location, styles.profilePosition]}
       onPress={onPress}
     >
       <View style={styles.profileContainer}>
-        <Image 
+        <Image
           source={require('../../assets/images/profile.png')}
           style={styles.locationIcon}
         />

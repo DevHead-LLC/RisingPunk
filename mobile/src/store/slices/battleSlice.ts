@@ -90,4 +90,4 @@ export const {
   resetBattle,
 } = battleSlice.actions;
 
-export default battleSlice.reducer; 
+export default battleSlice.reducer;

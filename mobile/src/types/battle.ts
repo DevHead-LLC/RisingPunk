@@ -1,4 +1,4 @@
-import { Animated } from 'react-native';
+
 
 export type Path = number[];
 
@@ -43,4 +43,4 @@ export type BattleNode = {
   y: number;
   health?: number;
   captureProgress?: number;
-}; 
+};

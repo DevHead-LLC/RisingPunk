@@ -10,11 +10,11 @@ export const baseApi = createApi({
       // Get token from Redux state
       const state = getState() as RootState;
       const token = state.auth?.token;
-      
+
       if (token) {
         headers.set('authorization', `Bearer ${token}`);
       }
-      
+
       headers.set('Content-Type', 'application/json');
       return headers;
     },
@@ -48,4 +48,4 @@ export const createQueryWithErrorHandling = <T>(queryFn: () => Promise<T>) => {
       throw error;
     }
   };
-}; 
+};

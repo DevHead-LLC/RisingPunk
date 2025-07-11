@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text, StyleSheet } from 'react-native';
-import { COLORS, SIZING } from '../../styles/theme';
+import { SIZING } from '../../styles/theme';
 import { BotType } from '../../types/bots';
 
 type BotDescriptionProps = {
@@ -10,7 +10,7 @@ type BotDescriptionProps = {
 const getBotDescription = (type: BotType) => ({
   breacher: 'Fast-moving assault units, specialized in penetrating network defenses',
   guardian: 'Heavy defensive units, forming the backbone of your digital army',
-  phreak: 'Long-range disruption specialists, attacking from network shadows'
+  phreak: 'Long-range disruption specialists, attacking from network shadows',
 })[type];
 
 export const BotDescription = React.memo(function BotDescription({ type }: BotDescriptionProps) {
@@ -27,4 +27,4 @@ const styles = StyleSheet.create({
     fontSize: SIZING.font.small,
     marginBottom: SIZING.spacing.md,
   },
-}); 
+});
