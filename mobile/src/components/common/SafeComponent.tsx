@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS } from '../../styles/theme';
+
 
 interface SafeComponentProps {
   fallback?: React.ReactNode;
@@ -12,11 +12,11 @@ export function SafeComponent({ children, fallback }: SafeComponentProps) {
     return <>{children}</>;
   } catch (error) {
     console.error('SafeComponent caught an error:', error);
-    
+
     if (fallback) {
       return <>{fallback}</>;
     }
-    
+
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>Component Error</Text>
@@ -37,4 +37,4 @@ const styles = StyleSheet.create({
     color: '#FF0000',
     fontSize: 12,
   },
-}); 
+});

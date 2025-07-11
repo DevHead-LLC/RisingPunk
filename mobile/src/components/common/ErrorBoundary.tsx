@@ -1,6 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS } from '../../styles/theme';
+
 
 interface Props {
   children: ReactNode;
@@ -16,14 +16,14 @@ export class ErrorBoundary extends Component<Props, State> {
     super(props);
     this.state = {
       hasError: false,
-      error: null
+      error: null,
     };
   }
 
   static getDerivedStateFromError(error: Error): State {
     return {
       hasError: true,
-      error
+      error,
     };
   }
 
@@ -56,4 +56,4 @@ const styles = StyleSheet.create({
     color: '#FF0000',
     fontSize: 12,
   },
-}); 
+});

@@ -42,4 +42,4 @@ export const DataFetcher: React.FC<DataFetcherProps> = ({ children }) => {
   }, [buildStateData, dispatch]);
 
   return <>{children}</>;
-}; 
+};

@@ -8,8 +8,8 @@ type BotAssemblyHeaderProps = {
   onClose: () => void;
 };
 
-export const BotAssemblyHeader = React.memo(function BotAssemblyHeader({ 
-  onClose 
+export const BotAssemblyHeader = React.memo(function BotAssemblyHeader({
+  onClose,
 }: BotAssemblyHeaderProps) {
   return (
     <>

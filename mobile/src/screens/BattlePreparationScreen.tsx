@@ -18,11 +18,7 @@ type Props = {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-type BattalionDeployment = {
-  [battalion: string]: {
-    [botType in BotType]?: number;
-  };
-};
+
 
 export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: Props) => {
   const pulseAnim = useRef(new Animated.Value(0)).current;
@@ -32,12 +28,8 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
   const token = useAppSelector((state) => state.auth.token);
   const botCounts = useAppSelector((state) => state.bots.botCounts);
   const [assignToBattalion] = useAssignToBattalionMutation();
-  const getAvailableBots = (botType) => {
-    const deployed = useAppSelector((state) => state.bots.deployedCounts[botType]);
-    const total = useAppSelector((state) => state.bots.botCounts[botType]);
-    return total - deployed;
-  };
-  
+
+
   useEffect(() => {
     // Run the animation sequence twice
     Animated.sequence([
@@ -69,9 +61,9 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
     transform: [{
       translateX: pulseAnim.interpolate({
         inputRange: [0, 1],
-        outputRange: [0, -35]
-      })
-    }]
+        outputRange: [0, -35],
+      }),
+    }],
   };
 
   const handleBattalionPress = (name: string) => {
@@ -80,13 +72,13 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
   };
 
   const handleBotAssignment = async (data: { botType: BotType; quantity: number }) => {
-    if (!selectedBattalion) return;
+    if (!selectedBattalion) {return;}
 
     try {
       await assignToBattalion({
         botType: data.botType,
         quantity: data.quantity,
-        battalionId: selectedBattalion
+        battalionId: selectedBattalion,
       });
 
       setAssignments(prev => ({
@@ -94,8 +86,8 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
         [selectedBattalion]: {
           botType: data.botType,
           quantity: data.quantity,
-          markLevel: 1
-        }
+          markLevel: 1,
+        },
       }));
     } catch (error) {
       console.error('Failed to assign bots:', error);
@@ -107,7 +99,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
     return () => {
       // Reset local assignments state
       setAssignments({});
-      
+
       // Reset server-side assignments for both battalions sequentially
       const resetBattalions = async () => {
         try {
@@ -115,14 +107,14 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
           await assignToBattalion({
             botType: 'breacher',
             quantity: 0,
-            battalionId: 'A'
+            battalionId: 'A',
           });
-          
+
           // Then reset battalion B
           await assignToBattalion({
             botType: 'breacher',
             quantity: 0,
-            battalionId: 'B'
+            battalionId: 'B',
           });
         } catch (error) {
           // Just log the error instead of showing it to the user
@@ -130,7 +122,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
           console.error('Failed to reset battalions:', error);
         }
       };
-      
+
       // Use void to indicate we're intentionally not handling the promise
       void resetBattalions();
     };
@@ -142,49 +134,49 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
       try {
         // First reset all assignments to 0
         setAssignments({});
-        
+
         // Then fetch current state
         const response = await fetch(`${API_URL}/api/bots`, {
           headers: {
-            'Authorization': `Bearer ${token}`
-          }
+            'Authorization': `Bearer ${token}`,
+          },
         });
         const data = await response.json();
-        
+
         // If there are any existing assignments, clear them first
         if (data.battalionAssignments?.length > 0) {
           await Promise.all([
             assignToBattalion({
               botType: 'breacher',
               quantity: 0,
-              battalionId: 'A'
+              battalionId: 'A',
             }),
             assignToBattalion({
               botType: 'breacher',
               quantity: 0,
-              battalionId: 'B'
-            })
+              battalionId: 'B',
+            }),
           ]);
         }
       } catch (error) {
         console.error('Failed to fetch assignments:', error);
       }
     };
-    
+
     fetchAssignments();
   }, [token, assignToBattalion]);
 
   return (
     <SafeAreaView style={styles.container}>
       <CloseButton onPress={onClose} />
-      
+
       <View style={styles.fixedHeader}>
         <Text style={styles.title}>BATTLE PREPARATION</Text>
       </View>
 
       <View style={styles.mainContainer}>
-        <ScrollView 
-          horizontal 
+        <ScrollView
+          horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
         >
@@ -205,15 +197,15 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
                 <BattalionSlot name="D" isLocked />
               </View>
               <View style={styles.battalionColumn}>
-                <BattalionSlot 
-                  name="A" 
+                <BattalionSlot
+                  name="A"
                   onPress={() => handleBattalionPress('A')}
-                  assignment={assignments['A']}
+                  assignment={assignments.A}
                 />
-                <BattalionSlot 
-                  name="B" 
+                <BattalionSlot
+                  name="B"
                   onPress={() => handleBattalionPress('B')}
-                  assignment={assignments['B']}
+                  assignment={assignments.B}
                 />
               </View>
               <View style={styles.circleColumn}>
@@ -234,13 +226,13 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
                 <CircleSlot isEnemy />
               </View>
               <View style={styles.battalionColumn}>
-                <BattalionSlot 
-                  name="A" 
-                  isEnemy 
+                <BattalionSlot
+                  name="A"
+                  isEnemy
                 />
-                <BattalionSlot 
-                  name="B" 
-                  isEnemy 
+                <BattalionSlot
+                  name="B"
+                  isEnemy
                 />
               </View>
               <View style={styles.battalionColumn}>
@@ -256,7 +248,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
         </ScrollView>
       </View>
 
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.executeButton}
         onPress={onBattleStart}
       >
@@ -386,4 +378,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 1,
   },
-}); 
+});

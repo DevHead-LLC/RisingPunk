@@ -78,4 +78,4 @@ const styles = StyleSheet.create({
     bottom: '5%',
     left: '5%',
   },
-}); 
+});

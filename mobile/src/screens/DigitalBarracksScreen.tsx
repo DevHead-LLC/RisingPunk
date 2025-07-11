@@ -25,7 +25,7 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
     const hackerLore = {
       breacher: "IRL: Named after 'breach and clear' tactics used in early penetration testing, where security teams would methodically break through firewall layers.",
       guardian: "IRL: Inspired by 'packet guardian' programs from the 1990s that network administrators used to monitor and filter suspicious traffic.",
-      phreak: "IRL: Based on 'phone phreakers' from the 1970s who used blue boxes to manipulate telephone systems and make free long-distance calls."
+      phreak: "IRL: Based on 'phone phreakers' from the 1970s who used blue boxes to manipulate telephone systems and make free long-distance calls.",
     };
 
     return (
@@ -34,7 +34,7 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
           <Text style={styles.botName}>{type.toUpperCase()}</Text>
           <Text style={styles.botRole}>{getBotRole(type)}</Text>
         </View>
-        
+
         <View style={styles.botContent}>
           <View style={styles.countRow}>
             <Text style={styles.countLabel}>Available:</Text>
@@ -72,10 +72,10 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
   };
 
   const ArmyComposition = () => {
-    if (!botCounts) return null;
-    
+    if (!botCounts) {return null;}
+
     const total = Object.values(botCounts).reduce((a, b) => a + b, 0);
-    if (total === 0) return null;
+    if (total === 0) {return null;}
 
     return (
       <View style={styles.compositionContainer}>
@@ -89,11 +89,11 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
                   styles.compositionBar,
                   {
                     width: `${percentage}%`,
-                    backgroundColor: 
+                    backgroundColor:
                       type === 'breacher' ? '#FF4B4B' :
                       type === 'guardian' ? '#4CAF50' :
-                      '#2196F3'
-                  }
+                      '#2196F3',
+                  },
                 ]}
               />
             );
@@ -108,8 +108,8 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
                   backgroundColor:
                     type === 'breacher' ? '#FF4B4B' :
                     type === 'guardian' ? '#4CAF50' :
-                    '#2196F3'
-                }
+                    '#2196F3',
+                },
               ]} />
               <Text style={styles.legendText}>
                 {`${type.charAt(0).toUpperCase() + type.slice(1)}: ${((count / total) * 100).toFixed(1)}%`}
@@ -136,7 +136,7 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
             key={mark}
             style={[
               styles.markButton,
-              selectedMark === mark && styles.selectedMark
+              selectedMark === mark && styles.selectedMark,
             ]}
             onPress={() => setSelectedMark(mark as MarkLevel)}
           >
@@ -144,7 +144,7 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
           </TouchableOpacity>
         ))}
       </View>
-      
+
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.totalContainer}>
           <View style={styles.totalRow}>
@@ -378,4 +378,4 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.6)',
     fontSize: SIZING.font.small,
   },
-}); 
+});

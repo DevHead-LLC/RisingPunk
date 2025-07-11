@@ -11,13 +11,13 @@ type BotTypeCardProps = {
   onPress: () => void;
 };
 
-export const BotTypeCard = React.memo(function BotTypeCard({ 
+export const BotTypeCard = React.memo(function BotTypeCard({
   type,
   level,
   isLocked,
   isSelected,
   count,
-  onPress
+  onPress,
 }: BotTypeCardProps) {
   return (
     <TouchableOpacity
@@ -85,5 +85,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  }
-}); 
+  },
+});

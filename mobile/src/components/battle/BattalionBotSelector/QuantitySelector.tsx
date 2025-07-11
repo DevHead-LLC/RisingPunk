@@ -28,14 +28,14 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
       <View style={styles.row}>
         <Text style={styles.label}>Quantity:</Text>
         <View style={styles.controls}>
-          <TouchableOpacity 
-            style={styles.button} 
+          <TouchableOpacity
+            style={styles.button}
             onPress={() => adjustQuantity(-25)}
           >
             <Text style={styles.buttonText}>-25</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={styles.button}
             onPress={() => adjustQuantity(-1)}
           >
@@ -50,14 +50,14 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
             maxLength={3}
           />
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.button}
             onPress={() => adjustQuantity(1)}
           >
             <Text style={styles.buttonText}>+1</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.button}
             onPress={() => adjustQuantity(25)}
           >
@@ -128,4 +128,4 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 14,
   },
-}); 
+});

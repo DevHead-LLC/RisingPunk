@@ -42,7 +42,7 @@ export const uiSlice = createSlice({
     setLegendExpanded: (state, action: PayloadAction<boolean>) => {
       state.map.legendExpanded = action.payload;
     },
-    
+
     // Modal actions (for future use)
     setHackRigAlert: (state, action: PayloadAction<boolean>) => {
       state.modals.hackRigAlert = action.payload;
@@ -53,7 +53,7 @@ export const uiSlice = createSlice({
     setBotSelector: (state, action: PayloadAction<boolean>) => {
       state.modals.botSelector = action.payload;
     },
-    
+
     // Screen navigation actions (for future use)
     setCurrentTurfScreen: (state, action: PayloadAction<string>) => {
       state.screens.currentTurfScreen = action.payload;
@@ -61,8 +61,8 @@ export const uiSlice = createSlice({
   },
 });
 
-export const { 
-  toggleLegend, 
+export const {
+  toggleLegend,
   setLegendExpanded,
   setHackRigAlert,
   setBattleResults,
@@ -70,4 +70,4 @@ export const {
   setCurrentTurfScreen,
 } = uiSlice.actions;
 
-export default uiSlice.reducer; 
+export default uiSlice.reducer;

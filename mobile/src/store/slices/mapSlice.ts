@@ -66,4 +66,4 @@ export const mapSlice = createSlice({
 });
 
 export const { setGrid, setPlayerPosition, revealFog, setLoading, resetMap } = mapSlice.actions;
-export default mapSlice.reducer; 
+export default mapSlice.reducer;

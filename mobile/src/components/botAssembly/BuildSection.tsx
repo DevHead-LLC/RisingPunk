@@ -23,12 +23,12 @@ export const BuildSection = React.memo(function BuildSection({
   quantity,
   onQuantityChange,
   onBuild,
-  botCost
+  botCost,
 }: BuildSectionProps) {
   return (
     <View style={styles.buildSection}>
       <Text style={styles.buildTitle}>BUILD CONTROLS</Text>
-      
+
       <View style={styles.selectedBotInfo}>
         <Text style={styles.selectedBot}>
           {selectedType ? selectedType.toUpperCase() : 'NO BOT SELECTED'}
@@ -44,7 +44,7 @@ export const BuildSection = React.memo(function BuildSection({
         onBuild={onBuild}
       />
 
-      <BuildStatus 
+      <BuildStatus
         selectedType={selectedType}
         quantity={quantity}
         botCost={botCost}
@@ -52,7 +52,7 @@ export const BuildSection = React.memo(function BuildSection({
 
       {buildingProgress !== null && (
         <>
-          <BuildTimer 
+          <BuildTimer
             quantity={parseInt(quantity) || 0}
             buildTimePerUnit={1000}
             progress={buildingProgress}
@@ -85,4 +85,4 @@ const styles = StyleSheet.create({
     fontSize: SIZING.font.body,
     marginBottom: SIZING.spacing.xs,
   },
-}); 
+});

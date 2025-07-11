@@ -7,7 +7,7 @@ import { useFetchBalanceQuery } from '../store/api/balanceApi';
 import { useFetchBotsQuery, useFetchBuildStateQuery } from '../store/api/botsApi';
 import { LoginScreen } from '../screens/LoginScreen';
 import { TurfScreen } from '../screens/TurfScreen';
-import { API_URL } from '../config';
+
 
 const AppContent = memo(() => {
   const dispatch = useAppDispatch();
@@ -19,12 +19,12 @@ const AppContent = memo(() => {
     skip: !token,
     pollingInterval: 10000, // Poll every 10 seconds
   });
-  
+
   const { data: botsData, isLoading: botsLoading } = useFetchBotsQuery(undefined, {
     skip: !token,
     pollingInterval: 10000, // Poll every 10 seconds
   });
-  
+
   const { data: buildStateData, isLoading: buildStateLoading } = useFetchBuildStateQuery(undefined, {
     skip: !token,
     pollingInterval: 10000, // Poll every 10 seconds
@@ -95,4 +95,4 @@ const AppContent = memo(() => {
   return <TurfScreen />;
 });
 
-export default AppContent; 
+export default AppContent;

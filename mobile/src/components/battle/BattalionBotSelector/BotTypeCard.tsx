@@ -1,6 +1,6 @@
 import React from 'react';
-import { TouchableOpacity, Text, View, StyleSheet } from 'react-native';
-import { COLORS, SIZING } from '../../../styles/theme';
+import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { SIZING } from '../../../styles/theme';
 import { BotType } from '../../../types/bots';
 
 type Props = {
@@ -12,7 +12,7 @@ type Props = {
 
 export const BotTypeCard = React.memo(({ type, count, isSelected, onSelect }: Props) => {
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[styles.card, isSelected && styles.selectedCard]}
       onPress={() => onSelect(type)}
     >
@@ -65,4 +65,4 @@ const styles = StyleSheet.create({
   selectedCount: {
     color: 'rgba(71, 23, 246, 0.7)',
   },
-}); 
+});

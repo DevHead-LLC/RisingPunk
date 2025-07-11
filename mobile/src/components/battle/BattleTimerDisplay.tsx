@@ -13,7 +13,7 @@ type Props = {
 };
 
 export const BattleTimerDisplay = React.memo(({ battleTime, maxBattleTime, isVisible }: Props) => {
-  if (!isVisible) return null;
+  if (!isVisible) {return null;}
 
   const timeRemaining = maxBattleTime - battleTime;
   const progressPercentage = (battleTime / maxBattleTime) * 100;
@@ -24,14 +24,14 @@ export const BattleTimerDisplay = React.memo(({ battleTime, maxBattleTime, isVis
         <Text style={styles.statusText}>SYSTEM BREACH IN PROGRESS</Text>
         <Text style={styles.timerText}>{timeRemaining}s</Text>
       </View>
-      
+
       <View style={styles.progressContainer}>
         <View style={styles.progressBar}>
-          <View 
+          <View
             style={[
-              styles.progressFill, 
-              { width: `${progressPercentage}%` }
-            ]} 
+              styles.progressFill,
+              { width: `${progressPercentage}%` },
+            ]}
           />
         </View>
       </View>
@@ -85,4 +85,4 @@ const styles = StyleSheet.create({
     backgroundColor: '#4717F6',
     borderRadius: 3,
   },
-}); 
+});

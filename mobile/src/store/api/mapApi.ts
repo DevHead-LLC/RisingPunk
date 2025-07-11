@@ -7,7 +7,7 @@ export const mapApi = createApi({
     baseUrl: API_URL,
     prepareHeaders: (headers, { getState }) => {
       const token = (getState() as any)?.auth?.token;
-      if (token) headers.set('Authorization', `Bearer ${token}`);
+      if (token) {headers.set('Authorization', `Bearer ${token}`);}
       return headers;
     },
   }),
@@ -28,4 +28,4 @@ export const mapApi = createApi({
   }),
 });
 
-export const { useFetchMapQuery, useUpdatePlayerPositionMutation } = mapApi; 
+export const { useFetchMapQuery, useUpdatePlayerPositionMutation } = mapApi;

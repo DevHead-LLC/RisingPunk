@@ -1,30 +1,20 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
-  TouchableOpacity,
   SafeAreaView,
-  TextInput,
   ScrollView,
 } from 'react-native';
-import { Balance } from '../components/common/Balance';
-import { CloseButton } from '../components/common/CloseButton';
-import { BotTypeCard } from '../components/botAssembly/BotTypeCard';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
-import { getCurrentBalance } from '../store/slices/balanceSlice';
 import { selectBotType } from '../store/slices/botsSlice';
 import { useStartBuildMutation } from '../store/api/botsApi';
 import { COLORS, SIZING } from '../styles/theme';
 import { LevelSection } from '../components/botAssembly/LevelSection';
-import { BuildProgressBar } from '../components/botAssembly/BuildProgressBar';
-import { BuildStatus } from '../components/botAssembly/BuildStatus';
-import { BuildControls } from '../components/botAssembly/BuildControls';
 import { BuildSection } from '../components/botAssembly/BuildSection';
 import { BotAssemblyHeader } from '../components/botAssembly/BotAssemblyHeader';
 
 type BotType = 'breacher' | 'guardian' | 'phreak';
-type BotLevel = 1 | 2 | 3 | 4;
+
 
 const LEVELS = [1, 2, 3, 4];
 
@@ -32,14 +22,13 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
   const dispatch = useAppDispatch();
   const bots = useAppSelector((state) => state.bots);
   const [quantity, setQuantity] = useState('1');
-  const balance = useAppSelector(getCurrentBalance);
   const [startBuild] = useStartBuildMutation();
   const BOT_COST = 1;
 
   const handleBuild = useCallback(() => {
-    if (!bots.selectedType) return;
+    if (!bots.selectedType) {return;}
     const qty = parseInt(quantity, 10);
-    if (isNaN(qty) || qty <= 0) return;
+    if (isNaN(qty) || qty <= 0) {return;}
     startBuild({ type: bots.selectedType, quantity: qty, totalCost: qty });
   }, [bots.selectedType, quantity, startBuild]);
 
@@ -309,4 +298,4 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-}); 
+});

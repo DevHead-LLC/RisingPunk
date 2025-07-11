@@ -38,4 +38,4 @@ export const BattleOverlayManager: React.FC = () => {
       {/* No overlay for COMPLETE phase */}
     </View>
   );
-}; 
+};

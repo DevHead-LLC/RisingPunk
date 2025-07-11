@@ -1,4 +1,4 @@
-import { createSlice, PayloadAction, createSelector } from '@reduxjs/toolkit';
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 export interface BalanceState {
   total: number | null;
@@ -49,15 +49,15 @@ export default balanceSlice.reducer;
 // Updates every 10 seconds to match API polling interval
 export const getCurrentBalance = (state: { balance: BalanceState }) => {
   // Safety check for undefined state
-  if (!state || !state.balance) return 0;
-  
+  if (!state || !state.balance) {return 0;}
+
   const { total, ratePerSecond, lastUpdated, updateTrigger } = state.balance;
-  if (total === null || lastUpdated === null) return 0;
-  
+  if (total === null || lastUpdated === null) {return 0;}
+
   // Calculate elapsed time since last update
   const elapsed = (Date.now() - lastUpdated) / 1000;
   const calculatedBalance = Math.floor(total + ratePerSecond * elapsed);
-  
+
   // Return calculated balance (updateTrigger ensures re-evaluation)
   return calculatedBalance + (updateTrigger * 0);
-}; 
+};

@@ -8,12 +8,12 @@ type HomeLocationProps = {
 
 export const HomeLocation = memo(function HomeLocation({ onPress }: HomeLocationProps) {
   return (
-    <TouchableOpacity 
-      style={[styles.location, styles.homePosition]} 
+    <TouchableOpacity
+      style={[styles.location, styles.homePosition]}
       onPress={onPress}
     >
       <View style={styles.iconContainer}>
-        <Image 
+        <Image
           source={require('../../assets/images/home.png')}
           style={styles.locationIcon}
         />
@@ -43,9 +43,9 @@ const styles = StyleSheet.create({
     padding: SIZING.spacing.xs,
   },
   locationIcon: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'contain',
+    width: 100,
+    height: 100,
+    resizeMode: 'contain' as const,
   },
   locationLabel: {
     color: COLORS.secondary,
@@ -64,5 +64,5 @@ const styles = StyleSheet.create({
     left: '25%',
     transform: [{translateX: -60}, {translateY: -80}],
     zIndex: 3,
-  }
+  },
 });

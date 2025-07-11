@@ -14,12 +14,12 @@ type Props = {
   availableBots: Record<BotType, number>;
 };
 
-export const BattalionBotSelector = React.memo(({ 
-  isVisible, 
-  onClose, 
+export const BattalionBotSelector = React.memo(({
+  isVisible,
+  onClose,
   onSubmit,
   battalionName,
-  availableBots 
+  availableBots,
 }: Props) => {
   const [selectedType, setSelectedType] = useState<BotType | null>(null);
   const [quantity, setQuantity] = useState(0);
@@ -47,7 +47,7 @@ export const BattalionBotSelector = React.memo(({
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <CloseButton onPress={onClose} />
-          
+
           <Text style={styles.title}>SELECT BOTS</Text>
           <Text style={styles.battalionName}>BATTALION {battalionName}</Text>
 
@@ -73,7 +73,7 @@ export const BattalionBotSelector = React.memo(({
             </View>
           )}
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.deployButton, !selectedType && styles.deployButtonDisabled]}
             onPress={handleSubmit}
             disabled={!selectedType || quantity === 0}
@@ -86,4 +86,4 @@ export const BattalionBotSelector = React.memo(({
       </View>
     </Modal>
   );
-}); 
+});

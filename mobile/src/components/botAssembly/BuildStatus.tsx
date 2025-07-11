@@ -6,7 +6,7 @@ import { useAppSelector } from '../../store/hooks';
 
 // Utility function for formatting balance
 export function formatBalance(amount: number): string {
-  if (amount === undefined || amount === null) return '0';
+  if (amount === undefined || amount === null) {return '0';}
   return amount.toLocaleString();
 }
 
@@ -19,10 +19,10 @@ type BuildStatusProps = {
 export const BuildStatus = React.memo(function BuildStatus({
   selectedType,
   quantity,
-  botCost
+  botCost,
 }: BuildStatusProps) {
   const buildQueue = useAppSelector((state) => state.bots.buildQueue);
-  
+
   const calculateCost = () => {
     // For active builds, use the stored totalCost
     if (buildQueue?.totalCost) {
@@ -34,7 +34,7 @@ export const BuildStatus = React.memo(function BuildStatus({
     }
     return 0;
   };
-  
+
   return (
     <View style={styles.buildStatus}>
       <View style={styles.statusRow}>
@@ -71,4 +71,4 @@ const styles = StyleSheet.create({
     fontSize: SIZING.font.small,
     fontWeight: 'bold',
   },
-}); 
+});

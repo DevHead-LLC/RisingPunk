@@ -20,7 +20,7 @@ export const store = configureStore({
     battle: battleSlice,
     map: mapSlice,
     ui: uiSlice,
-    
+
     [baseApi.reducerPath]: baseApi.reducer,
     [authApi.reducerPath]: authApi.reducer,
     [balanceApi.reducerPath]: balanceApi.reducer,
@@ -79,4 +79,4 @@ export const store = configureStore({
 
 // Infer the `RootState` and `AppDispatch` types from the store itself
 export type RootState = ReturnType<typeof store.getState>;
-export type AppDispatch = typeof store.dispatch; 
+export type AppDispatch = typeof store.dispatch;

@@ -1,1 +1,1 @@
-export type BotType = 'breacher' | 'guardian' | 'phreak'; 
+export type BotType = 'breacher' | 'guardian' | 'phreak';

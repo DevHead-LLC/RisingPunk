@@ -58,4 +58,4 @@ export interface MovementTarget {
   position: NodePosition;
   path: Path;
   distance: number;
-} 
+}

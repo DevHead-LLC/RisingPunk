@@ -48,7 +48,7 @@ export const BattleCountdownOverlay = React.memo(({ countdown, isVisible }: Prop
     }
   }, [isVisible, opacity, scale]);
 
-  if (!isVisible) return null;
+  if (!isVisible) {return null;}
 
   return (
     <Animated.View style={[styles.container, { opacity }]}>
@@ -94,4 +94,4 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },
-}); 
+});

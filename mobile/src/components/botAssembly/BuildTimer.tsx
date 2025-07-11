@@ -12,9 +12,9 @@ type BuildTimerProps = {
 export const BuildTimer = React.memo(function BuildTimer({
   quantity,
   buildTimePerUnit,
-  progress
+  progress,
 }: BuildTimerProps) {
-  const buildStartTime = useAppSelector((state) => state.bots.buildStartTime);
+
   const totalBuildQuantity = useAppSelector((state) => state.bots.totalBuildQuantity);
   const [timeLeft, setTimeLeft] = useState<number>(0);
 
@@ -22,7 +22,6 @@ export const BuildTimer = React.memo(function BuildTimer({
 
   useEffect(() => {
     const calculateTimeLeft = () => {
-      const now = Date.now();
       const totalTime = totalBuildQuantity * buildTimePerUnit;
       const elapsed = (progress / 100) * totalTime;
       const remaining = Math.max(0, totalTime - elapsed);
@@ -42,9 +41,9 @@ export const BuildTimer = React.memo(function BuildTimer({
     const days = Math.floor(hours / 24);
 
     const parts = [];
-    if (days > 0) parts.push(`${days}d`);
-    if (hours % 24 > 0) parts.push(`${hours % 24}h`);
-    if (minutes % 60 > 0) parts.push(`${minutes % 60}m`);
+    if (days > 0) {parts.push(`${days}d`);}
+    if (hours % 24 > 0) {parts.push(`${hours % 24}h`);}
+    if (minutes % 60 > 0) {parts.push(`${minutes % 60}m`);}
     parts.push(`${seconds % 60}s`);
 
     return `${parts.join(' ')} remaining`;
@@ -82,4 +81,4 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
   },
-}); 
+});

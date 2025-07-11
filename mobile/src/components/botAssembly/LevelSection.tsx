@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { BotTypeCard } from './BotTypeCard';
-import { COLORS, SIZING } from '../../styles/theme';
+import { SIZING } from '../../styles/theme';
 
 type BotType = 'breacher' | 'guardian' | 'phreak';
 
@@ -16,7 +16,7 @@ export const LevelSection = React.memo(function LevelSection({
   level,
   selectedType,
   botCounts,
-  onSelectBotType
+  onSelectBotType,
 }: LevelSectionProps) {
   const isLocked = level > 1; // Marks 2-4 are locked for now
 
@@ -52,5 +52,5 @@ const styles = StyleSheet.create({
   },
   botGrid: {
     gap: SIZING.spacing.sm,
-  }
-}); 
+  },
+});

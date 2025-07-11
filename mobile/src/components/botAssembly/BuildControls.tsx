@@ -16,7 +16,7 @@ export const BuildControls = React.memo(function BuildControls({
   buildingProgress,
   quantity,
   onQuantityChange,
-  onBuild
+  onBuild,
 }: BuildControlsProps) {
   return (
     <View style={styles.buildControlsRow}>
@@ -32,7 +32,7 @@ export const BuildControls = React.memo(function BuildControls({
       <TouchableOpacity
         style={[
           styles.buildButton,
-          (!selectedType || buildingProgress !== null) && styles.buildButtonDisabled
+          (!selectedType || buildingProgress !== null) && styles.buildButtonDisabled,
         ]}
         onPress={onBuild}
         disabled={!selectedType || buildingProgress !== null}

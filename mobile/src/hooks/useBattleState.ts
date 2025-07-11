@@ -5,16 +5,16 @@
 
 import { useReducer, useCallback, useRef, useEffect, useState } from 'react';
 import { BattlePhase } from '../types/battleTypes';
-import { 
-  BattleStateData, 
-  BattleStateAction, 
-  BattleTimerConfig 
+import {
+  BattleStateData,
+  BattleStateAction,
+  BattleTimerConfig,
 } from '../types/battleState';
 
 // Timer configuration from intentions documents
 const TIMER_CONFIG: BattleTimerConfig = {
   countdownDuration: 3,  // 3-second countdown
-  battleDuration: 20     // 20-second battle
+  battleDuration: 20,     // 20-second battle
 };
 
 // Initial state
@@ -23,7 +23,7 @@ const initialState: BattleStateData = {
   countdown: TIMER_CONFIG.countdownDuration,
   battleTime: 0,
   maxBattleTime: TIMER_CONFIG.battleDuration,
-  isPaused: false
+  isPaused: false,
 };
 
 // State reducer - only the actions actually used in BattleGridScreen workflow
@@ -35,7 +35,7 @@ function battleStateReducer(state: BattleStateData, action: BattleStateAction): 
         phase: BattlePhase.COUNTDOWN,
         countdown: TIMER_CONFIG.countdownDuration,
         battleTime: 0,
-        isPaused: false
+        isPaused: false,
       };
 
     case 'START_BATTLE':
@@ -44,14 +44,14 @@ function battleStateReducer(state: BattleStateData, action: BattleStateAction): 
         phase: BattlePhase.ACTIVE,
         countdown: 0,
         battleTime: 0,
-        isPaused: false
+        isPaused: false,
       };
 
     case 'END_BATTLE':
       return {
         ...state,
         phase: BattlePhase.COMPLETE,
-        isPaused: true
+        isPaused: true,
       };
 
     default:
@@ -142,7 +142,7 @@ export function useBattleState() {
   const combinedState = {
     ...state,
     countdown,
-    battleTime
+    battleTime,
   };
 
   return {
@@ -151,6 +151,6 @@ export function useBattleState() {
     startCountdown,
     startBattle,
     endBattle,
-    timerConfig: TIMER_CONFIG
+    timerConfig: TIMER_CONFIG,
   };
-} 
+}

@@ -21,7 +21,7 @@ export interface BattleStateData {
 }
 
 // Battle state actions - only the ones actually used in BattleGridScreen workflow
-export type BattleStateAction = 
+export type BattleStateAction =
   | { type: 'START_COUNTDOWN' }
   | { type: 'START_BATTLE' }
   | { type: 'END_BATTLE'; winner: 'user' | 'enemy' };
@@ -33,4 +33,4 @@ export interface BattleStateContext {
   startCountdown: () => void;
   startBattle: () => void;
   endBattle: (winner: 'user' | 'enemy') => void;
-} 
+}

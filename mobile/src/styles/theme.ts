@@ -43,7 +43,7 @@ export const COLORS = {
     placeholder: 'rgba(0, 255, 65, 0.4)',
   },
   error: '#ff4444',
-  neutral: '#666666'
+  neutral: '#666666',
 };
 
 export const SIZING: ThemeSizing = {
@@ -65,10 +65,10 @@ export const SIZING: ThemeSizing = {
     height: WINDOW_HEIGHT,
     padding: {
       horizontal: 20,
-      vertical: 10
+      vertical: 10,
     },
-    maxContentWidth: 800
-  }
+    maxContentWidth: 800,
+  },
 };
 
 export const styleGuide = {
@@ -95,7 +95,7 @@ export const styleGuide = {
     borderTopWidth: 1,
     borderRightWidth: 1,
     borderColor: COLORS.primary,
-  }
+  },
 };
 
-export type ThemeColors = typeof COLORS; 
+export type ThemeColors = typeof COLORS;
