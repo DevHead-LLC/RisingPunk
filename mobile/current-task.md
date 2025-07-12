@@ -4,9 +4,6 @@ AI MUST READ SECTION BELOW! START.
 
 # CRITICAL AI DIRECTIVES - READ BEFORE ANY BATCH IMPLEMENTATION
 
-## MANDATORY FILE CHECK
-**BEFORE ANY FILE CREATION OR MODIFICATION**: Check [current-battlegrid-connections.md](./current-battlegrid-connections.md) to ensure ALL work stays focused on BattleGridScreen.tsx workflow. DO NOT work on BattleScreen.tsx or associated files.
-
 ## Intentions Document Requirements
 **MANDATORY**: Before implementing any batch, read relevant intentions documents:
 - **Battle mechanics**: [battle-intentions.md](./battle-intentions.md)
@@ -20,11 +17,10 @@ AI MUST READ SECTION BELOW! START.
 - **BATTLEGRID FOCUS**: All work must connect to BattleGridScreen.tsx workflow
 
 ## Process
-1. Check current-battlegrid-connections.md for file scope
-2. Read relevant intentions documents
-3. Implement ONLY what's specified in batch description
-4. If conflicts exist, intentions documents take precedence
-5. Ask for clarification before proceeding with any deviation
+1. Read relevant intentions documents
+2. Implement ONLY what's specified in batch description
+3. If conflicts exist, intentions documents take precedence
+4. Ask for clarification before proceeding with any deviation
 
 # Battle System Rebuild - Detailed Implementation Plan
 
