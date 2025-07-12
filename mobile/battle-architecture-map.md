@@ -75,21 +75,30 @@ This document maps the battle system architecture to help AI assistants understa
   - ✅ Flexible data field for event-specific information
   - ✅ Compound indexes for efficient queries
 
-#### Services (Business Logic) - 🔄 PENDING (Batch 5D)
+#### Services (Business Logic) - ✅ COMPLETED (Batch 5D)
 - **BattleService.ts** - Core battle orchestration
-  - Initializes battles
-  - Manages battle lifecycle
-  - Coordinates all subsystems
+  - ✅ Initializes battles with proper battalion placement
+  - ✅ Manages battle lifecycle (create, get, end battles)
+  - ✅ Coordinates all subsystems
+  - ✅ Handles user and enemy battalion setup
+  - ✅ Calculates neutral node health based on army strength
   
 - **BattleCalculator.ts** - Combat calculations
-  - **Handles all damage calculations (moved from client)**
-  - **Calculates health, attack power, defense**
-  - **Determines unit losses and destruction**
+  - ✅ **Handles all damage calculations (moved from client)**
+  - ✅ **Calculates health, attack power, defense using exact formulas**
+  - ✅ **Determines unit losses and destruction**
+  - ✅ **Tug-of-war node capture system (-100% to +100% progress)**
+  - ✅ **Victory conditions: 20-second timer OR complete elimination**
+  - ✅ **Tie-breaker: enemy wins (defender advantage)**
   
 - **BattleMovement.ts** - Movement validation
-  - Validates movement along network paths
-  - Calculates pathfinding server-side
-  - **Will handle movement in Phase 6**
+  - ✅ Validates movement along network paths
+  - ✅ Calculates pathfinding server-side using Dijkstra's algorithm
+  - ✅ **Will handle movement in Phase 6**
+  - ✅ Network connection validation
+  - ✅ Movement cost calculations
+  - ✅ **Closest target selection (neutral nodes and enemy battalions)**
+  - ✅ **Attack range positioning (stop at exact range from targets)**
 
 #### Timer & Updates - 🔄 PENDING (Batch 5F)
 - **BattleTimer.ts** - Timer management
@@ -147,10 +156,15 @@ This document maps the battle system architecture to help AI assistants understa
    - Indexes for efficient event queries
    - Flexible data structure for all event types
 
-### 🔄 What's Next (Batch 5D)
-1. **BattleService.ts** - Core battle orchestration
-2. **BattleCalculator.ts** - Move all calculations from client to server
-3. **BattleMovement.ts** - Server-side pathfinding and movement validation
+### ✅ What's Complete (Batch 5D)
+1. **BattleService.ts** - Core battle orchestration ✅
+2. **BattleCalculator.ts** - Move all calculations from client to server ✅ (basic regression test added)
+3. **BattleMovement.ts** - Server-side pathfinding and movement validation ✅
+
+### 🔄 What's Next (Batch 5E)
+1. **battle.ts** (routes) - RESTful API endpoints
+2. **BattleController.ts** - Request handling
+3. **battleAuth.ts** - Battle-specific authentication
 
 ### 📋 What's Set Up for Future Phases
 - **Phase 6 (Movement)**: BattleMovement.ts service ready to implement
@@ -164,11 +178,11 @@ This document maps the battle system architecture to help AI assistants understa
 ## Key Architecture Changes
 
 ### What Moves to Server
-1. **All Calculations** - 🔄 PENDING (Batch 5D)
-   - Health calculations
-   - Damage calculations
-   - Attack power and defense
-   - Unit loss calculations
+1. **All Calculations** - ✅ COMPLETED (Batch 5D)
+   - Health calculations ✅
+   - Damage calculations ✅
+   - Attack power and defense ✅
+   - Unit loss calculations ✅
    
 2. **State Management** - 🔄 PENDING (Batch 5F)
    - Battalion positions and health
