@@ -40,52 +40,175 @@ AI MUST READ SECTION ABOVE! END.
 =====================================================================================================================================================================
 =====================================================================================================================================================================
 
-## Batch 5C: Server-Driven Battalion Initialization and Stats
+## Batch 5C: Server Battle Models and Database Schema
 REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
-**Goal:** Move battalion initialization and stat calculations to the server for authoritative state.
+**Goal:** Create server-side battle models and database schema for authoritative battle state
 
-### What This Will Do:
-- Server exposes endpoint to provide initial battle state (battalions, health, node positions, etc.)
-- Client fetches this data on battle start
-- All health/stat calculations are performed on the server, not the client
-- Client only displays what the server sends
+### NEW SERVER FILES TO CREATE:
+1. **`server/src/models/Battle.ts`** (150 lines) - Battle model with all state management
+2. **`server/src/models/BattleEvent.ts`** (50 lines) - Battle event logging for replay/audit
+3. **`server/src/types/battle.ts`** (80 lines) - Shared battle types for server
 
-### TODO/Comments:
-- Add TODOs in useBattalionData and related files to remind future devs to fetch from server, not calculate locally
-- Server: Implement endpoint `/api/battle/init` (or similar)
-- Client: Replace local battalion initialization with server fetch
+### What This Achieves:
+- ✅ MongoDB schema for battle state (battalions, nodes, timers, etc.)
+- ✅ Event logging for battle actions (movement, attacks, damage)
+- ✅ Authoritative server state for all battle calculations
+- ✅ Support for concurrent battles per user
+
+### Database Schema Includes:
+- Battle metadata (users, start time, phase, winner)
+- Battalion state (positions, health, targets, movement paths)
+- Node state (ownership, capture progress, health)
+- Timer state (countdown, battle time)
+- Event log for replay capability
 
 ---
 
-## Batch 5D: Periodic Server Sync for Live Battle State
+## Batch 5D: Server Battle Service and Game Logic
 REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
-**Goal:** Sync frontend with server every 1s for live battle state updates
+**Goal:** Implement core battle logic and calculations on the server
 
-### What This Will Do:
-- Server updates battle state as often as needed (every action, attack, etc.)
-- Client polls server every 1s (or uses websockets) to get latest state
-- Frontend only updates visuals once per second for health, quantity, etc.
-- Ensures frontend is always in sync with server
+### NEW SERVER FILES TO CREATE:
+1. **`server/src/services/BattleService.ts`** (250 lines) - Core battle logic
+2. **`server/src/services/BattleCalculator.ts`** (150 lines) - Damage/combat calculations
+3. **`server/src/services/BattleMovement.ts`** (120 lines) - Movement and pathfinding
 
-### TODO/Comments:
-- Add TODOs in battle screen and useBattalionData to replace local state with server-driven updates
-- Server: Implement endpoint `/api/battle/state` (or websocket event)
-- Client: Set up polling or websocket subscription
+### What This Achieves:
+- ✅ Battle initialization with proper battalion placement
+- ✅ Damage calculations (attack power, defense, unit loss)
+- ✅ Node capture mechanics (tug-of-war system)
+- ✅ Movement validation and pathfinding
+- ✅ Victory condition checking
+
+### Server-Side Calculations:
+- Health: `(Bot Type Health + bonuses) × Quantity`
+- Attack Power: `(Bot Type Strength + bonuses) × Quantity`
+- Damage: `Attack Power / (Defense % × 100)`
+- Node Capture: Progress based on damage/health ratio
 
 ---
 
-## Batch 5E: Code Comments and Future Integration Points
+## Batch 5E: Battle API Routes and Controllers
 REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
-**Goal:** Add comments and TODOs in code and current-task.md for future server integration
+**Goal:** Create REST API endpoints for battle operations
 
-### What This Will Do:
-- Mark all places in code where server logic should eventually live
-- Add clear comments in hooks/components (e.g., useBattalionData, BattleBattalion) for future devs
-- Document API endpoints and expected data structures
+### NEW SERVER FILES TO CREATE:
+1. **`server/src/routes/battle.ts`** (100 lines) - Battle API routes
+2. **`server/src/controllers/BattleController.ts`** (180 lines) - Battle request handlers
+3. **`server/src/middleware/battleAuth.ts`** (40 lines) - Battle-specific auth checks
 
-### TODO/Comments:
-- Add `// TODO: Move to server` comments in relevant files
-- Document endpoints and data contracts in current-task.md
+### API Endpoints:
+- `POST /api/battle/start` - Initialize new battle
+- `GET /api/battle/:id/state` - Get current battle state
+- `POST /api/battle/:id/action` - Submit battle action (future use)
+- `GET /api/battle/:id/events` - Get battle event log
+- `POST /api/battle/:id/end` - Force end battle (admin/timeout)
+
+### What This Achieves:
+- ✅ RESTful API for all battle operations
+- ✅ Proper authentication and authorization
+- ✅ Battle state serialization for client
+- ✅ Rate limiting for battle operations
+
+---
+
+## Batch 5F: Server Battle State Updates and Timer Management
+REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
+**Goal:** Implement server-side battle state updates and timer management
+
+### NEW SERVER FILES TO CREATE:
+1. **`server/src/services/BattleTimer.ts`** (100 lines) - Timer management service
+2. **`server/src/services/BattleUpdater.ts`** (150 lines) - State update orchestration
+3. **`server/src/config/battleConfig.ts`** (30 lines) - Battle configuration constants
+
+### What This Achieves:
+- ✅ Server-side timer management (3s countdown, 20s battle)
+- ✅ Automatic phase transitions
+- ✅ Periodic state calculations (every 100ms server-side)
+- ✅ Efficient state diffing for client updates
+- ✅ Battle cleanup on completion
+
+### Update Strategy:
+- Server calculates state every 100ms
+- Client receives updates every 1000ms (1s)
+- Only changed data is sent to minimize bandwidth
+- Critical events (victory, destruction) sent immediately
+
+---
+
+## Batch 5G: Client Battle API Integration
+REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
+**Goal:** Update client to fetch battle state from server instead of local calculations
+
+### CLIENT FILES TO MODIFY:
+1. **`src/store/api/battleApi.ts`** (NEW - 80 lines) - Battle API slice
+2. **`src/hooks/useBattleBattalions.ts`** - Remove local state, use server data
+3. **`src/hooks/useBattalionData.ts`** - Mark calculations as deprecated
+4. **`src/screens/BattleGridScreen.tsx`** - Integrate server state
+
+### What This Achieves:
+- ✅ RTK Query setup for battle endpoints
+- ✅ Automatic polling for battle state (1s intervals)
+- ✅ Remove local battalion creation/damage calculations
+- ✅ Display server-provided battle state
+- ✅ Proper loading and error states
+
+### Migration Strategy:
+- Add TODO comments to deprecated local calculations
+- Keep visualization components unchanged
+- Only data source changes from local to server
+
+---
+
+## Batch 5H: Battle State Synchronization and Optimizations
+REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
+**Goal:** Optimize client-server synchronization for smooth gameplay
+
+### CLIENT FILES TO CREATE/MODIFY:
+1. **`src/hooks/useBattleSync.ts`** (NEW - 120 lines) - State sync management
+2. **`src/utils/battleStateCache.ts`** (NEW - 60 lines) - Client-side state caching
+3. **`src/components/battle/BattleNetworkGrid.tsx`** - Add interpolation
+
+### SERVER FILES TO MODIFY:
+1. **`server/src/services/BattleUpdater.ts`** - Add state diffing
+2. **`server/src/controllers/BattleController.ts`** - Add compression
+
+### What This Achieves:
+- ✅ Smooth visual updates between server ticks
+- ✅ Client-side interpolation for movement
+- ✅ Predictive UI for better responsiveness
+- ✅ State compression for bandwidth efficiency
+- ✅ Automatic reconnection handling
+
+### Performance Targets:
+- < 100ms perceived latency for actions
+- < 50KB/s bandwidth per active battle
+- Smooth 60fps animations
+- Graceful degradation on poor connections
+
+---
+
+## Batch 5I: Battle Testing and Migration Cleanup
+REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
+**Goal:** Add comprehensive tests and clean up migration artifacts
+
+### NEW TEST FILES:
+1. **`server/src/__tests__/BattleService.test.ts`** (200 lines)
+2. **`server/src/__tests__/BattleCalculator.test.ts`** (150 lines)
+3. **`mobile/__tests__/hooks/useBattleSync.test.ts`** (100 lines)
+
+### CLEANUP TASKS:
+1. Remove deprecated local calculation code
+2. Update documentation with server architecture
+3. Add monitoring/logging for battle performance
+4. Create migration guide for future features
+
+### What This Achieves:
+- ✅ Unit tests for all battle calculations
+- ✅ Integration tests for battle flow
+- ✅ Clean codebase without deprecated code
+- ✅ Performance benchmarks documented
+- ✅ Clear path for future features (movement, targeting, attacks)
 
 ---
 
