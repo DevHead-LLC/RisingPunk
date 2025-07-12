@@ -22,9 +22,9 @@ interface GetInitialNodesParams {
 
 export function calculateNodePositions(width: number, height: number, topMargin: number = 125) {
   const availableHeight = height - topMargin;
-  const TOP_MARGIN = availableHeight * 0.010;
-  const BOTTOM_MARGIN = availableHeight * 0.09;
-  const H_PADDING = 64;
+  const TOP_MARGIN = availableHeight * 0.050; // Increased from 0.010
+  const BOTTOM_MARGIN = availableHeight * 0.15; // Increased from 0.09
+  const H_PADDING = 96; // Increased from 64
 
   const colWidth = (width - 2 * H_PADDING) / 2;
   const X_LEFT = H_PADDING;
