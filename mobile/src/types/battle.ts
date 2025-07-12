@@ -1,12 +1,9 @@
-
+import { BotType, BotStats } from '../hooks/useBots';
 
 export type Path = number[];
 
-export enum BattalionType {
-  GUARDIAN = 'guardian',
-  PHREAK = 'phreak',
-  BREACHER = 'breacher'
-}
+// Use the BotType from useBots instead of a separate enum
+export type BattalionType = BotType;
 
 // CLARIFICATION: This file should only define types/interfaces/enums for the battle system.
 // TODO: Ensure this file does not control logic for control state, capture progress, or any battle logic—only type definitions. Logic should be handled elsewhere.
@@ -23,6 +20,22 @@ export interface BattalionPosition {
   mark: number;
   remainingPath?: number[]; // For path following logic
   finalTarget?: number; // For path following logic
+}
+
+// Enhanced battalion interface with bot stats integration
+export interface Battalion {
+  id: string;
+  type: BattalionType;
+  quantity: number;
+  currentHealth: number;
+  maxHealth: number;
+  nodeIndex: number;
+  isUser: boolean;
+  stats: BotStats;
+  targetNode?: number;
+  mark: number;
+  remainingPath?: number[];
+  finalTarget?: number;
 }
 
 export type BattleTarget = {
