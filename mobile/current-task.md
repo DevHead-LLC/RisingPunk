@@ -41,54 +41,6 @@ AI MUST READ SECTION ABOVE! END.
 =====================================================================================================================================================================
 =====================================================================================================================================================================
 
-## Batch 5C: Server Battle Models and Database Schema
-REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
-**Goal:** Create server-side battle models and database schema for authoritative battle state
-
-### IMPLEMENTATION NOTES FOR AI:
-- Work in the `server` directory, NOT the `mobile` directory
-- Use TypeScript with Mongoose for MongoDB schemas
-- Reference existing models like `User.ts` and `Bot.ts` for schema patterns
-- All files go in `server/src/` subdirectories as specified
-
-### NEW SERVER FILES TO CREATE:
-1. **`server/src/models/Battle.ts`** (150 lines) - Battle model with all state management
-   - Import mongoose and create Schema
-   - Include fields for: battleId, attackerId, defenderId, phase, startTime, endTime
-   - Embed battalion array with: id, type, quantity, health, position, owner
-   - Embed node array with: index, owner, captureProgress, health
-   - Add timestamps and methods for state updates
-
-2. **`server/src/models/BattleEvent.ts`** (50 lines) - Battle event logging for replay/audit
-   - Reference battleId from Battle model
-   - Include: eventType, timestamp, data (flexible object), actorId
-   - Index by battleId and timestamp for efficient queries
-
-3. **`server/src/types/battle.ts`** (80 lines) - Shared battle types for server
-   - Export TypeScript interfaces matching the schemas
-   - Include enums for: BattlePhase, EventType, NodeOwner
-   - These types will be used by services and controllers
-
-### What This Achieves:
-- ✅ MongoDB schema for battle state (battalions, nodes, timers, etc.)
-- ✅ Event logging for battle actions (movement, attacks, damage)
-- ✅ Authoritative server state for all battle calculations
-- ✅ Support for concurrent battles per user
-
-### Database Schema Includes:
-- Battle metadata (users, start time, phase, winner)
-- Battalion state (positions, health, targets, movement paths)
-- Node state (ownership, capture progress, health)
-- Timer state (countdown, battle time)
-- Event log for replay capability
-
-### TESTING THIS BATCH:
-- Ensure server compiles with `npm run build` in server directory
-- Models should export properly
-- No runtime testing needed yet (no endpoints to call)
-
----
-
 ## Batch 5D: Server Battle Service and Game Logic
 REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
 **Goal:** Implement core battle logic and calculations on the server
