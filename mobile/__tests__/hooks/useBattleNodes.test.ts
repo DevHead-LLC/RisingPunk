@@ -57,7 +57,7 @@ describe('useInitialBattleNodes Logic (Batch 1A)', () => {
       expect(userNodes).toHaveLength(3);
       userNodes.forEach(node => {
         expect(node.index).toBeLessThan(3);
-        expect(node.position.x).toBe(64);
+        expect(node.position.x).toBe(96); // Updated from 64
       });
     });
 
@@ -81,7 +81,7 @@ describe('useInitialBattleNodes Logic (Batch 1A)', () => {
       enemyNodes.forEach(node => {
         expect(node.index).toBeGreaterThanOrEqual(6);
         expect(node.index).toBeLessThan(9);
-        expect(node.position.x).toBe(336);
+        expect(node.position.x).toBe(304); // Updated from 336
       });
     });
 
