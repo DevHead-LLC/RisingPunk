@@ -13,9 +13,7 @@ AI MUST READ SECTION BELOW! START.
 
 ## Implementation Rules
 - **NO INVENTION**: Only implement features specified in intentions documents
-- **NO LEGACY FILES**: Create new files with unique names, don't modify existing ones
 - **NO GAPS**: If batch requires logic not in intentions, STOP and ask for specification
-- **BATTLEGRID FOCUS**: All work must connect to BattleGridScreen.tsx workflow
 
 ## Process
 1. Read relevant intentions documents
@@ -23,15 +21,9 @@ AI MUST READ SECTION BELOW! START.
 3. If conflicts exist, intentions documents take precedence
 4. Ask for clarification before proceeding with any deviation
 
-# Battle System Rebuild - Detailed Implementation Plan
-
-## Overview
-Rebuilding the battle system from scratch with clean architecture, proper node management, and network-constrained movement. Each batch is small and testable with unique file names and clear references.
-
 ## Core Architecture Principles
 - **Single Source of Truth**: Each concept has one authoritative location
-- **File Size Limit**: No file exceeds 300 lines
-- **Network-Constrained Movement**: Battalions must follow network lines
+- **File Size Limit**: No file exceeds 250 lines - if it does, create a new file and import as needed
 - **Clean Separation**: Logic, state, and UI are properly separated
 - **Testable Components**: Each piece can be tested independently
 
@@ -41,62 +33,7 @@ AI MUST READ SECTION ABOVE! END.
 =====================================================================================================================================================================
 =====================================================================================================================================================================
 
-## Batch 5E: Battle API Routes and Controllers
-REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
-**Goal:** Create REST API endpoints for battle operations
 
-### IMPLEMENTATION NOTES FOR AI:
-- Follow existing patterns in `server/src/routes/auth.ts` and `userRoutes.ts`
-- Controllers handle HTTP requests/responses, services handle logic
-- Use the auth middleware from `server/src/middleware/auth.ts`
-- Add new routes to `server/server.ts` after creating them
-
-### NEW SERVER FILES TO CREATE:
-1. **`server/src/routes/battle.ts`** (100 lines) - Battle API routes
-   - Use Express Router
-   - Apply auth middleware to all routes
-   - Define routes mapping to controller methods
-   - Export router
-
-2. **`server/src/controllers/BattleController.ts`** (180 lines) - Battle request handlers
-   - Import services from 5D
-   - Methods: startBattle, getBattleState, submitAction, getBattleEvents, endBattle
-   - Handle errors with try/catch and proper HTTP status codes
-   - Validate request parameters
-
-3. **`server/src/middleware/battleAuth.ts`** (40 lines) - Battle-specific auth checks
-   - Verify user owns the battle or is a participant
-   - Check battle is active for action submissions
-   - Export middleware function
-
-### API Endpoints:
-- `POST /api/battle/start` - Initialize new battle
-- `GET /api/battle/:id/state` - Get current battle state
-- `POST /api/battle/:id/action` - Submit battle action (future use)
-- `GET /api/battle/:id/events` - Get battle event log
-- `POST /api/battle/:id/end` - Force end battle (admin/timeout)
-
-### IMPORTANT: Update server.ts
-After creating routes, add to `server/server.ts`:
-```typescript
-import battleRoutes from './src/routes/battle';
-app.use('/api/battle', battleRoutes);
-```
-
-### What This Achieves:
-- ✅ RESTful API for all battle operations
-- ✅ Proper authentication and authorization
-- ✅ Battle state serialization for client
-- ✅ Rate limiting for battle operations
-
-### TESTING THIS BATCH:
-- Start server with `npm run dev`
-- Test with Postman or curl:
-  - POST /api/battle/start (with auth token)
-  - GET /api/battle/:id/state (with auth token)
-- Verify proper error responses for unauthorized requests
-
----
 
 ## Batch 5F: Server Battle State Updates and Timer Management
 REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
