@@ -40,56 +40,6 @@ AI MUST READ SECTION ABOVE! END.
 =====================================================================================================================================================================
 =====================================================================================================================================================================
 
-## Batch 5A: Battalion Types and Data
-REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
-**Goal**: Create battalion data management system
-
-### RELEVANT EXISTING FILES:
-- **battleTypes.ts**: [current-battlegrid-connections.md#types](#types) - Already has `BattalionType` enum and `Battalion` interface
-- **useBattleNodes.ts**: [current-battlegrid-connections.md#hooks](#hooks) - Provides node positioning for battalion placement
-
-### BOT CATEGORIES TO ADD:
-- **Source**: [battalion-bot-behaviors.md#bot-categories](#bot-categories) (lines 48-95)
-- **Location**: Add to existing `src/types/battleTypes.ts` file
-- **Content**: Guardian, Breacher, Phreak stats, advantages, and lore
-
-### What This Achieves:
-- ✅ Bot categories and stats added to existing battleTypes.ts
-- ✅ Battalion data management using existing Battalion interface
-- ✅ Health calculation based on bot type stats
-
-### Test Criteria:
-- Bot categories are available in battleTypes.ts
-- Battalion data is managed correctly
-- Health calculations use correct bot stats
-
----
-
-## Batch 5B: Battalion Visualization
-REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
-**Goal**: Create static battalion visualization components
-
-### RELEVANT EXISTING FILES:
-- **BattleNetworkGrid.tsx**: [current-battlegrid-connections.md#components](#components) - Will render battalions on nodes
-- **battleTypes.ts**: [current-battlegrid-connections.md#types](#types) - Contains BattalionType enum and Battalion interface (updated in 5A)
-
-### BATTALION VISUALIZATION REQUIREMENTS:
-- **Source**: [battalion-bot-behaviors.md#battalion-structure](#battalion-structure) (lines 1-20)
-- **Integration**: Add battalion rendering to existing BattleNetworkGrid.tsx
-- **Requirements**: Shapes, quantity display, health bars, bot type indicators
-
-### What This Achieves:
-- ✅ Battalion visualization added to existing BattleNetworkGrid.tsx
-- ✅ Bot type indicators using stats from battleTypes.ts (added in 5A)
-- ✅ Health bars showing current/max health
-
-### Test Criteria:
-- Battalions render correctly on nodes in BattleNetworkGrid
-- Bot types are distinguishable by shape/color
-- Health bars show correctly
-
----
-
 ## Batch 5C: Server-Driven Battalion Initialization and Stats
 REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
 **Goal:** Move battalion initialization and stat calculations to the server for authoritative state.

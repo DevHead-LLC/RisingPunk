@@ -247,3 +247,30 @@
 - ✅ Health calculations use correct bot stats from useBots system
 
 ---
+
+## Batch 5B: Battalion Visualization
+**Goal**: Create static battalion visualization components
+
+### FILES CREATED/ENHANCED:
+1. **`src/components/battle/BattleBattalion.tsx`** - Individual battalion visualization (shapes, health bar, quantity, type, mark)
+2. **`src/components/battle/BattleBattalionManager.tsx`** - Manages and renders multiple battalions
+3. **`src/hooks/useBattleBattalions.ts`** - Battalion state management for visualization
+4. **`src/screens/BattleGridScreen.tsx`** - Integrated battalion visualization with the network grid
+5. **`src/hooks/useBattleNodes.ts`** - Node layout adjusted for better battalion visibility
+
+### What This Achieves:
+- ✅ Battalion visualization with distinct shapes: circle (Guardian), square (Breacher), diamond (Phreak)
+- ✅ Quantity displayed in a black circular background, always upright
+- ✅ Health bar above the shape, visually consistent for all types
+- ✅ Bot type abbreviation and Mark level on the same line, just below the shape
+- ✅ Red/blue border for enemy/user battalions
+- ✅ Responsive node layout to avoid clipping and crowding
+- ✅ All visual elements polished for clarity and consistency
+
+### Test Criteria:
+- ✅ Battalions render correctly on nodes in BattleNetworkGrid
+- ✅ Bot types are distinguishable by shape/color
+- ✅ Health bars and labels are visually clear and not clipped
+- ✅ No UI overlap or crowding at screen edges
+
+---
