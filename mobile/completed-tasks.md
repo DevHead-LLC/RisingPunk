@@ -217,3 +217,33 @@
 **Status:** Skipped for now. Will revisit and redesign deployment zone visualization at a later time.
 
 ---
+
+## Batch 5A: Battalion Types and Data
+**Goal**: Create battalion data management system
+
+### FILES ENHANCED:
+1. **`src/types/battle.ts`** - Updated to integrate with useBots system
+2. **`src/hooks/useBattalionData.ts`** - New battalion data management hook
+3. **`src/screens/BattleGridScreen.tsx`** - Updated to demonstrate integration
+
+### What This Achieves:
+- ✅ Bot categories and stats integrated from useBots system
+- ✅ Battalion data management with proper health calculations
+- ✅ Battalion creation with stats from bot categories (Guardian, Breacher, Phreak)
+- ✅ Health calculation based on bot type and quantity
+- ✅ Attack power and defense calculations using bot stats
+- ✅ Damage application system that reduces health and quantity
+- ✅ Battalion destruction detection
+- ✅ Integration demonstrated in BattleGridScreen
+
+### Bot Categories Integration:
+- **Guardian (Cavalry)**: Health 14, Speed 9, Range 4, Offense 8, Defense 6
+- **Breacher (Infantry)**: Health 18, Speed 5, Range 5, Offense 7, Defense 8  
+- **Phreak (Ranged)**: Health 12, Speed 7, Range 9, Offense 6, Defense 5
+
+### Test Criteria:
+- ✅ Bot categories are available in battle types system
+- ✅ Battalion data is managed correctly with proper health calculations
+- ✅ Health calculations use correct bot stats from useBots system
+
+---

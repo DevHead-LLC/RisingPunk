@@ -1,24 +1,26 @@
 /**
  * @file BattleGridScreen.tsx
- * @description Main battle screen container with network visualization
+ * @description Main battle screen container with network visualization and battalion rendering
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet, SafeAreaView, Dimensions, Text } from 'react-native';
 import { useInitialBattleNodes } from '../hooks/useBattleNodes';
 import { useBattleNetworkConnections } from '../hooks/useBattleNetwork';
 import { useBattalionData } from '../hooks/useBattalionData';
+import { useBattleBattalions } from '../hooks/useBattleBattalions';
 import { useBots } from '../hooks/useBots';
 import { BattleNetworkGrid } from '../components/battle/BattleNetworkGrid';
+import { BattleBattalionManager } from '../components/battle/BattleBattalionManager';
 import { BattleOverlayManager } from '../components/battle/BattleOverlayManager';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 type Props = {
-  onClose?: () => void;
+  _onClose?: () => void;
 };
 
-export const BattleGridScreen = React.memo(({ onClose }: Props) => {
+export const BattleGridScreen = React.memo(({ _onClose }: Props) => {
   // Use the single source of truth for node state/positions
   const nodes = useInitialBattleNodes({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
 
@@ -28,8 +30,21 @@ export const BattleGridScreen = React.memo(({ onClose }: Props) => {
   // Battalion data management system
   const battalionData = useBattalionData();
 
+  // Battalion state management for visualization
+  const {
+    battalions,
+    initializeSampleBattalions,
+    getUserBattalions,
+    getEnemyBattalions,
+  } = useBattleBattalions();
+
   // Bot categories and stats
   const { BOT_CATEGORIES, getBotRole } = useBots();
+
+  // Initialize sample battalions on component mount
+  useEffect(() => {
+    initializeSampleBattalions();
+  }, []); // Empty dependency array - only run on mount
 
   // Example: Create a sample battalion to demonstrate the system
   const sampleBattalion = React.useMemo(() => {
@@ -41,6 +56,7 @@ export const BattleGridScreen = React.memo(({ onClose }: Props) => {
       <View style={styles.battleArea}>
         {/* Overlays (countdown, timer) */}
         <BattleOverlayManager />
+
         {/* Network visualization */}
         <View style={styles.networkContainer}>
           <BattleNetworkGrid
@@ -56,30 +72,16 @@ export const BattleGridScreen = React.memo(({ onClose }: Props) => {
             lineWidth={2}
             showNodeLabels={true}
           />
-        </View>
 
-        {/* Title */}
-        <Text style={styles.title}>Battle Grid Screen</Text>
-        <Text style={styles.subtitle}>Network visualization complete</Text>
-
-        {/* Bot Categories Integration Demo */}
-        <View style={styles.botInfoContainer}>
-          <Text style={styles.botInfoTitle}>Bot Categories Available:</Text>
-          {Object.entries(BOT_CATEGORIES).map(([type, category]) => (
-            <Text key={type} style={styles.botInfoText}>
-              {getBotRole(type as any)}: {category.advantage}
-            </Text>
-          ))}
-        </View>
-
-        {/* Sample Battalion Demo */}
-        <View style={styles.battalionInfoContainer}>
-          <Text style={styles.battalionInfoTitle}>Sample Battalion:</Text>
-          <Text style={styles.battalionInfoText}>
-            Type: {getBotRole(sampleBattalion.type)} |
-            Quantity: {sampleBattalion.quantity} |
-            Health: {sampleBattalion.currentHealth}/{sampleBattalion.maxHealth}
-          </Text>
+          {/* Battalion visualization */}
+          <BattleBattalionManager
+            battalions={battalions}
+            nodes={nodes as any}
+            battalionSize={35}
+            showHealthBars={true}
+            showQuantities={true}
+            showBotTypes={true}
+          />
         </View>
       </View>
     </SafeAreaView>
@@ -131,6 +133,24 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     marginBottom: 4,
+  },
+  battalionStatsContainer: {
+    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: '#FFC107',
+  },
+  battalionStatsTitle: {
+    color: '#FFC107',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  battalionStatsText: {
+    color: '#FFFFFF',
+    fontSize: 12,
   },
   battalionInfoContainer: {
     backgroundColor: 'rgba(255, 65, 65, 0.1)',
