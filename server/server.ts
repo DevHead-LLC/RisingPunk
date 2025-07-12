@@ -16,11 +16,13 @@ import { Error } from 'mongoose';
 import { MapService } from './src/services/MapService';
 import { Map } from './src/models/Map';
 import userRoutes from './src/routes/userRoutes';
+import battleRoutes from './src/routes/battle';
 
 declare global {
   namespace Express {
     interface Request {
       user: { _id: string }
+      battle?: any
     }
   }
 }
@@ -335,6 +337,7 @@ app.get('/api/map/:name', async (req: Request, res: Response) => {
 });
 
 app.use('/api/users', userRoutes);
+app.use('/api/battle', battleRoutes);
 
 app.post('/api/battalions/assign', auth, async (req: Request, res: Response) => {
   try {

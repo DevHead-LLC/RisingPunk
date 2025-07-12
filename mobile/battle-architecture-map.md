@@ -111,9 +111,10 @@ This document maps the battle system architecture to help AI assistants understa
   - Performs state diffing for efficient updates
   - Sends updates to clients every 1s
 
-#### API Layer - 🔄 PENDING (Batch 5E)
-- **battle.ts** (routes) - RESTful endpoints
-- **BattleController.ts** - Request handling
+#### API Layer - ✅ COMPLETED (Batch 5E)
+- **battle.ts** (routes) - RESTful endpoints ✅
+- **BattleController.ts** - Request handling ✅
+- **battleAuth.ts** - Battle-specific authentication ✅
 
 ### Client Side (Modified) - 🔄 PENDING (Batch 5G-5H)
 
@@ -161,10 +162,11 @@ This document maps the battle system architecture to help AI assistants understa
 2. **BattleCalculator.ts** - Move all calculations from client to server ✅ (basic regression test added)
 3. **BattleMovement.ts** - Server-side pathfinding and movement validation ✅
 
-### 🔄 What's Next (Batch 5E)
-1. **battle.ts** (routes) - RESTful API endpoints
-2. **BattleController.ts** - Request handling
-3. **battleAuth.ts** - Battle-specific authentication
+### ✅ What's Complete (Batch 5E)
+1. **battle.ts** (routes) - RESTful API endpoints ✅
+2. **BattleController.ts** - Request handling ✅
+3. **battleAuth.ts** - Battle-specific authentication ✅
+4. **Regression test** - Unauthenticated access protection ✅
 
 ### 📋 What's Set Up for Future Phases
 - **Phase 6 (Movement)**: BattleMovement.ts service ready to implement
