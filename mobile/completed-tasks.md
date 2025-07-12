@@ -312,3 +312,52 @@
 - ✅ Database schemas are properly defined with validation
 
 ---
+
+## Batch 5D: Server Battle Service and Game Logic (COMPLETE)
+REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
+**Goal:** Implement core battle logic and calculations on the server
+
+### IMPLEMENTATION NOTES FOR AI:
+- Services contain business logic, NOT database queries
+- Import Battle model from 5C for database operations
+- Copy bot stats from `mobile/src/hooks/useBots.ts` BOT_CATEGORIES
+- Use existing `server/src/services/MapService.ts` as a pattern reference
+
+### NEW SERVER FILES TO CREATE:
+1. **`server/src/services/BattleService.ts`** (250 lines) - Core battle logic
+   - Methods: createBattle, getBattle, endBattle
+   - Initialize battalions on nodes 0-2 (user) and 6-8 (enemy)
+   - Set neutral node health to 75% of total army strength
+   - Handle phase transitions (countdown → active → complete)
+
+2. **`server/src/services/BattleCalculator.ts`** (150 lines) - Damage/combat calculations
+   - Copy formulas from intentions documents EXACTLY:
+     - Attack Power = (Bot Type Strength + bonuses) × Quantity
+     - Defense % = Bot Type Defense + bonuses
+     - Damage = Attack Power / (Defense % × 100)
+   - Methods: calculateDamage, applyDamage, checkDestruction
+
+3. **`server/src/services/BattleMovement.ts`** (120 lines) - Movement and pathfinding
+   - Copy NETWORK_CONNECTIONS from `mobile/src/utils/networkConstants.ts`
+   - Implement Dijkstra's algorithm (reference `mobile/src/utils/pathfinding.ts`)
+   - Methods: validatePath, calculatePath, moveAlongPath
+
+### What This Achieves:
+- ✅ Battle initialization with proper battalion placement
+- ✅ Damage calculations (attack power, defense, unit loss)
+- ✅ Node capture mechanics (tug-of-war system)
+- ✅ Movement validation and pathfinding
+- ✅ Victory condition checking
+
+### Server-Side Calculations:
+- Health: `(Bot Type Health + bonuses) × Quantity`
+- Attack Power: `(Bot Type Strength + bonuses) × Quantity`
+- Damage: `Attack Power / (Defense % × 100)`
+- Node Capture: Progress based on damage/health ratio
+
+### TESTING THIS BATCH:
+- Services should compile without errors
+- Export all service classes properly
+- Unit tests can be written but are not required yet
+
+---
