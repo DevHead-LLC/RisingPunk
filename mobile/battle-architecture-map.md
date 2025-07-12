@@ -1,7 +1,7 @@
 # Battle System Architecture Map
 
 ## Purpose
-This document maps the battle system architecture to help AI assistants understand what handles what during implementation. It shows the current client-side architecture and the upcoming server-driven changes in Phase 5 (5C-5I).
+This document maps the battle system architecture to help AI assistants understand what handles what during implementation. It shows the current client-side architecture and the server-driven changes in Phase 5 (5C-5I).
 
 ## Current Architecture (Client-Side Only)
 
@@ -57,21 +57,25 @@ This document maps the battle system architecture to help AI assistants understa
 
 ---
 
-## Phase 5 Architecture (Server-Driven)
+## Phase 5 Architecture (Server-Driven) - IN PROGRESS
 
-### Server Side (New)
+### Server Side (Partially Complete)
 
-#### Models (Database)
+#### Models (Database) - ✅ COMPLETED (Batch 5C)
 - **Battle.ts** - Battle state persistence
-  - Stores complete battle state
-  - Tracks all battalions, nodes, timers
-  - Links to users and battle events
+  - ✅ Stores complete battle state with embedded battalion and node arrays
+  - ✅ Tracks all battalions, nodes, timers with proper validation
+  - ✅ Links to users and battle events
+  - ✅ Instance methods for state updates (updatePhase, updateTimer, etc.)
+  - ✅ Static methods for querying battles (findByBattleId, findActiveBattles, etc.)
   
 - **BattleEvent.ts** - Event logging
-  - Records all battle actions
-  - Enables replay and audit trails
+  - ✅ Records all battle actions with proper indexing
+  - ✅ Enables replay and audit trails
+  - ✅ Flexible data field for event-specific information
+  - ✅ Compound indexes for efficient queries
 
-#### Services (Business Logic)
+#### Services (Business Logic) - 🔄 PENDING (Batch 5D)
 - **BattleService.ts** - Core battle orchestration
   - Initializes battles
   - Manages battle lifecycle
@@ -86,7 +90,8 @@ This document maps the battle system architecture to help AI assistants understa
   - Validates movement along network paths
   - Calculates pathfinding server-side
   - **Will handle movement in Phase 6**
-  
+
+#### Timer & Updates - 🔄 PENDING (Batch 5F)
 - **BattleTimer.ts** - Timer management
   - **Manages countdown and battle timers (moved from client)**
   - Triggers phase transitions
@@ -97,13 +102,13 @@ This document maps the battle system architecture to help AI assistants understa
   - Performs state diffing for efficient updates
   - Sends updates to clients every 1s
 
-#### API Layer
+#### API Layer - 🔄 PENDING (Batch 5E)
 - **battle.ts** (routes) - RESTful endpoints
 - **BattleController.ts** - Request handling
 
-### Client Side (Modified)
+### Client Side (Modified) - 🔄 PENDING (Batch 5G-5H)
 
-#### New/Modified Components
+#### New/Modified Components - 🔄 PENDING
 - **battleApi.ts** (NEW) - RTK Query API slice
   - Fetches battle state from server
   - Polls every 1s for updates
@@ -116,29 +121,62 @@ This document maps the battle system architecture to help AI assistants understa
   - Caches state for performance
   - Enables predictive UI
 
-#### Modified Hooks
+#### Modified Hooks - 🔄 PENDING
 - **useBattleBattalions** - Now fetches from server instead of local state
 - **useBattalionData** - Calculations marked as deprecated (server handles)
 - **useBattleState** - Timer display only (server manages actual timers)
 
 ---
 
+## Current Status After Batch 5C
+
+### ✅ What's Complete
+1. **Database Foundation**
+   - MongoDB schemas for Battle and BattleEvent models
+   - TypeScript interfaces and enums for all battle components
+   - Proper database indexing for performance
+   - Instance and static methods for battle operations
+
+2. **Type Safety**
+   - Complete TypeScript support across server and client
+   - Shared types between server models and client interfaces
+   - Proper validation and constraints
+
+3. **Event Logging Infrastructure**
+   - BattleEvent model ready for comprehensive logging
+   - Indexes for efficient event queries
+   - Flexible data structure for all event types
+
+### 🔄 What's Next (Batch 5D)
+1. **BattleService.ts** - Core battle orchestration
+2. **BattleCalculator.ts** - Move all calculations from client to server
+3. **BattleMovement.ts** - Server-side pathfinding and movement validation
+
+### 📋 What's Set Up for Future Phases
+- **Phase 6 (Movement)**: BattleMovement.ts service ready to implement
+- **Phase 7 (Targeting)**: Event logging ready for target selection events
+- **Phase 8 (Attacks)**: BattleCalculator.ts ready for damage calculations
+- **Phase 9 (Animations)**: Client-side interpolation hooks ready to implement
+- **Phase 10 (Integration)**: All foundation pieces in place
+
+---
+
 ## Key Architecture Changes
 
 ### What Moves to Server
-1. **All Calculations**
+1. **All Calculations** - 🔄 PENDING (Batch 5D)
    - Health calculations
    - Damage calculations
    - Attack power and defense
    - Unit loss calculations
    
-2. **State Management**
+2. **State Management** - 🔄 PENDING (Batch 5F)
    - Battalion positions and health
    - Node ownership and capture progress
    - Timer management
    - Victory conditions
    
-3. **Game Logic**
+3. **Game Logic** - 🔄 PENDING (Phases 6-8)
    - Target selection (Phase 7)
    - Movement validation (Phase 6)
    - Attack resolution (Phase 8)
@@ -157,7 +195,7 @@ This document maps the battle system architecture to help AI assistants understa
    - Shows server-provided state
    - Interpolates between updates
 
-### Data Flow
+### Data Flow - 🔄 PENDING (Batch 5G)
 1. Client requests battle start → Server initializes battle
 2. Server calculates state every 100ms
 3. Client polls state every 1000ms
@@ -172,24 +210,30 @@ This document maps the battle system architecture to help AI assistants understa
 
 #### Client-Side Work
 - **Visual components** → Modify existing components in `src/components/battle/`
-- **State display** → Use data from `battleApi.ts` queries
-- **Animations** → Add to components, use `useBattleSync` for interpolation
+- **State display** → Use data from `battleApi.ts` queries (once implemented)
+- **Animations** → Add to components, use `useBattleSync` for interpolation (once implemented)
 
 #### Server-Side Work
-- **Game logic** → Add to `BattleService.ts` or related services
-- **Calculations** → Add to `BattleCalculator.ts`
-- **State updates** → Modify `BattleUpdater.ts`
+- **Game logic** → Add to `BattleService.ts` or related services (once created)
+- **Calculations** → Add to `BattleCalculator.ts` (once created)
+- **State updates** → Modify `BattleUpdater.ts` (once created)
 - **New features** → Create new service files as needed
 
-#### Connection Points
+#### Connection Points - 🔄 PENDING
 - **API calls** → Client `battleApi.ts` ↔ Server `battle.ts` routes
 - **State updates** → Server `BattleUpdater.ts` → Client `useBattleSync.ts`
 - **Events** → Server `BattleEvent.ts` → Client event display (future)
 
 ### Phase Dependencies
-- **Phase 5** - Foundation (current focus)
+- **Phase 5** - Foundation (5C ✅ COMPLETE, 5D-5I 🔄 PENDING)
 - **Phase 6** - Movement (depends on Phase 5)
 - **Phase 7** - Targeting (depends on Phase 5)
 - **Phase 8** - Attacks (depends on Phases 5, 6, 7)
 - **Phase 9** - Animations (client-side, depends on Phase 6)
-- **Phase 10** - Integration (brings everything together) 
+- **Phase 10** - Integration (brings everything together)
+
+### Current Working Directory
+- **Server work**: `server/src/` directory
+- **Client work**: `mobile/src/` directory
+- **Database**: MongoDB with Mongoose schemas
+- **Types**: Shared between server and client via `server/src/types/battle.ts` 

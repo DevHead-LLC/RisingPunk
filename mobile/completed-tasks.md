@@ -274,3 +274,41 @@
 - ✅ No UI overlap or crowding at screen edges
 
 ---
+
+## Batch 5C: Server Battle Models and Database Schema
+**Goal:** Create server-side battle models and database schema for authoritative battle state
+
+### NEW SERVER FILES CREATED:
+1. **`server/src/models/Battle.ts`** (150 lines) - Battle model with all state management
+2. **`server/src/models/BattleEvent.ts`** (50 lines) - Battle event logging for replay/audit
+3. **`server/src/types/battle.ts`** (80 lines) - Shared battle types for server
+
+### What This Achieves:
+- ✅ MongoDB schema for battle state (battalions, nodes, timers, etc.)
+- ✅ Event logging for battle actions (movement, attacks, damage)
+- ✅ Authoritative server state for all battle calculations
+- ✅ Support for concurrent battles per user
+
+### Database Schema Includes:
+- Battle metadata (users, start time, phase, winner)
+- Battalion state (positions, health, targets, movement paths)
+- Node state (ownership, capture progress, health)
+- Timer state (countdown, battle time)
+- Event log for replay capability
+
+### Implementation Details:
+- **Battle Model**: Complete battle state with embedded battalion and node arrays
+- **BattleEvent Model**: Event logging with proper indexing for efficient queries
+- **Battle Types**: TypeScript interfaces and enums for all battle components
+- **Instance Methods**: Helper methods for updating battle state
+- **Static Methods**: Query methods for finding battles by various criteria
+- **Proper Indexing**: Database indexes for efficient queries and performance
+
+### Test Criteria:
+- ✅ Server compiles with `npm run build` in server directory
+- ✅ Models export properly and can be imported
+- ✅ All TypeScript types compile correctly
+- ✅ No runtime errors on model instantiation
+- ✅ Database schemas are properly defined with validation
+
+---
