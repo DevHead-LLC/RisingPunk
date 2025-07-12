@@ -9,7 +9,7 @@ AI MUST READ SECTION BELOW! START.
 - **Battle mechanics**: [battle-intentions.md](./battle-intentions.md)
 - **Node work**: [node-behaviors.md](./node-behaviors.md) 
 - **Battalion/bot work**: [battalion-bot-behaviors.md](./battalion-bot-behaviors.md)
-- **Architecture map**: [battle-architecture-map.md](./battle-architecture-map.md) - Shows current vs Phase 5 architecture
+- **Architecture map**: [battle-architecture-map.md](./battle-architecture-map.md)
 
 ## Implementation Rules
 - **NO INVENTION**: Only implement features specified in intentions documents
@@ -32,8 +32,6 @@ AI MUST READ SECTION ABOVE! END.
 ====================================
 =====================================================================================================================================================================
 =====================================================================================================================================================================
-
-
 
 ## Batch 5F: Server Battle State Updates and Timer Management
 REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
@@ -138,59 +136,50 @@ REVIEW AI MUST READ SECTION at the top of this file before you move forward with
 
 ---
 
-## Batch 5H: Battle State Synchronization and Optimizations
+## Batch 5H: Server-Side Movement Execution and Real-Time Updates
 REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
-**Goal:** Optimize client-server synchronization for smooth gameplay
+**Goal:** Activate server-side movement logic and implement real-time battle updates
 
 ### IMPLEMENTATION NOTES FOR AI:
-- Interpolation means smoothly animating between server updates
-- Cache previous state to detect changes
-- This is advanced - focus on basic functionality first
+- This batch activates the existing BattleMovement.ts service for actual movement execution
+- Extends BattleUpdater to call movement logic every 100ms
+- Server becomes the authoritative source for all movement and targeting
 
-### CLIENT FILES TO CREATE/MODIFY:
-1. **`mobile/src/hooks/useBattleSync.ts`** (NEW - 120 lines) - State sync management
-   - Subscribe to battle state updates
-   - Detect changes between updates
-   - Trigger animations for position changes
-   - Handle reconnection on network issues
+### SERVER FILES TO MODIFY/CREATE:
+1. **`server/src/services/BattleUpdater.ts`** - Add movement execution
+   - Add executeMovementPhase() method that calls BattleMovement.findClosestTarget()
+   - Add updateBattalionPositions() method that calls BattleMovement.moveAlongPath()
+   - Add retargetBattalions() method for when targets are captured/destroyed
+   - Call these methods in the main update loop every 100ms
 
-2. **`mobile/src/utils/battleStateCache.ts`** (NEW - 60 lines) - Client-side state caching
-   - Store previous battle state
-   - Compare states to find differences
-   - Export methods: cacheState, getStateDiff, clearCache
+2. **`server/src/services/BattleMovement.ts`** - Extend for execution (add 50 lines)
+   - Add executeBattalionMovement() method - orchestrates all movement for a battle
+   - Add assignInitialTargets() method - assigns targets to battalions at battle start
+   - Add checkRetargetingNeeded() method - determines when battalions need new targets
+   - Integrate with existing findClosestTarget() and moveAlongPath() methods
 
-3. **`mobile/src/components/battle/BattleNetworkGrid.tsx`** - Add interpolation
-   - Add TODO comment: "// TODO: Add position interpolation for smooth movement"
-   - Keep existing rendering for now
-
-### SERVER FILES TO MODIFY:
-1. **`server/src/services/BattleUpdater.ts`** - Add state diffing
-   - Add method: calculateStateDiff(oldState, newState)
-   - Only send changed fields to client
-   - Add TODO: "// TODO: Implement compression for large battles"
-
-2. **`server/src/controllers/BattleController.ts`** - Add compression
-   - Add TODO: "// TODO: Add gzip compression for responses"
-   - Keep sending full state for now
+3. **`server/src/controllers/BattleController.ts`** - Add movement endpoints
+   - Add getBattalionMovement endpoint for debugging movement state
+   - Add forceRetarget endpoint for testing retargeting logic
+   - Extend getBattleState to include movement data (current targets, paths)
 
 ### What This Achieves:
-- ✅ Smooth visual updates between server ticks
-- ✅ Client-side interpolation for movement
-- ✅ Predictive UI for better responsiveness
-- ✅ State compression for bandwidth efficiency
-- ✅ Automatic reconnection handling
+- ✅ Server-side movement execution using existing BattleMovement service
+- ✅ Automatic targeting and retargeting based on proximity
+- ✅ Real-time movement updates every 100ms
+- ✅ Attack range positioning per intentions documents
+- ✅ Single source of truth for all movement decisions
 
-### Performance Targets:
-- < 100ms perceived latency for actions
-- < 50KB/s bandwidth per active battle
-- Smooth 60fps animations
-- Graceful degradation on poor connections
+### Integration Strategy:
+- BattleUpdater orchestrates: timers → movement → combat → victory checks
+- BattleMovement handles: targeting → pathfinding → positioning → movement execution
+- All movement state saved to database and sent to clients
 
 ### TESTING THIS BATCH:
-- Monitor network traffic in dev tools
-- Verify smooth animations between updates
-- Test with network throttling
-- Check reconnection works on network loss
+- Start battle and verify battalions automatically select targets
+- Check movement follows network paths correctly
+- Verify retargeting when nodes are captured
+- Test attack range positioning accuracy
 
 ---
 
@@ -266,51 +255,102 @@ REVIEW AI MUST READ SECTION at the top of this file before you move forward with
 
 ---
 
-## Batch 6A: Movement Types and Utilities
+## Batch 6A: Client-Side Movement Visualization and Interpolation
 REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
-**Goal**: Create movement system foundation
+**Goal:** Create smooth client-side visualization of server-calculated movement
 
-### NEW FILES TO CREATE:
-1. **`src/types/movement.ts`** (30 lines) - Movement type definitions
-2. **`src/utils/networkMovement.ts`** (80 lines) - Movement utilities
+### IMPLEMENTATION NOTES FOR AI:
+- Client receives movement data from server, doesn't calculate movement logic
+- Focus on smooth interpolation between server updates (1s intervals)
+- Reuse existing client pathfinding for visual interpolation only
 
-### FILES TO REFERENCE (READ ONLY):
-- `src/utils/movementUtils.ts` (existing - for reference only)
-- `src/utils/pathfinding.ts` (existing - for reference only)
+### CLIENT FILES TO CREATE/MODIFY:
+1. **`mobile/src/hooks/useBattleMovementVisualization.ts`** (NEW - 120 lines) - Movement visualization
+   - Subscribe to server movement updates via battleApi
+   - Interpolate battalion positions between server updates
+   - Use existing pathfinding.ts for smooth line-following animation
+   - Handle movement state transitions (idle → moving → attacking)
+
+2. **`mobile/src/utils/movementInterpolation.ts`** (NEW - 80 lines) - Interpolation utilities
+   - calculateIntermediatePosition() - position between two points on network line
+   - smoothMovementTransition() - easing functions for natural movement
+   - projectPositionOnPath() - keep battalions on network lines during animation
+   - Use existing networkConstants.ts for network topology
+
+3. **`mobile/src/components/battle/BattleMovementEffects.tsx`** (NEW - 60 lines) - Visual effects
+   - Movement trails showing battalion paths
+   - Attack range circles when battalions reach targets
+   - Targeting lines connecting battalions to their targets
+   - Path preview lines showing intended movement routes
 
 ### What This Achieves:
-- ✅ Movement type definitions
-- ✅ Network line validation
-- ✅ Path calculation between nodes
-- ✅ Movement constraint enforcement
+- ✅ Smooth 60fps movement visualization between server updates
+- ✅ Visual feedback for targeting and movement decisions
+- ✅ Reuses existing client pathfinding for visual interpolation only
+- ✅ No duplicate movement logic (server remains authoritative)
 
-### Test Criteria:
-- Paths follow network lines
-- Invalid paths are rejected
-- Movement constraints enforced
+### Coordination Strategy:
+- Server sends: battalion positions, targets, movement paths every 1s
+- Client interpolates: smooth animation between server positions
+- Client displays: movement effects, targeting indicators, attack ranges
+
+### TESTING THIS BATCH:
+- Verify smooth movement animation between server updates
+- Check targeting indicators display correctly
+- Test movement effects render properly
+- Monitor performance with multiple moving battalions
 
 ---
 
-## Batch 6B: Movement Hook and Logic
+## Batch 6B: Integrated Movement System and Battle Coordination
 REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
-**Goal**: Create movement React hook and logic
+**Goal:** Integrate server movement logic with client visualization in BattleGridScreen
 
-### NEW FILES TO CREATE:
-1. **`src/hooks/useNetworkMovement.ts`** (70 lines) - Movement hook
+### IMPLEMENTATION NOTES FOR AI:
+- This batch connects server movement execution with client visualization
+- Updates BattleGridScreen to use server movement data
+- Deprecates local movement calculations with TODO comments
 
-### FILES TO REFERENCE (READ ONLY):
-- `src/hooks/useMovement.ts` (existing - for reference only)
-- `src/hooks/usePathFollowing.ts` (existing - for reference only)
+### CLIENT FILES TO MODIFY:
+1. **`mobile/src/screens/BattleGridScreen.tsx`** - Integrate movement visualization
+   - Import and use useBattleMovementVisualization hook
+   - Add movement effects to battle rendering
+   - Display targeting indicators and attack ranges
+   - Keep existing battle components unchanged
+
+2. **`mobile/src/hooks/useBattleBattalions.ts`** - Deprecate local movement
+   - Add TODO comments: "// TODO: Movement now handled by server - remove local movement logic"
+   - Keep existing visualization functionality
+   - Add server movement data integration
+
+3. **`mobile/src/hooks/useBattalionData.ts`** - Mark movement calculations as deprecated
+   - Add TODO comments before movement-related methods
+   - Keep methods functional for backward compatibility
+   - Add server data integration hooks
+
+### SERVER FILES TO MODIFY:
+1. **`server/src/controllers/BattleController.ts`** - Enhanced battle state response
+   - Include movement data in getBattleState response
+   - Add battalion targeting information
+   - Include movement paths and attack ranges
+   - Add movement timing information for client interpolation
 
 ### What This Achieves:
-- ✅ Movement state management
-- ✅ Path following logic
-- ✅ Position projection onto lines
+- ✅ Complete integration of server movement logic with client visualization
+- ✅ BattleGridScreen displays server-calculated movement
+- ✅ Smooth coordination between server updates and client animations
+- ✅ Clear migration path from local to server-side movement
 
-### Test Criteria:
-- Movement state is managed correctly
-- Position projection works
-- Path following is accurate
+### Integration Points:
+- **Server**: BattleUpdater → BattleMovement → database → API response
+- **Client**: battleApi → useBattleMovementVisualization → BattleGridScreen
+- **Coordination**: 100ms server updates, 1s client polling, 60fps interpolation
+
+### TESTING THIS BATCH:
+- Run full battle and verify movement works end-to-end
+- Check server movement logic coordinates with client visualization
+- Test targeting and retargeting displays correctly
+- Verify no conflicts between server and client movement logic
 
 ---
 
