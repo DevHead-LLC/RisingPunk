@@ -218,4 +218,6 @@ export class BattleController {
       throw new Error('Failed to end battle');
     }
   }
+
+
 } 

@@ -416,3 +416,46 @@ app.use('/api/battle', battleRoutes);
   - POST /api/battle/start (with auth token)
   - GET /api/battle/:id/state (with auth token)
 - Verify proper error responses for unauthorized requests
+
+---
+
+## Batch 5F: Server Battle State Updates and Timer Management (COMPLETE)
+**Goal:** Implement server-side battle state updates and timer management
+
+### NEW SERVER FILES CREATED:
+1. **`server/src/services/BattleTimer.ts`** (100 lines) - Timer management service
+   - Singleton pattern to manage all battle timers
+   - Methods: startTimer, stopTimer, getTimeRemaining
+   - Handle countdown (3s) and battle (20s) phases
+   - Emit events for phase transitions
+
+2. **`server/src/services/BattleUpdater.ts`** (150 lines) - State update orchestration
+   - Run update loop every 100ms per battle
+   - Call BattleCalculator for damage calculations
+   - Update battalion positions based on movement
+   - Check victory conditions
+   - Save state to database periodically (every 1s)
+
+3. **`server/src/config/battleConfig.ts`** (30 lines) - Battle configuration constants
+   - Export constants: COUNTDOWN_DURATION = 3, BATTLE_DURATION = 20
+   - UPDATE_INTERVAL = 100, SYNC_INTERVAL = 1000
+   - Copy network connections and bot stats here
+
+### What This Achieves:
+- ✅ Server-side timer management (3s countdown, 20s battle)
+- ✅ Automatic phase transitions
+- ✅ Periodic state calculations (every 100ms server-side)
+- ✅ Efficient state diffing for client updates
+- ✅ Battle cleanup on completion
+
+### Update Strategy:
+- Server calculates state every 100ms
+- Client receives updates every 1000ms (1s)
+- Only changed data is sent to minimize bandwidth
+- Critical events (victory, destruction) sent immediately
+
+### Test Criteria:
+- ✅ Timer management tests pass without hanging
+- ✅ Configuration constants match intentions documents
+- ✅ Singleton pattern works correctly
+- ✅ Cleanup methods prevent memory leaks
