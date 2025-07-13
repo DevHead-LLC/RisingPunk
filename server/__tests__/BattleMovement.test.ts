@@ -1,5 +1,5 @@
-import { BattleMovement } from '../services/BattleMovement';
-import { IBattalion, INode, BotType, NodeOwner } from '../types/battle';
+import { BattleMovement } from '../src/services/BattleMovement';
+import { IBattalion, INode, BotType, NodeOwner } from '../src/types/battle';
 
 describe('BattleMovement Execution Methods', () => {
   let battleMovement: BattleMovement;
