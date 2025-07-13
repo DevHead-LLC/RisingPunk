@@ -11,6 +11,7 @@ import { botsApi } from './api/botsApi';
 import battleSlice from './slices/battleSlice';
 import mapSlice from './slices/mapSlice';
 import { mapApi } from './api/mapApi';
+import { battleApi } from './api/battleApi';
 
 export const store = configureStore({
   reducer: {
@@ -26,6 +27,7 @@ export const store = configureStore({
     [balanceApi.reducerPath]: balanceApi.reducer,
     [botsApi.reducerPath]: botsApi.reducer,
     [mapApi.reducerPath]: mapApi.reducer,
+    [battleApi.reducerPath]: battleApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
@@ -49,6 +51,10 @@ export const store = configureStore({
           'mapApi/executeQuery/fulfilled',
           'mapApi/executeQuery/rejected',
           'mapApi/executeQuery/pending',
+          // RTK Query battleApi actions
+          'battleApi/executeQuery/fulfilled',
+          'battleApi/executeQuery/rejected',
+          'battleApi/executeQuery/pending',
         ],
         ignoredActionPaths: [
           'payload.timestamp',
@@ -65,6 +71,8 @@ export const store = configureStore({
           'botsApi.mutations',
           'mapApi.queries',
           'mapApi.mutations',
+          'battleApi.queries',
+          'battleApi.mutations',
         ],
       },
     })
@@ -73,7 +81,8 @@ export const store = configureStore({
     .concat(authApi.middleware)
     .concat(balanceApi.middleware)
     .concat(botsApi.middleware)
-    .concat(mapApi.middleware),
+    .concat(mapApi.middleware)
+    .concat(battleApi.middleware),
   devTools: __DEV__,
 });
 

@@ -2,6 +2,12 @@ import { useState, useMemo } from 'react';
 import { Battalion } from '../types/battle';
 import { useBattalionData } from './useBattalionData';
 
+// TODO: This hook will be deprecated once server integration is complete
+// Future implementation will use battleApi:
+// import { useGetBattleStateQuery } from '../store/api/battleApi';
+// const { data: battleState, isLoading, error } = useGetBattleStateQuery(battleId);
+// const battalions = battleState?.battalions || [];
+
 /**
  * Hook for managing battalion state for visualization
  * Integrates with useBattalionData for battalion creation and management

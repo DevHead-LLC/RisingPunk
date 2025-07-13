@@ -45,6 +45,7 @@ export const useBattalionData = () => {
   /**
    * Calculate health based on bot type and quantity
    */
+  // TODO: Server handles this calculation now - remove in cleanup phase
   const calculateHealth = useMemo(() => {
     return (type: BotType, quantity: number, isUser: boolean): number => {
       const botStats = getBotStats(type, isUser);
@@ -58,6 +59,7 @@ export const useBattalionData = () => {
   /**
    * Calculate attack power for a battalion
    */
+  // TODO: Server handles this calculation now - remove in cleanup phase
   const calculateAttackPower = useMemo(() => {
     return (battalion: Battalion): number => {
       return battalion.stats.offense * battalion.quantity;
@@ -67,6 +69,7 @@ export const useBattalionData = () => {
   /**
    * Calculate defense percentage for a battalion
    */
+  // TODO: Server handles this calculation now - remove in cleanup phase
   const calculateDefense = useMemo(() => {
     return (battalion: Battalion): number => {
       return battalion.stats.defense;
@@ -76,6 +79,7 @@ export const useBattalionData = () => {
   /**
    * Update battalion health and quantity after taking damage
    */
+  // TODO: Server handles this calculation now - remove in cleanup phase
   const applyDamage = useMemo(() => {
     return (battalion: Battalion, damage: number): Battalion => {
       const newHealth = Math.max(0, battalion.currentHealth - damage);
@@ -93,6 +97,7 @@ export const useBattalionData = () => {
   /**
    * Check if a battalion is destroyed (quantity = 0)
    */
+  // TODO: Server handles this calculation now - remove in cleanup phase
   const isBattalionDestroyed = useMemo(() => {
     return (battalion: Battalion): boolean => {
       return battalion.quantity <= 0;

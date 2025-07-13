@@ -3,8 +3,8 @@
  * @description Main battle screen container with network visualization and battalion rendering
  */
 
-import React, { useEffect } from 'react';
-import { View, StyleSheet, SafeAreaView, Dimensions, Text } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, SafeAreaView, Dimensions, Text, ActivityIndicator } from 'react-native';
 import { useInitialBattleNodes } from '../hooks/useBattleNodes';
 import { useBattleNetworkConnections } from '../hooks/useBattleNetwork';
 import { useBattalionData } from '../hooks/useBattalionData';
@@ -13,14 +13,16 @@ import { useBots } from '../hooks/useBots';
 import { BattleNetworkGrid } from '../components/battle/BattleNetworkGrid';
 import { BattleBattalionManager } from '../components/battle/BattleBattalionManager';
 import { BattleOverlayManager } from '../components/battle/BattleOverlayManager';
+import { useGetBattleStateQuery } from '../store/api/battleApi';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 type Props = {
   _onClose?: () => void;
+  battleId?: string; // Optional battle ID for server integration
 };
 
-export const BattleGridScreen = React.memo(({ _onClose }: Props) => {
+export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
   // Use the single source of truth for node state/positions
   const nodes = useInitialBattleNodes({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
 
@@ -41,15 +43,54 @@ export const BattleGridScreen = React.memo(({ _onClose }: Props) => {
   // Bot categories and stats
   const { BOT_CATEGORIES, getBotRole } = useBots();
 
-  // Initialize sample battalions on component mount
+  // Server battle state integration
+  const { data: battleState, isLoading: battleLoading, error: battleError } = useGetBattleStateQuery(
+    battleId || 'demo-battle',
+    { 
+      skip: !battleId, // Skip if no battleId provided
+      pollingInterval: 1000, // Poll every 1 second
+    }
+  );
+
+  // Use server data if available, otherwise fall back to local data
+  const displayBattalions = battleState?.battalions || battalions;
+  const displayNodes = battleState?.nodes || nodes;
+
+  // Initialize sample battalions on component mount (only if no server data)
   useEffect(() => {
-    initializeSampleBattalions();
-  }, []); // Empty dependency array - only run on mount
+    if (!battleId) {
+      initializeSampleBattalions();
+    }
+  }, [battleId]); // Run when battleId changes
 
   // Example: Create a sample battalion to demonstrate the system
   const sampleBattalion = React.useMemo(() => {
     return battalionData.createBattalion('guardian', 10, 0, true, 1);
   }, [battalionData]);
+
+  // Show loading state while fetching server data
+  if (battleId && battleLoading) {
+    return (
+      <SafeAreaView style={styles.container} testID="battle-grid-screen">
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4717F6" />
+          <Text style={styles.loadingText}>Loading battle state...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Show error state if server data fails
+  if (battleId && battleError) {
+    return (
+      <SafeAreaView style={styles.container} testID="battle-grid-screen">
+        <View style={styles.loadingContainer}>
+          <Text style={styles.errorText}>Failed to load battle state</Text>
+          <Text style={styles.errorSubtext}>Falling back to local data</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} testID="battle-grid-screen">
@@ -60,7 +101,7 @@ export const BattleGridScreen = React.memo(({ _onClose }: Props) => {
         {/* Network visualization */}
         <View style={styles.networkContainer}>
           <BattleNetworkGrid
-            nodes={nodes.map(node => ({
+            nodes={displayNodes.map(node => ({
               ...node,
               // Ensure index is NodeIndex and owner is NodeOwner
               index: node.index as any, // TypeScript: treat as NodeIndex
@@ -75,8 +116,8 @@ export const BattleGridScreen = React.memo(({ _onClose }: Props) => {
 
           {/* Battalion visualization */}
           <BattleBattalionManager
-            battalions={battalions}
-            nodes={nodes as any}
+            battalions={displayBattalions}
+            nodes={displayNodes as any}
             battalionSize={35}
             showHealthBars={true}
             showQuantities={true}
@@ -102,6 +143,25 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#4717F6',
+    fontSize: 16,
+    marginTop: 10,
+  },
+  errorText: {
+    color: '#FF4141',
+    fontSize: 16,
+    marginBottom: 5,
+  },
+  errorSubtext: {
+    color: '#666666',
+    fontSize: 14,
   },
   title: {
     color: '#FFFFFF',

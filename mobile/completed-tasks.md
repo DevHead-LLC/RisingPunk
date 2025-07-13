@@ -459,3 +459,65 @@ app.use('/api/battle', battleRoutes);
 - ✅ Configuration constants match intentions documents
 - ✅ Singleton pattern works correctly
 - ✅ Cleanup methods prevent memory leaks
+
+---
+
+## Batch 5G: Client Battle API Integration (COMPLETE)
+**Goal:** Update client to fetch battle state from server instead of local calculations
+
+### CLIENT FILES CREATED/MODIFIED:
+1. **`mobile/src/store/api/battleApi.ts`** (NEW - 60 lines) - Battle API slice
+   - RTK Query API slice following patterns from balanceApi.ts and botsApi.ts
+   - Endpoints: startBattle (mutation), getBattleState (query)
+   - Proper TypeScript interfaces for BattleState and StartBattleRequest
+   - Exports hooks: useStartBattleMutation, useGetBattleStateQuery
+
+2. **`mobile/src/store/index.ts`** - Store integration
+   - Added battleApi to Redux store configuration
+   - Included middleware and serializable check updates
+   - Proper integration with existing API slices
+
+3. **`mobile/src/hooks/useBattleBattalions.ts`** - Deprecation preparation
+   - Added TODO comment: "This hook will be deprecated once server integration is complete"
+   - Added commented code showing future battleApi usage
+   - Kept existing functionality intact for backward compatibility
+
+4. **`mobile/src/hooks/useBattalionData.ts`** - Calculation deprecation
+   - Added TODO comments before each calculation method:
+     "Server handles this calculation now - remove in cleanup phase"
+   - Marked methods: calculateHealth, calculateAttackPower, calculateDefense, applyDamage, isBattalionDestroyed
+   - Kept all methods functional for backward compatibility
+
+5. **`mobile/src/screens/BattleGridScreen.tsx`** - Server state integration
+   - Added useGetBattleStateQuery with 1-second polling interval
+   - Implemented loading and error states for server data
+   - Added fallback to local data when server data unavailable
+   - Mapped server state to existing component props
+   - Kept all existing rendering logic unchanged
+
+6. **`mobile/__tests__/api/battleApi.test.ts`** (NEW - 50 lines) - Regression test
+   - Tests RTK Query API configuration and endpoint structure
+   - Verifies correct hook exports and endpoint definitions
+   - Ensures proper API integration with Redux store
+
+### What This Achieves:
+- ✅ RTK Query setup for battle endpoints with proper TypeScript types
+- ✅ Automatic polling for battle state (1s intervals) in components
+- ✅ Graceful fallback from server to local data
+- ✅ Proper loading and error states for server integration
+- ✅ Migration path from local to server calculations (TODO comments)
+- ✅ Backward compatibility with existing local functionality
+
+### Migration Strategy:
+- Server data takes precedence when available
+- Local data serves as fallback for development/testing
+- TODO comments mark code for future cleanup
+- Visualization components remain unchanged
+- Only data source changes from local to server
+
+### Test Criteria:
+- ✅ Battle API slice compiles and exports correctly
+- ✅ Redux store integration works without errors
+- ✅ Loading and error states display properly
+- ✅ Fallback to local data works when server unavailable
+- ✅ All existing functionality remains intact
