@@ -2,6 +2,7 @@ import { Battle, IBattleDocument } from '../models/Battle';
 import { BattleEvent } from '../models/BattleEvent';
 import { BattleTimerService } from './BattleTimer';
 import { BattleCalculator } from './BattleCalculator';
+import { BattleMovement } from './BattleMovement';
 import { BATTLE_CONFIG } from '../config/battleConfig';
 import { BattlePhase, NodeOwner, EventType } from '../types/battle';
 
@@ -19,10 +20,12 @@ export class BattleUpdater {
   private activeBattles: Map<string, BattleUpdateState> = new Map();
   private timerService: BattleTimerService;
   private calculator: BattleCalculator;
+  private movementService: BattleMovement;
 
   private constructor() {
     this.timerService = BattleTimerService.getInstance();
     this.calculator = new BattleCalculator();
+    this.movementService = new BattleMovement();
     this.setupTimerEvents();
   }
 
@@ -136,8 +139,14 @@ export class BattleUpdater {
    * Update an active battle (combat, movement, etc.)
    */
   private async updateActiveBattle(battle: IBattleDocument): Promise<void> {
-    // Update battalion positions and targeting
+    // Execute movement phase (targeting and retargeting)
+    await this.executeMovementPhase(battle);
+
+    // Update battalion positions along their paths
     await this.updateBattalionPositions(battle);
+
+    // Retarget battalions if needed
+    await this.retargetBattalions(battle);
 
     // Perform combat calculations
     await this.performCombatCalculations(battle);
@@ -150,14 +159,95 @@ export class BattleUpdater {
   }
 
   /**
-   * Update battalion positions (placeholder for Phase 6)
+   * Execute movement phase for all battalions
+   */
+  private async executeMovementPhase(battle: IBattleDocument): Promise<void> {
+    for (const battalion of battle.battalions) {
+      if (battalion.currentHealth <= 0) continue;
+
+      // Find closest target for this battalion
+      const target = this.movementService.findClosestTarget(
+        battalion,
+        battle.nodes,
+        battle.battalions
+      );
+
+      if (target) {
+        // Update battalion target
+        battalion.targetNode = target.targetType === 'node' ? target.targetId as number : undefined;
+        battalion.finalTarget = target.targetId as number;
+      }
+    }
+  }
+
+  /**
+   * Update battalion positions along their movement paths
    */
   private async updateBattalionPositions(battle: IBattleDocument): Promise<void> {
-    // TODO: This will be implemented in Phase 6 (Batch 5H)
-    // For now, just log that movement updates would happen here
-    if (battle.battalions.length > 0) {
-      // Placeholder for movement logic
-      // BattleMovement service will handle this in Phase 6
+    for (const battalion of battle.battalions) {
+      if (battalion.currentHealth <= 0) continue;
+
+      // If battalion has a movement path, move along it
+      if (battalion.remainingPath && battalion.remainingPath.length > 0) {
+        const result = this.movementService.moveAlongPath(
+          battalion,
+          battalion.remainingPath,
+          battle.nodes
+        );
+
+        // Update battalion with new position
+        Object.assign(battalion, result.battalion);
+
+        // Log movement event if position changed
+        if (result.battalion.position.nodeIndex !== battalion.position.nodeIndex) {
+          await this.logBattleEvent(battle.battleId, EventType.BATTALION_MOVE, {
+            battalionId: battalion.id,
+            fromNode: battalion.position.nodeIndex,
+            toNode: result.battalion.position.nodeIndex,
+            path: battalion.remainingPath,
+          });
+        }
+      }
+    }
+  }
+
+  /**
+   * Retarget battalions when their targets are captured/destroyed
+   */
+  private async retargetBattalions(battle: IBattleDocument): Promise<void> {
+    for (const battalion of battle.battalions) {
+      if (battalion.currentHealth <= 0) continue;
+
+      // Check if current target is still valid
+      const needsRetargeting = this.movementService.checkRetargetingNeeded(
+        battalion,
+        battle.nodes,
+        battle.battalions
+      );
+
+      if (needsRetargeting) {
+        // Find new target
+        const newTarget = this.movementService.findClosestTarget(
+          battalion,
+          battle.nodes,
+          battle.battalions
+        );
+
+        if (newTarget) {
+          // Update battalion target and path
+          battalion.targetNode = newTarget.targetType === 'node' ? newTarget.targetId as number : undefined;
+          battalion.finalTarget = newTarget.targetId as number;
+          battalion.remainingPath = newTarget.path;
+
+          // Log retargeting event
+          await this.logBattleEvent(battle.battleId, EventType.BATTALION_MOVE, {
+            battalionId: battalion.id,
+            newTargetType: newTarget.targetType,
+            newTargetId: newTarget.targetId,
+            path: newTarget.path,
+          });
+        }
+      }
     }
   }
 

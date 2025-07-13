@@ -72,16 +72,26 @@ export class BattleController {
         throw new Error('User not authorized to view this battle');
       }
 
-      // Return battle state for client
+      // Return battle state for client with movement data
       return {
         battleId: battle.battleId,
         phase: battle.phase,
         countdown: battle.countdown,
         battleTime: battle.battleTime,
         winner: battle.winner,
-        battalions: battle.battalions,
+        battalions: battle.battalions.map(b => ({
+          ...b,
+          // Include movement data for client
+          isMoving: b.remainingPath && b.remainingPath.length > 0,
+          movementProgress: b.remainingPath ? (b.remainingPath.length > 0 ? 'moving' : 'idle') : 'idle'
+        })),
         nodes: battle.nodes,
-        lastUpdated: battle.updatedAt
+        lastUpdated: battle.updatedAt,
+        // Include movement timing information for client interpolation
+        movementData: {
+          updateInterval: 100, // Server updates every 100ms
+          lastMovementUpdate: battle.updatedAt
+        }
       };
     } catch (error) {
       console.error('BattleController getBattleState error:', error);
@@ -158,6 +168,88 @@ export class BattleController {
     } catch (error) {
       console.error('BattleController getBattleEvents error:', error);
       throw new Error('Failed to get battle events');
+    }
+  }
+
+  /**
+   * Get battalion movement state for debugging
+   */
+  async getBattalionMovement(battleId: string, userId: string): Promise<any> {
+    try {
+      // Get battle from database
+      const battle = await this.battleService.getBattle(battleId);
+      
+      if (!battle) {
+        throw new Error('Battle not found');
+      }
+
+      // Verify user is a participant
+      if (battle.attackerId !== userId && battle.defenderId !== userId) {
+        throw new Error('User not authorized to view this battle');
+      }
+
+      // Return movement data for debugging
+      return {
+        battleId: battle.battleId,
+        battalions: battle.battalions.map(b => ({
+          id: b.id,
+          position: b.position,
+          targetNode: b.targetNode,
+          finalTarget: b.finalTarget,
+          remainingPath: b.remainingPath,
+          isMoving: b.remainingPath && b.remainingPath.length > 0
+        })),
+        nodes: battle.nodes.map(n => ({
+          index: n.index,
+          owner: n.owner,
+          position: n.position
+        }))
+      };
+    } catch (error) {
+      console.error('BattleController getBattalionMovement error:', error);
+      throw new Error('Failed to get battalion movement');
+    }
+  }
+
+  /**
+   * Force retarget for testing retargeting logic
+   */
+  async forceRetarget(battleId: string, userId: string, battalionId: string): Promise<any> {
+    try {
+      // Get battle from database
+      const battle = await this.battleService.getBattle(battleId);
+      
+      if (!battle) {
+        throw new Error('Battle not found');
+      }
+
+      // Verify user is a participant
+      if (battle.attackerId !== userId && battle.defenderId !== userId) {
+        throw new Error('User not authorized to modify this battle');
+      }
+
+      // Find the battalion
+      const battalion = battle.battalions.find(b => b.id === battalionId);
+      if (!battalion) {
+        throw new Error('Battalion not found');
+      }
+
+      // Force retarget by clearing current target
+      battalion.targetNode = undefined;
+      battalion.finalTarget = undefined;
+      battalion.remainingPath = [];
+
+      // Save battle state
+      await battle.save();
+
+      return {
+        success: true,
+        battalionId,
+        message: 'Battalion retargeting forced'
+      };
+    } catch (error) {
+      console.error('BattleController forceRetarget error:', error);
+      throw new Error('Failed to force retarget');
     }
   }
 

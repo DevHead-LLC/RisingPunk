@@ -131,4 +131,8 @@ export interface BattleStateResponse {
   battalions: IBattalion[];
   nodes: INode[];
   lastUpdated: Date;
+  movementData?: {
+    updateInterval: number;
+    lastMovementUpdate: Date;
+  };
 } 
