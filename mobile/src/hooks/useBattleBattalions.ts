@@ -11,9 +11,11 @@ import { useBattalionData } from './useBattalionData';
 /**
  * Hook for managing battalion state for visualization
  * Integrates with useBattalionData for battalion creation and management
+ * TODO: Remove local state management - server handles all state
  */
 export const useBattleBattalions = () => {
   const battalionData = useBattalionData();
+  // TODO: Remove local state - server handles all battalion state
   const [battalions, setBattalions] = useState<Battalion[]>([]);
 
   /**
@@ -56,18 +58,14 @@ export const useBattleBattalions = () => {
 
   /**
    * Apply damage to a battalion
+   * TODO: Server handles damage calculations - remove this method
    */
   const damageBattalion = useMemo(() => {
     return (battalionId: string, damage: number) => {
-      setBattalions(prev => prev.map(b => {
-        if (b.id === battalionId) {
-          const damagedBattalion = battalionData.applyDamage(b, damage);
-          return damagedBattalion;
-        }
-        return b;
-      }));
+      // TODO: Server handles damage - this is deprecated
+      console.warn('damageBattalion is deprecated - server handles damage calculations');
     };
-  }, [battalionData]);
+  }, []);
 
   /**
    * Get battalions by node index
@@ -98,12 +96,15 @@ export const useBattleBattalions = () => {
 
   /**
    * Get destroyed battalions
+   * TODO: Server handles battalion state - remove this method
    */
   const getDestroyedBattalions = useMemo(() => {
     return (): Battalion[] => {
-      return battalions.filter(b => battalionData.isBattalionDestroyed(b));
+      // TODO: Server handles battalion state - this is deprecated
+      console.warn('getDestroyedBattalions is deprecated - server handles battalion state');
+      return [];
     };
-  }, [battalions, battalionData]);
+  }, []);
 
   /**
    * Clear all battalions

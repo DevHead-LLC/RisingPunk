@@ -1,6 +1,127 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# RisingPunk Battle System
 
-# Getting Started
+This is a [**React Native**](https://reactnative.dev) project with a Node.js/Express backend, implementing a strategic battle system where bot battalions compete to destroy the opposing army.
+
+## Architecture
+
+- **Client**: React Native mobile app (visualization and UI)
+- **Server**: Node.js/Express backend (game logic and state management)
+- **Database**: MongoDB with Mongoose schemas
+- **API**: RESTful endpoints with RTK Query integration
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 16+ and npm/yarn
+- React Native development environment
+- MongoDB instance (local or cloud)
+- iOS Simulator or Android Emulator
+
+### Step 1: Server Setup
+
+First, start the backend server:
+
+```bash
+cd server
+npm install
+npm start
+```
+
+The server will start on `http://localhost:3000` and connect to MongoDB.
+
+### Step 2: Start the Metro Server
+
+Start **Metro**, the JavaScript bundler for React Native:
+
+```bash
+# using npm
+npm start
+
+# OR using Yarn
+yarn start
+```
+
+### Step 3: Start your Application
+
+Let Metro Bundler run in its own terminal. Open a new terminal and run:
+
+#### For Android
+```bash
+npm run android
+# OR
+yarn android
+```
+
+#### For iOS
+```bash
+npm run ios
+# OR
+yarn ios
+```
+
+## Battle System Overview
+
+The battle system features:
+- **3 Bot Types**: Guardian (Cavalry), Breacher (Infantry), Phreak (Ranged)
+- **Network Topology**: 9 nodes with strategic connections
+- **Tug-of-War Capture**: Neutral nodes can be captured by either side
+- **Real-time Combat**: Server-driven battle logic with client visualization
+- **Victory Conditions**: 20-second timer or complete elimination
+
+## API Endpoints
+
+### Battle Management
+- `POST /api/battles/start` - Start new battle
+- `GET /api/battles/:id/state` - Get battle state
+- `GET /api/battles/:id/events` - Get battle events
+- `POST /api/battles/:id/end` - End battle
+
+### Movement (Batch 5H)
+- `GET /api/battles/:id/movement` - Get movement state
+- `POST /api/battles/:id/retarget/:battalionId` - Force retargeting
+
+## Development Phases
+
+- **Phase 5**: Server-driven architecture (COMPLETE)
+- **Phase 6**: Movement visualization (PENDING)
+- **Phase 7**: Targeting system (PENDING)
+- **Phase 8**: Attack system (PENDING)
+- **Phase 9**: Animations (PENDING)
+- **Phase 10**: Integration (PENDING)
+
+## Testing
+
+Run tests for both client and server:
+
+```bash
+# Server tests
+cd server
+npm test
+
+# Client tests
+npm test
+```
+
+## Performance Monitoring
+
+The system includes performance monitoring:
+- Battle update timing (target: <50ms per 100ms interval)
+- Damage calculation timing (target: <1ms per calculation)
+- Database sync timing (every 1s)
+- Client-side interpolation performance
+
+## Documentation
+
+- [Battle Intentions](./battle-intentions.md) - Core battle mechanics
+- [Node Behaviors](./node-behaviors.md) - Node capture and advantages
+- [Battalion Behaviors](./battalion-bot-behaviors.md) - Bot types and combat
+- [Architecture Map](./battle-architecture-map.md) - System architecture
+- [Migration Guide](./migration-guide.md) - Development guidelines
+
+---
+
+This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
 
 >**Note**: Make sure you have completed the [React Native - Environment Setup](https://reactnative.dev/docs/environment-setup) instructions till "Creating a new application" step, before proceeding.
 

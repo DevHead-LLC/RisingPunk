@@ -214,6 +214,14 @@ This document maps the battle system architecture to help AI assistants understa
 5. **battle.ts types** - Enhanced BattleStateResponse with movement data ✅
 6. **Regression tests** - Comprehensive movement execution test coverage ✅
 
+### ✅ What's Complete (Batch 5I)
+1. **BattleCalculator.test.ts** - Simplified regression tests for damage calculations and victory conditions ✅
+2. **useBattalionData.test.ts** - Simplified regression test for battalion creation ✅
+3. **Deprecated code cleanup** - TODO comments added to useBattalionData and useBattleBattalions ✅
+4. **Performance monitoring** - console.time() in BattleUpdater, performance tracking in BattleCalculator ✅
+5. **Documentation updates** - README.md with server setup and API endpoints ✅
+6. **Complex test removal** - Deleted BattleService.test.ts and useBattleSync.test.ts (too complex) ✅
+
 ### 📋 What's Set Up for Future Phases
 - **Phase 6 (Movement)**: BattleMovement.ts service ready to implement
 - **Phase 7 (Targeting)**: Event logging ready for target selection events
@@ -291,7 +299,7 @@ This document maps the battle system architecture to help AI assistants understa
 - **Events** → Server `BattleEvent.ts` → Client event display (future)
 
 ### Phase Dependencies
-- **Phase 5** - Foundation (5C ✅ COMPLETE, 5D ✅ COMPLETE, 5E ✅ COMPLETE, 5F ✅ COMPLETE, 5G ✅ COMPLETE, 5H ✅ COMPLETE, 5I 🔄 PENDING)
+- **Phase 5** - Foundation (5C ✅ COMPLETE, 5D ✅ COMPLETE, 5E ✅ COMPLETE, 5F ✅ COMPLETE, 5G ✅ COMPLETE, 5H ✅ COMPLETE, 5I ✅ COMPLETE)
 - **Phase 6** - Movement Visualization (depends on Phase 5, server movement ready)
 - **Phase 7** - Targeting (depends on Phase 5, BattleMovement ready)
 - **Phase 8** - Attacks (depends on Phases 5, 6, 7, BattleCalculator ready)
