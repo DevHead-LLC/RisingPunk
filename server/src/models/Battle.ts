@@ -20,6 +20,13 @@ export interface IBattleDocument extends IBattle, Document {
   endBattle(winner: NodeOwner): Promise<void>;
 }
 
+// Static methods interface
+export interface IBattleModel extends mongoose.Model<IBattleDocument> {
+  findByBattleId(battleId: string): Promise<IBattleDocument | null>;
+  findActiveBattles(): Promise<IBattleDocument[]>;
+  findByUser(userId: string): Promise<IBattleDocument[]>;
+}
+
 // Battalion sub-schema
 const battalionSchema = new Schema({
   id: {
@@ -287,4 +294,4 @@ battleSchema.statics.findByUser = function(userId: string) {
   }).sort({ startTime: -1 });
 };
 
-export const Battle = mongoose.model<IBattleDocument>('Battle', battleSchema); 
+export const Battle = mongoose.model<IBattleDocument, IBattleModel>('Battle', battleSchema); 

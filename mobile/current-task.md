@@ -33,56 +33,6 @@ AI MUST READ SECTION ABOVE! END.
 =====================================================================================================================================================================
 =====================================================================================================================================================================
 
-## Batch 5F: Server Battle State Updates and Timer Management
-REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
-**Goal:** Implement server-side battle state updates and timer management
-
-### IMPLEMENTATION NOTES FOR AI:
-- Timer service should use setInterval for periodic updates
-- Store active timers in memory (Map or object)
-- Clean up timers when battles end
-- BattleUpdater orchestrates all state changes
-
-### NEW SERVER FILES TO CREATE:
-1. **`server/src/services/BattleTimer.ts`** (100 lines) - Timer management service
-   - Singleton pattern to manage all battle timers
-   - Methods: startTimer, stopTimer, getTimeRemaining
-   - Handle countdown (3s) and battle (20s) phases
-   - Emit events for phase transitions
-
-2. **`server/src/services/BattleUpdater.ts`** (150 lines) - State update orchestration
-   - Run update loop every 100ms per battle
-   - Call BattleCalculator for damage calculations
-   - Update battalion positions based on movement
-   - Check victory conditions
-   - Save state to database periodically (every 1s)
-
-3. **`server/src/config/battleConfig.ts`** (30 lines) - Battle configuration constants
-   - Export constants: COUNTDOWN_DURATION = 3, BATTLE_DURATION = 20
-   - UPDATE_INTERVAL = 100, SYNC_INTERVAL = 1000
-   - Copy network connections and bot stats here
-
-### What This Achieves:
-- ✅ Server-side timer management (3s countdown, 20s battle)
-- ✅ Automatic phase transitions
-- ✅ Periodic state calculations (every 100ms server-side)
-- ✅ Efficient state diffing for client updates
-- ✅ Battle cleanup on completion
-
-### Update Strategy:
-- Server calculates state every 100ms
-- Client receives updates every 1000ms (1s)
-- Only changed data is sent to minimize bandwidth
-- Critical events (victory, destruction) sent immediately
-
-### TESTING THIS BATCH:
-- Start a battle and verify timer counts down
-- Check database updates every second
-- Verify battle ends after 20 seconds
-- Ensure timers are cleaned up (no memory leaks)
-
----
-
 ## Batch 5G: Client Battle API Integration
 REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
 **Goal:** Update client to fetch battle state from server instead of local calculations
