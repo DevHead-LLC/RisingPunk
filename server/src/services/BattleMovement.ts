@@ -319,6 +319,97 @@ export class BattleMovement {
    * Calculate position at attack range from target
    * Battalions should stop at exact attack range distance from targets
    */
+  /**
+   * Execute battalion movement for an entire battle
+   */
+  executeBattalionMovement(
+    battalions: IBattalion[],
+    nodes: INode[]
+  ): IBattalion[] {
+    const updatedBattalions: IBattalion[] = [];
+
+    for (const battalion of battalions) {
+      if (battalion.currentHealth <= 0) {
+        updatedBattalions.push(battalion);
+        continue;
+      }
+
+      // If battalion has a movement path, move along it
+      if (battalion.remainingPath && battalion.remainingPath.length > 0) {
+        const result = this.moveAlongPath(battalion, battalion.remainingPath, nodes);
+        updatedBattalions.push(result.battalion);
+      } else {
+        updatedBattalions.push(battalion);
+      }
+    }
+
+    return updatedBattalions;
+  }
+
+  /**
+   * Assign initial targets to battalions at battle start
+   */
+  assignInitialTargets(
+    battalions: IBattalion[],
+    nodes: INode[]
+  ): IBattalion[] {
+    const updatedBattalions: IBattalion[] = [];
+
+    for (const battalion of battalions) {
+      if (battalion.currentHealth <= 0) {
+        updatedBattalions.push(battalion);
+        continue;
+      }
+
+      // Find closest target for this battalion
+      const target = this.findClosestTarget(battalion, nodes, battalions);
+      
+      if (target) {
+        const updatedBattalion = { ...battalion };
+        updatedBattalion.targetNode = target.targetType === 'node' ? target.targetId as number : undefined;
+        updatedBattalion.finalTarget = target.targetId as number;
+        updatedBattalion.remainingPath = target.path;
+        updatedBattalions.push(updatedBattalion);
+      } else {
+        updatedBattalions.push(battalion);
+      }
+    }
+
+    return updatedBattalions;
+  }
+
+  /**
+   * Check if a battalion needs retargeting
+   */
+  checkRetargetingNeeded(
+    battalion: IBattalion,
+    nodes: INode[],
+    allBattalions: IBattalion[]
+  ): boolean {
+    // If battalion has no target, it needs retargeting
+    if (!battalion.finalTarget) {
+      return true;
+    }
+
+    // Check if target node still exists and is valid
+    if (battalion.targetNode !== undefined) {
+      const targetNode = nodes.find(n => n.index === battalion.targetNode);
+      if (!targetNode || targetNode.owner !== 'neutral') {
+        return true; // Node captured or destroyed
+      }
+    }
+
+    // Check if target battalion still exists
+    if (battalion.targetBattalion) {
+      const targetBattalion = allBattalions.find(b => b.id === battalion.targetBattalion);
+      if (!targetBattalion || targetBattalion.currentHealth <= 0) {
+        return true; // Battalion destroyed
+      }
+    }
+
+    return false;
+  }
+
   calculateAttackPosition(
     battalion: IBattalion,
     targetNodeIndex: number,

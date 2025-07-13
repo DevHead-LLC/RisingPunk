@@ -521,3 +521,74 @@ app.use('/api/battle', battleRoutes);
 - ✅ Loading and error states display properly
 - ✅ Fallback to local data works when server unavailable
 - ✅ All existing functionality remains intact
+
+---
+
+## Batch 5H: Server-Side Movement Execution and Real-Time Updates (COMPLETE)
+**Goal:** Activate server-side movement logic and implement real-time battle updates
+
+### SERVER FILES MODIFIED/CREATED:
+1. **`server/src/services/BattleUpdater.ts`** - Enhanced with movement execution
+   - Added `executeMovementPhase()` method that calls BattleMovement.findClosestTarget()
+   - Added `updateBattalionPositions()` method that calls BattleMovement.moveAlongPath()
+   - Added `retargetBattalions()` method for when targets are captured/destroyed
+   - Updated main update loop to call these methods every 100ms
+   - Integrated BattleMovement service into constructor
+
+2. **`server/src/services/BattleMovement.ts`** - Extended with execution methods (50+ lines)
+   - Added `executeBattalionMovement()` method - orchestrates all movement for a battle
+   - Added `assignInitialTargets()` method - assigns targets to battalions at battle start
+   - Added `checkRetargetingNeeded()` method - determines when battalions need new targets
+   - Integrated with existing `findClosestTarget()` and `moveAlongPath()` methods
+   - Proper handling of destroyed battalions and invalid targets
+
+3. **`server/src/controllers/BattleController.ts`** - Enhanced with movement endpoints
+   - Added `getBattalionMovement()` endpoint for debugging movement state
+   - Added `forceRetarget()` endpoint for testing retargeting logic
+   - Extended `getBattleState()` to include movement data (targets, paths, timing)
+   - Added movement timing information for client interpolation
+
+4. **`server/src/routes/battle.ts`** - Added movement API routes
+   - `GET /:id/movement` - Get battalion movement state for debugging
+   - `POST /:id/retarget/:battalionId` - Force retarget for testing
+   - Proper authentication and error handling
+
+5. **`server/src/types/battle.ts`** - Updated BattleStateResponse interface
+   - Added optional `movementData` field with update timing information
+   - Maintains backward compatibility
+
+6. **`server/src/__tests__/BattleMovement.test.ts`** (NEW - 100+ lines) - Regression tests
+   - Tests for `executeBattalionMovement()` with various scenarios
+   - Tests for `assignInitialTargets()` and target assignment
+   - Tests for `checkRetargetingNeeded()` with different conditions
+   - Comprehensive coverage of movement execution logic
+
+### What This Achieves:
+- ✅ **Server-side movement execution** using existing BattleMovement service
+- ✅ **Automatic targeting and retargeting** based on proximity (per intentions)
+- ✅ **Real-time movement updates** every 100ms
+- ✅ **Attack range positioning** per intentions documents
+- ✅ **Single source of truth** for all movement decisions
+- ✅ **Proper event logging** for movement and retargeting actions
+- ✅ **Debug endpoints** for movement state inspection and testing
+
+### Integration Strategy:
+- **BattleUpdater orchestrates**: timers → movement → combat → victory checks
+- **BattleMovement handles**: targeting → pathfinding → positioning → movement execution
+- **All movement state saved** to database and sent to clients
+- **Event logging** for movement, retargeting, and position changes
+
+### Movement Logic Implementation:
+- **Target Selection**: Always pick closest available target (neutral nodes or enemy battalions)
+- **Pathfinding**: Uses existing Dijkstra's algorithm for shortest network paths
+- **Movement Execution**: Battalions move along calculated paths at bot-type speed
+- **Attack Range**: Stop at exact attack range distance from targets
+- **Retargeting**: Automatic when targets are captured, destroyed, or become invalid
+
+### Test Criteria:
+- ✅ All existing tests pass (22 server tests, 52 mobile tests)
+- ✅ New movement execution tests pass (8 tests)
+- ✅ TypeScript compilation successful with no errors
+- ✅ No linter errors or conflicts
+- ✅ Movement logic follows intentions documents exactly
+- ✅ Proper integration with existing services and database

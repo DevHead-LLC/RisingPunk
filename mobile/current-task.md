@@ -33,52 +33,7 @@ AI MUST READ SECTION ABOVE! END.
 =====================================================================================================================================================================
 =====================================================================================================================================================================
 
-## Batch 5H: Server-Side Movement Execution and Real-Time Updates
-REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
-**Goal:** Activate server-side movement logic and implement real-time battle updates
 
-### IMPLEMENTATION NOTES FOR AI:
-- This batch activates the existing BattleMovement.ts service for actual movement execution
-- Extends BattleUpdater to call movement logic every 100ms
-- Server becomes the authoritative source for all movement and targeting
-
-### SERVER FILES TO MODIFY/CREATE:
-1. **`server/src/services/BattleUpdater.ts`** - Add movement execution
-   - Add executeMovementPhase() method that calls BattleMovement.findClosestTarget()
-   - Add updateBattalionPositions() method that calls BattleMovement.moveAlongPath()
-   - Add retargetBattalions() method for when targets are captured/destroyed
-   - Call these methods in the main update loop every 100ms
-
-2. **`server/src/services/BattleMovement.ts`** - Extend for execution (add 50 lines)
-   - Add executeBattalionMovement() method - orchestrates all movement for a battle
-   - Add assignInitialTargets() method - assigns targets to battalions at battle start
-   - Add checkRetargetingNeeded() method - determines when battalions need new targets
-   - Integrate with existing findClosestTarget() and moveAlongPath() methods
-
-3. **`server/src/controllers/BattleController.ts`** - Add movement endpoints
-   - Add getBattalionMovement endpoint for debugging movement state
-   - Add forceRetarget endpoint for testing retargeting logic
-   - Extend getBattleState to include movement data (current targets, paths)
-
-### What This Achieves:
-- ✅ Server-side movement execution using existing BattleMovement service
-- ✅ Automatic targeting and retargeting based on proximity
-- ✅ Real-time movement updates every 100ms
-- ✅ Attack range positioning per intentions documents
-- ✅ Single source of truth for all movement decisions
-
-### Integration Strategy:
-- BattleUpdater orchestrates: timers → movement → combat → victory checks
-- BattleMovement handles: targeting → pathfinding → positioning → movement execution
-- All movement state saved to database and sent to clients
-
-### TESTING THIS BATCH:
-- Start battle and verify battalions automatically select targets
-- Check movement follows network paths correctly
-- Verify retargeting when nodes are captured
-- Test attack range positioning accuracy
-
----
 
 ## Batch 5I: Battle Testing and Migration Cleanup
 REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!

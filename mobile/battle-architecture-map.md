@@ -91,14 +91,17 @@ This document maps the battle system architecture to help AI assistants understa
   - ✅ **Victory conditions: 20-second timer OR complete elimination**
   - ✅ **Tie-breaker: enemy wins (defender advantage)**
   
-- **BattleMovement.ts** - Movement validation
-  - ✅ Validates movement along network paths
-  - ✅ Calculates pathfinding server-side using Dijkstra's algorithm
-  - ✅ **Will handle movement in Phase 6**
-  - ✅ Network connection validation
-  - ✅ Movement cost calculations
+- **BattleMovement.ts** - Movement execution ✅ COMPLETED (Batch 5H)
+  - ✅ **Validates movement along network paths**
+  - ✅ **Calculates pathfinding server-side using Dijkstra's algorithm**
+  - ✅ **Handles movement execution every 100ms**
+  - ✅ **Network connection validation**
+  - ✅ **Movement cost calculations**
   - ✅ **Closest target selection (neutral nodes and enemy battalions)**
   - ✅ **Attack range positioning (stop at exact range from targets)**
+  - ✅ **executeBattalionMovement() - orchestrates all movement for a battle**
+  - ✅ **assignInitialTargets() - assigns targets to battalions at battle start**
+  - ✅ **checkRetargetingNeeded() - determines when battalions need new targets**
 
 #### Timer & Updates - ✅ COMPLETED (Batch 5F)
 - **BattleTimer.ts** - Timer management
@@ -108,22 +111,32 @@ This document maps the battle system architecture to help AI assistants understa
   - ✅ **Emits events for phase transitions**
   - ✅ **Proper cleanup to prevent memory leaks**
   
-- **BattleUpdater.ts** - State updates
+- **BattleUpdater.ts** - State updates ✅ COMPLETED (Batch 5H)
   - ✅ **Runs every 100ms to update battle state**
   - ✅ **Calls BattleCalculator for damage calculations**
-  - ✅ **Updates battalion positions (placeholder for Phase 6)**
+  - ✅ **Updates battalion positions (movement execution active)**
   - ✅ **Checks victory conditions**
   - ✅ **Saves state to database every 1s**
   - ✅ **Integrates with BattleTimer service**
+  - ✅ **executeMovementPhase() - calls BattleMovement.findClosestTarget()**
+  - ✅ **updateBattalionPositions() - calls BattleMovement.moveAlongPath()**
+  - ✅ **retargetBattalions() - handles retargeting when targets captured/destroyed**
 
 - **battleConfig.ts** - Configuration constants
   - ✅ **Timer durations: COUNTDOWN_DURATION = 3, BATTLE_DURATION = 20**
   - ✅ **Update intervals: UPDATE_INTERVAL = 100, SYNC_INTERVAL = 1000**
   - ✅ **Network connections and bot stats**
 
-#### API Layer - ✅ COMPLETED (Batch 5E)
+#### API Layer - ✅ COMPLETED (Batch 5E-5H)
 - **battle.ts** (routes) - RESTful endpoints ✅
+  - ✅ **Basic battle operations (start, state, events, end)**
+  - ✅ **Movement debugging endpoints (GET /:id/movement)**
+  - ✅ **Testing endpoints (POST /:id/retarget/:battalionId)**
 - **BattleController.ts** - Request handling ✅
+  - ✅ **Basic battle operations**
+  - ✅ **getBattalionMovement() - debugging movement state**
+  - ✅ **forceRetarget() - testing retargeting logic**
+  - ✅ **Enhanced getBattleState() with movement data**
 - **battleAuth.ts** - Battle-specific authentication ✅
 
 ### Client Side (Modified) - ✅ COMPLETED (Batch 5G)
@@ -134,18 +147,18 @@ This document maps the battle system architecture to help AI assistants understa
   - Polls every 1s for updates ✅
   - Proper TypeScript interfaces and error handling ✅
   
-- **useBattleSync.ts** (NEW) - State synchronization 🔄 PENDING (Batch 5H)
+- **useBattleSync.ts** (NEW) - State synchronization 🔄 PENDING (Batch 6A)
   - Manages server state updates
   - Handles interpolation for smooth visuals
   
-- **battleStateCache.ts** (NEW) - Client caching 🔄 PENDING (Batch 5H)
+- **battleStateCache.ts** (NEW) - Client caching 🔄 PENDING (Batch 6A)
   - Caches state for performance
   - Enables predictive UI
 
 #### Modified Hooks - ✅ COMPLETED
 - **useBattleBattalions** - Now fetches from server instead of local state ✅
 - **useBattalionData** - Calculations marked as deprecated (server handles) ✅
-- **useBattleState** - Timer display only (server manages actual timers) 🔄 PENDING (Batch 5H)
+- **useBattleState** - Timer display only (server manages actual timers) 🔄 PENDING (Batch 6A)
 
 ---
 
@@ -193,6 +206,14 @@ This document maps the battle system architecture to help AI assistants understa
 5. **BattleGridScreen** - Server state integration with fallback ✅
 6. **Regression test** - Battle API configuration validation ✅
 
+### ✅ What's Complete (Batch 5H)
+1. **BattleUpdater.ts** - Movement execution integration with BattleMovement service ✅
+2. **BattleMovement.ts** - Extended with execution methods (executeBattalionMovement, assignInitialTargets, checkRetargetingNeeded) ✅
+3. **BattleController.ts** - Movement debugging and testing endpoints ✅
+4. **battle.ts routes** - Movement API endpoints (GET /:id/movement, POST /:id/retarget/:battalionId) ✅
+5. **battle.ts types** - Enhanced BattleStateResponse with movement data ✅
+6. **Regression tests** - Comprehensive movement execution test coverage ✅
+
 ### 📋 What's Set Up for Future Phases
 - **Phase 6 (Movement)**: BattleMovement.ts service ready to implement
 - **Phase 7 (Targeting)**: Event logging ready for target selection events
@@ -236,13 +257,14 @@ This document maps the battle system architecture to help AI assistants understa
    - Shows server-provided state
    - Interpolates between updates
 
-### Data Flow - ✅ COMPLETED (Batch 5G)
+### Data Flow - ✅ COMPLETED (Batch 5H)
 1. Client requests battle start → Server initializes battle ✅
 2. **Server calculates state every 100ms (BattleUpdater)** ✅
 3. **Server manages timers (BattleTimer)** ✅
-4. Client polls state every 1000ms ✅ (implemented in BattleGridScreen)
-5. Client interpolates visuals between updates 🔄 PENDING (Batch 5H)
-6. Critical events (victory, destruction) sent immediately 🔄 PENDING (Batch 5H)
+4. **Server executes movement every 100ms (BattleMovement)** ✅
+5. Client polls state every 1000ms ✅ (implemented in BattleGridScreen)
+6. Client interpolates visuals between updates 🔄 PENDING (Batch 6A)
+7. Critical events (victory, destruction) sent immediately 🔄 PENDING (Batch 6A)
 
 ---
 
@@ -269,8 +291,8 @@ This document maps the battle system architecture to help AI assistants understa
 - **Events** → Server `BattleEvent.ts` → Client event display (future)
 
 ### Phase Dependencies
-- **Phase 5** - Foundation (5C ✅ COMPLETE, 5D ✅ COMPLETE, 5E ✅ COMPLETE, 5F ✅ COMPLETE, 5G ✅ COMPLETE, 5H-5I 🔄 PENDING)
-- **Phase 6** - Movement (depends on Phase 5, BattleUpdater ready)
+- **Phase 5** - Foundation (5C ✅ COMPLETE, 5D ✅ COMPLETE, 5E ✅ COMPLETE, 5F ✅ COMPLETE, 5G ✅ COMPLETE, 5H ✅ COMPLETE, 5I 🔄 PENDING)
+- **Phase 6** - Movement Visualization (depends on Phase 5, server movement ready)
 - **Phase 7** - Targeting (depends on Phase 5, BattleMovement ready)
 - **Phase 8** - Attacks (depends on Phases 5, 6, 7, BattleCalculator ready)
 - **Phase 9** - Animations (client-side, depends on Phase 6)
