@@ -10,6 +10,8 @@ export class BattleCalculator {
    * Damage = Attack Power / (Defense % × 100)
    */
   calculateDamage(attacker: IBattalion, defender: IBattalion): number {
+    const startTime = Date.now();
+    
     // Attack Power = (Bot Type Strength + bonuses) × Quantity
     const attackPower = (attacker.stats.offense + this.getAttackBonuses(attacker)) * attacker.quantity;
     
@@ -18,6 +20,11 @@ export class BattleCalculator {
     
     // Damage = Attack Power / (Defense % × 100)
     const damage = attackPower / (defensePercentage * 100);
+    
+    const calculationTime = Date.now() - startTime;
+    if (calculationTime > 1) { // Log if calculation takes more than 1ms
+      console.log(`Damage calculation took ${calculationTime}ms for ${attacker.id} vs ${defender.id}`);
+    }
     
     return Math.max(0, Math.floor(damage));
   }

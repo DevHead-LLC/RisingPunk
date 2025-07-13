@@ -42,67 +42,7 @@ export const useBattalionData = () => {
     };
   }, [getBotStats]);
 
-  /**
-   * Calculate health based on bot type and quantity
-   */
-  // TODO: Server handles this calculation now - remove in cleanup phase
-  const calculateHealth = useMemo(() => {
-    return (type: BotType, quantity: number, isUser: boolean): number => {
-      const botStats = getBotStats(type, isUser);
-      if (!botStats) {
-        throw new Error(`Invalid bot type: ${type}`);
-      }
-      return botStats.stats.health * quantity;
-    };
-  }, [getBotStats]);
 
-  /**
-   * Calculate attack power for a battalion
-   */
-  // TODO: Server handles this calculation now - remove in cleanup phase
-  const calculateAttackPower = useMemo(() => {
-    return (battalion: Battalion): number => {
-      return battalion.stats.offense * battalion.quantity;
-    };
-  }, []);
-
-  /**
-   * Calculate defense percentage for a battalion
-   */
-  // TODO: Server handles this calculation now - remove in cleanup phase
-  const calculateDefense = useMemo(() => {
-    return (battalion: Battalion): number => {
-      return battalion.stats.defense;
-    };
-  }, []);
-
-  /**
-   * Update battalion health and quantity after taking damage
-   */
-  // TODO: Server handles this calculation now - remove in cleanup phase
-  const applyDamage = useMemo(() => {
-    return (battalion: Battalion, damage: number): Battalion => {
-      const newHealth = Math.max(0, battalion.currentHealth - damage);
-      const healthPerUnit = battalion.stats.health;
-      const newQuantity = Math.max(0, Math.floor(newHealth / healthPerUnit));
-
-      return {
-        ...battalion,
-        currentHealth: newHealth,
-        quantity: newQuantity,
-      };
-    };
-  }, []);
-
-  /**
-   * Check if a battalion is destroyed (quantity = 0)
-   */
-  // TODO: Server handles this calculation now - remove in cleanup phase
-  const isBattalionDestroyed = useMemo(() => {
-    return (battalion: Battalion): boolean => {
-      return battalion.quantity <= 0;
-    };
-  }, []);
 
   /**
    * Get all available bot types
@@ -116,11 +56,6 @@ export const useBattalionData = () => {
   return {
     // Battalion creation and management
     createBattalion,
-    calculateHealth,
-    calculateAttackPower,
-    calculateDefense,
-    applyDamage,
-    isBattalionDestroyed,
     getAvailableBotTypes,
   };
 };

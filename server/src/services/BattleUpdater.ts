@@ -105,6 +105,9 @@ export class BattleUpdater {
       return;
     }
 
+    const startTime = Date.now();
+    console.time(`Battle update ${battleId}`);
+
     try {
       // Get current battle state
       const battle = await Battle.findByBattleId(battleId);
@@ -130,8 +133,17 @@ export class BattleUpdater {
 
       updateState.lastUpdate = Date.now();
 
+      const updateTime = Date.now() - startTime;
+      console.timeEnd(`Battle update ${battleId}`);
+      
+      // Log performance warning if update takes too long
+      if (updateTime > 50) { // More than 50ms is concerning for 100ms intervals
+        console.warn(`Battle update ${battleId} took ${updateTime}ms (target: <50ms)`);
+      }
+
     } catch (error) {
       console.error(`Error updating battle ${battleId}:`, error);
+      console.timeEnd(`Battle update ${battleId}`);
     }
   }
 
