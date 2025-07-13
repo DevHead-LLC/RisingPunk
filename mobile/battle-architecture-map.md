@@ -126,25 +126,26 @@ This document maps the battle system architecture to help AI assistants understa
 - **BattleController.ts** - Request handling ✅
 - **battleAuth.ts** - Battle-specific authentication ✅
 
-### Client Side (Modified) - 🔄 PENDING (Batch 5G-5H)
+### Client Side (Modified) - ✅ COMPLETED (Batch 5G)
 
-#### New/Modified Components - 🔄 PENDING
-- **battleApi.ts** (NEW) - RTK Query API slice
-  - Fetches battle state from server
-  - Polls every 1s for updates
+#### New/Modified Components - ✅ COMPLETED
+- **battleApi.ts** (NEW) - RTK Query API slice ✅
+  - Fetches battle state from server ✅
+  - Polls every 1s for updates ✅
+  - Proper TypeScript interfaces and error handling ✅
   
-- **useBattleSync.ts** (NEW) - State synchronization
+- **useBattleSync.ts** (NEW) - State synchronization 🔄 PENDING (Batch 5H)
   - Manages server state updates
   - Handles interpolation for smooth visuals
   
-- **battleStateCache.ts** (NEW) - Client caching
+- **battleStateCache.ts** (NEW) - Client caching 🔄 PENDING (Batch 5H)
   - Caches state for performance
   - Enables predictive UI
 
-#### Modified Hooks - 🔄 PENDING
-- **useBattleBattalions** - Now fetches from server instead of local state
-- **useBattalionData** - Calculations marked as deprecated (server handles)
-- **useBattleState** - Timer display only (server manages actual timers)
+#### Modified Hooks - ✅ COMPLETED
+- **useBattleBattalions** - Now fetches from server instead of local state ✅
+- **useBattalionData** - Calculations marked as deprecated (server handles) ✅
+- **useBattleState** - Timer display only (server manages actual timers) 🔄 PENDING (Batch 5H)
 
 ---
 
@@ -183,6 +184,14 @@ This document maps the battle system architecture to help AI assistants understa
 2. **BattleUpdater.ts** - State update orchestration ✅
 3. **battleConfig.ts** - Configuration constants ✅
 4. **Regression tests** - Timer and configuration validation ✅
+
+### ✅ What's Complete (Batch 5G)
+1. **battleApi.ts** - RTK Query API slice with proper TypeScript types ✅
+2. **Redux store integration** - battleApi added to store with middleware ✅
+3. **useBattleBattalions** - Deprecation preparation with TODO comments ✅
+4. **useBattalionData** - Calculation deprecation with TODO comments ✅
+5. **BattleGridScreen** - Server state integration with fallback ✅
+6. **Regression test** - Battle API configuration validation ✅
 
 ### 📋 What's Set Up for Future Phases
 - **Phase 6 (Movement)**: BattleMovement.ts service ready to implement
@@ -227,13 +236,13 @@ This document maps the battle system architecture to help AI assistants understa
    - Shows server-provided state
    - Interpolates between updates
 
-### Data Flow - 🔄 PENDING (Batch 5G)
-1. Client requests battle start → Server initializes battle
-2. **Server calculates state every 100ms (BattleUpdater)**
-3. **Server manages timers (BattleTimer)**
-4. Client polls state every 1000ms (to be implemented)
-5. Client interpolates visuals between updates (to be implemented)
-6. Critical events (victory, destruction) sent immediately
+### Data Flow - ✅ COMPLETED (Batch 5G)
+1. Client requests battle start → Server initializes battle ✅
+2. **Server calculates state every 100ms (BattleUpdater)** ✅
+3. **Server manages timers (BattleTimer)** ✅
+4. Client polls state every 1000ms ✅ (implemented in BattleGridScreen)
+5. Client interpolates visuals between updates 🔄 PENDING (Batch 5H)
+6. Critical events (victory, destruction) sent immediately 🔄 PENDING (Batch 5H)
 
 ---
 
@@ -260,7 +269,7 @@ This document maps the battle system architecture to help AI assistants understa
 - **Events** → Server `BattleEvent.ts` → Client event display (future)
 
 ### Phase Dependencies
-- **Phase 5** - Foundation (5C ✅ COMPLETE, 5D ✅ COMPLETE, 5E ✅ COMPLETE, 5F ✅ COMPLETE, 5G-5I 🔄 PENDING)
+- **Phase 5** - Foundation (5C ✅ COMPLETE, 5D ✅ COMPLETE, 5E ✅ COMPLETE, 5F ✅ COMPLETE, 5G ✅ COMPLETE, 5H-5I 🔄 PENDING)
 - **Phase 6** - Movement (depends on Phase 5, BattleUpdater ready)
 - **Phase 7** - Targeting (depends on Phase 5, BattleMovement ready)
 - **Phase 8** - Attacks (depends on Phases 5, 6, 7, BattleCalculator ready)

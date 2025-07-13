@@ -33,59 +33,6 @@ AI MUST READ SECTION ABOVE! END.
 =====================================================================================================================================================================
 =====================================================================================================================================================================
 
-## Batch 5G: Client Battle API Integration
-REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
-**Goal:** Update client to fetch battle state from server instead of local calculations
-
-### IMPLEMENTATION NOTES FOR AI:
-- Work in the `mobile` directory for this batch
-- Follow RTK Query patterns from existing API slices
-- Add TODO comments but keep existing code functional
-- Test on mobile app after changes
-
-### CLIENT FILES TO CREATE/MODIFY:
-1. **`mobile/src/store/api/battleApi.ts`** (NEW - 80 lines) - Battle API slice
-   - Copy pattern from `balanceApi.ts` or `botsApi.ts`
-   - Define endpoints: startBattle, getBattleState (with polling)
-   - Set polling interval to 1000ms for getBattleState
-   - Export hooks: useStartBattleMutation, useGetBattleStateQuery
-
-2. **`mobile/src/hooks/useBattleBattalions.ts`** - Remove local state, use server data
-   - Add TODO comment at top: "// TODO: This hook will be deprecated once server integration is complete"
-   - Keep existing functionality for now
-   - Add commented code showing how to use battleApi
-
-3. **`mobile/src/hooks/useBattalionData.ts`** - Mark calculations as deprecated
-   - Add TODO comments before each calculation method:
-     "// TODO: Server handles this calculation now - remove in cleanup phase"
-   - Keep methods functional for now
-
-4. **`mobile/src/screens/BattleGridScreen.tsx`** - Integrate server state
-   - Import and use useGetBattleStateQuery
-   - Add loading state while fetching
-   - Keep existing rendering logic
-   - Map server state to existing component props
-
-### What This Achieves:
-- ✅ RTK Query setup for battle endpoints
-- ✅ Automatic polling for battle state (1s intervals)
-- ✅ Remove local battalion creation/damage calculations
-- ✅ Display server-provided battle state
-- ✅ Proper loading and error states
-
-### Migration Strategy:
-- Add TODO comments to deprecated local calculations
-- Keep visualization components unchanged
-- Only data source changes from local to server
-
-### TESTING THIS BATCH:
-- Run mobile app with `npm start`
-- Start a battle - should call server endpoint
-- Verify state updates every second
-- Check loading states display properly
-
----
-
 ## Batch 5H: Server-Side Movement Execution and Real-Time Updates
 REVIEW AI MUST READ SECTION at the top of this file before you move forward with these batch changes!
 **Goal:** Activate server-side movement logic and implement real-time battle updates
