@@ -1,13 +1,10 @@
 {
+  "extends": "@react-native/typescript-config/tsconfig.json",
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
-    },
-    "esModuleInterop": true,
-    "moduleResolution": "node",
-    "jsx": "react-native",
-    "target": "es2017"
+    }
   },
   "include": ["src/**/*", "__tests__/**/*"]
 }

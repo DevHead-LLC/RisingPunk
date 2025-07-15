@@ -13,48 +13,91 @@ A strategic battle system where bot battalions compete to destroy the opposing a
 ## Battle Flow
 
 ### Phase 1: Setup (3 seconds)
-- Battle screen loads showing the network
-- Your battalions appear on the left side
-- Enemy battalions appear on the right side
-- Neutral nodes in center get health equal to 75% of total army strength
-- 3-second countdown begins
+- Battle screen loads showing the network *(see node-behaviors.md -> Network Topology -> Node Positions)*
+- Your battalions appear on the left side *(see battalion-bot-behaviors.md -> Battalion Lifecycle -> Creation -> Starting Position)*
+- Enemy battalions appear on the right side *(see battalion-bot-behaviors.md -> Battalion Lifecycle -> Creation -> Starting Position)*
+- Neutral nodes in center get health equal to 75% of total army strength *(see node-behaviors.md -> Node Health System -> Health Assignment)*
+- 3-second countdown begins *(see battalion-bot-behaviors.md -> Combat Phases, node-behaviors.md -> Node Types -> Neutral Nodes)*
+
+**Cross-References:**
+- **Battalion Placement**: battalion-bot-behaviors.md -> Battalion Structure -> Composition
+- **Node Types**: node-behaviors.md -> Node Types -> Permanent Nodes & Neutral Nodes  
+- **Network Layout**: node-behaviors.md -> Network Topology -> Network Connections
+- **Health Calculation**: node-behaviors.md -> Node Health System -> Health Assignment -> Formula
 
 ### Phase 2: Initial Targeting
-- Each battalion picks a neutral node to attack at random
-- Can only target neutral nodes connected to their current position
-- Battalions move along network lines toward their targets
-- Stop at exact attack range distance from target
-- Multiple battalions can target the same node, however battalions can only target and attack a single target (not multiple targets)
+- Each battalion picks a neutral node to attack at random *(see battalion-bot-behaviors.md -> Targeting Behavior -> Target Selection Process -> Phase 1: Initial Targeting -> Random Selection)*
+- Can only target neutral nodes connected to their current position *(see battalion-bot-behaviors.md -> Targeting Behavior -> Target Selection Process -> Phase 1: Initial Targeting -> Connection Constraint, node-behaviors.md -> Network Topology -> Network Connections)*
+- Battalions move along network lines toward their targets *(see battalion-bot-behaviors.md -> Battalion Movement -> Movement Rules -> Initial Movement)*
+- Stop at exact attack range distance from target *(see battalion-bot-behaviors.md -> Targeting Behavior -> Target Selection Process -> Phase 2: Retargeting -> Attack Range)*
+- Multiple battalions can target the same node, however battalions can only target and attack a single target (not multiple targets) *(see battalion-bot-behaviors.md -> Targeting Behavior -> Target Selection Process -> Phase 1: Initial Targeting -> Multiple Targeting & Single Target Rule)*
+
+**Cross-References:**
+- **Random Target Selection**: battalion-bot-behaviors.md -> Battalion Movement -> Pathfinding -> Initial Target Selection
+- **Connection Constraints**: node-behaviors.md -> Network Topology -> Network Connections
+- **Neutral Node Targeting**: node-behaviors.md -> Node Types -> Neutral Nodes
+- **Attack Range**: battalion-bot-behaviors.md -> Bot Type Stats -> Base Characteristics -> Range
+- **Movement Rules**: battalion-bot-behaviors.md -> Battalion Movement -> Movement Rules
 
 ### Phase 3: Node Combat (Tug-of-War)
-- Battalions attack neutral nodes continuously
-- Each attack pushes the node toward your side or enemy side
-- Progress bar goes from -100% (enemy control) to +100% (your control)
-- When progress reaches ±100%, the node is captured
-- Captured nodes change color to appropriate controlling party color and can't be attacked anymore
+- Battalions attack neutral nodes continuously *(see battalion-bot-behaviors.md -> Combat Phases -> Node Combat -> Target & Mechanic)*
+- Each attack pushes the node toward your side or enemy side *(see node-behaviors.md -> Neutral Node Capture System -> Tug-of-War Mechanics -> Attack Impact)*
+- Progress bar goes from -100% (enemy control) to +100% (your control) *(see node-behaviors.md -> Neutral Node Capture System -> Tug-of-War Mechanics -> Progress Range)*
+- When progress reaches ±100%, the node is captured *(see node-behaviors.md -> Neutral Node Capture System -> Tug-of-War Mechanics -> Capture Threshold)*
+- Captured nodes change color to appropriate controlling party color and can't be attacked anymore *(see node-behaviors.md -> Node Visual States -> Ownership Colors, node-behaviors.md -> Node Types -> Neutral Nodes -> Behavior)*
+
+**Cross-References:**
+- **Node Combat System**: battalion-bot-behaviors.md -> Combat Phases -> Node Combat
+- **Tug-of-War Mechanics**: node-behaviors.md -> Neutral Node Capture System -> Tug-of-War Mechanics
+- **Capture Process**: node-behaviors.md -> Neutral Node Capture System -> Capture Process
+- **Visual Feedback**: node-behaviors.md -> Node Visual States -> Progress Indicators
+- **Attack Calculations**: battalion-bot-behaviors.md -> Combat Mechanics -> Attack Power Calculation
 
 ### Phase 4: Retargeting and Movement
-- When a neutral node is captured, attacking battalions need new targets
-- They pick the closest available target (neutral nodes or enemy battalions)
-- Movement follows the same rules - along network lines to attack range
-- Retareting is based on proximity using the network lines and a pathfinding algorithm which sets up their movement path
-- If targeting battalions, a connection is made to notify the 'attacking' battalion if their the 'defending' target is destroyed or moves from the anticipated position to keep target destination position up to date
-- Attacking battalions movement stop to begin attack sequence when target center and attack range intersect (or target is within attack range)
+- When a neutral node is captured, attacking battalions need new targets *(see battalion-bot-behaviors.md -> Combat Phases -> Node Combat -> Retargeting)*
+- They pick the closest available target (neutral nodes or enemy battalions) *(see battalion-bot-behaviors.md -> Targeting Behavior -> Target Priority -> Retargeting, battalion-bot-behaviors.md -> Battalion Movement -> Pathfinding -> Retargeting)*
+- Movement follows the same rules - along network lines to attack range *(see battalion-bot-behaviors.md -> Battalion Movement -> Movement Rules -> Retargeting Movement)*
+- Retargeting is based on proximity using the network lines and a pathfinding algorithm which sets up their movement path *(see battalion-bot-behaviors.md -> Battalion Movement -> Pathfinding -> Route Calculation)*
+- If targeting battalions, a connection is made to notify the 'attacking' battalion if their the 'defending' target is destroyed or moves from the anticipated position to keep target destination position up to date *(see battalion-bot-behaviors.md -> Targeting Behavior -> Target Selection Process -> Phase 2: Retargeting -> Dynamic Updates)*
+- Attacking battalions movement stop to begin attack sequence when target center and attack range intersect (or target is within attack range) *(see battalion-bot-behaviors.md -> Targeting Behavior -> Target Selection Process -> Phase 2: Retargeting -> Attack Range)*
+
+**Cross-References:**
+- **Retargeting Logic**: battalion-bot-behaviors.md -> Targeting Behavior -> Target Priority -> Retargeting
+- **Pathfinding Algorithm**: battalion-bot-behaviors.md -> Battalion Movement -> Pathfinding -> Route Calculation
+- **Movement Rules**: battalion-bot-behaviors.md -> Battalion Movement -> Movement Rules -> Retargeting Movement
+- **Dynamic Target Updates**: battalion-bot-behaviors.md -> Targeting Behavior -> Target Selection Process -> Phase 2: Retargeting -> Dynamic Updates
+- **Attack Range Positioning**: battalion-bot-behaviors.md -> Targeting Behavior -> Target Selection Process -> Phase 2: Retargeting -> Attack Range
+- **Target Types**: battalion-bot-behaviors.md -> Targeting Behavior -> Target Priority -> Target Types
 
 ### Phase 5: Battalion Combat
-- Battalions can attack each other directly
-- Damage calculation: (Bot type strength + bonuses) * number of bots = total damage per attack
-- When a battalion takes damage, bot quantity is reduced in coordination with health
-- Reduced quantity = less health and attack power
-- When all units are lost, the battalion is destroyed
-- Destroyed battalions are removed from the battle
+- Battalions can attack each other directly *(see battalion-bot-behaviors.md -> Combat Phases -> Battalion Combat -> Target & Mechanic)*
+- Damage calculation: (Bot type strength + bonuses) * number of bots = total damage per attack *(see battalion-bot-behaviors.md -> Combat Mechanics -> Attack Power Calculation, battalion-bot-behaviors.md -> Combat Mechanics -> Damage Calculation)*
+- When a battalion takes damage, bot quantity is reduced in coordination with health *(see battalion-bot-behaviors.md -> Health and Damage System -> Damage Application -> Quantity Reduction)*
+- Reduced quantity = less health and attack power *(see battalion-bot-behaviors.md -> Combat Mechanics -> Unit Loss System -> Health Reduction & Power Reduction)*
+- When all units are lost, the battalion is destroyed *(see battalion-bot-behaviors.md -> Combat Mechanics -> Unit Loss System -> Destruction, battalion-bot-behaviors.md -> Battalion Lifecycle -> Destruction)*
+- Destroyed battalions are removed from the battle *(see battalion-bot-behaviors.md -> Battalion Lifecycle -> Destruction -> Removal)*
+
+**Cross-References:**
+- **Battalion vs Battalion Combat**: battalion-bot-behaviors.md -> Combat Phases -> Battalion Combat
+- **Damage Calculations**: battalion-bot-behaviors.md -> Combat Mechanics -> Attack Power Calculation & Damage Calculation
+- **Unit Loss System**: battalion-bot-behaviors.md -> Combat Mechanics -> Unit Loss System
+- **Health and Damage**: battalion-bot-behaviors.md -> Health and Damage System -> Damage Application
+- **Battalion Destruction**: battalion-bot-behaviors.md -> Battalion Lifecycle -> Destruction
+- **Bot Type Stats**: battalion-bot-behaviors.md -> Bot Type Stats -> Base Characteristics
 
 ### Phase 6: Victory
-- Battle ends after 20 seconds OR when one side is completely eliminated
-- Victory points are calculated based on units lost
-- Side with fewer losses wins
-- If tied, enemy wins (defender advantage)
-- Victor gains benefits (money, items, etc.) to be determined later
+- Battle ends after 20 seconds OR when one side is completely eliminated *(see battalion-bot-behaviors.md -> Combat Phases -> Combat phase management, victory conditions section below)*
+- Victory points are calculated based on units lost *(see battalion-bot-behaviors.md -> Battalion Lifecycle -> Destruction -> Impact)*
+- Side with fewer losses wins *(see battalion-bot-behaviors.md -> Combat Mechanics -> Unit Loss System)*
+- If tied, enemy wins (defender advantage) *(see victory conditions section below)*
+- Victor gains benefits (money, items, etc.) to be determined later *(see victory conditions section below)*
+
+**Cross-References:**
+- **Battle Timer**: battalion-bot-behaviors.md -> Combat Phases -> 20-second battle duration
+- **Complete Elimination**: battalion-bot-behaviors.md -> Battalion Lifecycle -> Destruction -> Removal
+- **Unit Loss Calculations**: battalion-bot-behaviors.md -> Combat Mechanics -> Unit Loss System
+- **Victory Points**: battalion-bot-behaviors.md -> Battalion Lifecycle -> Destruction -> Impact
+- **Tie-Breaker Rules**: Victory Conditions section below
 
 ## Key Behaviors
 
@@ -103,8 +146,15 @@ A strategic battle system where bot battalions compete to destroy the opposing a
 - **Phreak (Ranged)**: High range (9), low health (12), strong vs Cavalry
 
 ## Victory Conditions
-- **Timer**: 20-second time limit
-- **Elimination**: Destroy all enemy battalions completely
-- **Points**: Fewer losses wins (based on bot mark values)
-- **Tie**: Enemy wins automatically && a single unit is 'saved' (lowest mark brought to battle)
+- **Timer**: 20-second time limit *(see battalion-bot-behaviors.md -> Combat Phases -> Battle duration)*
+- **Elimination**: Destroy all enemy battalions completely *(see battalion-bot-behaviors.md -> Combat Mechanics -> Unit Loss System -> Destruction, battalion-bot-behaviors.md -> Battalion Lifecycle -> Destruction)*
+- **Points**: Fewer losses wins (based on bot mark values) *(see battalion-bot-behaviors.md -> Battalion Lifecycle -> Destruction -> Impact)*
+- **Tie**: Enemy wins automatically && a single unit is 'saved' (lowest mark brought to battle) *(see battalion-bot-behaviors.md -> Strategic Considerations -> defender advantage)*
 - **Rewards**: Victor gains money, items, and other benefits tbd at a later time
+
+**Cross-References:**
+- **20-Second Timer**: battalion-bot-behaviors.md -> Combat Phases -> Battle phase timing
+- **Battalion Elimination**: battalion-bot-behaviors.md -> Combat Mechanics -> Unit Loss System -> Destruction
+- **Loss Calculations**: battalion-bot-behaviors.md -> Health and Damage System -> Unit loss tracking
+- **Mark Values**: battalion-bot-behaviors.md -> Battalion Structure -> Composition -> Bot marks
+- **Defender Advantage**: battalion-bot-behaviors.md -> Strategic Considerations
