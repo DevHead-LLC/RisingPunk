@@ -1,5 +1,9 @@
 # Step 6c: Type Advantage System Activation
 
+**⚠️ POSSIBLE TODO CONSIDERATION ⚠️**
+
+The type advantages are currently built into the bot stats. This documentation describes a potential future enhancement where type advantages could be calculated separately from base stats. For now, the advantages are inherent in the bot type specifications.
+
 ## User Experience Behavior
 - **Type advantage calculation**: Rock-Paper-Scissors system affects all combat damage calculations
 - **Guardian advantage**: Guardian bots deal bonus damage to Breacher (Infantry) and receive reduced damage from Phreak (Ranged)

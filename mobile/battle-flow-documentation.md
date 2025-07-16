@@ -65,9 +65,11 @@ See: [`battle-ux-flow/5-pre-battle-countdown.md`](battle-ux-flow/5-pre-battle-co
 
 See: [`battle-ux-flow/6a-battle-initial-setup.md`](battle-ux-flow/6a-battle-initial-setup.md)
 
-### Step 6b: Node Advantages Activation
+### Step 6b: Node Advantages Activation (Future Feature)
 
 See: [`battle-ux-flow/6b-node-advantages-activation.md`](battle-ux-flow/6b-node-advantages-activation.md)
+
+**⚠️ FUTURE TODO ITEM - NOT CURRENTLY IMPLEMENTED ⚠️**
 
 ### Step 6c: Type Advantage System Activation
 
