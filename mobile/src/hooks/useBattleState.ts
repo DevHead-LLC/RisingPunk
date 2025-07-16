@@ -1,6 +1,6 @@
 /**
  * @file useBattleState.ts
- * @description Battle state management hook with timer functionality
+ * @description Battle state management hook with server-synced timer functionality
  */
 
 import { useReducer, useCallback, useRef, useEffect, useState } from 'react';
@@ -10,6 +10,7 @@ import {
   BattleStateAction,
   BattleTimerConfig,
 } from '../types/battleState';
+import { CountdownTimerService, TimerCallbacks } from '../services/CountdownTimerService';
 
 // Timer configuration from intentions documents
 const TIMER_CONFIG: BattleTimerConfig = {
@@ -63,80 +64,63 @@ export function useBattleState() {
   const [state, dispatch] = useReducer(battleStateReducer, initialState);
   const [countdown, setCountdown] = useState(initialState.countdown);
   const [battleTime, setBattleTime] = useState(initialState.battleTime);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const countdownRef = useRef<NodeJS.Timeout | null>(null);
-  const countdownValueRef = useRef(initialState.countdown);
-  const battleTimeRef = useRef(initialState.battleTime);
+  const timerServiceRef = useRef<CountdownTimerService | null>(null);
+  const battleIdRef = useRef<string | null>(null);
 
-  // Cleanup timers
-  const cleanupTimers = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    if (countdownRef.current) {
-      clearInterval(countdownRef.current);
-      countdownRef.current = null;
+  // Cleanup timer service
+  const cleanupTimerService = useCallback(() => {
+    if (timerServiceRef.current) {
+      timerServiceRef.current.stopTimerSync();
+      timerServiceRef.current = null;
     }
   }, []);
 
-  // Start countdown (3 seconds)
-  const startCountdown = useCallback(() => {
-    cleanupTimers();
+  // Start countdown with server sync
+  const startCountdown = useCallback((battleId: string) => {
+    cleanupTimerService();
     dispatch({ type: 'START_COUNTDOWN' });
-    countdownValueRef.current = TIMER_CONFIG.countdownDuration;
-    setCountdown(TIMER_CONFIG.countdownDuration);
+    battleIdRef.current = battleId;
 
-    countdownRef.current = setInterval(() => {
-      countdownValueRef.current -= 1;
-      if (countdownValueRef.current <= 0) {
-        // Countdown finished, start battle
-        if (countdownRef.current) {
-          clearInterval(countdownRef.current);
-          countdownRef.current = null;
+    // Create timer service instance
+    timerServiceRef.current = new CountdownTimerService();
+
+    // Set up callbacks for timer updates
+    const callbacks: TimerCallbacks = {
+      onCountdownUpdate: (newCountdown: number) => {
+        setCountdown(newCountdown);
+      },
+      onPhaseChange: (newPhase: BattlePhase) => {
+        if (newPhase === BattlePhase.ACTIVE) {
+          dispatch({ type: 'START_BATTLE' });
+          setCountdown(0);
         }
-        dispatch({ type: 'START_BATTLE' });
-        setCountdown(0);
-      } else {
-        // Update countdown internally
-        setCountdown(countdownValueRef.current);
-      }
-    }, 1000);
-  }, [cleanupTimers]);
+      },
+      onBattleEnd: (winner: 'user' | 'enemy') => {
+        dispatch({ type: 'END_BATTLE', winner });
+      },
+    };
 
-  // Start battle timer (20 seconds)
+    // Start server sync
+    timerServiceRef.current.startTimerSync(battleId, callbacks);
+  }, [cleanupTimerService]);
+
+  // Start battle timer (20 seconds) - now handled by server
   const startBattle = useCallback(() => {
-    cleanupTimers();
-    dispatch({ type: 'START_BATTLE' });
-    battleTimeRef.current = 0;
-    setBattleTime(0);
-
-    timerRef.current = setInterval(() => {
-      battleTimeRef.current += 1;
-      if (battleTimeRef.current >= TIMER_CONFIG.battleDuration) {
-        // Battle time expired
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
-        dispatch({ type: 'END_BATTLE', winner: 'enemy' }); // Default to enemy win on timeout
-      } else {
-        // Update timer internally
-        setBattleTime(battleTimeRef.current);
-      }
-    }, 1000);
-  }, [cleanupTimers]);
+    // Battle timer is now managed by server through CountdownTimerService
+    // This method is kept for compatibility but does nothing
+    console.log('Battle timer started by server');
+  }, []);
 
   // End battle
   const endBattle = useCallback((winner: 'user' | 'enemy') => {
-    cleanupTimers();
+    cleanupTimerService();
     dispatch({ type: 'END_BATTLE', winner });
-  }, [cleanupTimers]);
+  }, [cleanupTimerService]);
 
   // Cleanup on unmount
   useEffect(() => {
-    return cleanupTimers;
-  }, [cleanupTimers]);
+    return cleanupTimerService;
+  }, [cleanupTimerService]);
 
   // Combine state with local timer values
   const combinedState = {

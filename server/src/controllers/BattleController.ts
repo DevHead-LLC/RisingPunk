@@ -254,6 +254,51 @@ export class BattleController {
   }
 
   /**
+   * Get battle timer state
+   */
+  async getBattleTimer(battleId: string, userId: string): Promise<any> {
+    try {
+      // Get battle from database
+      const battle = await this.battleService.getBattle(battleId);
+      
+      if (!battle) {
+        throw new Error('Battle not found');
+      }
+
+      // Verify user is a participant
+      if (battle.attackerId !== userId && battle.defenderId !== userId) {
+        throw new Error('User not authorized to view this battle');
+      }
+
+      // Get timer state from BattleTimerService
+      const timerService = this.battleService.getTimerService();
+      const timerState = timerService.getTimeRemaining(battleId);
+
+      if (!timerState) {
+        // Timer not active, return current battle state
+        return {
+          battleId: battle.battleId,
+          phase: battle.phase,
+          countdown: battle.countdown,
+          battleTime: battle.battleTime,
+          isActive: false
+        };
+      }
+
+      return {
+        battleId: battle.battleId,
+        phase: timerState.phase,
+        countdown: timerState.countdown,
+        battleTime: timerState.battleTime,
+        isActive: timerService.isTimerActive(battleId)
+      };
+    } catch (error) {
+      console.error('BattleController getBattleTimer error:', error);
+      throw new Error('Failed to get battle timer');
+    }
+  }
+
+  /**
    * Force end battle (admin/timeout)
    */
   async endBattle(battleId: string, userId: string): Promise<BattleStateResponse> {

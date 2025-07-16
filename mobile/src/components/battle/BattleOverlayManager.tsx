@@ -10,22 +10,31 @@ import { BattlePhase } from '../../types/battleTypes';
 import { BattleCountdownOverlay } from './BattleCountdownOverlay';
 import { BattleTimerDisplay } from './BattleTimerDisplay';
 
-export const BattleOverlayManager: React.FC = () => {
+interface BattleOverlayManagerProps {
+  battleId?: string;
+}
+
+export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({ battleId }) => {
   const {
     state: { phase, countdown, battleTime, maxBattleTime },
     startCountdown,
   } = useBattleState();
 
-  // Start countdown on mount
+  // Start countdown on mount with battleId
   useEffect(() => {
-    startCountdown();
+    if (battleId) {
+      startCountdown(battleId);
+    } else {
+      // Fallback for demo mode - use a default battleId
+      startCountdown('demo-battle');
+    }
     // Only run on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      {phase === BattlePhase.COUNTDOWN && (
+      {phase === BattlePhase.COUNTDOWN && countdown > 0 && (
         <BattleCountdownOverlay countdown={countdown} isVisible={true} />
       )}
       {phase === BattlePhase.ACTIVE && (
