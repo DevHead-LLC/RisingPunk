@@ -96,7 +96,7 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
     <SafeAreaView style={styles.container} testID="battle-grid-screen">
       <View style={styles.battleArea}>
         {/* Overlays (countdown, timer) */}
-        <BattleOverlayManager />
+        <BattleOverlayManager battleId={battleId} />
 
         {/* Network visualization */}
         <View style={styles.networkContainer}>

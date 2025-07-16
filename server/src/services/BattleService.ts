@@ -1,6 +1,7 @@
 import { Battle, IBattleDocument } from '../models/Battle';
 import { BattleEvent } from '../models/BattleEvent';
 import { BattlePhase, NodeOwner, BotType, IBattalion, INode } from '../types/battle';
+import { BattleTimerService } from './BattleTimer';
 
 // Bot stats copied from mobile useBots.ts
 const BOT_CATEGORIES: Record<BotType, any> = {
@@ -71,6 +72,19 @@ const ENEMY_BOT_CATEGORIES: Record<BotType, any> = {
 };
 
 export class BattleService {
+  private timerService: BattleTimerService;
+
+  constructor() {
+    this.timerService = BattleTimerService.getInstance();
+  }
+
+  /**
+   * Get timer service instance
+   */
+  getTimerService(): BattleTimerService {
+    return this.timerService;
+  }
+
   /**
    * Create a new battle with initial setup
    */
@@ -188,8 +202,8 @@ export class BattleService {
       battleId,
       attackerId,
       defenderId,
-      phase: BattlePhase.SETUP,
-      countdown: 3, // 3-second setup phase as per intentions
+      phase: BattlePhase.COUNTDOWN, // Start in countdown phase
+      countdown: 3, // 3-second countdown as per intentions
       battleTime: 0,
       battalions,
       nodes,
@@ -197,8 +211,31 @@ export class BattleService {
       startTime: new Date(),
       endTime: null,
     });
-    
+
+    // Save battle to database
     const savedBattle = await battle.save();
+
+    // Start server-side timer for this battle
+    this.timerService.startTimer(battleId);
+
+    // Set up timer event listeners
+    this.timerService.on('countdownUpdate', (data) => {
+      if (data.battleId === battleId) {
+        this.updateBattleTimer(battleId, data.countdown, data.phase);
+      }
+    });
+
+    this.timerService.on('phaseChange', (data) => {
+      if (data.battleId === battleId) {
+        this.updateBattlePhase(battleId, data.phase);
+      }
+    });
+
+    this.timerService.on('battleEnd', (data) => {
+      if (data.battleId === battleId) {
+        this.endBattle(battleId, NodeOwner.ENEMY); // Default to enemy win on timeout
+      }
+    });
     
     // Log battle creation event
     await new BattleEvent({
@@ -266,5 +303,32 @@ export class BattleService {
     return Battle.find({
       phase: { $in: [BattlePhase.SETUP, BattlePhase.COUNTDOWN, BattlePhase.ACTIVE] }
     });
+  }
+
+  /**
+   * Update battle timer state
+   */
+  private async updateBattleTimer(battleId: string, countdown: number, phase: BattlePhase): Promise<void> {
+    const battle = await Battle.findOne({ battleId });
+    if (!battle) return;
+
+    battle.countdown = countdown;
+    battle.phase = phase;
+    await battle.save();
+  }
+
+  /**
+   * Update battle phase
+   */
+  private async updateBattlePhase(battleId: string, phase: BattlePhase): Promise<void> {
+    const battle = await Battle.findOne({ battleId });
+    if (!battle) return;
+
+    battle.phase = phase;
+    if (phase === BattlePhase.ACTIVE) {
+      battle.countdown = 0;
+      battle.battleTime = 0;
+    }
+    await battle.save();
   }
 } 

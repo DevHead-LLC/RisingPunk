@@ -183,6 +183,31 @@ router.post<{ id: string; battalionId: string }, BattleResponse>(
   }
 );
 
+// Get battle timer state
+router.get<{ id: string }, BattleResponse>(
+  '/:id/timer',
+  async (req, res): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?._id;
+
+      if (!userId) {
+        res.status(401).json({ success: false, error: 'Authentication required' });
+        return;
+      }
+
+      const timerState = await battleController.getBattleTimer(id, userId);
+      res.json({ success: true, data: timerState });
+    } catch (error) {
+      console.error('Get battle timer error:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to get battle timer' 
+      });
+    }
+  }
+);
+
 // Force end battle (admin/timeout)
 router.post<{ id: string }, BattleResponse>(
   '/:id/end',
