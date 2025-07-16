@@ -1,6 +1,6 @@
 # Step 6c: Type Advantage System Activation
 
-**⚠️ POSSIBLE TODO CONSIDERATION ⚠️**
+**⚠️ POSSIBLE TODO CONSIDERATION FOR THE FUTURE ⚠️**
 
 The type advantages are currently built into the bot stats. This documentation describes a potential future enhancement where type advantages could be calculated separately from base stats. For now, the advantages are inherent in the bot type specifications.
 
