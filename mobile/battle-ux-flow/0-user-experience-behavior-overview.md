@@ -64,13 +64,12 @@ See: [`6a-battle-initial-setup.md`](6a-battle-initial-setup.md)
 
 See: [`6b-node-advantages-activation.md`](6b-node-advantages-activation.md)
 
-- **Initial advantage activation**: Controlled nodes immediately begin providing stat bonuses to friendly battalions
-- **User nodes advantage**: Nodes 0, 1, 2 provide small stat bonuses to user battalions attacking along connected network lines
-- **Enemy nodes advantage**: Nodes 6, 7, 8 provide small stat bonuses to enemy battalions attacking along connected network lines
-- **Visual indicators**: Controlled nodes show subtle visual effects indicating active bonuses
-- **Dynamic updates**: When neutral nodes are captured later, they immediately begin providing bonuses to battalions attacking along their connected network lines
-- **Network-based distribution**: Bonuses only affect battalions attacking along network lines connected to controlled nodes
-- **Implementation Note**: Node advantage details are not fully defined yet - controlling neutral nodes provides small stat advantages to battalions attacking on connected network lines
+- **Current behavior**: No node advantages are currently active - all battalions fight with base stats only
+- **Future implementation**: When neutral nodes are captured, they will provide small stat bonuses to battalions attacking along connected network lines
+- **No starting advantages**: User-owned nodes (0, 1, 2) and enemy-owned nodes (6, 7, 8) do not provide any bonuses to their respective battalions
+- **Future visual indicators**: When implemented, controlled nodes will show subtle visual effects indicating active bonuses
+- **Future dynamic updates**: When neutral nodes are captured later, they will immediately begin providing bonuses to battalions attacking along their connected network lines
+- **Future network-based distribution**: Bonuses will only affect battalions attacking along network lines connected to controlled nodes
 
 ## Step 6c: Type Advantage System Activation
 
