@@ -95,6 +95,9 @@ export function useBattleState() {
           setCountdown(0);
         }
       },
+      onBattleTimeUpdate: (newBattleTime: number) => {
+        setBattleTime(newBattleTime);
+      },
       onBattleEnd: (winner: 'user' | 'enemy') => {
         dispatch({ type: 'END_BATTLE', winner });
       },
