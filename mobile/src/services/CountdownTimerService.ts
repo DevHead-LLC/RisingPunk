@@ -24,13 +24,14 @@ export interface TimerState {
 export interface TimerCallbacks {
   onCountdownUpdate?: (countdown: number) => void;
   onPhaseChange?: (phase: BattlePhase) => void;
+  onBattleTimeUpdate?: (battleTime: number) => void;
   onBattleEnd?: (winner: 'user' | 'enemy') => void;
 }
 
 export class CountdownTimerService {
   private battleId: string | null = null;
-  private syncInterval: NodeJS.Timeout | null = null;
-  private localTimerInterval: NodeJS.Timeout | null = null;
+  private syncInterval: number | null = null;
+  private localTimerInterval: number | null = null;
   private callbacks: TimerCallbacks = {};
   private currentState: TimerState = {
     phase: BattlePhase.COUNTDOWN,
@@ -55,6 +56,9 @@ export class CountdownTimerService {
         battleTime: 0,
         isActive: true,
       };
+      // Start local timer immediately for demo mode
+      this.useLocalTimerFallback();
+      return;
     }
 
     // Start polling server for timer updates
@@ -176,20 +180,28 @@ export class CountdownTimerService {
     console.log('Using local timer fallback for demo mode');
     
     // Start local countdown
-    this.localTimerInterval = setInterval(() => {
+    const tick = () => {
       if (this.currentState.phase === BattlePhase.COUNTDOWN) {
         if (this.currentState.countdown > 0) {
           this.currentState.countdown--;
           this.callbacks.onCountdownUpdate?.(this.currentState.countdown);
         } else {
-          // Countdown finished, start battle phase
+          // Countdown finished, start battle phase immediately
           this.currentState.phase = BattlePhase.ACTIVE;
           this.currentState.countdown = 0;
           this.currentState.battleTime = 0;
           this.callbacks.onPhaseChange?.(BattlePhase.ACTIVE);
+          this.callbacks.onBattleTimeUpdate?.(0);
+          
+          // Start battle timer immediately without waiting
+          setTimeout(() => {
+            this.currentState.battleTime = 1;
+            this.callbacks.onBattleTimeUpdate?.(1);
+          }, 0);
         }
       } else if (this.currentState.phase === BattlePhase.ACTIVE) {
         this.currentState.battleTime++;
+        this.callbacks.onBattleTimeUpdate?.(this.currentState.battleTime);
         if (this.currentState.battleTime >= TIMER_CONFIG.battleDuration) {
           // Battle time expired
           this.currentState.phase = BattlePhase.COMPLETE;
@@ -197,7 +209,10 @@ export class CountdownTimerService {
           this.stopTimerSync();
         }
       }
-    }, 1000);
+    };
+    
+    // Set up interval for countdown and battle timer
+    this.localTimerInterval = setInterval(tick, 1000);
   }
 
   /**

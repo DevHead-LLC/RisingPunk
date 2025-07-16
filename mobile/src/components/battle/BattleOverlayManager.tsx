@@ -34,16 +34,18 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({ batt
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      {/* Battle timer - always rendered and visible during countdown and active phases */}
+      <BattleTimerDisplay
+        battleTime={battleTime}
+        maxBattleTime={maxBattleTime}
+        isVisible={phase === BattlePhase.COUNTDOWN || phase === BattlePhase.ACTIVE}
+      />
+      
+      {/* Countdown overlay - rendered on top when in COUNTDOWN phase */}
       {phase === BattlePhase.COUNTDOWN && countdown > 0 && (
         <BattleCountdownOverlay countdown={countdown} isVisible={true} />
       )}
-      {phase === BattlePhase.ACTIVE && (
-        <BattleTimerDisplay
-          battleTime={battleTime}
-          maxBattleTime={maxBattleTime}
-          isVisible={true}
-        />
-      )}
+      
       {/* No overlay for COMPLETE phase */}
     </View>
   );
