@@ -44,8 +44,16 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
   // Bot categories and stats
   const { BOT_CATEGORIES, getBotRole } = useBots();
 
-  // Error state management through useBattleState
-  const { errorState, setLoading, setError, clearError } = useBattleState();
+  // Error state and initialization management through useBattleState
+  const { 
+    errorState, 
+    setLoading, 
+    setError, 
+    clearError,
+    isInitialized,
+    initializeComponent,
+    resetInitialization
+  } = useBattleState(battleId);
 
   // Data orchestration through useBattleSync
   const { 
@@ -60,15 +68,17 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
     nodes
   );
 
-  // Initialize sample battalions on component mount (only if no server data)
+  // Component initialization and error state sync
   useEffect(() => {
+    // Initialize component
+    initializeComponent(battleId);
+    
+    // Initialize sample battalions on component mount (only if no server data)
     if (!battleId) {
       initializeSampleBattalions();
     }
-  }, [battleId]); // Run when battleId changes
-
-  // Sync error state from useBattleSync to useBattleState
-  useEffect(() => {
+    
+    // Sync error state from useBattleSync to useBattleState
     if (battleId) {
       setLoading(battleLoading);
       if (battleError) {
@@ -77,7 +87,7 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
         clearError();
       }
     }
-  }, [battleId, battleLoading, battleError, setLoading, setError, clearError]);
+  }, [battleId, battleLoading, battleError, setLoading, setError, clearError, initializeComponent]);
 
   // Example: Create a sample battalion to demonstrate the system
   const sampleBattalion = React.useMemo(() => {

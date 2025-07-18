@@ -5,6 +5,8 @@
 ### Imported Logic
 
 **Hooks (Data Sources):**
+- `useBattleSync` - Server/client data synchronization and orchestration
+- `useBattleState` - Battle state, error management, and lifecycle management
 - `useInitialBattleNodes` - Provides node positions and state based on screen dimensions
 - `useBattleNetworkConnections` - Provides network topology and connection data
 - `useBattalionData` - Provides battalion creation and data management utilities
@@ -116,13 +118,13 @@
   - [x] Sync error state from useBattleSync to useBattleState
   - **Result**: Error state management consolidated in useBattleState, BattleGridScreen simplified
 
-- [ ] **Batch 3:** Lifecycle Management
-  - [ ] Extend useBattleState.ts with initialization logic
-  - [ ] Move useEffect logic to useBattleState
-  - [ ] Move component initialization to useBattleState
-  - [ ] Update BattleGridScreen to use useBattleState
-  - [ ] Test component initialization
-  - [ ] Document in TOC
+- [x] **Batch 3:** Lifecycle Management ✅ COMPLETED
+  - [x] Extend useBattleState.ts with initialization logic
+  - [x] Move useEffect logic to useBattleState
+  - [x] Move component initialization to useBattleState
+  - [x] Update BattleGridScreen to use useBattleState
+  - [x] Consolidate initialization and error sync effects
+  - **Result**: Lifecycle management consolidated in useBattleState, BattleGridScreen simplified
 
 - [ ] **Batch 4:** Styling Extraction
   - [ ] Create battleGridStyles.ts utility file

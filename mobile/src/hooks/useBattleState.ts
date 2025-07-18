@@ -67,7 +67,7 @@ function battleStateReducer(state: BattleStateData, action: BattleStateAction): 
   }
 }
 
-export function useBattleState() {
+export function useBattleState(battleId?: string) {
   const [state, dispatch] = useReducer(battleStateReducer, initialState);
   const [countdown, setCountdown] = useState(initialState.countdown);
   const [battleTime, setBattleTime] = useState(initialState.battleTime);
@@ -76,6 +76,7 @@ export function useBattleState() {
     error: null,
     hasError: false,
   });
+  const [isInitialized, setIsInitialized] = useState(false);
   const timerServiceRef = useRef<CountdownTimerService | null>(null);
   const battleIdRef = useRef<string | null>(null);
 
@@ -154,6 +155,19 @@ export function useBattleState() {
     });
   }, []);
 
+  // Initialization management
+  const initializeComponent = useCallback((battleId?: string) => {
+    if (!isInitialized) {
+      setIsInitialized(true);
+      // Component initialization logic will be handled here
+      // For now, just mark as initialized
+    }
+  }, [isInitialized]);
+
+  const resetInitialization = useCallback(() => {
+    setIsInitialized(false);
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return cleanupTimerService;
@@ -178,5 +192,9 @@ export function useBattleState() {
     setLoading,
     setError,
     clearError,
+    // Initialization management
+    isInitialized,
+    initializeComponent,
+    resetInitialization,
   };
 }

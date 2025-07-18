@@ -7,7 +7,7 @@
     - `[useBattleSync]` - Server/client data synchronization and orchestration (**belongs to: BattleGridScreen**)
       - [useBattleSync](../src/hooks/useBattleSync.ts)
       - [useBattleSync MD](sources-of-truth/useBattleSync.md)
-    - `[useBattleState]` - Battle state and error management (**belongs to: BattleGridScreen**)
+    - `[useBattleState]` - Battle state, error management, and lifecycle management (**belongs to: BattleGridScreen**)
       - [useBattleState](../src/hooks/useBattleState.ts)
       - [useBattleState MD](sources-of-truth/useBattleState.md)
 
