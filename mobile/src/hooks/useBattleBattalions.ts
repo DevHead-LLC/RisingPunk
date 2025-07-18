@@ -115,28 +115,6 @@ export const useBattleBattalions = () => {
     };
   }, []);
 
-  /**
-   * Initialize sample battalions for demonstration
-   * todo: remove this
-   */
-  const initializeSampleBattalions = useMemo(() => {
-    return () => {
-      const sampleBattalions = [
-        // User battalions on user nodes (0, 1, 2)
-        battalionData.createBattalion('guardian', 10, 0, true, 1, 'user-guardian-1'),
-        battalionData.createBattalion('breacher', 8, 1, true, 2, 'user-breacher-1'),
-        battalionData.createBattalion('phreak', 6, 2, true, 3, 'user-phreak-1'),
-
-        // Enemy battalions on enemy nodes (6, 7, 8)
-        battalionData.createBattalion('guardian', 12, 6, false, 1, 'enemy-guardian-1'),
-        battalionData.createBattalion('breacher', 10, 7, false, 2, 'enemy-breacher-1'),
-        battalionData.createBattalion('phreak', 8, 8, false, 3, 'enemy-phreak-1'),
-      ];
-
-      setBattalions(sampleBattalions);
-    };
-  }, [battalionData]);
-
   return {
     // State
     battalions,
@@ -153,8 +131,5 @@ export const useBattleBattalions = () => {
     getUserBattalions,
     getEnemyBattalions,
     getDestroyedBattalions,
-
-    // Initialization
-    initializeSampleBattalions,
   };
 };

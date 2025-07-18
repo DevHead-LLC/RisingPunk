@@ -21,7 +21,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 type Props = {
   _onClose?: () => void;
-  battleId?: string; // Optional battle ID for server integration
+  battleId: string; // Required battle ID for server integration
 };
 
 export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
@@ -37,7 +37,6 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
   // Battalion state management for visualization
   const {
     battalions,
-    initializeSampleBattalions,
     getUserBattalions,
     getEnemyBattalions,
   } = useBattleBattalions();
@@ -63,40 +62,24 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
     battleState,
     isLoading: battleLoading, 
     error: battleError 
-  } = useBattleSync(
-    battleId || 'demo-battle',
-    battalions,
-    nodes
-  );
+  } = useBattleSync(battleId);
 
   // Component initialization and error state sync
   useEffect(() => {
     // Initialize component
     initializeComponent(battleId);
     
-    // Initialize sample battalions on component mount (only if no server data)
-    if (!battleId) {
-      initializeSampleBattalions();
-    }
-    
     // Sync error state from useBattleSync to useBattleState
-    if (battleId) {
-      setLoading(battleLoading);
-      if (battleError) {
-        setError('Failed to load battle state');
-      } else {
-        clearError();
-      }
+    setLoading(battleLoading);
+    if (battleError) {
+      setError('Failed to load battle state');
+    } else {
+      clearError();
     }
   }, [battleId, battleLoading, battleError, setLoading, setError, clearError, initializeComponent]);
 
-  // Example: Create a sample battalion to demonstrate the system
-  const sampleBattalion = React.useMemo(() => {
-    return battalionData.createBattalion('guardian', 10, 0, true, 1);
-  }, [battalionData]);
-
   // Show loading state while fetching server data
-  if (battleId && (battleLoading || errorState.isLoading)) {
+  if (battleLoading || errorState.isLoading) {
     return (
       <SafeAreaView style={battleGridStyles.container} testID="battle-grid-screen">
         <View style={battleGridStyles.loadingContainer}>
@@ -108,12 +91,12 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
   }
 
   // Show error state if server data fails
-  if (battleId && (battleError || errorState.hasError)) {
+  if (battleError || errorState.hasError) {
     return (
       <SafeAreaView style={battleGridStyles.container} testID="battle-grid-screen">
         <View style={battleGridStyles.loadingContainer}>
           <Text style={battleGridStyles.errorText}>Failed to load battle state</Text>
-          <Text style={battleGridStyles.errorSubtext}>Falling back to local data</Text>
+          <Text style={battleGridStyles.errorSubtext}>Please try again</Text>
         </View>
       </SafeAreaView>
     );
@@ -133,12 +116,7 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
         {/* Network visualization */}
         <View style={battleGridStyles.networkContainer}>
           <BattleNetworkGrid
-            nodes={displayNodes.map((node: any) => ({
-              ...node,
-              // Ensure index is NodeIndex and owner is NodeOwner
-              index: node.index as any, // TypeScript: treat as NodeIndex
-              owner: (node.owner === 'user' || node.owner === 'enemy' || node.owner === 'neutral') ? node.owner : 'neutral',
-            })) as any}
+            nodes={displayNodes.filter(Boolean) as any}
             connections={connections}
             nodeSize={20}
             lineColor="#666666"

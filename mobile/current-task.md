@@ -17,6 +17,7 @@ Transform BattleGridScreen into a pure orchestrator by removing ALL demo fallbac
 - **Batch 2**: Error state management moved to useBattleState
 - **Batch 3**: Lifecycle management moved to useBattleState
 - **Batch 4**: Styling extraction moved to battleGridStyles utility
+- **Batch 5**: Demo mode removal completed
 - **Sources of Truth**: Properly documented in TOC
 
 ## **COMPLETED ISSUES**
@@ -27,18 +28,19 @@ Transform BattleGridScreen into a pure orchestrator by removing ALL demo fallbac
 - **Result**: Battalions display correctly with proper IDs and types
 - **Status**: ✅ COMPLETED - No more React key warnings or demo fallbacks
 
+### **✅ Node Positioning Debug - RESOLVED**
+- **Problem**: Network grid layout incorrect after demo removal
+- **Solution**: Restored proper positioning logic from useBattleNodes
+- **Result**: 3-column layout working correctly with proper spacing
+- **Status**: ✅ COMPLETED - Network grid displays correctly
+
 ## **CURRENT PRIORITIES**
 
-### **1. BattleGridScreen Refactor - Batch 5** 🔄 CURRENT
-- **Goal**: Remove Demo Fallback Logic
-- **Target**: Eliminate demo data fallbacks
-- **Plan**: Remove sampleBattalion creation and demo fallbacks
-- **Status**: Ready to start implementation
-
-### **2. BattleGridScreen Refactor - Batch 6** 🔄 NEXT
+### **1. BattleGridScreen Refactor - Batch 6** 🔄 CURRENT
 - **Goal**: Final Cleanup
 - **Target**: Remove any remaining internal logic
 - **Plan**: Verify BattleGridScreen is pure orchestrator
+- **Status**: Ready to start implementation
 
 ## **ARCHITECTURE TARGET**
 ```
