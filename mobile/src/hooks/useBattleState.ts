@@ -12,6 +12,13 @@ import {
 } from '../types/battleState';
 import { CountdownTimerService, TimerCallbacks } from '../services/CountdownTimerService';
 
+// Error state interface
+interface ErrorState {
+  isLoading: boolean;
+  error: string | null;
+  hasError: boolean;
+}
+
 // Timer configuration from intentions documents
 const TIMER_CONFIG: BattleTimerConfig = {
   countdownDuration: 3,  // 3-second countdown
@@ -60,10 +67,16 @@ function battleStateReducer(state: BattleStateData, action: BattleStateAction): 
   }
 }
 
-export function useBattleState() {
+export function useBattleState(battleId?: string) {
   const [state, dispatch] = useReducer(battleStateReducer, initialState);
   const [countdown, setCountdown] = useState(initialState.countdown);
   const [battleTime, setBattleTime] = useState(initialState.battleTime);
+  const [errorState, setErrorState] = useState<ErrorState>({
+    isLoading: false,
+    error: null,
+    hasError: false,
+  });
+  const [isInitialized, setIsInitialized] = useState(false);
   const timerServiceRef = useRef<CountdownTimerService | null>(null);
   const battleIdRef = useRef<string | null>(null);
 
@@ -120,6 +133,41 @@ export function useBattleState() {
     dispatch({ type: 'END_BATTLE', winner });
   }, [cleanupTimerService]);
 
+  // Error state management
+  const setLoading = useCallback((loading: boolean) => {
+    setErrorState(prev => ({ ...prev, isLoading: loading }));
+  }, []);
+
+  const setError = useCallback((error: string | null) => {
+    setErrorState(prev => ({ 
+      ...prev, 
+      error, 
+      hasError: !!error,
+      isLoading: false 
+    }));
+  }, []);
+
+  const clearError = useCallback(() => {
+    setErrorState({
+      isLoading: false,
+      error: null,
+      hasError: false,
+    });
+  }, []);
+
+  // Initialization management
+  const initializeComponent = useCallback((battleId?: string) => {
+    if (!isInitialized) {
+      setIsInitialized(true);
+      // Component initialization logic will be handled here
+      // For now, just mark as initialized
+    }
+  }, [isInitialized]);
+
+  const resetInitialization = useCallback(() => {
+    setIsInitialized(false);
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return cleanupTimerService;
@@ -139,5 +187,14 @@ export function useBattleState() {
     startBattle,
     endBattle,
     timerConfig: TIMER_CONFIG,
+    // Error state management
+    errorState,
+    setLoading,
+    setError,
+    clearError,
+    // Initialization management
+    isInitialized,
+    initializeComponent,
+    resetInitialization,
   };
 }

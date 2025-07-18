@@ -1,12 +1,15 @@
 # NEW Source of Truth Table of Contents - New Source of Truth Being Built Piece by Piece
 
-## **BattleGridView Source of Truth**
+## **BattleGridScreen Source of Truth**
   - `[BattleGridScreen]` - Main battle screen orchestrator and container
     - [Battle Grid Screen](../src/screens/BattleGridScreen.tsx)
     - [Battle Grid Screen MD](sources-of-truth/BattleGridScreen.md)
     - `[useBattleSync]` - Server/client data synchronization and orchestration (**belongs to: BattleGridScreen**)
       - [useBattleSync](../src/hooks/useBattleSync.ts)
       - [useBattleSync MD](sources-of-truth/useBattleSync.md)
+    - `[useBattleState]` - Battle state, error management, and lifecycle management (**belongs to: BattleGridScreen**)
+      - [useBattleState](../src/hooks/useBattleState.ts)
+      - [useBattleState MD](sources-of-truth/useBattleState.md)
 
 ---
 

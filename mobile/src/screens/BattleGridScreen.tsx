@@ -11,6 +11,7 @@ import { useBattalionData } from '../hooks/useBattalionData';
 import { useBattleBattalions } from '../hooks/useBattleBattalions';
 import { useBots } from '../hooks/useBots';
 import { useBattleSync } from '../hooks/useBattleSync';
+import { useBattleState } from '../hooks/useBattleState';
 import { BattleNetworkGrid } from '../components/battle/BattleNetworkGrid';
 import { BattleBattalionManager } from '../components/battle/BattleBattalionManager';
 import { BattleOverlayManager } from '../components/battle/BattleOverlayManager';
@@ -43,6 +44,17 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
   // Bot categories and stats
   const { BOT_CATEGORIES, getBotRole } = useBots();
 
+  // Error state and initialization management through useBattleState
+  const { 
+    errorState, 
+    setLoading, 
+    setError, 
+    clearError,
+    isInitialized,
+    initializeComponent,
+    resetInitialization
+  } = useBattleState(battleId);
+
   // Data orchestration through useBattleSync
   const { 
     displayBattalions, 
@@ -56,12 +68,26 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
     nodes
   );
 
-  // Initialize sample battalions on component mount (only if no server data)
+  // Component initialization and error state sync
   useEffect(() => {
+    // Initialize component
+    initializeComponent(battleId);
+    
+    // Initialize sample battalions on component mount (only if no server data)
     if (!battleId) {
       initializeSampleBattalions();
     }
-  }, [battleId]); // Run when battleId changes
+    
+    // Sync error state from useBattleSync to useBattleState
+    if (battleId) {
+      setLoading(battleLoading);
+      if (battleError) {
+        setError('Failed to load battle state');
+      } else {
+        clearError();
+      }
+    }
+  }, [battleId, battleLoading, battleError, setLoading, setError, clearError, initializeComponent]);
 
   // Example: Create a sample battalion to demonstrate the system
   const sampleBattalion = React.useMemo(() => {
@@ -69,7 +95,7 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
   }, [battalionData]);
 
   // Show loading state while fetching server data
-  if (battleId && battleLoading) {
+  if (battleId && (battleLoading || errorState.isLoading)) {
     return (
       <SafeAreaView style={styles.container} testID="battle-grid-screen">
         <View style={styles.loadingContainer}>
@@ -81,7 +107,7 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
   }
 
   // Show error state if server data fails
-  if (battleId && battleError) {
+  if (battleId && (battleError || errorState.hasError)) {
     return (
       <SafeAreaView style={styles.container} testID="battle-grid-screen">
         <View style={styles.loadingContainer}>
