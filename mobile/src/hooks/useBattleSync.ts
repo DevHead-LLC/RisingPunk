@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Dimensions } from 'react-native';
 import { useGetBattleStateQuery, BattleState } from '../store/api/battleApi';
 import { Battalion } from '../types/battle';
+import { NodeIndex } from '../types/battleTypes';
+import { calculateNodePositions } from './useBattleNodes';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface InterpolationState {
   isInterpolating: boolean;
@@ -10,7 +15,7 @@ interface InterpolationState {
   endState: BattleState | null;
 }
 
-export const useBattleSync = (battleId: string, localBattalions: Battalion[] = [], localNodes: any[] = []) => {
+export const useBattleSync = (battleId: string) => {
   const { data: battleState, isLoading, error } = useGetBattleStateQuery(battleId, {
     pollingInterval: 1000, // Poll every 1 second for real-time updates
   });
@@ -181,28 +186,32 @@ export const useBattleSync = (battleId: string, localBattalions: Battalion[] = [
     };
   }, []);
 
-  // Data orchestration logic - merge server data with client positioning
-  const displayBattalions = battleState?.battalions || localBattalions;
+  // Data orchestration logic - use server data only
+  const displayBattalions = battleState?.battalions || [];
   
-  // Merge server node data (ownership, health, etc.) with client positioning
+  // Use server node data with proper client positioning
   const displayNodes = useMemo(() => {
-    if (battleState?.nodes && localNodes.length > 0) {
-      // Server has node data, merge with client positioning
+    if (battleState?.nodes) {
+      // Get proper node positions using the established positioning logic
+      const positionedNodes = calculateNodePositions(SCREEN_WIDTH, SCREEN_HEIGHT, 125);
+      
+      // Merge server data with client positioning
       return battleState.nodes.map((serverNode, index) => {
-        const clientNode = localNodes[index];
-        if (clientNode) {
+        const positionedNode = positionedNodes[index];
+        if (positionedNode) {
           return {
-            ...clientNode, // Client positioning and structure
-            owner: serverNode.owner, // Server ownership
-            health: serverNode.health, // Server health
-            captureProgress: serverNode.captureProgress, // Server capture progress
+            index: serverNode.index as NodeIndex,
+            position: positionedNode.position, // Use proper positioning
+            owner: serverNode.owner,
+            health: serverNode.health,
+            captureProgress: serverNode.captureProgress,
           };
         }
-        return serverNode; // Fallback to server node if no client node
-      });
+        return null;
+      }).filter(Boolean); // Remove any null entries
     }
-    return localNodes; // Fallback to local nodes if no server data
-  }, [battleState?.nodes, localNodes]);
+    return []; // No fallback - require server data
+  }, [battleState?.nodes]);
 
   return {
     // State

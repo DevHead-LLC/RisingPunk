@@ -29,20 +29,15 @@
 **Data Orchestration:**
 - `displayBattalions` - Chooses between server battalions or local battalions
 - `displayNodes` - Chooses between server nodes or local nodes
-- `sampleBattalion` - Creates example battalion for demonstration (unused)
 
 **Conditional Rendering Logic:**
-- Loading state when fetching server data (`battleId && battleLoading`)
-- Error state when server data fails (`battleId && battleError`)
-- Fallback to local data when no server connection
-
-**Lifecycle Management:**
-- `useEffect` - Initializes sample battalions only when no battleId provided
-- Component memoization for performance
+- Loading state when fetching server data (`battleLoading || errorState.isLoading`)
+- Error state when server data fails (`battleError || errorState.hasError`)
+- No fallback to local data - requires valid server connection
 
 **Props Interface:**
 - `_onClose` - Optional callback for closing the screen
-- `battleId` - Optional battle identifier for server integration
+- `battleId` - Required battle identifier for server integration
 
 ---
 
@@ -131,13 +126,15 @@
   - [x] Document in TOC
   - **Result**: Styling logic moved to dedicated utility, BattleGridScreen simplified
 
-- [ ] **Batch 5:** Demo Mode Removal
-  - [ ] Remove demo logic from useBattleBattalions.ts
-  - [ ] Remove demo logic from useBattleSync.ts
-  - [ ] Remove sampleBattalion creation from BattleGridScreen
-  - [ ] Require valid battleId for functionality
-  - [ ] Test with real battleId only
-  - [ ] Document in TOC
+- [x] **Batch 5:** Demo Mode Removal ✅ COMPLETED
+  - [x] Remove demo logic from useBattleBattalions.ts
+  - [x] Remove demo logic from useBattleSync.ts
+  - [x] Remove sampleBattalion creation from BattleGridScreen
+  - [x] Require valid battleId for functionality
+  - [x] Fix node positioning after demo removal
+  - [x] Test with real battleId only
+  - [x] Document in TOC
+  - **Result**: Demo mode completely removed, server-driven architecture achieved
 
 - [ ] **Batch 6:** Final Cleanup
   - [ ] Remove any remaining internal logic from BattleGridScreen
