@@ -3,17 +3,17 @@
  * @description Main battle screen container with network visualization and battalion rendering
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet, SafeAreaView, Dimensions, Text, ActivityIndicator } from 'react-native';
 import { useInitialBattleNodes } from '../hooks/useBattleNodes';
 import { useBattleNetworkConnections } from '../hooks/useBattleNetwork';
 import { useBattalionData } from '../hooks/useBattalionData';
 import { useBattleBattalions } from '../hooks/useBattleBattalions';
 import { useBots } from '../hooks/useBots';
+import { useBattleSync } from '../hooks/useBattleSync';
 import { BattleNetworkGrid } from '../components/battle/BattleNetworkGrid';
 import { BattleBattalionManager } from '../components/battle/BattleBattalionManager';
 import { BattleOverlayManager } from '../components/battle/BattleOverlayManager';
-import { useGetBattleStateQuery } from '../store/api/battleApi';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -43,18 +43,18 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
   // Bot categories and stats
   const { BOT_CATEGORIES, getBotRole } = useBots();
 
-  // Server battle state integration
-  const { data: battleState, isLoading: battleLoading, error: battleError } = useGetBattleStateQuery(
+  // Data orchestration through useBattleSync
+  const { 
+    displayBattalions, 
+    displayNodes, 
+    battleState,
+    isLoading: battleLoading, 
+    error: battleError 
+  } = useBattleSync(
     battleId || 'demo-battle',
-    { 
-      skip: !battleId, // Skip if no battleId provided
-      pollingInterval: 1000, // Poll every 1 second
-    }
+    battalions,
+    nodes
   );
-
-  // Use server data if available, otherwise fall back to local data
-  const displayBattalions = battleState?.battalions || battalions;
-  const displayNodes = battleState?.nodes || nodes;
 
   // Initialize sample battalions on component mount (only if no server data)
   useEffect(() => {
@@ -96,12 +96,17 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
     <SafeAreaView style={styles.container} testID="battle-grid-screen">
       <View style={styles.battleArea}>
         {/* Overlays (countdown, timer) */}
-        <BattleOverlayManager battleId={battleId} />
+        <BattleOverlayManager 
+          battleId={battleId}
+          phase={battleState?.phase}
+          timeRemaining={battleState?.timeRemaining}
+          maxBattleTime={20}
+        />
 
         {/* Network visualization */}
         <View style={styles.networkContainer}>
           <BattleNetworkGrid
-            nodes={displayNodes.map(node => ({
+            nodes={displayNodes.map((node: any) => ({
               ...node,
               // Ensure index is NodeIndex and owner is NodeOwner
               index: node.index as any, // TypeScript: treat as NodeIndex
