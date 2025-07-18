@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useGetBattleStateQuery, BattleState } from '../store/api/battleApi';
+import { Battalion } from '../types/battle';
 
 interface InterpolationState {
   isInterpolating: boolean;
@@ -9,8 +10,12 @@ interface InterpolationState {
   endState: BattleState | null;
 }
 
-export const useBattleSync = (battleId: string) => {
-  const { data: battleState, isLoading, error } = useGetBattleStateQuery(battleId);
+export const useBattleSync = (battleId: string, localBattalions: Battalion[] = [], localNodes: any[] = []) => {
+  const { data: battleState, isLoading, error } = useGetBattleStateQuery(battleId, {
+    pollingInterval: 1000, // Poll every 1 second for real-time updates
+  });
+  
+
   
   const [interpolationState, setInterpolationState] = useState<InterpolationState>({
     isInterpolating: false,
@@ -33,14 +38,18 @@ export const useBattleSync = (battleId: string) => {
     
     const changes = [];
     
-    // Check battalion changes
-    if (oldState.battalions.length !== newState.battalions.length) {
+    // Check battalion changes - add defensive checks
+    const oldBattalions = oldState.battalions || [];
+    const newBattalions = newState.battalions || [];
+    if (oldBattalions.length !== newBattalions.length) {
       changes.push('battalion_count_changed');
     }
     
-    // Check node changes
-    const nodeChanges = newState.nodes.some((node, index) => {
-      const oldNode = oldState.nodes[index];
+    // Check node changes - add defensive checks
+    const oldNodes = oldState.nodes || [];
+    const newNodes = newState.nodes || [];
+    const nodeChanges = newNodes.some((node, index) => {
+      const oldNode = oldNodes[index];
       return oldNode && (node.owner !== oldNode.owner || node.captureProgress !== oldNode.captureProgress);
     });
     
@@ -94,27 +103,21 @@ export const useBattleSync = (battleId: string) => {
 
   const shouldAttemptReconnection = reconnectionAttempts < 5;
 
-  // Performance tracking
-  const logBattleEvent = useCallback((eventType: string, data: any) => {
-    console.log(`[BattleSync] ${eventType}:`, data);
-  }, []);
+
 
   // Main synchronization logic
   useEffect(() => {
     if (!battleState) return;
 
+
+
     const currentTime = Date.now();
     const timeSinceLastUpdate = currentTime - lastUpdateTimeRef.current;
     
-    // Detect state changes
+        // Detect state changes
     const stateDiff = detectStateDiff(lastState, battleState);
     
     if (stateDiff.hasChanges) {
-      logBattleEvent('state_changed', {
-        changes: stateDiff.changes,
-        timeSinceLastUpdate
-      });
-      
       // Start interpolation if we have a previous state
       if (lastState) {
         setInterpolationState({
@@ -129,7 +132,7 @@ export const useBattleSync = (battleId: string) => {
     
     setLastState(battleState);
     lastUpdateTimeRef.current = currentTime;
-  }, [battleState, lastState, detectStateDiff, logBattleEvent]);
+  }, [battleState, lastState, detectStateDiff]);
 
   // Animation loop for interpolation
   useEffect(() => {
@@ -178,6 +181,29 @@ export const useBattleSync = (battleId: string) => {
     };
   }, []);
 
+  // Data orchestration logic - merge server data with client positioning
+  const displayBattalions = battleState?.battalions || localBattalions;
+  
+  // Merge server node data (ownership, health, etc.) with client positioning
+  const displayNodes = useMemo(() => {
+    if (battleState?.nodes && localNodes.length > 0) {
+      // Server has node data, merge with client positioning
+      return battleState.nodes.map((serverNode, index) => {
+        const clientNode = localNodes[index];
+        if (clientNode) {
+          return {
+            ...clientNode, // Client positioning and structure
+            owner: serverNode.owner, // Server ownership
+            health: serverNode.health, // Server health
+            captureProgress: serverNode.captureProgress, // Server capture progress
+          };
+        }
+        return serverNode; // Fallback to server node if no client node
+      });
+    }
+    return localNodes; // Fallback to local nodes if no server data
+  }, [battleState?.nodes, localNodes]);
+
   return {
     // State
     battleState,
@@ -186,6 +212,10 @@ export const useBattleSync = (battleId: string) => {
     isConnected,
     reconnectionAttempts,
     shouldAttemptReconnection,
+    
+    // Data orchestration
+    displayBattalions,
+    displayNodes,
     
     // Interpolation
     interpolationState,
@@ -197,7 +227,6 @@ export const useBattleSync = (battleId: string) => {
     handleReconnection,
     
     // Utilities
-    detectStateDiff,
-    logBattleEvent
+    detectStateDiff
   };
 }; 

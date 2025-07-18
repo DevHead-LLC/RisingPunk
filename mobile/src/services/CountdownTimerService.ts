@@ -177,7 +177,7 @@ export class CountdownTimerService {
     // Only initialize local timer once
     if (this.localTimerInterval) return;
 
-    console.log('Using local timer fallback for demo mode');
+    
     
     // Start local countdown
     const tick = () => {

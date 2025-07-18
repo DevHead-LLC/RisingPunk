@@ -3,34 +3,58 @@
  * @description Manages and displays battle overlays (countdown, timer) for the battle screen. Clean, non-legacy, single source of truth.
  */
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { useBattleState } from '../../hooks/useBattleState';
 import { BattlePhase } from '../../types/battleTypes';
+
+// Server phase types (from server/src/types/battle.ts)
+type ServerPhase = 'setup' | 'countdown' | 'active' | 'battle' | 'victory' | 'defeat' | 'complete';
+
+// Map server phases to client phases
+const mapServerPhaseToClientPhase = (serverPhase: ServerPhase | undefined): BattlePhase => {
+  switch (serverPhase) {
+    case 'setup':
+    case 'countdown':
+      return BattlePhase.COUNTDOWN;
+    case 'active':
+    case 'battle':
+      return BattlePhase.ACTIVE;
+    case 'victory':
+    case 'defeat':
+    case 'complete':
+      return BattlePhase.COMPLETE;
+    default:
+      return BattlePhase.COUNTDOWN;
+  }
+};
+
 import { BattleCountdownOverlay } from './BattleCountdownOverlay';
 import { BattleTimerDisplay } from './BattleTimerDisplay';
 
 interface BattleOverlayManagerProps {
   battleId?: string;
+  // Server timer data
+  phase?: ServerPhase;
+  timeRemaining?: number;
+  maxBattleTime?: number;
 }
 
-export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({ battleId }) => {
-  const {
-    state: { phase, countdown, battleTime, maxBattleTime },
-    startCountdown,
-  } = useBattleState();
-
-  // Start countdown on mount with battleId
-  useEffect(() => {
-    if (battleId) {
-      startCountdown(battleId);
-    } else {
-      // Fallback for demo mode - use a default battleId
-      startCountdown('demo-battle');
-    }
-    // Only run on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({ 
+  battleId,
+  phase = 'countdown',
+  timeRemaining = 20,
+  maxBattleTime = 20
+}) => {
+  // Map server phase to client phase
+  const clientPhase = mapServerPhaseToClientPhase(phase);
+  
+  // Calculate battle time from time remaining for the timer display
+  const battleTime = maxBattleTime - timeRemaining;
+  
+  // Determine if we're in countdown phase and show countdown overlay
+  // Server sends timeRemaining: 3,2,1 during countdown phase
+  const isCountdownPhase = clientPhase === BattlePhase.COUNTDOWN && timeRemaining <= 3 && timeRemaining > 0;
+  const countdownValue = isCountdownPhase ? timeRemaining : 0;
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
@@ -38,12 +62,12 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({ batt
       <BattleTimerDisplay
         battleTime={battleTime}
         maxBattleTime={maxBattleTime}
-        isVisible={phase === BattlePhase.COUNTDOWN || phase === BattlePhase.ACTIVE}
+        isVisible={clientPhase === BattlePhase.COUNTDOWN || clientPhase === BattlePhase.ACTIVE}
       />
       
       {/* Countdown overlay - rendered on top when in COUNTDOWN phase */}
-      {phase === BattlePhase.COUNTDOWN && countdown > 0 && (
-        <BattleCountdownOverlay countdown={countdown} isVisible={true} />
+      {isCountdownPhase && countdownValue > 0 && (
+        <BattleCountdownOverlay countdown={countdownValue} isVisible={true} />
       )}
       
       {/* No overlay for COMPLETE phase */}

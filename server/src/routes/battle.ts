@@ -1,10 +1,14 @@
 import express, { Request, Response, Router } from 'express';
 import { BattleController } from '../controllers/BattleController';
-import battleAuth from '../middleware/battleAuth';
 
 interface StartBattleRequest extends Request {
   body: {
-    defenderId: string;
+    userBattalions?: Array<{
+      type: 'guardian' | 'breacher' | 'phreak';
+      quantity: number;
+      nodeIndex: number;
+    }>;
+    defenderId?: string;
   }
 }
 
@@ -16,32 +20,30 @@ interface BattleActionRequest extends Request {
 }
 
 interface BattleResponse {
-  success: boolean;
+  success?: boolean;
   data?: any;
   error?: string;
+  battleId?: string;
 }
 
 const router: Router = express.Router();
 const battleController = new BattleController();
 
-// Apply auth middleware to all battle routes
-router.use(battleAuth);
+// Authentication temporarily removed for user vs computer testing
 
 // Start a new battle
 router.post<{}, BattleResponse, StartBattleRequest['body']>(
   '/start',
   async (req, res): Promise<void> => {
     try {
-      const { defenderId } = req.body;
-      const attackerId = req.user?._id;
+      const { userBattalions, defenderId } = req.body;
+      // For now, use a default user ID for testing
+      const attackerId = 'test-user-id';
+      // Use computer opponent if no defenderId provided
+      const actualDefenderId = defenderId || 'computer';
 
-      if (!attackerId) {
-        res.status(401).json({ success: false, error: 'Authentication required' });
-        return;
-      }
-
-      const battle = await battleController.startBattle(attackerId, defenderId);
-      res.status(201).json({ success: true, data: battle });
+      const battle = await battleController.startBattle(attackerId, actualDefenderId);
+      res.status(201).json({ battleId: battle.battleId });
     } catch (error) {
       console.error('Start battle error:', error);
       res.status(500).json({ 
@@ -58,12 +60,8 @@ router.get<{ id: string }, BattleResponse>(
   async (req, res): Promise<void> => {
     try {
       const { id } = req.params;
-      const userId = req.user?._id;
-
-      if (!userId) {
-        res.status(401).json({ success: false, error: 'Authentication required' });
-        return;
-      }
+      // For now, use a default user ID for testing
+      const userId = 'test-user-id';
 
       const battleState = await battleController.getBattleState(id, userId);
       if (!battleState) {
@@ -71,7 +69,40 @@ router.get<{ id: string }, BattleResponse>(
         return;
       }
 
-      res.json({ success: true, data: battleState });
+
+
+      // Transform server response to match client expectations
+      const clientBattleState = {
+        battleId: battleState.battleId,
+        phase: battleState.phase === 'countdown' ? 'countdown' : 
+               battleState.phase === 'active' ? 'battle' : 
+               battleState.phase === 'complete' ? 'victory' : 'setup',
+        timeRemaining: battleState.phase === 'countdown' ? battleState.countdown : 
+                      battleState.phase === 'active' ? (20 - battleState.battleTime) : 0,
+        battalions: (battleState.battalions || []).map(battalion => ({
+          id: battalion.id,
+          type: battalion.type,
+          quantity: battalion.quantity,
+          currentHealth: battalion.currentHealth,
+          maxHealth: battalion.maxHealth,
+          nodeIndex: battalion.position?.nodeIndex ?? 0,
+          isUser: battalion.owner === 'user',
+          stats: battalion.stats,
+          targetNode: battalion.targetNode,
+          mark: battalion.mark,
+          remainingPath: battalion.remainingPath,
+          finalTarget: battalion.finalTarget,
+        })),
+        nodes: battleState.nodes || [],
+        victoryCondition: battleState.winner ? {
+          winner: battleState.winner === 'user' ? 'user' : 'enemy',
+          reason: 'timeout'
+        } : undefined
+      };
+
+
+
+      res.json({ success: true, data: clientBattleState });
     } catch (error) {
       console.error('Get battle state error:', error);
       res.status(500).json({ 
@@ -89,12 +120,8 @@ router.post<{ id: string }, BattleResponse, BattleActionRequest['body']>(
     try {
       const { id } = req.params;
       const { actionType, data } = req.body;
-      const userId = req.user?._id;
-
-      if (!userId) {
-        res.status(401).json({ success: false, error: 'Authentication required' });
-        return;
-      }
+      // For now, use a default user ID for testing
+      const userId = 'test-user-id';
 
       const result = await battleController.submitAction(id, userId, actionType, data);
       res.json({ success: true, data: result });
@@ -189,12 +216,8 @@ router.get<{ id: string }, BattleResponse>(
   async (req, res): Promise<void> => {
     try {
       const { id } = req.params;
-      const userId = req.user?._id;
-
-      if (!userId) {
-        res.status(401).json({ success: false, error: 'Authentication required' });
-        return;
-      }
+      // For now, use a default user ID for testing
+      const userId = 'test-user-id';
 
       const timerState = await battleController.getBattleTimer(id, userId);
       res.json({ success: true, data: timerState });

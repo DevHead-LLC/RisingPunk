@@ -59,6 +59,7 @@ const ScrollViewMemo = memo(function ScrollViewMemo({
 
 export function TurfScreen(): React.JSX.Element {
   const [currentScreen, setCurrentScreen] = useState('turf');
+  const [battleId, setBattleId] = useState<string | undefined>(undefined);
   const horizontalScrollRef = useRef<ScrollView>(null);
 
   const navigateToScreen = useCallback((screen: string) => {
@@ -98,7 +99,11 @@ export function TurfScreen(): React.JSX.Element {
             navigateToScreen('turf');
             setTimeout(() => navigateToScreen('hackRig'), 0);
           }}
-          onBattleStart={() => navigateToScreen('battle')}
+          onBattleStart={(battleId) => {
+            // Store battleId in component state for BattleGridScreen
+            setBattleId(battleId);
+            navigateToScreen('battle');
+          }}
         />;
       case 'map':
         return <HackMapScreen onClose={() => navigateToScreen('hackRig')} />;
@@ -109,10 +114,13 @@ export function TurfScreen(): React.JSX.Element {
       case 'profile':
         return <ProfileScreen onClose={() => navigateToScreen('turf')} />;
       case 'battle':
-        return <BattleGridScreen onClose={() => {
-          navigateToScreen('turf');
-          setTimeout(() => navigateToScreen('hackRig'), 0);
-        }} />;
+        return <BattleGridScreen 
+          battleId={battleId}
+          _onClose={() => {
+            navigateToScreen('turf');
+            setTimeout(() => navigateToScreen('hackRig'), 0);
+          }} 
+        />;
       default:
         return (
           <View style={styles.container}>

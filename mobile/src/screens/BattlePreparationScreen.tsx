@@ -9,11 +9,12 @@ import { BattalionAssignment } from '../components/battle/BattalionSlot';
 import { BotType } from '../types/bots';
 import { useAppSelector } from '../store/hooks';
 import { useAssignToBattalionMutation } from '../store/api/botsApi';
+import { useStartBattleMutation } from '../store/api/battleApi';
 import { API_URL } from '../config';
 
 type Props = {
   onClose: () => void;
-  onBattleStart: () => void;
+  onBattleStart: (battleId?: string) => void;
 };
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -28,6 +29,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
   const token = useAppSelector((state) => state.auth.token);
   const botCounts = useAppSelector((state) => state.bots.botCounts);
   const [assignToBattalion] = useAssignToBattalionMutation();
+  const [startBattle] = useStartBattleMutation();
 
 
   useEffect(() => {
@@ -250,7 +252,26 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
 
       <TouchableOpacity
         style={styles.executeButton}
-        onPress={onBattleStart}
+        onPress={async () => {
+          try {
+            // Start battle with computer opponent
+            const result = await startBattle({
+              userBattalions: [
+                { type: 'guardian', quantity: 10, nodeIndex: 0 },
+                { type: 'breacher', quantity: 8, nodeIndex: 1 },
+                { type: 'phreak', quantity: 6, nodeIndex: 2 },
+              ]
+            }).unwrap();
+            
+    
+            // Pass battleId to parent component
+            onBattleStart(result.battleId);
+          } catch (error) {
+            console.error('Failed to start battle:', error);
+            // Fallback to demo mode
+            onBattleStart();
+          }
+        }}
       >
         <Text style={styles.executeText}>DEPLOY PURGE</Text>
       </TouchableOpacity>

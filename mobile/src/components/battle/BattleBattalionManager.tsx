@@ -26,6 +26,8 @@ export const BattleBattalionManager = React.memo(({
   showQuantities = true,
   showBotTypes = true,
 }: Props) => {
+
+
   // Create a map of node positions for quick lookup
   const nodePositions = nodes.reduce((acc, node) => {
     acc[node.index] = node.position;
@@ -33,9 +35,11 @@ export const BattleBattalionManager = React.memo(({
   }, {} as Record<number, { x: number; y: number }>);
 
   // Filter out battalions that don't have valid node positions
-  const validBattalions = battalions.filter(battalion =>
-    nodePositions[battalion.nodeIndex] !== undefined
-  );
+  const validBattalions = battalions.filter(battalion => {
+    return nodePositions[battalion.nodeIndex] !== undefined;
+  });
+
+
 
   return (
     <View style={styles.container}>

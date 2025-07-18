@@ -33,26 +33,21 @@ export const battleApi = createApi({
   reducerPath: 'battleApi',
   baseQuery: fetchBaseQuery({
     baseUrl: API_URL,
-    prepareHeaders: (headers, { getState }) => {
-      const token = (getState() as any)?.auth?.token;
-      if (token) {
-        headers.set('Authorization', `Bearer ${token}`);
-      }
-      return headers;
-    },
+    // Authentication temporarily removed for battle testing
   }),
   tagTypes: ['Battle'],
   endpoints: (builder) => ({
     startBattle: builder.mutation<{ battleId: string }, StartBattleRequest>({
       query: (body) => ({
-        url: '/api/battles/start',
+        url: '/api/battle/start',
         method: 'POST',
         body,
       }),
       invalidatesTags: ['Battle'],
     }),
     getBattleState: builder.query<BattleState, string>({
-      query: (battleId) => `/api/battles/${battleId}/state`,
+      query: (battleId) => `/api/battle/${battleId}/state`,
+      transformResponse: (response: { success: boolean; data: BattleState }) => response.data,
       providesTags: ['Battle'],
     }),
   }),

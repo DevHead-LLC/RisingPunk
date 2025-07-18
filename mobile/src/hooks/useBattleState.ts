@@ -111,7 +111,7 @@ export function useBattleState() {
   const startBattle = useCallback(() => {
     // Battle timer is now managed by server through CountdownTimerService
     // This method is kept for compatibility but does nothing
-    console.log('Battle timer started by server');
+    
   }, []);
 
   // End battle

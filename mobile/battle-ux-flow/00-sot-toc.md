@@ -1,42 +1,12 @@
-# Source of Truth Table of Contents
+# NEW Source of Truth Table of Contents - New Source of Truth Being Built Piece by Piece
 
-**See `000-AI-Directive.md` for complete architecture guidelines**
-
-## Desired Architecture (Target State)
-
-### **Independent Sources of Truth**
-- `[Timer System]` - Standalone timer management (countdown, battle timer)
-- `[Network System]` - Network topology and connections
-- `[Bot System]` - Bot definitions and stats
-
-### **Battle State Management (Parent/Orchestrator)**
-- `[Battle State]` - Battle phase orchestration and state transitions
-  - `Battle Timer` (*belongs to: Battle State*) - Direct timer integration for 20-second battle
-  - `[Overlays]` (*belongs to: Battle State*) - Battle-specific overlay management
-    - `Countdown Overlay` (*belongs to: Overlays*) - Borrows timer data from Timer System
-    - `Results Overlay` (*belongs to: Overlays*) - Pure overlay logic
-  - `Phase Transitions` (*belongs to: Battle State*) - Countdown to active to complete phase management
-
-### **Combat System (Independent)**
-- `[Combat Calculations]` - Server-side damage and combat logic
-  - `Damage Calculation` (*belongs to: Combat Calculations*) - Attack power, defense, and damage formulas
-  - `Battalion Combat` (*belongs to: Combat Calculations*) - Direct battalion vs battalion combat system
-  - `Battalion Destruction` (*belongs to: Combat Calculations*) - Battalion destruction detection and cleanup system
-  - `Victory Determination` (*belongs to: Combat Calculations*) - Victory condition monitoring and battle end system
-  - `Node Capture` (*belongs to: Combat Calculations*) - Tug-of-war capture system (-100% to +100%)
-  - `Victory Conditions` (*belongs to: Combat Calculations*) - Elimination and time-based victory logic
-
-### **Node Management (Independent)**
-- `[Nodes]` - Node state, ownership, and rendering management
-  - `Node Ownership` (*belongs to: Nodes*) - User/enemy/neutral ownership tracking and transfers
-  - `Node Rendering` (*belongs to: Nodes*) - Color coding and visual representation
-  - `Node Health` (*belongs to: Nodes*) - Health management and capture progress
-  - `Node Types` (*belongs to: Nodes*) - Node type definitions and classifications
-
-### **Battle System Hierarchy (Parent)**
-- `[Battalions]` - Main battle entity orchestration
-  - `[Movement]` (*belongs to: Battalions*) - Battalion movement execution
-  - `[Targeting]` (*belongs to: Battalions*) - Battalion target selection
+## **BattleGridView Source of Truth**
+  - `[BattleGridScreen]` - Main battle screen orchestrator and container
+    - [Battle Grid Screen](../src/screens/BattleGridScreen.tsx)
+    - [Battle Grid Screen MD](sources-of-truth/BattleGridScreen.md)
+    - `[useBattleSync]` - Server/client data synchronization and orchestration (**belongs to: BattleGridScreen**)
+      - [useBattleSync](../src/hooks/useBattleSync.ts)
+      - [useBattleSync MD](sources-of-truth/useBattleSync.md)
 
 ---
 

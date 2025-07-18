@@ -91,12 +91,11 @@ export class BattleService {
   async createBattle(attackerId: string, defenderId: string): Promise<IBattleDocument> {
     const battleId = `battle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    // Initialize nodes (9 nodes in 3x3 grid)
+    // Initialize nodes (9 nodes with ownership only - positioning handled by client)
     const nodes: INode[] = [];
+    
+    // Create nodes with ownership (positioning will be calculated by client)
     for (let i = 0; i < 9; i++) {
-      const row = Math.floor(i / 3);
-      const col = i % 3;
-      
       let owner: NodeOwner = NodeOwner.NEUTRAL;
       let health = 100;
       
@@ -113,14 +112,14 @@ export class BattleService {
       // Neutral nodes (3, 4, 5) - set health to 75% of total army strength
       else {
         owner = NodeOwner.NEUTRAL;
-        health = 75; // Will be calculated based on total army strength
+        health = 75; // Temporary value, will be updated below
       }
       
       nodes.push({
         index: i,
         position: {
-          x: 100 + col * 200,
-          y: 100 + row * 200,
+          x: 0, // Client will calculate actual position based on screen dimensions
+          y: 0, // Client will calculate actual position based on screen dimensions
         },
         owner,
         health,
@@ -241,7 +240,7 @@ export class BattleService {
     await new BattleEvent({
       battleId,
       timestamp: new Date(),
-      eventType: 'BATTLE_CREATED',
+      eventType: 'battle_start',
       data: {
         attackerId,
         defenderId,
@@ -277,7 +276,7 @@ export class BattleService {
     await new BattleEvent({
       battleId,
       timestamp: new Date(),
-      eventType: 'BATTLE_ENDED',
+      eventType: 'battle_end',
       data: { winner },
     }).save();
     

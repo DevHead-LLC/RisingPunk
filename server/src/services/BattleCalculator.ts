@@ -22,9 +22,6 @@ export class BattleCalculator {
     const damage = attackPower / (defensePercentage * 100);
     
     const calculationTime = Date.now() - startTime;
-    if (calculationTime > 1) { // Log if calculation takes more than 1ms
-      console.log(`Damage calculation took ${calculationTime}ms for ${attacker.id} vs ${defender.id}`);
-    }
     
     return Math.max(0, Math.floor(damage));
   }
