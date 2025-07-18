@@ -20,6 +20,7 @@
 - `BattleOverlayManager` - Renders countdown and timer overlays
 
 **Utilities:**
+- `battleGridStyles` - Provides all visual styling and responsive layout
 - `Dimensions` - Provides screen dimensions for responsive layout
 - `React.memo` - Performance optimization wrapper
 
@@ -38,10 +39,6 @@
 **Lifecycle Management:**
 - `useEffect` - Initializes sample battalions only when no battleId provided
 - Component memoization for performance
-
-**Styling:**
-- Complete StyleSheet definition for all visual styling
-- Responsive layout calculations using screen dimensions
 
 **Props Interface:**
 - `_onClose` - Optional callback for closing the screen
@@ -126,12 +123,13 @@
   - [x] Consolidate initialization and error sync effects
   - **Result**: Lifecycle management consolidated in useBattleState, BattleGridScreen simplified
 
-- [ ] **Batch 4:** Styling Extraction
-  - [ ] Create battleGridStyles.ts utility file
-  - [ ] Move all StyleSheet definitions to utility
-  - [ ] Update BattleGridScreen to import styles
-  - [ ] Test visual appearance
-  - [ ] Document in TOC
+- [x] **Batch 4:** Styling Extraction ✅ COMPLETED
+  - [x] Create battleGridStyles.ts utility file
+  - [x] Move all StyleSheet definitions to utility
+  - [x] Update BattleGridScreen to import styles
+  - [x] Test visual appearance
+  - [x] Document in TOC
+  - **Result**: Styling logic moved to dedicated utility, BattleGridScreen simplified
 
 - [ ] **Batch 5:** Demo Mode Removal
   - [ ] Remove demo logic from useBattleBattalions.ts

@@ -10,6 +10,9 @@
     - `[useBattleState]` - Battle state, error management, and lifecycle management (**belongs to: BattleGridScreen**)
       - [useBattleState](../src/hooks/useBattleState.ts)
       - [useBattleState MD](sources-of-truth/useBattleState.md)
+    - `[battleGridStyles]` - Visual styling and responsive layout utilities (**belongs to: BattleGridScreen**)
+      - [battleGridStyles](../src/styles/battleGridStyles.ts)
+      - [battleGridStyles MD](sources-of-truth/battleGridStyles.md)
 
 ---
 
