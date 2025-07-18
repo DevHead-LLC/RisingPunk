@@ -16,6 +16,7 @@ Transform BattleGridScreen into a pure orchestrator by removing ALL demo fallbac
 - **Batch 1**: Data orchestration moved to useBattleSync
 - **Batch 2**: Error state management moved to useBattleState
 - **Batch 3**: Lifecycle management moved to useBattleState
+- **Batch 4**: Styling extraction moved to battleGridStyles utility
 - **Sources of Truth**: Properly documented in TOC
 
 ## **COMPLETED ISSUES**
@@ -28,22 +29,23 @@ Transform BattleGridScreen into a pure orchestrator by removing ALL demo fallbac
 
 ## **CURRENT PRIORITIES**
 
-### **1. BattleGridScreen Refactor - Batch 4** 🔄 CURRENT
-- **Goal**: Move Styling Extraction to utility file
-- **Target**: StyleSheet definitions
-- **Plan**: Create battleGridStyles.ts, move styles from BattleGridScreen
-- **Status**: Ready to start implementation
-
-### **2. BattleGridScreen Refactor - Batch 5** 🔄 NEXT
+### **1. BattleGridScreen Refactor - Batch 5** 🔄 CURRENT
 - **Goal**: Remove Demo Fallback Logic
 - **Target**: Eliminate demo data fallbacks
 - **Plan**: Remove sampleBattalion creation and demo fallbacks
+- **Status**: Ready to start implementation
+
+### **2. BattleGridScreen Refactor - Batch 6** 🔄 NEXT
+- **Goal**: Final Cleanup
+- **Target**: Remove any remaining internal logic
+- **Plan**: Verify BattleGridScreen is pure orchestrator
 
 ## **ARCHITECTURE TARGET**
 ```
 BattleGridScreen (Pure Orchestrator)
 ├── useBattleSync (Server Data Source)
 ├── useBattleState (State & Lifecycle)
+├── battleGridStyles (Styling Utilities)
 ├── BattleNetworkGrid (Network Display)
 ├── BattleBattalionManager (Battalion Display)
 └── BattleOverlayManager (Timer/Overlays)
