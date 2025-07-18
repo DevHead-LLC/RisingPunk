@@ -12,6 +12,13 @@ import {
 } from '../types/battleState';
 import { CountdownTimerService, TimerCallbacks } from '../services/CountdownTimerService';
 
+// Error state interface
+interface ErrorState {
+  isLoading: boolean;
+  error: string | null;
+  hasError: boolean;
+}
+
 // Timer configuration from intentions documents
 const TIMER_CONFIG: BattleTimerConfig = {
   countdownDuration: 3,  // 3-second countdown
@@ -64,6 +71,11 @@ export function useBattleState() {
   const [state, dispatch] = useReducer(battleStateReducer, initialState);
   const [countdown, setCountdown] = useState(initialState.countdown);
   const [battleTime, setBattleTime] = useState(initialState.battleTime);
+  const [errorState, setErrorState] = useState<ErrorState>({
+    isLoading: false,
+    error: null,
+    hasError: false,
+  });
   const timerServiceRef = useRef<CountdownTimerService | null>(null);
   const battleIdRef = useRef<string | null>(null);
 
@@ -120,6 +132,28 @@ export function useBattleState() {
     dispatch({ type: 'END_BATTLE', winner });
   }, [cleanupTimerService]);
 
+  // Error state management
+  const setLoading = useCallback((loading: boolean) => {
+    setErrorState(prev => ({ ...prev, isLoading: loading }));
+  }, []);
+
+  const setError = useCallback((error: string | null) => {
+    setErrorState(prev => ({ 
+      ...prev, 
+      error, 
+      hasError: !!error,
+      isLoading: false 
+    }));
+  }, []);
+
+  const clearError = useCallback(() => {
+    setErrorState({
+      isLoading: false,
+      error: null,
+      hasError: false,
+    });
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return cleanupTimerService;
@@ -139,5 +173,10 @@ export function useBattleState() {
     startBattle,
     endBattle,
     timerConfig: TIMER_CONFIG,
+    // Error state management
+    errorState,
+    setLoading,
+    setError,
+    clearError,
   };
 }

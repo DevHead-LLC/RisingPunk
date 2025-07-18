@@ -108,14 +108,13 @@
   - [x] Document in TOC
   - **Result**: Data orchestration successfully moved to useBattleSync, BattleGridScreen simplified
 
-- [ ] **Batch 2:** Error State Logic
-  - [ ] Extend useBattleState.ts with error state management
-  - [ ] Move loading state logic to useBattleState
-  - [ ] Move error state logic to useBattleState
-  - [ ] Update BattleGridScreen to use useBattleState
-  - [ ] Test loading states
-  - [ ] Test error states
-  - [ ] Document in TOC
+- [x] **Batch 2:** Error State Logic ✅ COMPLETED
+  - [x] Extend useBattleState.ts with error state management
+  - [x] Move loading state logic to useBattleState
+  - [x] Move error state logic to useBattleState
+  - [x] Update BattleGridScreen to use useBattleState
+  - [x] Sync error state from useBattleSync to useBattleState
+  - **Result**: Error state management consolidated in useBattleState, BattleGridScreen simplified
 
 - [ ] **Batch 3:** Lifecycle Management
   - [ ] Extend useBattleState.ts with initialization logic

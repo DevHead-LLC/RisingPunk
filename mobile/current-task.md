@@ -9,66 +9,39 @@ Transform BattleGridScreen into a pure orchestrator by removing ALL demo fallbac
 - **Timer System**: Server controls countdown and battle phases
 - **Network Layout**: 9 nodes in 3-column layout working
 - **Battle Creation**: Server creates battles with proper IDs
+- **Battalion Data**: Server creates and sends proper battalion data
 - **Authentication**: Temporarily removed for user vs computer testing
 
-### **❌ BROKEN (Still Using Demo Fallbacks)**
-- **Battalion Data**: Client receives undefined IDs/types, falls back to demo data
-- **React Keys**: No unique keys because battalion data is undefined
-- **Battalion Display**: Not showing on correct nodes due to undefined data
+### **✅ COMPLETED (Refactoring)**
+- **Batch 1**: Data orchestration moved to useBattleSync
+- **Batch 2**: Error state management moved to useBattleState
+- **Sources of Truth**: Properly documented in TOC
 
-## **CRITICAL ISSUE: Battalion Data Serialization**
+## **COMPLETED ISSUES**
 
-### **Problem**
-- Server creates battalions correctly: `user-battalion-0:guardian:0, user-battalion-1:breacher:1, etc.`
-- BattleController shows proper data: `6 battalions - OK/OK/0, OK/OK/1, OK/OK/2, OK/OK/6, OK/OK/7, OK/OK/8`
-- Client receives: `{"id": undefined, "nodeIndex": 0, "type": undefined}` for all 6 battalions
-- Result: React key prop warning and fallback to demo data
+### **✅ Battalion Data Serialization - RESOLVED**
+- **Problem**: Client received undefined battalion data from server
+- **Solution**: Manual property extraction in BattleController
+- **Result**: Battalions display correctly with proper IDs and types
+- **Status**: ✅ COMPLETED - No more React key warnings or demo fallbacks
 
-### **Root Cause Identified**
-- Battalion objects are Mongoose subdocuments with `__parentArray` and `__index` properties
-- Direct property access doesn't work on Mongoose subdocuments
-- Need manual property extraction in BattleController
+## **CURRENT PRIORITIES**
 
-### **Solution Applied**
-- Extract battalion properties manually: `id: b.id, type: b.type, position: b.position, etc.`
-- Avoid Mongoose methods that break TypeScript compilation
-- Preserve all battalion data for proper client serialization
+### **1. BattleGridScreen Refactor - Batch 3** 🔄 CURRENT
+- **Goal**: Move Lifecycle Management to useBattleState.ts
+- **Target**: Component initialization logic
+- **Plan**: Extend useBattleState.ts with initialization, remove from BattleGridScreen
+- **Status**: Ready to start implementation
 
-## **FAILED ATTEMPTS (DO NOT REPEAT)**
-1. **toObject() on IBattalion** ❌ - TypeScript compilation error
-2. **Spread operator { ...b }** ❌ - Produces undefined values  
-3. **Object.assign({}, b)** ❌ - Still undefined in route transformation
-4. **Repeated toObject() mistake** ❌ - Same TypeScript error
+### **2. BattleGridScreen Refactor - Batch 4** 🔄 NEXT
+- **Goal**: Move Styling Extraction to utility file
+- **Target**: StyleSheet definitions
+- **Plan**: Create battleGridStyles.ts, move styles from BattleGridScreen
 
-## **IMMEDIATE PRIORITIES**
-
-### **1. Fix Battalion Data Serialization** ✅ COMPLETED
-- **Status**: Manual property extraction implemented in BattleController
-- **Result**: Battalions appearing, timer working, no React key warnings
-- **Goal**: ✅ ACHIEVED - Server data working properly
-
-### **2. BattleGridScreen Refactor - Batch 1** ✅ COMPLETED
-- **Goal**: Complete Batch 1 of refactoring plan - Data Orchestration Logic
-- **Status**: ✅ COMPLETED - Application verified working
-- **Batch 1 Checklist**:
-  - ✅ Extend useBattleSync.ts with data orchestration logic
-  - ✅ Move displayBattalions logic to useBattleSync
-  - ✅ Move displayNodes logic to useBattleSync
-  - ✅ Update BattleGridScreen to use useBattleSync
-  - ✅ Test server data display
-  - ✅ Test local data display
-  - ✅ Document in TOC
-- **Result**: Data orchestration moved to useBattleSync, BattleGridScreen simplified
-
-### **3. BattleGridScreen Refactor - Batch 2** 🔄 CURRENT
-- **Goal**: Move Error State Logic to useBattleState.ts
-- **Target**: Loading/error state management
-- **Plan**: Extend useBattleState.ts with error handling, remove from BattleGridScreen
-
-### **4. Remove Demo Fallback Logic** 🔄 NEXT
-- **Location**: BattleGridScreen and related components
-- **Action**: Remove all demo data fallbacks
-- **Requirement**: Server data must work first (✅ COMPLETED)
+### **3. BattleGridScreen Refactor - Batch 5** 🔄 FUTURE
+- **Goal**: Remove Demo Fallback Logic
+- **Target**: Eliminate demo data fallbacks
+- **Plan**: Remove sampleBattalion creation and demo fallbacks
 
 ## **ARCHITECTURE TARGET**
 ```
