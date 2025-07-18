@@ -4,12 +4,8 @@
  */
 
 import React, { useEffect } from 'react';
-import { View, SafeAreaView, Dimensions, Text, ActivityIndicator } from 'react-native';
-import { useInitialBattleNodes } from '../hooks/useBattleNodes';
+import { View, SafeAreaView, Text, ActivityIndicator } from 'react-native';
 import { useBattleNetworkConnections } from '../hooks/useBattleNetwork';
-import { useBattalionData } from '../hooks/useBattalionData';
-import { useBattleBattalions } from '../hooks/useBattleBattalions';
-import { useBots } from '../hooks/useBots';
 import { useBattleSync } from '../hooks/useBattleSync';
 import { useBattleState } from '../hooks/useBattleState';
 import { BattleNetworkGrid } from '../components/battle/BattleNetworkGrid';
@@ -17,32 +13,14 @@ import { BattleBattalionManager } from '../components/battle/BattleBattalionMana
 import { BattleOverlayManager } from '../components/battle/BattleOverlayManager';
 import { battleGridStyles } from '../styles/battleGridStyles';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
 type Props = {
   _onClose?: () => void;
   battleId: string; // Required battle ID for server integration
 };
 
 export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
-  // Use the single source of truth for node state/positions
-  const nodes = useInitialBattleNodes({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
-
   // Use the single source of truth for network connections
   const connections = useBattleNetworkConnections();
-
-  // Battalion data management system
-  const battalionData = useBattalionData();
-
-  // Battalion state management for visualization
-  const {
-    battalions,
-    getUserBattalions,
-    getEnemyBattalions,
-  } = useBattleBattalions();
-
-  // Bot categories and stats
-  const { BOT_CATEGORIES, getBotRole } = useBots();
 
   // Error state and initialization management through useBattleState
   const { 
@@ -50,9 +28,7 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
     setLoading, 
     setError, 
     clearError,
-    isInitialized,
-    initializeComponent,
-    resetInitialization
+    initializeComponent
   } = useBattleState(battleId);
 
   // Data orchestration through useBattleSync
