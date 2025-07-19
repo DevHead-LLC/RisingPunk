@@ -62,8 +62,29 @@ useBattleLines.ts (Child - Line Source of Truth)
 - getNetworkConnections() for topology
 - NO data orchestration logic
 
+## **COMPLETED TASKS**
+
+### **✅ Network Topology Consolidation**
+- **Removed `NETWORK_CONNECTIONS`** from networkConstants.ts (duplicate of useBattleLines.ts)
+- **Removed `getConnectedNodes`** from networkConstants.ts (not needed for current application)
+- **Kept `ACTIVE_CONNECTIONS`** in networkConstants.ts (marked as deprecated)
+- **Result**: useBattleLines.ts is now the single source of truth for network topology
+
+### **✅ Unused File Cleanup**
+- **Deleted `networkConstants.ts`** - no longer needed after network topology consolidation
+- **Deleted `pathfinding.ts`** - not used in current application (battalions not moving yet)
+- **Result**: Clean codebase with only actively used files
+
+## **CURRENT STATUS**
+- **Application running successfully** with proper source of truth hierarchy
+- **Network visualization working** through useBattleLines.ts → BattleNetworkGrid.tsx → BattleGridScreen.tsx
+- **No duplicate network topology** in codebase
+- **Ready for next phase** of development
+
 ## **NEXT STEPS**
-1. Move getNetworkVisualData from useBattleLines.ts to BattleNetworkGrid.tsx
-2. Rename function to reflect network orchestration responsibility
-3. Update imports and data flow
-4. Ensure BattleGridScreen only imports BattleNetworkGrid.tsx
+1. **Server-Side Network Consolidation** (future)
+   - Consolidate server-side network topology into single source
+   - Align server and client network data structures
+2. **Battalion Movement Implementation** (future)
+   - Implement actual battalion movement logic
+   - Add pathfinding back when needed for movement
