@@ -1,68 +1,69 @@
-# Current Task: BattleGridScreen Refactoring - Remove Demo Mode
+# Current Task: Network Source of Truth Architecture Refactoring
 
 ## **BIG PICTURE GOAL**
-Transform BattleGridScreen into a pure orchestrator by removing ALL demo fallback logic and making everything work with proper server/client relationship.
+Establish proper source of truth hierarchy for network components with clear parent-child relationships and minimal logic in parent components.
 
-## **CURRENT STATUS**
+## **CURRENT FOCUS**
+- ✅ Renamed useBattleNetwork.ts to useBattleLines.ts
+- ✅ Moved NodeIndex to useBattleNodes.ts as source of truth
+- ✅ Fixed source of truth hierarchy and responsibilities
+- ✅ Moved getNetworkVisualData to BattleNetworkGrid.tsx as orchestrateNetworkData
 
-### **✅ WORKING (Server-Driven)**
-- **Timer System**: Server controls countdown and battle phases
-- **Network Layout**: 9 nodes in 3-column layout working
-- **Battle Creation**: Server creates battles with proper IDs
-- **Battalion Data**: Server creates and sends proper battalion data
-- **Authentication**: Temporarily removed for user vs computer testing
+## **SOURCE OF TRUTH HIERARCHY**
 
-### **✅ COMPLETED (Refactoring)**
-- **Batch 1**: Data orchestration moved to useBattleSync
-- **Batch 2**: Error state management moved to useBattleState
-- **Batch 3**: Lifecycle management moved to useBattleState
-- **Batch 4**: Styling extraction moved to battleGridStyles utility
-- **Batch 5**: Demo mode removal completed
-- **Batch 6**: Final cleanup completed
-- **Sources of Truth**: Properly documented in TOC
+### **Parent-Child Relationship (Top to Bottom)**
+```
+BattleGridScreen.tsx (Parent - Minimal Logic)
+    ↓ imports
+BattleNetworkGrid.tsx (Child - Network Orchestrator)
+    ↓ imports
+useBattleNodes.ts (Child - Node Source of Truth)
+useBattleLines.ts (Child - Line Source of Truth)
+```
+
+### **Current Sources of Truth**
+- **useBattleNodes.ts**: Everything node-related (NodeIndex, positions, ownership, colors)
+- **useBattleLines.ts**: Everything line-related (NetworkConnection, LineProperties, calculations)
+- **BattleNetworkGrid.tsx**: Network visual orchestration (combines nodes + lines for display)
 
 ## **COMPLETED ISSUES**
 
-### **✅ Battalion Data Serialization - RESOLVED**
-- **Problem**: Client received undefined battalion data from server
-- **Solution**: Manual property extraction in BattleController
-- **Result**: Battalions display correctly with proper IDs and types
-- **Status**: ✅ COMPLETED - No more React key warnings or demo fallbacks
+### **✅ getNetworkVisualData Moved to Correct Place**
+- **Problem**: Data orchestration logic was in useBattleLines.ts
+- **Solution**: Moved to BattleNetworkGrid.tsx as orchestrateNetworkData()
+- **Result**: Lines source of truth now only handles line-specific logic
 
-### **✅ Node Positioning Debug - RESOLVED**
-- **Problem**: Network grid layout incorrect after demo removal
-- **Solution**: Restored proper positioning logic from useBattleNodes
-- **Result**: 3-column layout working correctly with proper spacing
-- **Status**: ✅ COMPLETED - Network grid displays correctly
+### **✅ Architecture Hierarchy Fixed**
+- **Problem**: Parent (BattleGridScreen) had too much logic
+- **Solution**: Network orchestration moved to BattleNetworkGrid.tsx
+- **Result**: Each parent now has minimal logic, children handle their domains
 
-## **FINAL ARCHITECTURE ACHIEVED**
-```
-BattleGridScreen (Pure Orchestrator)
-├── useBattleSync (Server Data Source)
-├── useBattleState (State & Lifecycle)
-├── useBattleNetworkConnections (Network Topology)
-├── battleGridStyles (Styling Utilities)
-├── BattleNetworkGrid (Network Display)
-├── BattleBattalionManager (Battalion Display)
-└── BattleOverlayManager (Timer/Overlays)
-```
+## **TARGET ARCHITECTURE**
 
-## **SERVER/CLIENT RESPONSIBILITIES**
+### **BattleGridScreen.tsx (Parent - Minimal)**
+- Only imports BattleNetworkGrid.tsx
+- Passes basic props (battleId, etc.)
+- No network logic
 
-### **Server (Authoritative)**
-- Battle creation and management
-- Timer control and phase transitions
-- Battalion data and positioning
-- Node ownership and capture progress
+### **BattleNetworkGrid.tsx (Network Orchestrator)**
+- Imports from useBattleNodes.ts and useBattleLines.ts
+- Handles all network data orchestration
+- Combines node and line data for visual rendering
+- Exports complete network visualization
 
-### **Client (Display/UI)**
-- Network layout and positioning
-- Battalion visualization
-- Timer display and overlays
-- User interactions and feedback
+### **useBattleNodes.ts (Node Source of Truth)**
+- All node-related types and logic
+- Node positioning, ownership, colors
+- Exports NodeIndex, BattleNodeState, etc.
 
-## **REFACTORING COMPLETE**
-- **Pure Orchestrator**: BattleGridScreen now only orchestrates external components
-- **No Internal Logic**: All functionality moved to proper sources of truth
-- **Server-Driven**: No more demo fallbacks, requires valid battleId
-- **Clean Architecture**: Clear separation of concerns and responsibilities
+### **useBattleLines.ts (Line Source of Truth)**
+- All line-related types and logic
+- NetworkConnection, LineProperties, calculateLineProperties
+- getNetworkConnections() for topology
+- NO data orchestration logic
+
+## **NEXT STEPS**
+1. Move getNetworkVisualData from useBattleLines.ts to BattleNetworkGrid.tsx
+2. Rename function to reflect network orchestration responsibility
+3. Update imports and data flow
+4. Ensure BattleGridScreen only imports BattleNetworkGrid.tsx
