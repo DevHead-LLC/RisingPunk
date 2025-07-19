@@ -5,7 +5,7 @@
 
 import React, { useEffect } from 'react';
 import { View, SafeAreaView, Text, ActivityIndicator } from 'react-native';
-import { useBattleNetworkConnections } from '../hooks/useBattleNetwork';
+import { getNetworkConnections } from '../hooks/useBattleLines';
 import { useBattleSync } from '../hooks/useBattleSync';
 import { useBattleState } from '../hooks/useBattleState';
 import { BattleNetworkGrid } from '../components/battle/BattleNetworkGrid';
@@ -19,8 +19,8 @@ type Props = {
 };
 
 export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
-  // Use the single source of truth for network connections
-  const connections = useBattleNetworkConnections();
+  // Use network connections from useBattleLines
+  const connections = getNetworkConnections();
 
   // Error state and initialization management through useBattleState
   const { 

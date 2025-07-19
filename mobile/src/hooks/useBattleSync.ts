@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Dimensions } from 'react-native';
 import { useGetBattleStateQuery, BattleState } from '../store/api/battleApi';
 import { Battalion } from '../types/battle';
-import { NodeIndex } from '../types/battleTypes';
+import { NodeIndex } from './useBattleNodes';
 import { calculateNodePositions } from './useBattleNodes';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');

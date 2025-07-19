@@ -5,9 +5,8 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { NodeIndex } from '../../types/battleTypes';
-import { NetworkConnection, calculateLineProperties } from '../../hooks/useBattleNetwork';
-import { BattleNodeState, getNodeColor, getNodeBorderColor } from '../../hooks/useBattleNodes';
+import { NetworkConnection, calculateLineProperties } from '../../hooks/useBattleLines';
+import { BattleNodeState, getNodeColor, getNodeBorderColor, NodeIndex } from '../../hooks/useBattleNodes';
 
 interface Props {
   nodes: BattleNodeState[];
@@ -19,6 +18,44 @@ interface Props {
   showNodeLabels?: boolean;
 }
 
+/**
+ * orchestrateNetworkData() - Network Data Orchestration
+ * PURPOSE: Combines node and connection data for visual rendering
+ * USED BY: BattleNetworkGrid component to prepare data for display
+ *          Handles data transformation and line property calculations
+ */
+function orchestrateNetworkData(nodes: BattleNodeState[], connections: NetworkConnection[]) {
+  // Convert nodes array to positions record for line calculations
+  const nodePositions = nodes.reduce((acc, node) => {
+    acc[node.index] = node.position;
+    return acc;
+  }, {} as Record<NodeIndex, { x: number; y: number }>);
+
+  // Calculate line elements with pre-computed properties
+  const lineElements = connections.map((connection, index) => {
+    const fromPos = nodePositions[connection.from];
+    const toPos = nodePositions[connection.to];
+
+    if (!fromPos || !toPos) {
+      return null;
+    }
+
+    const lineProps = calculateLineProperties(fromPos, toPos);
+
+    return {
+      key: `${connection.from}-${connection.to}-${index}`,
+      from: connection.from,
+      to: connection.to,
+      lineProps,
+    };
+  }).filter((element): element is NonNullable<typeof element> => element !== null);
+
+  return {
+    nodePositions,
+    lineElements,
+  };
+}
+
 export const BattleNetworkGrid = React.memo(({
   nodes,
   connections,
@@ -28,35 +65,25 @@ export const BattleNetworkGrid = React.memo(({
   lineWidth = 2,
   showNodeLabels = true,
 }: Props) => {
-  // Convert nodes array to positions record for line calculations
-  const nodePositions = nodes.reduce((acc, node) => {
-    acc[node.index] = node.position;
-    return acc;
-  }, {} as Record<NodeIndex, { x: number; y: number }>);
+  // Get pre-calculated network visual data
+  const { lineElements } = orchestrateNetworkData(nodes, connections);
 
   return (
     <View style={styles.container}>
       {/* Render connection lines first (behind nodes) */}
-      {connections.map((connection, index) => {
-        const fromPos = nodePositions[connection.from];
-        const toPos = nodePositions[connection.to];
-
-        if (!fromPos || !toPos) {return null;}
-
-        const lineProps = calculateLineProperties(fromPos, toPos);
-
+      {lineElements.map((lineElement) => {
         return (
           <View
-            key={`${connection.from}-${connection.to}-${index}`}
+            key={lineElement.key}
             style={[
               styles.line,
               {
-                width: lineProps.length,
+                width: lineElement.lineProps.length,
                 height: lineWidth,
                 backgroundColor: lineColor,
-                left: lineProps.left,
-                top: lineProps.top - lineWidth / 2,
-                transform: [{ rotate: `${lineProps.angle}deg` }],
+                left: lineElement.lineProps.left,
+                top: lineElement.lineProps.top - lineWidth / 2,
+                transform: [{ rotate: `${lineElement.lineProps.angle}deg` }],
                 transformOrigin: '0 50%',
               },
             ]}

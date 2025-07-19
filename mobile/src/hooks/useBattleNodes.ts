@@ -4,7 +4,9 @@
  */
 
 import { useMemo, useState, useCallback } from 'react';
-import { NodeIndex } from '../types/battleTypes';
+
+// Node source of truth - defines all node-related types
+export type NodeIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export type NodeOwner = 'user' | 'enemy' | 'neutral';
 
