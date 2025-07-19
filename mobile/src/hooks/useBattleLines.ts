@@ -40,11 +40,24 @@ export interface LineProperties {
  */
 /**
  * getNetworkConnections() - Network Topology Source of Truth
- * PURPOSE: Defines which nodes connect to which for line rendering
+ * PURPOSE: Returns server-provided network topology for line rendering
  * USED BY: BattleGridScreen imports this to get network topology
  *          BattleNetworkGrid uses this to know which nodes to connect with lines
+ * 
+ * @param serverConnections - Optional server-provided network connections
+ * @returns NetworkConnection[] - Network topology for visualization
  */
-export function getNetworkConnections(): NetworkConnection[] {
+export function getNetworkConnections(serverConnections?: Array<{from: number, to: number}>): NetworkConnection[] {
+  // Use server-provided connections if available, otherwise fallback to hardcoded
+  if (serverConnections && serverConnections.length > 0) {
+    // Convert server number indices to client NodeIndex type
+    return serverConnections.map(conn => ({
+      from: conn.from as NodeIndex,
+      to: conn.to as NodeIndex
+    }));
+  }
+  
+  // Fallback network topology (should not be used in production)
   return [
     // Node 0 connections (top-left user territory)
     { from: 0, to: 3 }, // Connects to top-center neutral

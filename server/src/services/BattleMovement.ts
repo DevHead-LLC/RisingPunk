@@ -1,15 +1,8 @@
 import { IBattalion, INode } from '../types/battle';
+import { BATTLE_CONFIG } from '../config/battleConfig';
 
-// Network connections copied from mobile networkConstants.ts
-const NETWORK_CONNECTIONS: [number, number][] = [
-  // Horizontal connections
-  [0, 3], [3, 6], // Top row
-  [1, 4], [4, 7], // Middle row
-  [2, 5], [5, 8], // Bottom row
-  // Diagonal connections
-  [0, 4], [1, 3], [1, 5], [2, 4],
-  [3, 7], [4, 6], [4, 8], [5, 7],
-];
+// Network connections from battleConfig.ts (single source of truth)
+const NETWORK_CONNECTIONS = BATTLE_CONFIG.NETWORK_CONNECTIONS;
 
 export class BattleMovement {
   /**
@@ -17,8 +10,8 @@ export class BattleMovement {
    */
   getConnectedNodes(nodeIndex: number): number[] {
     return NETWORK_CONNECTIONS
-      .filter(([from, to]) => from === nodeIndex || to === nodeIndex)
-      .map(([from, to]) => from === nodeIndex ? to : from);
+      .filter(({ from, to }) => from === nodeIndex || to === nodeIndex)
+      .map(({ from, to }) => from === nodeIndex ? to : from);
   }
   
   /**
@@ -37,7 +30,7 @@ export class BattleMovement {
       const toNode = path[i + 1];
       
       // Check if this connection exists in NETWORK_CONNECTIONS
-      const isValidConnection = NETWORK_CONNECTIONS.some(([from, to]) =>
+      const isValidConnection = NETWORK_CONNECTIONS.some(({ from, to }) =>
         (from === fromNode && to === toNode) || (from === toNode && to === fromNode)
       );
       

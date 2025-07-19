@@ -19,9 +19,6 @@ type Props = {
 };
 
 export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
-  // Use network connections from useBattleLines
-  const connections = getNetworkConnections();
-
   // Error state and initialization management through useBattleState
   const { 
     errorState, 
@@ -35,10 +32,14 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
   const { 
     displayBattalions, 
     displayNodes, 
+    networkConnections, // Server-provided network topology
     battleState,
     isLoading: battleLoading, 
     error: battleError 
   } = useBattleSync(battleId);
+
+  // Use network connections from server via useBattleLines
+  const connections = getNetworkConnections(networkConnections);
 
   // Component initialization and error state sync
   useEffect(() => {
