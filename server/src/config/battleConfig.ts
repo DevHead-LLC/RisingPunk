@@ -8,18 +8,34 @@ export const BATTLE_CONFIG = {
   UPDATE_INTERVAL: 100, // Server calculates every 100ms
   SYNC_INTERVAL: 1000,  // Client receives updates every 1s
   
-  // Network connections (from networkConstants.ts)
-  NETWORK_CONNECTIONS: {
-    0: [3, 4],    // Node 0 connects to nodes 3, 4
-    1: [3, 4, 5], // Node 1 connects to nodes 3, 4, 5
-    2: [4, 5],    // Node 2 connects to nodes 4, 5
-    3: [0, 1, 6, 7], // Node 3 connects to nodes 0, 1, 6, 7
-    4: [0, 1, 2, 6, 7, 8], // Node 4 connects to nodes 0, 1, 2, 6, 7, 8
-    5: [1, 2, 7, 8], // Node 5 connects to nodes 1, 2, 7, 8
-    6: [3, 4],    // Node 6 connects to nodes 3, 4
-    7: [3, 4, 5], // Node 7 connects to nodes 3, 4, 5
-    8: [4, 5],    // Node 8 connects to nodes 4, 5
-  },
+  // Network connections (matching client useBattleLines.ts format)
+  NETWORK_CONNECTIONS: [
+    // Node 0 connections (top-left user territory)
+    { from: 0, to: 3 }, // Connects to top-center neutral
+    { from: 0, to: 4 }, // Connects to middle-center neutral
+
+    // Node 1 connections (middle-left user territory)  
+    { from: 1, to: 3 }, // Connects to top-center neutral
+    { from: 1, to: 4 }, // Connects to middle-center neutral
+    { from: 1, to: 5 }, // Connects to bottom-center neutral
+
+    // Node 2 connections (bottom-left user territory)
+    { from: 2, to: 4 }, // Connects to middle-center neutral
+    { from: 2, to: 5 }, // Connects to bottom-center neutral
+
+    // Node 6 connections (top-right enemy territory)
+    { from: 6, to: 3 }, // Connects to top-center neutral
+    { from: 6, to: 4 }, // Connects to middle-center neutral
+
+    // Node 7 connections (middle-right enemy territory)
+    { from: 7, to: 3 }, // Connects to top-center neutral
+    { from: 7, to: 4 }, // Connects to middle-center neutral
+    { from: 7, to: 5 }, // Connects to bottom-center neutral
+
+    // Node 8 connections (bottom-right enemy territory)
+    { from: 8, to: 4 }, // Connects to middle-center neutral
+    { from: 8, to: 5 }, // Connects to bottom-center neutral
+  ],
   
   // Bot stats (copied from BattleService.ts)
   BOT_STATS: {

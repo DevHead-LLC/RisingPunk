@@ -81,10 +81,79 @@ useBattleLines.ts (Child - Line Source of Truth)
 - **No duplicate network topology** in codebase
 - **Ready for next phase** of development
 
+## **SERVER-CLIENT NETWORK ARCHITECTURE ASSESSMENT**
+
+### **Current State Analysis**
+
+#### **Client-Side Sources of Truth (Working Well)**
+- **useBattleNodes.ts**: Node positions, ownership, colors, visual properties
+- **useBattleLines.ts**: Network topology (`{from, to}` format), line calculations
+- **BattleNetworkGrid.tsx**: Network orchestration, visual rendering
+
+#### **Server-Side Network Topology (Duplicated)**
+- **battleConfig.ts**: `{node: [connections]}` format (different structure)
+- **BattleMovement.ts**: `[number, number][]` format (copied from old networkConstants.ts)
+
+#### **Key Issues Identified**
+1. **Data Structure Mismatch**: Server uses different formats than client
+2. **Network Topology Duplication**: Same connections defined in 3 places
+3. **Type Inconsistency**: `[number, number][]` vs `{from, to}` vs `{node: [connections]}`
+
+### **Desired Architecture**
+
+#### **Server as Authoritative Source**
+- **Server owns network topology** - single source of truth
+- **Client receives network data** from server via useBattleSync
+- **Server controls movement validation** and pathfinding
+- **Client handles visualization** and user interactions
+
+#### **Proposed Data Flow**
+```
+Server (Authoritative)
+├── battleConfig.ts: Network topology in {from, to} format
+├── BattleMovement.ts: Movement validation using server topology
+└── Sends network data to client via API
+
+Client (Display/UI)
+├── useBattleSync.ts: Receives network data from server
+├── useBattleLines.ts: Visual line calculations only
+├── useBattleNodes.ts: Node visual properties only
+└── BattleNetworkGrid.tsx: Pure visualization orchestration
+```
+
+## **IMPLEMENTATION PLAN**
+
+### **Phase 1: Server Network Consolidation**
+1. **Update battleConfig.ts** to use `{from, to}` format matching client
+2. **Remove hardcoded network** from BattleMovement.ts
+3. **Create server network service** that exports topology
+
+### **Phase 2: Client Network Integration**
+1. **Update useBattleSync.ts** to receive network topology from server
+2. **Modify useBattleLines.ts** to use server data instead of hardcoded
+3. **Ensure BattleNetworkGrid.tsx** continues working with server data
+
+### **Phase 3: Movement Authority**
+1. **Server validates all movement** using server network topology
+2. **Client sends movement requests** to server
+3. **Server calculates paths** and validates connections
+
+## **COMPLETED TASKS**
+
+### **✅ Phase 1: Server Network Consolidation**
+- **Updated battleConfig.ts** to use `{from, to}` format matching client
+- **Removed hardcoded network** from BattleMovement.ts
+- **Updated BattleMovement.ts** to import network topology from battleConfig.ts
+- **Result**: Server now has single source of truth for network topology
+
+### **✅ Phase 2: Client Network Integration**
+- **Updated BattleState interface** to include server-provided networkConnections
+- **Modified useBattleSync.ts** to provide network topology from server
+- **Updated useBattleLines.ts** to accept and use server network data
+- **Updated BattleGridScreen.tsx** to pass server data to useBattleLines
+- **Result**: Client now receives network topology from server instead of hardcoded data
+
 ## **NEXT STEPS**
-1. **Server-Side Network Consolidation** (future)
-   - Consolidate server-side network topology into single source
-   - Align server and client network data structures
-2. **Battalion Movement Implementation** (future)
-   - Implement actual battalion movement logic
-   - Add pathfinding back when needed for movement
+1. **Test server-client data flow** - Ensure network topology syncs correctly
+2. **Implement Phase 3** - Movement authority and validation
+3. **Update server API** to include networkConnections in battle state response

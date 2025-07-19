@@ -213,6 +213,9 @@ export const useBattleSync = (battleId: string) => {
     return []; // No fallback - require server data
   }, [battleState?.nodes]);
 
+  // Server-provided network topology
+  const networkConnections = battleState?.networkConnections || [];
+
   return {
     // State
     battleState,
@@ -225,6 +228,7 @@ export const useBattleSync = (battleId: string) => {
     // Data orchestration
     displayBattalions,
     displayNodes,
+    networkConnections, // Server-provided network topology
     
     // Interpolation
     interpolationState,

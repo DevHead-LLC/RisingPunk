@@ -2,6 +2,12 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
 import { Battalion } from '../../types/battle';
 
+// Network connection interface matching server format
+export interface NetworkConnection {
+  from: number;
+  to: number;
+}
+
 // Battle state interface matching server response
 export interface BattleState {
   battleId: string;
@@ -14,6 +20,7 @@ export interface BattleState {
     health?: number;
     captureProgress?: number;
   }>;
+  networkConnections: NetworkConnection[]; // Server-provided network topology
   victoryCondition?: {
     winner: 'user' | 'enemy';
     reason: 'elimination' | 'timeout' | 'tie';
