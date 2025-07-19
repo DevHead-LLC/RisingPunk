@@ -5,6 +5,7 @@ import { BattleMovement } from '../services/BattleMovement';
 import { Battle, IBattleDocument } from '../models/Battle';
 import { BattleEvent } from '../models/BattleEvent';
 import { BattlePhase, NodeOwner, BattleStateResponse } from '../types/battle';
+import { BATTLE_CONFIG } from '../config/battleConfig';
 
 interface AuthenticatedRequest extends Request {
   user: { _id: string };
@@ -19,6 +20,50 @@ export class BattleController {
     this.battleService = new BattleService();
     this.battleCalculator = new BattleCalculator();
     this.battleMovement = new BattleMovement();
+  }
+
+  /**
+   * Generate network data for client (server authority)
+   */
+  private generateNetworkData(nodes: any[], screenWidth: number, screenHeight: number) {
+    // Recalculate node positions for client's actual screen size
+    const repositionedNodes = BATTLE_CONFIG.calculateNodePositions(screenWidth, screenHeight, 125);
+    
+    // Update the nodes with correct positions for client screen
+    const updatedNodes = nodes.map(node => {
+      const repositioned = repositionedNodes.find(rn => rn.index === node.index);
+      return {
+        index: node.index,
+        owner: node.owner,
+        health: node.health,
+        captureProgress: node.captureProgress,
+        position: repositioned ? repositioned.position : node.position
+      };
+    });
+    
+    // Get network connections from server config (convert readonly to mutable)
+    const networkConnections = [...BATTLE_CONFIG.NETWORK_CONNECTIONS];
+    
+    // Create node position map for line calculations using updated positions
+    const nodePositions = updatedNodes.reduce((acc, node) => {
+      acc[node.index] = node.position;
+      return acc;
+    }, {} as Record<number, { x: number; y: number }>);
+
+    // Calculate line properties for each connection using updated positions
+    const lineProperties = networkConnections.map(connection => {
+      const fromPos = nodePositions[connection.from];
+      const toPos = nodePositions[connection.to];
+      
+      if (!fromPos || !toPos) {
+        // Return default properties if positions not found
+        return { length: 0, angle: 0, left: 0, top: 0 };
+      }
+      
+      return BATTLE_CONFIG.calculateLineProperties(fromPos, toPos);
+    });
+
+    return { networkConnections, lineProperties, updatedNodes };
   }
 
   /**
@@ -41,6 +86,25 @@ export class BattleController {
         nodeCount: battle.nodes.length
       });
 
+      // Generate network data for client
+      const networkData = this.generateNetworkData(battle.nodes, 375, 667);
+
+      // Map battalions for client
+      const mappedBattalions = battle.battalions.map(b => ({
+        id: b.id,
+        type: b.type,
+        quantity: b.quantity,
+        currentHealth: b.currentHealth,
+        maxHealth: b.maxHealth,
+        nodeIndex: b.position.nodeIndex,
+        isUser: b.owner === 'user',
+        mark: b.mark,
+        targetNode: b.targetNode,
+        remainingPath: b.remainingPath,
+        finalTarget: b.finalTarget,
+        stats: b.stats,
+      }));
+
       // Return battle state for client
       return {
         battleId: battle.battleId,
@@ -48,8 +112,10 @@ export class BattleController {
         countdown: battle.countdown,
         battleTime: battle.battleTime,
         winner: battle.winner,
-        battalions: battle.battalions,
-        nodes: battle.nodes,
+        battalions: mappedBattalions,
+        nodes: networkData.updatedNodes,
+        networkConnections: networkData.networkConnections,
+        lineProperties: networkData.lineProperties,
         lastUpdated: battle.updatedAt
       };
     } catch (error) {
@@ -61,7 +127,7 @@ export class BattleController {
   /**
    * Get current battle state
    */
-  async getBattleState(battleId: string, userId: string): Promise<BattleStateResponse | null> {
+  async getBattleState(battleId: string, userId: string, screenWidth: number = 375, screenHeight: number = 667): Promise<BattleStateResponse | null> {
     try {
       // Get battle from database
       const battle = await this.battleService.getBattle(battleId);
@@ -96,11 +162,10 @@ export class BattleController {
           quantity: b.quantity,
           currentHealth: b.currentHealth,
           maxHealth: b.maxHealth,
-          position: b.position,
-          owner: b.owner,
+          nodeIndex: b.position.nodeIndex, // Extract nodeIndex from position
+          isUser: b.owner === 'user', // Map owner to isUser boolean
           mark: b.mark,
           targetNode: b.targetNode,
-          targetBattalion: b.targetBattalion,
           remainingPath: b.remainingPath,
           finalTarget: b.finalTarget,
           stats: b.stats,
@@ -110,6 +175,9 @@ export class BattleController {
         };
       });
 
+      // Generate network data for client
+      const networkData = this.generateNetworkData(battle.nodes, screenWidth, screenHeight);
+
       // Return battle state for client with movement data
       return {
         battleId: battle.battleId,
@@ -118,7 +186,9 @@ export class BattleController {
         battleTime: currentBattleTime,
         winner: battle.winner,
         battalions: mappedBattalions,
-        nodes: battle.nodes,
+        nodes: networkData.updatedNodes,
+        networkConnections: networkData.networkConnections,
+        lineProperties: networkData.lineProperties,
         lastUpdated: battle.updatedAt,
         // Include movement timing information for client interpolation
         movementData: {
@@ -372,6 +442,25 @@ export class BattleController {
         finalBattalionCount: endedBattle.battalions.length
       });
 
+      // Generate network data for client (use default dimensions for end battle)
+      const networkData = this.generateNetworkData(endedBattle.nodes, 375, 667);
+
+      // Map battalions for client
+      const mappedBattalions = endedBattle.battalions.map(b => ({
+        id: b.id,
+        type: b.type,
+        quantity: b.quantity,
+        currentHealth: b.currentHealth,
+        maxHealth: b.maxHealth,
+        nodeIndex: b.position.nodeIndex,
+        isUser: b.owner === 'user',
+        mark: b.mark,
+        targetNode: b.targetNode,
+        remainingPath: b.remainingPath,
+        finalTarget: b.finalTarget,
+        stats: b.stats,
+      }));
+
       // Return final battle state
       return {
         battleId: endedBattle.battleId,
@@ -379,8 +468,10 @@ export class BattleController {
         countdown: endedBattle.countdown,
         battleTime: endedBattle.battleTime,
         winner: endedBattle.winner,
-        battalions: endedBattle.battalions,
-        nodes: endedBattle.nodes,
+        battalions: mappedBattalions,
+        nodes: networkData.updatedNodes,
+        networkConnections: networkData.networkConnections,
+        lineProperties: networkData.lineProperties,
         lastUpdated: endedBattle.updatedAt
       };
     } catch (error) {

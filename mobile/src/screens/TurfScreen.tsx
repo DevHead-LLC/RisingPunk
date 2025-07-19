@@ -114,6 +114,19 @@ export function TurfScreen(): React.JSX.Element {
       case 'profile':
         return <ProfileScreen onClose={() => navigateToScreen('turf')} />;
       case 'battle':
+        if (!battleId) {
+          // If no battleId, redirect to battle prep
+          return <BattlePreparationScreen
+            onClose={() => {
+              navigateToScreen('turf');
+              setTimeout(() => navigateToScreen('hackRig'), 0);
+            }}
+            onBattleStart={(battleId) => {
+              setBattleId(battleId);
+              navigateToScreen('battle');
+            }}
+          />;
+        }
         return <BattleGridScreen 
           battleId={battleId}
           _onClose={() => {

@@ -29,7 +29,7 @@ describe('useBattleState', () => {
     const { result } = renderHook(() => useBattleState());
 
     act(() => {
-      result.current.startCountdown();
+      result.current.startCountdown('test-battle-id');
     });
 
     // Should start countdown

@@ -1,89 +1,108 @@
 /**
  * @file BattleNetworkGrid.tsx
- * @description Single network visualization component that renders nodes and connections
+ * @description Pure network visualization component that renders nodes and connections
  */
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { NetworkConnection, calculateLineProperties } from '../../hooks/useBattleLines';
-import { BattleNodeState, getNodeColor, getNodeBorderColor, NodeIndex } from '../../hooks/useBattleNodes';
+
+// Server-provided data types (matching server response)
+
+export interface NetworkConnection {
+  from: number;
+  to: number;
+}
+
+export interface LineProperties {
+  length: number;
+  angle: number;
+  left: number;
+  top: number;
+}
+
+export interface BattleNodeState {
+  index: number;
+  position: { x: number; y: number };
+  owner: 'user' | 'enemy' | 'neutral';
+  health?: number;
+  captureProgress?: number;
+}
 
 interface Props {
   nodes: BattleNodeState[];
   connections: NetworkConnection[];
-  onNodePress?: (nodeIndex: NodeIndex) => void;
+  lineProperties: LineProperties[];
+  onNodePress?: (nodeIndex: number) => void;
   nodeSize?: number;
   lineColor?: string;
   lineWidth?: number;
   showNodeLabels?: boolean;
 }
 
+// Server provides all network data - no fallback logic needed
+
 /**
- * orchestrateNetworkData() - Network Data Orchestration
- * PURPOSE: Combines node and connection data for visual rendering
- * USED BY: BattleNetworkGrid component to prepare data for display
- *          Handles data transformation and line property calculations
+ * getNodeColor() - Node Visual Properties
  */
-function orchestrateNetworkData(nodes: BattleNodeState[], connections: NetworkConnection[]) {
-  // Convert nodes array to positions record for line calculations
-  const nodePositions = nodes.reduce((acc, node) => {
-    acc[node.index] = node.position;
-    return acc;
-  }, {} as Record<NodeIndex, { x: number; y: number }>);
+function getNodeColor(owner: 'user' | 'enemy' | 'neutral'): string {
+  switch (owner) {
+    case 'user': return '#4717F6'; // User blue
+    case 'enemy': return '#FF4141'; // Enemy red
+    default: return '#666666'; // Neutral gray
+  }
+}
 
-  // Calculate line elements with pre-computed properties
-  const lineElements = connections.map((connection, index) => {
-    const fromPos = nodePositions[connection.from];
-    const toPos = nodePositions[connection.to];
-
-    if (!fromPos || !toPos) {
-      return null;
-    }
-
-    const lineProps = calculateLineProperties(fromPos, toPos);
-
-    return {
-      key: `${connection.from}-${connection.to}-${index}`,
-      from: connection.from,
-      to: connection.to,
-      lineProps,
-    };
-  }).filter((element): element is NonNullable<typeof element> => element !== null);
-
-  return {
-    nodePositions,
-    lineElements,
-  };
+/**
+ * getNodeBorderColor() - Node Visual Properties  
+ */
+function getNodeBorderColor(owner: 'user' | 'enemy' | 'neutral'): string {
+  switch (owner) {
+    case 'user': return '#7C3AED'; // Lighter blue border
+    case 'enemy': return '#EF4444'; // Lighter red border
+    default: return '#9CA3AF'; // Light gray border
+  }
 }
 
 export const BattleNetworkGrid = React.memo(({
   nodes,
   connections,
+  lineProperties,
   onNodePress,
   nodeSize = 20,
   lineColor = '#666666',
   lineWidth = 2,
   showNodeLabels = true,
 }: Props) => {
-  // Get pre-calculated network visual data
-  const { lineElements } = orchestrateNetworkData(nodes, connections);
+  // Server provides all network data - use directly
+  const actualConnections = connections || [];
+  const actualLineProperties = lineProperties || [];
+  
+  // SIMPLE LOG: Only log problems
+  React.useEffect(() => {
+    if (actualLineProperties?.length > 0 && actualLineProperties[0].length === 0) {
+      console.log('❌ LINE PROPS ALL ZERO - Server calculation failed');
+    }
+  }, [actualLineProperties]);
 
   return (
     <View style={styles.container}>
-      {/* Render connection lines first (behind nodes) */}
-      {lineElements.map((lineElement) => {
+      {/* Render connection lines */}
+      {actualLineProperties?.map((lineProps, index) => {
+        const connection = actualConnections?.[index];
+        if (!connection) return null;
+
         return (
           <View
-            key={lineElement.key}
+            key={`${connection.from}-${connection.to}-${index}`}
             style={[
               styles.line,
               {
-                width: lineElement.lineProps.length,
+                width: lineProps.length,
                 height: lineWidth,
                 backgroundColor: lineColor,
-                left: lineElement.lineProps.left,
-                top: lineElement.lineProps.top - lineWidth / 2,
-                transform: [{ rotate: `${lineElement.lineProps.angle}deg` }],
+                left: lineProps.left,
+                top: lineProps.top - lineWidth / 2,
+                transform: [{ rotate: `${lineProps.angle}deg` }],
                 transformOrigin: '0 50%',
               },
             ]}
@@ -91,8 +110,8 @@ export const BattleNetworkGrid = React.memo(({
         );
       })}
 
-      {/* Render nodes on top */}
-      {nodes.map((node) => {
+      {/* Render nodes */}
+      {nodes?.map((node) => {
         const NodeContent = () => (
           <View
             style={[
@@ -127,24 +146,20 @@ export const BattleNetworkGrid = React.memo(({
           );
         }
 
-        return <NodeContent key={node.index} />;
+        return (
+          <View key={node.index}>
+            <NodeContent />
+          </View>
+        );
       })}
     </View>
   );
 });
 
 const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-  },
-  line: {
-    position: 'absolute',
-  },
-  touchable: {
-    position: 'absolute',
-  },
+  container: { position: 'absolute', width: '100%', height: '100%' },
+  line: { position: 'absolute' },
+  touchable: { position: 'absolute' },
   node: {
     position: 'absolute',
     justifyContent: 'center',

@@ -60,10 +60,15 @@ router.get<{ id: string }, BattleResponse>(
   async (req, res): Promise<void> => {
     try {
       const { id } = req.params;
+      const { screenWidth, screenHeight } = req.query;
       // For now, use a default user ID for testing
       const userId = 'test-user-id';
 
-      const battleState = await battleController.getBattleState(id, userId);
+      // Parse screen dimensions from query params
+      const width = screenWidth ? parseInt(screenWidth as string) : 375;
+      const height = screenHeight ? parseInt(screenHeight as string) : 667;
+
+      const battleState = await battleController.getBattleState(id, userId, width, height);
       if (!battleState) {
         res.status(404).json({ success: false, error: 'Battle not found' });
         return;
@@ -79,21 +84,10 @@ router.get<{ id: string }, BattleResponse>(
                battleState.phase === 'complete' ? 'victory' : 'setup',
         timeRemaining: battleState.phase === 'countdown' ? battleState.countdown : 
                       battleState.phase === 'active' ? (20 - battleState.battleTime) : 0,
-        battalions: (battleState.battalions || []).map(battalion => ({
-          id: battalion.id,
-          type: battalion.type,
-          quantity: battalion.quantity,
-          currentHealth: battalion.currentHealth,
-          maxHealth: battalion.maxHealth,
-          nodeIndex: battalion.position?.nodeIndex ?? 0,
-          isUser: battalion.owner === 'user',
-          stats: battalion.stats,
-          targetNode: battalion.targetNode,
-          mark: battalion.mark,
-          remainingPath: battalion.remainingPath,
-          finalTarget: battalion.finalTarget,
-        })),
+        battalions: battleState.battalions || [],
         nodes: battleState.nodes || [],
+        networkConnections: battleState.networkConnections || [], // Add network data
+        lineProperties: battleState.lineProperties || [],         // Add line data
         victoryCondition: battleState.winner ? {
           winner: battleState.winner === 'user' ? 'user' : 'enemy',
           reason: 'timeout'
