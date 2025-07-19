@@ -8,6 +8,14 @@ export interface NetworkConnection {
   to: number;
 }
 
+// Line properties interface matching server format
+export interface LineProperties {
+  length: number;
+  angle: number;
+  left: number;
+  top: number;
+}
+
 // Battle state interface matching server response
 export interface BattleState {
   battleId: string;
@@ -19,8 +27,10 @@ export interface BattleState {
     owner: 'user' | 'enemy' | 'neutral';
     health?: number;
     captureProgress?: number;
+    position: { x: number; y: number }; // Server-provided node positions
   }>;
   networkConnections: NetworkConnection[]; // Server-provided network topology
+  lineProperties: LineProperties[];       // Server-calculated line properties
   victoryCondition?: {
     winner: 'user' | 'enemy';
     reason: 'elimination' | 'timeout' | 'tie';
@@ -52,8 +62,9 @@ export const battleApi = createApi({
       }),
       invalidatesTags: ['Battle'],
     }),
-    getBattleState: builder.query<BattleState, string>({
-      query: (battleId) => `/api/battle/${battleId}/state`,
+    getBattleState: builder.query<BattleState, { battleId: string; screenWidth: number; screenHeight: number }>({
+      query: ({ battleId, screenWidth, screenHeight }) => 
+        `/api/battle/${battleId}/state?screenWidth=${screenWidth}&screenHeight=${screenHeight}`,
       transformResponse: (response: { success: boolean; data: BattleState }) => response.data,
       providesTags: ['Battle'],
     }),

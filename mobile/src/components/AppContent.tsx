@@ -12,7 +12,7 @@ import { TurfScreen } from '../screens/TurfScreen';
 const AppContent = memo(() => {
   const dispatch = useAppDispatch();
   const { token, isLoading } = useAppSelector((state) => state.auth);
-  const balanceDisplayTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const balanceDisplayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch data when authenticated
   const { data: balanceData, isLoading: balanceLoading } = useFetchBalanceQuery(undefined, {

@@ -121,6 +121,38 @@ export interface CreateBattleRequest {
   }>;
 }
 
+// Network connection interface (for client)
+export interface NetworkConnection {
+  from: number;
+  to: number;
+}
+
+// Line properties interface (for client)
+export interface LineProperties {
+  length: number;
+  angle: number;
+  left: number;
+  top: number;
+}
+
+// Client-compatible battalion for API response
+export interface ClientBattalion {
+  id: string;
+  type: BotType;
+  quantity: number;
+  currentHealth: number;
+  maxHealth: number;
+  nodeIndex: number;
+  isUser: boolean;
+  mark: number;
+  targetNode?: number;
+  remainingPath?: number[];
+  finalTarget?: number;
+  stats: BotStats;
+  isMoving?: boolean;
+  movementProgress?: string;
+}
+
 // Battle state response interface (for client)
 export interface BattleStateResponse {
   battleId: string;
@@ -128,8 +160,10 @@ export interface BattleStateResponse {
   countdown: number;
   battleTime: number;
   winner?: NodeOwner;
-  battalions: IBattalion[];
+  battalions: ClientBattalion[];
   nodes: INode[];
+  networkConnections: NetworkConnection[]; // Server-provided network topology
+  lineProperties: LineProperties[];        // Server-calculated line properties
   lastUpdated: Date;
   movementData?: {
     updateInterval: number;

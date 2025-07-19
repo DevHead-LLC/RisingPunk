@@ -7,7 +7,14 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Battalion } from '../../types/battle';
 import { BattleBattalion } from './BattleBattalion';
-import { BattleNodeState } from '../../hooks/useBattleNodes';
+// BattleNodeState type moved to server API types
+type BattleNodeState = {
+  index: number;
+  owner: 'user' | 'enemy' | 'neutral';
+  health?: number;
+  captureProgress?: number;
+  position: { x: number; y: number };
+};
 
 interface Props {
   battalions: Battalion[];

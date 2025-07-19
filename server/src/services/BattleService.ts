@@ -2,6 +2,7 @@ import { Battle, IBattleDocument } from '../models/Battle';
 import { BattleEvent } from '../models/BattleEvent';
 import { BattlePhase, NodeOwner, BotType, IBattalion, INode } from '../types/battle';
 import { BattleTimerService } from './BattleTimer';
+import { BATTLE_CONFIG } from '../config/battleConfig';
 
 // Bot stats copied from mobile useBots.ts
 const BOT_CATEGORIES: Record<BotType, any> = {
@@ -91,41 +92,29 @@ export class BattleService {
   async createBattle(attackerId: string, defenderId: string): Promise<IBattleDocument> {
     const battleId = `battle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    // Initialize nodes (9 nodes with ownership only - positioning handled by client)
-    const nodes: INode[] = [];
+    // Initialize nodes with server-calculated positions (moved from client for security)
+    // Use standard screen dimensions for positioning (client will scale if needed)
+    const STANDARD_WIDTH = 375; // Standard mobile width
+    const STANDARD_HEIGHT = 667; // Standard mobile height  
+    const positionedNodes = BATTLE_CONFIG.calculateNodePositions(STANDARD_WIDTH, STANDARD_HEIGHT, 125);
     
-    // Create nodes with ownership (positioning will be calculated by client)
-    for (let i = 0; i < 9; i++) {
-      let owner: NodeOwner = NodeOwner.NEUTRAL;
+    const nodes: INode[] = positionedNodes.map((nodeTemplate) => {
       let health = 100;
       
-      // User nodes (0, 1, 2)
-      if (i < 3) {
-        owner = NodeOwner.USER;
-        health = 100;
-      }
-      // Enemy nodes (6, 7, 8)
-      else if (i >= 6) {
-        owner = NodeOwner.ENEMY;
-        health = 100;
-      }
-      // Neutral nodes (3, 4, 5) - set health to 75% of total army strength
-      else {
-        owner = NodeOwner.NEUTRAL;
+      // Neutral nodes (3, 4, 5) - temporary health, will be updated below
+      if (nodeTemplate.owner === 'neutral') {
         health = 75; // Temporary value, will be updated below
       }
       
-      nodes.push({
-        index: i,
-        position: {
-          x: 0, // Client will calculate actual position based on screen dimensions
-          y: 0, // Client will calculate actual position based on screen dimensions
-        },
-        owner,
+      return {
+        index: nodeTemplate.index,
+        position: nodeTemplate.position, // Server-calculated position
+        owner: nodeTemplate.owner === 'user' ? NodeOwner.USER : 
+               nodeTemplate.owner === 'enemy' ? NodeOwner.ENEMY : NodeOwner.NEUTRAL,
         health,
         captureProgress: 0,
-      });
-    }
+      };
+    });
     
     // Initialize battalions
     const battalions: IBattalion[] = [];
