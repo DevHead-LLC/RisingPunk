@@ -154,55 +154,7 @@ router.get<{ id: string }, BattleResponse>(
   }
 );
 
-// Get battalion movement state for debugging
-router.get<{ id: string }, BattleResponse>(
-  '/:id/movement',
-  async (req, res): Promise<void> => {
-    try {
-      const { id } = req.params;
-      const userId = req.user?._id;
 
-      if (!userId) {
-        res.status(401).json({ success: false, error: 'Authentication required' });
-        return;
-      }
-
-      const movementData = await battleController.getBattalionMovement(id, userId);
-      res.json({ success: true, data: movementData });
-    } catch (error) {
-      console.error('Get battalion movement error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to get battalion movement' 
-      });
-    }
-  }
-);
-
-// Force retarget for testing retargeting logic
-router.post<{ id: string; battalionId: string }, BattleResponse>(
-  '/:id/retarget/:battalionId',
-  async (req, res): Promise<void> => {
-    try {
-      const { id, battalionId } = req.params;
-      const userId = req.user?._id;
-
-      if (!userId) {
-        res.status(401).json({ success: false, error: 'Authentication required' });
-        return;
-      }
-
-      const result = await battleController.forceRetarget(id, userId, battalionId);
-      res.json({ success: true, data: result });
-    } catch (error) {
-      console.error('Force retarget error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to force retarget' 
-      });
-    }
-  }
-);
 
 // Get battle timer state
 router.get<{ id: string }, BattleResponse>(

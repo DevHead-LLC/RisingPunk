@@ -1,7 +1,6 @@
 import { Request } from 'express';
 import { BattleService } from '../services/BattleService';
 import { BattleCalculator } from '../services/BattleCalculator';
-import { BattleMovement } from '../services/BattleMovement';
 import { Battle, IBattleDocument } from '../models/Battle';
 import { BattleEvent } from '../models/BattleEvent';
 import { BattlePhase, NodeOwner, BattleStateResponse } from '../types/battle';
@@ -14,12 +13,10 @@ interface AuthenticatedRequest extends Request {
 export class BattleController {
   private battleService: BattleService;
   private battleCalculator: BattleCalculator;
-  private battleMovement: BattleMovement;
 
   constructor() {
     this.battleService = new BattleService();
     this.battleCalculator = new BattleCalculator();
-    this.battleMovement = new BattleMovement();
   }
 
   /**
@@ -89,7 +86,7 @@ export class BattleController {
       // Generate network data for client
       const networkData = this.generateNetworkData(battle.nodes, 375, 667);
 
-      // Map battalions for client
+      // Map battalions for client (simplified - no movement data)
       const mappedBattalions = battle.battalions.map(b => ({
         id: b.id,
         type: b.type,
@@ -99,9 +96,6 @@ export class BattleController {
         nodeIndex: b.position.nodeIndex,
         isUser: b.owner === 'user',
         mark: b.mark,
-        targetNode: b.targetNode,
-        remainingPath: b.remainingPath,
-        finalTarget: b.finalTarget,
         stats: b.stats,
       }));
 
@@ -136,8 +130,6 @@ export class BattleController {
         return null;
       }
 
-
-
       // For testing, allow access to any battle (authentication removed)
       // In production, this would verify user is a participant
       // if (battle.attackerId !== userId && battle.defenderId !== userId) {
@@ -153,7 +145,7 @@ export class BattleController {
       const currentCountdown = timerState ? timerState.countdown : battle.countdown;
       const currentBattleTime = timerState ? timerState.battleTime : battle.battleTime;
 
-      // Convert battalion objects to plain objects without using toObject()
+      // Convert battalion objects to plain objects (simplified - no movement data)
       const mappedBattalions = battle.battalions.map(b => {
         // Extract properties manually to avoid Mongoose subdocument issues
         return {
@@ -165,20 +157,14 @@ export class BattleController {
           nodeIndex: b.position.nodeIndex, // Extract nodeIndex from position
           isUser: b.owner === 'user', // Map owner to isUser boolean
           mark: b.mark,
-          targetNode: b.targetNode,
-          remainingPath: b.remainingPath,
-          finalTarget: b.finalTarget,
           stats: b.stats,
-          // Include movement data for client
-          isMoving: b.remainingPath && b.remainingPath.length > 0,
-          movementProgress: b.remainingPath ? (b.remainingPath.length > 0 ? 'moving' : 'idle') : 'idle'
         };
       });
 
       // Generate network data for client
       const networkData = this.generateNetworkData(battle.nodes, screenWidth, screenHeight);
 
-      // Return battle state for client with movement data
+      // Return battle state for client
       return {
         battleId: battle.battleId,
         phase: currentPhase,
@@ -189,12 +175,7 @@ export class BattleController {
         nodes: networkData.updatedNodes,
         networkConnections: networkData.networkConnections,
         lineProperties: networkData.lineProperties,
-        lastUpdated: battle.updatedAt,
-        // Include movement timing information for client interpolation
-        movementData: {
-          updateInterval: 100, // Server updates every 100ms
-          lastMovementUpdate: battle.updatedAt
-        }
+        lastUpdated: battle.updatedAt
       };
     } catch (error) {
       console.error('BattleController getBattleState error:', error);
@@ -203,7 +184,7 @@ export class BattleController {
   }
 
   /**
-   * Submit battle action (future use for movement/attacks)
+   * Submit a battle action (simplified - no movement actions)
    */
   async submitAction(battleId: string, userId: string, actionType: string, data: any): Promise<any> {
     try {
@@ -214,25 +195,14 @@ export class BattleController {
         throw new Error('Battle not found');
       }
 
-      // Verify user is a participant
-      if (battle.attackerId !== userId && battle.defenderId !== userId) {
-        throw new Error('User not authorized to submit actions for this battle');
-      }
-
-      // Verify battle is active
-      if (battle.phase !== BattlePhase.ACTIVE) {
-        throw new Error('Battle is not active');
-      }
-
-      // Log the action
+      // For now, just log the action (no movement processing)
       await this.battleCalculator.logBattleEvent(battleId, actionType, {
         userId,
-        data,
-        timestamp: new Date()
+        actionType,
+        data
       });
 
-      // For now, just return success - actual action processing will be implemented later
-      return { success: true, actionType, timestamp: new Date() };
+      return { success: true, message: 'Action logged' };
     } catch (error) {
       console.error('BattleController submitAction error:', error);
       throw new Error('Failed to submit action');
@@ -240,7 +210,7 @@ export class BattleController {
   }
 
   /**
-   * Get battle event log
+   * Get battle events
    */
   async getBattleEvents(battleId: string, userId: string): Promise<any[]> {
     try {
@@ -251,21 +221,13 @@ export class BattleController {
         throw new Error('Battle not found');
       }
 
-      // Verify user is a participant
-      if (battle.attackerId !== userId && battle.defenderId !== userId) {
-        throw new Error('User not authorized to view this battle');
-      }
-
       // Get events from database
-      const events = await BattleEvent.find({ battleId })
-        .sort({ timestamp: 1 })
-        .limit(100); // Limit to last 100 events
-
+      const events = await BattleEvent.find({ battleId }).sort({ timestamp: -1 }).limit(50);
+      
       return events.map(event => ({
         id: event._id,
         eventType: event.eventType,
         timestamp: event.timestamp,
-        actorId: event.actorId,
         data: event.data
       }));
     } catch (error) {
@@ -275,89 +237,7 @@ export class BattleController {
   }
 
   /**
-   * Get battalion movement state for debugging
-   */
-  async getBattalionMovement(battleId: string, userId: string): Promise<any> {
-    try {
-      // Get battle from database
-      const battle = await this.battleService.getBattle(battleId);
-      
-      if (!battle) {
-        throw new Error('Battle not found');
-      }
-
-      // Verify user is a participant
-      if (battle.attackerId !== userId && battle.defenderId !== userId) {
-        throw new Error('User not authorized to view this battle');
-      }
-
-      // Return movement data for debugging
-      return {
-        battleId: battle.battleId,
-        battalions: battle.battalions.map(b => ({
-          id: b.id,
-          position: b.position,
-          targetNode: b.targetNode,
-          finalTarget: b.finalTarget,
-          remainingPath: b.remainingPath,
-          isMoving: b.remainingPath && b.remainingPath.length > 0
-        })),
-        nodes: battle.nodes.map(n => ({
-          index: n.index,
-          owner: n.owner,
-          position: n.position
-        }))
-      };
-    } catch (error) {
-      console.error('BattleController getBattalionMovement error:', error);
-      throw new Error('Failed to get battalion movement');
-    }
-  }
-
-  /**
-   * Force retarget for testing retargeting logic
-   */
-  async forceRetarget(battleId: string, userId: string, battalionId: string): Promise<any> {
-    try {
-      // Get battle from database
-      const battle = await this.battleService.getBattle(battleId);
-      
-      if (!battle) {
-        throw new Error('Battle not found');
-      }
-
-      // Verify user is a participant
-      if (battle.attackerId !== userId && battle.defenderId !== userId) {
-        throw new Error('User not authorized to modify this battle');
-      }
-
-      // Find the battalion
-      const battalion = battle.battalions.find(b => b.id === battalionId);
-      if (!battalion) {
-        throw new Error('Battalion not found');
-      }
-
-      // Force retarget by clearing current target
-      battalion.targetNode = undefined;
-      battalion.finalTarget = undefined;
-      battalion.remainingPath = [];
-
-      // Save battle state
-      await battle.save();
-
-      return {
-        success: true,
-        battalionId,
-        message: 'Battalion retargeting forced'
-      };
-    } catch (error) {
-      console.error('BattleController forceRetarget error:', error);
-      throw new Error('Failed to force retarget');
-    }
-  }
-
-  /**
-   * Get battle timer state
+   * Get battle timer
    */
   async getBattleTimer(battleId: string, userId: string): Promise<any> {
     try {
@@ -368,32 +248,16 @@ export class BattleController {
         throw new Error('Battle not found');
       }
 
-      // Verify user is a participant
-      if (battle.attackerId !== userId && battle.defenderId !== userId) {
-        throw new Error('User not authorized to view this battle');
-      }
-
-      // Get timer state from BattleTimerService
+      // Get real-time timer values
       const timerService = this.battleService.getTimerService();
       const timerState = timerService.getTimeRemaining(battleId);
 
-      if (!timerState) {
-        // Timer not active, return current battle state
-        return {
-          battleId: battle.battleId,
-          phase: battle.phase,
-          countdown: battle.countdown,
-          battleTime: battle.battleTime,
-          isActive: false
-        };
-      }
-
       return {
-        battleId: battle.battleId,
-        phase: timerState.phase,
-        countdown: timerState.countdown,
-        battleTime: timerState.battleTime,
-        isActive: timerService.isTimerActive(battleId)
+        battleId,
+        phase: timerState ? timerState.phase : battle.phase,
+        countdown: timerState ? timerState.countdown : battle.countdown,
+        battleTime: timerState ? timerState.battleTime : battle.battleTime,
+        maxBattleTime: 20
       };
     } catch (error) {
       console.error('BattleController getBattleTimer error:', error);
@@ -402,7 +266,7 @@ export class BattleController {
   }
 
   /**
-   * Force end battle (admin/timeout)
+   * End battle
    */
   async endBattle(battleId: string, userId: string): Promise<BattleStateResponse> {
     try {
@@ -413,40 +277,22 @@ export class BattleController {
         throw new Error('Battle not found');
       }
 
-      // Verify user is a participant
-      if (battle.attackerId !== userId && battle.defenderId !== userId) {
-        throw new Error('User not authorized to end this battle');
-      }
-
-      // Check victory conditions
-      const winner = this.battleCalculator.checkVictoryConditions(
-        battle.battalions,
-        battle.nodes,
-        battle.battleTime
-      );
-
-      // End battle with winner
-      const endedBattle = await this.battleService.endBattle(
-        battleId, 
-        winner === 'attacker' ? NodeOwner.USER : NodeOwner.ENEMY
-      );
-
-      if (!endedBattle) {
-        throw new Error('Failed to end battle');
-      }
+      // Update battle phase to complete
+      battle.phase = BattlePhase.COMPLETE;
+      battle.endTime = new Date();
+      await battle.save();
 
       // Log battle end event
       await this.battleCalculator.logBattleEvent(battleId, 'battle_end', {
-        winner: endedBattle.winner,
-        finalBattleTime: endedBattle.battleTime,
-        finalBattalionCount: endedBattle.battalions.length
+        winner: battle.winner,
+        endTime: battle.endTime
       });
 
-      // Generate network data for client (use default dimensions for end battle)
-      const networkData = this.generateNetworkData(endedBattle.nodes, 375, 667);
+      // Generate network data for client
+      const networkData = this.generateNetworkData(battle.nodes, 375, 667);
 
-      // Map battalions for client
-      const mappedBattalions = endedBattle.battalions.map(b => ({
+      // Map battalions for client (simplified - no movement data)
+      const mappedBattalions = battle.battalions.map(b => ({
         id: b.id,
         type: b.type,
         quantity: b.quantity,
@@ -455,30 +301,25 @@ export class BattleController {
         nodeIndex: b.position.nodeIndex,
         isUser: b.owner === 'user',
         mark: b.mark,
-        targetNode: b.targetNode,
-        remainingPath: b.remainingPath,
-        finalTarget: b.finalTarget,
         stats: b.stats,
       }));
 
       // Return final battle state
       return {
-        battleId: endedBattle.battleId,
-        phase: endedBattle.phase,
-        countdown: endedBattle.countdown,
-        battleTime: endedBattle.battleTime,
-        winner: endedBattle.winner,
+        battleId: battle.battleId,
+        phase: battle.phase,
+        countdown: 0,
+        battleTime: 20,
+        winner: battle.winner,
         battalions: mappedBattalions,
         nodes: networkData.updatedNodes,
         networkConnections: networkData.networkConnections,
         lineProperties: networkData.lineProperties,
-        lastUpdated: endedBattle.updatedAt
+        lastUpdated: battle.updatedAt
       };
     } catch (error) {
       console.error('BattleController endBattle error:', error);
       throw new Error('Failed to end battle');
     }
   }
-
-
 } 

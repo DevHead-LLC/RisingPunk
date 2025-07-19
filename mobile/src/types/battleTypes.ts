@@ -31,7 +31,6 @@ export interface Battalion {
   maxHealth: number;
   position: NodePosition;
   currentNode: NodeIndex;
-  targetNode?: NodeIndex;
   owner: 'user' | 'enemy';
 }
 
@@ -49,13 +48,5 @@ export interface BattleState {
   maxBattleTime: number;
 }
 
-// Network Movement Types
-export type Path = NodeIndex[];
+// Network Connection Type
 export type NetworkConnection = [NodeIndex, NodeIndex];
-
-export interface MovementTarget {
-  nodeIndex: NodeIndex;
-  position: NodePosition;
-  path: Path;
-  distance: number;
-}

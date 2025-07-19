@@ -79,27 +79,6 @@ const battalionSchema = new Schema({
     required: true,
     min: 1
   },
-  targetNode: {
-    type: Number,
-    required: false,
-    min: 0,
-    max: 8
-  },
-  targetBattalion: {
-    type: String,
-    required: false
-  },
-  remainingPath: [{
-    type: Number,
-    min: 0,
-    max: 8
-  }],
-  finalTarget: {
-    type: Number,
-    required: false,
-    min: 0,
-    max: 8
-  },
   stats: {
     health: {
       type: Number,
