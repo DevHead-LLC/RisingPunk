@@ -12,7 +12,6 @@ export enum BattlePhase {
 export enum EventType {
   BATTLE_START = 'battle_start',
   BATTLE_END = 'battle_end',
-  BATTALION_MOVE = 'battalion_move',
   BATTALION_ATTACK = 'battalion_attack',
   BATTALION_DAMAGE = 'battalion_damage',
   BATTALION_DESTROYED = 'battalion_destroyed',
@@ -60,10 +59,6 @@ export interface IBattalion {
   position: BattalionPosition;
   owner: NodeOwner;
   mark: number;
-  targetNode?: number;
-  targetBattalion?: string;
-  remainingPath?: number[];
-  finalTarget?: number;
   stats: BotStats;
 }
 
@@ -145,12 +140,7 @@ export interface ClientBattalion {
   nodeIndex: number;
   isUser: boolean;
   mark: number;
-  targetNode?: number;
-  remainingPath?: number[];
-  finalTarget?: number;
   stats: BotStats;
-  isMoving?: boolean;
-  movementProgress?: string;
 }
 
 // Battle state response interface (for client)
@@ -165,8 +155,4 @@ export interface BattleStateResponse {
   networkConnections: NetworkConnection[]; // Server-provided network topology
   lineProperties: LineProperties[];        // Server-calculated line properties
   lastUpdated: Date;
-  movementData?: {
-    updateInterval: number;
-    lastMovementUpdate: Date;
-  };
 } 

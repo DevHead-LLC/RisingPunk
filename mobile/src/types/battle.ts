@@ -1,7 +1,5 @@
 import { BotType, BotStats } from '../hooks/useBots';
 
-export type Path = number[];
-
 // Use the BotType from useBots instead of a separate enum
 export type BattalionType = BotType;
 
@@ -16,10 +14,7 @@ export interface BattalionPosition {
   position: any; // Animated.ValueXY
   quantity: number;
   currentHealth?: number;
-  targetNode?: number;
   mark: number;
-  remainingPath?: number[]; // For path following logic
-  finalTarget?: number; // For path following logic
 }
 
 // Enhanced battalion interface with bot stats integration
@@ -32,24 +27,8 @@ export interface Battalion {
   nodeIndex: number;
   isUser: boolean;
   stats: BotStats;
-  targetNode?: number;
   mark: number;
-  remainingPath?: number[];
-  finalTarget?: number;
 }
-
-export type BattleTarget = {
-  type: 'node' | 'battalion';
-  index: number;
-  distance: number;
-  position: { x: number; y: number };
-  path?: Path;
-  pathInfo?: {
-    path: number[];
-    nodeTransitions: number;
-    pathOptions: number;
-  };
-};
 
 export type BattleNode = {
   x: number;
