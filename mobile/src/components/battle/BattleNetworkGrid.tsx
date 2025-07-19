@@ -1,10 +1,11 @@
 /**
  * @file BattleNetworkGrid.tsx
- * @description Pure network visualization component that renders nodes and connections
+ * @description Self-contained network visualization component with direct server integration
  */
 
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
+import { useGetBattleStateQuery } from '../../store/api/battleApi';
 
 // Server-provided data types (matching server response)
 
@@ -29,9 +30,7 @@ export interface BattleNodeState {
 }
 
 interface Props {
-  nodes: BattleNodeState[];
-  connections: NetworkConnection[];
-  lineProperties: LineProperties[];
+  battleId: string;
   onNodePress?: (nodeIndex: number) => void;
   nodeSize?: number;
   lineColor?: string;
@@ -64,31 +63,75 @@ function getNodeBorderColor(owner: 'user' | 'enemy' | 'neutral'): string {
 }
 
 export const BattleNetworkGrid = React.memo(({
-  nodes,
-  connections,
-  lineProperties,
+  battleId,
   onNodePress,
   nodeSize = 20,
   lineColor = '#666666',
   lineWidth = 2,
   showNodeLabels = true,
 }: Props) => {
-  // Server provides all network data - use directly
-  const actualConnections = connections || [];
-  const actualLineProperties = lineProperties || [];
+  // Get screen dimensions for server calculations
+  const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
   
+  // Direct API call to get battle state
+  const { 
+    data: battleState, 
+    isLoading: battleLoading, 
+    error: battleError 
+  } = useGetBattleStateQuery(
+    { battleId, screenWidth, screenHeight }, 
+    {
+      pollingInterval: 1000, // Poll every 1 second for real-time updates
+      skip: !battleId,
+    }
+  );
+
   // SIMPLE LOG: Only log problems
-  React.useEffect(() => {
-    if (actualLineProperties?.length > 0 && actualLineProperties[0].length === 0) {
+  useEffect(() => {
+    if (battleState && battleState.nodes?.length > 0) {
+      const firstNode = battleState.nodes[0];
+      if (!firstNode.index && firstNode.index !== 0) {
+        console.log('❌ NODES MISSING INDEX/OWNER - Server sending Mongoose docs');
+      }
+    }
+    if (battleState?.lineProperties && battleState.lineProperties.length > 0 && battleState.lineProperties[0].length === 0) {
       console.log('❌ LINE PROPS ALL ZERO - Server calculation failed');
     }
-  }, [actualLineProperties]);
+    if (battleError) {
+      console.log('❌ NETWORK API ERROR:', battleError);
+    }
+  }, [battleState, battleError]);
+
+  // Show loading state while fetching server data
+  if (battleLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4717F6" />
+        <Text style={styles.loadingText}>Loading network...</Text>
+      </View>
+    );
+  }
+
+  // Show error state if server data fails
+  if (battleError || !battleState) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Failed to load network</Text>
+        <Text style={styles.errorSubtext}>Please try again</Text>
+      </View>
+    );
+  }
+
+  // Server provides all network data - use directly
+  const nodes = battleState.nodes || [];
+  const connections = battleState.networkConnections || [];
+  const lineProperties = battleState.lineProperties || [];
 
   return (
     <View style={styles.container}>
       {/* Render connection lines */}
-      {actualLineProperties?.map((lineProps, index) => {
-        const connection = actualConnections?.[index];
+      {lineProperties?.map((lineProps, index) => {
+        const connection = connections?.[index];
         if (!connection) return null;
 
         return (
@@ -176,5 +219,39 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  loadingContainer: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.1)',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#4717F6',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  errorContainer: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,0,0,0.1)',
+  },
+  errorText: {
+    color: '#FF4141',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  errorSubtext: {
+    color: '#666666',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 5,
   },
 });
