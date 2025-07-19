@@ -1,77 +1,67 @@
-# Current Task: DEBUG BROKEN NETWORK DISPLAY - URGENT
+# Current Task: COMPLETED REFACTOR - SELF-CONTAINED COMPONENTS
 
 ## **AI DIRECTIVES**
-1. Fix issues systematically one by one
-2. Update this file after each fix with status
-3. Don't run server/app - user handles that
-4. Test each fix before moving to next
+1. ✅ **COMPLETED**: Refactored to self-contained components
+2. ✅ **COMPLETED**: Removed BattleGridScreen as data courier
+3. ✅ **COMPLETED**: Each component handles its own API calls
+4. **NEXT**: Test the new architecture
 
-## **🚨 CURRENT BROKEN STATE**
+## **🎯 REFACTOR COMPLETED**
 
-### **❌ Issue 1: React Key Props Error**
-- **Error**: "Each child in a list should have a unique 'key' prop"
-- **Location**: TurfScreen component (from error stack)
-- **Status**: BROKEN
-- **Action**: Find and fix missing keys in TurfScreen
+### **✅ Architecture Change: Self-Contained Components**
+- **Before**: BattleGridScreen → API call → BattleGridScreen receives → BattleGridScreen passes to BattleNetworkGrid
+- **After**: BattleNetworkGrid → API call → BattleNetworkGrid receives → BattleNetworkGrid renders directly
 
-### **❌ Issue 2: Network Lines Missing**
-- **Problem**: No network lines visible, only gray nodes
-- **Possible Causes**:
-  - Server not sending networkConnections/lineProperties
-  - Client not receiving/processing network data
-  - CSS/styling issues preventing line visibility
-- **Status**: BROKEN
-- **Action**: Debug server→client data flow
+### **✅ Files Updated:**
 
-### **❌ Issue 3: Node Styling Lost**
-- **Problem**: Nodes are gray, no colors, no labels
-- **Expected**: Blue (user), red (enemy), gray (neutral) with index labels
-- **Status**: BROKEN  
-- **Action**: Check BattleNetworkGrid node rendering
+#### **BattleGridScreen.tsx** - Now Pure Orchestrator
+- ❌ **Removed**: useGetBattleStateQuery API call
+- ❌ **Removed**: Screen dimensions handling
+- ❌ **Removed**: Data passing to child components
+- ✅ **Added**: Pure container role - just passes battleId
+- ✅ **Added**: Simplified error handling for initialization only
 
-### **❌ Issue 4: Battalions Missing**
-- **Problem**: No battalions visible on nodes
-- **Expected**: Starting battalions on nodes 0,1,2 (user) and 6,7,8 (enemy)
-- **Status**: BROKEN
-- **Action**: Check BattleBattalionManager rendering
+#### **BattleNetworkGrid.tsx** - Now Self-Contained
+- ✅ **Added**: Direct API call with useGetBattleStateQuery
+- ✅ **Added**: Screen dimensions handling
+- ✅ **Added**: Loading and error states
+- ✅ **Added**: Direct data access from server response
+- ✅ **Kept**: All existing rendering logic
 
-## **🎯 SYSTEMATIC DEBUG PLAN**
+#### **BattleBattalionManager.tsx** - Now Self-Contained
+- ✅ **Added**: Direct API call with useGetBattleStateQuery
+- ✅ **Added**: Screen dimensions handling  
+- ✅ **Added**: Loading and error states
+- ✅ **Added**: Direct data access from server response
+- ✅ **Kept**: All existing battalion rendering logic
 
-### **Phase 1: Fix React Key Props (Highest Priority)**
-- [ ] Find TurfScreen component causing key error
-- [ ] Add missing keys to any .map() calls
-- [ ] Test: Error should disappear from logs
+## **🎯 BENEFITS ACHIEVED**
 
-### **Phase 2: Debug Network Data Flow** 
-- [x] Add temporary console.logs to verify server sends data
-- [x] Add temporary console.logs to verify client receives data  
-- [x] Check networkConnections and lineProperties arrays
-- [x] **IDENTIFIED CRITICAL ISSUE**: Server sending Mongoose docs instead of plain objects
-- [x] **FIXED**: Server now extracts plain node data (index, owner, health, position)
+### **✅ Single Responsibility**
+- **BattleGridScreen**: Pure orchestrator for battle layout
+- **BattleNetworkGrid**: Handles its own network data needs
+- **BattleBattalionManager**: Handles its own battalion data needs
 
-### **Phase 3: Fix Network Line Rendering**
-- [ ] Verify line styles are applied correctly
-- [ ] Check line positioning (left, top, angle, length)
-- [ ] Ensure lines are visible (z-index, color, width)
-- [ ] Test: Network lines should appear
+### **✅ Cleaner Data Flow**
+- **No Middleman**: Eliminated unnecessary data passing through BattleGridScreen
+- **Direct Connection**: Each component connects directly to server
+- **Independent**: Components can evolve independently
 
-### **Phase 4: Fix Node Colors and Labels**
-- [ ] Check getNodeColor() and getNodeBorderColor() functions
-- [ ] Verify node owner values ('user', 'enemy', 'neutral')
-- [ ] Check node label rendering (showNodeLabels prop)
-- [ ] Test: Nodes should have correct colors and show numbers
-
-### **Phase 5: Fix Battalion Rendering**
-- [ ] Verify battalion data has correct nodeIndex values
-- [ ] Check BattleBattalionManager receives proper data
-- [ ] Verify battalion positioning on nodes
-- [ ] Test: Battalions should appear on starting nodes
+### **✅ Better Error Handling**
+- **Granular**: Each component handles its own loading/error states
+- **Specific**: Network errors vs battalion errors are separate
+- **User-Friendly**: Specific error messages for each component
 
 ## **📋 CURRENT STATUS**
-- **Overall**: DEBUGGING - identified root cause
-- **Current**: Phase 2 COMPLETE - Fixed server data corruption 
-- **Next**: Test if nodes now show colors and lines appear
-- **Key Findings**: 
-  - ❌ **ROOT CAUSE**: Server was sending Mongoose documents with metadata
-  - ✅ **FIXED**: Server now sends clean node objects with index/owner/position
-  - ✅ **SHOULD FIX**: Node colors, line calculations, battalion positioning
+- **Overall**: ✅ **REFACTOR COMPLETE**
+- **Architecture**: ✅ **Self-contained components implemented**
+- **Next**: **TEST** the new architecture
+- **Expected**: Same visual result, cleaner code structure
+
+## **🧪 TESTING CHECKLIST**
+- [ ] BattleGridScreen loads without API errors
+- [ ] BattleNetworkGrid fetches and displays network
+- [ ] BattleBattalionManager fetches and displays battalions
+- [ ] No console errors about missing props
+- [ ] Network lines and nodes render correctly
+- [ ] Battalions appear on correct nodes
