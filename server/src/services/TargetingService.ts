@@ -96,42 +96,21 @@ export class TargetingService {
   }
   
   /**
-   * Check if target node is reachable from starting node via network connections
+   * Check if target node is reachable from starting node via DIRECT network connections only
    */
   private static isReachableViaNetwork(startingNode: number, targetNode: number): boolean {
-    // Direct connection check
-    const hasDirectConnection = BATTLE_CONFIG.NETWORK_CONNECTIONS.some(connection => 
+    // Direct connection check only - no 1-hop paths for initial targeting
+    return BATTLE_CONFIG.NETWORK_CONNECTIONS.some(connection => 
       (connection.from === startingNode && connection.to === targetNode) ||
       (connection.from === targetNode && connection.to === startingNode)
-    );
-    
-    if (hasDirectConnection) {
-      return true;
-    }
-    
-    // Check for 1-hop connections (through intermediate nodes)
-    const intermediateNodes = BATTLE_CONFIG.NETWORK_CONNECTIONS
-      .filter(connection => 
-        connection.from === startingNode || connection.to === startingNode
-      )
-      .map(connection => 
-        connection.from === startingNode ? connection.to : connection.from
-      );
-    
-    // Check if any intermediate node connects to target
-    return intermediateNodes.some(intermediateNode => 
-      BATTLE_CONFIG.NETWORK_CONNECTIONS.some(connection => 
-        (connection.from === intermediateNode && connection.to === targetNode) ||
-        (connection.from === targetNode && connection.to === intermediateNode)
-      )
     );
   }
   
   /**
-   * Get network path from starting node to target node
+   * Get network path from starting node to target node (direct connections only for initial targeting)
    */
   static getNetworkPath(startingNode: number, targetNode: number): number[] {
-    // Direct connection
+    // Direct connection only - no 1-hop paths for initial targeting
     const hasDirectConnection = BATTLE_CONFIG.NETWORK_CONNECTIONS.some(connection => 
       (connection.from === startingNode && connection.to === targetNode) ||
       (connection.from === targetNode && connection.to === startingNode)
@@ -139,26 +118,6 @@ export class TargetingService {
     
     if (hasDirectConnection) {
       return [startingNode, targetNode];
-    }
-    
-    // Find 1-hop path
-    const intermediateNodes = BATTLE_CONFIG.NETWORK_CONNECTIONS
-      .filter(connection => 
-        connection.from === startingNode || connection.to === startingNode
-      )
-      .map(connection => 
-        connection.from === startingNode ? connection.to : connection.from
-      );
-    
-    for (const intermediateNode of intermediateNodes) {
-      const hasConnectionToTarget = BATTLE_CONFIG.NETWORK_CONNECTIONS.some(connection => 
-        (connection.from === intermediateNode && connection.to === targetNode) ||
-        (connection.from === targetNode && connection.to === intermediateNode)
-      );
-      
-      if (hasConnectionToTarget) {
-        return [startingNode, intermediateNode, targetNode];
-      }
     }
     
     return [];
