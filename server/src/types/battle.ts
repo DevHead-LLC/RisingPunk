@@ -116,19 +116,11 @@ export interface CreateBattleRequest {
   }>;
 }
 
-// Network connection interface (for client)
-export interface NetworkConnection {
-  from: number;
-  to: number;
-}
+// Network connection interface (imported from battleConfig - single source of truth)
+export { NetworkConnection } from '../config/battleConfig';
 
-// Line properties interface (for client)
-export interface LineProperties {
-  length: number;
-  angle: number;
-  left: number;
-  top: number;
-}
+// Line properties interface (imported from battleConfig - single source of truth)
+export { LineProperties } from '../config/battleConfig';
 
 // Client-compatible battalion for API response
 export interface ClientBattalion {
@@ -152,8 +144,8 @@ export interface BattleStateResponse {
   winner?: NodeOwner;
   battalions: ClientBattalion[];
   nodes: INode[];
-  networkConnections: NetworkConnection[]; // Server-provided network topology
-  lineProperties: LineProperties[];        // Server-calculated line properties
+  networkConnections: import('../config/battleConfig').NetworkConnection[]; // Server-provided network topology
+  lineProperties: import('../config/battleConfig').LineProperties[];        // Server-calculated line properties
   targetingResults?: any[];               // Initial targeting data
   lastUpdated: Date;
 } 

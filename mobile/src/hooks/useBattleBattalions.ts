@@ -1,6 +1,25 @@
 import { useState, useMemo } from 'react';
-import { Battalion } from '../types/battle';
+// Battalion type defined inline to match server response format
 import { useBattalionData } from './useBattalionData';
+
+// Server-provided battalion data (read-only)
+type Battalion = {
+  id: string;
+  type: 'guardian' | 'breacher' | 'phreak';
+  quantity: number;
+  currentHealth: number;
+  maxHealth: number;
+  nodeIndex: number;
+  isUser: boolean;
+  mark: number;
+  stats: {
+    health: number;
+    speed: number;
+    range: number;
+    offense: number;
+    defense: number;
+  };
+};
 
 // TODO: This hook will be deprecated once server integration is complete
 // Future implementation will use battleApi:

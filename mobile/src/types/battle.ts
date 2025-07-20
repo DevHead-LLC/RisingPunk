@@ -1,7 +1,6 @@
-import { BotType, BotStats } from '../hooks/useBots';
+// All types moved to battleTypes.ts (single source of truth)
 
-// Use the BotType from useBots instead of a separate enum
-export type BattalionType = BotType;
+// BattalionType moved to battleTypes.ts (single source of truth)
 
 // CLARIFICATION: This file should only define types/interfaces/enums for the battle system.
 // TODO: Ensure this file does not control logic for control state, capture progress, or any battle logic—only type definitions. Logic should be handled elsewhere.
@@ -17,22 +16,6 @@ export interface BattalionPosition {
   mark: number;
 }
 
-// Enhanced battalion interface with bot stats integration
-export interface Battalion {
-  id: string;
-  type: BattalionType;
-  quantity: number;
-  currentHealth: number;
-  maxHealth: number;
-  nodeIndex: number;
-  isUser: boolean;
-  stats: BotStats;
-  mark: number;
-}
+// Battalion interface moved to battleTypes.ts (single source of truth)
 
-export type BattleNode = {
-  x: number;
-  y: number;
-  health?: number;
-  captureProgress?: number;
-};
+// BattleNode interface moved to battleTypes.ts (single source of truth)

@@ -5,73 +5,9 @@ import { BattleTimerService } from './BattleTimer';
 import { BATTLE_CONFIG } from '../config/battleConfig';
 import { TargetingService, TargetingResult } from './TargetingService';
 
-// Bot stats copied from mobile useBots.ts
-const BOT_CATEGORIES: Record<BotType, any> = {
-  guardian: {
-    role: 'Cavalry',
-    stats: {
-      health: 14,
-      speed: 9,
-      range: 4,
-      offense: 8,
-      defense: 6,
-    },
-  },
-  breacher: {
-    role: 'Infantry',
-    stats: {
-      health: 18,
-      speed: 5,
-      range: 5,
-      offense: 7,
-      defense: 8,
-    },
-  },
-  phreak: {
-    role: 'Ranged',
-    stats: {
-      health: 12,
-      speed: 7,
-      range: 9,
-      offense: 6,
-      defense: 5,
-    },
-  },
-};
-
-// Enemy bot stats (4x higher attack for testing)
-const ENEMY_BOT_CATEGORIES: Record<BotType, any> = {
-  guardian: {
-    role: 'Cavalry',
-    stats: {
-      health: 14,
-      speed: 9,
-      range: 4,
-      offense: 32,
-      defense: 6,
-    },
-  },
-  breacher: {
-    role: 'Infantry',
-    stats: {
-      health: 18,
-      speed: 5,
-      range: 5,
-      offense: 28,
-      defense: 8,
-    },
-  },
-  phreak: {
-    role: 'Ranged',
-    stats: {
-      health: 12,
-      speed: 7,
-      range: 9,
-      offense: 24,
-      defense: 5,
-    },
-  },
-};
+// Bot stats from battleConfig (single source of truth)
+const BOT_CATEGORIES = BATTLE_CONFIG.BOT_STATS;
+const ENEMY_BOT_CATEGORIES = BATTLE_CONFIG.ENEMY_BOT_STATS;
 
 export class BattleService {
   private timerService: BattleTimerService;
