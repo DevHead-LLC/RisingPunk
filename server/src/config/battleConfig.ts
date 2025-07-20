@@ -1,8 +1,8 @@
 // Battle configuration constants from intentions documents
+import { NodeOwner } from '../types/battle';
 
 // Network types (moved from client for server authority)
 export type NodeIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
-export type NodeOwner = 'user' | 'enemy' | 'neutral';
 
 export interface NetworkConnection {
   from: NodeIndex;
@@ -77,15 +77,15 @@ export const BATTLE_CONFIG = {
     const Y_BOTTOM = topMargin + availableHeight - BOTTOM_MARGIN;
 
     return [
-      { index: 0, position: { x: X_LEFT, y: Y_TOP }, owner: 'user' },
-      { index: 1, position: { x: X_LEFT, y: Y_MIDDLE }, owner: 'user' },
-      { index: 2, position: { x: X_LEFT, y: Y_BOTTOM }, owner: 'user' },
-      { index: 3, position: { x: X_CENTER, y: Y_TOP }, owner: 'neutral' },
-      { index: 4, position: { x: X_CENTER, y: Y_MIDDLE }, owner: 'neutral' },
-      { index: 5, position: { x: X_CENTER, y: Y_BOTTOM }, owner: 'neutral' },
-      { index: 6, position: { x: X_RIGHT, y: Y_TOP }, owner: 'enemy' },
-      { index: 7, position: { x: X_RIGHT, y: Y_MIDDLE }, owner: 'enemy' },
-      { index: 8, position: { x: X_RIGHT, y: Y_BOTTOM }, owner: 'enemy' },
+      { index: 0, position: { x: X_LEFT, y: Y_TOP }, owner: NodeOwner.USER },
+      { index: 1, position: { x: X_LEFT, y: Y_MIDDLE }, owner: NodeOwner.USER },
+      { index: 2, position: { x: X_LEFT, y: Y_BOTTOM }, owner: NodeOwner.USER },
+      { index: 3, position: { x: X_CENTER, y: Y_TOP }, owner: NodeOwner.NEUTRAL },
+      { index: 4, position: { x: X_CENTER, y: Y_MIDDLE }, owner: NodeOwner.NEUTRAL },
+      { index: 5, position: { x: X_CENTER, y: Y_BOTTOM }, owner: NodeOwner.NEUTRAL },
+      { index: 6, position: { x: X_RIGHT, y: Y_TOP }, owner: NodeOwner.ENEMY },
+      { index: 7, position: { x: X_RIGHT, y: Y_MIDDLE }, owner: NodeOwner.ENEMY },
+      { index: 8, position: { x: X_RIGHT, y: Y_BOTTOM }, owner: NodeOwner.ENEMY },
     ];
   },
 
@@ -104,7 +104,7 @@ export const BATTLE_CONFIG = {
     };
   },
   
-  // Bot stats (copied from BattleService.ts)
+  // Bot stats (single source of truth)
   BOT_STATS: {
     guardian: {
       role: 'Cavalry',

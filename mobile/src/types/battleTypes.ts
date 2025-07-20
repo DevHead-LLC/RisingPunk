@@ -5,16 +5,9 @@
  */
 
 // Node and Network Types
-export type NodeIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type NodePosition = { x: number; y: number };
 
-export interface BattleNode {
-  index: NodeIndex;
-  position: NodePosition;
-  owner: 'neutral' | 'user' | 'enemy';
-  health?: number;
-  captureProgress?: number;
-}
+// BattleNode interface moved to server authority - client receives read-only data via API
 
 // Battalion Types
 export enum BattalionType {
@@ -23,16 +16,7 @@ export enum BattalionType {
   BREACHER = 'breacher'
 }
 
-export interface Battalion {
-  id: string;
-  type: BattalionType;
-  quantity: number;
-  currentHealth: number;
-  maxHealth: number;
-  position: NodePosition;
-  currentNode: NodeIndex;
-  owner: 'user' | 'enemy';
-}
+// Battalion interface moved to server authority - client receives read-only data via API
 
 // Battle State Types
 export enum BattlePhase {
@@ -41,12 +25,18 @@ export enum BattlePhase {
   COMPLETE = 'complete'
 }
 
-export interface BattleState {
-  phase: BattlePhase;
-  countdown: number;
-  battleTime: number;
-  maxBattleTime: number;
+// BattleState interface moved to battleApi.ts (server response format)
+
+// Network Connection Type (server authority - matches server format)
+export interface NetworkConnection {
+  from: number;
+  to: number;
 }
 
-// Network Connection Type
-export type NetworkConnection = [NodeIndex, NodeIndex];
+// Line Properties Type (server authority - matches server format)
+export interface LineProperties {
+  length: number;
+  angle: number;
+  left: number;
+  top: number;
+}

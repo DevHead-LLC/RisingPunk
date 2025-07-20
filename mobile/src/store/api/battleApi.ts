@@ -1,34 +1,42 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
-import { Battalion } from '../../types/battle';
+// Battalion interface defined inline to match server response format
 
-// Network connection interface matching server format
-export interface NetworkConnection {
-  from: number;
-  to: number;
-}
+// Network connection interface (server authority - imported from types)
+import { NetworkConnection } from '../../types/battleTypes';
 
-// Line properties interface matching server format
-export interface LineProperties {
-  length: number;
-  angle: number;
-  left: number;
-  top: number;
-}
+// Line properties interface (server authority - imported from types)
+import { LineProperties } from '../../types/battleTypes';
 
 // Battle state interface matching server response
 export interface BattleState {
   battleId: string;
   phase: 'setup' | 'countdown' | 'battle' | 'victory' | 'defeat';
   timeRemaining: number;
-  battalions: Battalion[];
+  battalions: Array<{
+    id: string;
+    type: 'guardian' | 'breacher' | 'phreak';
+    quantity: number;
+    currentHealth: number;
+    maxHealth: number;
+    nodeIndex: number;
+    isUser: boolean;
+    mark: number;
+    stats: {
+      health: number;
+      speed: number;
+      range: number;
+      offense: number;
+      defense: number;
+    };
+  }>; // Server-provided battalion data (read-only)
   nodes: Array<{
     index: number;
     owner: 'user' | 'enemy' | 'neutral';
     health?: number;
     captureProgress?: number;
     position: { x: number; y: number }; // Server-provided node positions
-  }>;
+  }>; // Server-provided node data (read-only)
   networkConnections: NetworkConnection[]; // Server-provided network topology
   lineProperties: LineProperties[];       // Server-calculated line properties
   victoryCondition?: {

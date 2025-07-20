@@ -4,7 +4,6 @@
  */
 
 import {
-  NodeIndex,
   NodePosition,
   BattleNode,
   BattalionType,
@@ -17,16 +16,10 @@ import {
 } from '../../src/types/battleTypes';
 
 describe('Battle Types (Batch 1A)', () => {
-  describe('NodeIndex type', () => {
+  describe('Node indices', () => {
     it('should accept valid node indices', () => {
-      const validIndices: NodeIndex[] = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+      const validIndices: number[] = [0, 1, 2, 3, 4, 5, 6, 7, 8];
       expect(validIndices).toHaveLength(9);
-    });
-
-    it('should reject invalid node indices', () => {
-      // TypeScript compilation test - this should fail at compile time
-      // const invalidIndex: NodeIndex = 9; // This would cause a TypeScript error
-      expect(true).toBe(true); // Placeholder - actual validation happens at compile time
     });
   });
 
@@ -89,8 +82,9 @@ describe('Battle Types (Batch 1A)', () => {
     });
 
     it('should accept valid network connections', () => {
-      const connection: NetworkConnection = [0, 3];
-      expect(connection).toEqual([0, 3]);
+      const connection: NetworkConnection = { from: 0, to: 3 };
+      expect(connection.from).toBe(0);
+      expect(connection.to).toBe(3);
     });
   });
 });
