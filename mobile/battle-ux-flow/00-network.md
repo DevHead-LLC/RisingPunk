@@ -148,20 +148,23 @@ SERVER SIDE                           CLIENT SIDE
 │  └─ Screen adaptation           │   │  ├─ Line rendering              │
 │             │                   │   │  ├─ Loading/error states        │
 │             ▼                   │   │  └─ Self-contained              │
-│  💾 BattleService               │   │             │                   │
-│  ├─ Network initialization      │   │             ▼                   │
-│  └─ Node ownership setup        │   │  👥 BattleBattalionManager      │
+│  🔧 BattalionMappingService     │   │             │                   │
+│  ├─ Map battalions for client   │   │             ▼                   │
+│  └─ Data transformation         │   │  👥 BattleBattalionManager      │
 │             │                   │   │  ├─ Direct API call             │
 │             ▼                   │   │  ├─ Battalion rendering         │
-│  🗄️  Battle Model               │   │  ├─ Loading/error states        │
-│  └─ Network persistence         │   │  └─ Self-contained              │
-│                                 │   │             │                   │
-│                                 │   │             ▼                   │
-│                                 │   │  ⏰ BattleOverlayManager        │
-│                                 │   │  ├─ Direct API call             │
-│                                 │   │  ├─ Timer display               │
-│                                 │   │  ├─ Countdown overlay           │
-│                                 │   │  └─ Self-contained              │
+│  📦 BattleResponseService       │   │  ├─ Loading/error states        │
+│  ├─ Format responses            │   │  └─ Self-contained              │
+│  └─ Response packaging          │   │             │                   │
+│             │                   │   │             ▼                   │
+│             ▼                   │   │  ⏰ BattleOverlayManager        │
+│  💾 BattleService               │   │  ├─ Direct API call             │
+│  ├─ Network initialization      │   │  ├─ Timer display               │
+│  └─ Node ownership setup        │   │  ├─ Countdown overlay           │
+│             │                   │   │  └─ Self-contained              │
+│             ▼                   │   │                                 │
+│  🗄️  Battle Model               │   │                                 │
+│  └─ Network persistence         │   │                                 │
 │                                 │   │                                 │
 └─────────────────────────────────┘   └─────────────────────────────────┘
                  │                                       ▲
