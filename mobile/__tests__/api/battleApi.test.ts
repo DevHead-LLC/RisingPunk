@@ -1,22 +1,21 @@
 import { battleApi } from '../../src/store/api/battleApi';
-import { configureStore } from '@reduxjs/toolkit';
+// import { configureStore } from '@reduxjs/toolkit'; // Not used in current tests
 
-// Create a test store with the battle API
-const createTestStore = () => {
-  return configureStore({
-    reducer: {
-      [battleApi.reducerPath]: battleApi.reducer,
-    },
-    middleware: (getDefaultMiddleware) =>
-      getDefaultMiddleware().concat(battleApi.middleware),
-  });
-};
+// Test store creation function (commented out - not used in current tests)
+// const createTestStore = () => {
+//   return configureStore({
+//     reducer: {
+//       [battleApi.reducerPath]: battleApi.reducer,
+//     },
+//     middleware: (getDefaultMiddleware) =>
+//       getDefaultMiddleware().concat(battleApi.middleware),
+//   });
+// };
 
 describe('Battle API', () => {
-  let store: ReturnType<typeof createTestStore>;
-
   beforeEach(() => {
-    store = createTestStore();
+    // Store created but not used in current tests
+    // const _store = createTestStore();
   });
 
   it('should have correct API configuration', () => {

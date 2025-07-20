@@ -4,13 +4,13 @@ import { COLORS, SIZING } from '../../styles/theme';
 import { useAppSelector } from '../../store/hooks';
 
 type BuildTimerProps = {
-  quantity: number;
+  _quantity: number;
   buildTimePerUnit: number;
   progress: number;
 };
 
 export const BuildTimer = React.memo(function BuildTimer({
-  quantity,
+  _quantity,
   buildTimePerUnit,
   progress,
 }: BuildTimerProps) {

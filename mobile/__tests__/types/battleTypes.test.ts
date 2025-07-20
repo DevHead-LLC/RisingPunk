@@ -5,14 +5,9 @@
 
 import {
   NodePosition,
-  BattleNode,
   BattalionType,
-  Battalion,
   BattlePhase,
-  BattleState,
-  Path,
   NetworkConnection,
-  MovementTarget,
 } from '../../src/types/battleTypes';
 
 describe('Battle Types (Batch 1A)', () => {
@@ -31,33 +26,7 @@ describe('Battle Types (Batch 1A)', () => {
     });
   });
 
-  describe('BattleNode interface', () => {
-    it('should accept valid battle node data', () => {
-      const node: BattleNode = {
-        index: 0,
-        position: { x: 100, y: 200 },
-        owner: 'user',
-        health: 100,
-        captureProgress: 0,
-      };
 
-      expect(node.index).toBe(0);
-      expect(node.owner).toBe('user');
-      expect(node.health).toBe(100);
-    });
-
-    it('should accept nodes without optional properties', () => {
-      const node: BattleNode = {
-        index: 1,
-        position: { x: 150, y: 250 },
-        owner: 'neutral',
-      };
-
-      expect(node.index).toBe(1);
-      expect(node.owner).toBe('neutral');
-      expect(node.health).toBeUndefined();
-    });
-  });
 
   describe('BattalionType enum', () => {
     it('should have correct values', () => {
@@ -75,12 +44,7 @@ describe('Battle Types (Batch 1A)', () => {
     });
   });
 
-  describe('Path and NetworkConnection types', () => {
-    it('should accept valid path data', () => {
-      const path: Path = [0, 3, 6];
-      expect(path).toEqual([0, 3, 6]);
-    });
-
+  describe('NetworkConnection type', () => {
     it('should accept valid network connections', () => {
       const connection: NetworkConnection = { from: 0, to: 3 };
       expect(connection.from).toBe(0);

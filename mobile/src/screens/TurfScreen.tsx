@@ -82,7 +82,7 @@ export function TurfScreen(): React.JSX.Element {
   useEffect(() => {
     // Center the view immediately when the screen mounts
     centerView();
-  }, []); // Empty dependency array for mount-only execution
+  }, [centerView]); // Include centerView in dependencies
 
   const renderScreen = useCallback(() => {
     switch (currentScreen) {
@@ -99,9 +99,9 @@ export function TurfScreen(): React.JSX.Element {
             navigateToScreen('turf');
             setTimeout(() => navigateToScreen('hackRig'), 0);
           }}
-          onBattleStart={(battleId) => {
+          onBattleStart={(newBattleId) => {
             // Store battleId in component state for BattleGridScreen
-            setBattleId(battleId);
+            setBattleId(newBattleId);
             navigateToScreen('battle');
           }}
         />;
@@ -121,8 +121,8 @@ export function TurfScreen(): React.JSX.Element {
               navigateToScreen('turf');
               setTimeout(() => navigateToScreen('hackRig'), 0);
             }}
-            onBattleStart={(battleId) => {
-              setBattleId(battleId);
+            onBattleStart={(newBattleId) => {
+              setBattleId(newBattleId);
               navigateToScreen('battle');
             }}
           />;
@@ -155,7 +155,7 @@ export function TurfScreen(): React.JSX.Element {
           </View>
         );
     }
-  }, [currentScreen, navigateToScreen]);
+  }, [currentScreen, navigateToScreen, battleId]);
 
   return renderScreen();
 }

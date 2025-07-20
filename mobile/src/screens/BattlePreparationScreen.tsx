@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Dimensions, TouchableOpacity, Animated } from 'react-native';
 import { COLORS, SIZING } from '../styles/theme';
 import { CloseButton } from '../components/common/CloseButton';
@@ -56,9 +56,9 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
+  }, [pulseAnim]);
 
-  const swipeIndicatorStyle = {
+  const swipeIndicatorStyle = useMemo(() => ({
     opacity: pulseAnim,
     transform: [{
       translateX: pulseAnim.interpolate({
@@ -66,7 +66,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
         outputRange: [0, -35],
       }),
     }],
-  };
+  }), [pulseAnim]);
 
   const handleBattalionPress = (name: string) => {
     setSelectedBattalion(name);

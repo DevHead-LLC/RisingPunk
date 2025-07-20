@@ -6,32 +6,18 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet, Dimensions, ActivityIndicator, Text } from 'react-native';
 import { useGetBattleStateQuery } from '../../store/api/battleApi';
-import { Battalion } from '../../types/battle';
 import { BattleBattalion } from './BattleBattalion';
-
-// BattleNodeState type moved to server API types
-type BattleNodeState = {
-  index: number;
-  owner: 'user' | 'enemy' | 'neutral';
-  health?: number;
-  captureProgress?: number;
-  position: { x: number; y: number };
-};
 
 interface Props {
   battleId: string;
   battalionSize?: number;
   showHealthBars?: boolean;
-  showQuantities?: boolean;
-  showBotTypes?: boolean;
 }
 
 export const BattleBattalionManager = React.memo(({
   battleId,
   battalionSize = 40,
   showHealthBars = true,
-  showQuantities = true,
-  showBotTypes = true,
 }: Props) => {
   // Get screen dimensions for server calculations
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');

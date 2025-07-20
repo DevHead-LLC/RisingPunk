@@ -51,8 +51,6 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
             battleId={battleId}
             battalionSize={35}
             showHealthBars={true}
-            showQuantities={true}
-            showBotTypes={true}
           />
         </View>
       </View>
