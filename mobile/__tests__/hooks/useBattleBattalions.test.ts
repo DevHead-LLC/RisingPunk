@@ -13,9 +13,9 @@ jest.mock('../../src/hooks/useBattalionData', () => ({
       nodeIndex,
       isUser,
       stats: { health: 10, speed: 5, range: 5, offense: 5, defense: 5 },
-      mark
-    })
-  })
+      mark,
+    }),
+  }),
 }));
 
 describe('useBattleBattalions', () => {
@@ -66,4 +66,4 @@ describe('useBattleBattalions', () => {
     expect(userBattalions[0].isUser).toBe(true);
     expect(enemyBattalions[0].isUser).toBe(false);
   });
-}); 
+});

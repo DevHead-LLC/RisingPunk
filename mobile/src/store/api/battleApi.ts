@@ -63,7 +63,7 @@ export const battleApi = createApi({
       invalidatesTags: ['Battle'],
     }),
     getBattleState: builder.query<BattleState, { battleId: string; screenWidth: number; screenHeight: number }>({
-      query: ({ battleId, screenWidth, screenHeight }) => 
+      query: ({ battleId, screenWidth, screenHeight }) =>
         `/api/battle/${battleId}/state?screenWidth=${screenWidth}&screenHeight=${screenHeight}`,
       transformResponse: (response: { success: boolean; data: BattleState }) => response.data,
       providesTags: ['Battle'],
@@ -71,4 +71,4 @@ export const battleApi = createApi({
   }),
 });
 
-export const { useStartBattleMutation, useGetBattleStateQuery } = battleApi; 
+export const { useStartBattleMutation, useGetBattleStateQuery } = battleApi;

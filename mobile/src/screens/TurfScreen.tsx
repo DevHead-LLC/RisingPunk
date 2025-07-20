@@ -127,12 +127,12 @@ export function TurfScreen(): React.JSX.Element {
             }}
           />;
         }
-        return <BattleGridScreen 
+        return <BattleGridScreen
           battleId={battleId}
           _onClose={() => {
             navigateToScreen('turf');
             setTimeout(() => navigateToScreen('hackRig'), 0);
-          }} 
+          }}
         />;
       default:
         return (

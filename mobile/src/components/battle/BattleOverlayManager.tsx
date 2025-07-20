@@ -36,19 +36,19 @@ interface BattleOverlayManagerProps {
   battleId: string;
 }
 
-export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({ 
-  battleId
+export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
+  battleId,
 }) => {
   // Get screen dimensions for server calculations
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-  
+
   // Direct API call to get battle state
-  const { 
-    data: battleState, 
-    isLoading: battleLoading, 
-    error: battleError 
+  const {
+    data: battleState,
+    isLoading: battleLoading,
+    error: battleError,
   } = useGetBattleStateQuery(
-    { battleId, screenWidth, screenHeight }, 
+    { battleId, screenWidth, screenHeight },
     {
       pollingInterval: 1000, // Poll every 1 second for real-time updates
       skip: !battleId,
@@ -89,10 +89,10 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
 
   // Map server phase to client phase
   const clientPhase = mapServerPhaseToClientPhase(phase);
-  
+
   // Calculate battle time from time remaining for the timer display
   const battleTime = maxBattleTime - timeRemaining;
-  
+
   // Determine if we're in countdown phase and show countdown overlay
   // Server sends timeRemaining: 3,2,1 during countdown phase
   const isCountdownPhase = clientPhase === BattlePhase.COUNTDOWN && timeRemaining <= 3 && timeRemaining > 0;
@@ -106,12 +106,12 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
         maxBattleTime={maxBattleTime}
         isVisible={clientPhase === BattlePhase.COUNTDOWN || clientPhase === BattlePhase.ACTIVE}
       />
-      
+
       {/* Countdown overlay - rendered on top when in COUNTDOWN phase */}
       {isCountdownPhase && countdownValue > 0 && (
         <BattleCountdownOverlay countdown={countdownValue} isVisible={true} />
       )}
-      
+
       {/* No overlay for COMPLETE phase */}
     </View>
   );

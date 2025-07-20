@@ -35,14 +35,14 @@ export const BattleBattalionManager = React.memo(({
 }: Props) => {
   // Get screen dimensions for server calculations
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-  
+
   // Direct API call to get battle state
-  const { 
-    data: battleState, 
-    isLoading: battleLoading, 
-    error: battleError 
+  const {
+    data: battleState,
+    isLoading: battleLoading,
+    error: battleError,
   } = useGetBattleStateQuery(
-    { battleId, screenWidth, screenHeight }, 
+    { battleId, screenWidth, screenHeight },
     {
       pollingInterval: 1000, // Poll every 1 second for real-time updates
       skip: !battleId,
