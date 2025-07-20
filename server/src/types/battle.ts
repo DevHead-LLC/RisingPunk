@@ -154,5 +154,6 @@ export interface BattleStateResponse {
   nodes: INode[];
   networkConnections: NetworkConnection[]; // Server-provided network topology
   lineProperties: LineProperties[];        // Server-calculated line properties
+  targetingResults?: any[];               // Initial targeting data
   lastUpdated: Date;
 } 
