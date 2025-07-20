@@ -12,12 +12,7 @@ interface StartBattleRequest extends Request {
   }
 }
 
-interface BattleActionRequest extends Request {
-  body: {
-    actionType: string;
-    data: any;
-  }
-}
+
 
 interface BattleResponse {
   success?: boolean;
@@ -107,99 +102,14 @@ router.get<{ id: string }, BattleResponse>(
   }
 );
 
-// Submit battle action (future use)
-router.post<{ id: string }, BattleResponse, BattleActionRequest['body']>(
-  '/:id/action',
-  async (req, res): Promise<void> => {
-    try {
-      const { id } = req.params;
-      const { actionType, data } = req.body;
-      // For now, use a default user ID for testing
-      const userId = 'test-user-id';
-
-      const result = await battleController.submitAction(id, userId, actionType, data);
-      res.json({ success: true, data: result });
-    } catch (error) {
-      console.error('Submit action error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to submit action' 
-      });
-    }
-  }
-);
-
-// Get battle event log
-router.get<{ id: string }, BattleResponse>(
-  '/:id/events',
-  async (req, res): Promise<void> => {
-    try {
-      const { id } = req.params;
-      const userId = req.user?._id;
-
-      if (!userId) {
-        res.status(401).json({ success: false, error: 'Authentication required' });
-        return;
-      }
-
-      const events = await battleController.getBattleEvents(id, userId);
-      res.json({ success: true, data: events });
-    } catch (error) {
-      console.error('Get battle events error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to get battle events' 
-      });
-    }
-  }
-);
 
 
 
-// Get battle timer state
-router.get<{ id: string }, BattleResponse>(
-  '/:id/timer',
-  async (req, res): Promise<void> => {
-    try {
-      const { id } = req.params;
-      // For now, use a default user ID for testing
-      const userId = 'test-user-id';
 
-      const timerState = await battleController.getBattleTimer(id, userId);
-      res.json({ success: true, data: timerState });
-    } catch (error) {
-      console.error('Get battle timer error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to get battle timer' 
-      });
-    }
-  }
-);
 
-// Force end battle (admin/timeout)
-router.post<{ id: string }, BattleResponse>(
-  '/:id/end',
-  async (req, res): Promise<void> => {
-    try {
-      const { id } = req.params;
-      const userId = req.user?._id;
 
-      if (!userId) {
-        res.status(401).json({ success: false, error: 'Authentication required' });
-        return;
-      }
 
-      const result = await battleController.endBattle(id, userId);
-      res.json({ success: true, data: result });
-    } catch (error) {
-      console.error('End battle error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to end battle' 
-      });
-    }
-  }
-);
+
+
 
 export default router; 
