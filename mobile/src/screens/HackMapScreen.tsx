@@ -1,4 +1,4 @@
-import React, {memo, useEffect, useRef, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   View,
   Text,
@@ -22,17 +22,7 @@ const MARGIN_SIZE = 80;
 type TerrainType = 'plain' | 'mountain' | 'water' | 'forest';
 type EntityType = 'empty' | 'player' | 'npc' | 'house';
 
-const FRIENDLY_NAMES = [
-  'Alpha', 'Beta', 'Gamma', 'Delta', 'Echo', 'Foxtrot',
-  'Helix', 'Iris', 'Jupiter', 'Kilo', 'Lima', 'Matrix',
-  'Nova', 'Omega', 'Pulse', 'Quantum', 'Razor', 'Sigma',
-];
 
-const HOSTILE_NAMES = [
-  'Cipher', 'Shadow', 'Wraith', 'Phantom', 'Specter', 'Ghost',
-  'Virus', 'Trojan', 'Malware', 'Breach', 'Havoc', 'Chaos',
-  'Doom', 'Eclipse', 'Fang', 'Glitch', 'Hex', 'Inferno',
-];
 
 type CellData = {
   terrain: TerrainType;
@@ -40,8 +30,6 @@ type CellData = {
   owner?: 'player' | 'enemy';
   name?: string;
 };
-
-type GridData = CellData[][];
 
 type Props = {
   onClose: () => void;

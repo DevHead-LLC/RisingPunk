@@ -80,7 +80,7 @@ export const useBattleBattalions = () => {
    * TODO: Server handles damage calculations - remove this method
    */
   const damageBattalion = useMemo(() => {
-    return (battalionId: string, damage: number) => {
+    return (_battalionId: string, _damage: number) => {
       // TODO: Server handles damage - this is deprecated
       console.warn('damageBattalion is deprecated - server handles damage calculations');
     };

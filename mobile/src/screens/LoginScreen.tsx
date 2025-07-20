@@ -67,41 +67,42 @@ export const LoginScreen = () => {
     }
   }, [formType, authError, dispatch]);
 
-  const validateForm = () => {
-    setError('');
-
-    if (formType === 'login') {
-      if (!formData.handle || !formData.accessKey) {
-        setError('ACCESS_DENIED: CREDENTIALS_REQUIRED');
-        return false;
-      }
-    } else {
-      if (!formData.email || !formData.handle || !formData.accessKey || !formData.verifyAccessKey) {
-        setError('ACCESS_DENIED: ALL_FIELDS_REQUIRED');
-        return false;
-      }
-      if (!formData.email.includes('@')) {
-        setError('ACCESS_DENIED: INVALID_EMAIL');
-        return false;
-      }
-      if (formData.accessKey.length < 6) {
-        setError('ACCESS_DENIED: ACCESS_KEY_TOO_SHORT');
-        return false;
-      }
-      if (formData.accessKey !== formData.verifyAccessKey) {
-        setError('ACCESS_DENIED: ACCESS_KEYS_DO_NOT_MATCH');
-        return false;
-      }
-    }
-    return true;
-  };
-
   const handleInputChange = useCallback((field: string) => (value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   }, []);
 
   const handleSubmit = useCallback(async () => {
     clearFormError();
+
+    const validateForm = () => {
+      setError('');
+
+      if (formType === 'login') {
+        if (!formData.handle || !formData.accessKey) {
+          setError('ACCESS_DENIED: CREDENTIALS_REQUIRED');
+          return false;
+        }
+      } else {
+        if (!formData.email || !formData.handle || !formData.accessKey || !formData.verifyAccessKey) {
+          setError('ACCESS_DENIED: ALL_FIELDS_REQUIRED');
+          return false;
+        }
+        if (!formData.email.includes('@')) {
+          setError('ACCESS_DENIED: INVALID_EMAIL');
+          return false;
+        }
+        if (formData.accessKey.length < 6) {
+          setError('ACCESS_DENIED: ACCESS_KEY_TOO_SHORT');
+          return false;
+        }
+        if (formData.accessKey !== formData.verifyAccessKey) {
+          setError('ACCESS_DENIED: ACCESS_KEYS_DO_NOT_MATCH');
+          return false;
+        }
+      }
+      return true;
+    };
+
     if (validateForm()) {
       try {
         setLoading(true);
@@ -140,7 +141,7 @@ export const LoginScreen = () => {
         setLoading(false);
       }
     }
-  }, [formType, formData, validateForm, dispatch, clearFormError, setLoading, setError]);
+  }, [formType, formData, dispatch, clearFormError, setLoading, setError]);
 
   const isFormValid = useMemo(() => {
     if (formType === 'login') {

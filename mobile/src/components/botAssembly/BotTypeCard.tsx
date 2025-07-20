@@ -4,7 +4,7 @@ import { COLORS, SIZING } from '../../styles/theme';
 
 type BotTypeCardProps = {
   type: string;
-  level: number;
+  _level: number;
   isLocked: boolean;
   isSelected: boolean;
   count?: number;
@@ -13,7 +13,7 @@ type BotTypeCardProps = {
 
 export const BotTypeCard = React.memo(function BotTypeCard({
   type,
-  level,
+  _level,
   isLocked,
   isSelected,
   count,

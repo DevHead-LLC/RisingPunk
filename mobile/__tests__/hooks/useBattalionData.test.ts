@@ -4,7 +4,7 @@ import { useBattalionData } from '../../src/hooks/useBattalionData';
 // Mock the useBots hook
 jest.mock('../../src/hooks/useBots', () => ({
   useBots: () => ({
-    getBotStats: (type: string, isUser: boolean) => {
+    getBotStats: (type: string, _isUser: boolean) => {
       const stats = {
         guardian: { stats: { health: 14, speed: 9, range: 4, offense: 8, defense: 6 } },
         breacher: { stats: { health: 18, speed: 5, range: 5, offense: 7, defense: 8 } },

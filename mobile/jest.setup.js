@@ -1,3 +1,5 @@
+/* eslint-env jest */
+
 // import 'react-native-gesture-handler/jestSetup'; // Removed - not installed
 
 // jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper'); // Removed for compatibility
