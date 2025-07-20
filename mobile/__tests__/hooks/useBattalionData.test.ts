@@ -8,11 +8,11 @@ jest.mock('../../src/hooks/useBots', () => ({
       const stats = {
         guardian: { stats: { health: 14, speed: 9, range: 4, offense: 8, defense: 6 } },
         breacher: { stats: { health: 18, speed: 5, range: 5, offense: 7, defense: 8 } },
-        phreak: { stats: { health: 12, speed: 7, range: 9, offense: 6, defense: 5 } }
+        phreak: { stats: { health: 12, speed: 7, range: 9, offense: 6, defense: 5 } },
       };
       return stats[type as keyof typeof stats];
-    }
-  })
+    },
+  }),
 }));
 
 describe('useBattalionData', () => {
@@ -30,4 +30,4 @@ describe('useBattalionData', () => {
     expect(battalion.mark).toBe(1);
     expect(battalion.stats.health).toBe(14);
   });
-}); 
+});

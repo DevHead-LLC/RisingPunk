@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
 import { useGetBattleStateQuery } from '../../store/api/battleApi';
 
 // Server-provided data types (matching server response)
@@ -31,7 +31,6 @@ export interface BattleNodeState {
 
 interface Props {
   battleId: string;
-  onNodePress?: (nodeIndex: number) => void;
   nodeSize?: number;
   lineColor?: string;
   lineWidth?: number;
@@ -52,7 +51,7 @@ function getNodeColor(owner: 'user' | 'enemy' | 'neutral'): string {
 }
 
 /**
- * getNodeBorderColor() - Node Visual Properties  
+ * getNodeBorderColor() - Node Visual Properties
  */
 function getNodeBorderColor(owner: 'user' | 'enemy' | 'neutral'): string {
   switch (owner) {
@@ -64,7 +63,6 @@ function getNodeBorderColor(owner: 'user' | 'enemy' | 'neutral'): string {
 
 export const BattleNetworkGrid = React.memo(({
   battleId,
-  onNodePress,
   nodeSize = 20,
   lineColor = '#666666',
   lineWidth = 2,
@@ -72,14 +70,14 @@ export const BattleNetworkGrid = React.memo(({
 }: Props) => {
   // Get screen dimensions for server calculations
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-  
+
   // Direct API call to get battle state
-  const { 
-    data: battleState, 
-    isLoading: battleLoading, 
-    error: battleError 
+  const {
+    data: battleState,
+    isLoading: battleLoading,
+    error: battleError,
   } = useGetBattleStateQuery(
-    { battleId, screenWidth, screenHeight }, 
+    { battleId, screenWidth, screenHeight },
     {
       pollingInterval: 1000, // Poll every 1 second for real-time updates
       skip: !battleId,
@@ -132,7 +130,7 @@ export const BattleNetworkGrid = React.memo(({
       {/* Render connection lines */}
       {lineProperties?.map((lineProps, index) => {
         const connection = connections?.[index];
-        if (!connection) return null;
+        if (!connection) {return null;}
 
         return (
           <View
@@ -176,19 +174,6 @@ export const BattleNetworkGrid = React.memo(({
           </View>
         );
 
-        if (onNodePress) {
-          return (
-            <TouchableOpacity
-              key={node.index}
-              onPress={() => onNodePress(node.index)}
-              style={styles.touchable}
-              activeOpacity={0.7}
-            >
-              <NodeContent />
-            </TouchableOpacity>
-          );
-        }
-
         return (
           <View key={node.index}>
             <NodeContent />
@@ -202,7 +187,6 @@ export const BattleNetworkGrid = React.memo(({
 const styles = StyleSheet.create({
   container: { position: 'absolute', width: '100%', height: '100%' },
   line: { position: 'absolute' },
-  touchable: { position: 'absolute' },
   node: {
     position: 'absolute',
     justifyContent: 'center',

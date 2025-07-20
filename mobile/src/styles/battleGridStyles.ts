@@ -102,4 +102,4 @@ export const battleGridStyles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
   },
-}); 
+});

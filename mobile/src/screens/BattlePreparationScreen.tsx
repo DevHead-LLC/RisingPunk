@@ -260,10 +260,10 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
                 { type: 'guardian', quantity: 10, nodeIndex: 0 },
                 { type: 'breacher', quantity: 8, nodeIndex: 1 },
                 { type: 'phreak', quantity: 6, nodeIndex: 2 },
-              ]
+              ],
             }).unwrap();
-            
-    
+
+
             // Pass battleId to parent component
             onBattleStart(result.battleId);
           } catch (error) {

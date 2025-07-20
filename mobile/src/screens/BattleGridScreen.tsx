@@ -32,7 +32,7 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
     <SafeAreaView style={battleGridStyles.container} testID="battle-grid-screen">
       <View style={battleGridStyles.battleArea}>
         {/* Overlays (countdown, timer) - self-contained with its own API call */}
-        <BattleOverlayManager 
+        <BattleOverlayManager
           battleId={battleId}
         />
 

@@ -48,4 +48,4 @@ describe('Battle API', () => {
     // This test verifies the endpoint exists and can be configured
     expect(getBattleStateEndpoint).toBeDefined();
   });
-}); 
+});
