@@ -164,6 +164,16 @@ export class BattleController {
       // Generate network data for client
       const networkData = this.generateNetworkData(battle.nodes, screenWidth, screenHeight);
 
+      // Get targeting results if countdown has ended
+      let targetingResults: any[] = [];
+      if (currentPhase === BattlePhase.ACTIVE && currentCountdown === 0) {
+        // Trigger initial targeting if not already done
+        if (this.battleService.getTargetingResults(battleId).length === 0) {
+          await this.battleService.triggerInitialTargeting(battleId);
+        }
+        targetingResults = this.battleService.getTargetingResults(battleId);
+      }
+
       // Return battle state for client
       return {
         battleId: battle.battleId,
@@ -175,6 +185,7 @@ export class BattleController {
         nodes: networkData.updatedNodes,
         networkConnections: networkData.networkConnections,
         lineProperties: networkData.lineProperties,
+        targetingResults,
         lastUpdated: battle.updatedAt
       };
     } catch (error) {

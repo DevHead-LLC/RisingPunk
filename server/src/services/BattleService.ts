@@ -3,6 +3,7 @@ import { BattleEvent } from '../models/BattleEvent';
 import { BattlePhase, NodeOwner, BotType, IBattalion, INode } from '../types/battle';
 import { BattleTimerService } from './BattleTimer';
 import { BATTLE_CONFIG } from '../config/battleConfig';
+import { TargetingService, TargetingResult } from './TargetingService';
 
 // Bot stats copied from mobile useBots.ts
 const BOT_CATEGORIES: Record<BotType, any> = {
@@ -74,6 +75,7 @@ const ENEMY_BOT_CATEGORIES: Record<BotType, any> = {
 
 export class BattleService {
   private timerService: BattleTimerService;
+  private targetingResults: Map<string, TargetingResult[]> = new Map();
 
   constructor() {
     this.timerService = BattleTimerService.getInstance();
@@ -84,6 +86,35 @@ export class BattleService {
    */
   getTimerService(): BattleTimerService {
     return this.timerService;
+  }
+
+  /**
+   * Trigger initial targeting when countdown ends
+   */
+  async triggerInitialTargeting(battleId: string): Promise<TargetingResult[]> {
+    const battle = await this.getBattle(battleId);
+    if (!battle) {
+      console.log('❌ BATTLE NOT FOUND for initial targeting:', battleId);
+      return [];
+    }
+
+    console.log('🎯 TRIGGERING INITIAL TARGETING for battle:', battleId);
+    
+    // Assign initial targets to all battalions
+    const results = TargetingService.assignInitialTargets(battle.battalions, battle.nodes);
+    this.targetingResults.set(battleId, results);
+    
+    return results;
+  }
+
+  /**
+   * Get current targeting results for a specific battle
+   */
+  getTargetingResults(battleId?: string): TargetingResult[] {
+    if (!battleId) {
+      return [];
+    }
+    return this.targetingResults.get(battleId) || [];
   }
 
   /**
