@@ -22,6 +22,10 @@ export const botsApi = createApi({
       query: () => '/api/bots/build-state',
       providesTags: ['Bots'],
     }),
+    fetchBotStats: builder.query<{ botStats: any }, void>({
+      query: () => '/api/bots/stats',
+      providesTags: ['Bots'],
+    }),
     startBuild: builder.mutation<any, { type: BotType; quantity: number; totalCost: number }>({
       query: (body) => ({
         url: '/api/bots/build',
@@ -41,4 +45,4 @@ export const botsApi = createApi({
   }),
 });
 
-export const { useFetchBotsQuery, useFetchBuildStateQuery, useStartBuildMutation, useAssignToBattalionMutation } = botsApi;
+export const { useFetchBotsQuery, useFetchBuildStateQuery, useFetchBotStatsQuery, useStartBuildMutation, useAssignToBattalionMutation } = botsApi;
