@@ -12,20 +12,49 @@ import { CloseButton } from '../components/common/CloseButton';
 import { useAppSelector } from '../store/hooks';
 import { SIZING } from '../styles/theme';
 import { COLORS } from '../styles/theme';
-import { useBots, BotType } from '../hooks/useBots';
+import { BotType } from '../types/bots';
+import { useFetchBotStatsQuery } from '../store/api/botsApi';
 
 type MarkLevel = 1 | 2 | 3 | 4;
 
 export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
   const botCounts = useAppSelector((state) => state.bots.botCounts);
   const [selectedMark, setSelectedMark] = useState<MarkLevel>(1);
-  const { BOT_CATEGORIES, getBotRole, getBotAdvantage, getBotStatsForType } = useBots();
+  const { data: botStatsData, isLoading: botStatsLoading } = useFetchBotStatsQuery();
 
   const BotCard = ({ type }: { type: BotType }) => {
     const hackerLore = {
       breacher: "IRL: Named after 'breach and clear' tactics used in early penetration testing, where security teams would methodically break through firewall layers.",
       guardian: "IRL: Inspired by 'packet guardian' programs from the 1990s that network administrators used to monitor and filter suspicious traffic.",
       phreak: "IRL: Based on 'phone phreakers' from the 1970s who used blue boxes to manipulate telephone systems and make free long-distance calls.",
+    };
+
+    const botStats = botStatsData?.botStats?.[type];
+    const allBotStats = botStatsData?.botStats;
+
+    const getBotRole = (_type: BotType): string => {
+      return botStats?.role || 'Unknown';
+    };
+
+    const getBotAdvantage = (_type: BotType): string => {
+      if (!botStats || !allBotStats) {
+        return 'Stats not available';
+      }
+
+      const stats = botStats.stats;
+      const maxRange = Math.max(...Object.values(allBotStats).map((bot: any) => bot.stats.range));
+      const maxOffense = Math.max(...Object.values(allBotStats).map((bot: any) => bot.stats.offense));
+      const maxDefense = Math.max(...Object.values(allBotStats).map((bot: any) => bot.stats.defense));
+
+      if (stats.range === maxRange) {
+        return 'Long-range specialist with superior attack distance';
+      } else if (stats.offense === maxOffense) {
+        return 'High damage output for aggressive tactics';
+      } else if (stats.defense === maxDefense) {
+        return 'Tank unit with maximum survivability';
+      } else {
+        return 'Balanced unit with versatile capabilities';
+      }
     };
 
     return (
@@ -51,7 +80,7 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
             </View>
 
             <View style={styles.statsContainer}>
-              {getBotStatsForType(type) ? Object.entries(getBotStatsForType(type)!).map(([stat, value]) => (
+              {botStats?.stats ? Object.entries(botStats.stats).map(([stat, value]) => (
                 <View key={stat} style={styles.statRow}>
                   <Text style={styles.statLabel}>
                     {stat === 'range' ? 'ATTACK DISTANCE' :
@@ -59,7 +88,7 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
                      stat === 'defense' ? 'DEFENSE ABILITY' :
                      stat.toUpperCase()}
                   </Text>
-                  <Text style={styles.statValue}>{value}</Text>
+                  <Text style={styles.statValue}>{String(value)}</Text>
                 </View>
               )) : (
                 <Text style={styles.lockedText}>No stats available</Text>
@@ -158,10 +187,14 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
 
         <View style={styles.botsContainer}>
           {selectedMark === 1 ? (
-            BOT_CATEGORIES ? Object.keys(BOT_CATEGORIES).map((type) => (
-              <BotCard key={type} type={type as BotType} />
-            )) : (
+            botStatsLoading ? (
               <Text style={styles.lockedText}>Loading...</Text>
+            ) : botStatsData?.botStats ? (
+              Object.keys(botStatsData.botStats).map((type) => (
+                <BotCard key={type} type={type as BotType} />
+              ))
+            ) : (
+              <Text style={styles.lockedText}>No bot data available</Text>
             )
           ) : (
             <Text style={styles.lockedText}>🔒 MARK {selectedMark} UNITS LOCKED</Text>
