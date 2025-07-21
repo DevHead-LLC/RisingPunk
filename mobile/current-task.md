@@ -25,6 +25,7 @@
 - ✅ **TIMING SYNCHRONIZATION FIXED** - Eliminated initial movement jump caused by server/client time mismatch
 - ✅ **IMMEDIATE MOVEMENT START** - Dynamic polling (200ms during battle) for instant movement when timer hits 20s
 - ✅ **DRY OPTIMIZATIONS COMPLETE** - Eliminated all duplicate logic, shared interfaces, and hardcoded values
+- ✅ **MOVEMENTSTATE INTERFACE CONSOLIDATION** - Fixed duplication bug, all server files now import from shared client types
 - ✅ **ATTACK RANGE VISUALIZATION IMPLEMENTED** - Simple circle approach shows battalion attack reach during movement
 - ✅ **ATTACK RANGE STOP BEHAVIOR IMPLEMENTED** - Battalions stop when attack range reaches target center
 

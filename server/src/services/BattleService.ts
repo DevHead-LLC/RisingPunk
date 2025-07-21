@@ -4,7 +4,8 @@ import { BattlePhase, NodeOwner, BotType, IBattalion, INode } from '../types/bat
 import { BattleTimerService } from './BattleTimer';
 import { BATTLE_CONFIG } from '../config/battleConfig';
 import { TargetingService, TargetingResult } from './TargetingService';
-import { MovementService, MovementState } from './MovementService';
+import { MovementService } from './MovementService';
+import { MovementState } from '../../../mobile/src/types/battleTypes';
 import { calculateBattalionHealth } from '../utils/battleUtils';
 
 // Bot stats from battleConfig (single source of truth)

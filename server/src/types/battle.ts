@@ -1,5 +1,5 @@
 import { Document } from 'mongoose';
-import { MovementState } from '../services/MovementService';
+import { MovementState } from '../../../mobile/src/types/battleTypes';
 
 // Battle phases from intentions document
 export enum BattlePhase {

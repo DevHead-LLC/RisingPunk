@@ -5,7 +5,7 @@
 
 import { BattleStateResponse, ClientBattalion } from '../types/battle';
 import { IBattleDocument } from '../models/Battle';
-import { MovementState } from './MovementService';
+import { MovementState } from '../../../mobile/src/types/battleTypes';
 
 export interface NetworkData {
   networkConnections: any[];
