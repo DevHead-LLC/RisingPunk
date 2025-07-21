@@ -65,25 +65,42 @@ export const BattleBattalion = React.memo(({
   React.useEffect(() => {
     if (movementState?.movementStatus === 'moving' && clientStartTime === null) {
       setClientStartTime(Date.now()); // Use current time as actual start for smooth animation
-    } else if (movementState?.movementStatus !== 'moving') {
-      setClientStartTime(null); // Reset for next movement
     }
+    // Don't reset clientStartTime when movement stops - keep it for smooth final positioning
   }, [movementState?.movementStatus, movementState?.battalionId, clientStartTime]);
   
   // Calculate smooth interpolated position
   const calculateSmoothPosition = () => {
-    if (!movementState || movementState.movementStatus !== 'moving' || !clientStartTime) {
+    if (!movementState) {
+      return position; // Default to node position if no movement data
+    }
+
+    // If battalion has arrived, stay at the target position (attack range position)
+    if (movementState.movementStatus === 'arrived') {
+      return movementState.targetPosition;
+    }
+
+    // If battalion is not moving or no client start time, use current position
+    if (movementState.movementStatus !== 'moving' || !clientStartTime) {
       return position; // Default to node position
     }
     
     const elapsed = currentTime - clientStartTime; // Use client start time instead of server time
     const progress = Math.min(elapsed / movementState.estimatedDuration, 1.0);
     
+    // When very close to completion (>95%), ease into final position to prevent warping
+    let adjustedProgress = progress;
+    if (progress > 0.95) {
+      // Smooth transition to final position in last 5% to prevent sudden server/client conflicts
+      const finalEaseProgress = (progress - 0.95) / 0.05; // 0-1 over final 5%
+      adjustedProgress = 0.95 + (0.05 * Math.min(finalEaseProgress, 1.0));
+    }
+    
     // Smooth interpolation between start and target
     const smoothX = movementState.startPosition.x + 
-      (movementState.targetPosition.x - movementState.startPosition.x) * progress;
+      (movementState.targetPosition.x - movementState.startPosition.x) * adjustedProgress;
     const smoothY = movementState.startPosition.y + 
-      (movementState.targetPosition.y - movementState.startPosition.y) * progress;
+      (movementState.targetPosition.y - movementState.startPosition.y) * adjustedProgress;
     
     return { x: smoothX, y: smoothY };
   };
@@ -118,6 +135,9 @@ export const BattleBattalion = React.memo(({
 
   // Border color by side
   const borderColor = battalion.isUser ? '#4717F6' : '#FF4141';
+
+  // Calculate attack range radius (scale the range stat to pixels)
+  const attackRangeRadius = battalion.stats.range * 8; // Scale factor: 8 pixels per range unit
 
   // Shape style
   const getShapeStyle = () => {
@@ -167,6 +187,24 @@ export const BattleBattalion = React.memo(({
 
   return (
     <View style={styles.container}>
+      {/* Attack Range Circle - Show when moving OR when arrived at attack position */}
+      {(movementState?.movementStatus === 'moving' || movementState?.movementStatus === 'arrived') && (
+        <View style={[
+          styles.attackRangeCircle,
+          {
+            left: displayPosition.x - attackRangeRadius,
+            top: displayPosition.y - attackRangeRadius,
+            width: attackRangeRadius * 2,
+            height: attackRangeRadius * 2,
+            borderRadius: attackRangeRadius,
+            borderWidth: 2,
+            borderColor: borderColor,
+            backgroundColor: 'transparent',
+            opacity: 0.3,
+          }
+        ]} />
+      )}
+      
       {/* Shape with quantity in center */}
       <View style={getShapeStyle()}>
         <View style={styles.quantityBackground}>
@@ -266,5 +304,12 @@ const styles = StyleSheet.create({
     textShadowColor: '#000',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 1,
+  },
+  attackRangeCircle: {
+    position: 'absolute',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
+    opacity: 0.3,
   },
 });
