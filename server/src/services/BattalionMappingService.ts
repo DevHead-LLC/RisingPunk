@@ -4,12 +4,13 @@
  */
 
 import { IBattalion, ClientBattalion } from '../types/battle';
+import { MovementState } from './MovementService';
 
 export class BattalionMappingService {
   /**
    * Transform Mongoose battalion objects to client-friendly format
    */
-  static mapBattalionsForClient(battalions: IBattalion[]): ClientBattalion[] {
+  static mapBattalionsForClient(battalions: IBattalion[], movementStates?: Map<string, MovementState>): ClientBattalion[] {
     return battalions.map(battalion => ({
       id: battalion.id,
       type: battalion.type,
@@ -20,6 +21,7 @@ export class BattalionMappingService {
       isUser: battalion.owner === 'user', // Convert string enum to boolean
       mark: battalion.mark,
       stats: battalion.stats,
+      movementState: movementStates?.get(battalion.id) // Add movement state to battalion data
     }));
   }
 } 

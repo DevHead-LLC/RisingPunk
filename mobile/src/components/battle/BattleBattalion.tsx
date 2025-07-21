@@ -4,12 +4,30 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Battalion } from '../../types/battle';
+import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
+import { MovementState } from '../../types/battleTypes';
+import { ANIMATION_CONFIG } from '../../config';
 
 interface Props {
-  battalion: Battalion;
+  battalion: {
+    id: string;
+    type: 'guardian' | 'breacher' | 'phreak';
+    quantity: number;
+    currentHealth: number;
+    maxHealth: number;
+    nodeIndex: number;
+    isUser: boolean;
+    mark: number;
+    stats: {
+      health: number;
+      speed: number;
+      range: number;
+      offense: number;
+      defense: number;
+    };
+  };
   position: { x: number; y: number };
+  movementState?: MovementState; // Shared movement state interface
   size?: number;
   showHealthBar?: boolean;
 }
@@ -23,9 +41,78 @@ const BOT_TYPE_LABELS: Record<string, string> = {
 export const BattleBattalion = React.memo(({
   battalion,
   position,
+  movementState,
   size = 30, // Shrunk by 25%
   showHealthBar = true,
 }: Props) => {
+  // Animated values for smooth interpolation
+  const animatedPosition = React.useRef(new Animated.ValueXY(position)).current;
+  
+  // Calculate smooth position using client-side interpolation
+  const [currentTime, setCurrentTime] = React.useState(Date.now());
+  const [clientStartTime, setClientStartTime] = React.useState<number | null>(null);
+  
+  // Update current time every 16ms for smooth 60fps animation
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, ANIMATION_CONFIG.FPS_60_INTERVAL_MS); // 60fps
+    
+    return () => clearInterval(interval);
+  }, []);
+  
+  // Set client start time when movement first detected (fixes server/client timing sync)
+  React.useEffect(() => {
+    if (movementState?.movementStatus === 'moving' && clientStartTime === null) {
+      setClientStartTime(Date.now()); // Use current time as actual start for smooth animation
+    } else if (movementState?.movementStatus !== 'moving') {
+      setClientStartTime(null); // Reset for next movement
+    }
+  }, [movementState?.movementStatus, movementState?.battalionId, clientStartTime]);
+  
+  // Calculate smooth interpolated position
+  const calculateSmoothPosition = () => {
+    if (!movementState || movementState.movementStatus !== 'moving' || !clientStartTime) {
+      return position; // Default to node position
+    }
+    
+    const elapsed = currentTime - clientStartTime; // Use client start time instead of server time
+    const progress = Math.min(elapsed / movementState.estimatedDuration, 1.0);
+    
+    // Smooth interpolation between start and target
+    const smoothX = movementState.startPosition.x + 
+      (movementState.targetPosition.x - movementState.startPosition.x) * progress;
+    const smoothY = movementState.startPosition.y + 
+      (movementState.targetPosition.y - movementState.startPosition.y) * progress;
+    
+    return { x: smoothX, y: smoothY };
+  };
+  
+  const smoothPosition = calculateSmoothPosition();
+  
+  // Animate to smooth position for additional easing
+  React.useEffect(() => {
+    Animated.timing(animatedPosition, {
+      toValue: smoothPosition,
+      duration: ANIMATION_CONFIG.QUICK_SYNC_DURATION_MS, // Quick sync with smooth calculation
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: false,
+    }).start();
+  }, [smoothPosition.x, smoothPosition.y, animatedPosition]);
+  
+  // Get current animated position for rendering
+  const [displayPosition, setDisplayPosition] = React.useState(position);
+  
+  React.useEffect(() => {
+    const listener = animatedPosition.addListener(({ x, y }) => {
+      setDisplayPosition({ x, y });
+    });
+    
+    return () => animatedPosition.removeListener(listener);
+  }, [animatedPosition]);
+
+  // Position tracking for smooth animation
+
   // Health percentage
   const healthPercentage = battalion.maxHealth > 0 ? (battalion.currentHealth / battalion.maxHealth) * 100 : 0;
 
@@ -37,8 +124,8 @@ export const BattleBattalion = React.memo(({
     const base = {
       width: size,
       height: size,
-      left: position.x - size / 2,
-      top: position.y - size / 2,
+      left: displayPosition.x - size / 2, // Use displayPosition
+      top: displayPosition.y - size / 2,  // Use displayPosition
       borderWidth: 3,
       borderColor,
       backgroundColor: 'transparent',
@@ -91,8 +178,8 @@ export const BattleBattalion = React.memo(({
         <View style={[
           styles.healthBarContainer,
           {
-            left: position.x - (size + 10) / 2,
-            top: position.y - healthBarOffset,
+            left: displayPosition.x - (size + 10) / 2, // Use displayPosition
+            top: displayPosition.y - healthBarOffset,  // Use displayPosition
             width: size + 10,
           },
         ]}>
@@ -113,8 +200,8 @@ export const BattleBattalion = React.memo(({
       <View style={[
         styles.labelRow,
         {
-          left: position.x - size / 2 - 2,
-          top: position.y + labelRowOffset,
+          left: displayPosition.x - size / 2 - 2, // Use displayPosition
+          top: displayPosition.y + labelRowOffset, // Use displayPosition
         },
       ]}>
         <Text style={botTypeLabelStyle}>{botTypeLabel}</Text>

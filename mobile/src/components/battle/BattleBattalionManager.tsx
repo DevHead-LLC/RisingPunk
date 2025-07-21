@@ -3,10 +3,12 @@
  * @description Self-contained battalion visualization component with direct server integration
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Dimensions, ActivityIndicator, Text } from 'react-native';
 import { useGetBattleStateQuery } from '../../store/api/battleApi';
 import { BattleBattalion } from './BattleBattalion';
+import { createNodePositionMap } from '../../utils/battleUtils';
+import { ANIMATION_CONFIG } from '../../config';
 
 interface Props {
   battleId: string;
@@ -22,6 +24,9 @@ export const BattleBattalionManager = React.memo(({
   // Get screen dimensions for server calculations
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
+  // Dynamic polling: Fast during battle phase for immediate movement, slower otherwise
+  const [pollingInterval, setPollingInterval] = useState<number>(ANIMATION_CONFIG.DEFAULT_POLLING_MS);
+  
   // Direct API call to get battle state
   const {
     data: battleState,
@@ -30,10 +35,19 @@ export const BattleBattalionManager = React.memo(({
   } = useGetBattleStateQuery(
     { battleId, screenWidth, screenHeight },
     {
-      pollingInterval: 1000, // Poll every 1 second for real-time updates
+      pollingInterval,
       skip: !battleId,
     }
   );
+
+  // Adjust polling speed based on battle phase
+  useEffect(() => {
+    if (battleState?.phase === 'battle') {
+      setPollingInterval(ANIMATION_CONFIG.BATTLE_PHASE_POLLING_MS); // Fast polling during active battle for immediate movement
+    } else {
+      setPollingInterval(ANIMATION_CONFIG.DEFAULT_POLLING_MS); // Slower polling during countdown/victory/etc
+    }
+  }, [battleState?.phase]);
 
   // SIMPLE LOG: Only log problems
   useEffect(() => {
@@ -66,27 +80,30 @@ export const BattleBattalionManager = React.memo(({
   const nodes = battleState.nodes || [];
 
   // Create a map of node positions for quick lookup
-  const nodePositions = nodes.reduce((acc, node) => {
-    acc[node.index] = node.position;
-    return acc;
-  }, {} as Record<number, { x: number; y: number }>);
+  const nodePositions = createNodePositionMap(nodes);
 
   // Filter out battalions that don't have valid node positions
   const validBattalions = battalions.filter(battalion => {
     return nodePositions[battalion.nodeIndex] !== undefined;
   });
 
+  // Clean logs - positioning issues resolved
+
   return (
     <View style={styles.container}>
       {validBattalions.map((battalion) => {
         const nodePosition = nodePositions[battalion.nodeIndex];
+        const movementState = (battalion as any).movementState; // Get movement data from battalion object
         if (!nodePosition) {return null;}
+
+        // Movement state available for smooth animation
 
         return (
           <BattleBattalion
             key={battalion.id}
             battalion={battalion}
             position={nodePosition}
+            movementState={movementState} // Pass movement data to BattleBattalion
             size={battalionSize}
             showHealthBar={showHealthBars}
           />

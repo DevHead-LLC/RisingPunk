@@ -5,6 +5,7 @@ import { BattlePhase, NodeOwner, BattleStateResponse } from '../types/battle';
 import { BATTLE_CONFIG } from '../config/battleConfig';
 import { BattalionMappingService } from '../services/BattalionMappingService';
 import { BattleResponseService } from '../services/BattleResponseService';
+import { createNodePositionMap } from '../utils/battleUtils';
 
 interface AuthenticatedRequest extends Request {
   user: { _id: string };
@@ -40,10 +41,7 @@ export class BattleController {
     const networkConnections = [...BATTLE_CONFIG.NETWORK_CONNECTIONS];
     
     // Create node position map for line calculations using updated positions
-    const nodePositions = updatedNodes.reduce((acc, node) => {
-      acc[node.index] = node.position;
-      return acc;
-    }, {} as Record<number, { x: number; y: number }>);
+    const nodePositions = createNodePositionMap(updatedNodes);
 
     // Calculate line properties for each connection using updated positions
     const lineProperties = networkConnections.map(connection => {
@@ -75,7 +73,7 @@ export class BattleController {
 
 
       // Generate network data for client
-      const networkData = this.generateNetworkData(battle.nodes, 375, 667);
+      const networkData = this.generateNetworkData(battle.nodes, BATTLE_CONFIG.STANDARD_SCREEN_WIDTH, BATTLE_CONFIG.STANDARD_SCREEN_HEIGHT);
 
       // Map battalions for client using focused service
       const mappedBattalions = BattalionMappingService.mapBattalionsForClient(battle.battalions);
@@ -91,8 +89,11 @@ export class BattleController {
   /**
    * Get current battle state
    */
-  async getBattleState(battleId: string, userId: string, screenWidth: number = 375, screenHeight: number = 667): Promise<BattleStateResponse | null> {
+  async getBattleState(battleId: string, userId: string, screenWidth: number = BATTLE_CONFIG.STANDARD_SCREEN_WIDTH, screenHeight: number = BATTLE_CONFIG.STANDARD_SCREEN_HEIGHT): Promise<BattleStateResponse | null> {
     try {
+      // Store screen dimensions for this battle (for movement calculations)
+      this.battleService.setBattleScreenDimensions(battleId, screenWidth, screenHeight);
+      
       // Get battle from database
       const battle = await this.battleService.getBattle(battleId);
       
@@ -115,8 +116,11 @@ export class BattleController {
       const currentCountdown = timerState ? timerState.countdown : battle.countdown;
       const currentBattleTime = timerState ? timerState.battleTime : battle.battleTime;
 
+      // Get movement states from BattleService
+      const movementStates = this.battleService.getMovementStates(battleId);
+
       // Map battalions for client using focused service
-      const mappedBattalions = BattalionMappingService.mapBattalionsForClient(battle.battalions);
+      const mappedBattalions = BattalionMappingService.mapBattalionsForClient(battle.battalions, movementStates);
 
       // Generate network data for client
       const networkData = this.generateNetworkData(battle.nodes, screenWidth, screenHeight);
@@ -139,7 +143,8 @@ export class BattleController {
         currentPhase, 
         currentCountdown, 
         currentBattleTime, 
-        targetingResults
+        targetingResults,
+        movementStates // Add movement data to existing response
       );
     } catch (error) {
       console.error('BattleController getBattleState error:', error);

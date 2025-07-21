@@ -40,3 +40,16 @@ export interface LineProperties {
   left: number;
   top: number;
 }
+
+// Movement State Type (shared between server and client)
+export interface MovementState {
+  battalionId: string;
+  startPosition: { x: number; y: number; nodeIndex: number };
+  targetPosition: { x: number; y: number; nodeIndex: number };
+  movementStatus: 'stationary' | 'moving' | 'arrived';
+  startTime: number; // Timestamp when movement began (Date.now())
+  estimatedDuration: number; // Total movement duration in milliseconds
+  networkPath: number[]; // [startNode, targetNode] from TargetingService
+  attackRangePosition?: { x: number; y: number };
+  isWithinAttackRange: boolean;
+}

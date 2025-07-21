@@ -1,4 +1,5 @@
 import { Document } from 'mongoose';
+import { MovementState } from '../services/MovementService';
 
 // Battle phases from intentions document
 export enum BattlePhase {
@@ -133,6 +134,7 @@ export interface ClientBattalion {
   isUser: boolean;
   mark: number;
   stats: BotStats;
+  movementState?: MovementState;
 }
 
 // Battle state response interface (for client)
@@ -147,5 +149,6 @@ export interface BattleStateResponse {
   networkConnections: import('../config/battleConfig').NetworkConnection[]; // Server-provided network topology
   lineProperties: import('../config/battleConfig').LineProperties[];        // Server-calculated line properties
   targetingResults?: any[];               // Initial targeting data
+  movementStates?: MovementState[];        // Movement data for battalion animations
   lastUpdated: Date;
 } 
