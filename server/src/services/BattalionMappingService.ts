@@ -4,7 +4,7 @@
  */
 
 import { IBattalion, ClientBattalion } from '../types/battle';
-import { MovementState } from './MovementService';
+import { MovementState } from '../../../mobile/src/types/battleTypes';
 
 export class BattalionMappingService {
   /**

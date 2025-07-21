@@ -3,17 +3,7 @@ import { TargetingService } from './TargetingService';
 import { IBattalion, INode } from '../types/battle';
 
 // Import shared MovementState interface from client types
-export interface MovementState {
-  battalionId: string;
-  startPosition: { x: number; y: number; nodeIndex: number };
-  targetPosition: { x: number; y: number; nodeIndex: number };
-  movementStatus: 'stationary' | 'moving' | 'arrived';
-  startTime: number; // Timestamp when movement began (Date.now())
-  estimatedDuration: number; // Total movement duration in milliseconds
-  networkPath: number[]; // [startNode, targetNode] from TargetingService
-  attackRangePosition?: { x: number; y: number };
-  isWithinAttackRange: boolean;
-}
+import { MovementState } from '../../../mobile/src/types/battleTypes';
 
 interface Position {
   x: number;
