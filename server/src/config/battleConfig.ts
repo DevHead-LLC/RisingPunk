@@ -23,9 +23,17 @@ export interface LineProperties {
 }
 
 export const BATTLE_CONFIG = {
+  // Screen dimensions (standard mobile reference)
+  STANDARD_SCREEN_WIDTH: 375,
+  STANDARD_SCREEN_HEIGHT: 667,
+  
   // Timer durations (in seconds)
   COUNTDOWN_DURATION: 3,
   BATTLE_DURATION: 20,
+  
+  // Movement timing constants
+  MOVEMENT_BASE_TIME_MS: 4000,       // Base movement time for slowest unit (4 seconds)
+  MOVEMENT_SPEED_REFERENCE: 5,       // Reference speed value (Breacher speed)
   
   // Update intervals (in milliseconds)
   UPDATE_INTERVAL: 100, // Server calculates every 100ms

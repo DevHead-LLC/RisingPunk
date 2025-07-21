@@ -6,7 +6,7 @@ import { API_URL } from '../../config';
 import { NetworkConnection } from '../../types/battleTypes';
 
 // Line properties interface (server authority - imported from types)
-import { LineProperties } from '../../types/battleTypes';
+import { LineProperties, MovementState } from '../../types/battleTypes';
 
 // Battle state interface matching server response
 export interface BattleState {
@@ -43,6 +43,7 @@ export interface BattleState {
     winner: 'user' | 'enemy';
     reason: 'elimination' | 'timeout' | 'tie';
   };
+  movementStates?: MovementState[]; // Shared movement state interface
 }
 
 // Start battle request interface

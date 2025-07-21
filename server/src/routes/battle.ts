@@ -1,5 +1,6 @@
 import express, { Request, Response, Router } from 'express';
 import { BattleController } from '../controllers/BattleController';
+import { BATTLE_CONFIG } from '../config/battleConfig';
 
 interface StartBattleRequest extends Request {
   body: {
@@ -60,8 +61,8 @@ router.get<{ id: string }, BattleResponse>(
       const userId = 'test-user-id';
 
       // Parse screen dimensions from query params
-      const width = screenWidth ? parseInt(screenWidth as string) : 375;
-      const height = screenHeight ? parseInt(screenHeight as string) : 667;
+      const width = screenWidth ? parseInt(screenWidth as string) : BATTLE_CONFIG.STANDARD_SCREEN_WIDTH;
+      const height = screenHeight ? parseInt(screenHeight as string) : BATTLE_CONFIG.STANDARD_SCREEN_HEIGHT;
 
       const battleState = await battleController.getBattleState(id, userId, width, height);
       if (!battleState) {

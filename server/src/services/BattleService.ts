@@ -4,6 +4,8 @@ import { BattlePhase, NodeOwner, BotType, IBattalion, INode } from '../types/bat
 import { BattleTimerService } from './BattleTimer';
 import { BATTLE_CONFIG } from '../config/battleConfig';
 import { TargetingService, TargetingResult } from './TargetingService';
+import { MovementService, MovementState } from './MovementService';
+import { calculateBattalionHealth } from '../utils/battleUtils';
 
 // Bot stats from battleConfig (single source of truth)
 const BOT_CATEGORIES = BATTLE_CONFIG.BOT_STATS;
@@ -12,6 +14,9 @@ const ENEMY_BOT_CATEGORIES = BATTLE_CONFIG.ENEMY_BOT_STATS;
 export class BattleService {
   private timerService: BattleTimerService;
   private targetingResults: Map<string, TargetingResult[]> = new Map();
+  private movementStates: Map<string, Map<string, MovementState>> = new Map(); // battleId -> battalionId -> MovementState
+  private movementIntervals: Map<string, NodeJS.Timeout> = new Map(); // battleId -> movement interval
+  private battleScreenDimensions: Map<string, { width: number; height: number }> = new Map(); // battleId -> screen dimensions
 
   constructor() {
     this.timerService = BattleTimerService.getInstance();
@@ -54,6 +59,133 @@ export class BattleService {
   }
 
   /**
+   * Get current movement states for a specific battle
+   */
+  getMovementStates(battleId: string): Map<string, MovementState> {
+    return this.movementStates.get(battleId) || new Map();
+  }
+
+  /**
+   * Store screen dimensions for a battle (called when client requests battle state)
+   */
+  setBattleScreenDimensions(battleId: string, width: number, height: number): void {
+    this.battleScreenDimensions.set(battleId, { width, height });
+  }
+
+  /**
+   * Get screen dimensions for a battle (for movement calculations)
+   */
+  getBattleScreenDimensions(battleId: string): { width: number; height: number } {
+    return this.battleScreenDimensions.get(battleId) || { 
+      width: BATTLE_CONFIG.STANDARD_SCREEN_WIDTH, 
+      height: BATTLE_CONFIG.STANDARD_SCREEN_HEIGHT 
+    };
+  }
+
+  /**
+   * Start smooth movement updates (separate from timer) at 100ms intervals
+   */
+  private startMovementUpdates(battleId: string): void {
+    // Don't start if already running
+    if (this.movementIntervals.has(battleId)) {
+      return;
+    }
+
+    console.log(`🏃 STARTING MOVEMENT UPDATES for battle ${battleId} (100ms intervals)`);
+
+    const movementInterval = setInterval(async () => {
+      await this.updateBattleMovement(battleId);
+    }, 100); // 100ms for smooth movement
+
+    this.movementIntervals.set(battleId, movementInterval);
+  }
+
+  /**
+   * Stop movement updates for a battle
+   */
+  private stopMovementUpdates(battleId: string): void {
+    const interval = this.movementIntervals.get(battleId);
+    if (interval) {
+      clearInterval(interval);
+      this.movementIntervals.delete(battleId);
+      console.log(`⏹️ STOPPED MOVEMENT UPDATES for battle ${battleId}`);
+    }
+    
+    // Clean up screen dimensions and movement states for this battle
+    this.battleScreenDimensions.delete(battleId);
+    this.movementStates.delete(battleId);
+  }
+
+  /**
+   * Update battle movement for all battalions (called every 100ms)
+   */
+  private async updateBattleMovement(battleId: string): Promise<void> {
+    const battle = await this.getBattle(battleId);
+    if (!battle) return;
+
+    // Get targeting results from existing getTargetingResults() method
+    const targetingResults = this.getTargetingResults(battleId);
+    if (targetingResults.length === 0) return;
+
+    // Ensure movement states map exists for this battle
+    if (!this.movementStates.has(battleId)) {
+      this.movementStates.set(battleId, new Map());
+    }
+    
+    const battleMovementStates = this.movementStates.get(battleId)!;
+    let activeMovements = 0;
+    
+    // For each battalion with valid target, call MovementService.initiateMovement()
+    for (const targetResult of targetingResults) {
+      const battalion = battle.battalions.find(b => b.id === targetResult.battalionId);
+      if (!battalion || targetResult.targetNode === -1) continue;
+
+      // Check if movement already exists for this battalion
+      let movementState = battleMovementStates.get(battalion.id);
+      
+      if (!movementState) {
+        // Get actual client screen dimensions for this battle
+        const screenDimensions = this.getBattleScreenDimensions(battleId);
+        
+        // Initiate new movement using actual client screen dimensions
+        movementState = MovementService.initiateMovement(
+          battalion,
+          targetResult.targetNode,
+          screenDimensions.width,  // ✅ Use actual client screen dimensions
+          screenDimensions.height  // ✅ Use actual client screen dimensions
+        );
+        battleMovementStates.set(battalion.id, movementState);
+        
+        // Movement initiated successfully
+      } else if (movementState.movementStatus === 'moving') {
+        // Check if movement is complete using MovementService.updateMovementProgress()
+        const updatedMovementState = MovementService.updateMovementProgress(
+          movementState,
+          100, // 100ms deltaTime (unused in new time-based approach)
+          battalion.stats.speed,
+          0, // screenWidth (unused)
+          0  // screenHeight (unused)
+        );
+        battleMovementStates.set(battalion.id, updatedMovementState);
+        
+        // Log movement status changes
+        if (updatedMovementState.movementStatus === 'arrived') {
+          console.log(`✅ ${battalion.owner} ${battalion.type} ARRIVED at node ${updatedMovementState.targetPosition.nodeIndex}`);
+        }
+      }
+      
+      if (movementState?.movementStatus === 'moving') {
+        activeMovements++;
+      }
+    }
+    
+    // Log active movements periodically
+    if (activeMovements > 0 && Date.now() % 2000 < 100) { // Every ~2 seconds
+      console.log(`📊 ACTIVE MOVEMENTS: ${activeMovements} battalions moving`);
+    }
+  }
+
+  /**
    * Create a new battle with initial setup
    */
   async createBattle(attackerId: string, defenderId: string): Promise<IBattleDocument> {
@@ -61,9 +193,11 @@ export class BattleService {
     
     // Initialize nodes with server-calculated positions (moved from client for security)
     // Use standard screen dimensions for positioning (client will scale if needed)
-    const STANDARD_WIDTH = 375; // Standard mobile width
-    const STANDARD_HEIGHT = 667; // Standard mobile height  
-    const positionedNodes = BATTLE_CONFIG.calculateNodePositions(STANDARD_WIDTH, STANDARD_HEIGHT, 125);
+    const positionedNodes = BATTLE_CONFIG.calculateNodePositions(
+      BATTLE_CONFIG.STANDARD_SCREEN_WIDTH, 
+      BATTLE_CONFIG.STANDARD_SCREEN_HEIGHT, 
+      125
+    );
     
     const nodes: INode[] = positionedNodes.map((nodeTemplate) => {
       let health = 100;
@@ -95,7 +229,7 @@ export class BattleService {
     
     userBattalions.forEach((battalion, index) => {
       const stats = BOT_CATEGORIES[battalion.type].stats;
-      const maxHealth = stats.health * battalion.quantity;
+      const maxHealth = calculateBattalionHealth(stats.health, battalion.quantity);
       
       battalions.push({
         id: `user-battalion-${index}`,
@@ -123,7 +257,7 @@ export class BattleService {
     
     enemyBattalions.forEach((battalion, index) => {
       const stats = ENEMY_BOT_CATEGORIES[battalion.type].stats;
-      const maxHealth = stats.health * battalion.quantity;
+      const maxHealth = calculateBattalionHealth(stats.health, battalion.quantity);
       
       battalions.push({
         id: `enemy-battalion-${index}`,
@@ -144,7 +278,7 @@ export class BattleService {
     
     // Calculate neutral node health based on total army strength
     const totalArmyStrength = battalions.reduce((sum, battalion) => {
-      return sum + (battalion.stats.health * battalion.quantity);
+      return sum + calculateBattalionHealth(battalion.stats.health, battalion.quantity);
     }, 0);
     
     const neutralNodeHealth = Math.floor(totalArmyStrength * 0.75);
@@ -183,11 +317,18 @@ export class BattleService {
     this.timerService.on('phaseChange', (data) => {
       if (data.battleId === battleId) {
         this.updateBattlePhase(battleId, data.phase);
+        
+        // Start movement updates when battle enters ACTIVE phase
+        if (data.phase === BattlePhase.ACTIVE) {
+          console.log(`🎮 BATTLE ACTIVE - Starting movement for ${battleId}`);
+          this.startMovementUpdates(battleId);
+        }
       }
     });
 
     this.timerService.on('battleEnd', (data) => {
       if (data.battleId === battleId) {
+        this.stopMovementUpdates(battleId); // Stop movement before ending battle
         this.endBattle(battleId, NodeOwner.ENEMY); // Default to enemy win on timeout
       }
     });
@@ -219,6 +360,9 @@ export class BattleService {
    * End battle and determine winner
    */
   async endBattle(battleId: string, winner: NodeOwner): Promise<IBattleDocument | null> {
+    // Stop movement updates first
+    this.stopMovementUpdates(battleId);
+    
     const battle = await Battle.findOne({ battleId });
     if (!battle) return null;
     
@@ -227,6 +371,9 @@ export class BattleService {
     battle.endTime = new Date();
     
     const updatedBattle = await battle.save();
+    
+    // Clean up movement states
+    this.movementStates.delete(battleId);
     
     // Log battle end event
     await new BattleEvent({

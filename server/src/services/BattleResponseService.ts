@@ -5,6 +5,7 @@
 
 import { BattleStateResponse, ClientBattalion } from '../types/battle';
 import { IBattleDocument } from '../models/Battle';
+import { MovementState } from './MovementService';
 
 export interface NetworkData {
   networkConnections: any[];
@@ -47,7 +48,8 @@ export class BattleResponseService {
     currentPhase: any,
     currentCountdown: number,
     currentBattleTime: number,
-    targetingResults: any[] = []
+    targetingResults: any[] = [],
+    movementStates: Map<string, MovementState> = new Map() // Add movement data
   ): BattleStateResponse {
     return {
       battleId: battle.battleId,
@@ -60,6 +62,7 @@ export class BattleResponseService {
       networkConnections: networkData.networkConnections,
       lineProperties: networkData.lineProperties,
       targetingResults,
+      movementStates: Array.from(movementStates.values()), // Add movement data to response
       lastUpdated: battle.updatedAt
     };
   }
