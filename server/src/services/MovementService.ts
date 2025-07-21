@@ -37,18 +37,20 @@ export class MovementService {
       nodeIndex: battalion.position.nodeIndex
     };
     
-    const targetPosition = {
-      x: nodePositions[targetNode].position.x,
-      y: nodePositions[targetNode].position.y,
-      nodeIndex: targetNode
-    };
-
     // Calculate attack range position using existing battalion.stats.range
     const attackRangePosition = this.calculateAttackRangePosition(
       battalion, 
       targetNode, 
       nodePositions.map(n => n.position)
     );
+
+    // Set target position to attack range position instead of target node center
+    // This makes battalions stop when they reach attack range, not the target center
+    const targetPosition = {
+      x: attackRangePosition.x,
+      y: attackRangePosition.y,
+      nodeIndex: targetNode // Keep target node index for reference
+    };
 
     // Determine if battalion is already within attack range
     const isWithinAttackRange = this.isWithinNetworkAttackRange(
@@ -58,12 +60,13 @@ export class MovementService {
     );
 
     // Calculate estimated movement duration based on battalion speed
-    // Base time scaled by relative speed - fastest unit (Guardian, speed=9) reaches in ~2.2 seconds
-    const speedRatio = BATTLE_CONFIG.MOVEMENT_SPEED_REFERENCE / battalion.stats.speed; // Higher speed = lower ratio = faster movement
+    // Use distance to attack range position, not target node center
+    const movementDistance = this.calculateNetworkDistance(startPosition, attackRangePosition);
+    const speedRatio = BATTLE_CONFIG.MOVEMENT_SPEED_REFERENCE / battalion.stats.speed;
     const estimatedDuration = Math.round(BATTLE_CONFIG.MOVEMENT_BASE_TIME_MS * speedRatio);
 
     // Result: Guardian(9)=~2.2s, Phreak(7)=~2.9s, Breacher(5)=4.0s
-    console.log(`🏃 ${battalion.owner} ${battalion.type} (speed=${battalion.stats.speed}) will move for ${estimatedDuration}ms`);
+    console.log(`🏃 ${battalion.owner} ${battalion.type} (speed=${battalion.stats.speed}) will move ${movementDistance.toFixed(1)}px to attack range for ${estimatedDuration}ms`);
 
     return {
       battalionId: battalion.id,
@@ -79,16 +82,25 @@ export class MovementService {
   }
 
   /**
-   * Check if movement is complete based on elapsed time
+   * Update movement progress and determine if movement is complete
+   * NOTE: This is a time-based approach, not position-based
    */
-  static updateMovementProgress(movementState: MovementState, deltaTime: number, battalionSpeed: number, screenWidth: number, screenHeight: number): MovementState {
+  static updateMovementProgress(movementState: MovementState, deltaTime: number, speed: number, screenWidth: number, screenHeight: number): MovementState {
     if (movementState.movementStatus !== 'moving') {
       return movementState;
     }
 
-    // Check if estimated duration has elapsed
+    // Check if estimated duration has elapsed (battalion has reached attack range)
     const elapsedTime = Date.now() - movementState.startTime;
-    const isComplete = elapsedTime >= movementState.estimatedDuration;
+    
+    // Add a small buffer (50ms) to prevent server/client timing conflicts
+    // This ensures client interpolation completes smoothly before server marks as arrived
+    const completionThreshold = movementState.estimatedDuration + 50;
+    const isComplete = elapsedTime >= completionThreshold;
+
+    if (isComplete) {
+      console.log(`🎯 ${movementState.battalionId} REACHED ATTACK RANGE - stopped at attack position (elapsed: ${elapsedTime}ms, threshold: ${completionThreshold}ms)`);
+    }
 
     return {
       ...movementState,
@@ -103,21 +115,23 @@ export class MovementService {
     const battalionPos = nodePositions[battalion.position.nodeIndex];
     const targetPos = nodePositions[targetNode];
     
-    // Use existing battalion.stats.range from BATTLE_CONFIG.BOT_STATS
-    const range = battalion.stats.range;
+    // Use same scaling as client visualization: 8 pixels per range unit
+    const rangeInPixels = battalion.stats.range * 8;
     
     // Calculate network-constrained range (not circular)
-    // Use existing BATTLE_CONFIG.calculateLineProperties() for range direction
     const lineDistance = this.calculateNetworkDistance(battalionPos, targetPos);
     
-    if (lineDistance <= range) {
-      // Target is within range from current position
+    if (lineDistance <= rangeInPixels) {
+      // Target is within range from current position - don't move
       return battalionPos;
     }
 
-    // Calculate position along network line at attack range distance
-    const rangeProgress = range / lineDistance;
-    return this.interpolateAlongNetworkLine(battalionPos, targetPos, rangeProgress);
+    // Calculate position along network line at attack range distance from target
+    const distanceFromTarget = rangeInPixels;
+    const stopDistance = lineDistance - distanceFromTarget;
+    const progress = stopDistance / lineDistance;
+    
+    return this.interpolateAlongNetworkLine(battalionPos, targetPos, progress);
   }
 
   /**
@@ -127,8 +141,11 @@ export class MovementService {
     const battalionPos = nodePositions[battalion.position.nodeIndex];
     const targetPos = nodePositions[targetNode];
     
+    // Use same scaling as client visualization: 8 pixels per range unit
+    const rangeInPixels = battalion.stats.range * 8;
+    
     const networkDistance = this.calculateNetworkDistance(battalionPos, targetPos);
-    return networkDistance <= battalion.stats.range;
+    return networkDistance <= rangeInPixels;
   }
 
   /**

@@ -1,4 +1,4 @@
-# Current Task: Battalion Movement - DRY OPTIMIZATION COMPLETE ✅
+# Current Task: Attack Range Stop Behavior - IMPLEMENTED ✅
 
 ## **🎯 CONTEXT: BATTLE FLOW PROGRESSION**
 
@@ -25,461 +25,179 @@
 - ✅ **TIMING SYNCHRONIZATION FIXED** - Eliminated initial movement jump caused by server/client time mismatch
 - ✅ **IMMEDIATE MOVEMENT START** - Dynamic polling (200ms during battle) for instant movement when timer hits 20s
 - ✅ **DRY OPTIMIZATIONS COMPLETE** - Eliminated all duplicate logic, shared interfaces, and hardcoded values
+- ✅ **ATTACK RANGE VISUALIZATION IMPLEMENTED** - Simple circle approach shows battalion attack reach during movement
+- ✅ **ATTACK RANGE STOP BEHAVIOR IMPLEMENTED** - Battalions stop when attack range reaches target center
 
-**Current Phase**: Movement system implementation - **PERFECTED & OPTIMIZED COMPLETE**
+**Current Phase**: Attack Range Stop Behavior - **COMPLETE**
 
-## **🔄 TIMING SYNCHRONIZATION FIX**
+## **🎯 ATTACK RANGE STOP BEHAVIOR IMPLEMENTATION**
 
-### **❌ The Initial Jump Problem**:
-Battalions stayed at starting positions for 1 full second, then suddenly **jumped** to their interpolated position when the timer hit 19s.
+### **✅ FEATURE: BATTALIONS STOP AT ATTACK RANGE**
 
-**Root Cause**: Server/client timing mismatch due to polling delay
-1. **Server**: Sets `startTime = Date.now()` when movement begins (at 20s)
-2. **Polling Delay**: Client doesn't receive data until 1s later (at 19s) 
-3. **Client Calculation**: `elapsed = now - serverStartTime = 1000ms` (thinks movement already happened!)
-4. **Result**: Battalion jumps to 1-second-into-movement position
+**Smart Movement Termination**: Battalions now stop moving when their attack range intersects the center of their target, rather than moving all the way to the target center. This creates realistic combat positioning where units maintain optimal engagement distance.
 
-### **✅ Client-Side Start Time Solution**:
+### **🚨 CRITICAL BUG FIXED: BOUNCE BACK BEHAVIOR**
+
+**Problem**: Battalions were correctly reaching their attack range positions but then bouncing back to their starting node positions.
+
+**Root Cause**: Client-side position calculation was reverting to original node position when movement status changed from 'moving' to 'arrived':
 ```typescript
-// ❌ BEFORE: Used server timestamp (creates 1s jump)
-const elapsed = currentTime - movementState.startTime;
+// ❌ BEFORE (caused bounce back):
+if (!movementState || movementState.movementStatus !== 'moving' || !clientStartTime) {
+  return position; // Reverted to original node position!
+}
 
-// ✅ AFTER: Use client timestamp when movement first detected
-const [clientStartTime, setClientStartTime] = React.useState<number | null>(null);
-
-// Set client start time when movement first received
-React.useEffect(() => {
-  if (movementState?.movementStatus === 'moving' && clientStartTime === null) {
-    setClientStartTime(Date.now()); // Treat NOW as movement start
-  }
-}, [movementState?.movementStatus]);
-
-// Use client start time for smooth calculation
-const elapsed = currentTime - clientStartTime;
-```
-
-### **🎯 Benefits**:
-- ✅ **No initial jump** - Battalions start moving smoothly from their actual positions
-- ✅ **Perfect timing sync** - Animation starts when client first receives movement data
-- ✅ **Maintained speed accuracy** - Still respects estimated duration from server
-- ✅ **Seamless experience** - No jarring position jumps
-
-## **⚡ IMMEDIATE MOVEMENT START FIX**
-
-### **❌ The 1-Second Delay Problem**:
-Battalions didn't start moving until 19s instead of immediately at 20s when battle begins.
-
-**Root Cause**: 1-second polling interval creates movement initiation delay
-1. **Server** (at 20s): Starts movement when battle phase becomes "battle"
-2. **Client** (at 20s): Still polling every 1 second, doesn't know movement started yet
-3. **Client** (at 19s): Finally receives movement data during next poll
-4. **Result**: 1-second delay between battle start and visible movement
-
-### **✅ Dynamic Polling Solution**:
-```typescript
-// ✅ Fast polling during battle phase for immediate response
-const [pollingInterval, setPollingInterval] = useState(1000);
-
-useEffect(() => {
-  if (battleState?.phase === 'battle') {
-    setPollingInterval(200); // 5x faster during active battle
-  } else {
-    setPollingInterval(1000); // Normal speed during countdown/victory
-  }
-}, [battleState?.phase]);
-```
-
-### **🎯 Benefits**:
-- ✅ **Instant movement start** - Battalions begin moving within 200ms of battle start
-- ✅ **Efficient polling** - Only fast polling during battle phase (not countdown)
-- ✅ **Responsive gameplay** - No delays between server actions and client response
-- ✅ **Battery optimized** - Returns to slower polling when not needed
-
-## **⚡ MOVEMENT SPEED OPTIMIZATION**
-
-### **❌ The Problem**: Snail-Pace Movement
-Battalions were moving too slowly - they couldn't even reach their initial destinations within the 20-second battle duration.
-
-### **✅ Speed Formula Redesign**:
-
-**Before (Distance-Based)**:
-```typescript
-const distance = Math.sqrt(deltaX² + deltaY²);
-const duration = (distance / speed) * 1000; // Way too slow!
-```
-
-**After (Time-Based with Speed Ratios)**:
-```typescript
-const baseTimeForSlowest = 4000; // 4 seconds for speed=5 (Breacher)
-const speedRatio = 5 / battalion.stats.speed; // Higher speed = faster
-const duration = baseTimeForSlowest * speedRatio;
-```
-
-### **🏃 New Movement Times**:
-- **Guardian** (speed=9): `4000 * (5/9) = ~2.2 seconds` ⚡ (Fastest)
-- **Phreak** (speed=7): `4000 * (5/7) = ~2.9 seconds` 🚀 (Medium)  
-- **Breacher** (speed=5): `4000 * (5/5) = 4.0 seconds` 🐌 (Slowest)
-
-### **🎯 Benefits**:
-- ✅ **Fast engagement** - Fastest units reach targets within 2-3 seconds
-- ✅ **Preserved speed differences** - Guardian still faster than Breacher
-- ✅ **Battle pacing** - Multiple movements possible within 20s battle duration
-- ✅ **Strategic depth** - Speed differences matter for tactics
-
-## **🔧 TYPESCRIPT COMPILATION ERRORS FIXED**
-
-### **❌ The TypeScript Errors**:
-Server compilation failed due to outdated type references after MovementState interface changes:
-```
-Property 'movementProgress' does not exist on type 'MovementState'
-Property 'currentPosition' does not exist on type 'MovementState'  
-```
-
-### **✅ Fixes Applied**:
-1. **Removed old logging code** - Cleaned up progress-based logging in BattleService
-2. **Updated server types** - Fixed MovementState references in `server/src/types/battle.ts`
-3. **Updated method calls** - Fixed updateMovementProgress parameter usage
-4. **Type consistency** - Ensured all interfaces match new time-based movement system
-
-**Result**: Server compiles cleanly with new smooth animation system ✅
-
-## **🧈 CLIENT-SIDE SMOOTH ANIMATION SYSTEM**
-
-### **💡 THE NEW APPROACH**:
-**Root Solution**: Client-side 60fps interpolation between server waypoints.
-
-**How It Works**:
-1. 🟢 **Server**: Sends start position, end position, duration, timestamp
-2. 🔵 **Client**: Calculates smooth 60fps interpolation between waypoints  
-3. 🟡 **Validation**: Server checks position every 1s for accuracy
-4. ✅ **Result**: Butter-smooth continuous movement
-
-**Before vs After**:
-```typescript
-// ❌ BEFORE (choppy discrete updates):
-Server: position A → position B → position C (every 50ms)
-Client: jump → jump → jump (discrete movement)
-
-// ✅ AFTER (smooth interpolation):
-Server: startPos + endPos + duration (once per movement)
-Client: smooth 60fps interpolation from start → end
-```
-
-### **📊 TECHNICAL IMPLEMENTATION**:
-
-**Server Changes**:
-```typescript
-// Send movement waypoints instead of current position
-movementState: {
-  startPosition: {x: 96, y: 140},
-  targetPosition: {x: 478, y: 140}, 
-  startTime: Date.now(),
-  estimatedDuration: 8000 // 8 seconds
+// ✅ AFTER (battalions stay at attack range):
+if (movementState.movementStatus === 'arrived') {
+  return movementState.targetPosition; // Stay at attack range position
 }
 ```
 
-**Client Animation**:
+**Solution**: Modified `calculateSmoothPosition()` to return `movementState.targetPosition` when battalions have arrived, ensuring they stay at their attack range positions instead of bouncing back.
+
+### **🚨 ADDITIONAL FIXES: WARPING & ATTACK RANGE VISIBILITY**
+
+**Problem 1 - Warping at Target**: Battalions were warping/speeding up dramatically when nearly reaching their target due to sudden position jumps.
+
+**Solution**: Removed clientStartTime reset when movement stops to maintain smooth positioning continuity:
 ```typescript
-// 60fps smooth interpolation
-const elapsed = currentTime - startTime;
-const progress = elapsed / estimatedDuration;
-const smoothX = startX + (targetX - startX) * progress;
+// ❌ BEFORE (caused warping):
+} else if (movementState?.movementStatus !== 'moving') {
+  setClientStartTime(null); // Reset caused sudden position jumps
+}
+
+// ✅ AFTER (smooth transition):
+// Don't reset clientStartTime when movement stops - keep it for smooth final positioning
 ```
 
-**Benefits**:
-- ✅ **Butter-smooth movement** (60fps client interpolation)
-- ✅ **Preserves coordinate system** (all positioning logic unchanged)
-- ✅ **Server validation** (1s checks for accuracy)
-- ✅ **Great performance** (minimal network traffic)
+**Problem 2 & 3 - Attack Range Visibility**: Attack range circles disappeared when battalions arrived, making it unclear what their engagement zones are.
 
-## **⚡ MOVEMENT SMOOTHNESS OPTIMIZATION**
-
-### **❌ THE CHOPPY MOVEMENT ISSUE**:
-**Root Cause**: Update frequency mismatch causing discrete quarter-inch jumps.
-
-**Before**:
-- 🟡 **Server**: 100ms movement calculations ✅  
-- 🔴 **Client**: 200ms polling ❌ (Too slow!)
-- 🔴 **Animation**: 150ms duration ❌ (Too long!)
-- 🚨 **Result**: Choppy quarter-inch jumps every 200ms
-
-### **✅ THE SMOOTHNESS FIX**:
-1. **Ultra-fast polling**: Reduced from 200ms → **50ms** polling
-2. **Quick animations**: Reduced from 150ms → **80ms** duration  
-3. **Smooth easing**: Added `Easing.out(Easing.cubic)` for natural movement
-4. **Clean logs**: Removed all debug logging for better performance
-
-**After**:
-- ✅ **Server**: 100ms movement calculations  
-- ✅ **Client**: 50ms polling (4x faster updates!)
-- ✅ **Animation**: 80ms duration with smooth easing
-- ✅ **Result**: Ultra-smooth fluid movement
-
+**Solution**: Extended attack range visibility to show during both movement and arrival:
 ```typescript
-// BEFORE (choppy):
-pollingInterval: 200, // ❌ Updates every 200ms = choppy
-duration: 150,        // ❌ Long animations = overlapping
+// ❌ BEFORE (only during movement):
+{movementState?.movementStatus === 'moving' && (
 
-// AFTER (smooth):
-pollingInterval: 50,  // ✅ Updates every 50ms = ultra-smooth  
-duration: 80,         // ✅ Quick animations = no overlap
-easing: Easing.out(Easing.cubic), // ✅ Natural movement curve
+// ✅ AFTER (during movement AND when positioned):
+{(movementState?.movementStatus === 'moving' || movementState?.movementStatus === 'arrived') && (
 ```
 
-## **🚨 CRITICAL DOUBLE SCALING BUG FOUND & FIXED**
+### **🚨 CRITICAL FIX: SERVER/CLIENT TIMING SYNCHRONIZATION**
 
-### **❌ THE DOUBLE SCALING BUG**:
-**Root Cause**: Client was scaling server coordinates that were already calculated for the client screen size.
+**Problem**: Intermittent warping where battalions suddenly speed up in the last inch, caused by competing timing systems:
+- **Client**: 60fps interpolation (16ms intervals) 
+- **Server**: 100ms movement updates + 200ms client polling
+- **Conflict**: Server marks movement complete while client is mid-interpolation
 
-**What Happened**:
-1. ✅ **Server**: Correctly calculated positions for `956 x 440` screen
-2. ❌ **Client**: Applied scaling transformation thinking server used `375 x 667`  
-3. 🚨 **Result**: `Server pos (853, 143) → Scaled (2175, 95)` - coordinates blown up to 2x screen size!
-
-**Example**:
-- Enemy should be at `x=860` for node 6
-- Server calculated `x=853` (close, 7px offset)
-- Client scaled `853 * (956/375) = 2175` (way off screen!)
-
-### **✅ THE FIX**:
-1. **Removed client-side scaling** - Server coordinates used directly
-2. **No coordinate transformation** - Server calculates for actual client screen
-3. **Single source of truth** - Server handles all position calculations
-
+**Root Cause Analysis**:
 ```typescript
-// BEFORE (broken double scaling):
-const scaleX = screenWidth / 375;  // ❌ Wrong assumption
-targetPosition = scaleMovementPosition(serverPos); // ❌ Double scaling
+// Server detects completion at ANY point during client interpolation cycle
+const isComplete = elapsedTime >= movementState.estimatedDuration;
 
-// AFTER (fixed):
-targetPosition = {  // ✅ Use server coordinates directly
-  x: movementState.currentPosition.x,
-  y: movementState.currentPosition.y
-};
+// If client is at 80% progress and server says "arrived"
+// Client jumps from 80% to 100% instantly → WARP!
 ```
 
-## **🚨 CRITICAL COORDINATE BUG FOUND & FIXED**
+**Solution - Server Side Buffer**:
+```typescript
+// Add 50ms buffer to prevent server/client timing conflicts
+const completionThreshold = movementState.estimatedDuration + 50;
+const isComplete = elapsedTime >= completionThreshold;
+```
 
-### **❌ THE COORDINATE MISMATCH BUG**:
-**Root Cause**: Server was using hardcoded dimensions for movement calculations while using actual client dimensions for node positions.
-
-**Client Screen**: `956 x 440`  
-**Node Positions**: Correctly calculated for `956 x 440` ✅  
-**Movement Calculations**: Using hardcoded `375 x 667` ❌  
+**Solution - Client Side Easing**:
+```typescript
+// Smooth transition in final 5% to prevent sudden jumps
+if (progress > 0.95) {
+  const finalEaseProgress = (progress - 0.95) / 0.05;
+  adjustedProgress = 0.95 + (0.05 * Math.min(finalEaseProgress, 1.0));
+}
+```
 
 **Result**: 
-- Movement target `(187.5, 396)` calculated for wrong screen size
-- Target Y coordinate `396` was off the bottom of `440px` screen
-- Battalions moved to wrong positions, then "jumped back" when arriving
+- **Server** waits 50ms longer before marking complete
+- **Client** eases smoothly through final 5% of movement  
+- **No more warping** - timing systems work in harmony
 
-### **✅ THE FIX**:
-1. **Added screen dimension storage** to `BattleService`
-2. **Store actual client dimensions** when `getBattleState()` called
-3. **Use stored dimensions** for all movement calculations
-4. **Coordinate system now consistent** between nodes and movement
+### **🔧 TECHNICAL IMPLEMENTATION**:
 
+**Server-Side Movement Calculation**:
+- ✅ **Target Position Redirection** - `targetPosition` set to `attackRangePosition` instead of target node center
+- ✅ **Pixel Scale Synchronization** - Server uses same 8px per range unit scaling as client visualization
+- ✅ **Network-Constrained Stopping** - Stop position calculated along network lines, not circular
+- ✅ **Attack Range Validation** - Movement only initiates if target is outside attack range
+
+**Attack Range Position Calculation**:
+- ✅ **Distance-Based Stopping** - Calculate position where attack range edge touches target center
+- ✅ **Line Interpolation** - Stop at precise point along network line using progress calculation
+- ✅ **Range Scaling** - `battalion.stats.range * 8` pixels matches visual circle radius
+- ✅ **Early Termination** - If already in range, don't move at all
+
+### **📊 ATTACK RANGE STOPPING DISTANCES**:
+- **Guardian** (Range=4): Stops **32px** from target center
+- **Breacher** (Range=5): Stops **40px** from target center  
+- **Phreak** (Range=9): Stops **72px** from target center
+
+### **🎯 BEHAVIORAL CHANGES**:
+
+**Before**: Battalions moved to target node center, then "bounced back"
+**After**: Battalions stop at optimal attack distance and hold position
+
+**Movement Logic**:
+1. **Calculate Attack Range Position**: Determine where to stop along network line
+2. **Set Target Position**: Use attack range position as movement destination
+3. **Movement Duration**: Calculate time to reach attack range, not target center
+4. **Stop Detection**: Movement completes when attack range position is reached
+5. **Position Holding**: Battalion maintains attack range position
+
+### **🔧 IMPLEMENTATION DETAILS**:
+
+**Attack Range Position Calculation**:
 ```typescript
-// BEFORE (broken):
-movementState = MovementService.initiateMovement(battalion, targetNode, 375, 667); // ❌ Hardcoded
-
-// AFTER (fixed):
-const screenDimensions = this.getBattleScreenDimensions(battleId);
-movementState = MovementService.initiateMovement(battalion, targetNode, 
-  screenDimensions.width, screenDimensions.height); // ✅ Actual client dimensions
+// Calculate position along network line at attack range distance from target
+const rangeInPixels = battalion.stats.range * 8; // Match client visualization
+const lineDistance = this.calculateNetworkDistance(battalionPos, targetPos);
+const stopDistance = lineDistance - rangeInPixels; // Stop before target
+const progress = stopDistance / lineDistance;
+return this.interpolateAlongNetworkLine(battalionPos, targetPos, progress);
 ```
 
-## **🚨 VISUAL MOVEMENT ISSUES FOUND & FIXED**
-
-### **❌ Problems Identified from Screenshots**:
-
-1. **Coordinate System Mismatch**:
-   - Server calculates for 375x667 screen
-   - Client has different actual dimensions  
-   - Result: Battalions jump to wrong positions off the network
-
-2. **No Position Scaling**:
-   - Client used server coordinates directly
-   - Network layout doesn't match movement calculations
-   - Result: Movement appears off the network lines
-
-3. **Choppy 200ms Animation**:
-   - Battalions jump every 200ms to new positions
-   - No smooth interpolation between updates
-   - Result: Jerky, unnatural movement
-
-4. **Group Movement Off Network**:
-   - All battalions move in formation like network is shifted
-   - Suggests systematic coordinate calculation error
-
-### **✅ FIXES IMPLEMENTED**:
-
-#### **1. Position Scaling System**
+**Movement Target Redirection**:
 ```typescript
-// Scale server coordinates (375x667) to actual client screen
-const scaleMovementPosition = (serverPos: { x: number; y: number }) => {
-  const scaleX = screenWidth / 375;  // Server uses 375 width
-  const scaleY = screenHeight / 667; // Server uses 667 height
-  return {
-    x: serverPos.x * scaleX,
-    y: serverPos.y * scaleY
-  };
+// Set target position to attack range position instead of target node center
+const targetPosition = {
+  x: attackRangePosition.x,
+  y: attackRangePosition.y,
+  nodeIndex: targetNode // Keep target node index for reference
 };
 ```
 
-#### **2. Smooth Client-Side Animation**
+**Range Validation**:
 ```typescript
-// Animated values for smooth interpolation
-const animatedPosition = React.useRef(new Animated.ValueXY(position)).current;
-
-// Smooth 150ms animation between server updates
-Animated.timing(animatedPosition, {
-  toValue: targetPosition,
-  duration: 150, // Smooth interpolation
-  useNativeDriver: false,
-}).start();
+// Check if battalion is already within attack range
+const isWithinAttackRange = this.isWithinNetworkAttackRange(battalion, targetNode, nodePositions);
+movementStatus: isWithinAttackRange ? 'stationary' : 'moving'
 ```
 
-#### **3. Screen Dimension Awareness**
-- Pass actual screen dimensions to BattleBattalion components
-- Scale all movement coordinates based on client screen size
-- Ensure movement matches visual network layout
+### **✅ STRATEGIC BENEFITS**:
 
-#### **4. Enhanced Debugging**
-```typescript
-// Log coordinate transformation for debugging
-console.log(`Server pos (${serverPos.x}, ${serverPos.y}) → Scaled (${scaledPos.x}, ${scaledPos.y}) → Display (${displayPos.x}, ${displayPos.y})`);
-```
+**Realistic Combat Positioning**:
+- **No Overcrowding**: Battalions don't stack on target centers
+- **Engagement Distance**: Units maintain optimal attack range
+- **Formation Integrity**: Multiple battalions can target same node without collision
+- **Strategic Positioning**: Different bot types stop at different distances
 
-## **🔄 EXPECTED VISUAL IMPROVEMENTS**
+**Visual Coordination**:
+- **Circle Alignment**: Stop position matches edge of visual attack range circles
+- **Predictable Behavior**: Players can see exactly where battalions will stop
+- **Range Visualization**: Attack range circles show actual engagement zones
+- **Combat Readiness**: Battalions in position to immediately begin attacking
 
-### **✅ What Should Now Work**:
+### **🎯 COMBAT FOUNDATION**:
 
-1. **Proper Network Alignment**:
-   - Battalions move along actual network lines
-   - No more jumping off to weird positions
-   - Movement coordinates match visual network layout
+**Ready for Combat Implementation**:
+- **Optimal Positioning**: Battalions positioned for immediate combat engagement
+- **Range Validation**: System knows which battalions can attack which targets
+- **Multiple Attackers**: Several battalions can attack same target from different angles
+- **Attack Range Enforcement**: Combat system can verify range before allowing attacks
 
-2. **Smooth Animation**:
-   - 150ms smooth interpolation between server updates  
-   - No more choppy 200ms jumps
-   - Natural, fluid movement along network paths
-
-3. **Correct Positioning**:
-   - Server coordinates properly scaled to client screen
-   - Movement starts/ends at correct network nodes
-   - Visual movement matches server calculations
-
-4. **Speed Differences**:
-   - Guardian moves faster than Breacher
-   - Different bot types have visible speed variations
-   - Network-constrained but speed-differentiated movement
-
-## **🔍 TESTING CHECKLIST**
-
-### **Visual Movement Verification**:
-1. **Start positions** - Battalions appear on correct nodes (0,1,2 and 6,7,8)
-2. **Movement initiation** - Battalions start moving along network lines after countdown
-3. **Network constraint** - Movement follows white network lines exactly
-4. **Smooth animation** - No choppy jumps, smooth interpolation
-5. **Speed differences** - Guardian visibly faster than Breacher
-6. **Arrival** - Battalions stop at target nodes correctly
-
-### **Console Log Verification**:
-1. **Screen dimensions** - Should show actual client screen size
-2. **Coordinate scaling** - Server → Scaled → Display position transformations
-3. **Movement data** - Periodic progress updates with correct coordinates
-4. **No errors** - Clean movement without React or coordinate errors
-
-## **🎯 CURRENT STATUS: PERFECTLY SMOOTH BATTALION MOVEMENT SYSTEM**
-
-The **Battalion Movement System** is fully functional, perfected, and optimized:
-- ✅ **Instant movement start** (configurable polling during battle for immediate response at 20s)
-- ✅ **Perfectly smooth movement** (60fps client interpolation with synchronized timing)
-- ✅ **No initial jumps** (client-side start time eliminates server/client timing mismatch)
-- ✅ **Fast-paced gameplay** (Guardian reaches targets in ~2.2 seconds via configurable timing)
-- ✅ **Preserved coordinate system** (all positioning logic unchanged from our fixes)
-- ✅ **Network-constrained paths** (movement follows network lines exactly)
-- ✅ **Strategic speed differences** (Guardian > Phreak > Breacher speeds maintained)
-- ✅ **Clean, maintainable code** (DRY principles applied, shared interfaces, no duplication)
-
-### **Complete Technical Stack**:
-- ✅ **Screen dimension storage** (BattleService tracks actual client dimensions via constants)
-- ✅ **Consistent coordinate system** (nodes and movement use same screen dimensions)  
-- ✅ **No coordinate scaling** (removed double scaling bug)
-- ✅ **Client-side smooth interpolation** (60fps continuous animation via ANIMATION_CONFIG)
-- ✅ **Server waypoint system** (start/end positions with configurable timing)
-- ✅ **Optimized movement speeds** (time-based with configurable speed ratios)
-- ✅ **Perfect timing synchronization** (client-side start time for seamless animation)
-- ✅ **Network topology adherence** (battalions move along network lines)
-- ✅ **Shared type system** (MovementState interface across client/server)
-- ✅ **Centralized configuration** (All constants in config files, no hardcoded values)
-- ✅ **Reusable utilities** (Helper functions eliminate duplicate logic)
-
-**Next: Movement system provides instant, flawless animation experience with clean, maintainable code - ready for combat mechanics, node capture, and battle interactions**
-
-## **🧹 DRY OPTIMIZATION COMPLETE**
-
-### **🚨 ELIMINATED 7 MAJOR DRY VIOLATIONS**
-
-1. **✅ MovementState Interface Consolidation** ⚠️ **CRITICAL**
-   - **Before**: MovementState defined 4 times across files with variations
-   - **After**: Single shared interface in `mobile/src/types/battleTypes.ts`
-   - **Impact**: Type consistency, reduced maintenance burden
-
-2. **✅ Screen Dimensions Constants** ⚠️ **HIGH**
-   - **Before**: `375x667` hardcoded in 6+ locations
-   - **After**: `BATTLE_CONFIG.STANDARD_SCREEN_WIDTH/HEIGHT` constants
-   - **Impact**: Single source of truth for screen dimensions
-
-3. **✅ Node Position Mapping Utility** ⚠️ **MEDIUM**
-   - **Before**: Identical reduce logic duplicated in 2 files
-   - **After**: Shared `createNodePositionMap()` utility function
-   - **Impact**: Reusable logic, consistent implementation
-
-4. **✅ Battalion Health Calculation** ⚠️ **MEDIUM**
-   - **Before**: `stats.health * quantity` repeated 3 times
-   - **After**: `calculateBattalionHealth()` utility function
-   - **Impact**: Single calculation method, easier testing
-
-5. **✅ Movement Timing Constants** ⚠️ **MEDIUM**
-   - **Before**: Hardcoded 4000ms, speed reference 5
-   - **After**: `BATTLE_CONFIG.MOVEMENT_BASE_TIME_MS/SPEED_REFERENCE`
-   - **Impact**: Configurable movement timing
-
-6. **✅ Animation Timing Constants** ⚠️ **LOW**
-   - **Before**: Hardcoded 16ms, 32ms, 200ms, 1000ms values
-   - **After**: `ANIMATION_CONFIG.FPS_60_INTERVAL_MS` etc.
-   - **Impact**: Consistent animation performance
-
-### **📊 TECHNICAL IMPROVEMENTS**
-
-**Shared Type System**:
-```typescript
-// ✅ AFTER: Single source of truth
-import { MovementState } from './types/battleTypes';
-```
-
-**Centralized Constants**:
-```typescript
-// ✅ Server config
-BATTLE_CONFIG.STANDARD_SCREEN_WIDTH: 375
-BATTLE_CONFIG.MOVEMENT_BASE_TIME_MS: 4000
-
-// ✅ Client config  
-ANIMATION_CONFIG.FPS_60_INTERVAL_MS: 16
-ANIMATION_CONFIG.BATTLE_PHASE_POLLING_MS: 200
-```
-
-**Reusable Utilities**:
-```typescript
-// ✅ Eliminates duplicate logic
-createNodePositionMap(nodes)
-calculateBattalionHealth(healthPerBot, quantity)
-```
-
-### **🎯 DRY BENEFITS ACHIEVED**:
-- ✅ **Type Safety**: Consistent interfaces across client/server
-- ✅ **Maintainability**: Single source of truth for constants  
-- ✅ **Testability**: Isolated utility functions
-- ✅ **Performance**: No duplicate calculations
-- ✅ **Code Quality**: Clean, readable, reusable components
+**Next Phase Ready**: System prepared for actual combat mechanics implementation where battalions attack targets from their established positions.
