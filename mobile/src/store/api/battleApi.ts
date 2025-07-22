@@ -33,8 +33,8 @@ export interface BattleState {
   nodes: Array<{
     index: number;
     owner: 'user' | 'enemy' | 'neutral';
-    health?: number;
-    captureProgress?: number;
+    tugOfWarProgress: number;      // NEW: -100 to +100
+    maxCaptureThreshold: number;   // NEW: Total army health
     position: { x: number; y: number }; // Server-provided node positions
   }>; // Server-provided node data (read-only)
   networkConnections: NetworkConnection[]; // Server-provided network topology

@@ -31,8 +31,8 @@ export class BattleController {
       return {
         index: node.index,
         owner: node.owner,
-        health: node.health,
-        captureProgress: node.captureProgress,
+        tugOfWarProgress: node.tugOfWarProgress,      // NEW: -100 to +100
+        maxCaptureThreshold: node.maxCaptureThreshold, // NEW: Total army health
         position: repositioned ? repositioned.position : node.position
       };
     });

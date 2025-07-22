@@ -116,18 +116,15 @@ const nodeSchema = new Schema({
     enum: Object.values(NodeOwner),
     required: true
   },
-  captureProgress: {
+  tugOfWarProgress: {
     type: Number,
-    required: true,
-    min: -100,
-    max: 100,
-    default: 0
+    default: 0,        // USER REQUIREMENT: Start at 0
+    min: -100,         // USER REQUIREMENT: -100% = enemy wins  
+    max: 100           // USER REQUIREMENT: +100% = user wins
   },
-  health: {
+  maxCaptureThreshold: {
     type: Number,
-    required: true,
-    min: 0,
-    default: 0
+    default: 0         // USER REQUIREMENT: Total army health (100%)
   },
   position: {
     x: {
