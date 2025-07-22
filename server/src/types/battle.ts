@@ -9,16 +9,7 @@ export enum BattlePhase {
   COMPLETE = 'complete'
 }
 
-// Event types for battle logging
-export enum EventType {
-  BATTLE_START = 'battle_start',
-  BATTLE_END = 'battle_end',
-  BATTALION_ATTACK = 'battalion_attack',
-  BATTALION_DAMAGE = 'battalion_damage',
-  BATTALION_DESTROYED = 'battalion_destroyed',
-  NODE_CAPTURED = 'node_captured',
-  PHASE_CHANGE = 'phase_change'
-}
+
 
 // Node ownership types
 export enum NodeOwner {
@@ -67,22 +58,15 @@ export interface IBattalion {
 export interface INode {
   index: number;
   owner: NodeOwner;
-  captureProgress: number; // -100 to +100 for neutral nodes
-  health: number; // Only for neutral nodes (3, 4, 5)
+  tugOfWarProgress: number;      // USER REQUIREMENT: -100 to +100
+  maxCaptureThreshold: number;   // USER REQUIREMENT: Total army health (100%)
   position: {
     x: number;
     y: number;
   };
 }
 
-// Battle event interface
-export interface IBattleEvent {
-  battleId: string;
-  eventType: EventType;
-  timestamp: Date;
-  actorId?: string; // User ID who triggered the event
-  data: Record<string, any>; // Flexible data object
-}
+
 
 // Main battle interface
 export interface IBattle extends Document {

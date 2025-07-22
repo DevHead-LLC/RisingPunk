@@ -6,6 +6,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
 import { useGetBattleStateQuery } from '../../store/api/battleApi';
+import { NodeHealthBar } from './NodeHealthBar';
 
 // Server-provided data types (matching server response)
 
@@ -25,8 +26,8 @@ export interface BattleNodeState {
   index: number;
   position: { x: number; y: number };
   owner: 'user' | 'enemy' | 'neutral';
-  health?: number;
-  captureProgress?: number;
+  tugOfWarProgress: number;      // NEW: -100 to +100
+  maxCaptureThreshold: number;   // NEW: Total army health
 }
 
 interface Props {
@@ -175,9 +176,14 @@ export const BattleNetworkGrid = React.memo(({
         );
 
         return (
-          <View key={node.index}>
+          <React.Fragment key={node.index}>
             <NodeContent />
-          </View>
+            
+            {/* NEW: Add health bar for neutral nodes only */}
+            {node.owner === 'neutral' && (
+              <NodeHealthBar node={node} />
+            )}
+          </React.Fragment>
         );
       })}
     </View>
