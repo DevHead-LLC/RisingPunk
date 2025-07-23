@@ -3,7 +3,6 @@ import { TargetingService } from './TargetingService';
 import { IBattalion, INode } from '../types/battle';
 import { MovementState } from '../../../mobile/src/types/battleTypes';
 import { CombatService } from './CombatService';
-import { AttackService } from './AttackService';
 import { BattalionPositionService } from './BattalionPositionService';
 
 // Movement configuration constants (single source of truth for movement timing)
@@ -132,12 +131,6 @@ export class MovementService {
         // Log movement status changes
         if (updatedMovementState.movementStatus === 'arrived') {
           console.log(`✅ ${battalion.owner} ${battalion.type} ARRIVED at node ${updatedMovementState.targetPosition.nodeIndex}`);
-          
-          // Start periodic attacking when battalion arrives at target
-          const targetNode = battle.nodes.find((n: INode) => n.index === updatedMovementState.targetPosition.nodeIndex);
-          if (targetNode && CombatService.canTargetNode(targetNode)) {
-            AttackService.startAttacking(battalion, targetNode.index);
-          }
         }
       }
       
@@ -152,34 +145,7 @@ export class MovementService {
     }
   }
 
-  /**
-   * Process all active attacks (moved from BattalionService)
-   */
-  static async processActiveAttacks(battle: any): Promise<void> {
-    for (const [battalionId, attackState] of AttackService.getActiveAttacks()) {
-      if (Date.now() - attackState.lastAttackTime >= attackState.attackInterval) {
-        const battalion = battle.battalions.find((b: IBattalion) => b.id === battalionId);
-        const node = battle.nodes.find((n: INode) => n.index === attackState.targetNodeIndex);
-        
-        if (battalion && node && CombatService.canTargetNode(node)) {
-          const captured = AttackService.processAttack(battalion, node);
-          
-          // Update last attack time
-          attackState.lastAttackTime = Date.now();
-          
-          if (captured) {
-            // Notify all attacking battalions to stop
-            const attackers = AttackService.getBattalionsAttackingNode(node.index);
-            attackers.forEach(id => AttackService.stopAttacking(id));
-            console.log(`🏆 NODE CAPTURED: Node ${node.index} captured by ${node.owner}!`);
-          }
-          
-          // Save the updated battle state
-          await battle.save();
-        }
-      }
-    }
-  }
+
 
   /**
    * Initiate movement for a battalion to a target node using existing network validation
