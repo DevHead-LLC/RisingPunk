@@ -6,7 +6,6 @@
 import { IBattalion, INode, NodeOwner, BotType, BattalionTargetingResult } from '../types/battle';
 import { BOT_CONFIG } from './BotService';
 import { MovementService } from './MovementService';
-import { BattalionPositionService } from './BattalionPositionService';
 import { MovementState } from '../../../mobile/src/types/battleTypes';
 import { Battle } from '../models/Battle';
 import { TargetingService } from './TargetingService';

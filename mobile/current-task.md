@@ -1,5 +1,51 @@
 # Current Task: Code Duplication Analysis & MovementService Optimization
 
+## 🎯 **COMPLETED: BattleService.ts Unused Logic Cleanup**
+
+### **Problem Identified:**
+- **`BattleService.ts`** contained several unused methods that were adding complexity
+- **Unused methods**: `getUserBattles()`, `getActiveBattles()`, `startMovementUpdates()`, `stopMovementUpdates()`
+- **Unused private methods**: `updateBattleTimer()`, `updateBattlePhase()` (but these are actually used by timer events)
+- **Code bloat**: 210 lines with ~50 lines of unused code
+
+### **Solution Implemented:**
+✅ **Removed unused public methods**:
+- `getUserBattles()` - No controller or service calls this method
+- `getActiveBattles()` - No controller or service calls this method
+- `startMovementUpdates()` - Private method that was just a wrapper
+- `stopMovementUpdates()` - Private method that was just a wrapper
+
+✅ **Removed unused imports**:
+- `MovementService` - Not used anywhere in the code
+- `CombatService` - Not used anywhere in the code
+- `IBattalion` - Not used anywhere in the code
+- `INode` - Not used anywhere in the code
+
+✅ **Updated method calls** to use direct delegation:
+- `this.startMovementUpdates()` → `BattalionService.startMovementUpdates()`
+- `this.stopMovementUpdates()` → `BattalionService.stopMovementUpdates()`
+
+✅ **Kept essential methods** that are actually used:
+- `createBattle()` - Used by BattleController
+- `setBattleScreenDimensions()` - Used by BattleController  
+- `getBattle()` - Used by BattleController
+- `getTimerService()` - Used by BattleController
+- `getMovementStates()` - Used by BattleController
+- `getTargetingResults()` - Used by BattleController
+- `triggerInitialTargeting()` - Used by BattleController
+- `endBattle()` - Used by timer events
+- `updateBattleTimer()` - Used by timer events (private)
+- `updateBattlePhase()` - Used by timer events (private)
+
+### **Architecture Benefits:**
+- **Reduced complexity**: Removed ~50 lines of unused code
+- **Cleaner interface**: Only exposes methods that are actually used
+- **Direct delegation**: No unnecessary wrapper methods
+- **Better maintainability**: Less code to maintain and test
+- **Focused responsibility**: Service focuses on battle orchestration
+
+---
+
 ## 🔍 **ANALYSIS: MovementService.ts Code Review & Duplication Search**
 
 ### **MovementService.ts Analysis:**
