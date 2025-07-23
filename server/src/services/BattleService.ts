@@ -1,7 +1,7 @@
 import { Battle, IBattleDocument } from '../models/Battle';
 import { BattlePhase, NodeOwner, IBattalion, INode } from '../types/battle';
 import { BattleTimerService } from './BattleTimer';
-import { TargetingService, TargetingResult } from './TargetingService';
+import { BattalionService, BattalionTargetingResult } from './BattalionService';
 import { MovementService } from './MovementService';
 import { MovementState } from '../../../mobile/src/types/battleTypes';
 import { BattleSetupService } from './BattleSetupService';
@@ -12,7 +12,6 @@ import { AttackService } from './AttackService';
 
 export class BattleService {
   private timerService: BattleTimerService;
-  private targetingResults: Map<string, TargetingResult[]> = new Map();
   private movementStates: Map<string, Map<string, MovementState>> = new Map(); // battleId -> battalionId -> MovementState
   private movementIntervals: Map<string, NodeJS.Timeout> = new Map(); // battleId -> movement interval
   private battleScreenDimensions: Map<string, { width: number; height: number }> = new Map(); // battleId -> screen dimensions
@@ -31,30 +30,22 @@ export class BattleService {
   /**
    * Trigger initial targeting when countdown ends
    */
-  async triggerInitialTargeting(battleId: string): Promise<TargetingResult[]> {
+  async triggerInitialTargeting(battleId: string): Promise<BattalionTargetingResult[]> {
     const battle = await this.getBattle(battleId);
     if (!battle) {
       console.log('❌ BATTLE NOT FOUND for initial targeting:', battleId);
       return [];
     }
 
-    console.log('🎯 TRIGGERING INITIAL TARGETING for battle:', battleId);
-    
-    // Assign initial targets to all battalions
-    const results = TargetingService.assignInitialTargets(battle.battalions, battle.nodes);
-    this.targetingResults.set(battleId, results);
-    
-    return results;
+    // Use BattalionService for targeting state management
+    return BattalionService.triggerInitialTargeting(battle.battalions, battle.nodes, battleId);
   }
 
   /**
    * Get current targeting results for a specific battle
    */
-  getTargetingResults(battleId?: string): TargetingResult[] {
-    if (!battleId) {
-      return [];
-    }
-    return this.targetingResults.get(battleId) || [];
+  getTargetingResults(battleId?: string): BattalionTargetingResult[] {
+    return BattalionService.getTargetingResults(battleId);
   }
 
   /**
@@ -293,6 +284,9 @@ export class BattleService {
     
     // Clean up movement states
     this.movementStates.delete(battleId);
+    
+    // Clean up targeting states
+    BattalionService.clearTargetingResults(battleId);
     
     // Clean up attack states
     AttackService.clearAllAttacks();

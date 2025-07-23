@@ -3,7 +3,7 @@
  * @description Battalion creation and business logic authority
  */
 
-import { NodeOwner, BotType, IBattalion, INode } from '../types/battle';
+import { IBattalion, INode, NodeOwner, BotType } from '../types/battle';
 import { BOT_CONFIG } from './BotService';
 import { NETWORK_CONNECTIONS } from '../config/networkConfig';
 
@@ -18,6 +18,67 @@ export interface BattalionTargetingResult {
 }
 
 export class BattalionService {
+  private static targetingResults: Map<string, BattalionTargetingResult[]> = new Map();
+
+  /**
+   * Trigger initial targeting for a battle and store results
+   */
+  static async triggerInitialTargeting(battalions: IBattalion[], nodes: INode[], battleId: string): Promise<BattalionTargetingResult[]> {
+    console.log('🎯 TRIGGERING INITIAL TARGETING for battle:', battleId);
+    
+    // Assign initial targets to all battalions
+    const results = this.assignInitialTargets(battalions, nodes);
+    this.targetingResults.set(battleId, results);
+    
+    return results;
+  }
+
+  /**
+   * Get current targeting results for a specific battle
+   */
+  static getTargetingResults(battleId?: string): BattalionTargetingResult[] {
+    if (!battleId) {
+      return [];
+    }
+    return this.targetingResults.get(battleId) || [];
+  }
+
+  /**
+   * Clear targeting results for a battle (cleanup)
+   */
+  static clearTargetingResults(battleId: string): void {
+    this.targetingResults.delete(battleId);
+  }
+
+  /**
+   * Assign initial random targets to all battalions
+   */
+  private static assignInitialTargets(battalions: IBattalion[], nodes: INode[]): BattalionTargetingResult[] {
+    const results: BattalionTargetingResult[] = [];
+    
+    // Get neutral nodes (3, 4, 5)
+    const neutralNodes = nodes.filter(node => node.owner === NodeOwner.NEUTRAL);
+    const neutralNodeIndices = neutralNodes.map(node => node.index);
+    
+    console.log('🎯 INITIAL TARGETING START');
+    console.log(`📊 Neutral nodes available: [${neutralNodeIndices.join(', ')}]`);
+    
+    // Process all battalions
+    battalions.forEach(battalion => {
+      const ownerLabel = battalion.owner === NodeOwner.USER ? 'user' : 'enemy';
+      const result = this.assignTargetToBattalion(battalion, neutralNodeIndices, ownerLabel);
+      results.push(result);
+    });
+    
+    // Log summary
+    const validTargets = results.filter(r => r.isValidTarget);
+    const invalidTargets = results.filter(r => !r.isValidTarget);
+    console.log(`📊 TARGETING SUMMARY: ${validTargets.length} valid, ${invalidTargets.length} invalid`);
+    console.log('🎯 INITIAL TARGETING COMPLETE');
+    
+    return results;
+  }
+
   /**
    * Calculate total army health from all battalions
    */

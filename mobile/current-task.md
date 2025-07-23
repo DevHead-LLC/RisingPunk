@@ -1,4 +1,43 @@
-# Current Task: Service Authority Refactoring Complete
+# Current Task: Targeting Logic Migration to BattalionService
+
+## 🎯 **COMPLETED: Targeting Logic Migration to BattalionService**
+
+### **Problem Identified:**
+- **`BattleService.triggerInitialTargeting()`** was delegating to **`TargetingService`** for targeting logic
+- **`TargetingService`** was handling both targeting orchestration AND battalion-specific targeting decisions
+- This violated the principle that **battalion authority should handle battalion-specific behaviors**
+
+### **Solution Implemented:**
+✅ **Moved** targeting logic from `TargetingService` to `BattalionService`:
+- `triggerInitialTargeting()` → `BattalionService.triggerInitialTargeting()`
+- `getTargetingResults()` → `BattalionService.getTargetingResults()`
+- `clearTargetingResults()` → `BattalionService.clearTargetingResults()`
+- `assignInitialTargets()` → `BattalionService.assignInitialTargets()` (private)
+
+✅ **Updated** `BattleService` to use `BattalionService`:
+- Changed imports from `TargetingService, TargetingResult` to `BattalionService, BattalionTargetingResult`
+- Updated method signatures to use `BattalionTargetingResult[]`
+- Updated all method calls to use `BattalionService` instead of `TargetingService`
+
+✅ **Simplified** `TargetingService` to pure utilities:
+- Removed targeting state management and orchestration logic
+- Kept only `getNetworkPath()` for network pathfinding utilities
+- Now acts as pure utility service for network operations
+
+✅ **Enhanced** `BattalionService` authority:
+- Now owns complete targeting lifecycle (trigger, get, clear)
+- Maintains targeting state management
+- Handles battalion-specific targeting decisions
+- Single source of truth for battalion targeting behavior
+
+### **Architecture Benefits:**
+- **Battalion Authority**: BattalionService now owns all battalion-specific targeting logic
+- **Clean Separation**: TargetingService focuses on network utilities, BattalionService on battalion behaviors
+- **Single Responsibility**: Each service has clear, focused responsibilities
+- **Better Maintainability**: Changes to battalion targeting isolated to BattalionService
+- **Consistent Pattern**: Matches established domain-specific authority approach
+
+---
 
 ## 🎯 **COMPLETED: Service Authority Assessment & Refactoring**
 
@@ -41,6 +80,40 @@
 - **Proper Authority**: Battalion logic in BattalionService, Node logic in NodeService
 - **Clean Orchestration**: TargetingService composes other services without duplicating logic
 - **Better Maintainability**: Changes to battalion targeting isolated to BattalionService
+- **Consistent Pattern**: Matches established domain-specific authority approach
+
+---
+
+## 🎯 **COMPLETED: Targeting State Management Refactoring**
+
+### **Problem Identified:**
+- **`BattleService`** was managing targeting state (`targetingResults` Map)
+- **`BattleService`** was handling targeting logic in movement updates
+- This violated the principle that **targeting authority should handle targeting state**
+
+### **Solution Implemented:**
+✅ **Moved** targeting state management from `BattleService` to `TargetingService`:
+- `targetingResults` Map → `TargetingService.targetingResults` (private static)
+- `triggerInitialTargeting()` → `TargetingService.triggerInitialTargeting()` (with state management)
+- `getTargetingResults()` → `TargetingService.getTargetingResults()`
+- Added `clearTargetingResults()` for cleanup
+
+✅ **Updated** `BattleService` to use `TargetingService`:
+- Removed `targetingResults` Map from BattleService
+- Updated `triggerInitialTargeting()` to delegate to TargetingService
+- Updated `getTargetingResults()` to delegate to TargetingService
+- Added targeting cleanup in `endBattle()`
+
+✅ **Enhanced** `TargetingService` responsibilities:
+- Now owns targeting state management
+- Handles targeting lifecycle (trigger, get, clear)
+- Maintains single source of truth for targeting data
+
+### **Architecture Benefits:**
+- **Targeting Authority**: TargetingService now owns all targeting state and logic
+- **Clean Separation**: BattleService focuses on battle orchestration, not targeting details
+- **Better State Management**: Targeting state centralized in TargetingService
+- **Proper Cleanup**: Targeting state properly cleaned up when battles end
 - **Consistent Pattern**: Matches established domain-specific authority approach
 
 ---
