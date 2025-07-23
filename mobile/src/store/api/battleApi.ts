@@ -53,6 +53,8 @@ export interface StartBattleRequest {
     quantity: number;
     nodeIndex: number;
   }>;
+  screenWidth: number;
+  screenHeight: number;
 }
 
 export const battleApi = createApi({

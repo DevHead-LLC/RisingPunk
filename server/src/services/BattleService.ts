@@ -76,10 +76,11 @@ export class BattleService {
    * Get screen dimensions for a battle (for movement calculations)
    */
   getBattleScreenDimensions(battleId: string): { width: number; height: number } {
-    return this.battleScreenDimensions.get(battleId) || { 
-      width: BATTLE_CONFIG.STANDARD_SCREEN_WIDTH, 
-      height: BATTLE_CONFIG.STANDARD_SCREEN_HEIGHT 
-    };
+    const dimensions = this.battleScreenDimensions.get(battleId);
+    if (!dimensions) {
+      throw new Error(`Screen dimensions not set for battle ${battleId}`);
+    }
+    return dimensions;
   }
 
   /**
@@ -144,17 +145,24 @@ export class BattleService {
       let movementState = battleMovementStates.get(battalion.id);
       
       if (!movementState) {
-        // Get actual client screen dimensions for this battle
-        const screenDimensions = this.getBattleScreenDimensions(battleId);
-        
-        // Initiate new movement using actual client screen dimensions
-        movementState = MovementService.initiateMovement(
-          battalion,
-          targetResult.targetNode,
-          screenDimensions.width,  // ✅ Use actual client screen dimensions
-          screenDimensions.height  // ✅ Use actual client screen dimensions
-        );
-        battleMovementStates.set(battalion.id, movementState);
+        // Only start movement if screen dimensions are available
+        try {
+          const screenDimensions = this.getBattleScreenDimensions(battleId);
+          
+          // Initiate new movement using actual client screen dimensions
+          movementState = MovementService.initiateMovement(
+            battalion,
+            targetResult.targetNode,
+            screenDimensions.width,
+            screenDimensions.height
+          );
+          battleMovementStates.set(battalion.id, movementState);
+          console.log(`🚀 Started movement for ${battalion.owner} ${battalion.type} to node ${targetResult.targetNode}`);
+        } catch (error) {
+          // Skip movement until screen dimensions are set by client
+          console.log(`⏳ Waiting for screen dimensions before starting movement for ${battalion.owner} ${battalion.type}`);
+          continue;
+        }
         
         // Movement initiated successfully
       } else if (movementState.movementStatus === 'moving') {
@@ -220,9 +228,12 @@ export class BattleService {
    * Create a new battle with initial setup
    * REUSE: BattleSetupService for battle creation
    */
-  async createBattle(attackerId: string, defenderId: string): Promise<IBattleDocument> {
+  async createBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number): Promise<IBattleDocument> {
     // Use BattleSetupService to create battle
-    const savedBattle = await BattleSetupService.createBattle(attackerId, defenderId);
+    const savedBattle = await BattleSetupService.createBattle(attackerId, defenderId, screenWidth, screenHeight);
+    
+    // Store screen dimensions for this battle
+    this.setBattleScreenDimensions(savedBattle.battleId, screenWidth, screenHeight);
 
     // Start server-side timer for this battle
     this.timerService.startTimer(savedBattle.battleId);

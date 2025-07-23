@@ -101,11 +101,11 @@ export interface CreateBattleRequest {
   }>;
 }
 
-// Network connection interface (imported from battleConfig - single source of truth)
-export { NetworkConnection } from '../config/battleConfig';
+// Network connection interface (imported from networkConfig - single source of truth)
+export { NetworkConnection } from '../config/networkConfig';
 
-// Line properties interface (imported from battleConfig - single source of truth)
-export { LineProperties } from '../config/battleConfig';
+// Line properties interface (imported from networkConfig - single source of truth)
+export { LineProperties } from '../config/networkConfig';
 
 // Client-compatible battalion for API response
 export interface ClientBattalion {
@@ -130,8 +130,8 @@ export interface BattleStateResponse {
   winner?: NodeOwner;
   battalions: ClientBattalion[];
   nodes: INode[];
-  networkConnections: import('../config/battleConfig').NetworkConnection[]; // Server-provided network topology
-  lineProperties: import('../config/battleConfig').LineProperties[];        // Server-calculated line properties
+  networkConnections: import('../config/networkConfig').NetworkConnection[]; // Server-provided network topology
+  lineProperties: import('../config/networkConfig').LineProperties[];        // Server-calculated line properties
   targetingResults?: any[];               // Initial targeting data
   movementStates?: MovementState[];        // Movement data for battalion animations
   lastUpdated: Date;

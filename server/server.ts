@@ -171,8 +171,8 @@ app.get('/api/bots', auth, async (req: Request, res: Response) => {
 // Get bot stats from server (single source of truth)
 app.get('/api/bots/stats', auth, async (req: Request, res: Response) => {
   try {
-    const { BATTLE_CONFIG } = await import('./src/config/battleConfig');
-    res.json({ botStats: BATTLE_CONFIG.BOT_STATS });
+    const { BOT_CONFIG } = await import('./src/services/BotService');
+    res.json({ botStats: BOT_CONFIG.USER_BOT_STATS });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

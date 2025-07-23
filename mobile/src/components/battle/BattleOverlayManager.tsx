@@ -55,10 +55,12 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
     }
   );
 
-  // SIMPLE LOG: Only log problems
+  // SIMPLE LOG: Only log problems (once per error)
   useEffect(() => {
-    if (battleError) {
+    if (battleError && !battleError.logged) {
       console.log('❌ OVERLAY API ERROR:', battleError);
+      // Mark as logged to prevent spam
+      (battleError as any).logged = true;
     }
   }, [battleError]);
 

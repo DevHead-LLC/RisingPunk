@@ -1,6 +1,11 @@
 import { EventEmitter } from 'events';
-import { BATTLE_CONFIG } from '../config/battleConfig';
 import { BattlePhase } from '../types/battle';
+
+// Timer configuration constants (single source of truth for battle timing)
+const TIMER_CONFIG = {
+  COUNTDOWN_DURATION: 3,  // Countdown phase duration in seconds
+  BATTLE_DURATION: 20,    // Battle phase duration in seconds
+} as const;
 
 interface BattleTimer {
   battleId: string;
@@ -38,7 +43,7 @@ export class BattleTimerService extends EventEmitter {
 
     const timer: BattleTimer = {
       battleId,
-      countdown: BATTLE_CONFIG.COUNTDOWN_DURATION,
+      countdown: TIMER_CONFIG.COUNTDOWN_DURATION,
       battleTime: 0,
       phase: BattlePhase.COUNTDOWN,
       isActive: true,
@@ -179,7 +184,7 @@ export class BattleTimerService extends EventEmitter {
         phase: timer.phase,
       });
 
-      if (timer.battleTime >= BATTLE_CONFIG.BATTLE_DURATION) {
+      if (timer.battleTime >= TIMER_CONFIG.BATTLE_DURATION) {
         // Battle time limit reached
         this.endBattle(battleId);
       }

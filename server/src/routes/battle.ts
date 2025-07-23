@@ -10,6 +10,8 @@ interface StartBattleRequest extends Request {
       nodeIndex: number;
     }>;
     defenderId?: string;
+    screenWidth: number;
+    screenHeight: number;
   }
 }
 
@@ -32,13 +34,23 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
   '/start',
   async (req, res): Promise<void> => {
     try {
-      const { userBattalions, defenderId } = req.body;
+      const { userBattalions, defenderId, screenWidth, screenHeight } = req.body;
+      
+      // Validate required screen dimensions
+      if (!screenWidth || !screenHeight) {
+        res.status(400).json({ 
+          success: false, 
+          error: 'Screen dimensions are required' 
+        });
+        return;
+      }
+      
       // For now, use a default user ID for testing
       const attackerId = 'test-user-id';
       // Use computer opponent if no defenderId provided
       const actualDefenderId = defenderId || 'computer';
 
-      const battle = await battleController.startBattle(attackerId, actualDefenderId);
+      const battle = await battleController.startBattle(attackerId, actualDefenderId, screenWidth, screenHeight);
       res.status(201).json({ battleId: battle.battleId });
     } catch (error) {
       console.error('Start battle error:', error);
@@ -61,8 +73,15 @@ router.get<{ id: string }, BattleResponse>(
       const userId = 'test-user-id';
 
       // Parse screen dimensions from query params
-      const width = screenWidth ? parseInt(screenWidth as string) : BATTLE_CONFIG.STANDARD_SCREEN_WIDTH;
-      const height = screenHeight ? parseInt(screenHeight as string) : BATTLE_CONFIG.STANDARD_SCREEN_HEIGHT;
+      if (!screenWidth || !screenHeight) {
+        res.status(400).json({ 
+          success: false, 
+          error: 'Screen dimensions are required' 
+        });
+        return;
+      }
+      const width = parseInt(screenWidth as string);
+      const height = parseInt(screenHeight as string);
 
       const battleState = await battleController.getBattleState(id, userId, width, height);
       if (!battleState) {
