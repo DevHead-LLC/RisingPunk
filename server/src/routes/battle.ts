@@ -80,8 +80,18 @@ router.get<{ id: string }, BattleResponse>(
         });
         return;
       }
+      
       const width = parseInt(screenWidth as string);
       const height = parseInt(screenHeight as string);
+      
+      // Validate parsed dimensions are valid numbers
+      if (isNaN(width) || isNaN(height) || width <= 0 || height <= 0) {
+        res.status(400).json({ 
+          success: false, 
+          error: 'Invalid screen dimensions. Must be positive numbers.' 
+        });
+        return;
+      }
 
       const battleState = await battleController.getBattleState(id, userId, width, height);
       if (!battleState) {
