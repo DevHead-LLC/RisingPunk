@@ -17,7 +17,7 @@ type Props = {
   onBattleStart: (battleId?: string) => void;
 };
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 
 
@@ -261,6 +261,8 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
                 { type: 'breacher', quantity: 8, nodeIndex: 1 },
                 { type: 'phreak', quantity: 6, nodeIndex: 2 },
               ],
+              screenWidth: SCREEN_WIDTH,
+              screenHeight: SCREEN_HEIGHT,
             }).unwrap();
 
 

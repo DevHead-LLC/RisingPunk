@@ -1,6 +1,11 @@
-import { BATTLE_CONFIG } from '../config/battleConfig';
+import { calculateNodePositions } from '../config/networkConfig';
 import { TargetingService } from './TargetingService';
 import { IBattalion, INode } from '../types/battle';
+
+// Movement configuration constants (single source of truth for movement timing)
+const MOVEMENT_CONFIG = {
+  BASE_MOVEMENT_TIME_MS: 20000,  // Base movement time in milliseconds (20 seconds)
+} as const;
 
 // Import shared MovementState interface from client types
 import { MovementState } from '../../../mobile/src/types/battleTypes';
@@ -18,8 +23,8 @@ export class MovementService {
     // Use existing TargetingService.getNetworkPath() for route validation
     const networkPath = TargetingService.getNetworkPath(battalion.position.nodeIndex, targetNode);
     
-    // Use existing BATTLE_CONFIG.calculateNodePositions() for screen adaptation
-    const nodePositions = BATTLE_CONFIG.calculateNodePositions(screenWidth, screenHeight);
+    // Use existing calculateNodePositions() for screen adaptation
+    const nodePositions = calculateNodePositions(screenWidth, screenHeight);
     
     const startPosition = {
       x: nodePositions[battalion.position.nodeIndex].position.x,
@@ -52,8 +57,7 @@ export class MovementService {
     // Calculate estimated movement duration based on battalion speed
     // Use distance to attack range position, not target node center
     const movementDistance = this.calculateNetworkDistance(startPosition, attackRangePosition);
-    const speedRatio = BATTLE_CONFIG.MOVEMENT_SPEED_REFERENCE / battalion.stats.speed;
-    const estimatedDuration = Math.round(BATTLE_CONFIG.MOVEMENT_BASE_TIME_MS * speedRatio);
+    const estimatedDuration = Math.round(MOVEMENT_CONFIG.BASE_MOVEMENT_TIME_MS / battalion.stats.speed);
 
     // Result: Guardian(9)=~2.2s, Phreak(7)=~2.9s, Breacher(5)=4.0s
     console.log(`🏃 ${battalion.owner} ${battalion.type} (speed=${battalion.stats.speed}) will move ${movementDistance.toFixed(1)}px to attack range for ${estimatedDuration}ms`);

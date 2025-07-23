@@ -4,7 +4,7 @@
  */
 
 import { IBattalion, INode, NodeOwner, BotType } from '../types/battle';
-import { BATTLE_CONFIG } from '../config/battleConfig';
+import { NETWORK_CONNECTIONS } from '../config/networkConfig';
 
 export interface TargetingResult {
   battalionId: string;
@@ -100,7 +100,7 @@ export class TargetingService {
    */
   private static isReachableViaNetwork(startingNode: number, targetNode: number): boolean {
     // Direct connection check only - no 1-hop paths for initial targeting
-    return BATTLE_CONFIG.NETWORK_CONNECTIONS.some(connection => 
+    return NETWORK_CONNECTIONS.some(connection => 
       (connection.from === startingNode && connection.to === targetNode) ||
       (connection.from === targetNode && connection.to === startingNode)
     );
@@ -111,7 +111,7 @@ export class TargetingService {
    */
   static getNetworkPath(startingNode: number, targetNode: number): number[] {
     // Direct connection only - no 1-hop paths for initial targeting
-    const hasDirectConnection = BATTLE_CONFIG.NETWORK_CONNECTIONS.some(connection => 
+    const hasDirectConnection = NETWORK_CONNECTIONS.some(connection => 
       (connection.from === startingNode && connection.to === targetNode) ||
       (connection.from === targetNode && connection.to === startingNode)
     );

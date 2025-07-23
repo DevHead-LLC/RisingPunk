@@ -5,21 +5,16 @@
 
 import { Battle, IBattleDocument } from '../models/Battle';
 import { BattlePhase, NodeOwner, BotType, IBattalion, INode } from '../types/battle';
-import { BATTLE_CONFIG } from '../config/battleConfig';
-import { calculateBattalionHealth } from '../utils/battleUtils';
-
-// Bot stats from battleConfig (single source of truth)
-const BOT_CATEGORIES = BATTLE_CONFIG.BOT_STATS;
-const ENEMY_BOT_CATEGORIES = BATTLE_CONFIG.ENEMY_BOT_STATS;
+import { calculateNodePositions } from '../config/networkConfig';
+import { BOT_CONFIG } from './BotService';
 
 export class BattleSetupService {
   /**
    * Calculate total army health from all battalions
-   * REUSE: calculateBattalionHealth() utility
    */
   static calculateTotalArmyHealth(battalions: IBattalion[]): number {
     return battalions.reduce((total, battalion) => {
-      return total + calculateBattalionHealth(battalion.stats.health, battalion.quantity);
+      return total + (battalion.stats.health * battalion.quantity);
     }, 0);
   }
 
@@ -27,12 +22,12 @@ export class BattleSetupService {
    * Create nodes with tug-of-war system
    * USER REQUIREMENT: 100% of total army health (not 75%)
    */
-  static createNodesWithTugOfWar(totalArmyHealth: number): INode[] {
+  static createNodesWithTugOfWar(totalArmyHealth: number, screenWidth: number, screenHeight: number): INode[] {
     // Initialize nodes with server-calculated positions (moved from client for security)
-    // Use standard screen dimensions for positioning (client will scale if needed)
-    const positionedNodes = BATTLE_CONFIG.calculateNodePositions(
-      BATTLE_CONFIG.STANDARD_SCREEN_WIDTH, 
-      BATTLE_CONFIG.STANDARD_SCREEN_HEIGHT, 
+    // Use provided screen dimensions for positioning
+    const positionedNodes = calculateNodePositions(
+      screenWidth, 
+      screenHeight, 
       125
     );
     
@@ -50,7 +45,7 @@ export class BattleSetupService {
 
   /**
    * Create user battalions with proper stats
-   * REUSE: BATTLE_CONFIG.BOT_STATS pattern
+   * REUSE: BOT_CONFIG.USER_BOT_STATS pattern
    */
   static createUserBattalions(nodes: INode[]): IBattalion[] {
     const battalions: IBattalion[] = [];
@@ -63,8 +58,8 @@ export class BattleSetupService {
     ];
     
     userBattalions.forEach((battalion, index) => {
-      const stats = BOT_CATEGORIES[battalion.type].stats;
-      const maxHealth = calculateBattalionHealth(stats.health, battalion.quantity);
+      const stats = BOT_CONFIG.USER_BOT_STATS[battalion.type].stats;
+      const maxHealth = stats.health * battalion.quantity;
       
       battalions.push({
         id: `user-battalion-${index}`,
@@ -88,7 +83,7 @@ export class BattleSetupService {
 
   /**
    * Create enemy battalions with proper stats
-   * REUSE: BATTLE_CONFIG.ENEMY_BOT_STATS pattern
+   * REUSE: BOT_CONFIG.ENEMY_BOT_STATS pattern
    */
   static createEnemyBattalions(nodes: INode[]): IBattalion[] {
     const battalions: IBattalion[] = [];
@@ -101,8 +96,8 @@ export class BattleSetupService {
     ];
     
     enemyBattalions.forEach((battalion, index) => {
-      const stats = ENEMY_BOT_CATEGORIES[battalion.type].stats;
-      const maxHealth = calculateBattalionHealth(stats.health, battalion.quantity);
+      const stats = BOT_CONFIG.ENEMY_BOT_STATS[battalion.type].stats;
+      const maxHealth = stats.health * battalion.quantity;
       
       battalions.push({
         id: `enemy-battalion-${index}`,
@@ -128,20 +123,24 @@ export class BattleSetupService {
    * Create a new battle with initial setup
    * REUSE: Existing battle creation pattern
    */
-  static async createBattle(attackerId: string, defenderId: string): Promise<IBattleDocument> {
+  static async createBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number): Promise<IBattleDocument> {
     const battleId = `battle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    // Create all battalions first to calculate total army health
-    const tempNodes = this.createNodesWithTugOfWar(0); // Temporary nodes for battalion positioning
-    const userBattalions = this.createUserBattalions(tempNodes);
-    const enemyBattalions = this.createEnemyBattalions(tempNodes);
+    // Create real nodes first with placeholder totalArmyHealth
+    const nodes = this.createNodesWithTugOfWar(0, screenWidth, screenHeight);
+    
+    // Create battalions using real nodes
+    const userBattalions = this.createUserBattalions(nodes);
+    const enemyBattalions = this.createEnemyBattalions(nodes);
     const battalions = [...userBattalions, ...enemyBattalions];
     
     // Calculate total army health for tug-of-war threshold
     const totalArmyHealth = this.calculateTotalArmyHealth(battalions);
     
-    // Create nodes with proper tug-of-war initialization
-    const nodes = this.createNodesWithTugOfWar(totalArmyHealth);
+    // Update nodes with proper tug-of-war initialization
+    nodes.forEach(node => {
+      node.maxCaptureThreshold = totalArmyHealth;
+    });
     
     // Create battle with proper phase setup
     const battle = new Battle({

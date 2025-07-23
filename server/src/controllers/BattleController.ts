@@ -3,6 +3,7 @@ import { BattleService } from '../services/BattleService';
 import { Battle, IBattleDocument } from '../models/Battle';
 import { BattlePhase, NodeOwner, BattleStateResponse } from '../types/battle';
 import { BATTLE_CONFIG } from '../config/battleConfig';
+import { calculateNodePositions, calculateLineProperties, NETWORK_CONNECTIONS } from '../config/networkConfig';
 import { BattalionMappingService } from '../services/BattalionMappingService';
 import { BattleResponseService } from '../services/BattleResponseService';
 import { createNodePositionMap } from '../utils/battleUtils';
@@ -23,7 +24,7 @@ export class BattleController {
    */
   private generateNetworkData(nodes: any[], screenWidth: number, screenHeight: number) {
     // Recalculate node positions for client's actual screen size
-    const repositionedNodes = BATTLE_CONFIG.calculateNodePositions(screenWidth, screenHeight, 125);
+    const repositionedNodes = calculateNodePositions(screenWidth, screenHeight, 125);
     
     // Update the nodes with correct positions for client screen
     const updatedNodes = nodes.map(node => {
@@ -38,7 +39,7 @@ export class BattleController {
     });
     
     // Get network connections from server config (convert readonly to mutable)
-    const networkConnections = [...BATTLE_CONFIG.NETWORK_CONNECTIONS];
+    const networkConnections = [...NETWORK_CONNECTIONS];
     
     // Create node position map for line calculations using updated positions
     const nodePositions = createNodePositionMap(updatedNodes);
@@ -53,7 +54,7 @@ export class BattleController {
         return { length: 0, angle: 0, left: 0, top: 0 };
       }
       
-      return BATTLE_CONFIG.calculateLineProperties(fromPos, toPos);
+      return calculateLineProperties(fromPos, toPos);
     });
 
     return { networkConnections, lineProperties, updatedNodes };
@@ -62,18 +63,20 @@ export class BattleController {
   /**
    * Start a new battle
    */
-  async startBattle(attackerId: string, defenderId: string): Promise<BattleStateResponse> {
+  async startBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number): Promise<BattleStateResponse> {
     try {
       // Handle computer opponent
       const actualDefenderId = defenderId === 'computer' ? 'computer-opponent' : defenderId;
       
-      // Create battle using BattleService
-      const battle = await this.battleService.createBattle(attackerId, actualDefenderId);
+      // Use provided screen dimensions (required)
+      const width = screenWidth;
+      const height = screenHeight;
       
-
+      // Create battle using BattleService
+      const battle = await this.battleService.createBattle(attackerId, actualDefenderId, width, height);
 
       // Generate network data for client
-      const networkData = this.generateNetworkData(battle.nodes, BATTLE_CONFIG.STANDARD_SCREEN_WIDTH, BATTLE_CONFIG.STANDARD_SCREEN_HEIGHT);
+      const networkData = this.generateNetworkData(battle.nodes, width, height);
 
       // Map battalions for client using focused service
       const mappedBattalions = BattalionMappingService.mapBattalionsForClient(battle.battalions);
@@ -89,7 +92,7 @@ export class BattleController {
   /**
    * Get current battle state
    */
-  async getBattleState(battleId: string, userId: string, screenWidth: number = BATTLE_CONFIG.STANDARD_SCREEN_WIDTH, screenHeight: number = BATTLE_CONFIG.STANDARD_SCREEN_HEIGHT): Promise<BattleStateResponse | null> {
+  async getBattleState(battleId: string, userId: string, screenWidth: number, screenHeight: number): Promise<BattleStateResponse | null> {
     try {
       // Store screen dimensions for this battle (for movement calculations)
       this.battleService.setBattleScreenDimensions(battleId, screenWidth, screenHeight);
