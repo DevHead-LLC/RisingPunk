@@ -1,6 +1,6 @@
 /**
  * @file TargetingService.ts
- * @description Initial targeting orchestration for battalions
+ * @description Targeting orchestration and state management for battles
  */
 
 import { IBattalion, INode, NodeOwner } from '../types/battle';
@@ -17,10 +17,42 @@ export interface TargetingResult {
 }
 
 export class TargetingService {
+  private static targetingResults: Map<string, TargetingResult[]> = new Map();
+
+  /**
+   * Trigger initial targeting for a battle and store results
+   */
+  static async triggerInitialTargeting(battalions: IBattalion[], nodes: INode[], battleId: string): Promise<TargetingResult[]> {
+    console.log('🎯 TRIGGERING INITIAL TARGETING for battle:', battleId);
+    
+    // Assign initial targets to all battalions
+    const results = this.assignInitialTargets(battalions, nodes);
+    this.targetingResults.set(battleId, results);
+    
+    return results;
+  }
+
+  /**
+   * Get current targeting results for a specific battle
+   */
+  static getTargetingResults(battleId?: string): TargetingResult[] {
+    if (!battleId) {
+      return [];
+    }
+    return this.targetingResults.get(battleId) || [];
+  }
+
+  /**
+   * Clear targeting results for a battle (cleanup)
+   */
+  static clearTargetingResults(battleId: string): void {
+    this.targetingResults.delete(battleId);
+  }
+
   /**
    * Assign initial random targets to all battalions
    */
-  static assignInitialTargets(battalions: IBattalion[], nodes: INode[]): TargetingResult[] {
+  private static assignInitialTargets(battalions: IBattalion[], nodes: INode[]): TargetingResult[] {
     const results: TargetingResult[] = [];
     
     // Get neutral nodes (3, 4, 5)

@@ -12,7 +12,6 @@ import { AttackService } from './AttackService';
 
 export class BattleService {
   private timerService: BattleTimerService;
-  private targetingResults: Map<string, TargetingResult[]> = new Map();
   private movementStates: Map<string, Map<string, MovementState>> = new Map(); // battleId -> battalionId -> MovementState
   private movementIntervals: Map<string, NodeJS.Timeout> = new Map(); // battleId -> movement interval
   private battleScreenDimensions: Map<string, { width: number; height: number }> = new Map(); // battleId -> screen dimensions
@@ -38,23 +37,15 @@ export class BattleService {
       return [];
     }
 
-    console.log('🎯 TRIGGERING INITIAL TARGETING for battle:', battleId);
-    
-    // Assign initial targets to all battalions
-    const results = TargetingService.assignInitialTargets(battle.battalions, battle.nodes);
-    this.targetingResults.set(battleId, results);
-    
-    return results;
+    // Use TargetingService for targeting state management
+    return TargetingService.triggerInitialTargeting(battle.battalions, battle.nodes, battleId);
   }
 
   /**
    * Get current targeting results for a specific battle
    */
   getTargetingResults(battleId?: string): TargetingResult[] {
-    if (!battleId) {
-      return [];
-    }
-    return this.targetingResults.get(battleId) || [];
+    return TargetingService.getTargetingResults(battleId);
   }
 
   /**
@@ -293,6 +284,9 @@ export class BattleService {
     
     // Clean up movement states
     this.movementStates.delete(battleId);
+    
+    // Clean up targeting states
+    TargetingService.clearTargetingResults(battleId);
     
     // Clean up attack states
     AttackService.clearAllAttacks();

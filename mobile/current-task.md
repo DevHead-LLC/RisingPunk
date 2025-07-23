@@ -45,6 +45,40 @@
 
 ---
 
+## 🎯 **COMPLETED: Targeting State Management Refactoring**
+
+### **Problem Identified:**
+- **`BattleService`** was managing targeting state (`targetingResults` Map)
+- **`BattleService`** was handling targeting logic in movement updates
+- This violated the principle that **targeting authority should handle targeting state**
+
+### **Solution Implemented:**
+✅ **Moved** targeting state management from `BattleService` to `TargetingService`:
+- `targetingResults` Map → `TargetingService.targetingResults` (private static)
+- `triggerInitialTargeting()` → `TargetingService.triggerInitialTargeting()` (with state management)
+- `getTargetingResults()` → `TargetingService.getTargetingResults()`
+- Added `clearTargetingResults()` for cleanup
+
+✅ **Updated** `BattleService` to use `TargetingService`:
+- Removed `targetingResults` Map from BattleService
+- Updated `triggerInitialTargeting()` to delegate to TargetingService
+- Updated `getTargetingResults()` to delegate to TargetingService
+- Added targeting cleanup in `endBattle()`
+
+✅ **Enhanced** `TargetingService` responsibilities:
+- Now owns targeting state management
+- Handles targeting lifecycle (trigger, get, clear)
+- Maintains single source of truth for targeting data
+
+### **Architecture Benefits:**
+- **Targeting Authority**: TargetingService now owns all targeting state and logic
+- **Clean Separation**: BattleService focuses on battle orchestration, not targeting details
+- **Better State Management**: Targeting state centralized in TargetingService
+- **Proper Cleanup**: Targeting state properly cleaned up when battles end
+- **Consistent Pattern**: Matches established domain-specific authority approach
+
+---
+
 ## 🎯 **COMPLETED: Domain-Specific Service Authorities Established**
 
 ### **MovementService Refactoring:**
