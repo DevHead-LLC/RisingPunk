@@ -1,3 +1,42 @@
+# Current Task: Attack Logic Refactoring - MovementService to AttackService
+
+## 🎯 **COMPLETED: Attack Logic Migration from MovementService to AttackService**
+
+### **Problem Identified:**
+- **`MovementService.ts`** was handling attack logic when battalions arrive at targets
+- **`MovementService.ts`** contained `processActiveAttacks()` method that should be in AttackService
+- **`MovementService.ts`** directly called `AttackService.startAttacking()` in movement logic
+- This violated the principle that **attack authority should handle all attack-related logic**
+
+### **Solution Implemented:**
+✅ **Moved** `processActiveAttacks()` from MovementService to AttackService:
+- Complete method moved with all logic intact
+- Updated method to use `this.getActiveAttacks()` instead of `AttackService.getActiveAttacks()`
+- Updated method to use `this.processAttack()` instead of `AttackService.processAttack()`
+- Updated method to use `this.getBattalionsAttackingNode()` instead of `AttackService.getBattalionsAttackingNode()`
+- Updated method to use `this.stopAttacking()` instead of `AttackService.stopAttacking()`
+
+✅ **Removed** attack logic from MovementService:
+- Removed `processActiveAttacks()` method entirely
+- Removed `AttackService` import (no longer needed)
+- Removed attack logic from `updateBattleMovement()` when battalions arrive
+- MovementService now focuses purely on movement logic
+
+✅ **Enhanced** BattalionService to orchestrate movement→attack transitions:
+- Added `AttackService` and `CombatService` imports
+- Added `handleArrivedBattalions()` method to check for arrived battalions and start attacks
+- Updated `updateBattleMovement()` to call `handleArrivedBattalions()` before processing attacks
+- Updated `updateBattleMovement()` to call `AttackService.processActiveAttacks()` instead of MovementService
+
+### **Architecture Benefits:**
+- **Attack Authority**: AttackService now owns all attack logic and processing
+- **Movement Authority**: MovementService focuses purely on movement logic
+- **Battalion Orchestration**: BattalionService coordinates movement→attack transitions
+- **Clean Separation**: Each service has focused, non-overlapping responsibilities
+- **Same Functionality**: No logic changes, just proper reorganization
+
+---
+
 # Current Task: Battalion Position Service Creation
 
 ## 🎯 **COMPLETED: BattalionPositionService Creation - Position Authority Separation**

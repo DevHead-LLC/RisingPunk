@@ -10,6 +10,8 @@ import { BattalionPositionService } from './BattalionPositionService';
 import { MovementState } from '../../../mobile/src/types/battleTypes';
 import { Battle } from '../models/Battle';
 import { TargetingService } from './TargetingService';
+import { AttackService } from './AttackService';
+import { CombatService } from './CombatService';
 
 export class BattalionService {
   private static targetingResults: Map<string, BattalionTargetingResult[]> = new Map();
@@ -100,8 +102,30 @@ export class BattalionService {
     // Delegate movement logic to MovementService
     await MovementService.updateBattleMovement(battleId, battle, targetingResults);
     
-    // Delegate attack processing to MovementService
-    await MovementService.processActiveAttacks(battle);
+    // Handle movement→attack transitions for arrived battalions
+    await this.handleArrivedBattalions(battle);
+    
+    // Delegate attack processing to AttackService
+    await AttackService.processActiveAttacks(battle);
+  }
+
+  /**
+   * Handle movement→attack transitions for arrived battalions
+   */
+  private static async handleArrivedBattalions(battle: any): Promise<void> {
+    const movementStates = MovementService.getMovementStates(battle.battleId);
+    const arrivedBattalions = MovementService.getArrivedBattalions(movementStates);
+    
+    for (const movementState of arrivedBattalions) {
+      const battalion = battle.battalions.find((b: IBattalion) => b.id === movementState.battalionId);
+      if (!battalion) continue;
+      
+      // Check if battalion should start attacking
+      const targetNode = battle.nodes.find((n: INode) => n.index === movementState.targetPosition.nodeIndex);
+      if (targetNode && CombatService.canTargetNode(targetNode) && !AttackService.isAttacking(battalion.id)) {
+        AttackService.startAttacking(battalion, targetNode.index);
+      }
+    }
   }
 
   /**

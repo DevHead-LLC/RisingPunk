@@ -116,4 +116,33 @@ export class AttackService {
   static clearAllAttacks(): void {
     this.attackStates.clear();
   }
+
+  /**
+   * Process all active attacks (moved from MovementService)
+   */
+  static async processActiveAttacks(battle: any): Promise<void> {
+    for (const [battalionId, attackState] of this.getActiveAttacks()) {
+      if (Date.now() - attackState.lastAttackTime >= attackState.attackInterval) {
+        const battalion = battle.battalions.find((b: IBattalion) => b.id === battalionId);
+        const node = battle.nodes.find((n: INode) => n.index === attackState.targetNodeIndex);
+        
+        if (battalion && node && CombatService.canTargetNode(node)) {
+          const captured = this.processAttack(battalion, node);
+          
+          // Update last attack time
+          attackState.lastAttackTime = Date.now();
+          
+          if (captured) {
+            // Notify all attacking battalions to stop
+            const attackers = this.getBattalionsAttackingNode(node.index);
+            attackers.forEach(id => this.stopAttacking(id));
+            console.log(`🏆 NODE CAPTURED: Node ${node.index} captured by ${node.owner}!`);
+          }
+          
+          // Save the updated battle state
+          await battle.save();
+        }
+      }
+    }
+  }
 } 
