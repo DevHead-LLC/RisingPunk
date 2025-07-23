@@ -1,4 +1,4 @@
-# Current Task: MovementService and BotService Refactoring Complete
+# Current Task: Bug Fixes and Refactoring Complete
 
 ## 🎯 **COMPLETED: Domain-Specific Service Authorities Established**
 
@@ -29,6 +29,22 @@
 - **Better Organization**: Bot stats centralized in dedicated service
 - **Easier Maintenance**: Changes to movement or bot logic isolated to respective services
 - **Consistent Pattern**: Matches `BattleTimer.ts` and `networkConfig.ts` structure
+
+---
+
+## 🐛 **BUG FIXES COMPLETED:**
+
+### **1. Error Object Mutation Fix:**
+✅ **Fixed** `BattleOverlayManager.tsx` error object mutation
+- **Problem**: Mutating RTK Query error objects with `(battleError as any).logged = true`
+- **Solution**: Use `useRef<Set<string>>` to track logged errors by JSON string
+- **Benefits**: No object mutation, TypeScript safe, prevents duplicate logging
+
+### **2. Screen Dimensions Validation Fix:**
+✅ **Fixed** `server/src/routes/battle.ts` invalid screen dimensions
+- **Problem**: `parseInt()` returns `NaN` for non-numeric strings, causing calculation errors
+- **Solution**: Added `isNaN()` checks and positive number validation
+- **Benefits**: Prevents server crashes, clear error messages, robust input handling
 
 ---
 

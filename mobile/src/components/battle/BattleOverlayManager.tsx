@@ -3,7 +3,7 @@
  * @description Self-contained battle overlay manager with direct server integration
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Dimensions, ActivityIndicator, Text } from 'react-native';
 import { useGetBattleStateQuery } from '../../store/api/battleApi';
 import { BattlePhase } from '../../types/battleTypes';
@@ -42,6 +42,9 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
   // Get screen dimensions for server calculations
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
+  // Track logged errors to prevent spam
+  const loggedErrors = useRef<Set<string>>(new Set());
+
   // Direct API call to get battle state
   const {
     data: battleState,
@@ -57,10 +60,13 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
 
   // SIMPLE LOG: Only log problems (once per error)
   useEffect(() => {
-    if (battleError && !battleError.logged) {
-      console.log('❌ OVERLAY API ERROR:', battleError);
-      // Mark as logged to prevent spam
-      (battleError as any).logged = true;
+    if (battleError) {
+      // Create a unique key for this error to prevent duplicate logging
+      const errorKey = JSON.stringify(battleError);
+      if (!loggedErrors.current.has(errorKey)) {
+        console.log('❌ OVERLAY API ERROR:', battleError);
+        loggedErrors.current.add(errorKey);
+      }
     }
   }, [battleError]);
 
