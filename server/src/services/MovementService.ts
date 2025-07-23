@@ -4,6 +4,7 @@ import { IBattalion, INode } from '../types/battle';
 import { MovementState } from '../../../mobile/src/types/battleTypes';
 import { CombatService } from './CombatService';
 import { AttackService } from './AttackService';
+import { BattalionPositionService } from './BattalionPositionService';
 
 // Movement configuration constants (single source of truth for movement timing)
 const MOVEMENT_CONFIG = {
@@ -18,7 +19,6 @@ interface Position {
 export class MovementService {
   private static movementStates: Map<string, Map<string, MovementState>> = new Map(); // battleId -> battalionId -> MovementState
   private static movementIntervals: Map<string, NodeJS.Timeout> = new Map(); // battleId -> movement interval
-  private static battleScreenDimensions: Map<string, { width: number; height: number }> = new Map(); // battleId -> screen dimensions
 
   /**
    * Get current movement states for a specific battle
@@ -31,18 +31,14 @@ export class MovementService {
    * Store screen dimensions for a battle (called when client requests battle state)
    */
   static setBattleScreenDimensions(battleId: string, width: number, height: number): void {
-    this.battleScreenDimensions.set(battleId, { width, height });
+    BattalionPositionService.setBattleScreenDimensions(battleId, width, height);
   }
 
   /**
    * Get screen dimensions for a battle (for movement calculations)
    */
   static getBattleScreenDimensions(battleId: string): { width: number; height: number } {
-    const dimensions = this.battleScreenDimensions.get(battleId);
-    if (!dimensions) {
-      throw new Error(`Screen dimensions not set for battle ${battleId}`);
-    }
-    return dimensions;
+    return BattalionPositionService.getBattleScreenDimensions(battleId);
   }
 
   /**
@@ -75,7 +71,7 @@ export class MovementService {
     }
     
     // Clean up screen dimensions and movement states for this battle
-    this.battleScreenDimensions.delete(battleId);
+    BattalionPositionService.clearBattleScreenDimensions(battleId);
     this.movementStates.delete(battleId);
   }
 
@@ -104,7 +100,7 @@ export class MovementService {
       if (!movementState) {
         // Only start movement if screen dimensions are available
         try {
-          const screenDimensions = this.getBattleScreenDimensions(battleId);
+          const screenDimensions = BattalionPositionService.getBattleScreenDimensions(battleId);
           
           // Initiate new movement using actual client screen dimensions
           movementState = this.initiateMovement(
@@ -367,23 +363,5 @@ export class MovementService {
     };
   }
 
-  /**
-   * Update battalion position from movement state (for server-side validation)
-   */
-  static updateBattalionPosition(battalion: IBattalion, movementState: MovementState): IBattalion {
-    // For arrived battalions, update to target position
-    // For moving battalions, client handles smooth interpolation
-    const finalPosition = movementState.movementStatus === 'arrived' 
-      ? movementState.targetPosition
-      : movementState.startPosition;
 
-    return {
-      ...battalion,
-      position: {
-        x: finalPosition.x,
-        y: finalPosition.y,
-        nodeIndex: finalPosition.nodeIndex
-      }
-    };
-  }
 } 
