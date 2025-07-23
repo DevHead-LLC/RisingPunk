@@ -1,4 +1,49 @@
-# Current Task: Bug Fixes and Refactoring Complete
+# Current Task: Service Authority Refactoring Complete
+
+## 🎯 **COMPLETED: Service Authority Assessment & Refactoring**
+
+### **Architecture Assessment Results:**
+
+#### **✅ Node-Related Logic: CORRECT AS-IS**
+- **`NodeService.ts`** - Handles node positioning, creation, and state (✅ correct)
+- **`networkConfig.ts`** - Defines network topology and connections (✅ correct)  
+- **`TargetingService.ts`** - Orchestrates targeting logic using network data (✅ correct)
+
+**Why this is good:**
+- **`NodeService`** owns node positioning and state management
+- **`networkConfig`** owns network topology definition
+- **`TargetingService`** is an **orchestration service** that uses both to make targeting decisions
+- This follows the **"composition over inheritance"** principle - services compose other services rather than duplicating their logic
+
+#### **✅ Battalion-Related Logic: REFACTORED FOR BETTER AUTHORITY**
+
+**Problem Identified:**
+- `TargetingService.assignTargetToBattalion()` handled battalion-specific targeting logic
+- This violated the principle that **battalion authority should handle battalion-specific decisions**
+
+**Solution Implemented:**
+✅ **Moved** battalion targeting logic from `TargetingService` to `BattalionService`:
+- `assignTargetToBattalion()` → `BattalionService.assignTargetToBattalion()`
+- `getValidTargets()` → `BattalionService.getValidTargets()` (private)
+- `isReachableViaNetwork()` → `BattalionService.isReachableViaNetwork()` (public)
+
+✅ **Updated** `TargetingService` to use `BattalionService`:
+- Now acts as pure **orchestration service**
+- Delegates battalion-specific logic to `BattalionService`
+- Maintains `getNetworkPath()` for pathfinding utilities
+
+✅ **Added** `BattalionTargetingResult` interface to `BattalionService`
+- Proper type safety for battalion targeting operations
+- Clear separation of concerns
+
+### **Final Architecture Benefits:**
+- **Single Responsibility**: Each service owns its complete domain
+- **Proper Authority**: Battalion logic in BattalionService, Node logic in NodeService
+- **Clean Orchestration**: TargetingService composes other services without duplicating logic
+- **Better Maintainability**: Changes to battalion targeting isolated to BattalionService
+- **Consistent Pattern**: Matches established domain-specific authority approach
+
+---
 
 ## 🎯 **COMPLETED: Domain-Specific Service Authorities Established**
 
