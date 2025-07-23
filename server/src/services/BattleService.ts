@@ -7,6 +7,7 @@ import { MovementState } from '../../../mobile/src/types/battleTypes';
 import { BattleSetupService } from './BattleSetupService';
 import { CombatService } from './CombatService';
 import { AttackService } from './AttackService';
+import { ScreenDimensionService } from './ScreenDimensionService';
 
 
 
@@ -53,17 +54,17 @@ export class BattleService {
   }
 
   /**
-   * Store screen dimensions for a battle (called when client requests battle state)
+   * Store screen dimensions for a battle (delegates to ScreenDimensionService)
    */
   setBattleScreenDimensions(battleId: string, width: number, height: number): void {
-    BattalionService.setBattleScreenDimensions(battleId, width, height);
+    ScreenDimensionService.setBattleScreenDimensions(battleId, width, height);
   }
 
   /**
-   * Get screen dimensions for a battle (for movement calculations)
+   * Get screen dimensions for a battle (delegates to ScreenDimensionService)
    */
   getBattleScreenDimensions(battleId: string): { width: number; height: number } {
-    return BattalionService.getBattleScreenDimensions(battleId);
+    return ScreenDimensionService.getBattleScreenDimensions(battleId);
   }
 
   /**

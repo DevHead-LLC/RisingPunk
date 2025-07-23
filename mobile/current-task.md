@@ -77,6 +77,88 @@
 
 ---
 
+## 🔍 **ANALYSIS: BattalionPositionService.ts Duplication & Design Review**
+
+### **BattalionPositionService.ts Analysis:**
+✅ **Good Practices Found:**
+- **Single source of truth**: Centralizes screen dimension management
+- **Proper delegation**: Other services correctly delegate to BattalionPositionService
+- **Clean interface**: Simple, focused methods for position operations
+
+### **Issues Identified:**
+
+#### **1. Screen Dimension Duplication - CRITICAL**
+- **`BattalionPositionService`** stores screen dimensions in memory (`battleScreenDimensions` Map)
+- **`Battle.ts` model** also stores screen dimensions in database (`screenDimensions` field)
+- **`BattleController`** updates database screen dimensions independently
+- **Issue**: Two sources of truth for screen dimensions - memory vs database
+
+#### **2. Position Interface Inconsistency**
+- **`server/src/types/battle.ts`** has `BattalionPosition { x: number; y: number; nodeIndex: number }`
+- **`mobile/src/types/battle.ts`** has different `BattalionPosition` interface
+- **Issue**: Inconsistent position interfaces between client and server
+
+#### **3. Battalion Position Calculation Duplication**
+- **`BattalionService.ts`** has hardcoded position calculations in `createUserBattalions()` and `createEnemyBattalions()`
+- **`BattalionPositionService.ts`** has `updateBattalionPosition()` method
+- **Issue**: Position logic scattered across multiple services
+
+#### **4. Software Design Issues**
+- **No error handling**: `getBattleScreenDimensions()` throws error but no graceful fallback
+- **No validation**: No validation of screen dimension values
+- **No cleanup strategy**: Memory-based screen dimensions may accumulate over time
+- **Mixed responsibilities**: Handles both screen dimensions AND battalion positioning
+
+### **Recommendations for Improvement:**
+
+#### **✅ Priority 1: Screen Dimension Authority Consolidation - COMPLETED**
+- **Action**: Created ScreenDimensionService as single source of truth for screen dimensions
+- **Changes Made**:
+  - **Created** `ScreenDimensionService.ts` - Single authority for all screen dimension operations:
+    - `setBattleScreenDimensions()` - Validates and stores screen dimensions
+    - `getBattleScreenDimensions()` - Retrieves screen dimensions with error handling
+    - `updateScreenDimensionsIfChanged()` - Updates only if dimensions changed
+    - `hasScreenDimensions()` - Checks if dimensions are available
+    - `clearBattleScreenDimensions()` - Cleanup for battle end
+    - `validateDimensions()` - Input validation with reasonable limits
+  - **Removed** screen dimensions from database:
+    - Removed `screenDimensions` field from `Battle.ts` model
+    - Removed `screenDimensions` from `IBattle` interface
+    - Removed database updates from `BattleController.generateNetworkData()`
+  - **Updated** all services to use ScreenDimensionService:
+    - `BattalionPositionService` now delegates to ScreenDimensionService
+    - `BattleService` now delegates to ScreenDimensionService
+    - `BattalionService` now delegates to ScreenDimensionService
+    - `MovementService` now delegates to ScreenDimensionService
+    - `BattleController` uses ScreenDimensionService for dimension changes
+  - **Added** error handling and validation:
+    - Input validation for screen dimensions
+    - Reasonable limits (max 10000x10000)
+    - Graceful error handling with descriptive messages
+- **Benefits**:
+  - **Single source of truth**: All screen dimensions managed in one place
+  - **No duplication**: Eliminated database vs memory conflicts
+  - **Better validation**: Input validation prevents invalid dimensions
+  - **Improved maintainability**: Centralized authority for screen dimensions
+  - **Same functionality**: Application works exactly as before
+
+#### **Priority 2: Position Interface Consolidation**
+- **Action**: Use shared `NodePosition` type consistently
+- **Solution**: Update all position interfaces to use `NodePosition`
+- **Benefit**: Ensure consistency across client and server
+
+#### **Priority 3: Error Handling & Validation**
+- **Action**: Add proper error handling and validation
+- **Solution**: Add input validation and graceful error handling
+- **Benefit**: More robust and maintainable code
+
+#### **Priority 4: Responsibility Separation**
+- **Action**: Consider splitting screen dimensions and battalion positioning
+- **Solution**: Create separate services if responsibilities grow
+- **Benefit**: Better single responsibility principle adherence
+
+---
+
 ## 🎯 **COMPLETED: Attack Logic Migration from MovementService to AttackService**
 
 ### **Problem Identified:**

@@ -4,6 +4,7 @@ import { IBattalion } from '../types/battle';
 import { MovementState, NodePosition } from '../../../mobile/src/types/battleTypes';
 import { BattalionPositionService } from './BattalionPositionService';
 import { MovementCalculationService } from './MovementCalculationService';
+import { ScreenDimensionService } from './ScreenDimensionService';
 
 export class MovementService {
   private static movementStates: Map<string, Map<string, MovementState>> = new Map(); // battleId -> battalionId -> MovementState
@@ -17,17 +18,17 @@ export class MovementService {
   }
 
   /**
-   * Store screen dimensions for a battle (called when client requests battle state)
+   * Store screen dimensions for a battle (delegates to ScreenDimensionService)
    */
   static setBattleScreenDimensions(battleId: string, width: number, height: number): void {
-    BattalionPositionService.setBattleScreenDimensions(battleId, width, height);
+    ScreenDimensionService.setBattleScreenDimensions(battleId, width, height);
   }
 
   /**
-   * Get screen dimensions for a battle (for movement calculations)
+   * Get screen dimensions for a battle (delegates to ScreenDimensionService)
    */
   static getBattleScreenDimensions(battleId: string): { width: number; height: number } {
-    return BattalionPositionService.getBattleScreenDimensions(battleId);
+    return ScreenDimensionService.getBattleScreenDimensions(battleId);
   }
 
   /**
@@ -60,7 +61,7 @@ export class MovementService {
     }
     
     // Clean up screen dimensions but preserve movement states for final positions
-    BattalionPositionService.clearBattleScreenDimensions(battleId);
+    ScreenDimensionService.clearBattleScreenDimensions(battleId);
     // Don't clear movement states - preserve final battalion positions when battle ends
   }
 
@@ -89,7 +90,7 @@ export class MovementService {
       if (!movementState) {
         // Only start movement if screen dimensions are available
         try {
-          const screenDimensions = BattalionPositionService.getBattleScreenDimensions(battleId);
+          const screenDimensions = ScreenDimensionService.getBattleScreenDimensions(battleId);
           
           // Initiate new movement using actual client screen dimensions
           movementState = this.initiateMovement(

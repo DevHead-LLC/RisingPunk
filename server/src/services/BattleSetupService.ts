@@ -41,10 +41,7 @@ export class BattleSetupService {
       phase: BattlePhase.COUNTDOWN, // Start in countdown phase
       countdown: 3, // 3-second countdown as per intentions
       battleTime: 0,
-      screenDimensions: {
-        width: screenWidth,
-        height: screenHeight
-      },
+
       battalions,
       nodes,
       winner: null,
