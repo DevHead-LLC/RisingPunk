@@ -1,6 +1,5 @@
 import express, { Request, Response, Router } from 'express';
 import { BattleController } from '../controllers/BattleController';
-import { BATTLE_CONFIG } from '../config/battleConfig';
 
 interface StartBattleRequest extends Request {
   body: {

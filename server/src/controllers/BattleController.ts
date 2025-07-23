@@ -2,7 +2,6 @@ import { Request } from 'express';
 import { BattleService } from '../services/BattleService';
 import { Battle, IBattleDocument } from '../models/Battle';
 import { BattlePhase, NodeOwner, BattleStateResponse } from '../types/battle';
-import { BATTLE_CONFIG } from '../config/battleConfig';
 import { calculateNodePositions, calculateLineProperties, NETWORK_CONNECTIONS } from '../config/networkConfig';
 import { BattalionMappingService } from '../services/BattalionMappingService';
 import { BattleResponseService } from '../services/BattleResponseService';
