@@ -5,7 +5,7 @@
 
 import { Battle, IBattleDocument } from '../models/Battle';
 import { BattlePhase, NodeOwner, BotType, IBattalion, INode } from '../types/battle';
-import { calculateNodePositions } from '../config/networkConfig';
+import { createNodesWithTugOfWar } from '../services/NodeService';
 import { BOT_CONFIG } from './BotService';
 
 export class BattleSetupService {
@@ -16,31 +16,6 @@ export class BattleSetupService {
     return battalions.reduce((total, battalion) => {
       return total + (battalion.stats.health * battalion.quantity);
     }, 0);
-  }
-
-  /**
-   * Create nodes with tug-of-war system
-   * USER REQUIREMENT: 100% of total army health (not 75%)
-   */
-  static createNodesWithTugOfWar(totalArmyHealth: number, screenWidth: number, screenHeight: number): INode[] {
-    // Initialize nodes with server-calculated positions (moved from client for security)
-    // Use provided screen dimensions for positioning
-    const positionedNodes = calculateNodePositions(
-      screenWidth, 
-      screenHeight, 
-      125
-    );
-    
-    return positionedNodes.map((nodeTemplate) => {
-      return {
-        index: nodeTemplate.index,
-        position: nodeTemplate.position, // Server-calculated position
-        owner: nodeTemplate.owner === 'user' ? NodeOwner.USER : 
-               nodeTemplate.owner === 'enemy' ? NodeOwner.ENEMY : NodeOwner.NEUTRAL,
-        tugOfWarProgress: 0,        // USER REQUIREMENT: Start at 0
-        maxCaptureThreshold: totalArmyHealth, // USER REQUIREMENT: Total army health (for damage calculation)
-      };
-    });
   }
 
   /**
@@ -127,7 +102,7 @@ export class BattleSetupService {
     const battleId = `battle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
     // Create real nodes first with placeholder totalArmyHealth
-    const nodes = this.createNodesWithTugOfWar(0, screenWidth, screenHeight);
+    const nodes = createNodesWithTugOfWar(0, screenWidth, screenHeight);
     
     // Create battalions using real nodes
     const userBattalions = this.createUserBattalions(nodes);
@@ -150,6 +125,10 @@ export class BattleSetupService {
       phase: BattlePhase.COUNTDOWN, // Start in countdown phase
       countdown: 3, // 3-second countdown as per intentions
       battleTime: 0,
+      screenDimensions: {
+        width: screenWidth,
+        height: screenHeight
+      },
       battalions,
       nodes,
       winner: null,

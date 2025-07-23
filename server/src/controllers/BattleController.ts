@@ -2,7 +2,8 @@ import { Request } from 'express';
 import { BattleService } from '../services/BattleService';
 import { Battle, IBattleDocument } from '../models/Battle';
 import { BattlePhase, NodeOwner, BattleStateResponse } from '../types/battle';
-import { calculateNodePositions, calculateLineProperties, NETWORK_CONNECTIONS } from '../config/networkConfig';
+import { calculateNodePositions } from '../services/NodeService';
+import { calculateLineProperties, NETWORK_CONNECTIONS } from '../config/networkConfig';
 import { BattalionMappingService } from '../services/BattalionMappingService';
 import { BattleResponseService } from '../services/BattleResponseService';
 import { createNodePositionMap } from '../utils/battleUtils';
@@ -21,21 +22,43 @@ export class BattleController {
   /**
    * Generate network data for client (server authority)
    */
-  private generateNetworkData(nodes: any[], screenWidth: number, screenHeight: number) {
-    // Recalculate node positions for client's actual screen size
-    const repositionedNodes = calculateNodePositions(screenWidth, screenHeight, 125);
+  private generateNetworkData(nodes: any[], screenWidth: number, screenHeight: number, battle: IBattleDocument) {
+    // Check if screen dimensions have changed (e.g., phone rotation)
+    const storedDimensions = battle.screenDimensions;
+    const dimensionsChanged = storedDimensions.width !== screenWidth || storedDimensions.height !== screenHeight;
     
-    // Update the nodes with correct positions for client screen
-    const updatedNodes = nodes.map(node => {
-      const repositioned = repositionedNodes.find(rn => rn.index === node.index);
-      return {
+    let updatedNodes;
+    
+    if (dimensionsChanged) {
+      // Recalculate node positions for new screen dimensions
+      console.log(`📱 Screen dimensions changed: ${storedDimensions.width}x${storedDimensions.height} → ${screenWidth}x${screenHeight}`);
+      const repositionedNodes = calculateNodePositions(screenWidth, screenHeight, 125);
+      
+      // Update the nodes with new positions
+      updatedNodes = nodes.map(node => {
+        const repositioned = repositionedNodes.find(rn => rn.index === node.index);
+        return {
+          index: node.index,
+          owner: node.owner,
+          tugOfWarProgress: node.tugOfWarProgress,
+          maxCaptureThreshold: node.maxCaptureThreshold,
+          position: repositioned ? repositioned.position : node.position
+        };
+      });
+      
+      // Update stored screen dimensions
+      battle.screenDimensions = { width: screenWidth, height: screenHeight };
+      battle.save();
+    } else {
+      // Use existing node positions (no recalculation needed)
+      updatedNodes = nodes.map(node => ({
         index: node.index,
         owner: node.owner,
-        tugOfWarProgress: node.tugOfWarProgress,      // NEW: -100 to +100
-        maxCaptureThreshold: node.maxCaptureThreshold, // NEW: Total army health
-        position: repositioned ? repositioned.position : node.position
-      };
-    });
+        tugOfWarProgress: node.tugOfWarProgress,
+        maxCaptureThreshold: node.maxCaptureThreshold,
+        position: node.position
+      }));
+    }
     
     // Get network connections from server config (convert readonly to mutable)
     const networkConnections = [...NETWORK_CONNECTIONS];
@@ -75,7 +98,7 @@ export class BattleController {
       const battle = await this.battleService.createBattle(attackerId, actualDefenderId, width, height);
 
       // Generate network data for client
-      const networkData = this.generateNetworkData(battle.nodes, width, height);
+      const networkData = this.generateNetworkData(battle.nodes, width, height, battle);
 
       // Map battalions for client using focused service
       const mappedBattalions = BattalionMappingService.mapBattalionsForClient(battle.battalions);
@@ -125,7 +148,7 @@ export class BattleController {
       const mappedBattalions = BattalionMappingService.mapBattalionsForClient(battle.battalions, movementStates);
 
       // Generate network data for client
-      const networkData = this.generateNetworkData(battle.nodes, screenWidth, screenHeight);
+      const networkData = this.generateNetworkData(battle.nodes, screenWidth, screenHeight, battle);
 
       // Get targeting results if countdown has ended
       let targetingResults: any[] = [];
