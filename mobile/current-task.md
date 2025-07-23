@@ -1,5 +1,76 @@
 # Current Task: Targeting Logic Migration to BattalionService
 
+## 🎯 **COMPLETED: Targeting Logic Migration to TargetingService**
+
+### **Problem Identified:**
+- **`BattalionService`** was handling targeting logic (`assignTargetToBattalion`, `getValidTargets`, `isReachableViaNetwork`)
+- **`BattalionService`** was doing targeting orchestration (`assignInitialTargets`)
+- This violated the principle that **targeting authority should handle targeting logic**
+
+### **Solution Implemented:**
+✅ **Moved** targeting logic from `BattalionService` to `TargetingService`:
+- `assignTargetToBattalion()` → `TargetingService.assignTargetToBattalion()`
+- `getValidTargets()` → `TargetingService.getValidTargets()`
+- `isReachableViaNetwork()` → `TargetingService.isReachableViaNetwork()`
+- `assignInitialTargets()` → `TargetingService.assignInitialTargets()`
+
+✅ **Simplified** `BattalionService` to pure orchestration:
+- `assignInitialTargets()` now delegates to `TargetingService`
+- Removed all targeting logic and network validation
+- Focuses purely on battalion creation and coordination
+- Acts as conductor for targeting operations
+
+✅ **Enhanced** `TargetingService` authority:
+- Now owns complete targeting logic and network validation
+- Handles target assignment and validation
+- Maintains network reachability logic
+- Single source of truth for targeting behavior
+
+### **Architecture Benefits:**
+- **Proper Authority**: TargetingService now owns all targeting logic
+- **Better Separation**: TargetingService handles targeting, BattalionService handles battalion coordination
+- **Reduced Complexity**: BattalionService further simplified and focused
+- **Single Responsibility**: Each service has focused, non-overlapping responsibilities
+- **Easier Maintenance**: Changes to targeting logic isolated to TargetingService
+
+---
+
+## 🎯 **COMPLETED: BattalionService Refactoring - Orchestration Over Heavy Logic**
+
+### **Problem Identified:**
+- **`BattalionService.updateBattleMovement()`** was 80+ lines doing heavy movement coordination, attack processing, and battle state management
+- **`BattalionService`** was handling movement state management, screen dimensions, and attack processing
+- This violated the principle that **services should orchestrate rather than handle heavy logic**
+
+### **Solution Implemented:**
+✅ **Moved** heavy movement logic from `BattalionService` to `MovementService`:
+- Movement state management → `MovementService.movementStates`
+- Screen dimension management → `MovementService.battleScreenDimensions`
+- Movement interval management → `MovementService.movementIntervals`
+- `updateBattleMovement()` logic → `MovementService.updateBattleMovement()`
+- Attack processing logic → `MovementService.processActiveAttacks()`
+
+✅ **Simplified** `BattalionService` to orchestration:
+- `updateBattleMovement()` now orchestrates calls to `MovementService`
+- Removed heavy movement logic and state management
+- Focuses on battalion-specific targeting and coordination
+- Acts as conductor rather than worker
+
+✅ **Enhanced** `MovementService` authority:
+- Now owns complete movement lifecycle and state management
+- Handles movement coordination and attack processing
+- Maintains movement-related state (states, intervals, screen dimensions)
+- Single source of truth for movement behavior
+
+### **Architecture Benefits:**
+- **Proper Orchestration**: BattalionService now orchestrates rather than handles heavy logic
+- **Better Separation**: MovementService handles movement, BattalionService handles battalion coordination
+- **Reduced Complexity**: BattalionService reduced from 405 to ~200 lines
+- **Single Responsibility**: Each service has focused, non-overlapping responsibilities
+- **Easier Maintenance**: Changes to movement logic isolated to MovementService
+
+---
+
 ## 🎯 **COMPLETED: Movement Logic Migration to BattalionService**
 
 ### **Problem Identified:**
