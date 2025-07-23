@@ -79,6 +79,10 @@ export interface IBattle extends Document {
   winner?: NodeOwner;
   countdown: number; // 3 to 0
   battleTime: number; // 0 to 20
+  screenDimensions: {
+    width: number;
+    height: number;
+  };
   battalions: IBattalion[];
   nodes: INode[];
   createdAt: Date;

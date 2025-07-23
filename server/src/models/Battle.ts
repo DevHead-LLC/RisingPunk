@@ -188,6 +188,16 @@ const battleSchema = new Schema({
     max: 20,
     default: 0
   },
+  screenDimensions: {
+    width: {
+      type: Number,
+      required: true
+    },
+    height: {
+      type: Number,
+      required: true
+    }
+  },
   battalions: [battalionSchema],
   nodes: [nodeSchema]
 }, {

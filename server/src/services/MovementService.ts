@@ -1,4 +1,4 @@
-import { calculateNodePositions } from '../config/networkConfig';
+import { calculateNodePositions } from '../services/NodeService';
 import { TargetingService } from './TargetingService';
 import { IBattalion, INode } from '../types/battle';
 

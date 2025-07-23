@@ -48,7 +48,7 @@
 
 ---
 
-## 🎯 **COMPLETED: battleConfig.ts Cleanup**
+## 🎯 **COMPLETED: battleConfig.ts Cleanup & NodeService Creation**
 
 ### **Final Cleanup Accomplished:**
 ✅ **Deleted** `server/src/config/battleConfig.ts` entirely
@@ -58,6 +58,28 @@
 - `server/src/services/BattleService.ts`
 - `server/src/services/AttackService.ts` (updated comment)
 ✅ **Verified** no remaining references to `battleConfig` or `BATTLE_CONFIG`
+
+### **NodeService Creation (Focused):**
+✅ **Created** `server/src/services/NodeService.ts` - Authority for node types and positioning
+✅ **Moved** node-specific items from `networkConfig.ts`:
+- `NodeIndex` type
+- `BattleNodeState` interface
+- `calculateNodePositions` function
+✅ **Updated** `networkConfig.ts` to import from `NodeService`
+✅ **Focused approach** - Only essential node types and positioning, no unnecessary extras
+
+### **Smart Node Position Optimization:**
+✅ **Added** screen dimensions to battle schema and types
+✅ **Implemented** smart recalculation in `BattleController.generateNetworkData()`
+✅ **Optimized** performance - Only recalculates node positions when screen dimensions change
+✅ **Handles** phone rotation - Positions update when screen orientation changes
+✅ **Efficient** - Uses stored positions for real-time updates when dimensions haven't changed
+
+### **NodeService Authority Expansion:**
+✅ **Moved** `createNodesWithTugOfWar` from `BattleSetupService` to `NodeService`
+✅ **Enhanced** node authority - NodeService now handles node creation and positioning
+✅ **Updated** imports - BattleSetupService now imports from NodeService
+✅ **Consistent pattern** - Follows same domain-specific authority approach
 
 ### **Analysis Results:**
 - **UPDATE_INTERVAL: 100** - Not used anywhere in codebase
@@ -69,6 +91,7 @@
 - ✅ **Timer system** - `BattleTimer.ts` authority  
 - ✅ **Movement system** - `MovementService.ts` authority
 - ✅ **Bot system** - `BotService.ts` authority
+- ✅ **Node system** - `NodeService.ts` authority
 - ✅ **Screen dimensions** - Client-provided, no hard-coding
 - ✅ **battleConfig.ts** - **DELETED** (all constants moved to domain-specific files)
 
