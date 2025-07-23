@@ -1,7 +1,7 @@
 import { Battle, IBattleDocument } from '../models/Battle';
 import { BattlePhase, NodeOwner, IBattalion, INode } from '../types/battle';
 import { BattleTimerService } from './BattleTimer';
-import { TargetingService, TargetingResult } from './TargetingService';
+import { BattalionService, BattalionTargetingResult } from './BattalionService';
 import { MovementService } from './MovementService';
 import { MovementState } from '../../../mobile/src/types/battleTypes';
 import { BattleSetupService } from './BattleSetupService';
@@ -30,22 +30,22 @@ export class BattleService {
   /**
    * Trigger initial targeting when countdown ends
    */
-  async triggerInitialTargeting(battleId: string): Promise<TargetingResult[]> {
+  async triggerInitialTargeting(battleId: string): Promise<BattalionTargetingResult[]> {
     const battle = await this.getBattle(battleId);
     if (!battle) {
       console.log('❌ BATTLE NOT FOUND for initial targeting:', battleId);
       return [];
     }
 
-    // Use TargetingService for targeting state management
-    return TargetingService.triggerInitialTargeting(battle.battalions, battle.nodes, battleId);
+    // Use BattalionService for targeting state management
+    return BattalionService.triggerInitialTargeting(battle.battalions, battle.nodes, battleId);
   }
 
   /**
    * Get current targeting results for a specific battle
    */
-  getTargetingResults(battleId?: string): TargetingResult[] {
-    return TargetingService.getTargetingResults(battleId);
+  getTargetingResults(battleId?: string): BattalionTargetingResult[] {
+    return BattalionService.getTargetingResults(battleId);
   }
 
   /**
@@ -286,7 +286,7 @@ export class BattleService {
     this.movementStates.delete(battleId);
     
     // Clean up targeting states
-    TargetingService.clearTargetingResults(battleId);
+    BattalionService.clearTargetingResults(battleId);
     
     // Clean up attack states
     AttackService.clearAllAttacks();
