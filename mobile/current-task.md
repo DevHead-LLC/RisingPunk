@@ -1,4 +1,47 @@
-# Current Task: Targeting Logic Migration to BattalionService
+# Current Task: Battalion Position Service Creation
+
+## 🎯 **COMPLETED: BattalionPositionService Creation - Position Authority Separation**
+
+### **Problem Identified:**
+- **`MovementService.ts`** was handling both movement logic AND battalion positioning (`updateBattalionPosition()`)
+- **`MovementService.ts`** was managing screen dimensions for position calculations
+- **`MovementService.ts`** was too large (389 lines) and mixing concerns
+- **`BattalionService.ts`** was at good size (197 lines) and shouldn't be extended
+- This violated the principle that **position authority should handle position-specific logic**
+
+### **Solution Implemented:**
+✅ **Created** `BattalionPositionService.ts` - Authority for battalion positioning:
+- `updateBattalionPosition()` → `BattalionPositionService.updateBattalionPosition()`
+- Screen dimension management → `BattalionPositionService.battleScreenDimensions`
+- `setBattleScreenDimensions()` → `BattalionPositionService.setBattleScreenDimensions()`
+- `getBattleScreenDimensions()` → `BattalionPositionService.getBattleScreenDimensions()`
+- `clearBattleScreenDimensions()` → `BattalionPositionService.clearBattleScreenDimensions()`
+- Added `hasScreenDimensions()` for validation
+
+✅ **Updated** `MovementService.ts` to use `BattalionPositionService`:
+- Removed `battleScreenDimensions` Map from MovementService
+- Updated all screen dimension methods to delegate to BattalionPositionService
+- Removed `updateBattalionPosition()` method (now in BattalionPositionService)
+- MovementService now focuses purely on movement logic
+
+✅ **Updated** `BattalionService.ts` to use `BattalionPositionService`:
+- Changed screen dimension methods to delegate to BattalionPositionService
+- Maintains orchestration role while delegating position logic
+
+### **Architecture Benefits:**
+- **Position Authority**: BattalionPositionService now owns all battalion positioning logic
+- **Clean Separation**: MovementService handles movement, BattalionPositionService handles positioning
+- **Reduced Complexity**: MovementService reduced by ~50 lines and focused on movement
+- **Single Responsibility**: Each service has focused, non-overlapping responsibilities
+- **Better Maintainability**: Changes to positioning logic isolated to BattalionPositionService
+- **Future Ready**: Central location for all battalion position-related functionality
+
+### **Import Strategy:**
+- **BattalionService** imports BattalionPositionService for position operations
+- **MovementService** imports BattalionPositionService for screen dimensions during movement
+- **Clean dependency flow**: BattalionPositionService → MovementService/BattalionService
+
+---
 
 ## 🎯 **COMPLETED: Circular Dependency Fix - BattalionTargetingResult to Shared Types**
 

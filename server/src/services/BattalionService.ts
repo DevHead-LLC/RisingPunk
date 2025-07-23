@@ -6,6 +6,7 @@
 import { IBattalion, INode, NodeOwner, BotType, BattalionTargetingResult } from '../types/battle';
 import { BOT_CONFIG } from './BotService';
 import { MovementService } from './MovementService';
+import { BattalionPositionService } from './BattalionPositionService';
 import { MovementState } from '../../../mobile/src/types/battleTypes';
 import { Battle } from '../models/Battle';
 import { TargetingService } from './TargetingService';
@@ -61,14 +62,14 @@ export class BattalionService {
    * Store screen dimensions for a battle (called when client requests battle state)
    */
   static setBattleScreenDimensions(battleId: string, width: number, height: number): void {
-    MovementService.setBattleScreenDimensions(battleId, width, height);
+    BattalionPositionService.setBattleScreenDimensions(battleId, width, height);
   }
 
   /**
    * Get screen dimensions for a battle (for movement calculations)
    */
   static getBattleScreenDimensions(battleId: string): { width: number; height: number } {
-    return MovementService.getBattleScreenDimensions(battleId);
+    return BattalionPositionService.getBattleScreenDimensions(battleId);
   }
 
   /**
