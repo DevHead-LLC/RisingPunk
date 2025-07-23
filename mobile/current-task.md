@@ -1,5 +1,41 @@
 # Current Task: Targeting Logic Migration to BattalionService
 
+## 🎯 **COMPLETED: Movement Logic Migration to BattalionService**
+
+### **Problem Identified:**
+- **`BattleService.getMovementStates()`** and movement-related methods were managing battalion movement state
+- **`BattleService`** was handling movement updates, screen dimensions, and movement intervals
+- This violated the principle that **battalion authority should handle battalion-specific behaviors**
+
+### **Solution Implemented:**
+✅ **Moved** movement logic from `BattleService` to `BattalionService`:
+- `getMovementStates()` → `BattalionService.getMovementStates()`
+- `setBattleScreenDimensions()` → `BattalionService.setBattleScreenDimensions()`
+- `getBattleScreenDimensions()` → `BattalionService.getBattleScreenDimensions()`
+- `startMovementUpdates()` → `BattalionService.startMovementUpdates()`
+- `stopMovementUpdates()` → `BattalionService.stopMovementUpdates()`
+- `updateBattleMovement()` → `BattalionService.updateBattleMovement()`
+
+✅ **Updated** `BattleService` to use `BattalionService`:
+- All movement methods now delegate to `BattalionService`
+- Removed movement-related private fields (`movementStates`, `movementIntervals`, `battleScreenDimensions`)
+- Removed movement cleanup from `endBattle()` (now handled by BattalionService)
+
+✅ **Enhanced** `BattalionService` authority:
+- Now owns complete movement lifecycle (start, update, stop, cleanup)
+- Maintains movement state management and screen dimensions
+- Handles battalion-specific movement decisions and attack coordination
+- Single source of truth for battalion movement behavior
+
+### **Architecture Benefits:**
+- **Battalion Authority**: BattalionService now owns all battalion-specific movement logic
+- **Clean Separation**: BattleService focuses on battle orchestration, BattalionService on battalion behaviors
+- **Single Responsibility**: Each service has clear, focused responsibilities
+- **Better Maintainability**: Changes to battalion movement isolated to BattalionService
+- **Consistent Pattern**: Matches established domain-specific authority approach
+
+---
+
 ## 🎯 **COMPLETED: Targeting Logic Migration to BattalionService**
 
 ### **Problem Identified:**
