@@ -81,6 +81,15 @@
 ✅ **Updated** imports - BattleSetupService now imports from NodeService
 ✅ **Consistent pattern** - Follows same domain-specific authority approach
 
+### **BattalionService Creation:**
+✅ **Created** `server/src/services/BattalionService.ts` - Authority for battalion creation and business logic
+✅ **Moved** battalion creation functions from `BattleSetupService`:
+- `createUserBattalions` - Creates user battalions with proper stats
+- `createEnemyBattalions` - Creates enemy battalions with proper stats
+- `calculateTotalArmyHealth` - Calculates total army health for tug-of-war
+✅ **Updated** imports - BattleSetupService now imports from BattalionService
+✅ **Clean separation** - BattalionService (business logic) vs BattalionMappingService (data transformation)
+
 ### **Analysis Results:**
 - **UPDATE_INTERVAL: 100** - Not used anywhere in codebase
 - **SYNC_INTERVAL: 1000** - Not used anywhere in codebase
