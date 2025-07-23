@@ -1,19 +1,10 @@
 import { calculateNodePositions } from '../services/NodeService';
 import { TargetingService } from './TargetingService';
-import { IBattalion, INode } from '../types/battle';
-import { MovementState } from '../../../mobile/src/types/battleTypes';
-import { CombatService } from './CombatService';
+import { IBattalion } from '../types/battle';
+import { MovementState, NodePosition } from '../../../mobile/src/types/battleTypes';
 import { BattalionPositionService } from './BattalionPositionService';
-
-// Movement configuration constants (single source of truth for movement timing)
-const MOVEMENT_CONFIG = {
-  BASE_MOVEMENT_TIME_MS: 20000,  // Base movement time in milliseconds (20 seconds)
-} as const;
-
-interface Position {
-  x: number;
-  y: number;
-}
+import { MovementCalculationService } from './MovementCalculationService';
+import { ScreenDimensionService } from './ScreenDimensionService';
 
 export class MovementService {
   private static movementStates: Map<string, Map<string, MovementState>> = new Map(); // battleId -> battalionId -> MovementState
@@ -27,17 +18,17 @@ export class MovementService {
   }
 
   /**
-   * Store screen dimensions for a battle (called when client requests battle state)
+   * Store screen dimensions for a battle (delegates to ScreenDimensionService)
    */
   static setBattleScreenDimensions(battleId: string, width: number, height: number): void {
-    BattalionPositionService.setBattleScreenDimensions(battleId, width, height);
+    ScreenDimensionService.setBattleScreenDimensions(battleId, width, height);
   }
 
   /**
-   * Get screen dimensions for a battle (for movement calculations)
+   * Get screen dimensions for a battle (delegates to ScreenDimensionService)
    */
   static getBattleScreenDimensions(battleId: string): { width: number; height: number } {
-    return BattalionPositionService.getBattleScreenDimensions(battleId);
+    return ScreenDimensionService.getBattleScreenDimensions(battleId);
   }
 
   /**
@@ -70,7 +61,7 @@ export class MovementService {
     }
     
     // Clean up screen dimensions but preserve movement states for final positions
-    BattalionPositionService.clearBattleScreenDimensions(battleId);
+    ScreenDimensionService.clearBattleScreenDimensions(battleId);
     // Don't clear movement states - preserve final battalion positions when battle ends
   }
 
@@ -99,7 +90,7 @@ export class MovementService {
       if (!movementState) {
         // Only start movement if screen dimensions are available
         try {
-          const screenDimensions = BattalionPositionService.getBattleScreenDimensions(battleId);
+          const screenDimensions = ScreenDimensionService.getBattleScreenDimensions(battleId);
           
           // Initiate new movement using actual client screen dimensions
           movementState = this.initiateMovement(
@@ -119,13 +110,7 @@ export class MovementService {
         // Movement initiated successfully
       } else if (movementState.movementStatus === 'moving') {
         // Check if movement is complete using updateMovementProgress()
-        const updatedMovementState = this.updateMovementProgress(
-          movementState,
-          100, // 100ms deltaTime (unused in new time-based approach)
-          battalion.stats.speed,
-          0, // screenWidth (unused)
-          0  // screenHeight (unused)
-        );
+        const updatedMovementState = this.updateMovementProgress(movementState);
         battleMovementStates.set(battalion.id, updatedMovementState);
         
         // Log movement status changes
@@ -145,8 +130,6 @@ export class MovementService {
     }
   }
 
-
-
   /**
    * Initiate movement for a battalion to a target node using existing network validation
    */
@@ -164,7 +147,7 @@ export class MovementService {
     };
     
     // Calculate attack range position using existing battalion.stats.range
-    const attackRangePosition = this.calculateAttackRangePosition(
+    const attackRangePosition = MovementCalculationService.calculateAttackRangePosition(
       battalion, 
       targetNode, 
       nodePositions.map(n => n.position)
@@ -179,7 +162,7 @@ export class MovementService {
     };
 
     // Determine if battalion is already within attack range
-    const isWithinAttackRange = this.isWithinNetworkAttackRange(
+    const isWithinAttackRange = MovementCalculationService.isWithinNetworkAttackRange(
       battalion,
       targetNode,
       nodePositions.map(n => n.position)
@@ -187,8 +170,8 @@ export class MovementService {
 
     // Calculate estimated movement duration based on battalion speed
     // Use distance to attack range position, not target node center
-    const movementDistance = this.calculateNetworkDistance(startPosition, attackRangePosition);
-    const estimatedDuration = Math.round(MOVEMENT_CONFIG.BASE_MOVEMENT_TIME_MS / battalion.stats.speed);
+    const movementDistance = MovementCalculationService.calculateNetworkDistance(startPosition, attackRangePosition);
+    const estimatedDuration = MovementCalculationService.calculateMovementDuration(battalion);
 
     // Result: Guardian(9)=~2.2s, Phreak(7)=~2.9s, Breacher(5)=4.0s
     console.log(`🏃 ${battalion.owner} ${battalion.type} (speed=${battalion.stats.speed}) will move ${movementDistance.toFixed(1)}px to attack range for ${estimatedDuration}ms`);
@@ -210,7 +193,7 @@ export class MovementService {
    * Update movement progress and determine if movement is complete
    * NOTE: This is a time-based approach, not position-based
    */
-  static updateMovementProgress(movementState: MovementState, deltaTime: number, speed: number, screenWidth: number, screenHeight: number): MovementState {
+  static updateMovementProgress(movementState: MovementState): MovementState {
     if (movementState.movementStatus !== 'moving') {
       return movementState;
     }
@@ -233,73 +216,7 @@ export class MovementService {
     };
   }
 
-  /**
-   * Calculate attack range position using existing bot stats and network constraints
-   */
-  static calculateAttackRangePosition(battalion: IBattalion, targetNode: number, nodePositions: Position[]): Position {
-    const battalionPos = nodePositions[battalion.position.nodeIndex];
-    const targetPos = nodePositions[targetNode];
-    
-    // Use same scaling as client visualization: 8 pixels per range unit
-    const rangeInPixels = battalion.stats.range * 8;
-    
-    // Calculate network-constrained range (not circular)
-    const lineDistance = this.calculateNetworkDistance(battalionPos, targetPos);
-    
-    if (lineDistance <= rangeInPixels) {
-      // Target is within range from current position - don't move
-      return battalionPos;
-    }
 
-    // Calculate position along network line at attack range distance from target
-    const distanceFromTarget = rangeInPixels;
-    const stopDistance = lineDistance - distanceFromTarget;
-    const progress = stopDistance / lineDistance;
-    
-    return this.interpolateAlongNetworkLine(battalionPos, targetPos, progress);
-  }
-
-  /**
-   * Check if battalion is within attack range using network distance
-   */
-  static isWithinNetworkAttackRange(battalion: IBattalion, targetNode: number, nodePositions: Position[]): boolean {
-    const battalionPos = nodePositions[battalion.position.nodeIndex];
-    const targetPos = nodePositions[targetNode];
-    
-    // Use same scaling as client visualization: 8 pixels per range unit
-    const rangeInPixels = battalion.stats.range * 8;
-    
-    const networkDistance = this.calculateNetworkDistance(battalionPos, targetPos);
-    return networkDistance <= rangeInPixels;
-  }
-
-  /**
-   * Calculate distance along network line between two positions
-   */
-  private static calculateNetworkDistance(pos1: Position, pos2: Position): number {
-    const dx = pos2.x - pos1.x;
-    const dy = pos2.y - pos1.y;
-    return Math.sqrt(dx * dx + dy * dy);
-  }
-
-  /**
-   * Interpolate position along network line using progress (0.0 to 1.0)
-   */
-  private static interpolateAlongNetworkLine(startPos: Position, targetPos: Position, progress: number): Position {
-    return {
-      x: startPos.x + (targetPos.x - startPos.x) * progress,
-      y: startPos.y + (targetPos.y - startPos.y) * progress
-    };
-  }
-
-  /**
-   * Get all active movement states for a battle
-   */
-  static getActiveMovements(movementStates: Map<string, MovementState>): MovementState[] {
-    return Array.from(movementStates.values()).filter(
-      state => state.movementStatus === 'moving'
-    );
-  }
 
   /**
    * Get battalions that have arrived at their destinations
@@ -307,15 +224,6 @@ export class MovementService {
   static getArrivedBattalions(movementStates: Map<string, MovementState>): MovementState[] {
     return Array.from(movementStates.values()).filter(
       state => state.movementStatus === 'arrived'
-    );
-  }
-
-  /**
-   * Get battalions within attack range of their targets
-   */
-  static getBattalionsInRange(movementStates: Map<string, MovementState>): MovementState[] {
-    return Array.from(movementStates.values()).filter(
-      state => state.isWithinAttackRange
     );
   }
 

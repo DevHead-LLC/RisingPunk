@@ -12,6 +12,7 @@ import { Battle } from '../models/Battle';
 import { TargetingService } from './TargetingService';
 import { AttackService } from './AttackService';
 import { CombatService } from './CombatService';
+import { ScreenDimensionService } from './ScreenDimensionService';
 
 export class BattalionService {
   private static targetingResults: Map<string, BattalionTargetingResult[]> = new Map();
@@ -61,17 +62,17 @@ export class BattalionService {
   }
 
   /**
-   * Store screen dimensions for a battle (called when client requests battle state)
+   * Store screen dimensions for a battle (delegates to ScreenDimensionService)
    */
   static setBattleScreenDimensions(battleId: string, width: number, height: number): void {
-    BattalionPositionService.setBattleScreenDimensions(battleId, width, height);
+    ScreenDimensionService.setBattleScreenDimensions(battleId, width, height);
   }
 
   /**
-   * Get screen dimensions for a battle (for movement calculations)
+   * Get screen dimensions for a battle (delegates to ScreenDimensionService)
    */
   static getBattleScreenDimensions(battleId: string): { width: number; height: number } {
-    return BattalionPositionService.getBattleScreenDimensions(battleId);
+    return ScreenDimensionService.getBattleScreenDimensions(battleId);
   }
 
   /**

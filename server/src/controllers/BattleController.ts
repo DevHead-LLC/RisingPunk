@@ -7,6 +7,7 @@ import { calculateLineProperties, NETWORK_CONNECTIONS } from '../config/networkC
 import { BattalionMappingService } from '../services/BattalionMappingService';
 import { BattleResponseService } from '../services/BattleResponseService';
 import { createNodePositionMap } from '../utils/battleUtils';
+import { ScreenDimensionService } from '../services/ScreenDimensionService';
 
 interface AuthenticatedRequest extends Request {
   user: { _id: string };
@@ -23,15 +24,13 @@ export class BattleController {
    * Generate network data for client (server authority)
    */
   private generateNetworkData(nodes: any[], screenWidth: number, screenHeight: number, battle: IBattleDocument) {
-    // Check if screen dimensions have changed (e.g., phone rotation)
-    const storedDimensions = battle.screenDimensions;
-    const dimensionsChanged = storedDimensions.width !== screenWidth || storedDimensions.height !== screenHeight;
+    // Use ScreenDimensionService as single source of truth
+    const dimensionsChanged = ScreenDimensionService.updateScreenDimensionsIfChanged(battle.battleId, screenWidth, screenHeight);
     
     let updatedNodes;
     
     if (dimensionsChanged) {
       // Recalculate node positions for new screen dimensions
-      console.log(`📱 Screen dimensions changed: ${storedDimensions.width}x${storedDimensions.height} → ${screenWidth}x${screenHeight}`);
       const repositionedNodes = calculateNodePositions(screenWidth, screenHeight, 125);
       
       // Update the nodes with new positions
@@ -45,10 +44,6 @@ export class BattleController {
           position: repositioned ? repositioned.position : node.position
         };
       });
-      
-      // Update stored screen dimensions
-      battle.screenDimensions = { width: screenWidth, height: screenHeight };
-      battle.save();
     } else {
       // Use existing node positions (no recalculation needed)
       updatedNodes = nodes.map(node => ({

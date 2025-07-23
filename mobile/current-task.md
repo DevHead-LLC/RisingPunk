@@ -1,4 +1,163 @@
-# Current Task: Attack Logic Refactoring - MovementService to AttackService
+# Current Task: Code Duplication Analysis & MovementService Optimization
+
+## 🔍 **ANALYSIS: MovementService.ts Code Review & Duplication Search**
+
+### **MovementService.ts Analysis:**
+✅ **Good Practices Found:**
+- **Single source of truth**: Uses `calculateNodePositions()` from NodeService
+- **Proper delegation**: Uses `BattalionPositionService` for screen dimensions
+- **Clean separation**: Movement logic separated from attack logic
+- **Consistent imports**: Uses existing services rather than duplicating logic
+
+### **Potential Duplication Issues Found:**
+
+#### **1. Position Interface Duplication:**
+- **`server/src/services/MovementService.ts`** defines local `interface Position { x: number; y: number }`
+- **`server/src/types/battle.ts`** defines `export interface BattalionPosition { x: number; y: number; nodeIndex: number }`
+- **`mobile/src/types/battle.ts`** defines different `BattalionPosition` interface
+- **Issue**: Three different position interfaces with overlapping properties
+
+#### **2. createNodePositionMap Duplication:**
+- **`server/src/utils/battleUtils.ts`** has `createNodePositionMap()` function
+- **`mobile/src/utils/battleUtils.ts`** has identical `createNodePositionMap()` function
+- **Issue**: Exact same utility function duplicated between client and server
+
+#### **3. Node Position Calculation Usage:**
+- **`calculateNodePositions()`** is properly centralized in `NodeService.ts`
+- **Used by**: MovementService, BattleController, networkConfig
+- **Status**: ✅ **GOOD** - Single source of truth maintained
+
+#### **4. Screen Dimension Management:**
+- **`BattalionPositionService`** properly centralizes screen dimension logic
+- **Used by**: MovementService, BattalionService
+- **Status**: ✅ **GOOD** - Single source of truth maintained
+
+### **Consolidation Work Completed:**
+
+#### **✅ Priority 1: Position Interface Consolidation - COMPLETED**
+- **Action**: Replaced local `Position` interface in MovementService with shared `NodePosition` type
+- **Changes Made**:
+  - Removed local `interface Position { x: number; y: number }` from MovementService
+  - Added import for `NodePosition` from `mobile/src/types/battleTypes`
+  - Updated all method signatures to use `NodePosition` instead of `Position`
+  - Updated `calculateAttackRangePosition()`, `isWithinNetworkAttackRange()`, `calculateNetworkDistance()`, and `interpolateAlongNetworkLine()` methods
+- **Benefit**: Eliminated interface duplication and ensured consistency across server and client
+
+#### **✅ Priority 2: createNodePositionMap Consolidation - COMPLETED**
+- **Action**: Updated both server and client versions to use shared `NodePosition` type
+- **Changes Made**:
+  - **Server**: Updated `server/src/utils/battleUtils.ts` to import and use `NodePosition`
+  - **Client**: Updated `mobile/src/utils/battleUtils.ts` to import and use `NodePosition`
+  - Both functions now use consistent typing with the shared `NodePosition` type
+- **Benefit**: Prevented future divergence of utility functions and ensured type consistency
+
+#### **✅ Priority 3: MovementService Optimization - COMPLETED**
+- **Action**: Extracted movement calculation utilities to reduce file size
+- **Changes Made**:
+  - **Created** `MovementCalculationService.ts` (86 lines) for pure calculation utilities:
+    - `calculateAttackRangePosition()` - Attack range position calculations
+    - `isWithinNetworkAttackRange()` - Range checking logic
+    - `calculateNetworkDistance()` - Distance calculations
+    - `interpolateAlongNetworkLine()` - Position interpolation
+    - `calculateMovementDuration()` - Duration calculations
+    - `getMovementConfig()` - Configuration access
+  - **Updated** `MovementService.ts` to use `MovementCalculationService`:
+    - Removed extracted methods from MovementService
+    - Updated method calls to use `MovementCalculationService.calculateAttackRangePosition()`
+    - Updated method calls to use `MovementCalculationService.calculateNetworkDistance()`
+    - Updated method calls to use `MovementCalculationService.calculateMovementDuration()`
+    - Updated method calls to use `MovementCalculationService.isWithinNetworkAttackRange()`
+  - **Reduced** MovementService from 290 lines to 228 lines (under 250-line target)
+- **Benefits**:
+  - **Smaller files**: MovementService now under 250 lines
+  - **Better separation**: Pure calculations separated from state management
+  - **Reusability**: Calculation utilities can be used by other services
+  - **Maintainability**: Easier to test and modify calculation logic independently
+  - **Same functionality**: No logic changes, just better organization
+
+---
+
+## 🔍 **ANALYSIS: BattalionPositionService.ts Duplication & Design Review**
+
+### **BattalionPositionService.ts Analysis:**
+✅ **Good Practices Found:**
+- **Single source of truth**: Centralizes screen dimension management
+- **Proper delegation**: Other services correctly delegate to BattalionPositionService
+- **Clean interface**: Simple, focused methods for position operations
+
+### **Issues Identified:**
+
+#### **1. Screen Dimension Duplication - CRITICAL**
+- **`BattalionPositionService`** stores screen dimensions in memory (`battleScreenDimensions` Map)
+- **`Battle.ts` model** also stores screen dimensions in database (`screenDimensions` field)
+- **`BattleController`** updates database screen dimensions independently
+- **Issue**: Two sources of truth for screen dimensions - memory vs database
+
+#### **2. Position Interface Inconsistency**
+- **`server/src/types/battle.ts`** has `BattalionPosition { x: number; y: number; nodeIndex: number }`
+- **`mobile/src/types/battle.ts`** has different `BattalionPosition` interface
+- **Issue**: Inconsistent position interfaces between client and server
+
+#### **3. Battalion Position Calculation Duplication**
+- **`BattalionService.ts`** has hardcoded position calculations in `createUserBattalions()` and `createEnemyBattalions()`
+- **`BattalionPositionService.ts`** has `updateBattalionPosition()` method
+- **Issue**: Position logic scattered across multiple services
+
+#### **4. Software Design Issues**
+- **No error handling**: `getBattleScreenDimensions()` throws error but no graceful fallback
+- **No validation**: No validation of screen dimension values
+- **No cleanup strategy**: Memory-based screen dimensions may accumulate over time
+- **Mixed responsibilities**: Handles both screen dimensions AND battalion positioning
+
+### **Recommendations for Improvement:**
+
+#### **✅ Priority 1: Screen Dimension Authority Consolidation - COMPLETED**
+- **Action**: Created ScreenDimensionService as single source of truth for screen dimensions
+- **Changes Made**:
+  - **Created** `ScreenDimensionService.ts` - Single authority for all screen dimension operations:
+    - `setBattleScreenDimensions()` - Validates and stores screen dimensions
+    - `getBattleScreenDimensions()` - Retrieves screen dimensions with error handling
+    - `updateScreenDimensionsIfChanged()` - Updates only if dimensions changed
+    - `hasScreenDimensions()` - Checks if dimensions are available
+    - `clearBattleScreenDimensions()` - Cleanup for battle end
+    - `validateDimensions()` - Input validation with reasonable limits
+  - **Removed** screen dimensions from database:
+    - Removed `screenDimensions` field from `Battle.ts` model
+    - Removed `screenDimensions` from `IBattle` interface
+    - Removed database updates from `BattleController.generateNetworkData()`
+  - **Updated** all services to use ScreenDimensionService:
+    - `BattalionPositionService` now delegates to ScreenDimensionService
+    - `BattleService` now delegates to ScreenDimensionService
+    - `BattalionService` now delegates to ScreenDimensionService
+    - `MovementService` now delegates to ScreenDimensionService
+    - `BattleController` uses ScreenDimensionService for dimension changes
+  - **Added** error handling and validation:
+    - Input validation for screen dimensions
+    - Reasonable limits (max 10000x10000)
+    - Graceful error handling with descriptive messages
+- **Benefits**:
+  - **Single source of truth**: All screen dimensions managed in one place
+  - **No duplication**: Eliminated database vs memory conflicts
+  - **Better validation**: Input validation prevents invalid dimensions
+  - **Improved maintainability**: Centralized authority for screen dimensions
+  - **Same functionality**: Application works exactly as before
+
+#### **Priority 2: Position Interface Consolidation**
+- **Action**: Use shared `NodePosition` type consistently
+- **Solution**: Update all position interfaces to use `NodePosition`
+- **Benefit**: Ensure consistency across client and server
+
+#### **Priority 3: Error Handling & Validation**
+- **Action**: Add proper error handling and validation
+- **Solution**: Add input validation and graceful error handling
+- **Benefit**: More robust and maintainable code
+
+#### **Priority 4: Responsibility Separation**
+- **Action**: Consider splitting screen dimensions and battalion positioning
+- **Solution**: Create separate services if responsibilities grow
+- **Benefit**: Better single responsibility principle adherence
+
+---
 
 ## 🎯 **COMPLETED: Attack Logic Migration from MovementService to AttackService**
 
@@ -61,6 +220,41 @@
 - **Better user experience**: Players can see the final state of the battle
 - **Cleaner code**: Removed unused method that was never called
 - **Preserved functionality**: All movement logic still works exactly the same during battles
+
+---
+
+## 🎯 **COMPLETED: MovementService Cleanup - Remove Unused Code**
+
+### **Problem Identified:**
+- **MovementService.ts** contained unused imports, methods, and parameters
+- **`INode` import** was imported but never used
+- **`getActiveMovements()` and `getBattalionsInRange()` methods** were defined but never called
+- **`updateMovementProgress()` method** had unused parameters (`deltaTime`, `speed`, `screenWidth`, `screenHeight`)
+- **Extra blank lines** made the code less clean
+
+### **Solution Implemented:**
+✅ **Removed unused imports**:
+- Removed `INode` from import statement (not used anywhere in the file)
+- Removed `CombatService` from import statement (not used anywhere in the file)
+
+✅ **Removed unused methods**:
+- Deleted `getActiveMovements()` method (never called)
+- Deleted `getBattalionsInRange()` method (never called)
+- Kept `getArrivedBattalions()` method (used by BattalionService)
+
+✅ **Simplified method signatures**:
+- Updated `updateMovementProgress()` to only take `movementState` parameter
+- Removed unused parameters: `deltaTime`, `speed`, `screenWidth`, `screenHeight`
+- Updated method call to use simplified signature
+
+✅ **Cleaned up formatting**:
+- Removed extra blank lines for cleaner code
+
+### **Benefits:**
+- **Cleaner code**: Removed all unused imports, methods, and parameters
+- **Better maintainability**: Less code to maintain and understand
+- **No functionality loss**: All used methods and logic preserved
+- **Simplified API**: Method signatures are now cleaner and more focused
 
 ---
 

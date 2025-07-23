@@ -1,37 +1,32 @@
 /**
  * @file BattalionPositionService.ts
- * @description Battalion positioning authority - handles position updates, screen dimensions, and position calculations
+ * @description Battalion positioning authority - handles position updates and position calculations
  */
 
 import { IBattalion } from '../types/battle';
 import { MovementState } from '../../../mobile/src/types/battleTypes';
+import { ScreenDimensionService } from './ScreenDimensionService';
 
 export class BattalionPositionService {
-  private static battleScreenDimensions: Map<string, { width: number; height: number }> = new Map(); // battleId -> screen dimensions
-
   /**
-   * Store screen dimensions for a battle (called when client requests battle state)
+   * Store screen dimensions for a battle (delegates to ScreenDimensionService)
    */
   static setBattleScreenDimensions(battleId: string, width: number, height: number): void {
-    this.battleScreenDimensions.set(battleId, { width, height });
+    ScreenDimensionService.setBattleScreenDimensions(battleId, width, height);
   }
 
   /**
-   * Get screen dimensions for a battle (for position calculations)
+   * Get screen dimensions for a battle (delegates to ScreenDimensionService)
    */
   static getBattleScreenDimensions(battleId: string): { width: number; height: number } {
-    const dimensions = this.battleScreenDimensions.get(battleId);
-    if (!dimensions) {
-      throw new Error(`Screen dimensions not set for battle ${battleId}`);
-    }
-    return dimensions;
+    return ScreenDimensionService.getBattleScreenDimensions(battleId);
   }
 
   /**
-   * Check if screen dimensions are available for a battle
+   * Check if screen dimensions are available for a battle (delegates to ScreenDimensionService)
    */
   static hasScreenDimensions(battleId: string): boolean {
-    return this.battleScreenDimensions.has(battleId);
+    return ScreenDimensionService.hasScreenDimensions(battleId);
   }
 
   /**
@@ -55,9 +50,9 @@ export class BattalionPositionService {
   }
 
   /**
-   * Clean up screen dimensions for a battle (cleanup)
+   * Clean up screen dimensions for a battle (delegates to ScreenDimensionService)
    */
   static clearBattleScreenDimensions(battleId: string): void {
-    this.battleScreenDimensions.delete(battleId);
+    ScreenDimensionService.clearBattleScreenDimensions(battleId);
   }
 } 
