@@ -4,95 +4,11 @@
  */
 
 import { Battle, IBattleDocument } from '../models/Battle';
-import { BattlePhase, NodeOwner, BotType, IBattalion, INode } from '../types/battle';
+import { BattlePhase, IBattalion, INode } from '../types/battle';
 import { createNodesWithTugOfWar } from '../services/NodeService';
-import { BOT_CONFIG } from './BotService';
+import { BattalionService } from './BattalionService';
 
 export class BattleSetupService {
-  /**
-   * Calculate total army health from all battalions
-   */
-  static calculateTotalArmyHealth(battalions: IBattalion[]): number {
-    return battalions.reduce((total, battalion) => {
-      return total + (battalion.stats.health * battalion.quantity);
-    }, 0);
-  }
-
-  /**
-   * Create user battalions with proper stats
-   * REUSE: BOT_CONFIG.USER_BOT_STATS pattern
-   */
-  static createUserBattalions(nodes: INode[]): IBattalion[] {
-    const battalions: IBattalion[] = [];
-    
-    // User battalions on nodes 0, 1, 2
-    const userBattalions = [
-      { type: 'guardian' as BotType, quantity: 10, nodeIndex: 0 },
-      { type: 'breacher' as BotType, quantity: 8, nodeIndex: 1 },
-      { type: 'phreak' as BotType, quantity: 6, nodeIndex: 2 },
-    ];
-    
-    userBattalions.forEach((battalion, index) => {
-      const stats = BOT_CONFIG.USER_BOT_STATS[battalion.type].stats;
-      const maxHealth = stats.health * battalion.quantity;
-      
-      battalions.push({
-        id: `user-battalion-${index}`,
-        type: battalion.type,
-        quantity: battalion.quantity,
-        currentHealth: maxHealth,
-        maxHealth,
-        position: {
-          x: nodes[battalion.nodeIndex].position.x,
-          y: nodes[battalion.nodeIndex].position.y,
-          nodeIndex: battalion.nodeIndex,
-        },
-        owner: NodeOwner.USER,
-        stats,
-        mark: 1,
-      });
-    });
-
-    return battalions;
-  }
-
-  /**
-   * Create enemy battalions with proper stats
-   * REUSE: BOT_CONFIG.ENEMY_BOT_STATS pattern
-   */
-  static createEnemyBattalions(nodes: INode[]): IBattalion[] {
-    const battalions: IBattalion[] = [];
-    
-    // Enemy battalions on nodes 6, 7, 8
-    const enemyBattalions = [
-      { type: 'guardian' as BotType, quantity: 8, nodeIndex: 6 },
-      { type: 'breacher' as BotType, quantity: 10, nodeIndex: 7 },
-      { type: 'phreak' as BotType, quantity: 7, nodeIndex: 8 },
-    ];
-    
-    enemyBattalions.forEach((battalion, index) => {
-      const stats = BOT_CONFIG.ENEMY_BOT_STATS[battalion.type].stats;
-      const maxHealth = stats.health * battalion.quantity;
-      
-      battalions.push({
-        id: `enemy-battalion-${index}`,
-        type: battalion.type,
-        quantity: battalion.quantity,
-        currentHealth: maxHealth,
-        maxHealth,
-        position: {
-          x: nodes[battalion.nodeIndex].position.x,
-          y: nodes[battalion.nodeIndex].position.y,
-          nodeIndex: battalion.nodeIndex,
-        },
-        owner: NodeOwner.ENEMY,
-        stats,
-        mark: 1,
-      });
-    });
-
-    return battalions;
-  }
 
   /**
    * Create a new battle with initial setup
@@ -105,12 +21,12 @@ export class BattleSetupService {
     const nodes = createNodesWithTugOfWar(0, screenWidth, screenHeight);
     
     // Create battalions using real nodes
-    const userBattalions = this.createUserBattalions(nodes);
-    const enemyBattalions = this.createEnemyBattalions(nodes);
+    const userBattalions = BattalionService.createUserBattalions(nodes);
+    const enemyBattalions = BattalionService.createEnemyBattalions(nodes);
     const battalions = [...userBattalions, ...enemyBattalions];
     
     // Calculate total army health for tug-of-war threshold
-    const totalArmyHealth = this.calculateTotalArmyHealth(battalions);
+    const totalArmyHealth = BattalionService.calculateTotalArmyHealth(battalions);
     
     // Update nodes with proper tug-of-war initialization
     nodes.forEach(node => {
