@@ -220,27 +220,4 @@ export class BattleTimerService extends EventEmitter {
     this.timers.delete(battleId);
   }
 
-  /**
-   * Force end a battle (for testing or manual intervention)
-   */
-  public forceEndBattle(battleId: string): void {
-    const timer = this.timers.get(battleId);
-    if (!timer) {
-      console.warn(`No active timer found for battle ${battleId}`);
-      return;
-    }
-
-    console.log(`Force ending battle ${battleId}`);
-    this.endBattle(battleId);
-  }
-
-  /**
-   * Get timer statistics for monitoring
-   */
-  public getTimerStats(): { activeBattles: number; totalTimers: number } {
-    return {
-      activeBattles: this.timers.size,
-      totalTimers: this.timers.size,
-    };
-  }
 } 
