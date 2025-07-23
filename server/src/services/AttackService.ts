@@ -18,8 +18,7 @@ export class AttackService {
   private static attackStates = new Map<string, AttackState>();
   
   /**
-   * Calculate attack interval from speed stat (reuse existing stats)
-   * REUSE: BATTLE_CONFIG.BOT_STATS[type].stats.speed
+   * Calculate attack interval from speed stat
    * Speed 1-10, where 10 is fastest
    * Example: speed 10 = 1000ms, speed 5 = 2000ms
    */
