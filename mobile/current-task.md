@@ -37,6 +37,33 @@
 
 ---
 
+## 🎯 **COMPLETED: Battalion Position Jump Fix - Preserve Final Positions**
+
+### **Problem Identified:**
+- **Battalions were "jumping back"** to their starting positions when battles ended after 20 seconds
+- **MovementService** was clearing all movement states when battles ended (`this.movementStates.delete(battleId)`)
+- **Client** would fall back to using battalion's `nodeIndex` position when no movement state was available
+- This caused battalions to appear to teleport from their final attack positions back to starting positions
+
+### **Solution Implemented:**
+✅ **Preserved movement states** when battles end:
+- Modified `MovementService.stopMovementUpdates()` to not clear movement states
+- Removed `this.movementStates.delete(battleId)` call
+- Added comment explaining why movement states are preserved
+- Battalions now stay at their final positions when battles end
+
+✅ **Removed unused code**:
+- Deleted unused `resetToStationary()` method from MovementService
+- This method was defined but never called anywhere in the codebase
+
+### **Benefits:**
+- **No more position jumping**: Battalions stay where they ended up when battles end
+- **Better user experience**: Players can see the final state of the battle
+- **Cleaner code**: Removed unused method that was never called
+- **Preserved functionality**: All movement logic still works exactly the same during battles
+
+---
+
 # Current Task: Battalion Position Service Creation
 
 ## 🎯 **COMPLETED: BattalionPositionService Creation - Position Authority Separation**

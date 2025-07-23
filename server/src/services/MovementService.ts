@@ -69,9 +69,9 @@ export class MovementService {
       console.log(`⏹️ STOPPED MOVEMENT UPDATES for battle ${battleId}`);
     }
     
-    // Clean up screen dimensions and movement states for this battle
+    // Clean up screen dimensions but preserve movement states for final positions
     BattalionPositionService.clearBattleScreenDimensions(battleId);
-    this.movementStates.delete(battleId);
+    // Don't clear movement states - preserve final battalion positions when battle ends
   }
 
   /**
@@ -318,16 +318,5 @@ export class MovementService {
       state => state.isWithinAttackRange
     );
   }
-
-  /**
-   * Reset movement state to stationary
-   */
-  static resetToStationary(movementState: MovementState): MovementState {
-    return {
-      ...movementState,
-      movementStatus: 'stationary'
-    };
-  }
-
 
 } 
