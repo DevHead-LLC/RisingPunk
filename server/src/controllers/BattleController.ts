@@ -171,12 +171,4 @@ export class BattleController {
       throw new Error('Failed to get battle state');
     }
   }
-
-
-
-
-
-
-
-
 } 

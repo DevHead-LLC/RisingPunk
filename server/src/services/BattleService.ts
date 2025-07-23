@@ -1,15 +1,11 @@
 import { Battle, IBattleDocument } from '../models/Battle';
-import { BattlePhase, NodeOwner, IBattalion, INode, BattalionTargetingResult } from '../types/battle';
+import { BattlePhase, NodeOwner, BattalionTargetingResult } from '../types/battle';
 import { BattleTimerService } from './BattleTimer';
 import { BattalionService } from './BattalionService';
-import { MovementService } from './MovementService';
 import { MovementState } from '../../../mobile/src/types/battleTypes';
 import { BattleSetupService } from './BattleSetupService';
-import { CombatService } from './CombatService';
 import { AttackService } from './AttackService';
 import { ScreenDimensionService } from './ScreenDimensionService';
-
-
 
 export class BattleService {
   private timerService: BattleTimerService;
@@ -68,20 +64,6 @@ export class BattleService {
   }
 
   /**
-   * Start smooth movement updates (separate from timer) at 100ms intervals
-   */
-  private startMovementUpdates(battleId: string): void {
-    BattalionService.startMovementUpdates(battleId);
-  }
-
-  /**
-   * Stop movement updates for a battle
-   */
-  private stopMovementUpdates(battleId: string): void {
-    BattalionService.stopMovementUpdates(battleId);
-  }
-
-  /**
    * Create a new battle with initial setup
    * REUSE: BattleSetupService for battle creation
    */
@@ -109,19 +91,17 @@ export class BattleService {
         // Start movement updates when battle enters ACTIVE phase
         if (data.phase === BattlePhase.ACTIVE) {
           console.log(`🎮 BATTLE ACTIVE - Starting movement for ${savedBattle.battleId}`);
-          this.startMovementUpdates(savedBattle.battleId);
+          BattalionService.startMovementUpdates(savedBattle.battleId);
         }
       }
     });
 
     this.timerService.on('battleEnd', (data) => {
       if (data.battleId === savedBattle.battleId) {
-        this.stopMovementUpdates(savedBattle.battleId); // Stop movement before ending battle
+        BattalionService.stopMovementUpdates(savedBattle.battleId); // Stop movement before ending battle
         this.endBattle(savedBattle.battleId, NodeOwner.ENEMY); // Default to enemy win on timeout
       }
     });
-    
-
     
     return savedBattle;
   }
@@ -138,7 +118,7 @@ export class BattleService {
    */
   async endBattle(battleId: string, winner: NodeOwner): Promise<IBattleDocument | null> {
     // Stop movement updates first
-    this.stopMovementUpdates(battleId);
+    BattalionService.stopMovementUpdates(battleId);
     
     const battle = await Battle.findOne({ battleId });
     if (!battle) return null;
@@ -155,30 +135,7 @@ export class BattleService {
     // Clean up attack states
     AttackService.clearAllAttacks();
     
-
-    
     return updatedBattle;
-  }
-  
-  /**
-   * Get all battles for a user
-   */
-  async getUserBattles(userId: string): Promise<IBattleDocument[]> {
-    return Battle.find({
-      $or: [
-        { attackerId: userId },
-        { defenderId: userId }
-      ]
-    }).sort({ startTime: -1 });
-  }
-  
-  /**
-   * Get active battles
-   */
-  async getActiveBattles(): Promise<IBattleDocument[]> {
-    return Battle.find({
-      phase: { $in: [BattlePhase.SETUP, BattlePhase.COUNTDOWN, BattlePhase.ACTIVE] }
-    });
   }
 
   /**

@@ -2,7 +2,6 @@ import { calculateNodePositions } from '../services/NodeService';
 import { TargetingService } from './TargetingService';
 import { IBattalion } from '../types/battle';
 import { MovementState, NodePosition } from '../../../mobile/src/types/battleTypes';
-import { BattalionPositionService } from './BattalionPositionService';
 import { MovementCalculationService } from './MovementCalculationService';
 import { ScreenDimensionService } from './ScreenDimensionService';
 
