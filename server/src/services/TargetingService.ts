@@ -3,9 +3,8 @@
  * @description Targeting logic and network pathfinding utilities
  */
 
-import { IBattalion, INode, NodeOwner, BotType } from '../types/battle';
+import { IBattalion, INode, NodeOwner, BotType, BattalionTargetingResult } from '../types/battle';
 import { NETWORK_CONNECTIONS } from '../config/networkConfig';
-import { BattalionService, BattalionTargetingResult } from './BattalionService';
 
 export class TargetingService {
   /**

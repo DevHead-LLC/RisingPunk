@@ -66,6 +66,17 @@ export interface INode {
   };
 }
 
+// Battalion targeting result interface
+export interface BattalionTargetingResult {
+  battalionId: string;
+  battalionType: BotType;
+  battalionOwner: NodeOwner;
+  startingNode: number;
+  targetNode: number;
+  isValidTarget: boolean;
+  reason?: string;
+}
+
 
 
 // Main battle interface

@@ -1,7 +1,7 @@
 import { Battle, IBattleDocument } from '../models/Battle';
-import { BattlePhase, NodeOwner, IBattalion, INode } from '../types/battle';
+import { BattlePhase, NodeOwner, IBattalion, INode, BattalionTargetingResult } from '../types/battle';
 import { BattleTimerService } from './BattleTimer';
-import { BattalionService, BattalionTargetingResult } from './BattalionService';
+import { BattalionService } from './BattalionService';
 import { MovementService } from './MovementService';
 import { MovementState } from '../../../mobile/src/types/battleTypes';
 import { BattleSetupService } from './BattleSetupService';

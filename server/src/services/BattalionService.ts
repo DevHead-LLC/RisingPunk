@@ -3,22 +3,12 @@
  * @description Battalion creation and business logic authority
  */
 
-import { IBattalion, INode, NodeOwner, BotType } from '../types/battle';
+import { IBattalion, INode, NodeOwner, BotType, BattalionTargetingResult } from '../types/battle';
 import { BOT_CONFIG } from './BotService';
 import { MovementService } from './MovementService';
 import { MovementState } from '../../../mobile/src/types/battleTypes';
 import { Battle } from '../models/Battle';
 import { TargetingService } from './TargetingService';
-
-export interface BattalionTargetingResult {
-  battalionId: string;
-  battalionType: BotType;
-  battalionOwner: NodeOwner;
-  startingNode: number;
-  targetNode: number;
-  isValidTarget: boolean;
-  reason?: string;
-}
 
 export class BattalionService {
   private static targetingResults: Map<string, BattalionTargetingResult[]> = new Map();

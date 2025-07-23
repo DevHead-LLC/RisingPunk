@@ -1,5 +1,37 @@
 # Current Task: Targeting Logic Migration to BattalionService
 
+## 🎯 **COMPLETED: Circular Dependency Fix - BattalionTargetingResult to Shared Types**
+
+### **Problem Identified:**
+- **Circular dependency** between `TargetingService` and `BattalionService`
+- `TargetingService` imported `BattalionService` to get `BattalionTargetingResult` type
+- `BattalionService` imported `TargetingService` for targeting logic
+- This caused module loading issues and potential runtime errors
+
+### **Solution Implemented:**
+✅ **Moved** `BattalionTargetingResult` interface to shared types:
+- `BattalionTargetingResult` → `server/src/types/battle.ts`
+- Now available as shared type for all services
+
+✅ **Updated** imports across all services:
+- `BattalionService` - Imports from `../types/battle`
+- `TargetingService` - Imports from `../types/battle` (removed BattalionService import)
+- `BattleService` - Imports from `../types/battle`
+
+✅ **Eliminated** circular dependency:
+- `TargetingService` no longer imports `BattalionService`
+- `BattalionService` only imports `TargetingService` for method calls
+- Clean, unidirectional dependency flow
+
+### **Architecture Benefits:**
+- **No Circular Dependencies**: Clean import hierarchy
+- **Shared Types**: Common interfaces in centralized location
+- **Better Maintainability**: Type changes only need to be made in one place
+- **Module Loading**: No more potential runtime issues
+- **Clean Architecture**: Proper separation of concerns
+
+---
+
 ## 🎯 **COMPLETED: Targeting Logic Migration to TargetingService**
 
 ### **Problem Identified:**
