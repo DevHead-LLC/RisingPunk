@@ -1,17 +1,12 @@
-import { Request } from 'express';
 import { BattleService } from '../services/BattleService';
-import { Battle, IBattleDocument } from '../models/Battle';
-import { BattlePhase, NodeOwner, BattleStateResponse } from '../types/battle';
+import { IBattleDocument } from '../models/Battle';
+import { BattlePhase, BattleStateResponse } from '../types/battle';
 import { calculateNodePositions } from '../services/NodeService';
 import { calculateLineProperties, NETWORK_CONNECTIONS } from '../config/networkConfig';
 import { BattalionMappingService } from '../services/BattalionMappingService';
 import { BattleResponseService } from '../services/BattleResponseService';
 import { createNodePositionMap } from '../utils/battleUtils';
 import { ScreenDimensionService } from '../services/ScreenDimensionService';
-
-interface AuthenticatedRequest extends Request {
-  user: { _id: string };
-}
 
 export class BattleController {
   private battleService: BattleService;
@@ -85,15 +80,11 @@ export class BattleController {
       // Handle computer opponent
       const actualDefenderId = defenderId === 'computer' ? 'computer-opponent' : defenderId;
       
-      // Use provided screen dimensions (required)
-      const width = screenWidth;
-      const height = screenHeight;
-      
       // Create battle using BattleService
-      const battle = await this.battleService.createBattle(attackerId, actualDefenderId, width, height);
+      const battle = await this.battleService.createBattle(attackerId, actualDefenderId, screenWidth, screenHeight);
 
       // Generate network data for client
-      const networkData = this.generateNetworkData(battle.nodes, width, height, battle);
+      const networkData = this.generateNetworkData(battle.nodes, screenWidth, screenHeight, battle);
 
       // Map battalions for client using focused service
       const mappedBattalions = BattalionMappingService.mapBattalionsForClient(battle.battalions);
