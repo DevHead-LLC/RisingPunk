@@ -3,7 +3,7 @@
  * @description Network configuration and calculations for battle system
  */
 
-import { NodeIndex, BattleNodeState, calculateNodePositions } from '../services/NodeService';
+import { NodeIndex } from '../services/NodeService';
 
 export interface NetworkConnection {
   from: NodeIndex;

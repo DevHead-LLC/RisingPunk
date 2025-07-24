@@ -1,5 +1,46 @@
 # Current Task: Code Duplication Analysis & MovementService Optimization
 
+## 🎯 **COMPLETED: Battle.ts Unused Code Cleanup**
+
+### **Problem Identified:**
+- **`Battle.ts`** contained numerous unused methods and interfaces that were adding unnecessary complexity
+- **Unused imports**: `BattalionPosition` from types
+- **Unused instance methods**: `updatePhase`, `updateTimer`, `addBattalion`, `updateBattalion`, `removeBattalion`, `updateNode`
+- **Unused static methods**: `findByBattleId`, `findActiveBattles`, `findByUser`
+- **Unused interface**: `IBattleModel` interface defined but never used
+
+### **Solution Implemented:**
+✅ **Removed unused imports**:
+- `BattalionPosition` - Not used anywhere in the file
+
+✅ **Removed unused instance methods**:
+- `updatePhase()` - Defined but never called
+- `updateTimer()` - Defined but never called
+- `addBattalion()` - Defined but never called
+- `updateBattalion()` - Defined but never called
+- `removeBattalion()` - Defined but never called
+- `updateNode()` - Defined but never called
+
+✅ **Removed unused static methods**:
+- `findByBattleId()` - Defined but never called
+- `findActiveBattles()` - Defined but never called
+- `findByUser()` - Defined but never called
+
+✅ **Removed unused interface**:
+- `IBattleModel` interface - Defined but never used
+
+### **Architecture Benefits:**
+- **Cleaner model**: Only contains methods that are actually used
+- **Reduced complexity**: No unnecessary method definitions
+- **Better maintainability**: Focused on core functionality
+- **Faster compilation**: Less unused code to process
+
+---
+
+## 🎯 **COMPLETED: BattleController.ts Unused Code Cleanup**
+
+## 🎯 **COMPLETED: networkConfig.ts Unused Import Cleanup**
+
 ## 🎯 **COMPLETED: BattleService.ts Unused Logic Cleanup**
 
 ### **Problem Identified:**
