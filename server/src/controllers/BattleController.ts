@@ -111,8 +111,8 @@ export class BattleController {
    */
   async getBattleState(battleId: string, userId: string, screenWidth: number, screenHeight: number): Promise<BattleStateResponse | null> {
     try {
-      // Store screen dimensions for this battle (for movement calculations)
-      this.battleService.setBattleScreenDimensions(battleId, screenWidth, screenHeight);
+      // Update screen dimensions if they've changed (smart update)
+      ScreenDimensionService.updateScreenDimensionsIfChanged(battleId, screenWidth, screenHeight);
       
       // Get battle from database
       const battle = await this.battleService.getBattle(battleId);
