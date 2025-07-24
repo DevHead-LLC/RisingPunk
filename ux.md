@@ -28,25 +28,29 @@ The battle continues until the 20-second timer runs out or some other victory co
 
 ### Server-Side Battle Initialization
 
-**`server/src/services/BattleSetupService.ts`** creates a new battle with 6 battalions (3 user, 3 enemy) positioned on their starting nodes (0,1,2 for user; 6,7,8 for enemy). It uses **`server/src/services/BattalionService.ts`** to create battalions with proper stats and calculate total army health. It uses **`server/src/services/NodeService.ts`** to set up 9 nodes with server-calculated positions. Neutral nodes (3,4,5) get tug-of-war progress initialized to 0 and max capture threshold set to total army health.
+**`server/src/controllers/BattleController.ts`** receives the battle start request and calls **`server/src/services/BattleService.ts`** to create the battle. BattleService orchestrates the entire battle creation process by calling **`server/src/services/BattleSetupService.ts`** for core battle creation, then setting up screen dimensions via **`server/src/services/ScreenDimensionService.ts`**, and starting the timer service.
+
+**`server/src/services/BattleSetupService.ts`** creates a new battle with 6 battalions (3 user, 3 enemy) positioned on their starting nodes (0,1,2 for user; 6,7,8 for enemy). It delegates battalion creation to **`server/src/services/BattalionService.ts`** which creates battalions with proper stats and calculates total army health. It uses **`server/src/services/NodeService.ts`** to set up 9 nodes with server-calculated positions. Neutral nodes (3,4,5) get tug-of-war progress initialized to 0 and max capture threshold set to total army health.
 
 **`server/src/services/BattleTimer.ts`** starts a 3-second countdown timer, emitting countdown updates every second. When countdown reaches zero, it transitions the battle phase to ACTIVE and triggers the movement system.
 
 ### Battle Start & Targeting
 
-**`server/src/services/BattleService.ts`** receives the phase change event and triggers initial targeting. It uses **`server/src/services/TargetingService.ts`** to assign random neutral node targets to all battalions. TargetingService validates that each battalion can reach its target via network connections defined in **`server/src/config/networkConfig.ts`**, then returns targeting results showing which battalion targets which node.
+**`server/src/services/BattleService.ts`** receives the phase change event and triggers initial targeting by calling **`server/src/services/BattalionService.ts`**. BattalionService delegates targeting to **`server/src/services/TargetingService.ts`** which assigns random neutral node targets to all battalions. TargetingService validates that each battalion can reach its target via network connections defined in **`server/src/config/networkConfig.ts`**, then returns targeting results showing which battalion targets which node.
 
-**`server/src/controllers/BattleController.ts`** receives client requests for battle state updates. When clients request battle state, it stores the client's actual screen dimensions, retrieves the battle from the database, gets real-time timer values from BattleTimerService, and calculates updated node positions for the client's specific screen size using **`server/src/services/NodeService.ts`**. It also calculates line properties for network connections using **`server/src/config/networkConfig.ts`**.
+**`server/src/controllers/BattleController.ts`** receives client requests for battle state updates. When clients request battle state, it updates screen dimensions only if they've changed via **`server/src/services/ScreenDimensionService.ts`** (smart update that prevents unnecessary overwrites), retrieves the battle from the database, gets real-time timer values from BattleTimerService, and calculates updated node positions for the client's specific screen size using **`server/src/services/NodeService.ts`**. It also calculates line properties for network connections using **`server/src/config/networkConfig.ts`**.
 
 ### Movement System
 
-**`server/src/services/MovementService.ts`** handles battalion movement when BattleService initiates movement. It calculates the attack range position (not the target node center) using the battalion's range stat multiplied by 8 pixels per range unit. MovementService determines if the battalion is already within range, calculates movement duration based on the battalion's speed stat using its own movement constants, and returns movement state information with start position, target position, and timing.
+**`server/src/services/BattalionService.ts`** orchestrates movement by calling **`server/src/services/MovementService.ts`** when the battle enters ACTIVE phase. MovementService handles battalion movement and delegates pure calculation utilities to **`server/src/services/MovementCalculationService.ts** for attack range calculations, distance calculations, and movement timing.
 
-BattleService updates movement every 100ms by checking movement progress, which uses time-based calculations to determine if movement is complete. When a battalion's movement status changes to 'arrived', BattleService triggers the attack system.
+MovementService calculates the attack range position (not the target node center) using the battalion's range stat multiplied by 8 pixels per range unit. It determines if the battalion is already within range, calculates movement duration based on the battalion's speed stat, and returns movement state information with start position, target position, and timing.
+
+BattalionService updates movement every 100ms by calling MovementService to check movement progress, which uses time-based calculations to determine if movement is complete. When a battalion's movement status changes to 'arrived', BattalionService triggers the attack system.
 
 ### Attack & Combat System
 
-**`server/src/services/AttackService.ts`** manages periodic attacking. When a battalion arrives at its target, BattleService starts the attack process, which calculates the attack interval based on the battalion's speed stat (faster = more frequent attacks). AttackService stores attack state for each attacking battalion and processes attacks when enough time has elapsed.
+**`server/src/services/AttackService.ts`** manages periodic attacking. When a battalion arrives at its target, BattalionService starts the attack process, which calculates the attack interval based on the battalion's speed stat (faster = more frequent attacks). AttackService stores attack state for each attacking battalion and processes attacks when enough time has elapsed.
 
 **`server/src/services/CombatService.ts`** handles the actual damage calculations and tug-of-war mechanics. When AttackService processes an attack, CombatService calculates damage as (battalion offense × quantity), converts this to a percentage of total army health, and applies it to the node's tug-of-war progress. User attacks increase progress toward +100%, enemy attacks decrease toward -100%. When a node reaches ±100%, CombatService marks it as captured and changes its owner.
 
