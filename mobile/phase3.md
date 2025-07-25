@@ -1,7 +1,7 @@
 # Phase 3: RetargetingService Implementation
 
 ## 🎯 GOAL:
-Implement proximity-based retargeting using PathfindingService for neutral node selection with random tie-breaking
+Implement proximity-based retargeting using PathfindingService for NEAREST target selection (neutral nodes OR enemy battalions) with random tie-breaking
 
 ## 🔍 LOGIC HOLES ADDRESSED:
 
@@ -25,11 +25,11 @@ export interface RetargetingResult {
   newTargetNodeIndex: number;
   pathToTarget: number[];  // Full path including start and end
   pathDistance: number;    // Hop count
-  targetType: 'neutral_node';  // Future: 'enemy_battalion'
+  targetType: 'neutral_node' | 'enemy_battalion';  // Both neutral nodes and enemy battalions
 }
 
 /**
- * AUTHORITY: Post-capture proximity targeting for neutral nodes only
+ * AUTHORITY: Post-capture proximity targeting for NEAREST targets (neutral nodes OR enemy battalions)
  * OVERLAPS: Uses PathfindingService for distances, integrates with AttackService
  * DEPENDENCIES: PathfindingService, node ownership validation
  */
@@ -45,12 +45,15 @@ export class RetargetingService {
   ): RetargetingResult[] {
     console.log(`🎯 RETARGETING START: Node ${capturedNodeIndex} captured, ${affectedBattalionIds.length} battalions affected`);
     
-    // Filter for only neutral nodes (never target enemy-owned nodes)
+    // Find the NEAREST target (neutral nodes OR enemy battalions)
     const neutralNodes = allNodes.filter(node => node.owner === NodeOwner.NEUTRAL);
-    console.log(`🎯 RETARGETING: Available neutral targets: [${neutralNodes.map(n => n.index).join(', ')}]`);
+    const enemyBattalions = allBattalions.filter(b => b.owner !== battalion.owner);
     
-    if (neutralNodes.length === 0) {
-      console.log(`🎯 RETARGETING: No neutral nodes available for targeting`);
+    console.log(`🎯 RETARGETING: Available neutral targets: [${neutralNodes.map(n => n.index).join(', ')}]`);
+    console.log(`🎯 RETARGETING: Available enemy battalions: ${enemyBattalions.length}`);
+    
+    if (neutralNodes.length === 0 && enemyBattalions.length === 0) {
+      console.log(`🎯 RETARGETING: No targets available for retargeting`);
       return [];
     }
     
@@ -63,11 +66,11 @@ export class RetargetingService {
         continue;
       }
       
-      console.log(`🎯 PROXIMITY: Evaluating ${neutralNodes.length} neutral nodes for ${battalion.owner} ${battalion.type}`);
+      console.log(`🎯 PROXIMITY: Evaluating ${neutralNodes.length + enemyBattalions.length} total targets for ${battalion.owner} ${battalion.type}`);
       
-      const targetResult = this.findClosestNeutralNode(battalion, neutralNodes);
+      const targetResult = this.findClosestTarget(battalion, neutralNodes, enemyBattalions);
       if (targetResult) {
-        console.log(`🎯 PROXIMITY: Selected node ${targetResult.targetNodeIndex} (${targetResult.pathDistance} hops via ${targetResult.pathToTarget.join(' → ')})`);
+        console.log(`🎯 PROXIMITY: Selected ${targetResult.targetType} at node ${targetResult.targetNodeIndex} (${targetResult.pathDistance} hops via ${targetResult.pathToTarget.join(' → ')})`);
         
         retargetingResults.push({
           battalionId: battalion.id,
@@ -75,7 +78,7 @@ export class RetargetingService {
           newTargetNodeIndex: targetResult.targetNodeIndex,
           pathToTarget: targetResult.pathToTarget,
           pathDistance: targetResult.pathDistance,
-          targetType: 'neutral_node'
+          targetType: targetResult.targetType
         });
       } else {
         console.log(`🎯 PROXIMITY ERROR: No reachable targets for ${battalion.owner} ${battalion.type}`);
@@ -87,12 +90,13 @@ export class RetargetingService {
   }
   
   /**
-   * Find closest neutral node using network pathfinding with random tie-breaking
+   * Find closest target (neutral node OR enemy battalion) using network pathfinding with random tie-breaking
    */
-  static findClosestNeutralNode(
+  static findClosestTarget(
     battalion: IBattalion,
-    neutralNodes: INode[]
-  ): {targetNodeIndex: number, pathToTarget: number[], pathDistance: number} | null {
+    neutralNodes: INode[],
+    enemyBattalions: IBattalion[]
+  ): {targetNodeIndex: number, pathToTarget: number[], pathDistance: number, targetType: 'neutral_node' | 'enemy_battalion'} | null {
     
     let closestDistance = Infinity;
     let candidateTargets: Array<{nodeIndex: number, path: number[], distance: number}> = [];
@@ -267,7 +271,7 @@ if (captured) {
 - Define RetargetingResult interface
 
 ### Step 2: Implement Proximity Logic
-- Build `findClosestNeutralNode()` with network distance calculation
+- Build `findClosestTarget()` with network distance calculation for both neutral nodes and enemy battalions
 - Use PathfindingService for hop count calculations
 - Implement random tie-breaking for equidistant targets
 
@@ -281,7 +285,44 @@ if (captured) {
 - Update targeting results for retargeted battalions
 - Ensure smooth transition from old targets to new ones
 
-### Step 5: Test Queue Processing
+### Step 5: Integrate Retargeting Status with Client Responses
+- Fix BattleResponseService to include retargetingStatus in response object
+- Pass retargeting data from AttackService to BattleResponseService
+- Ensure client receives retargeting information for UI updates
+
+```typescript
+// In server/src/services/BattleResponseService.ts - FIX retargetingStatus integration:
+static createBattleStateResponse(
+  battle: IBattleDocument,
+  mappedBattalions: ClientBattalion[],
+  networkData: NetworkData,
+  targetingResults: any[] = [],
+  retargetingStatus?: {nodeIndex: number, affectedBattalionIds: string[]}
+): BattleStateResponse {
+  // PHASE 3: Actually include retargeting status in response
+  if (retargetingStatus) {
+    console.log(`📡 CLIENT SYNC: Including retargeting status in response`);
+    console.log(`📡 CLIENT SYNC: Node ${retargetingStatus.nodeIndex} captured, ${retargetingStatus.affectedBattalionIds.length} battalions affected`);
+  }
+
+  return {
+    battleId: battle.battleId,
+    phase: battle.phase,
+    countdown: battle.countdown,
+    battleTime: battle.battleTime,
+    winner: battle.winner,
+    battalions: mappedBattalions,
+    nodes: networkData.updatedNodes,
+    networkConnections: networkData.networkConnections,
+    lineProperties: networkData.lineProperties,
+    targetingResults,
+    retargetingStatus, // NEW: Actually include in response
+    lastUpdated: battle.updatedAt
+  };
+}
+```
+
+### Step 6: Test Queue Processing
 - Verify sequential processing of simultaneous captures
 - Confirm no race conditions in retargeting
 - Test random selection for equidistant targets
@@ -294,21 +335,25 @@ if (captured) {
 ⚙️ RETARGETING QUEUE: Processing node 3 capture (2 battalions)
 🎯 RETARGETING START: Node 3 captured, 2 battalions affected
 🎯 RETARGETING: Available neutral targets: [4, 5]
-🎯 PROXIMITY: Evaluating 2 neutral nodes for enemy breacher
-🎯 PROXIMITY: Node 4 reachable in 1 hops
-🎯 PROXIMITY: Node 5 reachable in 2 hops
-🎯 PROXIMITY: Selected node 4 (random from 1 equidistant)
+🎯 RETARGETING: Available enemy battalions: 2
+🎯 PROXIMITY: Evaluating 4 total targets for enemy breacher
+🎯 PROXIMITY: Neutral node 4 reachable in 1 hops
+🎯 PROXIMITY: Neutral node 5 reachable in 2 hops
+🎯 PROXIMITY: Enemy battalion at node 7 reachable in 1 hops
+🎯 PROXIMITY: Selected neutral_node at node 4 (random from 2 equidistant)
 🎯 RETARGETING END: 2/2 battalions retargeted
 🎯 INTEGRATION: Updated targeting for 2 battalions
+📡 CLIENT SYNC: Including retargeting status in response
+📡 CLIENT SYNC: Node 3 captured, 2 battalions affected
 ⚙️ RETARGETING QUEUE: Finished processing all tasks
 ```
 
 ## ✅ SUCCESS CRITERIA:
-- RetargetingService correctly identifies closest neutral nodes
+- RetargetingService correctly identifies closest targets (neutral nodes OR enemy battalions)
 - Random tie-breaking works for equidistant targets
 - Queue system prevents race conditions from simultaneous captures
 - Integration with PathfindingService provides accurate distances
-- Only neutral nodes are targeted (never enemy-owned)
+- Pure proximity-based selection (no priority system)
 - Affected battalions get new targets smoothly
 - Foundation ready for sequential movement implementation (Phase 4)
 

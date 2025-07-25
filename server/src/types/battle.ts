@@ -1,5 +1,22 @@
 import { Document } from 'mongoose';
-import { MovementState } from '../../../mobile/src/types/battleTypes';
+// Movement State Type (shared between server and client)
+export interface MovementState {
+  battalionId: string;
+  startPosition: { x: number; y: number; nodeIndex: number };
+  targetPosition: { x: number; y: number; nodeIndex: number };
+  movementStatus: 'stationary' | 'moving' | 'arrived';
+  startTime: number; // Timestamp when movement began (Date.now())
+  estimatedDuration: number; // Total movement duration in milliseconds
+  networkPath: number[]; // [startNode, targetNode] from TargetingService
+  attackRangePosition?: { x: number; y: number };
+  isWithinAttackRange: boolean;
+  // PHASE 1: Enhanced properties for movement type distinction and interruption
+  movementType?: 'initial' | 'retargeting';        // NEW - prevents logic mixing
+  fullPath?: number[];                             // NEW - complete multi-node path [0,3,1,4]
+  currentPathIndex?: number;                       // NEW - current position in fullPath (0=start)
+  finalTarget?: number;                            // NEW - ultimate destination node
+  isInterruptible?: boolean;                       // NEW - can be stopped for retargeting
+}
 
 // Battle phases from intentions document
 export enum BattlePhase {
@@ -146,5 +163,6 @@ export interface BattleStateResponse {
   lineProperties: import('../config/networkConfig').LineProperties[];        // Server-calculated line properties
   targetingResults?: any[];               // Initial targeting data
   movementStates?: MovementState[];        // Movement data for battalion animations
+  retargetingStatus?: {nodeIndex: number, affectedBattalionIds: string[]}; // Phase 3: Retargeting data
   lastUpdated: Date;
 } 

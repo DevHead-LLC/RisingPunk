@@ -21,9 +21,10 @@
 - When a node is captured, it becomes owned by the capturing party and un-attackable
 - **Only battalions attacking the captured node stop attacking and retarget**
 - Other battalions continue attacking their current targets until those nodes are captured
-- Retargeting finds the closest target using network pathfinding:
-  - **Priority 1:** Uncaptured neutral nodes only (no enemy-owned nodes)
-  - **Priority 2:** Enemy battalions (when battalion-to-battalion combat is implemented)
+- Retargeting finds the NEAREST target using network pathfinding:
+  - **Targets:** EITHER uncaptured neutral nodes OR enemy battalions
+  - **Selection:** Whichever is closer to the battalion's current position
+  - **No priority system:** Pure proximity-based selection
 - Distance measured along network paths, not straight lines
 - **For equidistant targets:** Random selection
 - **Retargeting queuing:** Multiple simultaneous captures are processed in sequence to avoid race conditions

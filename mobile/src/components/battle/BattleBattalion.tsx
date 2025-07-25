@@ -61,19 +61,23 @@ export const BattleBattalion = React.memo(({
     return () => clearInterval(interval);
   }, []);
   
-  // Set client start time when movement first detected (fixes server/client timing sync)
+  // Set client start time when movement first detected or when movement state changes (fixes server/client timing sync)
   React.useEffect(() => {
-    if (movementState?.movementStatus === 'moving' && clientStartTime === null) {
-      setClientStartTime(Date.now()); // Use current time as actual start for smooth animation
+    if (movementState?.movementStatus === 'moving') {
+      // Reset client start time for new movements or when movement state changes
+      setClientStartTime(Date.now());
     }
     // Don't reset clientStartTime when movement stops - keep it for smooth final positioning
-  }, [movementState?.movementStatus, movementState?.battalionId, clientStartTime]);
+  }, [movementState?.startTime, movementState?.movementStatus]); // React to startTime changes (new movements)
   
   // Calculate smooth interpolated position
   const calculateSmoothPosition = () => {
     if (!movementState) {
       return position; // Default to node position if no movement data
     }
+
+    // Debug: Log movement state for troubleshooting (reduced logging)
+    // console.log(`🎯 CLIENT MOVEMENT: Battalion ${battalion.id} moving from (${movementState.startPosition.x},${movementState.startPosition.y}) to (${movementState.targetPosition.x},${movementState.targetPosition.y})`);
 
     // If battalion has arrived, stay at the target position (attack range position)
     if (movementState.movementStatus === 'arrived') {

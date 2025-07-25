@@ -78,25 +78,36 @@ export const BattleBattalionManager = React.memo(({
 
   const battalions = battleState.battalions || [];
   const nodes = battleState.nodes || [];
+  const movementStates = battleState.movementStates || [];
 
   // Create a map of node positions for quick lookup
   const nodePositions = createNodePositionMap(nodes);
+
+  // Create a map of movement states for quick lookup
+  const movementStateMap = new Map();
+  movementStates.forEach(movementState => {
+    movementStateMap.set(movementState.battalionId, movementState);
+  });
+
+  // Debug: Log movement states received (reduced logging)
+  // if (movementStates.length > 0) {
+  //   console.log(`📡 CLIENT DEBUG: Received ${movementStates.length} movement states from server`);
+  //   movementStates.forEach(ms => {
+  //     console.log(`📡 CLIENT DEBUG: Movement state for ${ms.battalionId}: ${ms.movementStatus} from (${ms.startPosition.x},${ms.startPosition.y}) to (${ms.targetPosition.x},${ms.targetPosition.y})`);
+  //   });
+  // }
 
   // Filter out battalions that don't have valid node positions
   const validBattalions = battalions.filter(battalion => {
     return nodePositions[battalion.nodeIndex] !== undefined;
   });
 
-  // Clean logs - positioning issues resolved
-
   return (
     <View style={styles.container}>
       {validBattalions.map((battalion) => {
         const nodePosition = nodePositions[battalion.nodeIndex];
-        const movementState = (battalion as any).movementState; // Get movement data from battalion object
+        const movementState = movementStateMap.get(battalion.id); // Get movement data from global movement states
         if (!nodePosition) {return null;}
-
-        // Movement state available for smooth animation
 
         return (
           <BattleBattalion
