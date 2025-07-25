@@ -130,9 +130,23 @@ export class MovementService {
   }
 
   /**
-   * Initiate movement for a battalion to a target node using existing network validation
+   * Initiate movement for a battalion to a target node using existing network validation (PHASE 1: Enhanced signature)
    */
-  static initiateMovement(battalion: IBattalion, targetNode: number, screenWidth: number, screenHeight: number): MovementState {
+  static initiateMovement(
+    battalion: IBattalion, 
+    targetNode: number, 
+    screenWidth: number, 
+    screenHeight: number,
+    movementType: 'initial' | 'retargeting' = 'initial', // NEW parameter
+    fullPath?: number[]  // Required for retargeting
+  ): MovementState {
+    // PHASE 1: Log movement type distinction for verification
+    console.log(`🔧 MOVEMENT TYPE: ${battalion.owner} ${battalion.type} starting ${movementType} movement (${battalion.position.nodeIndex} → ${targetNode})`);
+    
+    // PHASE 1: Foundation logging for verification
+    console.log(`🏗️ FOUNDATION: Enhanced MovementState with interruption support`);
+    console.log(`🏗️ FOUNDATION: Movement type: ${movementType}, Interruptible: ${movementType === 'retargeting'}`);
+    
     // Use existing TargetingService.getNetworkPath() for route validation
     const networkPath = TargetingService.getNetworkPath(battalion.position.nodeIndex, targetNode);
     
@@ -184,7 +198,13 @@ export class MovementService {
       estimatedDuration,
       networkPath,
       attackRangePosition,
-      isWithinAttackRange
+      isWithinAttackRange,
+      // PHASE 1: Enhanced properties for movement type distinction and interruption
+      movementType,
+      fullPath,
+      currentPathIndex: 0, // Start at beginning of path
+      finalTarget: targetNode,
+      isInterruptible: movementType === 'retargeting' // Only retargeting movements can be interrupted
     };
   }
 

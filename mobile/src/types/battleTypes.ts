@@ -52,4 +52,10 @@ export interface MovementState {
   networkPath: number[]; // [startNode, targetNode] from TargetingService
   attackRangePosition?: { x: number; y: number };
   isWithinAttackRange: boolean;
+  // PHASE 1: Enhanced properties for movement type distinction and interruption
+  movementType?: 'initial' | 'retargeting';        // NEW - prevents logic mixing
+  fullPath?: number[];                             // NEW - complete multi-node path [0,3,1,4]
+  currentPathIndex?: number;                       // NEW - current position in fullPath (0=start)
+  finalTarget?: number;                            // NEW - ultimate destination node
+  isInterruptible?: boolean;                       // NEW - can be stopped for retargeting
 }

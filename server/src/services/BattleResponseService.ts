@@ -20,14 +20,21 @@ export interface NetworkData {
 
 export class BattleResponseService {
   /**
-   * Create battle state response for client
+   * Create battle state response for client (PHASE 1: Enhanced with retargeting support)
    */
   static createBattleStateResponse(
     battle: IBattleDocument,
     mappedBattalions: ClientBattalion[],
     networkData: NetworkData,
-    targetingResults: any[] = []
+    targetingResults: any[] = [],
+    retargetingStatus?: {nodeIndex: number, affectedBattalionIds: string[]} // NEW parameter
   ): BattleStateResponse {
+    // PHASE 1: Log retargeting status for verification
+    if (retargetingStatus) {
+      console.log(`📡 CLIENT SYNC: Including retargeting status in response`);
+      console.log(`📡 CLIENT SYNC: Node ${retargetingStatus.nodeIndex} captured, ${retargetingStatus.affectedBattalionIds.length} battalions affected`);
+    }
+
     return {
       battleId: battle.battleId,
       phase: battle.phase,
