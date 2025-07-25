@@ -39,6 +39,9 @@ interface BattleOverlayManagerProps {
 export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
   battleId,
 }) => {
+  // Debug: Log component render with battleId (reduced logging)
+  // console.log(`📱 OVERLAY RENDER: BattleOverlayManager rendered with battleId: ${battleId}`);
+
   // Get screen dimensions for server calculations
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 

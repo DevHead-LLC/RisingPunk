@@ -29,6 +29,7 @@ export interface BattleState {
       offense: number;
       defense: number;
     };
+    movementState?: MovementState; // Individual battalion movement state
   }>; // Server-provided battalion data (read-only)
   nodes: Array<{
     index: number;
@@ -39,11 +40,11 @@ export interface BattleState {
   }>; // Server-provided node data (read-only)
   networkConnections: NetworkConnection[]; // Server-provided network topology
   lineProperties: LineProperties[];       // Server-calculated line properties
+  movementStates?: MovementState[];      // Global movement states array
   victoryCondition?: {
     winner: 'user' | 'enemy';
     reason: 'elimination' | 'timeout' | 'tie';
   };
-  movementStates?: MovementState[]; // Shared movement state interface
 }
 
 // Start battle request interface
@@ -76,7 +77,11 @@ export const battleApi = createApi({
     getBattleState: builder.query<BattleState, { battleId: string; screenWidth: number; screenHeight: number }>({
       query: ({ battleId, screenWidth, screenHeight }) =>
         `/api/battle/${battleId}/state?screenWidth=${screenWidth}&screenHeight=${screenHeight}`,
-      transformResponse: (response: { success: boolean; data: BattleState }) => response.data,
+      transformResponse: (response: { success: boolean; data: BattleState }) => {
+        // Debug: Log what's being received from server (reduced logging)
+        // console.log(`📡 API DEBUG: Response received - movementStates: ${response.data.movementStates?.length || 0}`);
+        return response.data;
+      },
       providesTags: ['Battle'],
     }),
   }),

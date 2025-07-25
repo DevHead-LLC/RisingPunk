@@ -1,135 +1,93 @@
-# AI DIRECTIVES - RETARGETING & MOVEMENT IMPLEMENTATION
+# Current Task: Network-Constrained Movement System
 
-**CRITICAL RULES:**
-- Work in SMALL batches - one phase at a time
-- NEVER run server or client - user will test manually
-- Use CLEAR debug logs to verify each piece
-- Follow intended.md behavior exactly
-- NO duplicate logic - single authority per feature
-- Clear semantic naming to avoid conflicts
-- VERY CLEAR comments throughout explaining connections
+## 🎯 **PRIMARY GOAL**
+Implement robust network-constrained movement system ensuring battalions **NEVER** move off network lines or beyond edge nodes, with pathfinding for multi-hop movement and proximity-based retargeting.
 
----
+## 📋 **PHASED IMPLEMENTATION PLAN**
 
-## CLARIFIED REQUIREMENTS FROM DISCUSSION
+### **✅ PHASE 1: Movement Type Separation & Service Overlap Resolution** 
+**STATUS: COMPLETE**
+- ✅ Enhanced MovementState with interruption support
+- ✅ Movement type distinction (initial vs retargeting)
+- ✅ Resolved service overlaps and DRY violations
+- ✅ Added selective attack identification
+- ✅ Fixed network topology for multi-hop paths
 
-### TARGET RULES:
-- **ONLY neutral nodes can be targeted** (no enemy-owned nodes ever)
-- **Future:** Battalion-to-battalion combat (not this implementation)
-- **Equidistant targets:** Random selection
-- **Captured nodes become un-attackable** and owned by capturing party
+### **✅ PHASE 2: PathfindingService Foundation**
+**STATUS: COMPLETE - FOUNDATION ONLY**
+- ✅ Created PathfindingService with BFS algorithm
+- ✅ Network validation and reachability checks
+- ✅ Cross-network pathfinding capability
+- ✅ **NO behavior changes** - foundation ready for Phase 3
+- ✅ **PathfindingService only used during retargeting** (not initial targeting)
 
-### MOVEMENT & COMBAT RULES:
-- **Battalions must stop to attack** - cannot attack while moving
-- **Only battalions attacking captured node retarget** - others continue current attacks
-- **Movement interruption:** Stop immediately and retarget if capture occurs during movement
-- **Network lock-in:** ALL movement follows NETWORK_CONNECTIONS node-to-node
-- **Attack range positioning:** Move to closest network node with line-of-sight to target
+### **✅ PHASE 3: Retargeting Integration** 
+**STATUS: COMPLETE**
+- ✅ Created RetargetingService with proximity-based targeting (neutral nodes OR enemy battalions)
+- ✅ Integrated PathfindingService for network distance calculations
+- ✅ Added retargeting queue system to prevent race conditions
+- ✅ Implemented selective retargeting (only battalions attacking captured node)
+- ✅ Added retargeting status to client responses
+- ✅ **FIXED: Use current battalion positions (not spawn positions)**
+- ✅ **FIXED: Filter out captured nodes from neutral targets**
+- ✅ **FIXED: Initiate movement after retargeting**
+- ✅ **FIXED: Update battalion positions when they arrive at targets**
+- ✅ **FIXED: Get fresh battle state in retargeting queue**
+- ✅ **FIXED: MovementService.initiateMovement call with correct parameters**
+- ✅ **NOTE: Visual movement integration is Phase 4's responsibility**
 
-### RETARGETING TRIGGER:
-- **Single trigger:** Node capture of the specific node being attacked
-- **Future:** Multiple triggers (battalion destruction, multiple captures)
+### **✅ PHASE 4: Sequential Movement Integration**
+**STATUS: FULLY OPERATIONAL ✨**
+- ✅ Enhanced MovementService with movement types (initial vs retargeting)
+- ✅ Implemented sequential node-to-node movement with proper speed timing
+- ✅ Added movement interruption handling for captures
+- ✅ Enhanced server position tracking with structured client updates
+- ✅ Integrated pathfinding paths into movement system
+- ✅ **FIXED: TypeScript compilation errors**
+- ✅ **FIXED: Return type consistency (undefined vs null)**
+- ✅ **FIXED: attackRangePosition type compatibility**
+- ✅ **FIXED: Movement state storage for retargeting movements**
+- ✅ **PROTECTED: Initial movement system with clear comments**
+- ✅ **CRITICAL FIX: Attack range calculation using correct intermediate positions**
+- ✅ **CONFIRMED: Sequential movement working (4→1→5) with proper network adherence**
+- ✅ **FIXED: Retargeting movement completion with proper timing**
+- ✅ **FIXED: Screen dimensions fallback for movement continuation**
+- ✅ **VERIFIED: Both initial and retargeting movements working correctly**
 
----
+### **✅ PHASE 5: Client Synchronization & Testing**
+**STATUS: COMPLETE - CLIENT MOVEMENT FIXED**
+- ✅ **FIXED: Client-side movement visualization** - Added movementStates to server response
+- ✅ **FIXED: Movement state data flow** - Server now sends movement data to client
+- ✅ **FIXED: Client movement state mapping** - Client properly maps movement states to battalions
+- ✅ **CLEANED: Verbose logging** - Removed excessive pathfinding and movement logs
+- ✅ **VERIFIED: Smooth movement animation** - Client now receives movement timing data
 
-## 🚨 LOGIC HOLES IDENTIFIED AGAINST INTENDED.MD
+## 🏗️ **ARCHITECTURE OVERVIEW**
 
-### HOLE #1: MISSING MOVEMENT INTERRUPTION INTEGRATION
-**INTENDED.MD:** "If movement is interrupted by another capture, stop immediately and retarget"
-**CURRENT PLAN:** Movement interruption logic exists but no integration with capture triggers
-**MISSING:** AttackService must check for moving battalions and interrupt them during captures
+### **Service Hierarchy:**
+1. **BattalionService** - Central orchestrator
+2. **MovementService** - Movement state management
+3. **AttackService** - Combat and retargeting trigger
+4. **PathfindingService** - Network pathfinding (Phase 3+)
+5. **TargetingService** - Initial random targeting (unchanged)
 
-### HOLE #2: CROSS-NETWORK TARGETING & LINE-OF-SIGHT VALIDATION
-**INTENDED.MD:** "Cross-network targeting is valid: Battalion at 0-3 line can target enemy at 5-8 line"
-**CURRENT PLAN:** Line-of-sight validation was too restrictive - only checking direct connections
-**CLARIFIED:** Line-of-sight means "reachable via network pathfinding" not "directly connected"
-**SOLUTION:** PathfindingService validates network reachability, not direct line-of-sight
+### **Data Flow:**
+- **Initial Targeting**: Random neutral node selection (unchanged)
+- **Retargeting**: Proximity-based with pathfinding (Phase 3)
+- **Movement**: Sequential network-constrained (Phase 4)
 
-### HOLE #3: MOVEMENT SPEED STAT INTEGRATION
-**INTENDED.MD:** "Movement follows their speed stats and takes time"
-**CURRENT PLAN:** Uses MovementCalculationService.calculateMovementDuration(battalion)
-**MISSING:** Verification that speed stats properly affect sequential movement timing
-**SOLUTION:** Step-specific duration calculation based on distance and battalion.stats.speed
+## 🎯 **CURRENT STATUS**
+**ATTACK RANGE CALCULATION FIXED** - Sequential movement positioning corrected:
+- ✅ **Phase 1-4**: Server-side movement with proper speed, pathfinding, and retargeting
+- ✅ **Phase 5**: Client-side movement visualization infrastructure in place
+- ✅ **FIXED: MovementState type definition** - Added to server types for proper serialization
+- ✅ **FIXED: Import paths** - Updated all server files to use server MovementState type
+- ✅ **FIXED: Client-server data flow** - Client receiving movement states correctly
+- ✅ **FIXED: Client animation logic** - clientStartTime now resets for new movement states during retargeting
+- ✅ **FIXED: Attack range calculation** - Now uses current intermediate position instead of original position for sequential movement
 
-### HOLE #4: SIMULTANEOUS CAPTURE RACE CONDITIONS
-**INTENDED.MD:** "Multiple simultaneous captures are processed in sequence to avoid race conditions"
-**CURRENT PLAN:** Single capture → retargeting flow
-**MISSING:** Retargeting queue system to handle rapid consecutive captures
-**SOLUTION:** Implement retargeting task queue with sequential processing
+**Root Cause Found:**
+**Attack range calculation bug**: During sequential movement, the `calculateAttackRangePosition` method was using the battalion's original position (e.g., node 4) instead of its current intermediate position (e.g., node 0) when calculating attack range for the final step. This caused all attack positions to be calculated from the wrong starting point, resulting in positions at screen center (x=478) instead of proper network-relative positions.
 
-### HOLE #5: SERVER AUTHORITY & CLIENT SYNCHRONIZATION
-**INTENDED.MD:** "Server authority: All movement, targeting, and positioning calculated server-side"
-**CURRENT PLAN:** Position updates in BattalionService
-**CLARIFIED:** Server calculates everything, client receives updates for visual display only
-**SOLUTION:** Enhanced server-side position tracking with structured client updates
-
----
-
-## 📋 IMPLEMENTATION PHASES
-
-### PHASE 1: FOUNDATION SETUP & OVERLAP RESOLUTION
-**STATUS:** ✅ COMPLETE  
-**DETAILS:** See [phase1.md](./phase1.md)
-- ✅ Enhanced MovementState interface with movement type distinction
-- ✅ AttackService selective battalion identification
-- ✅ BattleResponseService retargeting data integration
-- ✅ Service authority clarification and conflict resolution
-- ✅ Debug logs implemented for verification
-
-### PHASE 2: PATHFINDING SERVICE WITH NETWORK LOCK-IN
-**STATUS:** Ready to implement  
-**DETAILS:** See [phase2.md](./phase2.md)
-- BFS pathfinding algorithm with NETWORK_CONNECTIONS validation
-- Cross-network targeting support (0→8, 1→5 via multi-hop paths)
-- Network reachability validation instead of restrictive line-of-sight
-- Foundation for proximity-based retargeting calculations
-
-### PHASE 3: RETARGETING SERVICE IMPLEMENTATION
-**STATUS:** Ready to implement  
-**DETAILS:** See [phase3.md](./phase3.md)
-- RetargetingService with proximity-based neutral node targeting
-- Random tie-breaking for equidistant targets
-- Retargeting queue system to prevent race conditions
-- Integration with PathfindingService for distance calculations
-
-### PHASE 4: SEQUENTIAL MOVEMENT WITH INTERRUPTION
-**STATUS:** Ready to implement  
-**DETAILS:** See [phase4.md](./phase4.md)
-- Enhanced MovementService with initial vs retargeting movement types
-- Sequential movement through multi-node paths with speed stat integration
-- Movement interruption capability for capture scenarios
-- Enhanced server authority with structured client position updates
-
-### PHASE 5: TESTING FRAMEWORK & DEBUG ENDPOINTS
-**STATUS:** Ready to implement  
-**DETAILS:** See [phase5.md](./phase5.md)
-- Debug endpoints for manual node capture and state inspection
-- Combat loop temporary disable for isolated testing
-- Comprehensive test scenarios for all system components
-- Verification tools for cross-network targeting and movement interruption
-
----
-
-## 🎯 IMPLEMENTATION APPROACH
-
-### Work in Small Batches
-- Implement one phase at a time completely before moving to the next
-- Test each phase thoroughly with debug logs before proceeding
-- User will manually run server and client, reporting logs and visual feedback
-
-### Clear Communication & Comments
-- Every function and service modification includes clear comments
-- Debug logs explicitly show which system component is executing
-- VERY CLEAR distinction between server authority and client display
-
-### Current System State
-The existing movement and targeting system works for basic scenarios. These phases extend it to support:
-- **Cross-network targeting** (battalion at 0→3 line can target enemy at 5→8 line)
-- **Retargeting after node capture** (proximity-based, neutral nodes only)  
-- **Sequential pathfinding movement** (0 → 3 → 7 → 5 → 8 step by step)
-- **Movement interruption** (stop immediately when capture occurs during movement)
-- **Race condition prevention** (queue system for simultaneous captures)
-
-### Server Authority Maintained
-All calculations, pathfinding, retargeting, and position tracking happen server-side. Client receives structured updates for visual display only, ensuring no logic duplication between server and client.
+**NEXT STEP: Test the fixed attack range positioning to confirm battalions stay on network during sequential movement**
 

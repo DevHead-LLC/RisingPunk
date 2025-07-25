@@ -10,7 +10,7 @@
 
 import { BattleStateResponse, ClientBattalion } from '../types/battle';
 import { IBattleDocument } from '../models/Battle';
-import { MovementState } from '../../../mobile/src/types/battleTypes';
+import { MovementState } from '../types/battle';
 
 export interface NetworkData {
   networkConnections: any[];
@@ -29,7 +29,7 @@ export class BattleResponseService {
     targetingResults: any[] = [],
     retargetingStatus?: {nodeIndex: number, affectedBattalionIds: string[]} // NEW parameter
   ): BattleStateResponse {
-    // PHASE 1: Log retargeting status for verification
+    // PHASE 3: Actually include retargeting status in response
     if (retargetingStatus) {
       console.log(`📡 CLIENT SYNC: Including retargeting status in response`);
       console.log(`📡 CLIENT SYNC: Node ${retargetingStatus.nodeIndex} captured, ${retargetingStatus.affectedBattalionIds.length} battalions affected`);
@@ -46,6 +46,7 @@ export class BattleResponseService {
       networkConnections: networkData.networkConnections,
       lineProperties: networkData.lineProperties,
       targetingResults,
+      retargetingStatus, // NEW: Actually include in response
       lastUpdated: battle.updatedAt
     };
   }

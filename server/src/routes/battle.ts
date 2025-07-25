@@ -112,11 +112,14 @@ router.get<{ id: string }, BattleResponse>(
         nodes: battleState.nodes || [],
         networkConnections: battleState.networkConnections || [], // Add network data
         lineProperties: battleState.lineProperties || [],         // Add line data
+        movementStates: battleState.movementStates || [],        // Add movement data for smooth animation
         victoryCondition: battleState.winner ? {
           winner: battleState.winner === 'user' ? 'user' : 'enemy',
           reason: 'timeout'
         } : undefined
       };
+
+
 
 
 

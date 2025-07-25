@@ -9,7 +9,7 @@
  */
 
 import { IBattalion, ClientBattalion } from '../types/battle';
-import { MovementState } from '../../../mobile/src/types/battleTypes';
+import { MovementState } from '../types/battle';
 
 export class BattalionMappingService {
   /**

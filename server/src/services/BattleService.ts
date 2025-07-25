@@ -2,7 +2,7 @@ import { Battle, IBattleDocument } from '../models/Battle';
 import { BattlePhase, NodeOwner, BattalionTargetingResult } from '../types/battle';
 import { BattleTimerService } from './BattleTimer';
 import { BattalionService } from './BattalionService';
-import { MovementState } from '../../../mobile/src/types/battleTypes';
+import { MovementState } from '../types/battle';
 import { BattleSetupService } from './BattleSetupService';
 import { AttackService } from './AttackService';
 import { ScreenDimensionService } from './ScreenDimensionService';
