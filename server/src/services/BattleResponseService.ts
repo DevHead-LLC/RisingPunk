@@ -1,6 +1,11 @@
 /**
  * @file BattleResponseService.ts
  * @description Battle response object creation for client API responses
+ * 
+ * AUTHORITY: Client data formatting and API response structure
+ * OVERLAPS: Uses MovementState and targeting data - MUST coordinate with retargeting implementation
+ * CONFLICTS: May need to include retargeting data in client responses
+ * DEPENDENCIES: BattalionMappingService, MovementService states, targeting results
  */
 
 import { BattleStateResponse, ClientBattalion } from '../types/battle';

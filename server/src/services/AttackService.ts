@@ -1,6 +1,11 @@
 /**
  * @file AttackService.ts
- * @description Periodic attack management for battalion combat
+ * @description Attack state management and coordination with combat system
+ * 
+ * AUTHORITY: Attack state tracking, starting/stopping attacks, capture triggers
+ * OVERLAPS: Node capture detection - PRIMARY retargeting trigger point
+ * CONFLICTS: Must stop ONLY attacks on captured node, not all attacks
+ * DEPENDENCIES: CombatService for damage/capture, RetargetingService integration, BattalionService updates
  */
 
 import { IBattalion, INode, NodeOwner } from '../types/battle';
