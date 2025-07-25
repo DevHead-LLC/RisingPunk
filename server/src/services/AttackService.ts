@@ -79,18 +79,31 @@ export class AttackService {
   }
   
   /**
-   * Get all battalions attacking a specific node
+   * Get all battalions attacking a specific node (PHASE 1: Selective identification)
    */
-  static getBattalionsAttackingNode(nodeIndex: number): string[] {
+  static getBattalionsAttackingSpecificNode(nodeIndex: number): string[] {
+    // Return ONLY battalions attacking this specific node
+    // This ensures we don't stop ALL attacks when one node is captured
+    console.log(`🔍 SELECTIVE: Finding battalions attacking node ${nodeIndex} specifically`);
+
     const attackers: string[] = [];
-    
     for (const [battalionId, attackState] of this.attackStates) {
       if (attackState.isAttacking && attackState.targetNodeIndex === nodeIndex) {
         attackers.push(battalionId);
+        console.log(`🔍 SELECTIVE: Battalion ${battalionId} is attacking node ${nodeIndex}`);
       }
     }
-    
+
+    console.log(`🔍 SELECTIVE: Found ${attackers.length} battalions attacking node ${nodeIndex}`);
     return attackers;
+  }
+
+  /**
+   * Get all battalions attacking a specific node (DEPRECATED: Use getBattalionsAttackingSpecificNode)
+   */
+  static getBattalionsAttackingNode(nodeIndex: number): string[] {
+    // Maintain backward compatibility - delegate to new selective method
+    return this.getBattalionsAttackingSpecificNode(nodeIndex);
   }
   
   /**
