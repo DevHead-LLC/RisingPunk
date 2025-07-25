@@ -1,6 +1,11 @@
 /**
  * @file BattalionMappingService.ts
  * @description Battalion data transformation from Mongoose format to client-friendly format
+ * 
+ * AUTHORITY: Battalion data transformation for client display
+ * OVERLAPS: Uses battalion.position.nodeIndex - CRITICAL for retargeting position updates
+ * CONFLICTS: Position updates in retargeting MUST be reflected here for client sync
+ * DEPENDENCIES: MovementState for position data, BattalionService position updates
  */
 
 import { IBattalion, ClientBattalion } from '../types/battle';

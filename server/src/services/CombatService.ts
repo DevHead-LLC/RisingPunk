@@ -1,6 +1,11 @@
 /**
  * @file CombatService.ts
  * @description Combat and tug-of-war logic (extracted from BattleService.ts)
+ * 
+ * AUTHORITY: Damage calculation and node capture determination
+ * OVERLAPS: Node capture detection triggers retargeting - CRITICAL INTEGRATION POINT
+ * CONFLICTS: Must coordinate with AttackService.stopAttacking() during retargeting
+ * DEPENDENCIES: AttackService for capture notifications, RetargetingService integration
  */
 
 import { IBattalion, INode, NodeOwner } from '../types/battle';
