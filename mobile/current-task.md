@@ -32,6 +32,80 @@ Implement robust network-constrained movement system ensuring battalions **NEVER
 
 **Expected Result:** Battalions should only be interrupted if they were targeting the specific captured node, eliminating the race condition.
 
+## 🔍 **SERVICE ANALYSIS FINDINGS**
+**STATUS: ANALYSIS COMPLETE - FIXES IN PROGRESS**
+
+### **Systematic Review Results:**
+Conducted comprehensive analysis of all 17 services in `server/src/services/` directory.
+
+### **Critical Issues Found:**
+
+#### **🚨 HIGH PRIORITY:**
+1. **Duplicated Network Pathfinding Logic** ✅ **COMPLETED & VERIFIED**
+   - `PathfindingService` had duplicate `isReachableViaNetwork()` and `isNetworkReachable()` methods
+   - **Fix Applied:** Made `isNetworkReachable()` call `isReachableViaNetwork()` to eliminate code duplication
+   - **Verification:** Multi-hop pathfinding working correctly, sequential movement through nodes confirmed
+   - **Status:** ✅ **COMPLETED**
+
+2. **Duplicated Army Health Calculation** ✅ **COMPLETED**
+   - Both `CombatService` and `BattalionService` had identical `calculateTotalArmyHealth()` methods
+   - **Fix Applied:** Removed duplicate from CombatService
+   - **Status:** ✅ **COMPLETED**
+
+3. **TargetingService Network Pathfinding Confusion** ✅ **ANALYZED - NOT DUPLICATES**
+   - `TargetingService.isReachableViaNetwork()` vs `PathfindingService.isReachableViaNetwork()`
+   - **Analysis Result:** These serve DIFFERENT purposes per intended.md:
+     - **TargetingService:** Direct connections only (initial targeting)
+     - **PathfindingService:** Multi-hop paths (retargeting)
+   - **Status:** ✅ **NO ACTION NEEDED - INTENDED BEHAVIORS**
+
+#### **⚠️ MEDIUM PRIORITY:**
+4. **Screen Dimension Delegation Chain** ✅ **COMPLETED**
+   - BattleService → BattalionService → MovementService → ScreenDimensionService
+   - **Fix Applied:** Removed unnecessary delegation wrapper methods
+   - **Result:** Services now call ScreenDimensionService directly
+   - **Status:** ✅ **COMPLETED**
+
+5. **Targeting Results Management Confusion**
+   - Multiple services manage targeting results with overlapping concerns
+   - **Impact:** Data consistency issues, unclear ownership
+   - **Fix:** Single authority for targeting state management
+
+#### **📝 LOW PRIORITY:**
+6. **Movement Update Orchestration Complexity**
+   - Movement updates flow through multiple services with unclear boundaries
+   - **Impact:** Hard to trace execution flow, potential for race conditions
+
+7. **Initial Targeting Delegation**
+   - BattalionService delegates to TargetingService but maintains its own method
+   - **Impact:** Confusing API, unnecessary abstraction layer
+
+### **✅ Intended.md Validation:**
+All intended behaviors are correctly implemented:
+- ✅ Initial targeting uses random neutral nodes only
+- ✅ Retargeting uses proximity-based selection (neutral OR enemy battalions)
+- ✅ Movement follows network topology only
+- ✅ Node capture triggers retargeting for affected battalions only (FIXED)
+- ✅ Tug-of-war damage system works correctly
+- ✅ Sequential movement for retargeting only
+- ✅ Server authority for all calculations
+
+### **📋 Action Plan:**
+**Phase 1: Critical Fixes**
+- [x] Remove duplicate `calculateTotalArmyHealth()` from CombatService ✅ **COMPLETED**
+- [x] Consolidate network pathfinding to PathfindingService only ✅ **COMPLETED & VERIFIED**
+- [x] Analyze TargetingService vs PathfindingService network methods ✅ **ANALYZED - NOT DUPLICATES**
+
+**Phase 2: Refactoring**
+- [x] Simplify screen dimension access patterns ✅ **COMPLETED**
+- [ ] Clarify targeting results ownership
+- [ ] Streamline movement update orchestration
+
+**Phase 3: Optimization**
+- [ ] Remove unnecessary delegation layers
+- [ ] Consolidate similar functionality
+- [ ] Improve service boundary clarity
+
 ## 📋 **PHASED IMPLEMENTATION PLAN**
 
 ### **✅ PHASE 1: Movement Type Separation & Service Overlap Resolution** 

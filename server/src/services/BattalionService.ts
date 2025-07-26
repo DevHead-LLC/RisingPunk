@@ -81,24 +81,10 @@ export class BattalionService {
   }
 
   /**
-   * Get current movement states for a specific battle
+   * Get movement states for a battle (delegates to MovementService)
    */
   static getMovementStates(battleId: string): Map<string, MovementState> {
     return MovementService.getMovementStates(battleId);
-  }
-
-  /**
-   * Store screen dimensions for a battle (delegates to ScreenDimensionService)
-   */
-  static setBattleScreenDimensions(battleId: string, width: number, height: number): void {
-    ScreenDimensionService.setBattleScreenDimensions(battleId, width, height);
-  }
-
-  /**
-   * Get screen dimensions for a battle (delegates to ScreenDimensionService)
-   */
-  static getBattleScreenDimensions(battleId: string): { width: number; height: number } {
-    return ScreenDimensionService.getBattleScreenDimensions(battleId);
   }
 
   /**

@@ -75,13 +75,13 @@ export class PathfindingService {
   }
   
   /**
-   * Validate if path exists
+   * Validate if path exists (for retargeting and general pathfinding)
    */
   static isReachableViaNetwork(startNode: number, targetNode: number): boolean {
     const path = this.findNetworkPath(startNode, targetNode);
     return path.length > 0;
   }
-  
+
   /**
    * Validate node exists in NETWORK_CONNECTIONS
    */
@@ -92,10 +92,10 @@ export class PathfindingService {
   }
   
   /**
-   * Check if target is reachable via network pathfinding (for cross-network targeting)
+   * Check if target is reachable via network pathfinding (for initial movement validation)
+   * NOTE: This is identical to isReachableViaNetwork - kept for backward compatibility
    */
   static isNetworkReachable(fromNode: number, toNode: number): boolean {
-    const path = this.findNetworkPath(fromNode, toNode);
-    return path.length > 0;
+    return this.isReachableViaNetwork(fromNode, toNode);
   }
 } 
