@@ -40,30 +40,28 @@ export class BattalionService {
   }
 
   /**
-   * Update targeting results for retargeting (Phase 3 integration)
+   * Update targeting results for retargeted battalions (accepts RetargetingResult directly)
    */
-  static async updateTargetingResults(battleId: string, newTargetingResults: Array<{battalionId: string, targetNode: number, networkPath: number[]}>): Promise<void> {
-    console.log(`🎯 BATTALION SERVICE: Updating targeting results for ${newTargetingResults.length} battalions`);
+  static async updateTargetingResults(battleId: string, retargetingResults: Array<{battalionId: string, newTargetNodeIndex: number, pathToTarget: number[]}>): Promise<void> {
+    console.log(`🎯 BATTALION SERVICE: Updating targeting for ${retargetingResults.length} battalions`);
     
     // Get current targeting results
     const currentResults = this.getTargetingResults(battleId);
     
     // Update each battalion's targeting
-    for (const newResult of newTargetingResults) {
-      const existingIndex = currentResults.findIndex(result => result.battalionId === newResult.battalionId);
+    for (const retargetResult of retargetingResults) {
+      const existingIndex = currentResults.findIndex(result => result.battalionId === retargetResult.battalionId);
       
       if (existingIndex >= 0) {
         // Update existing targeting result
-        currentResults[existingIndex].targetNode = newResult.targetNode;
-        console.log(`🎯 BATTALION SERVICE: Updated ${newResult.battalionId} target to node ${newResult.targetNode}`);
+        currentResults[existingIndex].targetNode = retargetResult.newTargetNodeIndex;
       } else {
-        console.log(`🎯 BATTALION SERVICE WARNING: Battalion ${newResult.battalionId} not found in current targeting results`);
+        console.log(`🎯 BATTALION SERVICE WARNING: Battalion ${retargetResult.battalionId} not found in current targeting results`);
       }
     }
     
     // Store updated results
     this.targetingResults.set(battleId, currentResults);
-    console.log(`🎯 BATTALION SERVICE: Targeting results updated for battle ${battleId}`);
   }
 
   /**
@@ -104,7 +102,7 @@ export class BattalionService {
   }
 
   /**
-   * Update battle movement for all battalions (orchestration)
+   * Update battle movement for all battalions (streamlined orchestration)
    */
   static async updateBattleMovement(battleId: string): Promise<void> {
     const battle = await this.getBattle(battleId);
@@ -112,55 +110,11 @@ export class BattalionService {
     
     if (!battle) return;
 
-    // Delegate movement logic to MovementService
+    // Delegate movement logic to MovementService (now includes movement→attack transitions)
     await MovementService.updateBattleMovement(battleId, battle, targetingResults);
-    
-    // Handle movement→attack transitions for arrived battalions
-    await this.handleArrivedBattalions(battle);
     
     // Delegate attack processing to AttackService
     await AttackService.processActiveAttacks(battle);
-  }
-
-  /**
-   * Handle movement→attack transitions for arrived battalions
-   */
-  private static async handleArrivedBattalions(battle: any): Promise<void> {
-    const movementStates = MovementService.getMovementStates(battle.battleId);
-    const arrivedBattalions = MovementService.getArrivedBattalions(movementStates);
-    
-    let positionUpdated = false;
-    
-    for (const movementState of arrivedBattalions) {
-      const battalion = battle.battalions.find((b: IBattalion) => b.id === movementState.battalionId);
-      if (!battalion) continue;
-      
-      // Skip if battalion is already attacking (prevents infinite processing)
-      if (AttackService.isAttacking(battalion.id)) {
-        continue;
-      }
-      
-      // Only update position if it actually changed
-      if (battalion.position.nodeIndex !== movementState.targetPosition.nodeIndex) {
-        battalion.position.nodeIndex = movementState.targetPosition.nodeIndex;
-        battalion.position.x = movementState.targetPosition.x;
-        battalion.position.y = movementState.targetPosition.y;
-        console.log(`📍 POSITION: Updated ${battalion.owner} ${battalion.type} position to node ${battalion.position.nodeIndex}`);
-        positionUpdated = true;
-      }
-      
-      // Check if battalion should start attacking (only if not already attacking)
-      const targetNode = battle.nodes.find((n: INode) => n.index === movementState.targetPosition.nodeIndex);
-      if (targetNode && CombatService.canTargetNode(targetNode)) {
-        AttackService.startAttacking(battalion, targetNode.index);
-      }
-    }
-    
-    // Save battle state if positions were updated
-    if (positionUpdated) {
-      await battle.save();
-      console.log(`💾 BATTLE SAVED: Updated battalion positions saved to database`);
-    }
   }
 
   /**
@@ -295,10 +249,6 @@ export class BattalionService {
           movementState: movementState
         });
       }
-    }
-    
-    if (positionUpdates.length > 0) {
-      console.log(`📡 CLIENT SYNC: Prepared ${positionUpdates.length} position updates for transmission`);
     }
     
     return { positionUpdates, movementUpdates };

@@ -44,11 +44,6 @@ export class RetargetingService {
       const neutralNodes = allNodes.filter(node => node.owner === NodeOwner.NEUTRAL);
       const enemyBattalions = allBattalions.filter(b => b.owner !== battalion.owner);
       
-      console.log(`🎯 RETARGETING: Available neutral targets: [${neutralNodes.map(n => n.index).join(', ')}]`);
-      console.log(`🎯 RETARGETING: Available enemy battalions: ${enemyBattalions.length}`);
-      
-
-      
       const targetResult = this.findClosestTarget(battalion, neutralNodes, enemyBattalions);
       if (targetResult) {
         console.log(`🎯 PROXIMITY: Selected ${targetResult.targetType} at node ${targetResult.targetNodeIndex} (${targetResult.pathDistance} hops via ${targetResult.pathToTarget.join(' → ')})`);
@@ -89,7 +84,6 @@ export class RetargetingService {
     for (const node of neutralNodes) {
       // Skip if battalion is already at this node
       if (battalion.position.nodeIndex === node.index) {
-        console.log(`🎯 PROXIMITY: Skipping neutral node ${node.index} - battalion already at this node`);
         continue;
       }
       
@@ -114,9 +108,8 @@ export class RetargetingService {
     
     // Calculate network distance to each enemy battalion
     for (const enemyBattalion of enemyBattalions) {
-      // Skip if battalion is already at the same node as enemy battalion
+      // Skip if battalion is already at this node
       if (battalion.position.nodeIndex === enemyBattalion.position.nodeIndex) {
-        console.log(`🎯 PROXIMITY: Skipping enemy battalion at node ${enemyBattalion.position.nodeIndex} - battalion already at this node`);
         continue;
       }
       
@@ -148,7 +141,6 @@ export class RetargetingService {
     let selectedTarget;
     if (candidateTargets.length === 1) {
       selectedTarget = candidateTargets[0];
-      console.log(`🎯 PROXIMITY: Single closest target selected`);
     } else {
       const randomIndex = Math.floor(Math.random() * candidateTargets.length);
       selectedTarget = candidateTargets[randomIndex];
