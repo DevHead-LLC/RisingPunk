@@ -109,14 +109,6 @@ export class AttackService {
     console.log(`🔍 SELECTIVE: Found ${attackers.length} battalions attacking node ${nodeIndex}`);
     return attackers;
   }
-
-  /**
-   * Get all battalions attacking a specific node (DEPRECATED: Use getBattalionsAttackingSpecificNode)
-   */
-  static getBattalionsAttackingNode(nodeIndex: number): string[] {
-    // Maintain backward compatibility - delegate to new selective method
-    return this.getBattalionsAttackingSpecificNode(nodeIndex);
-  }
   
   /**
    * Get all active attack states
