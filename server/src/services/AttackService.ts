@@ -103,7 +103,6 @@ export class AttackService {
     for (const [battalionId, attackState] of this.attackStates) {
       if (attackState.isAttacking && attackState.targetNodeIndex === nodeIndex) {
         attackers.push(battalionId);
-        console.log(`🔍 SELECTIVE: Battalion ${battalionId} is attacking node ${nodeIndex}`);
       }
     }
 
@@ -248,16 +247,10 @@ export class AttackService {
       battle.nodes
     );
     
-    // Update battalion targeting results
+    // Update battalion targeting results (direct integration - no conversion)
     if (retargetingResults.length > 0) {
-      const targetingResults = retargetingResults.map(result => ({
-        battalionId: result.battalionId,
-        targetNode: result.newTargetNodeIndex,
-        networkPath: result.pathToTarget
-      }));
-      
-      // Integrate with BattalionService to update targeting
-      await BattalionService.updateTargetingResults(battle.battleId, targetingResults);
+      // Integrate with BattalionService to update targeting (direct pass-through)
+      await BattalionService.updateTargetingResults(battle.battleId, retargetingResults);
       
       console.log(`🎯 INTEGRATION: Updated targeting for ${retargetingResults.length} battalions`);
       
@@ -279,8 +272,6 @@ export class AttackService {
         continue;
       }
       
-      console.log(`🚀 MOVEMENT: Starting retargeting movement for ${battalion.owner} ${battalion.type} (${result.currentNodeIndex} → ${result.newTargetNodeIndex})`);
-      
       // Use MovementService to start retargeting movement
       const { MovementService } = require('./MovementService');
       const { ScreenDimensionService } = require('./ScreenDimensionService');
@@ -301,7 +292,6 @@ export class AttackService {
       if (movementState) {
         const battleMovementStates = MovementService.getMovementStates(battle.battleId);
         battleMovementStates.set(battalion.id, movementState);
-        console.log(`💾 MOVEMENT STATE: Stored retargeting movement for ${battalion.owner} ${battalion.type}`);
       } else {
         console.log(`❌ MOVEMENT ERROR: Failed to create movement state for ${battalion.owner} ${battalion.type}`);
       }
@@ -333,12 +323,6 @@ export class AttackService {
             affectedAttackers.forEach(id => this.stopAttacking(id));
             
             console.log(`🏆 NODE CAPTURED: Node ${node.index} captured by ${node.owner}!, stopping ${affectedAttackers.length} specific attacks`);
-            
-            // ENHANCED: Log current battle state before retargeting
-            console.log(`📊 PRE-RETARGET STATE: ${battle.battalions.length} total battalions`);
-            for (const b of battle.battalions) {
-              console.log(`📊 BATTALION ${b.id}: ${b.owner} ${b.type} at node ${b.position.nodeIndex}`);
-            }
             
             // NEW: Add to retargeting queue instead of immediate processing
             this.queueRetargetingTask(battle.battleId, node.index, affectedAttackers);

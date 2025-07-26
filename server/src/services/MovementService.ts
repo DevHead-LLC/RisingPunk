@@ -54,6 +54,7 @@ export class MovementService {
 
   /**
    * Update battle movement for all battalions (called every 100ms)
+   * STREAMLINED: Consolidated movement→attack transitions
    */
   static async updateBattleMovement(battleId: string, battle: any, targetingResults: any[]): Promise<void> {
     if (!battle) return;
@@ -65,6 +66,7 @@ export class MovementService {
     
     const battleMovementStates = this.movementStates.get(battleId)!;
     let activeMovements = 0;
+    let positionUpdated = false;
     
     // Process existing movement states (including retargeting movements)
     for (const [battalionId, movementState] of battleMovementStates) {
@@ -73,11 +75,30 @@ export class MovementService {
         const updatedMovementState = this.updateMovementProgress(movementState, battleId, battle);
         battleMovementStates.set(battalionId, updatedMovementState);
         
-        // Log movement status changes
+        // Handle movement→attack transitions for arrived battalions
         if (updatedMovementState.movementStatus === 'arrived') {
           const battalion = battle.battalions.find((b: IBattalion) => b.id === battalionId);
           if (battalion) {
             console.log(`✅ ${battalion.owner} ${battalion.type} ARRIVED at node ${updatedMovementState.targetPosition.nodeIndex}`);
+            
+            // Update battalion position if it changed
+            if (battalion.position.nodeIndex !== updatedMovementState.targetPosition.nodeIndex) {
+              battalion.position.nodeIndex = updatedMovementState.targetPosition.nodeIndex;
+              battalion.position.x = updatedMovementState.targetPosition.x;
+              battalion.position.y = updatedMovementState.targetPosition.y;
+              positionUpdated = true;
+            }
+            
+            // Start attacking if not already attacking and target is valid
+            const { AttackService } = require('./AttackService');
+            const { CombatService } = require('./CombatService');
+            
+            if (!AttackService.isAttacking(battalion.id)) {
+              const targetNode = battle.nodes.find((n: any) => n.index === updatedMovementState.targetPosition.nodeIndex);
+              if (targetNode && CombatService.canTargetNode(targetNode)) {
+                AttackService.startAttacking(battalion, targetNode.index);
+              }
+            }
           }
         }
         
@@ -117,6 +138,12 @@ export class MovementService {
           }
         }
       }
+    }
+    
+    // Save battle state if positions were updated
+    if (positionUpdated) {
+      await battle.save();
+      console.log(`💾 BATTLE SAVED: Updated battalion positions saved to database`);
     }
     
     // Log active movements periodically
@@ -296,13 +323,6 @@ export class MovementService {
     const completionThreshold = movementState.estimatedDuration + 50;
     const isComplete = elapsedTime >= completionThreshold;
     
-    // DEBUG: Log timing details for continuation steps
-    if (movementState.movementType === 'retargeting' && elapsedTime < 1000) {
-      console.log(`⏱️ TIMING DEBUG: ${movementState.battalionId} - elapsed: ${elapsedTime}ms, threshold: ${completionThreshold}ms, complete: ${isComplete}`);
-    }
-    
-
-
     if (isComplete) {
       console.log(`✅ ARRIVAL: Battalion ${movementState.battalionId} arrived at node ${movementState.targetPosition.nodeIndex}`);
       
@@ -372,25 +392,25 @@ export class MovementService {
                   nodeIndex: nextNodeIndex
                 };
               } else {
-                                 const battalionAtCurrentPosition = {
-                   ...actualBattalion,
-                   position: { ...actualBattalion.position, nodeIndex: currentNodeIndex },
-                   stats: actualBattalion.stats // Ensure stats are properly copied
-                 };
-               
-                 const attackRangePosition = MovementCalculationService.calculateAttackRangePosition(
-                   battalionAtCurrentPosition,
-                   nextNodeIndex,
-                   nodePositions.map(n => n.position)
-                 );
-                 movementState.targetPosition = { 
-                   x: attackRangePosition.x, 
-                   y: attackRangePosition.y, 
-                   nodeIndex: nextNodeIndex 
-                 };
-                 console.log(`📍 POSITION: ${movementState.battalionId} final step from node ${currentNodeIndex} to node ${nextNodeIndex} at attack range (${movementState.targetPosition.x}, ${movementState.targetPosition.y})`);
-               }
-             }
+                                  const battalionAtCurrentPosition = {
+                    ...actualBattalion,
+                    position: { ...actualBattalion.position, nodeIndex: currentNodeIndex },
+                    stats: actualBattalion.stats // Ensure stats are properly copied
+                  };
+                
+                  const attackRangePosition = MovementCalculationService.calculateAttackRangePosition(
+                    battalionAtCurrentPosition,
+                    nextNodeIndex,
+                    nodePositions.map(n => n.position)
+                  );
+                  movementState.targetPosition = { 
+                    x: attackRangePosition.x, 
+                    y: attackRangePosition.y, 
+                    nodeIndex: nextNodeIndex 
+                  };
+                  console.log(`📍 POSITION: ${movementState.battalionId} final step from node ${currentNodeIndex} to node ${nextNodeIndex} at attack range (${movementState.targetPosition.x}, ${movementState.targetPosition.y})`);
+                }
+              }
           } else {
             // Intermediate step - move to node center
             movementState.targetPosition = {
@@ -427,7 +447,7 @@ export class MovementService {
             };
           }
           
-
+ 
           
         } else {
           // Reached final destination

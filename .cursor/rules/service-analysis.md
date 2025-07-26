@@ -101,7 +101,12 @@ Systematic review of server/src/services/ to identify:
 - **Issue Type:** Competing Responsibilities
 - **Description:** Movement updates flow through multiple services with unclear boundaries
 - **Impact:** Hard to trace execution flow, potential for race conditions
-- **Recommendation:** Simplify orchestration, clarify service boundaries
+- **Fix Applied:** Streamlined orchestration by consolidating movement→attack transitions
+- **Changes Made:**
+  - **MovementService:** Consolidated movement→attack transition logic directly into updateBattleMovement
+  - **BattalionService:** Removed separate handleArrivedBattalions method, simplified updateBattleMovement
+  - **Result:** Clearer service boundaries, easier execution flow tracing
+- **Status:** ✅ **COMPLETED**
 
 ### **Finding #5: Targeting Results Management Confusion**
 - **Service(s):** BattalionService, AttackService, RetargetingService
@@ -116,6 +121,20 @@ Systematic review of server/src/services/ to identify:
 - **Description:** BattalionService delegates to TargetingService but maintains its own method
 - **Impact:** Confusing API, unnecessary abstraction layer
 - **Recommendation:** Direct use of TargetingService or consolidate logic
+
+### **Finding #6: Verbose Logging Impacting Clarity**
+- **Service(s):** AttackService, BattalionService, MovementService, RetargetingService
+- **Issue Type:** Log Noise
+- **Description:** Excessive logging making it difficult to track essential information
+- **Impact:** Reduced debugging effectiveness, log overflow
+- **Fix Applied:** Comprehensive log reduction across all services
+- **Changes Made:**
+  - **AttackService:** Removed individual selective identification logs, simplified movement initiation
+  - **BattalionService:** Removed individual targeting updates, redundant position logs, client sync messages
+  - **MovementService:** Removed verbose timing debug logs (every 100ms), kept only completion logs
+  - **RetargetingService:** Removed availability logs, proximity skipping logs, simplified selection logs
+- **Result:** Clean, focused logs that highlight essential information without overwhelming detail
+- **Status:** ✅ **COMPLETED & VERIFIED**
 
 ## ✅ **VALIDATION AGAINST INTENDED.MD**
 
