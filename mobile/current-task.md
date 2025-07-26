@@ -3,6 +3,35 @@
 ## 🎯 **PRIMARY GOAL**
 Implement robust network-constrained movement system ensuring battalions **NEVER** move off network lines or beyond edge nodes, with pathfinding for multi-hop movement and proximity-based retargeting.
 
+## 🚨 **RACE CONDITION ANALYSIS & FIX** 
+**STATUS: FIXED ✅**
+
+### **Root Cause Identified:**
+```
+🛑 CAPTURE INTERRUPT: 2 battalions moving during capture
+🛑 INTERRUPT: Stopping retargeting movement for battalion user-battalion-0
+🛑 INTERRUPT: Stopping retargeting movement for battalion user-battalion-1
+```
+
+**Problem:** When ANY node was captured, system interrupted ALL moving battalions, causing erratic movement patterns.
+
+**Intended Behavior (per intended.md):**
+- Only battalions attacking the captured node should be retargeted
+- Battalions targeting other nodes should continue their movement unaffected
+- "Multiple simultaneous captures are processed in sequence to avoid race conditions"
+
+### **Fix Applied:**
+1. **Modified `executeRetargetingTask()`**: Changed from `getMovingBattalionsInBattle()` to `getMovingBattalionsTargetingNode(capturedNodeIndex)`
+2. **Selective Interruption**: Only interrupt battalions with `finalTarget === capturedNodeIndex`
+3. **Enhanced Logging**: Added battalion tracking logs to identify conflicts
+
+### **Code Changes:**
+- `AttackService.getMovingBattalionsTargetingNode()` - NEW method for selective interruption
+- `AttackService.executeRetargetingTask()` - FIXED to only interrupt relevant battalions
+- Added `📊 BATTALION TRACKING` logs throughout retargeting process
+
+**Expected Result:** Battalions should only be interrupted if they were targeting the specific captured node, eliminating the race condition.
+
 ## 📋 **PHASED IMPLEMENTATION PLAN**
 
 ### **✅ PHASE 1: Movement Type Separation & Service Overlap Resolution** 

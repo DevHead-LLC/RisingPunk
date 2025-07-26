@@ -14,7 +14,14 @@
 ## 3. Initial Combat Phase
 - Battalions attack their target nodes with tug-of-war damage
 - Multiple battalions can attack the same node
-- Nodes have health that goes up/down based on damage from different owners
+- **Tug-of-War System:**
+  - Total army health is calculated for damage scaling
+  - Node control starts at 0% (neutral)
+  - **+100% = User control** (attacker wins the node)
+  - **-100% = Enemy control** (defender wins the node)
+  - Damage from user battalions pushes control toward +100%
+  - Damage from enemy battalions pushes control toward -100%
+  - First side to reach ±100% permanently captures the node
 - **Battalions must stop to attack - cannot attack while moving**
 
 ## 4. Node Capture & Retargeting

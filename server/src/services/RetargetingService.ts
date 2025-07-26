@@ -37,6 +37,9 @@ export class RetargetingService {
         continue;
       }
       
+      // ENHANCED: Log specific battalion being retargeted
+      console.log(`🎯 TRACKING: Retargeting ${battalion.owner} ${battalion.type} (${battalionId}) from node ${battalion.position.nodeIndex}`);
+      
       // Find the NEAREST target (neutral nodes OR enemy battalions)
       const neutralNodes = allNodes.filter(node => node.owner === NodeOwner.NEUTRAL);
       const enemyBattalions = allBattalions.filter(b => b.owner !== battalion.owner);
@@ -47,9 +50,11 @@ export class RetargetingService {
 
       
       const targetResult = this.findClosestTarget(battalion, neutralNodes, enemyBattalions);
-      
       if (targetResult) {
         console.log(`🎯 PROXIMITY: Selected ${targetResult.targetType} at node ${targetResult.targetNodeIndex} (${targetResult.pathDistance} hops via ${targetResult.pathToTarget.join(' → ')})`);
+        
+        // ENHANCED: Log the specific retargeting decision
+        console.log(`🎯 DECISION: ${battalion.owner} ${battalion.type} (${battalionId}) → targeting node ${targetResult.targetNodeIndex}`);
         
         retargetingResults.push({
           battalionId: battalion.id,
