@@ -26,7 +26,7 @@
 
 ## 4. Node Capture & Retargeting
 - When a node is captured, it becomes owned by the capturing party and un-attackable
-- **Only battalions attacking the captured node stop attacking and retarget**
+- **Only battalions attacking or targeting the captured node stop attacking or moving and retarget**
 - Other battalions continue attacking their current targets until those nodes are captured
 - Retargeting finds the NEAREST target using network pathfinding:
   - **Targets:** EITHER uncaptured neutral nodes OR enemy battalions
@@ -37,18 +37,18 @@
 - **Retargeting queuing:** Multiple simultaneous captures are processed in sequence to avoid race conditions
 
 ## 5. Sequential Movement Phase
-- Retargeted battalions **immediately stop current attacks** and begin movement
+- Battalions cannot retarget during attacking phase until node capture or battalion destruction, depending on target respectively
+- Battalions who retarget immediately begin movement upon finding a new target
 - Move node-by-node along calculated network paths
 - Move to node centers for intermediate nodes to access new network connections
 - Stop at attack range for the final target (closest network position with line-of-sight)
 - Movement respects network topology - no shortcuts or jumps
-- **If movement is interrupted by another capture, stop immediately and retarget**
+- **If movement is interrupted by current target capture, stop immediately and retarget**
 
-## 6. Ongoing Combat (Future Phases)
-- Battalions continue attacking until battle ends
+## 6. Ongoing Combat
+- Battalions continue attacking and retargeting until battle ends or until all opposing battalions are defeated
 - Process repeats: attack → capture → retarget → move → attack
-- **Future:** Battalion-to-battalion combat with health/destruction
-- **Future:** Multiple retargeting triggers (battalion destruction, multiple captures)
+- Battalion-to-battalion combat with health/destruction
 
 ## Key Rules & Network Lock-in
 - **Battalions NEVER leave the network lines** (movement, targeting, attacking)

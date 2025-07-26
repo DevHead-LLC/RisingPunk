@@ -71,16 +71,6 @@ export class CombatService {
   }
 
   /**
-   * Calculate total army health for capture threshold
-   * REUSE: calculateBattalionHealth() utility pattern
-   */
-  static calculateTotalArmyHealth(battalions: IBattalion[]): number {
-    return battalions.reduce((total, battalion) => {
-      return total + (battalion.stats.health * battalion.quantity);
-    }, 0);
-  }
-
-  /**
    * Initialize tug-of-war progress for neutral nodes
    * USER REQUIREMENT: Start at 0
    */

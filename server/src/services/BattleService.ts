@@ -43,24 +43,10 @@ export class BattleService {
   }
 
   /**
-   * Get current movement states for a specific battle
+   * Get movement states for a battle (delegates to BattalionService)
    */
   getMovementStates(battleId: string): Map<string, MovementState> {
     return BattalionService.getMovementStates(battleId);
-  }
-
-  /**
-   * Store screen dimensions for a battle (delegates to ScreenDimensionService)
-   */
-  setBattleScreenDimensions(battleId: string, width: number, height: number): void {
-    ScreenDimensionService.setBattleScreenDimensions(battleId, width, height);
-  }
-
-  /**
-   * Get screen dimensions for a battle (delegates to ScreenDimensionService)
-   */
-  getBattleScreenDimensions(battleId: string): { width: number; height: number } {
-    return ScreenDimensionService.getBattleScreenDimensions(battleId);
   }
 
   /**
@@ -71,8 +57,8 @@ export class BattleService {
     // Use BattleSetupService to create battle
     const savedBattle = await BattleSetupService.createBattle(attackerId, defenderId, screenWidth, screenHeight);
     
-    // Store screen dimensions for this battle
-    this.setBattleScreenDimensions(savedBattle.battleId, screenWidth, screenHeight);
+    // Store screen dimensions for this battle (direct access to authority)
+    ScreenDimensionService.setBattleScreenDimensions(savedBattle.battleId, screenWidth, screenHeight);
 
     // Start server-side timer for this battle
     this.timerService.startTimer(savedBattle.battleId);
