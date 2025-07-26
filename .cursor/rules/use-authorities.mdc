@@ -1,0 +1,5 @@
+---
+alwaysApply: true
+---
+
+We should always use authorities in coordination with the use-existing-first.mdc file rules.  We want to have single responsibilities for most files... however the main thing is that we have an authority system where a source of truth exists to handle a given feature / behavior.  Make sure we're always using the authority where possible before we implement new files or put logic elsewhere.
