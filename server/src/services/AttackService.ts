@@ -201,22 +201,24 @@ export class AttackService {
   }
 
   /**
-   * NEW: Get battalions currently in retargeting movement
+   * NEW: Get battalions currently moving to a specific target node
    */
-  static getMovingBattalionsInBattle(battleId: string): string[] {
+  static getMovingBattalionsTargetingNode(battleId: string, targetNodeIndex: number): string[] {
     const { MovementService } = require('./MovementService');
     const movementStates = MovementService.getMovementStates(battleId);
-    const movingBattalions: string[] = [];
+    const relevantBattalions: string[] = [];
     
     for (const [battalionId, movementState] of movementStates) {
       if (movementState.movementStatus === 'moving' && 
           movementState.movementType === 'retargeting' && 
-          movementState.isInterruptible) {
-        movingBattalions.push(battalionId);
+          movementState.isInterruptible &&
+          movementState.finalTarget === targetNodeIndex) {
+        relevantBattalions.push(battalionId);
+        console.log(`🛑 INTERRUPT: Battalion ${battalionId} moving to captured node ${targetNodeIndex}`);
       }
     }
     
-    return movingBattalions;
+    return relevantBattalions;
   }
 
   /**
@@ -225,15 +227,15 @@ export class AttackService {
   static async executeRetargetingTask(battle: any, capturedNodeIndex: number, affectedBattalionIds: string[]): Promise<void> {
     console.log(`🎯 EXECUTING: Retargeting for node ${capturedNodeIndex} capture`);
     
-    // NEW: Check for moving battalions and interrupt them
-    const movingBattalions = this.getMovingBattalionsInBattle(battle.battleId);
-    if (movingBattalions.length > 0) {
-      console.log(`🛑 CAPTURE INTERRUPT: ${movingBattalions.length} battalions moving during capture`);
-      for (const battalionId of movingBattalions) {
+    // FIXED: Only interrupt battalions moving to the captured node
+    const movingBattalionsToThisNode = this.getMovingBattalionsTargetingNode(battle.battleId, capturedNodeIndex);
+    if (movingBattalionsToThisNode.length > 0) {
+      console.log(`🛑 CAPTURE INTERRUPT: ${movingBattalionsToThisNode.length} battalions moving during capture`);
+      for (const battalionId of movingBattalionsToThisNode) {
         const { MovementService } = require('./MovementService');
         const interrupted = MovementService.interruptRetargetingMovement(battalionId, battle.battleId);
         if (interrupted) {
-          console.log(`🛑 CAPTURE INTERRUPT: Stopped movement for battalion ${battalionId}`);
+          console.log(`🛑 INTERRUPT: Stopping retargeting movement for battalion ${battalionId}`);
         }
       }
     }
@@ -331,6 +333,12 @@ export class AttackService {
             affectedAttackers.forEach(id => this.stopAttacking(id));
             
             console.log(`🏆 NODE CAPTURED: Node ${node.index} captured by ${node.owner}!, stopping ${affectedAttackers.length} specific attacks`);
+            
+            // ENHANCED: Log current battle state before retargeting
+            console.log(`📊 PRE-RETARGET STATE: ${battle.battalions.length} total battalions`);
+            for (const b of battle.battalions) {
+              console.log(`📊 BATTALION ${b.id}: ${b.owner} ${b.type} at node ${b.position.nodeIndex}`);
+            }
             
             // NEW: Add to retargeting queue instead of immediate processing
             this.queueRetargetingTask(battle.battleId, node.index, affectedAttackers);
