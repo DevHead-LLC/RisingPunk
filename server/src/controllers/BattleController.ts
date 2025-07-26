@@ -7,6 +7,8 @@ import { BattalionMappingService } from '../services/BattalionMappingService';
 import { BattleResponseService } from '../services/BattleResponseService';
 import { createNodePositionMap } from '../utils/battleUtils';
 import { ScreenDimensionService } from '../services/ScreenDimensionService';
+import { BattalionService } from '../services/BattalionService';
+import { MovementService } from '../services/MovementService';
 
 export class BattleController {
   private battleService: BattleService;
@@ -124,8 +126,8 @@ export class BattleController {
       const currentCountdown = timerState ? timerState.countdown : battle.countdown;
       const currentBattleTime = timerState ? timerState.battleTime : battle.battleTime;
 
-      // Get movement states from BattleService
-      const movementStates = this.battleService.getMovementStates(battleId);
+      // Get movement states from MovementService (direct access to authority)
+      const movementStates = MovementService.getMovementStates(battleId);
 
       // Map battalions for client using focused service
       const mappedBattalions = BattalionMappingService.mapBattalionsForClient(battle.battalions, movementStates);
@@ -137,10 +139,10 @@ export class BattleController {
       let targetingResults: any[] = [];
       if (currentPhase === BattlePhase.ACTIVE && currentCountdown === 0) {
         // Trigger initial targeting if not already done
-        if (this.battleService.getTargetingResults(battleId).length === 0) {
+        if (BattalionService.getTargetingResults(battleId).length === 0) {
           await this.battleService.triggerInitialTargeting(battleId);
         }
-        targetingResults = this.battleService.getTargetingResults(battleId);
+        targetingResults = BattalionService.getTargetingResults(battleId);
       }
 
       // Return battle state for client using focused service

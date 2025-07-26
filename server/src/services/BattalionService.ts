@@ -22,8 +22,8 @@ export class BattalionService {
   static async triggerInitialTargeting(battalions: IBattalion[], nodes: INode[], battleId: string): Promise<BattalionTargetingResult[]> {
     console.log('🎯 TRIGGERING INITIAL TARGETING for battle:', battleId);
     
-    // Assign initial targets to all battalions
-    const results = this.assignInitialTargets(battalions, nodes);
+    // Assign initial targets to all battalions (direct call to authority)
+    const results = TargetingService.assignInitialTargets(battalions, nodes);
     this.targetingResults.set(battleId, results);
     
     return results;
@@ -79,13 +79,6 @@ export class BattalionService {
   }
 
   /**
-   * Get movement states for a battle (delegates to MovementService)
-   */
-  static getMovementStates(battleId: string): Map<string, MovementState> {
-    return MovementService.getMovementStates(battleId);
-  }
-
-  /**
    * Start smooth movement updates (separate from timer) at 100ms intervals
    */
   static startMovementUpdates(battleId: string): void {
@@ -115,13 +108,6 @@ export class BattalionService {
     
     // Delegate attack processing to AttackService
     await AttackService.processActiveAttacks(battle);
-  }
-
-  /**
-   * Assign initial random targets to all battalions
-   */
-  private static assignInitialTargets(battalions: IBattalion[], nodes: INode[]): BattalionTargetingResult[] {
-    return TargetingService.assignInitialTargets(battalions, nodes);
   }
 
   /**

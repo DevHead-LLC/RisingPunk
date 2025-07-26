@@ -36,20 +36,6 @@ export class BattleService {
   }
 
   /**
-   * Get current targeting results for a specific battle
-   */
-  getTargetingResults(battleId?: string): BattalionTargetingResult[] {
-    return BattalionService.getTargetingResults(battleId);
-  }
-
-  /**
-   * Get movement states for a battle (delegates to BattalionService)
-   */
-  getMovementStates(battleId: string): Map<string, MovementState> {
-    return BattalionService.getMovementStates(battleId);
-  }
-
-  /**
    * Create a new battle with initial setup
    * REUSE: BattleSetupService for battle creation
    */

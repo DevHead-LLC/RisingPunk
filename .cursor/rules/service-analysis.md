@@ -120,7 +120,31 @@ Systematic review of server/src/services/ to identify:
 - **Issue Type:** Unclear Boundaries
 - **Description:** BattalionService delegates to TargetingService but maintains its own method
 - **Impact:** Confusing API, unnecessary abstraction layer
-- **Recommendation:** Direct use of TargetingService or consolidate logic
+- **Fix Applied:** Removed unnecessary delegation method, direct call to TargetingService
+- **Result:** Cleaner API, direct access to authority
+- **Status:** ✅ **COMPLETED**
+
+### **Finding #7: Deprecated Method Delegation**
+- **Service(s):** AttackService
+- **Issue Type:** Unnecessary Delegation
+- **Description:** `getBattalionsAttackingNode()` method just delegates to `getBattalionsAttackingSpecificNode()`
+- **Impact:** Confusing API, maintenance burden
+- **Fix Applied:** Removed deprecated delegation method
+- **Result:** Cleaner API, no unused methods
+- **Status:** ✅ **COMPLETED**
+
+### **Finding #8: Double Delegation Chain**
+- **Service(s):** BattleController → BattleService → BattalionService → MovementService
+- **Issue Type:** Unnecessary Delegation
+- **Description:** Complex delegation chain for movement states and targeting results
+- **Impact:** Confusing API, tight coupling, violation of single source of truth
+- **Fix Applied:** Removed delegation wrapper methods, direct access to authorities
+- **Changes Made:**
+  - **BattleController:** Now calls BattalionService and MovementService directly
+  - **BattleService:** Removed getTargetingResults and getMovementStates delegation methods
+  - **BattalionService:** Removed getMovementStates delegation method
+- **Result:** Clearer service boundaries, direct access to authorities
+- **Status:** ✅ **COMPLETED**
 
 ### **Finding #6: Verbose Logging Impacting Clarity**
 - **Service(s):** AttackService, BattalionService, MovementService, RetargetingService
@@ -135,6 +159,27 @@ Systematic review of server/src/services/ to identify:
   - **RetargetingService:** Removed availability logs, proximity skipping logs, simplified selection logs
 - **Result:** Clean, focused logs that highlight essential information without overwhelming detail
 - **Status:** ✅ **COMPLETED & VERIFIED**
+
+### **Finding #9: Service Boundary Clarity Achievement**
+- **Service(s):** All services after Phase 3 optimizations
+- **Issue Type:** Service Boundary Clarity
+- **Description:** Service boundaries were unclear due to delegation chains and overlapping responsibilities
+- **Impact:** Confusing API, tight coupling, violation of single source of truth
+- **Fix Applied:** Comprehensive service boundary clarification through Phase 3 optimizations
+- **Changes Made:**
+  - **Clear Authorities Established:**
+    - **ScreenDimensionService:** Central authority for screen dimensions
+    - **TargetingService:** Authority for initial targeting behaviors
+    - **RetargetingService:** Authority for retargeting behaviors  
+    - **PathfindingService:** Authority for multi-hop pathfinding
+    - **BattalionService:** Authority for targeting result storage and battalion data
+    - **MovementService:** Authority for movement state management
+    - **AttackService:** Authority for attack state management and retargeting queue
+    - **CombatService:** Authority for damage calculation and node capture
+  - **Direct Access Pattern:** Services now call authorities directly instead of through delegation chains
+  - **Single Source of Truth:** Each domain has one clear authority
+- **Result:** Clear service boundaries, direct access to authorities, no confusion about responsibilities
+- **Status:** ✅ **COMPLETED**
 
 ## ✅ **VALIDATION AGAINST INTENDED.MD**
 
