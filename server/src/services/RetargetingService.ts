@@ -81,7 +81,8 @@ export class RetargetingService {
           newTargetNodeIndex: targetResult.targetNodeIndex,
           pathToTarget: targetResult.pathToTarget,
           pathDistance: targetResult.pathDistance,
-          targetType: targetResult.targetType
+          targetType: targetResult.targetType,
+          targetBattalionId: targetResult.targetBattalionId  // PHASE 4 FIX: Include battalion ID for precise targeting
         });
       } else {
         console.log(`🎯 PROXIMITY ERROR: No reachable targets for ${battalion.owner} ${battalion.type}`);

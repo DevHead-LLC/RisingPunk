@@ -127,12 +127,19 @@ export class BattalionService {
 
   /**
    * Update battle movement for all battalions (streamlined orchestration)
+   * FIXED: Added battle end check to prevent movement processing after battle ends
    */
   static async updateBattleMovement(battleId: string): Promise<void> {
     const battle = await this.getBattle(battleId);
     const targetingResults = this.getTargetingResults(battleId);
     
     if (!battle) return;
+
+    // FIXED: Check if battle has ended - don't process movement after battle end
+    if (battle.phase === 'COMPLETE') {
+      console.log(`⏹️ BATTLE ENDED: Skipping movement processing for completed battle ${battleId}`);
+      return;
+    }
 
     // Delegate movement logic to MovementService (now includes movement→attack transitions)
     await MovementService.updateBattleMovement(battleId, battle, targetingResults);

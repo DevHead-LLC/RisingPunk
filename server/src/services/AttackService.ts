@@ -41,7 +41,8 @@ export class AttackService {
     timestamp: number,
     // NEW PHASE 3 PROPERTIES for battalion destruction:
     triggerType?: 'node_capture' | 'battalion_destruction',  // What type of event triggered retargeting
-    destroyedBattalionId?: string     // For battalion destruction events
+    destroyedBattalionId?: string,    // For battalion destruction events
+    priority: number                   // FIXED: Priority system (1=high, 2=normal)
   }> = [];
 
   private static isProcessingQueue: boolean = false;
@@ -222,7 +223,15 @@ export class AttackService {
   }
 
   /**
-   * NEW: Add retargeting task to queue for sequential processing
+   * Clear attack state for a specific battalion (useful for destroyed battalions)
+   */
+  static clearBattalionAttacks(battalionId: string): void {
+    this.attackStates.delete(battalionId);
+    console.log(`🧹 CLEARED ATTACKS: Removed attack state for battalion ${battalionId}`);
+  }
+
+  /**
+   * Queue retargeting task for processing
    */
   static queueRetargetingTask(battleId: string, capturedNodeIndex: number, affectedBattalionIds: string[]): void {
     const task = {
@@ -230,7 +239,8 @@ export class AttackService {
       capturedNodeIndex,
       affectedBattalionIds,
       timestamp: Date.now(),
-      triggerType: 'node_capture' as const  // Mark as node capture for processing
+      triggerType: 'node_capture' as const,  // Mark as node capture
+      priority: 2 // FIXED: Set priority for node capture (lower than battalion destruction)
     };
     
     this.retargetingQueue.push(task);
@@ -247,11 +257,15 @@ export class AttackService {
    * 
    * USAGE: Called when a battalion is destroyed to retarget any battalions attacking it
    * PATTERN: Similar to queueRetargetingTask but for battalion destruction events
+   * FIXED: Immediately clear attack states for destroyed battalions
    * 
    * @param battleId - The battle ID where destruction occurred
    * @param destroyedBattalionId - ID of the battalion that was destroyed
    */
   static queueBattalionDestructionRetargeting(battleId: string, destroyedBattalionId: string): void {
+    // FIXED: Immediately clear attack state for the destroyed battalion
+    this.clearBattalionAttacks(destroyedBattalionId);
+    
     // Find all battalions that were targeting the destroyed battalion
     const affectedBattalions: string[] = [];
     
@@ -270,7 +284,8 @@ export class AttackService {
         affectedBattalionIds: affectedBattalions,
         timestamp: Date.now(),
         triggerType: 'battalion_destruction' as const,  // Mark as battalion destruction
-        destroyedBattalionId
+        destroyedBattalionId,
+        priority: 1 // FIXED: Set priority for battalion destruction
       };
       
       this.retargetingQueue.push(task);
@@ -295,6 +310,9 @@ export class AttackService {
     this.isProcessingQueue = true;
     console.log(`⚙️ RETARGETING QUEUE: Starting sequential processing`);
     
+    // Sort queue by priority (1=high, 2=normal)
+    this.retargetingQueue.sort((a, b) => a.priority - b.priority);
+
     while (this.retargetingQueue.length > 0) {
       const task = this.retargetingQueue.shift()!;
       
@@ -366,11 +384,22 @@ export class AttackService {
     const movingBattalionsToThisNode = this.getMovingBattalionsTargetingNode(battle.battleId, capturedNodeIndex);
     if (movingBattalionsToThisNode.length > 0) {
       console.log(`🛑 CAPTURE INTERRUPT: ${movingBattalionsToThisNode.length} battalions moving during capture`);
+      
+      // FIXED: Track interrupted battalions to prevent duplicates
+      const interruptedBattalions = new Set<string>();
+      
       for (const battalionId of movingBattalionsToThisNode) {
+        // Skip if already interrupted
+        if (interruptedBattalions.has(battalionId)) {
+          console.log(`🛑 INTERRUPT SKIP: Battalion ${battalionId} already interrupted`);
+          continue;
+        }
+        
         const { MovementService } = require('./MovementService');
         const interrupted = MovementService.interruptRetargetingMovement(battalionId, battle.battleId);
         if (interrupted) {
           console.log(`🛑 INTERRUPT: Stopping retargeting movement for battalion ${battalionId}`);
+          interruptedBattalions.add(battalionId);
         }
       }
     }
@@ -400,6 +429,7 @@ export class AttackService {
    * 
    * USAGE: Called when a battalion is destroyed to retarget affected battalions
    * PATTERN: Similar to executeRetargetingTask but for battalion destruction events
+   * FIXED: Get fresh battle state and filter out destroyed battalions before retargeting
    * 
    * @param battle - The battle object
    * @param destroyedBattalionId - ID of the destroyed battalion
@@ -409,27 +439,55 @@ export class AttackService {
     console.log(`🎯 EXECUTING: Retargeting for battalion destruction ${destroyedBattalionId}`);
     console.log(`🎯 DESTRUCTION START: Battalion ${destroyedBattalionId} destroyed, ${affectedBattalionIds.length} battalions affected`);
     
+    // FIXED: Get fresh battle state to ensure isDestroyed flags are up to date
+    const freshBattle = await Battle.findOne({ battleId: battle.battleId });
+    if (!freshBattle) {
+      console.log(`❌ RETARGETING ERROR: Battle ${battle.battleId} not found for destruction retargeting`);
+      return;
+    }
+    
+    // FIXED: Filter out destroyed battalions from the affected list
+    const aliveAffectedBattalions = affectedBattalionIds.filter(battalionId => {
+      const battalion = freshBattle.battalions.find((b: any) => b.id === battalionId);
+      if (!battalion) {
+        console.log(`🎯 RETARGETING WARNING: Battalion ${battalionId} not found in fresh battle state`);
+        return false;
+      }
+      if (battalion.isDestroyed || battalion.currentHealth <= 0 || battalion.quantity <= 0) {
+        console.log(`🎯 RETARGETING SKIP: Battalion ${battalionId} is destroyed, skipping retargeting`);
+        return false;
+      }
+      return true;
+    });
+    
+    if (aliveAffectedBattalions.length === 0) {
+      console.log(`🎯 DESTRUCTION: No alive battalions need retargeting after ${destroyedBattalionId} destruction`);
+      return;
+    }
+    
+    console.log(`🎯 DESTRUCTION: ${aliveAffectedBattalions.length} alive battalions need retargeting`);
+    
     // No movement interruption needed for destruction - affected battalions have already stopped attacking
     // Use RetargetingService to find new targets for affected battalions
     // NOTE: This reuses the same retargeting logic as node captures
     const retargetingResults = RetargetingService.retargetBattalionsAfterCapture(
       -1, // No specific node involved in destruction
-      affectedBattalionIds,
-      battle.battalions,
-      battle.nodes
+      aliveAffectedBattalions,
+      freshBattle.battalions,
+      freshBattle.nodes
     );
     
-    console.log(`🎯 DESTRUCTION END: ${retargetingResults.length}/${affectedBattalionIds.length} battalions retargeted`);
+    console.log(`🎯 DESTRUCTION END: ${retargetingResults.length}/${aliveAffectedBattalions.length} battalions retargeted`);
     
     // Update battalion targeting results (same integration as node captures)
     if (retargetingResults.length > 0) {
       // Integrate with BattalionService to update targeting
-      await BattalionService.updateTargetingResults(battle.battleId, retargetingResults);
+      await BattalionService.updateTargetingResults(freshBattle.battleId, retargetingResults);
       
       console.log(`🎯 INTEGRATION: Updated targeting for ${retargetingResults.length} battalions`);
       
       // Initiate movement for retargeted battalions
-      await this.initiateRetargetingMovement(battle, retargetingResults);
+      await this.initiateRetargetingMovement(freshBattle, retargetingResults);
     } else {
       console.log(`🎯 DESTRUCTION: No valid retargeting options found for affected battalions`);
     }
@@ -483,8 +541,15 @@ export class AttackService {
   /**
    * Process all active attacks (moved from MovementService)
    * PHASE 2 ENHANCEMENT: Now handles both node and battalion attacks
+   * FIXED: Added battle end check and immediate cleanup of destroyed battalions
    */
   static async processActiveAttacks(battle: any): Promise<void> {
+    // FIXED: Check if battle has ended - don't process attacks after battle end
+    if (battle.phase === 'COMPLETE') {
+      console.log(`⏹️ BATTLE ENDED: Skipping attack processing for completed battle ${battle.battleId}`);
+      return;
+    }
+
     for (const [battalionId, attackState] of this.getActiveAttacks()) {
       if (Date.now() - attackState.lastAttackTime >= attackState.attackInterval) {
         const battalion = battle.battalions.find((b: IBattalion) => b.id === battalionId);
@@ -495,54 +560,35 @@ export class AttackService {
           continue;
         }
         
+        // FIXED: Check if attacker is destroyed BEFORE processing any attacks
+        if (battalion.isDestroyed || battalion.quantity <= 0 || battalion.currentHealth <= 0) {
+          console.log(`🚫 BATTALION ATTACK BLOCKED: Attacker ${battalionId} is destroyed/dead (destroyed: ${battalion.isDestroyed}, units: ${battalion.quantity}, health: ${battalion.currentHealth})`);
+          this.stopAttacking(battalionId);
+          continue;
+        }
+        
         // PHASE 2: Handle different attack types
         if (attackState.targetType === 'battalion') {
           // ============================================
           // BATTALION ATTACK PROCESSING (NEW PHASE 2)
           // ============================================
-          console.log(`⚔️ PROCESSING BATTALION ATTACK: ${battalionId} targeting ${attackState.targetId} (interval check passed)`);
-          
-          // CRITICAL FIX: Re-check battalion state to ensure fresh data (battalion might have been destroyed by another attack)
-          const freshBattalion = battle.battalions.find((b: IBattalion) => b.id === battalionId);
-          if (!freshBattalion) {
-            console.log(`🚫 BATTALION ATTACK BLOCKED: Attacker ${battalionId} no longer exists in battle`);
-            this.stopAttacking(battalionId);
-            continue;
-          }
-          
-          // ENHANCED CHECK: Verify battalion is alive and has units before attacking
-          if (freshBattalion.isDestroyed || freshBattalion.quantity <= 0 || freshBattalion.currentHealth <= 0) {
-            console.log(`🚫 BATTALION ATTACK BLOCKED: Attacker ${battalionId} is destroyed/dead (destroyed: ${freshBattalion.isDestroyed}, units: ${freshBattalion.quantity}, health: ${freshBattalion.currentHealth})`);
-            this.stopAttacking(battalionId);
-            continue;
-          }
-          
+          // FIXED: Removed redundant battalion state check since we already checked above
           const defender = battle.battalions.find((b: IBattalion) => b.id === attackState.targetId);
           
           if (defender && !defender.isDestroyed) {
-            console.log(`⚔️ BATTALION ATTACK VALID: Attacker ${freshBattalion.owner} ${freshBattalion.type} (destroyed: ${freshBattalion.isDestroyed}) vs Defender ${defender.owner} ${defender.type} (destroyed: ${defender.isDestroyed})`);
-            
-            const destroyed = this.processBattalionAttack(freshBattalion, defender);
+            const destroyed = this.processBattalionAttack(battalion, defender);
             
             // Update last attack time for continued attacks
             attackState.lastAttackTime = Date.now();
-            console.log(`⏰ BATTALION ATTACK TIMING: Updated last attack time for ${battalionId}, next attack in ${attackState.attackInterval}ms`);
             
             if (destroyed) {
-              console.log(`💀 BATTALION DESTROYED: ${defender.owner} ${defender.type} eliminated by ${freshBattalion.owner} ${freshBattalion.type}`);
+              console.log(`💀 BATTALION DESTROYED: ${defender.owner} ${defender.type} eliminated by ${battalion.owner} ${battalion.type}`);
               
               // CRITICAL FIX: Immediately save battle state to persist isDestroyed flag
-              // This ensures that subsequent retargeting operations see the destroyed status
-              console.log(`💾 BATTALION DESTRUCTION: Saving battle state immediately to persist destruction of ${defender.owner} ${defender.type}`);
               await battle.save();
-              console.log(`💾 BATTALION DESTRUCTION: Battle state saved successfully`);
-              
-              // NOTE: Don't stop attacker's attack here - let it continue attacking unless it gets destroyed
               
               // PHASE 3: Queue retargeting for battalions that were targeting the destroyed battalion
               this.queueBattalionDestructionRetargeting(battle.battleId, defender.id);
-            } else {
-              console.log(`⚔️ BATTALION ATTACK CONTINUES: ${freshBattalion.owner} ${freshBattalion.type} will attack again in ${attackState.attackInterval}ms`);
             }
           } else {
             // Target battalion missing, destroyed, or attacker issues

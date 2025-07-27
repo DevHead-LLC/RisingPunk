@@ -12,70 +12,66 @@
 
 import { IBattalion, ClientBattalion } from '../types/battle';
 import { MovementState } from '../types/battle';
+import { NodeOwner } from '../types/battle';
 
 export class BattalionMappingService {
+  // Track last logging time and destroyed battalions to prevent spam
+  private static lastLogTime: number = 0;
+  private static lastDestroyedBattalions: string = '';
+  private static readonly LOG_INTERVAL = 10000; // Only log every 10 seconds after battle end
+
   /**
    * Transform Mongoose battalion objects to client-friendly format
    * PHASE 1: Now includes battalion combat properties for client display
    * PHASE 5: Now filters out destroyed battalions for client-side visibility management
+   * FIXED: Added logging frequency control to prevent spam after battle end
    */
   static mapBattalionsForClient(battalions: IBattalion[], movementStates?: Map<string, MovementState>): ClientBattalion[] {
-    // PHASE 5: Filter out destroyed battalions before mapping - they should not be visible to client
-    // This ensures destroyed battalions disappear from the battlefield immediately
-    // and cannot be interacted with in any way on the client side
+    // Filter out destroyed battalions for client display
+    const aliveBattalions = battalions.filter(battalion => !battalion.isDestroyed);
+    const destroyedBattalions = battalions.filter(battalion => battalion.isDestroyed);
     
-    // TRANSITION FIX: Handle battalions that should be destroyed but might not have isDestroyed flag set
-    // This handles the case where existing battles were saved before the schema was updated
-    const aliveBattalions = battalions.filter(battalion => {
-      // Primary check: explicit isDestroyed flag
-      if (battalion.isDestroyed === true) {
-        return false; // Filter out explicitly destroyed battalions
+    // Create a hash of destroyed battalions to detect changes
+    const destroyedHash = destroyedBattalions.map(b => `${b.id}-${b.position.nodeIndex}`).sort().join('|');
+    
+    // Check if we should log (only if enough time passed AND destroyed battalions changed)
+    const now = Date.now();
+    const shouldLog = (now - this.lastLogTime >= this.LOG_INTERVAL) && (destroyedHash !== this.lastDestroyedBattalions);
+    
+    if (shouldLog) {
+      console.log(`📊 BATTALION MAPPING: Filtering ${battalions.length} total battalions → ${aliveBattalions.length} alive battalions for client`);
+      
+      if (destroyedBattalions.length > 0) {
+        console.log(`💀 DESTROYED BATTALIONS: ${destroyedBattalions.length} battalions filtered from client view:`);
+        destroyedBattalions.forEach(battalion => {
+          console.log(`💀   - ${battalion.owner} ${battalion.type} (${battalion.id}) destroyed at node ${battalion.position.nodeIndex}`);
+        });
       }
       
-      // TRANSITION CHECK: Battalions with 0 health or 0 units should be considered destroyed
-      // This handles legacy battles where isDestroyed might not be set correctly
-      if (battalion.currentHealth <= 0 || battalion.quantity <= 0) {
-        console.log(`🔧 TRANSITION FIX: Treating ${battalion.owner} ${battalion.type} as destroyed (health: ${battalion.currentHealth}, units: ${battalion.quantity})`);
-        return false; // Filter out battalions with no health or units
-      }
-      
-      return true; // Keep alive battalions
-    });
-    
-    console.log(`📊 BATTALION MAPPING: Filtering ${battalions.length} total battalions → ${aliveBattalions.length} alive battalions for client`);
-    
-    // DEBUGGING: Log each battalion's destruction status for troubleshooting
-    battalions.forEach(battalion => {
-      console.log(`🔍 BATTALION STATUS: ${battalion.owner} ${battalion.type} (${battalion.id}) - destroyed: ${battalion.isDestroyed}, health: ${battalion.currentHealth}, units: ${battalion.quantity}`);
-    });
-    
-    // If any battalions were filtered out, log the destruction details for tracking
-    const destroyedCount = battalions.length - aliveBattalions.length;
-    if (destroyedCount > 0) {
-      const destroyedBattalions = battalions.filter(battalion => battalion.isDestroyed);
-      console.log(`💀 DESTROYED BATTALIONS: ${destroyedCount} battalions filtered from client view:`);
-      destroyedBattalions.forEach(battalion => {
-        console.log(`💀   - ${battalion.owner} ${battalion.type} (${battalion.id}) destroyed at node ${battalion.position.nodeIndex}`);
-      });
+      // Update tracking
+      this.lastLogTime = now;
+      this.lastDestroyedBattalions = destroyedHash;
     }
-    
-    return aliveBattalions.map(battalion => ({
-      id: battalion.id,
-      type: battalion.type,
-      quantity: battalion.quantity,                    // PHASE 1: Updates dynamically with health damage
-      currentHealth: battalion.currentHealth,          // PHASE 1: Current health total (decreases with damage)
-      maxHealth: battalion.maxHealth,                  // Maximum health when at full strength
+
+    // Transform alive battalions to client format
+    return aliveBattalions.map(battalion => {
+      const movementState = movementStates?.get(battalion.id);
       
-      // PHASE 1 PROPERTIES for battalion combat (kept for debugging/future use):
-      baseHealthPerUnit: battalion.baseHealthPerUnit,  // Original health per unit for calculations
-      isDestroyed: battalion.isDestroyed,              // Should always be false here due to filtering
-      destroyedAt: battalion.destroyedAt,              // Should always be undefined here
-      
-      nodeIndex: battalion.position.nodeIndex, // Extract from nested position
-      isUser: battalion.owner === 'user', // Convert string enum to boolean
-      mark: battalion.mark,
-      stats: battalion.stats,
-      movementState: movementStates?.get(battalion.id) // Add movement state to battalion data
-    }));
+      return {
+        id: battalion.id,
+        type: battalion.type,
+        quantity: battalion.quantity,
+        currentHealth: battalion.currentHealth,
+        maxHealth: battalion.maxHealth,
+        baseHealthPerUnit: battalion.baseHealthPerUnit,
+        isDestroyed: battalion.isDestroyed,
+        destroyedAt: battalion.destroyedAt,
+        nodeIndex: battalion.position.nodeIndex,
+        isUser: battalion.owner === NodeOwner.USER,
+        mark: battalion.mark,
+        stats: battalion.stats,
+        movementState: movementState || undefined
+      };
+    });
   }
 } 

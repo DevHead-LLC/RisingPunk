@@ -11,11 +11,63 @@
 
 **🎉 ALL PHASES COMPLETED SUCCESSFULLY** 
 
-**🚨 CRITICAL BUG FIX APPLIED:**
-- **Issue:** Destroyed battalions (0 health, 0 units) were continuing to attack
-- **Root Cause:** `isDestroyed` flag was `undefined` instead of `true`, and stale battalion references were being used
-- **Fix:** Enhanced `AttackService.processActiveAttacks()` with fresh battalion state checks and comprehensive destruction validation
-- **Validation:** Now checks `isDestroyed`, `quantity <= 0`, and `currentHealth <= 0` before allowing attacks
+**🚨 CRITICAL BUG FIXES APPLIED:**
+
+**Bug #1: Missing Battalion ID in RetargetingResult**
+- **Issue:** `targetBattalionId` property not included in `RetargetingService.retargetBattalionsAfterCapture()` results
+- **Impact:** Phase 4 battalion targeting fails, causing mis-targeting when multiple enemy battalions at same node
+- **Fix:** Added `targetBattalionId: targetResult.targetBattalionId` to `retargetingResults.push()` call
+- **Location:** `server/src/services/RetargetingService.ts#L77-L85`
+
+**Bug #2: Battalion Damage Calculation Fails For Zero Health Units**
+- **Issue:** `applyBattalionDamage` skips unit recalculation when `defender.baseHealthPerUnit` is 0, null, or undefined
+- **Impact:** Battalions retain incorrect unit counts after taking damage, affecting legacy battalions
+- **Fix:** Added graceful handling with fallback calculation (1 unit per 10 health) for invalid `baseHealthPerUnit`
+- **Location:** `server/src/services/CombatService.ts#L114-L120`
+
+**Bug #3: Battalion Attack Blocking After Destruction**
+- **Issue:** Destroyed battalions continue trying to attack after being destroyed, causing repeated "BATTALION ATTACK BLOCKED" logs
+- **Impact:** Performance issues and confusing logs when destroyed battalions attempt attacks
+- **Fix:** Added immediate attack state cleanup and battle end checks
+- **Location:** `server/src/services/AttackService.ts#L487-L584`
+
+**Bug #4: Movement Continuing After Battle End**
+- **Issue:** Movement updates and battalion mapping continue for several seconds after battle officially ends
+- **Impact:** Unnecessary server processing and confusing logs after battle completion
+- **Fix:** Added battle phase check in `BattalionService.updateBattleMovement()` to skip processing for completed battles
+- **Location:** `server/src/services/BattalionService.ts#L126-L142`
+
+**Bug #5: Battalion Mapping Log Spam After Battle End**
+- **Issue:** Battalion mapping logs repeat continuously after battle ends, showing the same destroyed battalions repeatedly
+- **Impact:** Log spam and confusion when client continues polling after battle completion
+- **Fix:** Smart logging that only logs when destroyed battalions actually change
+- **Location:** `server/src/services/BattalionMappingService.ts#L16-L78`
+
+**🚨 NEW CRITICAL ISSUES FIXED:**
+
+**Bug #6: Retargeting Logic Targeting Destroyed Battalions**
+- **Issue:** Retargeting system was targeting destroyed battalions even after they were marked as destroyed
+- **Impact:** Battalions would retarget destroyed enemies, causing targeting conflicts
+- **Fix:** Get fresh battle state and filter out destroyed battalions before retargeting
+- **Location:** `server/src/services/AttackService.ts#L421-L481`
+
+**Bug #7: Movement Interruption Logic Issue**
+- **Issue:** Movement was being interrupted multiple times for the same battalion, causing duplicate interruption logs
+- **Impact:** Confusing logs and potential movement state conflicts
+- **Fix:** Added tracking of interrupted battalions to prevent duplicates
+- **Location:** `server/src/services/AttackService.ts#L374-431`
+
+**Bug #8: Retargeting Queue Processing Order Issue**
+- **Issue:** Multiple retargeting events were being processed simultaneously, causing conflicts
+- **Impact:** Battalion destruction and node capture events could interfere with each other
+- **Fix:** Added priority system to ensure battalion destruction events are processed before node capture events
+- **Location:** `server/src/services/AttackService.ts#L37-47, 235-263, 304-352`
+
+**📝 LOG REDUCTION APPLIED:**
+- **Removed excessive battalion status logging** from `BattalionMappingService` - now only logs destroyed battalions
+- **Reduced attack processing verbosity** in `AttackService` - removed redundant timing and validation logs
+- **Streamlined combat logs** in `CombatService` - kept essential damage calculation and unit reduction info
+- **Result:** Much cleaner server output while maintaining critical debugging information
 
 **🚨 CRITICAL PERSISTENCE FIX APPLIED:**
 - **Issue:** Battalions reaching 0 health are marked as destroyed but `isDestroyed` flag shows as `undefined` in subsequent operations
@@ -55,6 +107,10 @@
     if (defender.currentHealth > 0 && defender.baseHealthPerUnit) {
       const newQuantity = Math.round(defender.currentHealth / defender.baseHealthPerUnit);
       defender.quantity = Math.max(1, newQuantity); // At least 1 unit if alive
+    } else if (defender.currentHealth > 0) { // Fallback for invalid baseHealthPerUnit
+      defender.quantity = 1; // Assume 1 unit if baseHealthPerUnit is 0 or null
+    } else { // Fallback for 0 health
+      defender.quantity = 0;
     }
     
     // Check if destroyed

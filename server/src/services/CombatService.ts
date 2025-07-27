@@ -68,17 +68,14 @@ export class CombatService {
    * @returns The final damage amount after defense reduction (floored to integer)
    */
   static calculateBattalionDamage(attacker: IBattalion, defender: IBattalion): number {
-    // Calculate base damage using same pattern as node attacks (offense × quantity)
+    // Calculate base damage: offense stat × quantity
     const baseDamage = attacker.stats.offense * attacker.quantity;
     
-    // Calculate defense reduction as percentage of base damage
+    // Apply defense reduction: base_damage - (base_damage * defense%/100)
     const defenseReduction = baseDamage * (defender.stats.defense / 100);
+    const finalDamage = Math.max(1, baseDamage - defenseReduction); // Minimum 1 damage
     
-    // Apply defense reduction and floor to integer for clean damage values
-    const finalDamage = Math.floor(baseDamage - defenseReduction);
-    
-    // Log detailed damage calculation for debugging and readability
-    console.log(`📊 DAMAGE CALCULATION: ${attacker.owner} ${attacker.type} (${attacker.stats.offense}×${attacker.quantity}=${baseDamage}) attacks ${defender.owner} ${defender.type} (${defender.stats.defense}% defense) → ${defenseReduction} reduction = ${finalDamage} final damage`);
+    console.log(`📊 DAMAGE CALCULATION: ${attacker.owner} ${attacker.type} (${attacker.stats.offense}×${attacker.quantity}=${baseDamage}) attacks ${defender.owner} ${defender.type} (${defender.stats.defense}% defense) → ${defenseReduction.toFixed(1)} reduction = ${finalDamage} final damage`);
     
     return finalDamage;
   }
@@ -102,17 +99,21 @@ export class CombatService {
    * @returns true if battalion was destroyed, false if still alive
    */
   static applyBattalionDamage(defender: IBattalion, damage: number): boolean {
-    // Store original values for detailed logging
     const originalHealth = defender.currentHealth;
     const originalQuantity = defender.quantity;
     
-    // Apply damage, ensuring health never goes below 0
+    // Apply damage (cannot go below 0)
     defender.currentHealth = Math.max(0, defender.currentHealth - damage);
     
-    console.log(`⚔️ DAMAGE APPLIED: ${defender.owner} ${defender.type} health: ${originalHealth} → ${defender.currentHealth} (-${damage} damage)`);
-    
     // Recalculate unit count based on remaining health if battalion is still alive
-    if (defender.currentHealth > 0 && defender.baseHealthPerUnit) {
+    if (defender.currentHealth > 0) {
+      // PHASE 1 FIX: Handle missing or zero baseHealthPerUnit gracefully
+      if (!defender.baseHealthPerUnit || defender.baseHealthPerUnit <= 0) {
+        console.log(`⚠️ COMBAT WARNING: ${defender.owner} ${defender.type} has invalid baseHealthPerUnit (${defender.baseHealthPerUnit}), using fallback calculation`);
+        // Fallback: assume 1 unit per 10 health (reasonable default)
+        defender.baseHealthPerUnit = 10;
+      }
+      
       // Use Math.round for consistent behavior as specified in intended.md
       const newQuantity = Math.round(defender.currentHealth / defender.baseHealthPerUnit);
       
@@ -135,7 +136,6 @@ export class CombatService {
       defender.destroyedAt = Date.now();
       defender.quantity = 0; // No units remaining
       
-      console.log(`💀 BATTALION DESTROYED: ${defender.owner} ${defender.type} eliminated (health reached 0)`);
       return true; // Battalion destroyed
     }
     
