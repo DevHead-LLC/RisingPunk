@@ -41,8 +41,10 @@ export class BattalionService {
 
   /**
    * Update targeting results for retargeted battalions (accepts RetargetingResult directly)
+   * PHASE 2 EXTENSION: Now stores targetType for attack target determination
+   * PHASE 4 EXTENSION: Now stores targetBattalionId for specific battalion targeting
    */
-  static async updateTargetingResults(battleId: string, retargetingResults: Array<{battalionId: string, newTargetNodeIndex: number, pathToTarget: number[]}>): Promise<void> {
+  static async updateTargetingResults(battleId: string, retargetingResults: Array<{battalionId: string, newTargetNodeIndex: number, pathToTarget: number[], targetType?: 'neutral_node' | 'enemy_battalion', targetBattalionId?: string}>): Promise<void> {
     console.log(`🎯 BATTALION SERVICE: Updating targeting for ${retargetingResults.length} battalions`);
     
     // Get current targeting results
@@ -53,8 +55,17 @@ export class BattalionService {
       const existingIndex = currentResults.findIndex(result => result.battalionId === retargetResult.battalionId);
       
       if (existingIndex >= 0) {
-        // Update existing targeting result
+        // Update existing targeting result with new target, type, and specific battalion information
         currentResults[existingIndex].targetNode = retargetResult.newTargetNodeIndex;
+        currentResults[existingIndex].targetType = retargetResult.targetType; // Store what type to attack
+        currentResults[existingIndex].targetBattalionId = retargetResult.targetBattalionId; // PHASE 4: Store which specific battalion to attack
+        
+        // Enhanced logging for Phase 4 - show specific target details
+        if (retargetResult.targetType === 'enemy_battalion') {
+          console.log(`🎯 TARGETING UPDATE: Battalion ${retargetResult.battalionId} now targeting ${retargetResult.targetType} ${retargetResult.targetBattalionId} at node ${retargetResult.newTargetNodeIndex}`);
+        } else {
+          console.log(`🎯 TARGETING UPDATE: Battalion ${retargetResult.battalionId} now targeting ${retargetResult.targetType} at node ${retargetResult.newTargetNodeIndex}`);
+        }
       } else {
         console.log(`🎯 BATTALION SERVICE WARNING: Battalion ${retargetResult.battalionId} not found in current targeting results`);
       }
@@ -62,6 +73,26 @@ export class BattalionService {
     
     // Store updated results
     this.targetingResults.set(battleId, currentResults);
+  }
+
+  /**
+   * Get targeting result for a specific battalion
+   * PHASE 2 NEW METHOD: Used by MovementService to determine attack target type on arrival
+   */
+  static getTargetingResultForBattalion(battalionId: string, battleId?: string): BattalionTargetingResult | null {
+    // Use current battle if no battleId provided (for convenience)
+    const targetingResults = this.getTargetingResults(battleId);
+    
+    // Find the targeting result for this specific battalion
+    const result = targetingResults.find(result => result.battalionId === battalionId);
+    
+    if (result) {
+      console.log(`🎯 TARGETING LOOKUP: Battalion ${battalionId} is targeting ${result.targetType || 'unknown'} at node ${result.targetNode}`);
+      return result;
+    } else {
+      console.log(`🎯 TARGETING LOOKUP: No targeting result found for battalion ${battalionId}`);
+      return null;
+    }
   }
 
   /**
@@ -96,12 +127,19 @@ export class BattalionService {
 
   /**
    * Update battle movement for all battalions (streamlined orchestration)
+   * FIXED: Added battle end check to prevent movement processing after battle ends
    */
   static async updateBattleMovement(battleId: string): Promise<void> {
     const battle = await this.getBattle(battleId);
     const targetingResults = this.getTargetingResults(battleId);
     
     if (!battle) return;
+
+    // FIXED: Check if battle has ended - don't process movement after battle end
+    if (battle.phase === 'COMPLETE') {
+      console.log(`⏹️ BATTLE ENDED: Skipping movement processing for completed battle ${battleId}`);
+      return;
+    }
 
     // Delegate movement logic to MovementService (now includes movement→attack transitions)
     await MovementService.updateBattleMovement(battleId, battle, targetingResults);
@@ -140,8 +178,17 @@ export class BattalionService {
         id: `user-battalion-${index}`,
         type: battalion.type,
         quantity: battalion.quantity,
-        currentHealth: maxHealth,
-        maxHealth,
+        currentHealth: maxHealth,  // Already initialized - total health
+        maxHealth,                 // Already initialized - maximum possible health
+        
+        // NEW PHASE 1 PROPERTIES for battalion combat system:
+        baseHealthPerUnit: stats.health,  // Store original health per unit for calculations
+                                         // Used in Math.round(currentHealth / baseHealthPerUnit)
+                                         // Example: guardian has 14 health per unit
+        
+        isDestroyed: false,              // Start as alive and targetable
+        // destroyedAt not set - only added when battalion is actually destroyed
+        
         position: {
           x: nodes[battalion.nodeIndex].position.x,
           y: nodes[battalion.nodeIndex].position.y,
@@ -151,6 +198,9 @@ export class BattalionService {
         stats,
         mark: 1,
       });
+      
+      // Log battalion creation with new combat properties for debugging
+      console.log(`🏗️ USER BATTALION CREATED: ${battalion.type} (${battalion.quantity} units, ${maxHealth} total health, ${stats.health} per unit)`);
     });
 
     return battalions;
@@ -177,8 +227,17 @@ export class BattalionService {
         id: `enemy-battalion-${index}`,
         type: battalion.type,
         quantity: battalion.quantity,
-        currentHealth: maxHealth,
-        maxHealth,
+        currentHealth: maxHealth,  // Already initialized - total health  
+        maxHealth,                 // Already initialized - maximum possible health
+        
+        // NEW PHASE 1 PROPERTIES for battalion combat system:
+        baseHealthPerUnit: stats.health,  // Store original health per unit for calculations
+                                         // Used in Math.round(currentHealth / baseHealthPerUnit)
+                                         // Example: enemy guardian has 14 health per unit
+        
+        isDestroyed: false,              // Start as alive and targetable
+        // destroyedAt not set - only added when battalion is actually destroyed
+        
         position: {
           x: nodes[battalion.nodeIndex].position.x,
           y: nodes[battalion.nodeIndex].position.y,
@@ -188,6 +247,9 @@ export class BattalionService {
         stats,
         mark: 1,
       });
+      
+      // Log battalion creation with new combat properties for debugging
+      console.log(`🏗️ ENEMY BATTALION CREATED: ${battalion.type} (${battalion.quantity} units, ${maxHealth} total health, ${stats.health} per unit)`);
     });
 
     return battalions;

@@ -50,6 +50,58 @@
 - Process repeats: attack → capture → retarget → move → attack
 - Battalion-to-battalion combat with health/destruction
 
+## 7. Battalion-to-Battalion Combat System
+
+### **Combat Damage Calculation:**
+- **Base Attack Damage** = `attacker.stats.offense * attacker.quantity`
+- **Defense Percentage Reduction** = `base_damage * (defender.stats.defense / 100)`
+- **Final Damage** = `base_damage - defense_reduction`
+- **Example:** User guardian (offense=10, quantity=10) attacks enemy guardian (defense=25%)
+  - Base damage: 10 × 10 = 100
+  - Defense reduction: 100 × (25/100) = 25
+  - Final damage: 100 - 25 = **75 damage dealt**
+
+### **Health and Unit Management:**
+- **Total Health** = `battalion.stats.health * battalion.quantity`
+- **Example:** Enemy guardian with health=100, quantity=10 = **1000 total health**
+- **Health reduces with each attack:** 1000 → 925 → 850...
+- **Unit count calculation:** Uses specific rounding rules (see below)
+- **Attack power adjusts:** New attack = `stats.offense * current_quantity`
+
+### **Unit Reduction Example (Following Exact User Specification):**
+1. **Initial:** Enemy guardian (health=100/unit, 10 units = 1000 health, attack=10×10=100)
+2. **After 75 damage:** 925 health → `925 ÷ 100 = 9.25` → **Round down to 9 units** → attack=10×9=90
+3. **After another 75 damage:** 850 health → `850 ÷ 100 = 8.5` → **Round up to 9 units** → attack=10×9=90
+4. **After another 75 damage:** 775 health → `775 ÷ 100 = 7.75` → **Round down to 7 units** → attack=10×7=70
+
+### **Unit Count Rounding Rules:**
+Based on the user's example showing "round down" then "round up", two interpretations are possible:
+1. **Alternating Pattern:** First damage rounds down, second rounds up, third rounds down, etc.
+2. **Standard Rounding:** Use Math.round() consistently (9.25→9, 8.5→9, 7.75→8)
+
+**Implementation Decision:** Use **Math.round()** for consistent, predictable behavior.
+- This matches the mathematical results in the example (9.25→9, 8.5→9)
+- Avoids complex state tracking for alternating patterns
+- Provides fair rounding throughout the battle
+
+### **Battalion Destruction:**
+- **Health reaches 0:** Battalion is completely destroyed and removed from battle
+- **Destroyed battalions:**
+  - Cannot be targeted by enemy battalions
+  - Cannot attack other battalions or nodes  
+  - Are not visible on the battlefield
+  - Trigger retargeting for any battalions currently targeting them
+
+### **Movement and Destruction Triggers:**
+- **When a battalion is destroyed:** Any enemy battalions targeting it must immediately retarget
+- **Retargeting queue:** Battalion destruction events are processed sequentially to prevent race conditions
+- **Movement updates:** Battalions targeting destroyed battalions stop movement and find new targets
+
+### **Combat Queue System:**
+- **Attack queue:** All battalion attacks are queued to prevent race conditions
+- **Damage processing:** Sequential damage application with health/unit recalculation
+- **Destruction handling:** Immediate removal and retargeting trigger when health ≤ 0
+
 ## Key Rules & Network Lock-in
 - **Battalions NEVER leave the network lines** (movement, targeting, attacking)
 - Movement is always node-to-node following NETWORK_CONNECTIONS

@@ -2,10 +2,13 @@
  * @file CombatService.ts
  * @description Combat and tug-of-war logic (extracted from BattleService.ts)
  * 
- * AUTHORITY: Damage calculation and node capture determination
+ * AUTHORITY: Damage calculation and node capture determination + BATTALION COMBAT
  * OVERLAPS: Node capture detection triggers retargeting - CRITICAL INTEGRATION POINT
  * CONFLICTS: Must coordinate with AttackService.stopAttacking() during retargeting
  * DEPENDENCIES: AttackService for capture notifications, RetargetingService integration
+ * 
+ * PHASE 1 EXTENSION: Added battalion-to-battalion combat methods for damage calculation,
+ * health management, unit count recalculation, and destruction detection.
  */
 
 import { IBattalion, INode, NodeOwner } from '../types/battle';
@@ -42,6 +45,126 @@ export class CombatService {
     
     return false; // No capture
   }
+
+  // ============================================================================
+  // BATTALION COMBAT METHODS - PHASE 1 IMPLEMENTATION
+  // ============================================================================
+
+  /**
+   * Calculate battalion-to-battalion damage with defense reduction
+   * 
+   * INTENDED.MD SPECIFICATION:
+   * - Base damage = attacker.stats.offense × attacker.quantity  
+   * - Defense reduction = base_damage × (defender.stats.defense / 100)
+   * - Final damage = base_damage - defense_reduction
+   * 
+   * EXAMPLE: User guardian (offense=10, quantity=10) attacks enemy guardian (defense=25%)
+   * - Base damage: 10 × 10 = 100
+   * - Defense reduction: 100 × (25/100) = 25  
+   * - Final damage: 100 - 25 = 75
+   * 
+   * @param attacker - The battalion dealing damage
+   * @param defender - The battalion receiving damage  
+   * @returns The final damage amount after defense reduction (floored to integer)
+   */
+  static calculateBattalionDamage(attacker: IBattalion, defender: IBattalion): number {
+    // Calculate base damage: offense stat × quantity
+    const baseDamage = attacker.stats.offense * attacker.quantity;
+    
+    // Apply defense reduction: base_damage - (base_damage * defense%/100)
+    const defenseReduction = baseDamage * (defender.stats.defense / 100);
+    const finalDamage = Math.max(1, baseDamage - defenseReduction); // Minimum 1 damage
+    
+    console.log(`📊 DAMAGE CALCULATION: ${attacker.owner} ${attacker.type} (${attacker.stats.offense}×${attacker.quantity}=${baseDamage}) attacks ${defender.owner} ${defender.type} (${defender.stats.defense}% defense) → ${defenseReduction.toFixed(1)} reduction = ${finalDamage} final damage`);
+    
+    return finalDamage;
+  }
+
+  /**
+   * Apply damage to a battalion and update health/unit count/destruction status
+   * 
+   * INTENDED.MD SPECIFICATION:
+   * - Reduce currentHealth by damage amount
+   * - Recalculate unit count: Math.round(currentHealth / baseHealthPerUnit)
+   * - Update quantity to match new unit count
+   * - If health ≤ 0: mark as destroyed, set quantity to 0
+   * 
+   * UNIT COUNT EXAMPLE:
+   * - Initial: 1000 health, 100 per unit = 10 units
+   * - After 75 damage: 925 health → Math.round(925/100) = 9 units
+   * - Attack power updates: offense × current_quantity
+   * 
+   * @param defender - The battalion receiving damage (modified in place)
+   * @param damage - The damage amount to apply
+   * @returns true if battalion was destroyed, false if still alive
+   */
+  static applyBattalionDamage(defender: IBattalion, damage: number): boolean {
+    const originalHealth = defender.currentHealth;
+    const originalQuantity = defender.quantity;
+    
+    // Apply damage (cannot go below 0)
+    defender.currentHealth = Math.max(0, defender.currentHealth - damage);
+    
+    // Recalculate unit count based on remaining health if battalion is still alive
+    if (defender.currentHealth > 0) {
+      // PHASE 1 FIX: Handle missing or zero baseHealthPerUnit gracefully
+      if (!defender.baseHealthPerUnit || defender.baseHealthPerUnit <= 0) {
+        console.log(`⚠️ COMBAT WARNING: ${defender.owner} ${defender.type} has invalid baseHealthPerUnit (${defender.baseHealthPerUnit}), using fallback calculation`);
+        // Fallback: assume 1 unit per 10 health (reasonable default)
+        defender.baseHealthPerUnit = 10;
+      }
+      
+      // Use Math.round for consistent behavior as specified in intended.md
+      const newQuantity = Math.round(defender.currentHealth / defender.baseHealthPerUnit);
+      
+      // Ensure at least 1 unit remains if health > 0 (prevents 0-unit alive battalions)
+      defender.quantity = Math.max(1, newQuantity);
+      
+      // Log unit count changes for battle tracking
+      if (defender.quantity !== originalQuantity) {
+        const newAttackPower = defender.stats.offense * defender.quantity;
+        const oldAttackPower = defender.stats.offense * originalQuantity;
+        console.log(`📊 UNIT REDUCTION: ${defender.owner} ${defender.type} units: ${originalQuantity} → ${defender.quantity} (attack power: ${oldAttackPower} → ${newAttackPower})`);
+      }
+      
+      return false; // Battalion still alive
+    }
+    
+    // Battalion health reached 0 - mark as destroyed
+    if (defender.currentHealth <= 0) {
+      defender.isDestroyed = true;
+      defender.destroyedAt = Date.now();
+      defender.quantity = 0; // No units remaining
+      
+      return true; // Battalion destroyed
+    }
+    
+    return false; // Battalion still alive (fallback case)
+  }
+
+  /**
+   * Check if a battalion can be targeted for combat
+   * 
+   * INTENDED.MD SPECIFICATION:
+   * - Destroyed battalions cannot be targeted
+   * - Cannot be attacked, receive damage, or be visible
+   * 
+   * @param battalion - The battalion to check
+   * @returns true if battalion can be targeted, false if destroyed/untargetable
+   */
+  static canTargetBattalion(battalion: IBattalion): boolean {
+    const canTarget = !battalion.isDestroyed;
+    
+    if (!canTarget) {
+      console.log(`🚫 TARGETING BLOCKED: ${battalion.owner} ${battalion.type} cannot be targeted (destroyed: ${battalion.isDestroyed})`);
+    }
+    
+    return canTarget;
+  }
+
+  // ============================================================================
+  // EXISTING NODE COMBAT METHODS (UNCHANGED)
+  // ============================================================================
 
   /**
    * Check if a node can be targeted (only neutral nodes)

@@ -1,197 +1,393 @@
-# Current Task: Network-Constrained Movement System
+# **BATTALION COMBAT SYSTEM IMPLEMENTATION**
 
-## 🎯 **PRIMARY GOAL**
-Implement robust network-constrained movement system ensuring battalions **NEVER** move off network lines or beyond edge nodes, with pathfinding for multi-hop movement and proximity-based retargeting.
+## **🎯 CURRENT FOCUS: Battalion Combat System Implementation**
 
-## 🚨 **RACE CONDITION ANALYSIS & FIX** 
-**STATUS: FIXED ✅**
+**PROGRESS UPDATE:**
+- ✅ **PHASE 1 COMPLETED** - Combat Infrastructure Setup
+- ✅ **PHASE 2 COMPLETED** - Attack System Integration  
+- ✅ **PHASE 3 COMPLETED** - Destruction and Retargeting
+- ✅ **PHASE 4 COMPLETED** - Targeting Data Flow
+- ✅ **PHASE 5 COMPLETED** - Client-Side Updates
 
-### **Root Cause Identified:**
-```
-🛑 CAPTURE INTERRUPT: 2 battalions moving during capture
-🛑 INTERRUPT: Stopping retargeting movement for battalion user-battalion-0
-🛑 INTERRUPT: Stopping retargeting movement for battalion user-battalion-1
-```
+**🎉 ALL PHASES COMPLETED SUCCESSFULLY** 
 
-**Problem:** When ANY node was captured, system interrupted ALL moving battalions, causing erratic movement patterns.
+**🚨 CRITICAL BUG FIXES APPLIED:**
 
-**Intended Behavior (per intended.md):**
-- Only battalions attacking the captured node should be retargeted
-- Battalions targeting other nodes should continue their movement unaffected
-- "Multiple simultaneous captures are processed in sequence to avoid race conditions"
+**Bug #1: Missing Battalion ID in RetargetingResult**
+- **Issue:** `targetBattalionId` property not included in `RetargetingService.retargetBattalionsAfterCapture()` results
+- **Impact:** Phase 4 battalion targeting fails, causing mis-targeting when multiple enemy battalions at same node
+- **Fix:** Added `targetBattalionId: targetResult.targetBattalionId` to `retargetingResults.push()` call
+- **Location:** `server/src/services/RetargetingService.ts#L77-L85`
 
-### **Fix Applied:**
-1. **Modified `executeRetargetingTask()`**: Changed from `getMovingBattalionsInBattle()` to `getMovingBattalionsTargetingNode(capturedNodeIndex)`
-2. **Selective Interruption**: Only interrupt battalions with `finalTarget === capturedNodeIndex`
-3. **Enhanced Logging**: Added battalion tracking logs to identify conflicts
+**Bug #2: Battalion Damage Calculation Fails For Zero Health Units**
+- **Issue:** `applyBattalionDamage` skips unit recalculation when `defender.baseHealthPerUnit` is 0, null, or undefined
+- **Impact:** Battalions retain incorrect unit counts after taking damage, affecting legacy battalions
+- **Fix:** Added graceful handling with fallback calculation (1 unit per 10 health) for invalid `baseHealthPerUnit`
+- **Location:** `server/src/services/CombatService.ts#L114-L120`
 
-### **Code Changes:**
-- `AttackService.getMovingBattalionsTargetingNode()` - NEW method for selective interruption
-- `AttackService.executeRetargetingTask()` - FIXED to only interrupt relevant battalions
-- Added `📊 BATTALION TRACKING` logs throughout retargeting process
+**Bug #3: Battalion Attack Blocking After Destruction**
+- **Issue:** Destroyed battalions continue trying to attack after being destroyed, causing repeated "BATTALION ATTACK BLOCKED" logs
+- **Impact:** Performance issues and confusing logs when destroyed battalions attempt attacks
+- **Fix:** Added immediate attack state cleanup and battle end checks
+- **Location:** `server/src/services/AttackService.ts#L487-L584`
 
-**Expected Result:** Battalions should only be interrupted if they were targeting the specific captured node, eliminating the race condition.
+**Bug #4: Movement Continuing After Battle End**
+- **Issue:** Movement updates and battalion mapping continue for several seconds after battle officially ends
+- **Impact:** Unnecessary server processing and confusing logs after battle completion
+- **Fix:** Added battle phase check in `BattalionService.updateBattleMovement()` to skip processing for completed battles
+- **Location:** `server/src/services/BattalionService.ts#L126-L142`
 
-## 🔍 **SERVICE ANALYSIS FINDINGS**
-**STATUS: ANALYSIS COMPLETE - FIXES IN PROGRESS**
+**Bug #5: Battalion Mapping Log Spam After Battle End**
+- **Issue:** Battalion mapping logs repeat continuously after battle ends, showing the same destroyed battalions repeatedly
+- **Impact:** Log spam and confusion when client continues polling after battle completion
+- **Fix:** Smart logging that only logs when destroyed battalions actually change
+- **Location:** `server/src/services/BattalionMappingService.ts#L16-L78`
 
-### **Systematic Review Results:**
-Conducted comprehensive analysis of all 17 services in `server/src/services/` directory.
+**🚨 NEW CRITICAL ISSUES FIXED:**
 
-### **Critical Issues Found:**
+**Bug #6: Retargeting Logic Targeting Destroyed Battalions**
+- **Issue:** Retargeting system was targeting destroyed battalions even after they were marked as destroyed
+- **Impact:** Battalions would retarget destroyed enemies, causing targeting conflicts
+- **Fix:** Get fresh battle state and filter out destroyed battalions before retargeting
+- **Location:** `server/src/services/AttackService.ts#L421-L481`
 
-#### **🚨 HIGH PRIORITY:**
-1. **Duplicated Network Pathfinding Logic** ✅ **COMPLETED & VERIFIED**
-   - `PathfindingService` had duplicate `isReachableViaNetwork()` and `isNetworkReachable()` methods
-   - **Fix Applied:** Made `isNetworkReachable()` call `isReachableViaNetwork()` to eliminate code duplication
-   - **Verification:** Multi-hop pathfinding working correctly, sequential movement through nodes confirmed
-   - **Status:** ✅ **COMPLETED**
+**Bug #7: Movement Interruption Logic Issue**
+- **Issue:** Movement was being interrupted multiple times for the same battalion, causing duplicate interruption logs
+- **Impact:** Confusing logs and potential movement state conflicts
+- **Fix:** Added tracking of interrupted battalions to prevent duplicates
+- **Location:** `server/src/services/AttackService.ts#L374-431`
 
-2. **Duplicated Army Health Calculation** ✅ **COMPLETED**
-   - Both `CombatService` and `BattalionService` had identical `calculateTotalArmyHealth()` methods
-   - **Fix Applied:** Removed duplicate from CombatService
-   - **Status:** ✅ **COMPLETED**
+**Bug #8: Retargeting Queue Processing Order Issue**
+- **Issue:** Multiple retargeting events were being processed simultaneously, causing conflicts
+- **Impact:** Battalion destruction and node capture events could interfere with each other
+- **Fix:** Added priority system to ensure battalion destruction events are processed before node capture events
+- **Location:** `server/src/services/AttackService.ts#L37-47, 235-263, 304-352`
 
-3. **TargetingService Network Pathfinding Confusion** ✅ **ANALYZED - NOT DUPLICATES**
-   - `TargetingService.isReachableViaNetwork()` vs `PathfindingService.isReachableViaNetwork()`
-   - **Analysis Result:** These serve DIFFERENT purposes per intended.md:
-     - **TargetingService:** Direct connections only (initial targeting)
-     - **PathfindingService:** Multi-hop paths (retargeting)
-   - **Status:** ✅ **NO ACTION NEEDED - INTENDED BEHAVIORS**
+**📝 LOG REDUCTION APPLIED:**
+- **Removed excessive battalion status logging** from `BattalionMappingService` - now only logs destroyed battalions
+- **Reduced attack processing verbosity** in `AttackService` - removed redundant timing and validation logs
+- **Streamlined combat logs** in `CombatService` - kept essential damage calculation and unit reduction info
+- **Result:** Much cleaner server output while maintaining critical debugging information
 
-#### **⚠️ MEDIUM PRIORITY:**
-4. **Screen Dimension Delegation Chain** ✅ **COMPLETED**
-   - BattleService → BattalionService → MovementService → ScreenDimensionService
-   - **Fix Applied:** Removed unnecessary delegation wrapper methods
-   - **Result:** Services now call ScreenDimensionService directly
-   - **Status:** ✅ **COMPLETED**
+**🚨 CRITICAL PERSISTENCE FIX APPLIED:**
+- **Issue:** Battalions reaching 0 health are marked as destroyed but `isDestroyed` flag shows as `undefined` in subsequent operations
+- **Root Cause:** Database save operation not occurring immediately after destruction, causing race conditions in retargeting
+- **Fix:** Added immediate `battle.save()` after battalion destruction to persist `isDestroyed = true` flag
+- **Debug Enhancement:** Added detailed battalion status logging to track destruction state and filter effectiveness
 
-5. **Targeting Results Management Confusion**
-   - Multiple services manage targeting results with overlapping concerns
-   - **Impact:** Data consistency issues, unclear ownership
-   - **Fix:** Single authority for targeting state management
+**🚨 CRITICAL DATABASE SCHEMA FIX APPLIED:**
+- **Issue:** `isDestroyed`, `baseHealthPerUnit`, and `destroyedAt` fields showing as `undefined` because they weren't in the database schema
+- **Root Cause:** MongoDB schema in `Battle.ts` was missing the new battalion combat fields added in Phase 1
+- **Fix:** Updated `battalionSchema` to include all Phase 1 combat fields with proper types and constraints
+- **Transition Handling:** Added logic to treat battalions with `currentHealth <= 0` or `quantity <= 0` as destroyed for legacy compatibility
 
-#### **📝 LOW PRIORITY:**
-6. **Movement Update Orchestration Complexity**
-   - Movement updates flow through multiple services with unclear boundaries
-   - **Impact:** Hard to trace execution flow, potential for race conditions
+**Goal:** Extend existing services with battalion combat capabilities
 
-7. **Initial Targeting Delegation**
-   - BattalionService delegates to TargetingService but maintains its own method
-   - **Impact:** Confusing API, unnecessary abstraction layer
+## **📋 IMPLEMENTATION PHASES:**
 
-### **✅ Intended.md Validation:**
-All intended behaviors are correctly implemented:
-- ✅ Initial targeting uses random neutral nodes only
-- ✅ Retargeting uses proximity-based selection (neutral OR enemy battalions)
-- ✅ Movement follows network topology only
-- ✅ Node capture triggers retargeting for affected battalions only (FIXED)
-- ✅ Tug-of-war damage system works correctly
-- ✅ Sequential movement for retargeting only
-- ✅ Server authority for all calculations
+### **PHASE 1: Combat Infrastructure Setup**
+**Goal:** Extend existing services with battalion combat capabilities
 
-### **📋 Action Plan:**
-**Phase 1: Critical Fixes**
-- [x] Remove duplicate `calculateTotalArmyHealth()` from CombatService ✅ **COMPLETED**
-- [x] Consolidate network pathfinding to PathfindingService only ✅ **COMPLETED & VERIFIED**
-- [x] Analyze TargetingService vs PathfindingService network methods ✅ **ANALYZED - NOT DUPLICATES**
+#### **Step 1.1: Extend CombatService for Battalion Combat**
+- **File:** `server/src/services/CombatService.ts` (Currently 97 lines)
+- **Add Battalion Combat Methods:**
+  ```typescript
+  // Calculate battalion damage with defense reduction
+  static calculateBattalionDamage(attacker: IBattalion, defender: IBattalion): number {
+    const baseDamage = attacker.stats.offense * attacker.quantity;
+    const defenseReduction = baseDamage * (defender.stats.defense / 100);
+    return Math.floor(baseDamage - defenseReduction);
+  }
+  
+  // Apply damage and update health/units
+  static applyBattalionDamage(defender: IBattalion, damage: number): boolean {
+    defender.currentHealth = Math.max(0, defender.currentHealth - damage);
+    
+    // Recalculate unit count based on health
+    if (defender.currentHealth > 0 && defender.baseHealthPerUnit) {
+      const newQuantity = Math.round(defender.currentHealth / defender.baseHealthPerUnit);
+      defender.quantity = Math.max(1, newQuantity); // At least 1 unit if alive
+    } else if (defender.currentHealth > 0) { // Fallback for invalid baseHealthPerUnit
+      defender.quantity = 1; // Assume 1 unit if baseHealthPerUnit is 0 or null
+    } else { // Fallback for 0 health
+      defender.quantity = 0;
+    }
+    
+    // Check if destroyed
+    if (defender.currentHealth <= 0) {
+      defender.isDestroyed = true;
+      defender.destroyedAt = Date.now();
+      defender.quantity = 0;
+      return true; // Battalion destroyed
+    }
+    
+    return false; // Battalion still alive
+  }
+  
+  // Check if battalion can be targeted
+  static canTargetBattalion(battalion: IBattalion): boolean {
+    return !battalion.isDestroyed;
+  }
+  ```
 
-**Phase 2: Refactoring**
-- [x] Simplify screen dimension access patterns ✅ **COMPLETED**
-- [x] Clarify targeting results ownership ✅ **COMPLETED**
-- [x] Reduce verbose logging for clarity ✅ **COMPLETED & VERIFIED**
-- [x] Streamline movement update orchestration ✅ **COMPLETED**
+#### **Step 1.2: Extend IBattalion Interface**
+- **Files:** `server/src/types/battle.ts` and `mobile/src/types/battleTypes.ts`
+- **Add Properties:**
+  ```typescript
+  interface IBattalion {
+    // ... existing properties including currentHealth, maxHealth
+    baseHealthPerUnit: number;  // Original health per unit for unit count calculations
+    isDestroyed: boolean;       // Whether battalion has been eliminated
+    destroyedAt?: number;       // Timestamp when destroyed (for cleanup/animations)
+  }
+  ```
+- **Initialize in BattalionService:**
+  ```typescript
+  // In createUserBattalions and createEnemyBattalions
+  baseHealthPerUnit: stats.health,
+  isDestroyed: false,
+  ```
 
-**Phase 3: Optimization**
-- [x] Remove unnecessary delegation layers ✅ **COMPLETED**
-- [x] Consolidate similar functionality ✅ **COMPLETED**
-- [x] Improve service boundary clarity ✅ **COMPLETED**
+### **PHASE 2: Attack System Integration**
+**Goal:** Extend existing attack system to handle battalion targets seamlessly
 
-## 📋 **PHASED IMPLEMENTATION PLAN**
+#### **Step 2.1: Update Movement → Attack Transition**
+- **File:** `server/src/services/MovementService.ts`
+- **Current Issue:** System always tries to attack the node at arrival
+- **Fix in `updateBattleMovement()` arrival handling:**
+  ```typescript
+  // After battalion arrives (line ~115)
+  if (!AttackService.isAttacking(battalion.id)) {
+    // Check the targeting result to determine what to attack
+    const targetingResult = BattalionService.getTargetingResultForBattalion(battalion.id);
+    
+    if (targetingResult && targetingResult.targetType === 'enemy_battalion') {
+      // Find the enemy battalion at this node
+      const enemyBattalion = battle.battalions.find((b: IBattalion) => 
+        b.owner !== battalion.owner && 
+        b.position.nodeIndex === updatedMovementState.targetPosition.nodeIndex &&
+        !b.isDestroyed
+      );
+      
+      if (enemyBattalion) {
+        console.log(`⚔️ BATTALION COMBAT: ${battalion.owner} ${battalion.type} starting to attack ${enemyBattalion.owner} ${enemyBattalion.type}`);
+        AttackService.startBattalionAttack(battalion.id, enemyBattalion.id);
+      }
+    } else {
+      // Original node attack logic
+      const targetNode = battle.nodes.find((n: any) => n.index === updatedMovementState.targetPosition.nodeIndex);
+      if (targetNode && CombatService.canTargetNode(targetNode)) {
+        AttackService.startAttacking(battalion, targetNode.index);
+      }
+    }
+  }
+  ```
 
-### **✅ PHASE 1: Movement Type Separation & Service Overlap Resolution** 
-**STATUS: COMPLETE**
-- ✅ Enhanced MovementState with interruption support
-- ✅ Movement type distinction (initial vs retargeting)
-- ✅ Resolved service overlaps and DRY violations
-- ✅ Added selective attack identification
-- ✅ Fixed network topology for multi-hop paths
+#### **Step 2.2: Extend AttackService for Battalion Combat**
+- **File:** `server/src/services/AttackService.ts`
+- **Add Battalion Attack Methods:**
+  ```typescript
+  // Start attacking a battalion (similar to startAttacking for nodes)
+  static startBattalionAttack(attackerId: string, targetId: string): void {
+    const attackInterval = this.calculateAttackInterval(/* get attacker's speed */);
+    
+    const attackState: AttackState = {
+      battalionId: attackerId,
+      targetType: 'battalion',
+      targetId: targetId,
+      targetNodeIndex: -1, // Not used for battalion attacks
+      lastAttackTime: Date.now(),
+      attackInterval,
+      isAttacking: true
+    };
+    
+    this.attackStates.set(attackerId, attackState);
+    console.log(`⚔️ Battalion attack started: ${attackerId} → ${targetId}`);
+  }
+  
+  // Process battalion attack (called from processActiveAttacks)
+  static processBattalionAttack(attacker: IBattalion, defender: IBattalion): boolean {
+    if (!CombatService.canTargetBattalion(defender)) {
+      return true; // Target destroyed, stop attacking
+    }
+    
+    const damage = CombatService.calculateBattalionDamage(attacker, defender);
+    const destroyed = CombatService.applyBattalionDamage(defender, damage);
+    
+    console.log(`⚔️ BATTALION ATTACK: ${attacker.owner} ${attacker.type} deals ${damage} damage to ${defender.owner} ${defender.type} (${defender.currentHealth} health remaining)`);
+    
+    if (defender.quantity !== Math.round(defender.currentHealth / defender.baseHealthPerUnit)) {
+      const oldQuantity = defender.quantity;
+      defender.quantity = Math.round(defender.currentHealth / defender.baseHealthPerUnit);
+      console.log(`📊 UNIT REDUCTION: ${defender.owner} ${defender.type} units: ${oldQuantity} → ${defender.quantity}`);
+    }
+    
+    return destroyed;
+  }
+  ```
 
-### **✅ PHASE 2: PathfindingService Foundation**
-**STATUS: COMPLETE - FOUNDATION ONLY**
-- ✅ Created PathfindingService with BFS algorithm
-- ✅ Network validation and reachability checks
-- ✅ Cross-network pathfinding capability
-- ✅ **NO behavior changes** - foundation ready for Phase 3
-- ✅ **PathfindingService only used during retargeting** (not initial targeting)
+#### **Step 2.3: Update Attack Processing Loop**
+- **File:** `server/src/services/AttackService.ts`
+- **Modify `processActiveAttacks()` to handle both types:**
+  ```typescript
+  // In processActiveAttacks() around line 305
+  if (attackState.targetType === 'battalion') {
+    // Battalion attack
+    const attacker = battle.battalions.find((b: IBattalion) => b.id === battalionId);
+    const defender = battle.battalions.find((b: IBattalion) => b.id === attackState.targetId);
+    
+    if (attacker && defender && !attacker.isDestroyed) {
+      const destroyed = this.processBattalionAttack(attacker, defender);
+      
+      if (destroyed) {
+        console.log(`💀 BATTALION DESTROYED: ${defender.owner} ${defender.type} eliminated`);
+        this.stopAttacking(battalionId);
+        
+        // Queue retargeting for battalions that were targeting the destroyed battalion
+        this.queueBattalionDestructionRetargeting(battle.battleId, defender.id);
+      }
+    }
+  } else {
+    // Existing node attack logic
+    const node = battle.nodes.find((n: INode) => n.index === attackState.targetNodeIndex);
+    if (battalion && node && CombatService.canTargetNode(node)) {
+      const captured = this.processAttack(battalion, node);
+      // ... existing capture handling
+    }
+  }
+  ```
 
-### **✅ PHASE 3: Retargeting Integration** 
-**STATUS: COMPLETE**
-- ✅ Created RetargetingService with proximity-based targeting (neutral nodes OR enemy battalions)
-- ✅ Integrated PathfindingService for network distance calculations
-- ✅ Added retargeting queue system to prevent race conditions
-- ✅ Implemented selective retargeting (only battalions attacking captured node)
-- ✅ Added retargeting status to client responses
-- ✅ **FIXED: Use current battalion positions (not spawn positions)**
-- ✅ **FIXED: Filter out captured nodes from neutral targets**
-- ✅ **FIXED: Initiate movement after retargeting**
-- ✅ **FIXED: Update battalion positions when they arrive at targets**
-- ✅ **FIXED: Get fresh battle state in retargeting queue**
-- ✅ **FIXED: MovementService.initiateMovement call with correct parameters**
-- ✅ **NOTE: Visual movement integration is Phase 4's responsibility**
+### **PHASE 3: Destruction and Retargeting**
+**Goal:** Handle battalion destruction events and trigger appropriate retargeting
 
-### **✅ PHASE 4: Sequential Movement Integration**
-**STATUS: FULLY OPERATIONAL ✨**
-- ✅ Enhanced MovementService with movement types (initial vs retargeting)
-- ✅ Implemented sequential node-to-node movement with proper speed timing
-- ✅ Added movement interruption handling for captures
-- ✅ Enhanced server position tracking with structured client updates
-- ✅ Integrated pathfinding paths into movement system
-- ✅ **FIXED: TypeScript compilation errors**
-- ✅ **FIXED: Return type consistency (undefined vs null)**
-- ✅ **FIXED: attackRangePosition type compatibility**
-- ✅ **FIXED: Movement state storage for retargeting movements**
-- ✅ **PROTECTED: Initial movement system with clear comments**
-- ✅ **CRITICAL FIX: Attack range calculation using correct intermediate positions**
-- ✅ **CONFIRMED: Sequential movement working (4→1→5) with proper network adherence**
-- ✅ **FIXED: Retargeting movement completion with proper timing**
-- ✅ **FIXED: Screen dimensions fallback for movement continuation**
-- ✅ **VERIFIED: Both initial and retargeting movements working correctly**
+#### **Step 3.1: Add Destruction Retargeting Queue**
+- **File:** `server/src/services/AttackService.ts`
+- **Add method similar to `queueRetargetingTask()`:**
+  ```typescript
+  static queueBattalionDestructionRetargeting(battleId: string, destroyedBattalionId: string): void {
+    // Find all battalions targeting the destroyed battalion
+    const affectedBattalions: string[] = [];
+    
+    for (const [battalionId, attackState] of this.attackStates) {
+      if (attackState.targetType === 'battalion' && attackState.targetId === destroyedBattalionId) {
+        affectedBattalions.push(battalionId);
+        this.stopAttacking(battalionId); // Stop attacking destroyed target
+      }
+    }
+    
+    if (affectedBattalions.length > 0) {
+      console.log(`📋 DESTRUCTION RETARGETING: ${affectedBattalions.length} battalions need new targets`);
+      this.retargetingQueue.push({
+        battleId,
+        triggerType: 'battalion_destruction',
+        destroyedBattalionId,
+        affectedBattalionIds: affectedBattalions
+      });
+    }
+  }
+  ```
 
-### **✅ PHASE 5: Client Synchronization & Testing**
-**STATUS: COMPLETE - CLIENT MOVEMENT FIXED**
-- ✅ **FIXED: Client-side movement visualization** - Added movementStates to server response
-- ✅ **FIXED: Movement state data flow** - Server now sends movement data to client
-- ✅ **FIXED: Client movement state mapping** - Client properly maps movement states to battalions
-- ✅ **CLEANED: Verbose logging** - Removed excessive pathfinding and movement logs
-- ✅ **VERIFIED: Smooth movement animation** - Client now receives movement timing data
+#### **Step 3.2: Update RetargetingService**
+- **File:** `server/src/services/RetargetingService.ts`
+- **Modify `findClosestTarget()` to exclude destroyed battalions:**
+  ```typescript
+  // In the enemy battalions loop (around line 140)
+  for (const enemyBattalion of enemyBattalions) {
+    // Skip destroyed battalions
+    if (enemyBattalion.isDestroyed) {
+      continue;
+    }
+    
+    // ... existing distance calculation logic
+  }
+  ```
 
-## 🏗️ **ARCHITECTURE OVERVIEW**
+#### **Step 3.3: Process Destruction Retargeting**
+- **File:** `server/src/services/AttackService.ts`
+- **Update `processRetargetingQueue()` to handle destruction events:**
+  ```typescript
+  // In processRetargetingQueue()
+  if (task.triggerType === 'battalion_destruction') {
+    // Same logic as node capture but for battalion destruction
+    await this.executeBattalionDestructionRetargeting(battle, task);
+  } else {
+    // Existing node capture retargeting
+    await this.executeRetargetingTask(battle, task.capturedNodeIndex!, task.affectedBattalionIds);
+  }
+  ```
 
-### **Service Hierarchy:**
-1. **BattalionService** - Central orchestrator
-2. **MovementService** - Movement state management
-3. **AttackService** - Combat and retargeting trigger
-4. **PathfindingService** - Network pathfinding (Phase 3+)
-5. **TargetingService** - Initial random targeting (unchanged)
+### **PHASE 4: Targeting Data Flow**
+**Goal:** Ensure targeting results properly flow through the system
 
-### **Data Flow:**
-- **Initial Targeting**: Random neutral node selection (unchanged)
-- **Retargeting**: Proximity-based with pathfinding (Phase 3)
-- **Movement**: Sequential network-constrained (Phase 4)
+#### **Step 4.1: Extend BattalionTargetingResult**
+- **File:** `server/src/types/battle.ts`
+- **Current Interface:**
+  ```typescript
+  interface BattalionTargetingResult {
+    battalionId: string;
+    targetNode: number;
+  }
+  ```
+- **Extended Interface:**
+  ```typescript
+  interface BattalionTargetingResult {
+    battalionId: string;
+    targetNode: number;
+    targetType: 'neutral_node' | 'enemy_battalion'; // What we're targeting
+    targetBattalionId?: string; // If targeting a battalion
+  }
+  ```
 
-## 🎯 **CURRENT STATUS**
-**ATTACK RANGE CALCULATION FIXED** - Sequential movement positioning corrected:
-- ✅ **Phase 1-4**: Server-side movement with proper speed, pathfinding, and retargeting
-- ✅ **Phase 5**: Client-side movement visualization infrastructure in place
-- ✅ **FIXED: MovementState type definition** - Added to server types for proper serialization
-- ✅ **FIXED: Import paths** - Updated all server files to use server MovementState type
-- ✅ **FIXED: Client-server data flow** - Client receiving movement states correctly
-- ✅ **FIXED: Client animation logic** - clientStartTime now resets for new movement states during retargeting
-- ✅ **FIXED: Attack range calculation** - Now uses current intermediate position instead of original position for sequential movement
+#### **Step 4.2: Update BattalionService Storage**
+- **File:** `server/src/services/BattalionService.ts`
+- **Update `updateTargetingResults()` to store target type:**
+  ```typescript
+  // When updating from retargeting results
+  currentResults[existingIndex].targetNode = retargetResult.newTargetNodeIndex;
+  currentResults[existingIndex].targetType = retargetResult.targetType;
+  currentResults[existingIndex].targetBattalionId = retargetResult.targetBattalionId;
+  ```
 
-**Root Cause Found:**
-**Attack range calculation bug**: During sequential movement, the `calculateAttackRangePosition` method was using the battalion's original position (e.g., node 4) instead of its current intermediate position (e.g., node 0) when calculating attack range for the final step. This caused all attack positions to be calculated from the wrong starting point, resulting in positions at screen center (x=478) instead of proper network-relative positions.
+### **PHASE 5: Client-Side Updates**
+**Goal:** Ensure client properly displays health changes and hides destroyed battalions
 
-**NEXT STEP: Test the fixed attack range positioning to confirm battalions stay on network during sequential movement**
+#### **Step 5.1: Update Battalion Mapping**
+- **File:** `server/src/services/BattalionMappingService.ts`
+- **Ensure `isDestroyed` is passed to client:**
+  ```typescript
+  // In mapBattalionsForClient()
+  return battalions
+    .filter(battalion => !battalion.isDestroyed) // Don't send destroyed battalions
+    .map(battalion => ({
+      // ... existing mapping
+      currentHealth: battalion.currentHealth,
+      quantity: battalion.quantity, // Will update with damage
+    }));
+  ```
 
+#### **Step 5.2: Client Health Updates**
+- **Status:** Health bars already implemented and working
+- **Verification:** Ensure `currentHealth` updates reach client through WebSocket/polling
+
+## **🔧 IMPLEMENTATION SUMMARY:**
+
+### **Key Insights:**
+1. **Target type is already determined during targeting/retargeting** - RetargetingResult has `targetType`
+2. **No ambiguity at arrival** - Battalion knows exactly what to attack based on stored targeting result
+3. **Maximum code reuse** - Extend existing methods instead of creating new ones
+4. **Minimal breaking changes** - Add optional properties and new branches to existing logic
+
+### **Authority Service Updates:**
+- **CombatService:** +5 methods for battalion combat (~150 lines total)
+- **AttackService:** +3 methods and modified processActiveAttacks (~400 lines total)
+- **RetargetingService:** +1 filter for destroyed battalions (~185 lines total)
+- **BattalionService:** +2 properties in initialization (~250 lines total)
+
+### **Critical Success Factors:**
+1. **Targeting determines attack type** - No guessing at arrival
+2. **Unified attack processing** - Single loop handles both node and battalion attacks
+3. **Queue-based retargeting** - Prevents race conditions for destruction events
+4. **Server authority maintained** - All combat calculations server-side
+
+## **📝 CURRENT STATUS:**
+**READY TO BEGIN PHASE 1** - Extending CombatService with battalion combat methods

@@ -9,6 +9,11 @@ export interface RetargetingResult {
   pathToTarget: number[];  // Full path including start and end
   pathDistance: number;    // Hop count
   targetType: 'neutral_node' | 'enemy_battalion';  // Both neutral nodes and enemy battalions
+  
+  // NEW PHASE 4 PROPERTY for specific battalion targeting:
+  targetBattalionId?: string;  // When targetType is 'enemy_battalion', this specifies which specific battalion
+                              // Used to identify the exact enemy battalion to attack at the target node
+                              // Essential for multi-battalion nodes where target selection must be precise
 }
 
 /**
@@ -49,7 +54,26 @@ export class RetargetingService {
         console.log(`🎯 PROXIMITY: Selected ${targetResult.targetType} at node ${targetResult.targetNodeIndex} (${targetResult.pathDistance} hops via ${targetResult.pathToTarget.join(' → ')})`);
         
         // ENHANCED: Log the specific retargeting decision
-        console.log(`🎯 DECISION: ${battalion.owner} ${battalion.type} (${battalionId}) → targeting node ${targetResult.targetNodeIndex}`);
+        if (targetResult.targetType === 'enemy_battalion') {
+          const targetBattalion = enemyBattalions.find(b => b.position.nodeIndex === targetResult.targetNodeIndex);
+          if (targetBattalion) {
+            console.log(`🎯 DECISION: ${battalion.owner} ${battalion.type} (${battalionId}) → targeting ${targetBattalion.owner} ${targetBattalion.type} at node ${targetResult.targetNodeIndex}`);
+          } else {
+            console.log(`🎯 DECISION: ${battalion.owner} ${battalion.type} (${battalionId}) → targeting enemy battalion at node ${targetResult.targetNodeIndex}`);
+          }
+        } else {
+          console.log(`🎯 DECISION: ${battalion.owner} ${battalion.type} (${battalionId}) → targeting neutral node ${targetResult.targetNodeIndex}`);
+        }
+        
+        // DETAILED LOGGING: Show battalion position and target details
+        if (targetResult.targetType === 'enemy_battalion') {
+          const targetBattalion = enemyBattalions.find(b => b.position.nodeIndex === targetResult.targetNodeIndex);
+          if (targetBattalion) {
+            console.log(`📊 RETARGETING DETAILS: ${battalion.owner} ${battalion.type}-type battalion at position node ${battalion.position.nodeIndex} retargeting results: targeted ${targetBattalion.owner} ${targetBattalion.type}-type battalion at position node ${targetBattalion.position.nodeIndex}`);
+          }
+        } else {
+          console.log(`📊 RETARGETING DETAILS: ${battalion.owner} ${battalion.type}-type battalion at position node ${battalion.position.nodeIndex} retargeting results: targeted neutral node at position node ${targetResult.targetNodeIndex}`);
+        }
         
         retargetingResults.push({
           battalionId: battalion.id,
@@ -57,7 +81,8 @@ export class RetargetingService {
           newTargetNodeIndex: targetResult.targetNodeIndex,
           pathToTarget: targetResult.pathToTarget,
           pathDistance: targetResult.pathDistance,
-          targetType: targetResult.targetType
+          targetType: targetResult.targetType,
+          targetBattalionId: targetResult.targetBattalionId  // PHASE 4 FIX: Include battalion ID for precise targeting
         });
       } else {
         console.log(`🎯 PROXIMITY ERROR: No reachable targets for ${battalion.owner} ${battalion.type}`);
@@ -75,10 +100,10 @@ export class RetargetingService {
     battalion: IBattalion,
     neutralNodes: INode[],
     enemyBattalions: IBattalion[]
-  ): {targetNodeIndex: number, pathToTarget: number[], pathDistance: number, targetType: 'neutral_node' | 'enemy_battalion'} | null {
+  ): {targetNodeIndex: number, pathToTarget: number[], pathDistance: number, targetType: 'neutral_node' | 'enemy_battalion', targetBattalionId?: string} | null {
     
     let closestDistance = Infinity;
-    let candidateTargets: Array<{nodeIndex: number, path: number[], distance: number, targetType: 'neutral_node' | 'enemy_battalion'}> = [];
+    let candidateTargets: Array<{nodeIndex: number, path: number[], distance: number, targetType: 'neutral_node' | 'enemy_battalion', targetBattalionId?: string}> = [];
     
     // Calculate network distance to each neutral node
     for (const node of neutralNodes) {
@@ -108,27 +133,41 @@ export class RetargetingService {
     
     // Calculate network distance to each enemy battalion
     for (const enemyBattalion of enemyBattalions) {
-      // Skip if battalion is already at this node
-      if (battalion.position.nodeIndex === enemyBattalion.position.nodeIndex) {
+      // PHASE 3: Skip destroyed battalions - they cannot be targeted
+      // TRANSITION FIX: Also check health/units for legacy battles where isDestroyed might not be set
+      if (enemyBattalion.isDestroyed === true || enemyBattalion.currentHealth <= 0 || enemyBattalion.quantity <= 0) {
+        console.log(`🎯 SKIPPING DESTROYED: ${enemyBattalion.owner} ${enemyBattalion.type} cannot be targeted (destroyed: ${enemyBattalion.isDestroyed}, health: ${enemyBattalion.currentHealth}, units: ${enemyBattalion.quantity})`);
         continue;
       }
       
-      const path = PathfindingService.findNetworkPath(battalion.position.nodeIndex, enemyBattalion.position.nodeIndex);
+      // FIXED: Don't skip same-node enemy battalions - they should be the primary target!
+      // When two enemy battalions are at the same node, they should target each other
       
-      if (path.length > 0) {
-        const distance = path.length - 1; // Hop count
-
-        
-        if (distance < closestDistance) {
-          // Found closer target - reset candidates
-          closestDistance = distance;
-          candidateTargets = [{nodeIndex: enemyBattalion.position.nodeIndex, path: path, distance: distance, targetType: 'enemy_battalion'}];
-        } else if (distance === closestDistance) {
-          // Tied for closest - add to candidates
-          candidateTargets.push({nodeIndex: enemyBattalion.position.nodeIndex, path: path, distance: distance, targetType: 'enemy_battalion'});
-        }
+      let distance: number;
+      let path: number[];
+      
+      if (battalion.position.nodeIndex === enemyBattalion.position.nodeIndex) {
+        // Same node - distance is 0, path is just the current node
+        distance = 0;
+        path = [battalion.position.nodeIndex];
+        console.log(`🎯 SAME-NODE TARGET: ${battalion.owner} ${battalion.type} at node ${battalion.position.nodeIndex} can target ${enemyBattalion.owner} ${enemyBattalion.type} at same node (distance: 0)`);
       } else {
-        console.log(`🎯 PROXIMITY: Enemy battalion at node ${enemyBattalion.position.nodeIndex} unreachable via network`);
+        // Different node - calculate network path
+        path = PathfindingService.findNetworkPath(battalion.position.nodeIndex, enemyBattalion.position.nodeIndex);
+        if (path.length === 0) {
+          console.log(`🎯 PROXIMITY: Enemy battalion at node ${enemyBattalion.position.nodeIndex} unreachable via network`);
+          continue;
+        }
+        distance = path.length - 1; // Hop count
+      }
+      
+      if (distance < closestDistance) {
+        // Found closer target - reset candidates
+        closestDistance = distance;
+        candidateTargets = [{nodeIndex: enemyBattalion.position.nodeIndex, path: path, distance: distance, targetType: 'enemy_battalion', targetBattalionId: enemyBattalion.id}];
+      } else if (distance === closestDistance) {
+        // Tied for closest - add to candidates
+        candidateTargets.push({nodeIndex: enemyBattalion.position.nodeIndex, path: path, distance: distance, targetType: 'enemy_battalion', targetBattalionId: enemyBattalion.id});
       }
     }
     
@@ -151,7 +190,11 @@ export class RetargetingService {
       targetNodeIndex: selectedTarget.nodeIndex,
       pathToTarget: selectedTarget.path,
       pathDistance: selectedTarget.distance,
-      targetType: selectedTarget.targetType
+      targetType: selectedTarget.targetType,
+      // PHASE 4: Include target battalion ID for precise targeting
+      targetBattalionId: selectedTarget.targetBattalionId  // Will be undefined for neutral nodes, specific ID for enemy battalions
+                                                          // This enables MovementService to target the exact enemy battalion
+                                                          // Prevents confusion when multiple enemies are at the same node
     };
   }
 } 

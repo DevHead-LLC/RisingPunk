@@ -39,6 +39,23 @@ const battalionSchema = new Schema({
     required: true,
     min: 0
   },
+  
+  // PHASE 1 BATTALION COMBAT FIELDS: Added for destruction and health management
+  baseHealthPerUnit: {
+    type: Number,
+    required: true,
+    min: 1
+  },
+  isDestroyed: {
+    type: Boolean,
+    required: true,
+    default: false
+  },
+  destroyedAt: {
+    type: Number,
+    required: false  // Optional - only set when battalion is actually destroyed
+  },
+  
   position: {
     x: {
       type: Number,
