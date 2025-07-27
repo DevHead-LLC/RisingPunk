@@ -111,16 +111,61 @@ export class MovementService {
             }
             
             // Start attacking if not already attacking and target is valid
+            // PHASE 2 ENHANCEMENT: Now determines attack target based on targeting result
             const { AttackService } = require('./AttackService');
             const { CombatService } = require('./CombatService');
+            const { BattalionService } = require('./BattalionService');
             
             if (!AttackService.isAttacking(battalion.id)) {
-              const targetNode = battle.nodes.find((n: any) => n.index === updatedMovementState.targetPosition.nodeIndex);
-              if (targetNode && CombatService.canTargetNode(targetNode)) {
-                console.log(`📊 ATTACK INITIATION: ${battalion.owner} ${battalion.type}-type battalion at position node ${battalion.position.nodeIndex} starting to attack node ${targetNode.index}`);
-                AttackService.startAttacking(battalion, targetNode.index);
+              // PHASE 2: Check the targeting result to determine what to attack (battalion vs node)
+              const targetingResult = BattalionService.getTargetingResultForBattalion(battalion.id, battleId);
+              
+              if (targetingResult && targetingResult.targetType === 'enemy_battalion') {
+                // BATTALION TARGET: Find the specific enemy battalion to attack
+                // PHASE 4: Use targetBattalionId for precise targeting when available
+                let enemyBattalion: IBattalion | undefined;
+                
+                if (targetingResult.targetBattalionId) {
+                  // PHASE 4: Find the specific target battalion by ID (most precise)
+                  enemyBattalion = battle.battalions.find((b: IBattalion) => 
+                    b.id === targetingResult.targetBattalionId &&
+                    !b.isDestroyed  // Ensure target is still alive
+                  );
+                  
+                  if (enemyBattalion) {
+                    console.log(`🎯 SPECIFIC TARGET: ${battalion.owner} ${battalion.type} found specific target ${enemyBattalion.owner} ${enemyBattalion.type} (${enemyBattalion.id}) at node ${enemyBattalion.position.nodeIndex}`);
+                  } else {
+                    console.log(`🎯 SPECIFIC TARGET MISSING: ${battalion.owner} ${battalion.type} cannot find specific target ${targetingResult.targetBattalionId} (may be destroyed or moved)`);
+                  }
+                } else {
+                  // PHASE 2 FALLBACK: Find any enemy battalion at this node (less precise)
+                  enemyBattalion = battle.battalions.find((b: IBattalion) => 
+                    b.owner !== battalion.owner && 
+                    b.position.nodeIndex === updatedMovementState.targetPosition.nodeIndex &&
+                    !b.isDestroyed  // Only target alive battalions
+                  );
+                  
+                  if (enemyBattalion) {
+                    console.log(`🎯 FALLBACK TARGET: ${battalion.owner} ${battalion.type} found fallback target ${enemyBattalion.owner} ${enemyBattalion.type} at node ${enemyBattalion.position.nodeIndex}`);
+                  }
+                }
+                
+                if (enemyBattalion) {
+                  console.log(`⚔️ BATTALION COMBAT: ${battalion.owner} ${battalion.type} starting to attack ${enemyBattalion.owner} ${enemyBattalion.type} at node ${enemyBattalion.position.nodeIndex}`);
+                  // PHASE 2: Now implemented - start battalion combat with correct parameters
+                  AttackService.startBattalionAttack(battalion, enemyBattalion.id);
+                } else {
+                  console.log(`📊 NO BATTALION TARGET: ${battalion.owner} ${battalion.type} cannot find any enemy battalion to attack (target may be destroyed or moved)`);
+                }
               } else {
-                console.log(`📊 NO ATTACK: ${battalion.owner} ${battalion.type}-type battalion at position node ${battalion.position.nodeIndex} cannot attack node ${updatedMovementState.targetPosition.nodeIndex} (node owner: ${targetNode?.owner}, canTarget: ${targetNode ? CombatService.canTargetNode(targetNode) : 'no node'})`);
+                // NODE TARGET: Original node attack logic for neutral nodes
+                const targetNode = battle.nodes.find((n: any) => n.index === updatedMovementState.targetPosition.nodeIndex);
+                if (targetNode && CombatService.canTargetNode(targetNode)) {
+                  console.log(`📊 ATTACK INITIATION: ${battalion.owner} ${battalion.type}-type battalion at position node ${battalion.position.nodeIndex} starting to attack node ${targetNode.index}`);
+                  AttackService.startAttacking(battalion, targetNode.index);
+                } else {
+                  console.log(`📊 NO ATTACK: ${battalion.owner} ${battalion.type}-type battalion at position node ${battalion.position.nodeIndex} cannot attack node ${updatedMovementState.targetPosition.nodeIndex} (node owner: ${targetNode?.owner}, canTarget: ${targetNode ? CombatService.canTargetNode(targetNode) : 'no node'})`);
+                }
               }
             } else {
               console.log(`📊 ALREADY ATTACKING: ${battalion.owner} ${battalion.type}-type battalion at position node ${battalion.position.nodeIndex} is already attacking`);
@@ -345,7 +390,7 @@ export class MovementService {
       
       // Calculate movement distance and duration for smooth animation
       const distance = Math.sqrt(Math.pow(attackRangePosition.x - currentX, 2) + Math.pow(attackRangePosition.y - currentY, 2));
-      const duration = Math.max(300, Math.min(1500, distance * 15)); // Faster movement: 300ms to 1.5s
+      const duration = Math.max(500, Math.min(1500, distance * 15)); // Increased minimum from 300ms to 500ms for better detection
       
       console.log(`📊 SAME-NODE POSITIONING: ${battalion.owner} ${battalion.type} moving ${distance.toFixed(1)}px from (${currentX.toFixed(1)}, ${currentY.toFixed(1)}) to (${attackRangePosition.x.toFixed(1)}, ${attackRangePosition.y.toFixed(1)}) (duration: ${duration}ms)`);
       console.log(`📊 TARGET DISTANCE: Final distance to ${targetBattalion.owner} ${targetBattalion.type} will be approximately ${Math.abs(attackRangePosition.x - targetX).toFixed(1)}px`);
@@ -445,6 +490,11 @@ export class MovementService {
     
     if (isComplete) {
       console.log(`✅ ARRIVAL: Battalion ${movementState.battalionId} arrived at node ${movementState.targetPosition.nodeIndex}`);
+      
+      // Enhanced logging for positioning movement completion
+      if (movementState.movementType === 'retargeting' && movementState.fullPath && movementState.fullPath.length === 1) {
+        console.log(`📊 POSITIONING COMPLETE: Battalion ${movementState.battalionId} finished ${elapsedTime}ms positioning movement (target duration: ${movementState.estimatedDuration}ms)`);
+      }
       
       // For retargeting movement, check if there are more steps
       if (movementState.movementType === 'retargeting' && movementState.fullPath && movementState.currentPathIndex !== undefined) {

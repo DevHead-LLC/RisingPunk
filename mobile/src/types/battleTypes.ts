@@ -16,6 +16,34 @@ export enum BattalionType {
   BREACHER = 'breacher'
 }
 
+// PHASE 1 & 5 EXTENSION: Client-side battalion interface for type safety and health display
+// This matches the server's ClientBattalion interface to ensure proper typing
+// of battalion data received from the server, including health management properties
+export interface ClientBattalion {
+  id: string;
+  type: 'guardian' | 'breacher' | 'phreak';
+  quantity: number;                         // PHASE 1: Updates dynamically with health damage
+  currentHealth: number;                    // PHASE 1: Current health total (decreases with damage)
+  maxHealth: number;                        // Maximum health when at full strength
+  
+  // PHASE 1: Battalion combat properties for health management and destruction
+  baseHealthPerUnit: number;                // Original health per unit for calculations
+  isDestroyed: boolean;                     // Whether battalion has been eliminated
+  destroyedAt?: number;                     // Timestamp when destroyed (optional)
+  
+  nodeIndex: number;
+  isUser: boolean;
+  mark: number;
+  stats: {
+    health: number;
+    speed: number;
+    range: number;
+    offense: number;
+    defense: number;
+  };
+  movementState?: MovementState;
+}
+
 // Battalion interface moved to server authority - client receives read-only data via API
 
 // Battle State Types

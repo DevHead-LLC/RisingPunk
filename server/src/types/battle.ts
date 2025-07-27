@@ -59,12 +59,27 @@ export interface BattalionPosition {
 }
 
 // Battalion interface for embedded documents
+// PHASE 1 EXTENSION: Added properties for battalion combat system
 export interface IBattalion {
   id: string;
   type: BotType;
   quantity: number;
-  currentHealth: number;
-  maxHealth: number;
+  currentHealth: number;  // Already exists - running health total
+  maxHealth: number;      // Already exists - maximum health when at full strength
+  
+  // NEW PHASE 1 PROPERTIES for battalion combat:
+  baseHealthPerUnit: number;  // Original health per unit for unit count calculations
+                             // Used in Math.round(currentHealth / baseHealthPerUnit) formula
+                             // Example: 100 health per unit enables precise unit reduction tracking
+  
+  isDestroyed: boolean;      // Whether battalion has been eliminated in combat
+                            // When true: cannot be targeted, attacked, or receive damage
+                            // Triggers retargeting for any battalions targeting this one
+  
+  destroyedAt?: number;     // Timestamp when battalion was destroyed (optional)
+                           // Used for cleanup operations and destruction animations
+                           // Only set when isDestroyed becomes true
+  
   position: BattalionPosition;
   owner: NodeOwner;
   mark: number;
@@ -84,6 +99,8 @@ export interface INode {
 }
 
 // Battalion targeting result interface
+// PHASE 2 EXTENSION: Added targetType for battalion vs node attack distinction
+// PHASE 4 EXTENSION: Added targetBattalionId for specific battalion targeting
 export interface BattalionTargetingResult {
   battalionId: string;
   battalionType: BotType;
@@ -92,6 +109,16 @@ export interface BattalionTargetingResult {
   targetNode: number;
   isValidTarget: boolean;
   reason?: string;
+  
+  // PHASE 2 PROPERTY for attack target determination:
+  targetType?: 'neutral_node' | 'enemy_battalion';  // What type of target this battalion should attack
+                                                    // Used in MovementService to determine attack behavior on arrival
+                                                    // Flows from RetargetingService through BattalionService storage
+  
+  // NEW PHASE 4 PROPERTY for specific battalion targeting:
+  targetBattalionId?: string;                       // When targetType is 'enemy_battalion', this specifies which battalion
+                                                    // Used to identify the exact enemy battalion to attack at the target node
+                                                    // Prevents confusion when multiple enemy battalions are at the same node
 }
 
 
@@ -137,12 +164,19 @@ export { NetworkConnection } from '../config/networkConfig';
 export { LineProperties } from '../config/networkConfig';
 
 // Client-compatible battalion for API response
+// PHASE 1 EXTENSION: Added properties for battalion combat system
 export interface ClientBattalion {
   id: string;
   type: BotType;
   quantity: number;
-  currentHealth: number;
-  maxHealth: number;
+  currentHealth: number;  // Already exists - running health total
+  maxHealth: number;      // Already exists - maximum health when at full strength
+  
+  // NEW PHASE 1 PROPERTIES for battalion combat (matching IBattalion):
+  baseHealthPerUnit: number;  // Original health per unit for unit count calculations
+  isDestroyed: boolean;      // Whether battalion has been eliminated in combat
+  destroyedAt?: number;     // Timestamp when battalion was destroyed (optional)
+  
   nodeIndex: number;
   isUser: boolean;
   mark: number;
