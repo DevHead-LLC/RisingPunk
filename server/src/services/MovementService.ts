@@ -81,12 +81,33 @@ export class MovementService {
           if (battalion) {
             console.log(`✅ ${battalion.owner} ${battalion.type} ARRIVED at node ${updatedMovementState.targetPosition.nodeIndex}`);
             
+            // DETAILED LOGGING: Show battalion arrival details
+            console.log(`📊 ARRIVAL DETAILS: ${battalion.owner} ${battalion.type}-type battalion arrived at position node ${updatedMovementState.targetPosition.nodeIndex} from previous position node ${battalion.position.nodeIndex}`);
+            
+            // Enhanced logging for same-node movement completion
+            if (updatedMovementState.movementType === 'retargeting' && updatedMovementState.fullPath && updatedMovementState.fullPath.length === 1) {
+              console.log(`📊 SAME-NODE ARRIVAL: ${battalion.owner} ${battalion.type} final position: (${updatedMovementState.targetPosition.x.toFixed(1)}, ${updatedMovementState.targetPosition.y.toFixed(1)})`);
+              
+              // Show distance to other battalions at the same node for verification
+              const sameBattalions = battle.battalions.filter((b: IBattalion) => 
+                b.id !== battalion.id && b.position.nodeIndex === updatedMovementState.targetPosition.nodeIndex
+              );
+              for (const other of sameBattalions) {
+                const actualDistance = Math.sqrt(
+                  Math.pow(updatedMovementState.targetPosition.x - other.position.x, 2) + 
+                  Math.pow(updatedMovementState.targetPosition.y - other.position.y, 2)
+                );
+                console.log(`📊 ACTUAL DISTANCE: ${battalion.owner} ${battalion.type} to ${other.owner} ${other.type} = ${actualDistance.toFixed(1)}px`);
+              }
+            }
+            
             // Update battalion position if it changed
             if (battalion.position.nodeIndex !== updatedMovementState.targetPosition.nodeIndex) {
               battalion.position.nodeIndex = updatedMovementState.targetPosition.nodeIndex;
               battalion.position.x = updatedMovementState.targetPosition.x;
               battalion.position.y = updatedMovementState.targetPosition.y;
               positionUpdated = true;
+              console.log(`📊 POSITION UPDATE: ${battalion.owner} ${battalion.type}-type battalion position updated to node ${battalion.position.nodeIndex}`);
             }
             
             // Start attacking if not already attacking and target is valid
@@ -96,8 +117,13 @@ export class MovementService {
             if (!AttackService.isAttacking(battalion.id)) {
               const targetNode = battle.nodes.find((n: any) => n.index === updatedMovementState.targetPosition.nodeIndex);
               if (targetNode && CombatService.canTargetNode(targetNode)) {
+                console.log(`📊 ATTACK INITIATION: ${battalion.owner} ${battalion.type}-type battalion at position node ${battalion.position.nodeIndex} starting to attack node ${targetNode.index}`);
                 AttackService.startAttacking(battalion, targetNode.index);
+              } else {
+                console.log(`📊 NO ATTACK: ${battalion.owner} ${battalion.type}-type battalion at position node ${battalion.position.nodeIndex} cannot attack node ${updatedMovementState.targetPosition.nodeIndex} (node owner: ${targetNode?.owner}, canTarget: ${targetNode ? CombatService.canTargetNode(targetNode) : 'no node'})`);
               }
+            } else {
+              console.log(`📊 ALREADY ATTACKING: ${battalion.owner} ${battalion.type}-type battalion at position node ${battalion.position.nodeIndex} is already attacking`);
             }
           }
         }
@@ -161,7 +187,8 @@ export class MovementService {
     screenWidth: number, 
     screenHeight: number,
     movementType: 'initial' | 'retargeting' = 'initial',
-    fullPath?: number[]  // Required for retargeting
+    fullPath?: number[],  // Required for retargeting
+    battle?: any  // Required for same-node targeting
   ): MovementState | undefined {
     
 
@@ -176,7 +203,7 @@ export class MovementService {
     if (movementType === 'initial') {
       return this.initiateInitialMovement(battalion, targetNode, nodePositions, startPosition);
     } else if (movementType === 'retargeting') {
-      return this.initiateRetargetingMovement(battalion, targetNode, fullPath!, nodePositions, startPosition);
+      return this.initiateRetargetingMovement(battalion, targetNode, fullPath!, nodePositions, startPosition, battle);
     }
     
     return undefined;
@@ -247,9 +274,102 @@ export class MovementService {
    * - Calculates step-by-step timing based on battalion speed
    * - This is DIFFERENT from initial movement (which is direct only)
    */
-  private static initiateRetargetingMovement(battalion: IBattalion, targetNode: number, fullPath: number[], nodePositions: any[], startPosition: any): MovementState | undefined {
-    if (!fullPath || fullPath.length < 2) {
-      console.log(`🔄 RETARGETING ERROR: Invalid path provided`);
+  private static initiateRetargetingMovement(battalion: IBattalion, targetNode: number, fullPath: number[], nodePositions: any[], startPosition: any, battle?: any): MovementState | undefined {
+    if (!fullPath || fullPath.length === 0) {
+      console.log(`🔄 RETARGETING ERROR: No path provided`);
+      return undefined;
+    }
+    
+    // FIXED: Handle same-node targeting (path length = 1)
+    if (fullPath.length === 1) {
+      console.log(`🎯 SAME-NODE MOVEMENT: ${battalion.owner} ${battalion.type} targeting enemy battalion at same node ${targetNode} - positioning at attack range`);
+      
+      // For same-node targeting, find the target battalion and calculate attack range relative to its position
+      // This requires battle context to find the target battalion
+      if (!battle || !battle.battalions) {
+        console.log(`❌ SAME-NODE ERROR: Cannot access battle data for same-node positioning`);
+        return undefined;
+      }
+      
+      // Find the target battalion at the same node
+      const targetBattalion = battle.battalions.find((b: any) => 
+        b.owner !== battalion.owner && 
+        b.position.nodeIndex === targetNode
+      );
+      
+      if (!targetBattalion) {
+        console.log(`❌ SAME-NODE ERROR: Target battalion not found at node ${targetNode}`);
+        return undefined;
+      }
+      
+      // Calculate attack range position relative to the target battalion's actual position
+      // FIXED: Use smaller attack range for same-node targeting to keep battalions closer
+      const baseAttackRange = battalion.stats.range || 50;
+      const sameNodeAttackRange = Math.min(baseAttackRange, 15); // Reduced from 25 to 15px for closer positioning
+      const targetX = targetBattalion.position.x;
+      const targetY = targetBattalion.position.y;
+      const currentX = startPosition.x;
+      const currentY = startPosition.y;
+      
+      console.log(`📊 CURRENT POSITIONS: ${battalion.owner} ${battalion.type} at (${currentX.toFixed(1)}, ${currentY.toFixed(1)}), target ${targetBattalion.owner} ${targetBattalion.type} at (${targetX.toFixed(1)}, ${targetY.toFixed(1)})`);
+      
+      // FIXED: Deterministic positioning to prevent simultaneous crossover
+      // Instead of using current positions (which causes both to cross), use consistent rules:
+      // - User battalions ALWAYS position on the LEFT side of enemy battalions
+      // - Enemy battalions ALWAYS position on the RIGHT side of user battalions
+      // This prevents the simultaneous positioning crossover bug
+      let attackRangeX, attackRangeY;
+      
+      // Get the node center as the baseline for positioning
+      const nodePosition = nodePositions[targetNode].position;
+      const nodeX = nodePosition.x;
+      
+      if (battalion.owner === 'user') {
+        // User battalions ALWAYS go to the LEFT side of the node center
+        attackRangeX = nodeX - sameNodeAttackRange;
+        console.log(`📊 POSITIONING LOGIC: ${battalion.owner} ${battalion.type} positioned on LEFT side of node (deterministic user positioning, range: ${sameNodeAttackRange}px)`);
+      } else {
+        // Enemy battalions ALWAYS go to the RIGHT side of the node center  
+        attackRangeX = nodeX + sameNodeAttackRange;
+        console.log(`📊 POSITIONING LOGIC: ${battalion.owner} ${battalion.type} positioned on RIGHT side of node (deterministic enemy positioning, range: ${sameNodeAttackRange}px)`);
+      }
+      
+      attackRangeY = nodePosition.y; // Use node center Y position
+      
+      // FIXED: Tighter bounds checking to keep battalions closer to node center
+      const nodeRadius = 25; // Reduced from 30 to 25px for tighter bounds
+      const clampedX = Math.max(nodePosition.x - nodeRadius, Math.min(nodePosition.x + nodeRadius, attackRangeX));
+      const clampedY = Math.max(nodePosition.y - nodeRadius, Math.min(nodePosition.y + nodeRadius, attackRangeY));
+      
+      const attackRangePosition = { x: clampedX, y: clampedY };
+      
+      // Calculate movement distance and duration for smooth animation
+      const distance = Math.sqrt(Math.pow(attackRangePosition.x - currentX, 2) + Math.pow(attackRangePosition.y - currentY, 2));
+      const duration = Math.max(300, Math.min(1500, distance * 15)); // Faster movement: 300ms to 1.5s
+      
+      console.log(`📊 SAME-NODE POSITIONING: ${battalion.owner} ${battalion.type} moving ${distance.toFixed(1)}px from (${currentX.toFixed(1)}, ${currentY.toFixed(1)}) to (${attackRangePosition.x.toFixed(1)}, ${attackRangePosition.y.toFixed(1)}) (duration: ${duration}ms)`);
+      console.log(`📊 TARGET DISTANCE: Final distance to ${targetBattalion.owner} ${targetBattalion.type} will be approximately ${Math.abs(attackRangePosition.x - targetX).toFixed(1)}px`);
+      
+      return {
+        battalionId: battalion.id,
+        startPosition: startPosition,
+        targetPosition: { x: attackRangePosition.x, y: attackRangePosition.y, nodeIndex: targetNode },
+        movementStatus: 'moving', // FIXED: Use 'moving' for smooth animation instead of instant 'arrived'
+        startTime: Date.now(),
+        estimatedDuration: duration, // FIXED: Use calculated duration based on distance
+        networkPath: fullPath,
+        attackRangePosition: { x: attackRangePosition.x, y: attackRangePosition.y },
+        isWithinAttackRange: false, // FIXED: Will become true when movement completes
+        movementType: 'retargeting',
+        fullPath: fullPath,
+        currentPathIndex: 0,
+        finalTarget: targetNode,
+        isInterruptible: true
+      };
+    }
+    
+    if (fullPath.length < 2) {
+      console.log(`🔄 RETARGETING ERROR: Invalid path length ${fullPath.length} for multi-hop movement`);
       return undefined;
     }
     

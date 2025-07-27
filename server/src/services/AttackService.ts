@@ -264,6 +264,9 @@ export class AttackService {
         continue;
       }
       
+      // DETAILED LOGGING: Show battalion position and target details
+      console.log(`📊 MOVEMENT INITIATION: ${battalion.owner} ${battalion.type}-type battalion at position node ${battalion.position.nodeIndex} initiating movement to target type: ${result.targetType} at node ${result.newTargetNodeIndex}`);
+      
       // Use MovementService to start retargeting movement
       const { MovementService } = require('./MovementService');
       const { ScreenDimensionService } = require('./ScreenDimensionService');
@@ -277,7 +280,8 @@ export class AttackService {
         screenDimensions.width,
         screenDimensions.height,
         'retargeting',
-        result.pathToTarget
+        result.pathToTarget,
+        battle  // Pass battle context for same-node targeting
       );
       
       // Store the movement state so it can be processed by the update loop
@@ -315,6 +319,9 @@ export class AttackService {
             affectedAttackers.forEach(id => this.stopAttacking(id));
             
             console.log(`🏆 NODE CAPTURED: Node ${node.index} captured by ${node.owner}!, stopping ${affectedAttackers.length} specific attacks`);
+            
+            // DETAILED LOGGING: Show which battalions are affected by the capture
+            console.log(`📊 CAPTURE DETAILS: Node ${node.index} captured by ${node.owner}, affecting ${affectedAttackers.length} battalions that were attacking this node`);
             
             // NEW: Add to retargeting queue instead of immediate processing
             this.queueRetargetingTask(battle.battleId, node.index, affectedAttackers);

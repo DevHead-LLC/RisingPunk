@@ -49,7 +49,26 @@ export class RetargetingService {
         console.log(`🎯 PROXIMITY: Selected ${targetResult.targetType} at node ${targetResult.targetNodeIndex} (${targetResult.pathDistance} hops via ${targetResult.pathToTarget.join(' → ')})`);
         
         // ENHANCED: Log the specific retargeting decision
-        console.log(`🎯 DECISION: ${battalion.owner} ${battalion.type} (${battalionId}) → targeting node ${targetResult.targetNodeIndex}`);
+        if (targetResult.targetType === 'enemy_battalion') {
+          const targetBattalion = enemyBattalions.find(b => b.position.nodeIndex === targetResult.targetNodeIndex);
+          if (targetBattalion) {
+            console.log(`🎯 DECISION: ${battalion.owner} ${battalion.type} (${battalionId}) → targeting ${targetBattalion.owner} ${targetBattalion.type} at node ${targetResult.targetNodeIndex}`);
+          } else {
+            console.log(`🎯 DECISION: ${battalion.owner} ${battalion.type} (${battalionId}) → targeting enemy battalion at node ${targetResult.targetNodeIndex}`);
+          }
+        } else {
+          console.log(`🎯 DECISION: ${battalion.owner} ${battalion.type} (${battalionId}) → targeting neutral node ${targetResult.targetNodeIndex}`);
+        }
+        
+        // DETAILED LOGGING: Show battalion position and target details
+        if (targetResult.targetType === 'enemy_battalion') {
+          const targetBattalion = enemyBattalions.find(b => b.position.nodeIndex === targetResult.targetNodeIndex);
+          if (targetBattalion) {
+            console.log(`📊 RETARGETING DETAILS: ${battalion.owner} ${battalion.type}-type battalion at position node ${battalion.position.nodeIndex} retargeting results: targeted ${targetBattalion.owner} ${targetBattalion.type}-type battalion at position node ${targetBattalion.position.nodeIndex}`);
+          }
+        } else {
+          console.log(`📊 RETARGETING DETAILS: ${battalion.owner} ${battalion.type}-type battalion at position node ${battalion.position.nodeIndex} retargeting results: targeted neutral node at position node ${targetResult.targetNodeIndex}`);
+        }
         
         retargetingResults.push({
           battalionId: battalion.id,
@@ -108,27 +127,34 @@ export class RetargetingService {
     
     // Calculate network distance to each enemy battalion
     for (const enemyBattalion of enemyBattalions) {
-      // Skip if battalion is already at this node
+      // FIXED: Don't skip same-node enemy battalions - they should be the primary target!
+      // When two enemy battalions are at the same node, they should target each other
+      
+      let distance: number;
+      let path: number[];
+      
       if (battalion.position.nodeIndex === enemyBattalion.position.nodeIndex) {
-        continue;
+        // Same node - distance is 0, path is just the current node
+        distance = 0;
+        path = [battalion.position.nodeIndex];
+        console.log(`🎯 SAME-NODE TARGET: ${battalion.owner} ${battalion.type} at node ${battalion.position.nodeIndex} can target ${enemyBattalion.owner} ${enemyBattalion.type} at same node (distance: 0)`);
+      } else {
+        // Different node - calculate network path
+        path = PathfindingService.findNetworkPath(battalion.position.nodeIndex, enemyBattalion.position.nodeIndex);
+        if (path.length === 0) {
+          console.log(`🎯 PROXIMITY: Enemy battalion at node ${enemyBattalion.position.nodeIndex} unreachable via network`);
+          continue;
+        }
+        distance = path.length - 1; // Hop count
       }
       
-      const path = PathfindingService.findNetworkPath(battalion.position.nodeIndex, enemyBattalion.position.nodeIndex);
-      
-      if (path.length > 0) {
-        const distance = path.length - 1; // Hop count
-
-        
-        if (distance < closestDistance) {
-          // Found closer target - reset candidates
-          closestDistance = distance;
-          candidateTargets = [{nodeIndex: enemyBattalion.position.nodeIndex, path: path, distance: distance, targetType: 'enemy_battalion'}];
-        } else if (distance === closestDistance) {
-          // Tied for closest - add to candidates
-          candidateTargets.push({nodeIndex: enemyBattalion.position.nodeIndex, path: path, distance: distance, targetType: 'enemy_battalion'});
-        }
-      } else {
-        console.log(`🎯 PROXIMITY: Enemy battalion at node ${enemyBattalion.position.nodeIndex} unreachable via network`);
+      if (distance < closestDistance) {
+        // Found closer target - reset candidates
+        closestDistance = distance;
+        candidateTargets = [{nodeIndex: enemyBattalion.position.nodeIndex, path: path, distance: distance, targetType: 'enemy_battalion'}];
+      } else if (distance === closestDistance) {
+        // Tied for closest - add to candidates
+        candidateTargets.push({nodeIndex: enemyBattalion.position.nodeIndex, path: path, distance: distance, targetType: 'enemy_battalion'});
       }
     }
     
