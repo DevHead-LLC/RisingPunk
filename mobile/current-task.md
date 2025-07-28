@@ -1,15 +1,23 @@
-# **BATTALION COMBAT SYSTEM IMPLEMENTATION**
+# **BATTLE EVENT QUEUE SYSTEM IMPLEMENTATION**
 
-## **🎯 CURRENT FOCUS: Battalion Combat System Implementation**
+## **🎯 CURRENT FOCUS: Battle Event Queue System Implementation**
 
 **PROGRESS UPDATE:**
-- ✅ **PHASE 1 COMPLETED** - Combat Infrastructure Setup
-- ✅ **PHASE 2 COMPLETED** - Attack System Integration  
-- ✅ **PHASE 3 COMPLETED** - Destruction and Retargeting
-- ✅ **PHASE 4 COMPLETED** - Targeting Data Flow
-- ✅ **PHASE 5 COMPLETED** - Client-Side Updates
+- 🟡 **PHASE 1 STARTING** - Queue Foundation + Attack Event Processing
 
-**🎉 ALL PHASES COMPLETED SUCCESSFULLY** 
+**🎯 NEW PRIORITY: Eliminate Race Conditions in Battle System**
+
+**Previous System Status:**
+- ✅ **Battalion Combat System COMPLETED** - All 5 phases working correctly
+- ⚠️ **Race Condition Issues Identified** - Immediate processing causes conflicts when multiple events occur simultaneously
+
+**Race Condition Examples Found:**
+- Multiple battalions attacking same node simultaneously → inconsistent capture timing
+- Battalion destruction + node capture happening at same time → targeting conflicts  
+- Movement interruption + retargeting happening simultaneously → battalions targeting invalid targets
+
+**Queue System Goal:** 
+Sequential processing of all battle events to eliminate race conditions and create deterministic behavior 
 
 **🚨 CRITICAL BUG FIXES APPLIED:**
 
