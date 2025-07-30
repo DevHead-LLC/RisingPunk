@@ -21,13 +21,9 @@ export const BattleBattalionManager = React.memo(({
   battalionSize = 40,
   showHealthBars = true,
 }: Props) => {
-  // Get screen dimensions for server calculations
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-
-  // Dynamic polling: Fast during battle phase for immediate movement, slower otherwise
   const [pollingInterval, setPollingInterval] = useState<number>(ANIMATION_CONFIG.DEFAULT_POLLING_MS);
   
-  // Direct API call to get battle state
   const {
     data: battleState,
     isLoading: battleLoading,
@@ -40,23 +36,14 @@ export const BattleBattalionManager = React.memo(({
     }
   );
 
-  // Adjust polling speed based on battle phase
   useEffect(() => {
-    if (battleState?.phase === 'battle') {
-      setPollingInterval(ANIMATION_CONFIG.BATTLE_PHASE_POLLING_MS); // Fast polling during active battle for immediate movement
-    } else {
-      setPollingInterval(ANIMATION_CONFIG.DEFAULT_POLLING_MS); // Slower polling during countdown/victory/etc
-    }
+    setPollingInterval(
+      battleState?.phase === 'battle' 
+        ? ANIMATION_CONFIG.BATTLE_PHASE_POLLING_MS 
+        : ANIMATION_CONFIG.DEFAULT_POLLING_MS
+    );
   }, [battleState?.phase]);
 
-  // SIMPLE LOG: Only log problems
-  useEffect(() => {
-    if (battleError) {
-      console.log('❌ BATTALION API ERROR:', battleError);
-    }
-  }, [battleError]);
-
-  // Show loading state while fetching server data
   if (battleLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -66,7 +53,6 @@ export const BattleBattalionManager = React.memo(({
     );
   }
 
-  // Show error state if server data fails
   if (battleError || !battleState) {
     return (
       <View style={styles.errorContainer}>
@@ -76,50 +62,31 @@ export const BattleBattalionManager = React.memo(({
     );
   }
 
-  const battalions = battleState.battalions || [];
-  const nodes = battleState.nodes || [];
-  const movementStates = battleState.movementStates || [];
-
-  // Create a map of node positions for quick lookup
+  const { battalions = [], nodes = [], movementStates = [] } = battleState;
   const nodePositions = createNodePositionMap(nodes);
-
-  // Create a map of movement states for quick lookup
-  const movementStateMap = new Map();
-  movementStates.forEach(movementState => {
-    movementStateMap.set(movementState.battalionId, movementState);
-  });
-
-  // Debug: Log movement states received (reduced logging)
-  // if (movementStates.length > 0) {
-  //   console.log(`📡 CLIENT DEBUG: Received ${movementStates.length} movement states from server`);
-  //   movementStates.forEach(ms => {
-  //     console.log(`📡 CLIENT DEBUG: Movement state for ${ms.battalionId}: ${ms.movementStatus} from (${ms.startPosition.x},${ms.startPosition.y}) to (${ms.targetPosition.x},${ms.targetPosition.y})`);
-  //   });
-  // }
-
-  // Filter out battalions that don't have valid node positions
-  const validBattalions = battalions.filter(battalion => {
-    return nodePositions[battalion.nodeIndex] !== undefined;
-  });
+  const movementStateMap = new Map(movementStates.map(ms => [ms.battalionId, ms]));
 
   return (
     <View style={styles.container}>
-      {validBattalions.map((battalion) => {
-        const nodePosition = nodePositions[battalion.nodeIndex];
-        const movementState = movementStateMap.get(battalion.id); // Get movement data from global movement states
-        if (!nodePosition) {return null;}
+      {battalions
+        .filter(battalion => nodePositions[battalion.nodeIndex] !== undefined)
+        .map((battalion) => {
+          const nodePosition = nodePositions[battalion.nodeIndex];
+          const movementState = movementStateMap.get(battalion.id);
+          
+          if (!nodePosition) return null;
 
-        return (
-          <BattleBattalion
-            key={battalion.id}
-            battalion={battalion}
-            position={nodePosition}
-            movementState={movementState} // Pass movement data to BattleBattalion
-            size={battalionSize}
-            showHealthBar={showHealthBars}
-          />
-        );
-      })}
+          return (
+            <BattleBattalion
+              key={battalion.id}
+              battalion={battalion}
+              position={nodePosition}
+              movementState={movementState}
+              size={battalionSize}
+              showHealthBar={showHealthBars}
+            />
+          );
+        })}
     </View>
   );
 });
@@ -129,7 +96,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '100%',
     height: '100%',
-    pointerEvents: 'none', // Allow touches to pass through to underlying components
+    pointerEvents: 'none',
   },
   loadingContainer: {
     position: 'absolute',
