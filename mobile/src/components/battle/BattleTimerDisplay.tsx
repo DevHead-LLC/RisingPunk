@@ -1,8 +1,3 @@
-/**
- * @file BattleTimerDisplay.tsx
- * @description Battle timer display for active battle phase
- */
-
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -15,8 +10,6 @@ type Props = {
 export const BattleTimerDisplay = React.memo(({ battleTime, maxBattleTime, isVisible }: Props) => {
   if (!isVisible) return null;
 
-  const progressPercentage = (battleTime / maxBattleTime) * 100;
-
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -28,7 +21,7 @@ export const BattleTimerDisplay = React.memo(({ battleTime, maxBattleTime, isVis
         <View
           style={[
             styles.progressFill,
-            { width: `${progressPercentage}%` },
+            { width: `${(battleTime / maxBattleTime) * 100}%` },
           ]}
         />
       </View>

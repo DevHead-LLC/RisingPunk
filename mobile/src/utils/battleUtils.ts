@@ -1,11 +1,5 @@
-/**
- * @file battleUtils.ts
- * @description Client-side utility functions for battle system operations
- */
-
 import { NodePosition } from '../types/battleTypes';
 
-// Node position mapping utility (eliminates duplicate reduce logic)
 export function createNodePositionMap(nodes: Array<{ index: number; position: NodePosition }>): Record<number, NodePosition> {
   return nodes.reduce((acc, node) => {
     acc[node.index] = node.position;

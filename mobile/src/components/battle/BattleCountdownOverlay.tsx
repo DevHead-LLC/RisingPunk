@@ -1,8 +1,3 @@
-/**
- * @file BattleCountdownOverlay.tsx
- * @description Full-screen countdown overlay for battle initialization
- */
-
 import React from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 
@@ -16,7 +11,7 @@ export const BattleCountdownOverlay = React.memo(({ countdown, isVisible }: Prop
   const scale = React.useRef(new Animated.Value(0.5)).current;
 
   React.useEffect(() => {
-    const animations = [
+    Animated.parallel([
       Animated.timing(opacity, {
         toValue: isVisible ? 1 : 0,
         duration: 200,
@@ -25,9 +20,7 @@ export const BattleCountdownOverlay = React.memo(({ countdown, isVisible }: Prop
       isVisible 
         ? Animated.spring(scale, { toValue: 1, tension: 100, friction: 8, useNativeDriver: true })
         : Animated.timing(scale, { toValue: 0.5, duration: 200, useNativeDriver: true })
-    ];
-    
-    Animated.parallel(animations).start();
+    ]).start();
   }, [isVisible]);
 
   if (!isVisible) return null;
