@@ -14,8 +14,6 @@ interface StartBattleRequest extends Request {
   }
 }
 
-
-
 interface BattleResponse {
   success?: boolean;
   data?: any;
@@ -26,30 +24,18 @@ interface BattleResponse {
 const router: Router = express.Router();
 const battleController = new BattleController();
 
-// Authentication temporarily removed for user vs computer testing
-
-// Start a new battle
 router.post<{}, BattleResponse, StartBattleRequest['body']>(
   '/start',
   async (req, res): Promise<void> => {
     try {
       const { userBattalions, defenderId, screenWidth, screenHeight } = req.body;
       
-      // Validate required screen dimensions
       if (!screenWidth || !screenHeight) {
-        res.status(400).json({ 
-          success: false, 
-          error: 'Screen dimensions are required' 
-        });
+        res.status(400).json({ success: false, error: 'Screen dimensions are required' });
         return;
       }
       
-      // For now, use a default user ID for testing
-      const attackerId = 'test-user-id';
-      // Use computer opponent if no defenderId provided
-      const actualDefenderId = defenderId || 'computer';
-
-      const battle = await battleController.startBattle(attackerId, actualDefenderId, screenWidth, screenHeight);
+      const battle = await battleController.startBattle('test-user-id', defenderId || 'computer', screenWidth, screenHeight);
       res.status(201).json({ battleId: battle.battleId });
     } catch (error) {
       console.error('Start battle error:', error);
@@ -61,46 +47,32 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
   }
 );
 
-// Get current battle state
 router.get<{ id: string }, BattleResponse>(
   '/:id/state',
   async (req, res): Promise<void> => {
     try {
       const { id } = req.params;
       const { screenWidth, screenHeight } = req.query;
-      // For now, use a default user ID for testing
-      const userId = 'test-user-id';
 
-      // Parse screen dimensions from query params
       if (!screenWidth || !screenHeight) {
-        res.status(400).json({ 
-          success: false, 
-          error: 'Screen dimensions are required' 
-        });
+        res.status(400).json({ success: false, error: 'Screen dimensions are required' });
         return;
       }
       
       const width = parseInt(screenWidth as string);
       const height = parseInt(screenHeight as string);
       
-      // Validate parsed dimensions are valid numbers
       if (isNaN(width) || isNaN(height) || width <= 0 || height <= 0) {
-        res.status(400).json({ 
-          success: false, 
-          error: 'Invalid screen dimensions. Must be positive numbers.' 
-        });
+        res.status(400).json({ success: false, error: 'Invalid screen dimensions. Must be positive numbers.' });
         return;
       }
 
-      const battleState = await battleController.getBattleState(id, userId, width, height);
+      const battleState = await battleController.getBattleState(id, 'test-user-id', width, height);
       if (!battleState) {
         res.status(404).json({ success: false, error: 'Battle not found' });
         return;
       }
 
-
-
-      // Transform server response to match client expectations
       const clientBattleState = {
         battleId: battleState.battleId,
         phase: battleState.phase === 'countdown' ? 'countdown' : 
@@ -110,18 +82,14 @@ router.get<{ id: string }, BattleResponse>(
                       battleState.phase === 'active' ? (20 - battleState.battleTime) : 0,
         battalions: battleState.battalions || [],
         nodes: battleState.nodes || [],
-        networkConnections: battleState.networkConnections || [], // Add network data
-        lineProperties: battleState.lineProperties || [],         // Add line data
-        movementStates: battleState.movementStates || [],        // Add movement data for smooth animation
+        networkConnections: battleState.networkConnections || [],
+        lineProperties: battleState.lineProperties || [],
+        movementStates: battleState.movementStates || [],
         victoryCondition: battleState.winner ? {
           winner: battleState.winner === 'user' ? 'user' : 'enemy',
           reason: 'timeout'
         } : undefined
       };
-
-
-
-
 
       res.json({ success: true, data: clientBattleState });
     } catch (error) {
@@ -133,15 +101,5 @@ router.get<{ id: string }, BattleResponse>(
     }
   }
 );
-
-
-
-
-
-
-
-
-
-
 
 export default router; 

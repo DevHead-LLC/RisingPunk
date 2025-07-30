@@ -8,8 +8,6 @@ import { View, Text, StyleSheet, Dimensions, ActivityIndicator } from 'react-nat
 import { useGetBattleStateQuery } from '../../store/api/battleApi';
 import { NodeHealthBar } from './NodeHealthBar';
 
-// Server-provided data types (matching server response)
-
 export interface NetworkConnection {
   from: number;
   to: number;
@@ -26,8 +24,8 @@ export interface BattleNodeState {
   index: number;
   position: { x: number; y: number };
   owner: 'user' | 'enemy' | 'neutral';
-  tugOfWarProgress: number;      // NEW: -100 to +100
-  maxCaptureThreshold: number;   // NEW: Total army health
+  tugOfWarProgress: number;
+  maxCaptureThreshold: number;
 }
 
 interface Props {
@@ -38,29 +36,21 @@ interface Props {
   showNodeLabels?: boolean;
 }
 
-// Server provides all network data - no fallback logic needed
-
-/**
- * getNodeColor() - Node Visual Properties
- */
-function getNodeColor(owner: 'user' | 'enemy' | 'neutral'): string {
+const getNodeColor = (owner: 'user' | 'enemy' | 'neutral'): string => {
   switch (owner) {
-    case 'user': return '#4717F6'; // User blue
-    case 'enemy': return '#FF4141'; // Enemy red
-    default: return '#666666'; // Neutral gray
+    case 'user': return '#4717F6';
+    case 'enemy': return '#FF4141';
+    default: return '#666666';
   }
-}
+};
 
-/**
- * getNodeBorderColor() - Node Visual Properties
- */
-function getNodeBorderColor(owner: 'user' | 'enemy' | 'neutral'): string {
+const getNodeBorderColor = (owner: 'user' | 'enemy' | 'neutral'): string => {
   switch (owner) {
-    case 'user': return '#7C3AED'; // Lighter blue border
-    case 'enemy': return '#EF4444'; // Lighter red border
-    default: return '#9CA3AF'; // Light gray border
+    case 'user': return '#7C3AED';
+    case 'enemy': return '#EF4444';
+    default: return '#9CA3AF';
   }
-}
+};
 
 export const BattleNetworkGrid = React.memo(({
   battleId,
@@ -69,10 +59,8 @@ export const BattleNetworkGrid = React.memo(({
   lineWidth = 2,
   showNodeLabels = true,
 }: Props) => {
-  // Get screen dimensions for server calculations
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
-  // Direct API call to get battle state
   const {
     data: battleState,
     isLoading: battleLoading,
@@ -80,12 +68,11 @@ export const BattleNetworkGrid = React.memo(({
   } = useGetBattleStateQuery(
     { battleId, screenWidth, screenHeight },
     {
-      pollingInterval: 1000, // Poll every 1 second for real-time updates
+      pollingInterval: 1000,
       skip: !battleId,
     }
   );
 
-  // SIMPLE LOG: Only log problems
   useEffect(() => {
     if (battleState && battleState.nodes?.length > 0) {
       const firstNode = battleState.nodes[0];
@@ -101,7 +88,6 @@ export const BattleNetworkGrid = React.memo(({
     }
   }, [battleState, battleError]);
 
-  // Show loading state while fetching server data
   if (battleLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -111,7 +97,6 @@ export const BattleNetworkGrid = React.memo(({
     );
   }
 
-  // Show error state if server data fails
   if (battleError || !battleState) {
     return (
       <View style={styles.errorContainer}>
@@ -121,17 +106,15 @@ export const BattleNetworkGrid = React.memo(({
     );
   }
 
-  // Server provides all network data - use directly
   const nodes = battleState.nodes || [];
   const connections = battleState.networkConnections || [];
   const lineProperties = battleState.lineProperties || [];
 
   return (
     <View style={styles.container}>
-      {/* Render connection lines */}
       {lineProperties?.map((lineProps, index) => {
         const connection = connections?.[index];
-        if (!connection) {return null;}
+        if (!connection) return null;
 
         return (
           <View
@@ -152,9 +135,8 @@ export const BattleNetworkGrid = React.memo(({
         );
       })}
 
-      {/* Render nodes */}
-      {nodes?.map((node) => {
-        const NodeContent = () => (
+      {nodes?.map((node) => (
+        <React.Fragment key={node.index}>
           <View
             style={[
               styles.node,
@@ -173,19 +155,12 @@ export const BattleNetworkGrid = React.memo(({
               <Text style={styles.nodeLabel}>{node.index}</Text>
             )}
           </View>
-        );
-
-        return (
-          <React.Fragment key={node.index}>
-            <NodeContent />
-            
-            {/* NEW: Add health bar for neutral nodes only */}
-            {node.owner === 'neutral' && (
-              <NodeHealthBar node={node} />
-            )}
-          </React.Fragment>
-        );
-      })}
+          
+          {node.owner === 'neutral' && (
+            <NodeHealthBar node={node} />
+          )}
+        </React.Fragment>
+      ))}
     </View>
   );
 });

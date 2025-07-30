@@ -1,20 +1,7 @@
-/**
- * @file PathfindingService.ts
- * @description Multi-hop pathfinding through NETWORK_CONNECTIONS for cross-network targeting
- * 
- * AUTHORITY: Multi-hop pathfinding through NETWORK_CONNECTIONS
- * NO OVERLAPS: Pure pathfinding algorithm - no movement or targeting logic
- * DEPENDENCIES: networkConfig.ts NETWORK_CONNECTIONS only
- */
-
 import { NETWORK_CONNECTIONS } from '../config/networkConfig';
 
 export class PathfindingService {
-  /**
-   * Find shortest path using BFS algorithm with NETWORK_CONNECTIONS validation
-   */
   static findNetworkPath(startNode: number, targetNode: number): number[] {
-    // Validate both nodes exist in NETWORK_CONNECTIONS
     if (!this.isValidNode(startNode) || !this.isValidNode(targetNode)) {
       return [];
     }
@@ -23,7 +10,6 @@ export class PathfindingService {
       return [startNode];
     }
     
-    // BFS implementation with parent tracking
     const queue: Array<{node: number, path: number[]}> = [{node: startNode, path: [startNode]}];
     const visited = new Set<number>();
     
@@ -49,9 +35,6 @@ export class PathfindingService {
     return [];
   }
   
-  /**
-   * Get valid neighbors from NETWORK_CONNECTIONS only
-   */
   static getValidNeighbors(nodeIndex: number): number[] {
     const neighbors: number[] = [];
     
@@ -63,38 +46,24 @@ export class PathfindingService {
       }
     }
     
-    return neighbors.sort(); // Consistent ordering
+    return neighbors.sort();
   }
   
-  /**
-   * Calculate hop count distance (for proximity calculations)
-   */
   static calculateNetworkHops(startNode: number, targetNode: number): number {
     const path = this.findNetworkPath(startNode, targetNode);
-    return path.length > 0 ? path.length - 1 : -1; // -1 indicates unreachable
+    return path.length > 0 ? path.length - 1 : -1;
   }
   
-  /**
-   * Validate if path exists (for retargeting and general pathfinding)
-   */
   static isReachableViaNetwork(startNode: number, targetNode: number): boolean {
-    const path = this.findNetworkPath(startNode, targetNode);
-    return path.length > 0;
+    return this.findNetworkPath(startNode, targetNode).length > 0;
   }
 
-  /**
-   * Validate node exists in NETWORK_CONNECTIONS
-   */
   static isValidNode(nodeIndex: number): boolean {
     return NETWORK_CONNECTIONS.some(conn => 
       conn.from === nodeIndex || conn.to === nodeIndex
     );
   }
   
-  /**
-   * Check if target is reachable via network pathfinding (for initial movement validation)
-   * NOTE: This is identical to isReachableViaNetwork - kept for backward compatibility
-   */
   static isNetworkReachable(fromNode: number, toNode: number): boolean {
     return this.isReachableViaNetwork(fromNode, toNode);
   }
