@@ -38,15 +38,15 @@ export const TEST_NODE_POSITIONS: NodePosition[] = [
 
 // Shared test nodes
 export const createTestNodes = (): INode[] => [
-  { index: 0, owner: NodeOwner.USER, tugOfWarProgress: 100, maxCaptureThreshold: 1000, position: { x: 100, y: 100 } },
-  { index: 1, owner: NodeOwner.USER, tugOfWarProgress: 100, maxCaptureThreshold: 1000, position: { x: 100, y: 300 } },
-  { index: 2, owner: NodeOwner.USER, tugOfWarProgress: 100, maxCaptureThreshold: 1000, position: { x: 100, y: 500 } },
-  { index: 3, owner: NodeOwner.NEUTRAL, tugOfWarProgress: 0, maxCaptureThreshold: 1000, position: { x: 400, y: 100 } },
-  { index: 4, owner: NodeOwner.NEUTRAL, tugOfWarProgress: 0, maxCaptureThreshold: 1000, position: { x: 400, y: 300 } },
-  { index: 5, owner: NodeOwner.NEUTRAL, tugOfWarProgress: 0, maxCaptureThreshold: 1000, position: { x: 400, y: 500 } },
-  { index: 6, owner: NodeOwner.ENEMY, tugOfWarProgress: -100, maxCaptureThreshold: 1000, position: { x: 700, y: 100 } },
-  { index: 7, owner: NodeOwner.ENEMY, tugOfWarProgress: -100, maxCaptureThreshold: 1000, position: { x: 700, y: 300 } },
-  { index: 8, owner: NodeOwner.ENEMY, tugOfWarProgress: -100, maxCaptureThreshold: 1000, position: { x: 700, y: 500 } }
+  { index: 0, owner: NodeOwner.USER, tugOfWarProgress: 100, maxCaptureThreshold: 1000, position: { x: 96, y: 155 } },
+  { index: 1, owner: NodeOwner.USER, tugOfWarProgress: 100, maxCaptureThreshold: 1000, position: { x: 96, y: 425 } },
+  { index: 2, owner: NodeOwner.USER, tugOfWarProgress: 100, maxCaptureThreshold: 1000, position: { x: 96, y: 695 } },
+  { index: 3, owner: NodeOwner.NEUTRAL, tugOfWarProgress: 0, maxCaptureThreshold: 1000, position: { x: 448, y: 155 } },
+  { index: 4, owner: NodeOwner.NEUTRAL, tugOfWarProgress: 0, maxCaptureThreshold: 1000, position: { x: 448, y: 425 } },
+  { index: 5, owner: NodeOwner.NEUTRAL, tugOfWarProgress: 0, maxCaptureThreshold: 1000, position: { x: 448, y: 695 } },
+  { index: 6, owner: NodeOwner.ENEMY, tugOfWarProgress: -100, maxCaptureThreshold: 1000, position: { x: 800, y: 155 } },
+  { index: 7, owner: NodeOwner.ENEMY, tugOfWarProgress: -100, maxCaptureThreshold: 1000, position: { x: 800, y: 425 } },
+  { index: 8, owner: NodeOwner.ENEMY, tugOfWarProgress: -100, maxCaptureThreshold: 1000, position: { x: 800, y: 695 } }
 ];
 
 // Bot stats from BotService (single source of truth)

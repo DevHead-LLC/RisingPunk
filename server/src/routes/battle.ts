@@ -35,7 +35,7 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
         return;
       }
       
-      const battle = await battleController.startBattle('test-user-id', defenderId || 'computer', screenWidth, screenHeight);
+      const battle = await battleController.startBattle('test-user-id', defenderId || 'computer', screenWidth, screenHeight, userBattalions);
       res.status(201).json({ battleId: battle.battleId });
     } catch (error) {
       console.error('Start battle error:', error);

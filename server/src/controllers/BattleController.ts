@@ -60,10 +60,10 @@ export class BattleController {
   /**
    * Start a new battle
    */
-  async startBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number): Promise<BattleStateResponse> {
+  async startBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number, nodeIndex: number}>): Promise<BattleStateResponse> {
     try {
       const actualDefenderId = defenderId === 'computer' ? 'computer-opponent' : defenderId;
-      const battle = await this.battleService.createBattle(attackerId, actualDefenderId, screenWidth, screenHeight);
+      const battle = await this.battleService.createBattle(attackerId, actualDefenderId, screenWidth, screenHeight, userBattalions);
       const networkData = this.generateNetworkData(battle.nodes, screenWidth, screenHeight, battle);
       const mappedBattalions = BattalionMappingService.mapBattalionsForClient(battle.battalions);
       
@@ -82,34 +82,32 @@ export class BattleController {
       const battle = await this.battleService.getBattle(battleId);
       if (!battle) return null;
 
+      // Always ensure screen dimensions are set for this battle
+      ScreenDimensionService.setBattleScreenDimensions(battleId, screenWidth, screenHeight);
+
       const timerService = this.battleService.getTimerService();
       const timerState = timerService.getTimeRemaining(battleId);
-
-      const currentPhase = timerState ? timerState.phase : battle.phase;
-      const currentCountdown = timerState ? timerState.countdown : battle.countdown;
-      const currentBattleTime = timerState ? timerState.battleTime : battle.battleTime;
 
       const movementStates = MovementService.getMovementStates(battleId);
       const mappedBattalions = BattalionMappingService.mapBattalionsForClient(battle.battalions, movementStates);
       const networkData = this.generateNetworkData(battle.nodes, screenWidth, screenHeight, battle);
 
       let targetingResults: any[] = [];
-      if (currentPhase === BattlePhase.ACTIVE && currentCountdown === 0) {
+      if (timerState?.phase === BattlePhase.ACTIVE && timerState.countdown === 0) {
         if (BattalionService.getTargetingResults(battleId).length === 0) {
           await this.battleService.triggerInitialTargeting(battleId);
         }
         targetingResults = BattalionService.getTargetingResults(battleId);
       }
 
-      return BattleResponseService.createBattleStateResponseWithTimer(
+      return BattleResponseService.createBattleStateResponse(
         battle, 
         mappedBattalions, 
         networkData, 
-        currentPhase, 
-        currentCountdown, 
-        currentBattleTime, 
         targetingResults,
-        movementStates
+        undefined, // retargetingStatus
+        movementStates,
+        timerState || undefined
       );
     } catch (error) {
       console.error('BattleController getBattleState error:', error);

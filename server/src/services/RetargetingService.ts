@@ -1,6 +1,7 @@
 // server/src/services/RetargetingService.ts
 import { IBattalion, INode, NodeOwner } from '../types/battle';
 import { PathfindingService } from './PathfindingService';
+import { CombatService } from './CombatService';
 
 export interface RetargetingResult {
   battalionId: string;
@@ -96,7 +97,7 @@ export class RetargetingService {
     
     // Evaluate enemy battalions
     for (const enemyBattalion of enemyBattalions) {
-      if (enemyBattalion.isDestroyed === true || enemyBattalion.currentHealth <= 0 || enemyBattalion.quantity <= 0) {
+      if (!CombatService.canTargetBattalion(enemyBattalion)) {
         console.log(`🎯 SKIPPING DESTROYED: ${enemyBattalion.owner} ${enemyBattalion.type} cannot be targeted`);
         continue;
       }
