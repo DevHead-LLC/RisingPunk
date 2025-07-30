@@ -16,9 +16,6 @@ import { ScreenDimensionService } from './ScreenDimensionService';
 export class BattalionService {
   private static targetingResults: Map<string, BattalionTargetingResult[]> = new Map();
 
-  /**
-   * Trigger initial targeting for a battle and store results
-   */
   static async triggerInitialTargeting(battalions: IBattalion[], nodes: INode[], battleId: string): Promise<BattalionTargetingResult[]> {
     console.log('🎯 TRIGGERING INITIAL TARGETING for battle:', battleId);
     const results = TargetingService.assignInitialTargets(battalions, nodes);
@@ -26,16 +23,10 @@ export class BattalionService {
     return results;
   }
 
-  /**
-   * Get current targeting results for a specific battle
-   */
   static getTargetingResults(battleId?: string): BattalionTargetingResult[] {
     return battleId ? this.targetingResults.get(battleId) || [] : [];
   }
 
-  /**
-   * Update targeting results for retargeted battalions
-   */
   static async updateTargetingResults(battleId: string, retargetingResults: Array<{battalionId: string, newTargetNodeIndex: number, pathToTarget: number[], targetType?: 'neutral_node' | 'enemy_battalion', targetBattalionId?: string}>): Promise<void> {
     console.log(`🎯 BATTALION SERVICE: Updating targeting for ${retargetingResults.length} battalions`);
     
@@ -61,9 +52,6 @@ export class BattalionService {
     this.targetingResults.set(battleId, currentResults);
   }
 
-  /**
-   * Get targeting result for a specific battalion
-   */
   static getTargetingResultForBattalion(battalionId: string, battleId?: string): BattalionTargetingResult | null {
     const targetingResults = this.getTargetingResults(battleId);
     const result = targetingResults.find(result => result.battalionId === battalionId);
@@ -77,39 +65,24 @@ export class BattalionService {
     }
   }
 
-  /**
-   * Clear targeting results for a battle (cleanup)
-   */
   static clearTargetingResults(battleId: string): void {
     this.targetingResults.delete(battleId);
   }
 
-  /**
-   * Get battle by ID
-   */
   static async getBattle(battleId: string): Promise<any> {
     return Battle.findOne({ battleId });
   }
 
-  /**
-   * Start smooth movement updates (separate from timer) at 100ms intervals
-   */
   static startMovementUpdates(battleId: string): void {
     MovementService.startMovementUpdates(battleId, async (battleId: string) => {
       await this.updateBattleMovement(battleId);
     });
   }
 
-  /**
-   * Stop movement updates for a battle
-   */
   static stopMovementUpdates(battleId: string): void {
     MovementService.stopMovementUpdates(battleId);
   }
 
-  /**
-   * Update battle movement for all battalions (streamlined orchestration)
-   */
   static async updateBattleMovement(battleId: string): Promise<void> {
     const battle = await this.getBattle(battleId);
     const targetingResults = this.getTargetingResults(battleId);
@@ -125,16 +98,10 @@ export class BattalionService {
     await AttackService.processActiveAttacks(battle);
   }
 
-  /**
-   * Calculate total army health from all battalions
-   */
   static calculateTotalArmyHealth(battalions: IBattalion[]): number {
     return battalions.reduce((total, battalion) => total + (battalion.stats.health * battalion.quantity), 0);
   }
 
-  /**
-   * Create battalion with common properties
-   */
   private static createBattalion(
     id: string,
     type: BotType,
@@ -168,9 +135,6 @@ export class BattalionService {
     };
   }
 
-  /**
-   * Create user battalions with proper stats
-   */
   static createUserBattalions(nodes: INode[]): IBattalion[] {
     const userBattalions = [
       { type: 'guardian' as BotType, quantity: 10, nodeIndex: 0 },
@@ -191,9 +155,6 @@ export class BattalionService {
     );
   }
 
-  /**
-   * Create enemy battalions with proper stats
-   */
   static createEnemyBattalions(nodes: INode[]): IBattalion[] {
     const enemyBattalions = [
       { type: 'guardian' as BotType, quantity: 8, nodeIndex: 6 },
@@ -214,9 +175,6 @@ export class BattalionService {
     );
   }
 
-  /**
-   * Enhanced position update with client sync structure
-   */
   static updateBattalionPositions(battleId: string, battle: any): {
     positionUpdates: Array<{battalionId: string, oldPosition: number, newPosition: number, coordinates: {x: number, y: number}}>,
     movementUpdates: Array<{battalionId: string, movementState: MovementState}>
