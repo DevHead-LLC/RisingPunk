@@ -51,12 +51,12 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
     }],
   }), [pulseAnim]);
 
-  const handleBattalionPress = (name: string) => {
+  const handleBattalionPress = React.useCallback((name: string) => {
     setSelectedBattalion(name);
     setSelectorVisible(true);
-  };
+  }, []);
 
-  const handleBotAssignment = async (data: { botType: BotType; quantity: number }) => {
+  const handleBotAssignment = React.useCallback(async (data: { botType: BotType; quantity: number }) => {
     if (!selectedBattalion) return;
 
     try {
@@ -78,9 +78,9 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
       console.error('Failed to assign bots:', error);
     }
     setSelectorVisible(false);
-  };
+  }, [selectedBattalion, assignToBattalion]);
 
-  const resetBattalions = async () => {
+  const resetBattalions = React.useCallback(async () => {
     try {
       await Promise.all([
         assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'A' }),
@@ -89,7 +89,19 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
     } catch (error) {
       console.error('Failed to reset battalions:', error);
     }
-  };
+  }, [assignToBattalion]);
+
+  const userBattalions = React.useMemo(() => [
+    { type: 'guardian' as BotType, quantity: 10, nodeIndex: 0 },
+    { type: 'breacher' as BotType, quantity: 8, nodeIndex: 1 },
+    { type: 'phreak' as BotType, quantity: 6, nodeIndex: 2 },
+  ], []);
+
+  const battleStartData = React.useMemo(() => ({
+    userBattalions,
+    screenWidth: SCREEN_WIDTH,
+    screenHeight: SCREEN_HEIGHT,
+  }), [userBattalions]);
 
   useEffect(() => {
     const fetchAssignments = async () => {
@@ -179,15 +191,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
         style={styles.executeButton}
         onPress={async () => {
           try {
-            const result = await startBattle({
-              userBattalions: [
-                { type: 'guardian', quantity: 10, nodeIndex: 0 },
-                { type: 'breacher', quantity: 8, nodeIndex: 1 },
-                { type: 'phreak', quantity: 6, nodeIndex: 2 },
-              ],
-              screenWidth: SCREEN_WIDTH,
-              screenHeight: SCREEN_HEIGHT,
-            }).unwrap();
+            const result = await startBattle(battleStartData).unwrap();
 
             onBattleStart(result.battleId);
           } catch (error) {

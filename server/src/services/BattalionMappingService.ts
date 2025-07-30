@@ -5,8 +5,14 @@ export class BattalionMappingService {
   private static lastLogTime: number = 0;
   private static lastDestroyedBattalions: string = '';
   private static readonly LOG_INTERVAL = 10000;
+  private static battalionCache = new Map<string, ClientBattalion>();
 
   static mapBattalionsForClient(battalions: IBattalion[], movementStates?: Map<string, MovementState>): ClientBattalion[] {
+    // Clear cache if battalions array changes significantly
+    if (this.battalionCache.size > battalions.length * 2) {
+      this.battalionCache.clear();
+    }
+
     const aliveBattalions = battalions.filter(battalion => !battalion.isDestroyed);
     const destroyedBattalions = battalions.filter(battalion => battalion.isDestroyed);
     
@@ -28,20 +34,37 @@ export class BattalionMappingService {
       this.lastDestroyedBattalions = destroyedHash;
     }
 
-    return aliveBattalions.map(battalion => ({
-      id: battalion.id,
-      type: battalion.type,
-      quantity: battalion.quantity,
-      currentHealth: battalion.currentHealth,
-      maxHealth: battalion.maxHealth,
-      baseHealthPerUnit: battalion.baseHealthPerUnit,
-      isDestroyed: battalion.isDestroyed,
-      destroyedAt: battalion.destroyedAt,
-      nodeIndex: battalion.position.nodeIndex,
-      isUser: battalion.owner === NodeOwner.USER,
-      mark: battalion.mark,
-      stats: battalion.stats,
-      movementState: movementStates?.get(battalion.id) || undefined
-    }));
+    // Use cached mapping when possible to avoid redundant object creation
+    return aliveBattalions.map(battalion => {
+      const cacheKey = `${battalion.id}-${battalion.currentHealth}-${battalion.quantity}-${battalion.position.nodeIndex}`;
+      
+      if (this.battalionCache.has(cacheKey)) {
+        const cached = this.battalionCache.get(cacheKey)!;
+        // Only update movement state if it changed
+        if (cached.movementState !== (movementStates?.get(battalion.id) || undefined)) {
+          cached.movementState = movementStates?.get(battalion.id) || undefined;
+        }
+        return cached;
+      }
+
+      const clientBattalion: ClientBattalion = {
+        id: battalion.id,
+        type: battalion.type,
+        quantity: battalion.quantity,
+        currentHealth: battalion.currentHealth,
+        maxHealth: battalion.maxHealth,
+        baseHealthPerUnit: battalion.baseHealthPerUnit,
+        isDestroyed: battalion.isDestroyed,
+        destroyedAt: battalion.destroyedAt,
+        nodeIndex: battalion.position.nodeIndex,
+        isUser: battalion.owner === NodeOwner.USER,
+        mark: battalion.mark,
+        stats: battalion.stats,
+        movementState: movementStates?.get(battalion.id) || undefined
+      };
+
+      this.battalionCache.set(cacheKey, clientBattalion);
+      return clientBattalion;
+    });
   }
 } 

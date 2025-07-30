@@ -110,9 +110,23 @@ export const BattleBattalion = React.memo(({
     return () => animatedPosition.removeListener(listener);
   }, [animatedPosition]);
 
-  const healthPercentage = battalion.maxHealth > 0 ? (battalion.currentHealth / battalion.maxHealth) * 100 : 0;
-  const borderColor = battalion.isUser ? '#4717F6' : '#FF4141';
-  const attackRangeRadius = battalion.stats.range * 8;
+  const healthPercentage = React.useMemo(() => 
+    battalion.maxHealth > 0 ? (battalion.currentHealth / battalion.maxHealth) * 100 : 0
+  , [battalion.currentHealth, battalion.maxHealth]);
+
+  const borderColor = React.useMemo(() => 
+    battalion.isUser ? '#4717F6' : '#FF4141'
+  , [battalion.isUser]);
+
+  const attackRangeRadius = React.useMemo(() => battalion.stats.range * 8, [battalion.stats.range]);
+
+  const botTypeLabel = React.useMemo(() => 
+    BOT_TYPE_LABELS[battalion.type] || ''
+  , [battalion.type]);
+
+  const shouldShowAttackRange = React.useMemo(() => 
+    movementState?.movementStatus === 'moving' || movementState?.movementStatus === 'arrived'
+  , [movementState?.movementStatus]);
 
   const getShapeStyle = React.useMemo(() => {
     const base = {
@@ -143,7 +157,6 @@ export const BattleBattalion = React.memo(({
     return healthPercentage > 60 ? '#4CAF50' : healthPercentage > 30 ? '#FF9800' : '#F44336';
   }, [healthPercentage]);
 
-  const botTypeLabel = BOT_TYPE_LABELS[battalion.type] || '';
   const quantityTextStyle = React.useMemo(() => 
     battalion.type === 'phreak' 
       ? [styles.quantityText, { fontSize: 12 }, { transform: [{ rotate: '-45deg' }] }] 
@@ -205,7 +218,7 @@ export const BattleBattalion = React.memo(({
 
   return (
     <View style={styles.container}>
-      {(movementState?.movementStatus === 'moving' || movementState?.movementStatus === 'arrived') && (
+      {shouldShowAttackRange && (
         <View style={attackRangeStyle} />
       )}
       

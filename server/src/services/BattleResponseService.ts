@@ -33,6 +33,9 @@ export class BattleResponseService {
     const currentCountdown = timerState ? timerState.countdown : battle.countdown;
     const currentBattleTime = timerState ? timerState.battleTime : battle.battleTime;
 
+    // Convert movement states to array only if needed
+    const movementStatesArray = movementStates && movementStates.size > 0 ? Array.from(movementStates.values()) : undefined;
+
     return {
       battleId: battle.battleId,
       phase: currentPhase,
@@ -45,7 +48,7 @@ export class BattleResponseService {
       lineProperties: networkData.lineProperties,
       targetingResults,
       retargetingStatus,
-      movementStates: movementStates ? Array.from(movementStates.values()) : undefined,
+      movementStates: movementStatesArray,
       lastUpdated: battle.updatedAt
     };
   }

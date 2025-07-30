@@ -10,6 +10,16 @@ export const BattleCountdownOverlay = React.memo(({ countdown, isVisible }: Prop
   const opacity = React.useRef(new Animated.Value(0)).current;
   const scale = React.useRef(new Animated.Value(0.5)).current;
 
+  const containerStyle = React.useMemo(() => [
+    styles.container, 
+    { opacity }
+  ], [opacity]);
+
+  const countdownContainerStyle = React.useMemo(() => [
+    styles.countdownContainer, 
+    { transform: [{ scale }] }
+  ], [scale]);
+
   const startAnimations = React.useCallback(() => {
     const animations = [
       Animated.timing(opacity, {
@@ -32,9 +42,9 @@ export const BattleCountdownOverlay = React.memo(({ countdown, isVisible }: Prop
   if (!isVisible) return null;
 
   return (
-    <Animated.View style={[styles.container, { opacity }]}>
+    <Animated.View style={containerStyle}>
       <View style={styles.overlay}>
-        <Animated.View style={[styles.countdownContainer, { transform: [{ scale }] }]}>
+        <Animated.View style={countdownContainerStyle}>
           <Text style={styles.countdownText}>{countdown}</Text>
           <Text style={styles.countdownLabel}>BATTLE STARTING</Text>
         </Animated.View>

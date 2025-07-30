@@ -36,17 +36,12 @@ export const BattalionSlot = React.memo(({
     isLocked && styles.lockedText,
   ], [isEnemy, isLocked]);
 
-  if (isLocked && !isEnemy) {
-    return (
-      <View style={slotStyle}>
-        <Text style={textStyle}>BATTALION {name}</Text>
-        <Text style={[styles.deployText, styles.lockedText]}>+ Deploy</Text>
-        <Text style={styles.lockText}>🔒</Text>
-      </View>
-    );
-  }
+  const deployTextStyle = React.useMemo(() => [
+    styles.deployText, 
+    styles.lockedText
+  ], []);
 
-  const content = (
+  const content = React.useMemo(() => (
     <>
       <Text style={textStyle}>BATTALION {name}</Text>
       {!assignment ? (
@@ -63,7 +58,17 @@ export const BattalionSlot = React.memo(({
       )}
       {isEnemy && <Text style={styles.scanErrorText}>[scan error]</Text>}
     </>
-  );
+  ), [textStyle, name, assignment, isEnemy, isLocked]);
+
+  if (isLocked && !isEnemy) {
+    return (
+      <View style={slotStyle}>
+        <Text style={textStyle}>BATTALION {name}</Text>
+        <Text style={deployTextStyle}>+ Deploy</Text>
+        <Text style={styles.lockText}>🔒</Text>
+      </View>
+    );
+  }
 
   return isEnemy ? (
     <View style={slotStyle}>{content}</View>

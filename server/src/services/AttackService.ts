@@ -42,9 +42,17 @@ export class AttackService {
   private static attackStates = new Map<string, AttackState>();
   private static retargetingQueue: RetargetingTask[] = [];
   private static isProcessingQueue: boolean = false;
+  private static attackIntervalCache = new Map<number, number>();
   
   static calculateAttackInterval(speedStat: number): number {
-    return 3000 - (speedStat * 200);
+    // Cache attack interval calculations to avoid repeated computation
+    if (this.attackIntervalCache.has(speedStat)) {
+      return this.attackIntervalCache.get(speedStat)!;
+    }
+    
+    const interval = 3000 - (speedStat * 200);
+    this.attackIntervalCache.set(speedStat, interval);
+    return interval;
   }
   
   static startAttacking(battalion: IBattalion, targetNodeIndex: number): void {
@@ -132,6 +140,7 @@ export class AttackService {
     console.log(`🔍 SELECTIVE: Finding battalions attacking node ${nodeIndex} specifically`);
 
     const attackers: string[] = [];
+    // Use direct iteration instead of creating intermediate arrays
     for (const [battalionId, attackState] of this.attackStates) {
       if (attackState.isAttacking && attackState.targetNodeIndex === nodeIndex) {
         attackers.push(battalionId);
@@ -214,6 +223,7 @@ export class AttackService {
     
     const affectedBattalions: string[] = [];
     
+    // Use direct iteration and early collection to avoid multiple Map operations
     for (const [battalionId, attackState] of this.attackStates) {
       if (attackState.targetType === 'battalion' && attackState.targetId === destroyedBattalionId) {
         affectedBattalions.push(battalionId);

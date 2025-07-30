@@ -15,11 +15,15 @@ export const BattleTimerDisplay = React.memo(({ battleTime, maxBattleTime, isVis
     { width: `${(battleTime / maxBattleTime) * 100}%` as any },
   ], [battleTime, maxBattleTime]);
 
+  const timerText = React.useMemo(() => 
+    `${maxBattleTime - battleTime}s`
+  , [maxBattleTime, battleTime]);
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.statusText}>SYSTEM BREACH IN PROGRESS</Text>
-        <Text style={styles.timerText}>{maxBattleTime - battleTime}s</Text>
+        <Text style={styles.timerText}>{timerText}</Text>
       </View>
 
       <View style={styles.progressBar}>

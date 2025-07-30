@@ -15,6 +15,8 @@ import { ScreenDimensionService } from './ScreenDimensionService';
 
 export class BattalionService {
   private static targetingResults: Map<string, BattalionTargetingResult[]> = new Map();
+  private static validBotTypes = ['guardian', 'breacher', 'phreak'] as const;
+  private static botTypeCache = new Map<string, BotType>();
 
   static async triggerInitialTargeting(battalions: IBattalion[], nodes: INode[], battleId: string): Promise<BattalionTargetingResult[]> {
     console.log('🎯 TRIGGERING INITIAL TARGETING for battle:', battleId);
@@ -32,13 +34,16 @@ export class BattalionService {
     
     const currentResults = this.getTargetingResults(battleId);
     
+    // Use Map for faster lookups instead of findIndex
+    const resultMap = new Map(currentResults.map(result => [result.battalionId, result]));
+    
     retargetingResults.forEach(retargetResult => {
-      const existingIndex = currentResults.findIndex(result => result.battalionId === retargetResult.battalionId);
+      const existingResult = resultMap.get(retargetResult.battalionId);
       
-      if (existingIndex >= 0) {
-        currentResults[existingIndex].targetNode = retargetResult.newTargetNodeIndex;
-        currentResults[existingIndex].targetType = retargetResult.targetType;
-        currentResults[existingIndex].targetBattalionId = retargetResult.targetBattalionId;
+      if (existingResult) {
+        existingResult.targetNode = retargetResult.newTargetNodeIndex;
+        existingResult.targetType = retargetResult.targetType;
+        existingResult.targetBattalionId = retargetResult.targetBattalionId;
         
         const targetInfo = retargetResult.targetType === 'enemy_battalion' 
           ? `${retargetResult.targetType} ${retargetResult.targetBattalionId} at node ${retargetResult.newTargetNodeIndex}`
@@ -49,7 +54,7 @@ export class BattalionService {
       }
     });
     
-    this.targetingResults.set(battleId, currentResults);
+    this.targetingResults.set(battleId, Array.from(resultMap.values()));
   }
 
   static getTargetingResultForBattalion(battalionId: string, battleId?: string): BattalionTargetingResult | null {
@@ -130,6 +135,32 @@ export class BattalionService {
     };
   }
 
+  private static validateBotType(botType: string): BotType {
+    // Check cache first
+    if (this.botTypeCache.has(botType)) {
+      return this.botTypeCache.get(botType)!;
+    }
+
+    // Validate bot type
+    if (!this.validBotTypes.includes(botType as any)) {
+      console.log(`⚠️ INVALID BOT TYPE: "${botType}" is not a valid bot type. Using 'guardian' as fallback.`);
+      this.botTypeCache.set(botType, 'guardian' as BotType);
+      return 'guardian' as BotType;
+    }
+
+    const validatedBotType = botType as BotType;
+    
+    // Ensure the bot type exists in BOT_CONFIG
+    if (!BOT_CONFIG.USER_BOT_STATS[validatedBotType]) {
+      console.log(`⚠️ MISSING BOT CONFIG: "${validatedBotType}" not found in BOT_CONFIG. Using 'guardian' as fallback.`);
+      this.botTypeCache.set(botType, 'guardian' as BotType);
+      return 'guardian' as BotType;
+    }
+
+    this.botTypeCache.set(botType, validatedBotType);
+    return validatedBotType;
+  }
+
   static createUserBattalions(nodes: INode[], userBattalions?: Array<{type: string, quantity: number, nodeIndex: number}>): IBattalion[] {
     const defaultUserBattalions = [
       { type: 'guardian' as BotType, quantity: 10, nodeIndex: 0 },
@@ -140,30 +171,15 @@ export class BattalionService {
     const battalionConfigs = userBattalions || defaultUserBattalions;
     
     return battalionConfigs.map((battalion, index) => {
-      // Validate bot type
-      const validBotTypes = ['guardian', 'breacher', 'phreak'] as const;
-      const botType = battalion.type as string;
-      
-      if (!validBotTypes.includes(botType as any)) {
-        console.log(`⚠️ INVALID BOT TYPE: "${botType}" is not a valid bot type. Using 'guardian' as fallback.`);
-        battalion.type = 'guardian' as BotType;
-      }
-      
-      const validatedBotType = battalion.type as BotType;
-      
-      // Ensure the bot type exists in BOT_CONFIG
-      if (!BOT_CONFIG.USER_BOT_STATS[validatedBotType]) {
-        console.log(`⚠️ MISSING BOT CONFIG: "${validatedBotType}" not found in BOT_CONFIG. Using 'guardian' as fallback.`);
-        battalion.type = 'guardian' as BotType;
-      }
+      const validatedBotType = this.validateBotType(battalion.type);
       
       return this.createBattalion(
         `user-battalion-${index}`,
-        battalion.type as BotType,
+        validatedBotType,
         battalion.quantity,
         battalion.nodeIndex,
         NodeOwner.USER,
-        BOT_CONFIG.USER_BOT_STATS[battalion.type as BotType].stats,
+        BOT_CONFIG.USER_BOT_STATS[validatedBotType].stats,
         nodes
       );
     });
