@@ -10,11 +10,12 @@
  * PHASE 2 EXTENSION: Added battalion-to-battalion attack support with extended AttackState
  */
 
-import { IBattalion, INode, NodeOwner } from '../types/battle';
+import { IBattalion, INode, NodeOwner, RetargetingQueueTask } from '../types/battle';
 import { CombatService } from './CombatService';
 import { RetargetingService } from './RetargetingService';
 import { BattalionService } from './BattalionService';
 import { Battle } from '../models/Battle';
+import { MovementService } from './MovementService';
 
 // PHASE 2 EXTENSION: AttackState now supports both node and battalion targets
 interface AttackState {
@@ -40,7 +41,7 @@ export class AttackService {
     affectedBattalionIds: string[],
     timestamp: number,
     // NEW PHASE 3 PROPERTIES for battalion destruction:
-    triggerType?: 'node_capture' | 'battalion_destruction',  // What type of event triggered retargeting
+    triggerType?: 'node_capture' | 'battalion_destruction' | 'interrupted_recovery' | 'missing_target',  // What type of event triggered retargeting
     destroyedBattalionId?: string,    // For battalion destruction events
     priority: number                   // FIXED: Priority system (1=high, 2=normal)
   }> = [];
@@ -301,6 +302,27 @@ export class AttackService {
   }
 
   /**
+   * NEW: Queue retargeting for a single interrupted battalion that reached its nearest node
+   */
+  static queueInterruptedBattalionRetargeting(battleId: string, battalionId: string): void {
+    console.log(`📋 INTERRUPTED RETARGETING: Queueing retargeting for recovered battalion ${battalionId}`);
+    
+    this.retargetingQueue.push({
+      battleId,
+      triggerType: 'interrupted_recovery',
+      affectedBattalionIds: [battalionId],
+      capturedNodeIndex: -1, // Not applicable for recovery retargeting
+      timestamp: Date.now(),
+      priority: 1 // Normal priority
+    });
+    
+    // Start processing if not already running
+    if (!this.isProcessingQueue) {
+      this.processRetargetingQueue();
+    }
+  }
+
+  /**
    * NEW: Process retargeting queue sequentially to avoid race conditions
    * PHASE 3: Now handles both node capture and battalion destruction retargeting
    */
@@ -316,33 +338,31 @@ export class AttackService {
     while (this.retargetingQueue.length > 0) {
       const task = this.retargetingQueue.shift()!;
       
-      // PHASE 3: Handle different trigger types
-      if (task.triggerType === 'battalion_destruction') {
-        console.log(`⚙️ RETARGETING QUEUE: Processing battalion destruction ${task.destroyedBattalionId} (${task.affectedBattalionIds.length} battalions)`);
-        
-        try {
-          // Get fresh battle state for battalion destruction retargeting
-          const battle = await Battle.findOne({ battleId: task.battleId });
-          if (battle) {
-            await this.executeBattalionDestructionRetargeting(battle, task.destroyedBattalionId!, task.affectedBattalionIds);
-          }
-        } catch (error) {
-          console.error(`❌ RETARGETING QUEUE: Error processing battalion destruction ${task.destroyedBattalionId}:`, error);
-        }
-        
-      } else {
-        // Default to node capture retargeting (existing logic)
-        console.log(`⚙️ RETARGETING QUEUE: Processing node ${task.capturedNodeIndex} capture (${task.affectedBattalionIds.length} battalions)`);
-        
-        try {
-          // FIXED: Get fresh battle state to ensure node ownership is updated
-          const battle = await Battle.findOne({ battleId: task.battleId });
-          if (battle) {
-            await this.executeRetargetingTask(battle, task.capturedNodeIndex!, task.affectedBattalionIds);
-          }
-        } catch (error) {
-          console.error(`❌ RETARGETING QUEUE: Error processing task for node ${task.capturedNodeIndex}:`, error);
-        }
+      // Get fresh battle state for each task
+      const battle = await Battle.findOne({ battleId: task.battleId });
+      if (!battle) {
+        console.log(`❌ RETARGETING ERROR: Battle ${task.battleId} not found`);
+        continue;
+      }
+      
+      try {
+                 if (task.triggerType === 'node_capture') {
+           console.log(`⚙️ RETARGETING QUEUE: Processing node capture ${task.capturedNodeIndex} (${task.affectedBattalionIds?.length || 0} battalions)`);
+           await this.executeRetargetingTask(battle, task.capturedNodeIndex!, task.affectedBattalionIds!);
+         } else if (task.triggerType === 'battalion_destruction') {
+           console.log(`⚙️ RETARGETING QUEUE: Processing battalion destruction ${task.destroyedBattalionId} (${task.affectedBattalionIds?.length || 0} battalions)`);
+           await this.executeBattalionDestructionRetargeting(battle, task.destroyedBattalionId!, task.affectedBattalionIds!);
+         } else if (task.triggerType === 'interrupted_recovery') {
+           console.log(`⚙️ RETARGETING QUEUE: Processing interrupted recovery ${task.affectedBattalionIds[0]}`);
+           await this.executeInterruptedBattalionRetargeting(battle, task.affectedBattalionIds[0]);
+                 } else if (task.triggerType === 'missing_target') {
+           console.log(`⚙️ RETARGETING QUEUE: Processing missing target retargeting ${task.affectedBattalionIds[0]}`);
+           await this.executeMissingTargetRetargeting(battle, task.affectedBattalionIds[0]);
+                 } else {
+           console.log(`❌ RETARGETING ERROR: Unknown trigger type ${task.triggerType}`);
+         }
+       } catch (error) {
+         console.log(`❌ RETARGETING ERROR: Failed to process ${task.triggerType}:`, error);
       }
       
       // Small delay between tasks to prevent overwhelming
@@ -357,7 +377,6 @@ export class AttackService {
    * NEW: Get battalions currently moving to a specific target node
    */
   static getMovingBattalionsTargetingNode(battleId: string, targetNodeIndex: number): string[] {
-    const { MovementService } = require('./MovementService');
     const movementStates = MovementService.getMovementStates(battleId);
     const relevantBattalions: string[] = [];
     
@@ -395,32 +414,62 @@ export class AttackService {
           continue;
         }
         
-        const { MovementService } = require('./MovementService');
         const interrupted = MovementService.interruptRetargetingMovement(battalionId, battle.battleId);
         if (interrupted) {
           console.log(`🛑 INTERRUPT: Stopping retargeting movement for battalion ${battalionId}`);
           interruptedBattalions.add(battalionId);
         }
       }
+      
+      // CRITICAL FIX: Update battalion positions in battle object with interruption positions
+      // This must happen BEFORE retargeting so it uses correct positions, not stale data
+      if (interruptedBattalions.size > 0) {
+        const movementStates = MovementService.getMovementStates(battle.battleId);
+        
+        for (const battalionId of interruptedBattalions) {
+          const movementState = movementStates.get(battalionId);
+          const battalion = battle.battalions.find((b: any) => b.id === battalionId);
+          
+          if (movementState && battalion && movementState.wasInterrupted && movementState.interruptionPosition) {
+            // FIXED: Don't instantly sync position to node - initiate movement to nearest node instead
+            console.log(`🚀 INTERRUPTED MOVEMENT: Battalion ${battalionId} will move from interruption coordinates (${movementState.interruptionPosition.x.toFixed(1)}, ${movementState.interruptionPosition.y.toFixed(1)}) to nearest node ${movementState.interruptionPosition.nodeIndex}`);
+            
+            // Initiate movement from interruption position to nearest node
+            MovementService.initiateMovementToNearestNode(battalion, movementState.interruptionPosition, battle.battleId);
+          }
+        }
+        
+        // Save battle state after setting up movements
+        await battle.save();
+        console.log(`💾 MOVEMENTS SAVED: Interrupted battalions now moving to nearest nodes`);
+      }
     }
     
-    // Use RetargetingService to find new targets
-    const retargetingResults = RetargetingService.retargetBattalionsAfterCapture(
-      capturedNodeIndex,
-      affectedBattalionIds,
-      battle.battalions,
-      battle.nodes
-    );
+    // REMOVED: Don't do retargeting immediately - it will happen when battalions reach their nearest nodes
+    console.log(`⏸️ RETARGETING DEFERRED: Interrupted battalions will retarget after reaching nearest nodes`);
     
-    // Update battalion targeting results (direct integration - no conversion)
-    if (retargetingResults.length > 0) {
-      // Integrate with BattalionService to update targeting (direct pass-through)
-      await BattalionService.updateTargetingResults(battle.battleId, retargetingResults);
+    // Only retarget battalions that were already at nodes (not moving)
+    if (affectedBattalionIds.length > 0) {
+      console.log(`🎯 IMMEDIATE RETARGETING: ${affectedBattalionIds.length} battalions already at nodes`);
       
-      console.log(`🎯 INTEGRATION: Updated targeting for ${retargetingResults.length} battalions`);
+      // Use RetargetingService to find new targets (for battalions already at nodes)
+      const retargetingResults = RetargetingService.retargetBattalionsAfterCapture(
+        capturedNodeIndex,
+        affectedBattalionIds,  // Only battalions that were already at nodes
+        battle.battalions,
+        battle.nodes
+      );
       
-      // NEW: Initiate movement for retargeted battalions
-      await this.initiateRetargetingMovement(battle, retargetingResults);
+      // Update battalion targeting results (direct integration - no conversion)
+      if (retargetingResults.length > 0) {
+        // Integrate with BattalionService to update targeting (direct pass-through)
+        await BattalionService.updateTargetingResults(battle.battleId, retargetingResults);
+        
+        console.log(`🎯 INTEGRATION: Updated targeting for ${retargetingResults.length} battalions already at nodes`);
+        
+        // NEW: Initiate movement for retargeted battalions
+        await this.initiateRetargetingMovement(battle, retargetingResults, 'NODE_CAPTURE_RETARGETING');
+      }
     }
   }
 
@@ -487,7 +536,7 @@ export class AttackService {
       console.log(`🎯 INTEGRATION: Updated targeting for ${retargetingResults.length} battalions`);
       
       // Initiate movement for retargeted battalions
-      await this.initiateRetargetingMovement(freshBattle, retargetingResults);
+      await this.initiateRetargetingMovement(freshBattle, retargetingResults, 'BATTALION_DESTRUCTION_RETARGETING');
     } else {
       console.log(`🎯 DESTRUCTION: No valid retargeting options found for affected battalions`);
     }
@@ -496,8 +545,8 @@ export class AttackService {
   /**
    * NEW: Initiate movement for retargeted battalions
    */
-  static async initiateRetargetingMovement(battle: any, retargetingResults: any[]): Promise<void> {
-    console.log(`🚀 MOVEMENT: Initiating movement for ${retargetingResults.length} retargeted battalions`);
+  static async initiateRetargetingMovement(battle: any, retargetingResults: any[], source: string = 'REGULAR_RETARGETING'): Promise<void> {
+    console.log(`🚀 MOVEMENT [${source}]: Initiating movement for ${retargetingResults.length} retargeted battalions`);
     
     for (const result of retargetingResults) {
       const battalion = battle.battalions.find((b: any) => b.id === result.battalionId);
@@ -523,7 +572,8 @@ export class AttackService {
         screenDimensions.height,
         'retargeting',
         result.pathToTarget,
-        battle  // Pass battle context for same-node targeting
+        battle,  // Pass battle context for same-node targeting
+        'INTERRUPTED_BATTALION_RETARGETING' // NEW: Source tracking for debugging
       );
       
       // Store the movement state so it can be processed by the update loop
@@ -536,6 +586,122 @@ export class AttackService {
     }
     
     console.log(`🚀 MOVEMENT: Movement initiated for all retargeted battalions`);
+  }
+
+  /**
+   * NEW: Execute individual retargeting task for an interrupted battalion that reached its nearest node
+   */
+  static async executeInterruptedBattalionRetargeting(battle: any, battalionId: string): Promise<void> {
+    console.log(`🎯 EXECUTING: Retargeting for interrupted battalion ${battalionId}`);
+    
+    const battalion = battle.battalions.find((b: any) => b.id === battalionId);
+    if (!battalion) {
+      console.log(`❌ RETARGETING ERROR: Battalion ${battalionId} not found for interrupted retargeting`);
+      return;
+    }
+
+    // FIXED: Use preserved originalInterruptionPosition from movement state
+    const movementState = MovementService.getMovementStates(battle.battleId).get(battalionId);
+    if (!movementState || !movementState.originalInterruptionPosition || movementState.originalInterruptionPosition.nodeIndex === undefined) {
+      console.log(`❌ RETARGETING ERROR: Movement state for ${battalionId} not found or no original interruption position`);
+      console.log(`🔍 DEBUG: Movement state exists: ${!!movementState}, originalInterruptionPosition: ${JSON.stringify(movementState?.originalInterruptionPosition)}`);
+      return;
+    }
+
+    const interruptedNodeIndex = movementState.originalInterruptionPosition.nodeIndex;
+    
+    // CRITICAL FIX: Ensure battalion position in battle object matches current reality
+    console.log(`🔍 POSITION CHECK: Battalion ${battalionId} battle object shows node ${battalion.position.nodeIndex}, movement state shows node ${movementState.targetPosition.nodeIndex}`);
+    
+    if (battalion.position.nodeIndex !== movementState.targetPosition.nodeIndex) {
+      console.log(`🔄 POSITION SYNC: Updating battalion ${battalionId} position from stale node ${battalion.position.nodeIndex} to current node ${movementState.targetPosition.nodeIndex}`);
+      battalion.position.nodeIndex = movementState.targetPosition.nodeIndex;
+      battalion.position.x = movementState.targetPosition.x;
+      battalion.position.y = movementState.targetPosition.y;
+      await battle.save();
+      console.log(`💾 POSITION UPDATED: Battalion ${battalionId} position synced to battle object`);
+    }
+    
+    console.log(`🎯 INTERRUPTED RETARGETING: Battalion ${battalionId} recovered from interruption at node ${interruptedNodeIndex}, currently at node ${battalion.position.nodeIndex}`);
+
+    // Use RetargetingService to find new targets for the battalion
+    const retargetingResults = RetargetingService.retargetBattalionsAfterCapture(
+      interruptedNodeIndex,
+      [battalionId],
+      battle.battalions,
+      battle.nodes
+    );
+
+    if (retargetingResults.length > 0) {
+      console.log(`🎯 INTERRUPTED RETARGETING: ${retargetingResults.length} new targets found for ${battalionId}`);
+      
+      // Integrate with BattalionService to update targeting
+      await BattalionService.updateTargetingResults(battle.battleId, retargetingResults);
+      
+      // Initiate movement for retargeted battalions
+      await this.initiateRetargetingMovement(battle, retargetingResults, 'INTERRUPTED_BATTALION_RETARGETING');
+    } else {
+      console.log(`🎯 INTERRUPTED RETARGETING: No valid retargeting options found for ${battalionId}`);
+    }
+  }
+
+  /**
+   * NEW: Queue retargeting for battalion that arrived but couldn't find its target
+   */
+  static queueMissingTargetRetargeting(battleId: string, battalionId: string): void {
+    const task = {
+      battleId: battleId,
+      affectedBattalionIds: [battalionId], // Use array format to match existing queue type
+      timestamp: Date.now(),
+      triggerType: 'missing_target' as const,
+      priority: 2 // Normal priority for missing target retargeting
+    };
+    
+    this.retargetingQueue.push(task);
+    console.log(`📋 MISSING TARGET RETARGETING: Queueing retargeting for battalion ${battalionId} (queue size: ${this.retargetingQueue.length})`);
+    
+    // Process the queue
+    this.processRetargetingQueue();
+  }
+
+  /**
+   * NEW: Execute retargeting for battalion that couldn't find its target on arrival
+   */
+  static async executeMissingTargetRetargeting(battle: any, battalionId: string): Promise<void> {
+    console.log(`🎯 EXECUTING: Retargeting for missing target battalion ${battalionId}`);
+    
+    const battalion = battle.battalions.find((b: any) => b.id === battalionId);
+    if (!battalion) {
+      console.log(`❌ RETARGETING ERROR: Battalion ${battalionId} not found for missing target retargeting`);
+      return;
+    }
+
+    if (battalion.isDestroyed || battalion.currentHealth <= 0) {
+      console.log(`🎯 RETARGETING SKIP: Battalion ${battalionId} is destroyed, skipping retargeting`);
+      return;
+    }
+
+    console.log(`🎯 MISSING TARGET: Battalion ${battalion.owner} ${battalion.type} at node ${battalion.position.nodeIndex} needs new target`);
+
+    // Use RetargetingService to find new targets for the battalion
+    const retargetingResults = RetargetingService.retargetBattalionsAfterCapture(
+      battalion.position.nodeIndex, // Use current position as reference
+      [battalionId],
+      battle.battalions,
+      battle.nodes
+    );
+
+    if (retargetingResults.length > 0) {
+      console.log(`🎯 MISSING TARGET RETARGETING: ${retargetingResults.length} new targets found for ${battalionId}`);
+      
+      // Integrate with BattalionService to update targeting
+      await BattalionService.updateTargetingResults(battle.battleId, retargetingResults);
+      
+      // Initiate movement for retargeted battalions
+      await this.initiateRetargetingMovement(battle, retargetingResults, 'MISSING_TARGET_RETARGETING');
+    } else {
+      console.log(`🎯 MISSING TARGET RETARGETING: No valid retargeting options found for ${battalionId}`);
+    }
   }
 
   /**

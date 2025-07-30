@@ -86,4 +86,7 @@ export interface MovementState {
   currentPathIndex?: number;                       // NEW - current position in fullPath (0=start)
   finalTarget?: number;                            // NEW - ultimate destination node
   isInterruptible?: boolean;                       // NEW - can be stopped for retargeting
+  // MOVEMENT INTERRUPTION FIX: Properties for handling interrupted movements
+  wasInterrupted?: boolean;                        // NEW - marks movement as interrupted
+  interruptionPosition?: { x: number; y: number; nodeIndex: number }; // NEW - exact position when interrupted
 }

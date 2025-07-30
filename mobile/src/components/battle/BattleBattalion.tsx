@@ -75,10 +75,7 @@ export const BattleBattalion = React.memo(({
     if (!movementState) {
       return position; // Default to node position if no movement data
     }
-
-    // Debug: Log movement state for troubleshooting (reduced logging)
-    // console.log(`🎯 CLIENT MOVEMENT: Battalion ${battalion.id} moving from (${movementState.startPosition.x},${movementState.startPosition.y}) to (${movementState.targetPosition.x},${movementState.targetPosition.y})`);
-
+    
     // If battalion has arrived, stay at the target position (attack range position)
     if (movementState.movementStatus === 'arrived') {
       return movementState.targetPosition;

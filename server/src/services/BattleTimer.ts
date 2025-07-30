@@ -58,20 +58,9 @@ export class BattleTimerService extends EventEmitter {
    */
   public stopTimer(battleId: string): void {
     const timer = this.timers.get(battleId);
-    if (!timer) {
-      return;
-    }
+    if (!timer) return;
 
-    // Clear intervals
-    if (timer.countdownInterval) {
-      clearInterval(timer.countdownInterval);
-      timer.countdownInterval = undefined;
-    }
-    if (timer.battleInterval) {
-      clearInterval(timer.battleInterval);
-      timer.battleInterval = undefined;
-    }
-
+    this.clearTimerIntervals(timer);
     timer.isActive = false;
     this.timers.delete(battleId);
     
@@ -82,8 +71,7 @@ export class BattleTimerService extends EventEmitter {
    * Stop all timers (for cleanup)
    */
   public stopAllTimers(): void {
-    const battleIds = Array.from(this.timers.keys());
-    battleIds.forEach(battleId => this.stopTimer(battleId));
+    Array.from(this.timers.keys()).forEach(battleId => this.stopTimer(battleId));
   }
 
   /**
@@ -91,9 +79,7 @@ export class BattleTimerService extends EventEmitter {
    */
   public getTimeRemaining(battleId: string): { countdown: number; battleTime: number; phase: BattlePhase } | null {
     const timer = this.timers.get(battleId);
-    if (!timer) {
-      return null;
-    }
+    if (!timer) return null;
 
     return {
       countdown: timer.countdown,
@@ -106,8 +92,7 @@ export class BattleTimerService extends EventEmitter {
    * Check if a battle timer is active
    */
   public isTimerActive(battleId: string): boolean {
-    const timer = this.timers.get(battleId);
-    return timer?.isActive || false;
+    return this.timers.get(battleId)?.isActive || false;
   }
 
   /**
@@ -131,7 +116,6 @@ export class BattleTimerService extends EventEmitter {
 
       timer.countdown--;
       
-      // Emit countdown update event
       this.emit('countdownUpdate', {
         battleId,
         countdown: timer.countdown,
@@ -139,10 +123,9 @@ export class BattleTimerService extends EventEmitter {
       });
 
       if (timer.countdown <= 0) {
-        // Countdown finished, start battle phase
         this.startBattlePhase(battleId);
       }
-    }, 1000); // Update every second
+    }, 1000);
   }
 
   /**
@@ -152,32 +135,23 @@ export class BattleTimerService extends EventEmitter {
     const timer = this.timers.get(battleId);
     if (!timer) return;
 
-    // Clear countdown interval
-    if (timer.countdownInterval) {
-      clearInterval(timer.countdownInterval);
-      timer.countdownInterval = undefined;
-    }
-
-    // Transition to active phase
+    this.clearTimerIntervals(timer);
     timer.phase = BattlePhase.ACTIVE;
     timer.countdown = 0;
 
     console.log(`Starting battle phase for battle ${battleId}`);
 
-    // Emit phase change event
     this.emit('phaseChange', {
       battleId,
       phase: BattlePhase.ACTIVE,
       countdown: 0,
     });
 
-    // Start battle timer
     timer.battleInterval = setInterval(() => {
       if (!timer.isActive) return;
 
       timer.battleTime++;
       
-      // Emit battle time update event
       this.emit('battleTimeUpdate', {
         battleId,
         battleTime: timer.battleTime,
@@ -185,10 +159,9 @@ export class BattleTimerService extends EventEmitter {
       });
 
       if (timer.battleTime >= TIMER_CONFIG.BATTLE_DURATION) {
-        // Battle time limit reached
         this.endBattle(battleId);
       }
-    }, 1000); // Update every second
+    }, 1000);
   }
 
   /**
@@ -198,26 +171,32 @@ export class BattleTimerService extends EventEmitter {
     const timer = this.timers.get(battleId);
     if (!timer) return;
 
-    // Clear battle interval
-    if (timer.battleInterval) {
-      clearInterval(timer.battleInterval);
-      timer.battleInterval = undefined;
-    }
-
+    this.clearTimerIntervals(timer);
     timer.phase = BattlePhase.COMPLETE;
     timer.isActive = false;
 
     console.log(`Battle ${battleId} ended after ${timer.battleTime} seconds`);
 
-    // Emit battle end event
     this.emit('battleEnd', {
       battleId,
       battleTime: timer.battleTime,
       phase: BattlePhase.COMPLETE,
     });
 
-    // Clean up timer
     this.timers.delete(battleId);
   }
 
+  /**
+   * Clear timer intervals
+   */
+  private clearTimerIntervals(timer: BattleTimer): void {
+    if (timer.countdownInterval) {
+      clearInterval(timer.countdownInterval);
+      timer.countdownInterval = undefined;
+    }
+    if (timer.battleInterval) {
+      clearInterval(timer.battleInterval);
+      timer.battleInterval = undefined;
+    }
+  }
 } 
