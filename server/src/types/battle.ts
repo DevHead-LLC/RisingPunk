@@ -11,11 +11,17 @@ export interface MovementState {
   attackRangePosition?: { x: number; y: number };
   isWithinAttackRange: boolean;
   // PHASE 1: Enhanced properties for movement type distinction and interruption
-  movementType?: 'initial' | 'retargeting';        // NEW - prevents logic mixing
+  movementType?: 'initial' | 'retargeting' | 'interrupted_recovery';        // NEW - prevents logic mixing, added recovery type
   fullPath?: number[];                             // NEW - complete multi-node path [0,3,1,4]
   currentPathIndex?: number;                       // NEW - current position in fullPath (0=start)
   finalTarget?: number;                            // NEW - ultimate destination node
   isInterruptible?: boolean;                       // NEW - can be stopped for retargeting
+  // MOVEMENT INTERRUPTION FIX: Properties for handling interrupted movements
+  wasInterrupted?: boolean;                        // NEW - marks movement as interrupted
+  interruptionPosition?: { x: number; y: number; nodeIndex: number }; // NEW - exact position when interrupted
+  // RECOVERY MOVEMENT: Properties for handling movement to nearest node after interruption  
+  needsRetargetingOnArrival?: boolean;             // NEW - triggers retargeting when reaching nearest node
+  originalInterruptionPosition?: { x: number; y: number; nodeIndex: number }; // FIXED: Preserve original interruption data for retargeting
 }
 
 // Battle phases from intentions document
@@ -199,4 +205,26 @@ export interface BattleStateResponse {
   movementStates?: MovementState[];        // Movement data for battalion animations
   retargetingStatus?: {nodeIndex: number, affectedBattalionIds: string[]}; // Phase 3: Retargeting data
   lastUpdated: Date;
+} 
+
+// RETARGETING QUEUE: Task management for sequential retargeting operations
+export interface RetargetingQueueTask {
+  trigger: string;                                      // Human-readable description of what caused this retargeting
+  triggerType: 'node_capture' | 'battalion_destruction' | 'interrupted_recovery' | 'missing_target'; // NEW - type of retargeting event
+  battleId: string;                                     // Which battle this affects  
+  timestamp: number;                                    // When this was queued
+  
+  // NODE CAPTURE specific fields:
+  capturedNodeIndex?: number;                           // Which node was captured
+  affectedBattalionIds?: string[];                      // Battalions that need retargeting
+  
+  // BATTALION DESTRUCTION specific fields:
+  destroyedBattalionId?: string;                        // Which battalion was destroyed
+  // affectedBattalionIds also used here                // Battalions that were targeting the destroyed one
+  
+  // INTERRUPTED RECOVERY specific fields:
+  battalionId?: string;                                 // NEW - battalion that completed recovery movement
+  
+  // MISSING TARGET specific fields:
+  // battalionId also used here                         // NEW - battalion that couldn't find its target on arrival
 } 

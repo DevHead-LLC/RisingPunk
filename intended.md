@@ -43,7 +43,32 @@
 - Move to node centers for intermediate nodes to access new network connections
 - Stop at attack range for the final target (closest network position with line-of-sight)
 - Movement respects network topology - no shortcuts or jumps
-- **If movement is interrupted by current target capture, stop immediately and retarget**
+- **🚨 CRITICAL: If movement is interrupted by current target capture, battalion MUST:**
+  - **Stop immediately at its current position** (not jump to destination)
+  - **Record exact interruption coordinates** (e.g., 248.0, 326.4) 
+  - **Calculate nearest node** based on movement progress (>50% = closer to target node, <50% = closer to start node)
+  - **NO instant position jumping** - battalion stays at interruption coordinates until natural movement begins
+
+## 5.1. Natural Recovery Movement After Interruption
+- **🎯 DESIRED FLOW FOR INTERRUPTED BATTALIONS:**
+  1. **Node capture at current node** (triggers interruption process)
+  2. **Retarget to new node and begin moving along path** (normal retargeting)
+  3. **Targeted node is captured (while moving)** (interruption trigger)
+  4. **Stop movement pattern record position** - battalion stops at exact coordinates on the spot
+  5. **Retarget from recorded position IF NEEDED** - using nearest node calculation:
+  6. **Move to nearest node and use retargeted path** - following normal speed movement for battalion/bot type stats
+
+- **Natural Recovery Process:**
+  - **Initiate recovery movement** from interruption coordinates to nearest node at normal battalion speed
+  - **No instant teleportation** - battalion moves naturally from (x, y) coordinates to node center
+  - **Deferred retargeting** - retargeting happens AFTER battalion reaches nearest node, not immediately
+  - **Recovery completion trigger** - when battalion arrives at nearest node, automatically queue retargeting
+  - **Resume normal flow** - after retargeting, battalion proceeds with normal movement to new objectives
+
+- **Movement Type Progression:**
+  - `initial` → `retargeting` → `interrupted_recovery` → `retargeting` (normal flow resumes)
+  - Recovery movements are **non-interruptible** to prevent cascading interruptions
+  - Recovery movements use **normal battalion speed stats** for realistic animation
 
 ## 6. Ongoing Combat
 - Battalions continue attacking and retargeting until battle ends or until all opposing battalions are defeated
@@ -95,12 +120,39 @@ Based on the user's example showing "round down" then "round up", two interpreta
 ### **Movement and Destruction Triggers:**
 - **When a battalion is destroyed:** Any enemy battalions targeting it must immediately retarget
 - **Retargeting queue:** Battalion destruction events are processed sequentially to prevent race conditions
-- **Movement updates:** Battalions targeting destroyed battalions stop movement and find new targets
+- **Destruction updates:** Battalions targeting destroyed battalions stop movement and find new targets
+- **Movement updates:** Battalions targeting battalions who move should be triggered to find new location / target
+
+### **Battalion Movement Dynamics:**
+- **When a battalion moves:** All enemy battalions targeting it receive immediate notification
+- **Dynamic pursuit:** Targeting battalions adjust their movement to meet the target at its new destination
+- **Real-time coordination:** Both moving battalion and pursuing battalions update positions continuously
+- **Priority notifications:** Movement updates are processed as high-priority queue events
+
+### **Immediate Response Events (Priority Queue Processing):**
+1. **Node Capture:** 
+   - Immediately stop all attacks on captured node
+   - Immediately interrupt all movements targeting captured node
+   - Update battalion positions to interruption point
+   - Trigger retargeting with updated positions
+   
+2. **Battalion Destruction:**
+   - Immediately remove destroyed battalion from battle
+   - Immediately stop all targeting/attacking of destroyed battalion
+   - Immediately interrupt all movements targeting destroyed battalion
+   - Trigger retargeting for all affected battalions
+   
+3. **Battalion Movement:**
+   - Immediately notify all battalions targeting the moving battalion
+   - Update pursuit paths to new destination
+   - Recalculate movement timing and positioning
 
 ### **Combat Queue System:**
 - **Attack queue:** All battalion attacks are queued to prevent race conditions
 - **Damage processing:** Sequential damage application with health/unit recalculation
 - **Destruction handling:** Immediate removal and retargeting trigger when health ≤ 0
+- **Movement coordination:** Dynamic pursuit and interception calculations
+- **Position updates:** Real-time battalion position tracking for accurate retargeting
 
 ## Key Rules & Network Lock-in
 - **Battalions NEVER leave the network lines** (movement, targeting, attacking)

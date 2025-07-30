@@ -6,6 +6,7 @@ import { NodePosition } from '../../../mobile/src/types/battleTypes';
 import { MovementCalculationService } from './MovementCalculationService';
 import { ScreenDimensionService } from './ScreenDimensionService';
 import { PathfindingService } from './PathfindingService';
+import { BattalionTargetingResult } from '../types/battle';
 
 export class MovementService {
   private static movementStates: Map<string, Map<string, MovementState>> = new Map(); // battleId -> battalionId -> MovementState
@@ -101,13 +102,47 @@ export class MovementService {
               }
             }
             
+            // CRITICAL FIX: Handle interrupted movements properly
+            // For interrupted movements, use the interruption position instead of target position
+            const finalPosition = updatedMovementState.wasInterrupted && updatedMovementState.interruptionPosition 
+              ? updatedMovementState.interruptionPosition 
+              : updatedMovementState.targetPosition;
+              
+            if (updatedMovementState.wasInterrupted) {
+              console.log(`🛑 INTERRUPTED ARRIVAL: ${battalion.owner} ${battalion.type} stopped at interruption position (${finalPosition.x.toFixed(1)}, ${finalPosition.y.toFixed(1)}) on node ${finalPosition.nodeIndex}`);
+            }
+            
             // Update battalion position if it changed
-            if (battalion.position.nodeIndex !== updatedMovementState.targetPosition.nodeIndex) {
-              battalion.position.nodeIndex = updatedMovementState.targetPosition.nodeIndex;
-              battalion.position.x = updatedMovementState.targetPosition.x;
-              battalion.position.y = updatedMovementState.targetPosition.y;
+            if (battalion.position.nodeIndex !== finalPosition.nodeIndex || 
+                Math.abs(battalion.position.x - finalPosition.x) > 0.1 || 
+                Math.abs(battalion.position.y - finalPosition.y) > 0.1) {
+              battalion.position.nodeIndex = finalPosition.nodeIndex;
+              battalion.position.x = finalPosition.x;
+              battalion.position.y = finalPosition.y;
               positionUpdated = true;
-              console.log(`📊 POSITION UPDATE: ${battalion.owner} ${battalion.type}-type battalion position updated to node ${battalion.position.nodeIndex}`);
+              
+              if (updatedMovementState.wasInterrupted) {
+                console.log(`💾 INTERRUPT POSITION SAVED: ${battalion.owner} ${battalion.type} position updated to interruption location node ${battalion.position.nodeIndex} at (${battalion.position.x.toFixed(1)}, ${battalion.position.y.toFixed(1)})`);
+              } else {
+                console.log(`📊 POSITION UPDATE: ${battalion.owner} ${battalion.type}-type battalion position updated to node ${battalion.position.nodeIndex}`);
+              }
+            }
+            
+            // SPECIAL HANDLING: Trigger retargeting for recovery movements
+            if (updatedMovementState.movementType === 'interrupted_recovery' && updatedMovementState.needsRetargetingOnArrival) {
+              console.log(`🎯 RECOVERY COMPLETE: ${battalion.owner} ${battalion.type} reached nearest node ${battalion.position.nodeIndex}, triggering retargeting`);
+              
+              // Trigger retargeting now that battalion is at a proper node
+              const { AttackService } = require('./AttackService');
+              AttackService.queueInterruptedBattalionRetargeting(battleId, battalionId);
+              
+              // Clear the retargeting flag and continue normal movement processing
+              updatedMovementState.needsRetargetingOnArrival = false;
+              updatedMovementState.movementType = 'retargeting'; // Convert to normal retargeting movement
+              battleMovementStates.set(battalionId, updatedMovementState);
+              
+              // Don't process attack logic for recovery movements - they need retargeting first
+              continue;
             }
             
             // Start attacking if not already attacking and target is valid
@@ -156,6 +191,11 @@ export class MovementService {
                   AttackService.startBattalionAttack(battalion, enemyBattalion.id);
                 } else {
                   console.log(`📊 NO BATTALION TARGET: ${battalion.owner} ${battalion.type} cannot find any enemy battalion to attack (target may be destroyed or moved)`);
+                  
+                  // CRITICAL FIX: Trigger retargeting when battalion arrives but target is missing
+                  console.log(`🎯 MISSING TARGET RETARGETING: Queueing retargeting for ${battalion.owner} ${battalion.type} (target not found on arrival)`);
+                  const { AttackService } = require('./AttackService');
+                  AttackService.queueMissingTargetRetargeting(battleId, battalion.id);
                 }
               } else {
                 // NODE TARGET: Original node attack logic for neutral nodes
@@ -198,7 +238,10 @@ export class MovementService {
             targetResult.targetNode,
             screenDimensions.width,
             screenDimensions.height,
-            'initial'  // FIXED: Use 'initial' for initial targeting, not 'retargeting'
+            'initial',  // FIXED: Use 'initial' for initial targeting, not 'retargeting'
+            undefined,
+            undefined,
+            'INITIAL_TARGETING'
           );
           
           if (movementState) {
@@ -233,8 +276,10 @@ export class MovementService {
     screenHeight: number,
     movementType: 'initial' | 'retargeting' = 'initial',
     fullPath?: number[],  // Required for retargeting
-    battle?: any  // Required for same-node targeting
+    battle?: any,  // Required for same-node targeting
+    source: string = 'UNKNOWN' // NEW: Track movement source for debugging
   ): MovementState | undefined {
+    console.log(`🚀 MOVEMENT INITIATION [${source}]: ${battalion.owner} ${battalion.type} (${movementType}) to node ${targetNode}`);
     
 
     
@@ -639,20 +684,102 @@ export class MovementService {
   static interruptRetargetingMovement(battalionId: string, battleId: string): boolean {
     const battleMovementStates = this.movementStates.get(battleId);
     if (!battleMovementStates) return false;
-    
+
     const movementState = battleMovementStates.get(battalionId);
     if (!movementState || !movementState.isInterruptible) {
       console.log(`🛑 INTERRUPT: Battalion ${battalionId} not interruptible`);
       return false;
     }
-    
+
     console.log(`🛑 INTERRUPT: Stopping retargeting movement for battalion ${battalionId}`);
+
+    // CRITICAL FIX: Calculate current position instead of jumping to destination
+    const { MovementCalculationService } = require('./MovementCalculationService');
+    const currentPosition = MovementCalculationService.calculateCurrentMovementPosition(movementState);
     
-    // Stop current movement and mark as arrived at current target
+    console.log(`🛑 INTERRUPT POSITION: Battalion ${battalionId} stopped at coordinates (${currentPosition.x.toFixed(1)}, ${currentPosition.y.toFixed(1)}) nearest to node ${currentPosition.nodeIndex}`);
+    
+    // Update movement state with current position as the new "arrival" position
+    movementState.targetPosition = currentPosition;
     movementState.movementStatus = 'arrived';
-    battleMovementStates.set(battalionId, movementState);
     
+    // Mark this as an interrupted movement for database update
+    movementState.wasInterrupted = true;
+    movementState.interruptionPosition = currentPosition;
+    
+    console.log(`💾 INTERRUPT UPDATE: Battalion ${battalionId} movement state updated with interruption coordinates`);
+    
+    battleMovementStates.set(battalionId, movementState);
+
     return true;
+  }
+
+  /**
+   * NEW: Initiate movement from interruption position to nearest node
+   * This allows interrupted battalions to move naturally to nodes before retargeting
+   */
+  static initiateMovementToNearestNode(battalion: any, interruptionPosition: any, battleId: string): void {
+    console.log(`🚀 RECOVERY MOVEMENT [INTERRUPTION_RECOVERY]: ${battalion.owner} ${battalion.type} movement from interruption position to nearest node ${interruptionPosition.nodeIndex}`);
+    
+    // Get screen dimensions for movement calculation
+    const screenDimensions = ScreenDimensionService.getBattleScreenDimensions(battleId);
+    
+    // Get node positions for the target node
+    const nodePositions = calculateNodePositions(screenDimensions.width, screenDimensions.height);
+    const targetNodePosition = nodePositions[interruptionPosition.nodeIndex];
+    
+    // FIXED: Calculate duration based on actual distance traveled, not full node duration
+    const { MovementCalculationService } = require('./MovementCalculationService');
+    const actualDistance = MovementCalculationService.calculateNetworkDistance(
+      { x: interruptionPosition.x, y: interruptionPosition.y },
+      targetNodePosition.position
+    );
+    
+    // Base duration calculation for proportional movement
+    const fullMovementDuration = MovementCalculationService.calculateMovementDuration(battalion);
+    const averageNodeDistance = 300; // Approximate average node-to-node distance in pixels
+    const proportionalDuration = Math.max(
+      500, // Minimum 500ms for visual smoothness
+      Math.round((actualDistance / averageNodeDistance) * fullMovementDuration)
+    );
+    
+    console.log(`⏱️ RECOVERY DISTANCE: ${actualDistance.toFixed(1)}px → ${proportionalDuration}ms (was ${fullMovementDuration}ms)`);
+
+    
+    // Create movement state from interruption position to nearest node
+    const movementState = {
+      battalionId: battalion.id,
+      startPosition: { 
+        x: interruptionPosition.x, 
+        y: interruptionPosition.y, 
+        nodeIndex: battalion.position.nodeIndex // Keep original position nodeIndex until arrival
+      },
+      targetPosition: {
+        x: targetNodePosition.position.x,
+        y: targetNodePosition.position.y,
+        nodeIndex: interruptionPosition.nodeIndex
+      },
+      movementStatus: 'moving',
+      startTime: Date.now(),
+      estimatedDuration: proportionalDuration, // FIXED: Use proportional duration
+      networkPath: [battalion.position.nodeIndex, interruptionPosition.nodeIndex],
+      attackRangePosition: { x: targetNodePosition.position.x, y: targetNodePosition.position.y },
+      isWithinAttackRange: false,
+      movementType: 'interrupted_recovery', // Special type for interrupted recovery movement
+      currentPathIndex: 0,
+      finalTarget: interruptionPosition.nodeIndex,
+      isInterruptible: false, // Don't interrupt recovery movements
+      needsRetargetingOnArrival: true, // Flag to trigger retargeting when arriving at node
+      // FIXED: Preserve interruption data for retargeting
+      originalInterruptionPosition: interruptionPosition // Keep original interruption data
+    };
+    
+    // Store movement state
+    const battleMovementStates = this.movementStates.get(battleId) || new Map();
+    battleMovementStates.set(battalion.id, movementState);
+    this.movementStates.set(battleId, battleMovementStates);
+    
+    console.log(`🚀 RECOVERY MOVEMENT: ${battalion.owner} ${battalion.type} moving from (${interruptionPosition.x.toFixed(1)}, ${interruptionPosition.y.toFixed(1)}) to node ${interruptionPosition.nodeIndex} at (${targetNodePosition.position.x}, ${targetNodePosition.position.y})`);
   }
 
 

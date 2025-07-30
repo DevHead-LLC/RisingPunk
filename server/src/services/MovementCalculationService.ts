@@ -84,4 +84,45 @@ export class MovementCalculationService {
   static getMovementConfig() {
     return MOVEMENT_CONFIG;
   }
+
+  /**
+   * Calculate current position of a battalion during movement
+   * Uses time-based interpolation to determine where the battalion is at this moment
+   */
+  static calculateCurrentMovementPosition(movementState: any): { x: number; y: number; nodeIndex: number } {
+    const elapsedTime = Date.now() - movementState.startTime;
+    const totalDuration = movementState.estimatedDuration;
+    
+    // Calculate movement progress (0.0 = start, 1.0 = end)
+    const progress = Math.min(elapsedTime / totalDuration, 1.0);
+    
+    console.log(`📊 CURRENT POSITION CALC: Battalion ${movementState.battalionId} progress ${(progress * 100).toFixed(1)}% (${elapsedTime}ms / ${totalDuration}ms)`);
+    
+    // Interpolate between start and target positions
+    const currentPosition = this.interpolateAlongNetworkLine(
+      movementState.startPosition,
+      movementState.targetPosition,
+      progress
+    );
+    
+    console.log(`📍 INTERPOLATED POSITION: Battalion ${movementState.battalionId} at (${currentPosition.x.toFixed(1)}, ${currentPosition.y.toFixed(1)}) between start (${movementState.startPosition.x}, ${movementState.startPosition.y}) and target (${movementState.targetPosition.x}, ${movementState.targetPosition.y})`);
+    
+    // CRITICAL FIX: Determine which node the battalion is actually closest to
+    // Instead of always using the starting node, find the nearest node to the actual position
+    let closestNodeIndex = movementState.startPosition.nodeIndex; // Fallback to start node
+    
+    // If we're more than halfway to the target, we're probably closer to the target node
+    if (progress > 0.5) {
+      closestNodeIndex = movementState.targetPosition.nodeIndex;
+      console.log(`🎯 POSITION: Battalion ${movementState.battalionId} >50% progress, closer to target node ${closestNodeIndex}`);
+    } else {
+      console.log(`🎯 POSITION: Battalion ${movementState.battalionId} <50% progress, closer to start node ${closestNodeIndex}`);
+    }
+    
+    return {
+      x: currentPosition.x,
+      y: currentPosition.y,
+      nodeIndex: closestNodeIndex // Use closest node, not always start node
+    };
+  }
 } 

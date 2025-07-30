@@ -16,39 +16,21 @@ export const BattleCountdownOverlay = React.memo(({ countdown, isVisible }: Prop
   const scale = React.useRef(new Animated.Value(0.5)).current;
 
   React.useEffect(() => {
-    if (isVisible) {
-      // Fade in and scale up
-      Animated.parallel([
-        Animated.timing(opacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.spring(scale, {
-          toValue: 1,
-          tension: 100,
-          friction: 8,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      // Fade out and scale down
-      Animated.parallel([
-        Animated.timing(opacity, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scale, {
-          toValue: 0.5,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-  }, [isVisible, opacity, scale]);
+    const animations = [
+      Animated.timing(opacity, {
+        toValue: isVisible ? 1 : 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      isVisible 
+        ? Animated.spring(scale, { toValue: 1, tension: 100, friction: 8, useNativeDriver: true })
+        : Animated.timing(scale, { toValue: 0.5, duration: 200, useNativeDriver: true })
+    ];
+    
+    Animated.parallel(animations).start();
+  }, [isVisible]);
 
-  if (!isVisible) {return null;}
+  if (!isVisible) return null;
 
   return (
     <Animated.View style={[styles.container, { opacity }]}>
