@@ -1,22 +1,7 @@
 /**
  * @file jest.setup.js
- * @description Jest setup for React Native tests
+ * @description Jest setup to suppress console.log during tests but allow errors
  */
-
-// Mock react-native-reanimated
-jest.mock('react-native-reanimated', () => {
-  const Reanimated = require('react-native-reanimated/mock');
-  Reanimated.default.call = () => {};
-  return Reanimated;
-});
-
-// Mock @react-native-async-storage/async-storage
-jest.mock('@react-native-async-storage/async-storage', () =>
-  require('@react-native-async-storage/async-storage/jest/async-storage-mock')
-);
-
-// Mock react-native-svg
-jest.mock('react-native-svg', () => 'Svg');
 
 // Store original console methods
 const originalConsoleLog = console.log;
@@ -40,4 +25,4 @@ afterAll(() => {
   console.log = originalConsoleLog;
   console.error = originalConsoleError;
   console.warn = originalConsoleWarn;
-});
+}); 
