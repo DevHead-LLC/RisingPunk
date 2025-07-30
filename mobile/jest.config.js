@@ -9,11 +9,15 @@ module.exports = {
     '^.+\\.(js|jsx)$': 'babel-jest',
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-  setupFiles: [
+  setupFilesAfterEnv: [
     './jest.setup.js',
   ],
   transformIgnorePatterns: [
     'node_modules/(?!(react-native|@react-native|react-native-svg|@react-navigation)/)',
   ],
   testEnvironment: 'node',
+  testMatch: [
+    '**/__tests__/**/*.test.(ts|tsx|js|jsx)',
+    '**/?(*.)+(spec|test).(ts|tsx|js|jsx)'
+  ],
 };

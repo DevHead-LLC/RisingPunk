@@ -19,8 +19,6 @@ type Props = {
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-
-
 export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: Props) => {
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const [selectorVisible, setSelectorVisible] = useState(false);
@@ -31,30 +29,15 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
   const [assignToBattalion] = useAssignToBattalionMutation();
   const [startBattle] = useStartBattleMutation();
 
-
   useEffect(() => {
-    // Run the animation sequence twice
     Animated.sequence([
       ...Array(2).fill(
         Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 0,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 1500, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 0, duration: 1500, useNativeDriver: true }),
         ])
       ),
-      // Finally set to a low, steady opacity
-      Animated.timing(pulseAnim, {
-        toValue: 0.3,
-        duration: 500,
-        useNativeDriver: true,
-      }),
+      Animated.timing(pulseAnim, { toValue: 0.3, duration: 500, useNativeDriver: true }),
     ]).start();
   }, [pulseAnim]);
 
@@ -74,7 +57,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
   };
 
   const handleBotAssignment = async (data: { botType: BotType; quantity: number }) => {
-    if (!selectedBattalion) {return;}
+    if (!selectedBattalion) return;
 
     try {
       await assignToBattalion({
@@ -97,68 +80,28 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
     setSelectorVisible(false);
   };
 
-  useEffect(() => {
-    return () => {
-      // Reset local assignments state
-      setAssignments({});
+  const resetBattalions = async () => {
+    try {
+      await Promise.all([
+        assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'A' }),
+        assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'B' }),
+      ]);
+    } catch (error) {
+      console.error('Failed to reset battalions:', error);
+    }
+  };
 
-      // Reset server-side assignments for both battalions sequentially
-      const resetBattalions = async () => {
-        try {
-          // Reset battalion A first
-          await assignToBattalion({
-            botType: 'breacher',
-            quantity: 0,
-            battalionId: 'A',
-          });
-
-          // Then reset battalion B
-          await assignToBattalion({
-            botType: 'breacher',
-            quantity: 0,
-            battalionId: 'B',
-          });
-        } catch (error) {
-          // Just log the error instead of showing it to the user
-          // This is cleanup code and shouldn't block the user
-          console.error('Failed to reset battalions:', error);
-        }
-      };
-
-      // Use void to indicate we're intentionally not handling the promise
-      void resetBattalions();
-    };
-  }, [assignToBattalion]);
-
-  // Add this effect to fetch initial assignments
   useEffect(() => {
     const fetchAssignments = async () => {
       try {
-        // First reset all assignments to 0
         setAssignments({});
-
-        // Then fetch current state
         const response = await fetch(`${API_URL}/api/bots`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
+          headers: { 'Authorization': `Bearer ${token}` },
         });
         const data = await response.json();
 
-        // If there are any existing assignments, clear them first
         if (data.battalionAssignments?.length > 0) {
-          await Promise.all([
-            assignToBattalion({
-              botType: 'breacher',
-              quantity: 0,
-              battalionId: 'A',
-            }),
-            assignToBattalion({
-              botType: 'breacher',
-              quantity: 0,
-              battalionId: 'B',
-            }),
-          ]);
+          await resetBattalions();
         }
       } catch (error) {
         console.error('Failed to fetch assignments:', error);
@@ -166,7 +109,33 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
     };
 
     fetchAssignments();
+    return () => {
+      void resetBattalions();
+    };
   }, [token, assignToBattalion]);
+
+  const renderBattalionSlots = (names: string[], isEnemy = false, isLocked = false) => (
+    <View style={styles.battalionColumn}>
+      {names.map(name => (
+        <BattalionSlot
+          key={name}
+          name={name}
+          isEnemy={isEnemy}
+          isLocked={isLocked}
+          onPress={!isLocked ? () => handleBattalionPress(name) : undefined}
+          assignment={!isEnemy && !isLocked ? assignments[name] : undefined}
+        />
+      ))}
+    </View>
+  );
+
+  const renderCircleSlots = (count: number, isEnemy = false) => (
+    <View style={isEnemy ? styles.circleColumnEnemy : styles.circleColumn}>
+      {Array(count).fill(null).map((_, index) => (
+        <CircleSlot key={index} isEnemy={isEnemy} />
+      ))}
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -177,11 +146,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
       </View>
 
       <View style={styles.mainContainer}>
-        <ScrollView
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-        >
+        <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
           {/* User Forces Screen */}
           <View style={styles.screen}>
             <Text style={styles.subtitle}>[USER FORCES]</Text>
@@ -190,31 +155,10 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
               <Text style={styles.swipeText}>ENEMY FORCES</Text>
             </Animated.View>
             <View style={styles.battalionsContainer}>
-              <View style={styles.battalionColumn}>
-                <BattalionSlot name="E" isLocked />
-                <BattalionSlot name="F" isLocked />
-              </View>
-              <View style={styles.battalionColumn}>
-                <BattalionSlot name="C" isLocked />
-                <BattalionSlot name="D" isLocked />
-              </View>
-              <View style={styles.battalionColumn}>
-                <BattalionSlot
-                  name="A"
-                  onPress={() => handleBattalionPress('A')}
-                  assignment={assignments.A}
-                />
-                <BattalionSlot
-                  name="B"
-                  onPress={() => handleBattalionPress('B')}
-                  assignment={assignments.B}
-                />
-              </View>
-              <View style={styles.circleColumn}>
-                <CircleSlot />
-                <CircleSlot />
-                <CircleSlot />
-              </View>
+              {renderBattalionSlots(['E', 'F'], false, true)}
+              {renderBattalionSlots(['C', 'D'], false, true)}
+              {renderBattalionSlots(['A', 'B'])}
+              {renderCircleSlots(3)}
             </View>
           </View>
 
@@ -222,29 +166,10 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
           <View style={styles.screen}>
             <Text style={styles.subtitleEnemy}>[ENEMY FORCES]</Text>
             <View style={[styles.battalionsContainer, styles.battalionsContainerEnemy]}>
-              <View style={styles.circleColumnEnemy}>
-                <CircleSlot isEnemy />
-                <CircleSlot isEnemy />
-                <CircleSlot isEnemy />
-              </View>
-              <View style={styles.battalionColumn}>
-                <BattalionSlot
-                  name="A"
-                  isEnemy
-                />
-                <BattalionSlot
-                  name="B"
-                  isEnemy
-                />
-              </View>
-              <View style={styles.battalionColumn}>
-                <BattalionSlot name="C" isEnemy isLocked />
-                <BattalionSlot name="D" isEnemy isLocked />
-              </View>
-              <View style={styles.battalionColumn}>
-                <BattalionSlot name="E" isEnemy isLocked />
-                <BattalionSlot name="F" isEnemy isLocked />
-              </View>
+              {renderCircleSlots(3, true)}
+              {renderBattalionSlots(['A', 'B'], true)}
+              {renderBattalionSlots(['C', 'D'], true, true)}
+              {renderBattalionSlots(['E', 'F'], true, true)}
             </View>
           </View>
         </ScrollView>
@@ -254,7 +179,6 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
         style={styles.executeButton}
         onPress={async () => {
           try {
-            // Start battle with computer opponent
             const result = await startBattle({
               userBattalions: [
                 { type: 'guardian', quantity: 10, nodeIndex: 0 },
@@ -265,12 +189,9 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
               screenHeight: SCREEN_HEIGHT,
             }).unwrap();
 
-
-            // Pass battleId to parent component
             onBattleStart(result.battleId);
           } catch (error) {
             console.error('Failed to start battle:', error);
-            // Fallback to demo mode
             onBattleStart();
           }
         }}
@@ -362,9 +283,6 @@ const styles = StyleSheet.create({
     gap: SIZING.spacing.xs,
     paddingTop: 4,
   },
-  enemyForces: {
-    flex: 1,
-  },
   executeButton: {
     marginHorizontal: SIZING.spacing.sm,
     marginBottom: SIZING.spacing.sm,
@@ -390,7 +308,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: SIZING.spacing.xs,
     paddingRight: SIZING.spacing.lg * 5,
-    marginTop: -SIZING.spacing.lg * 1.5, // Position it closer to top
+    marginTop: -SIZING.spacing.lg * 1.5,
   },
   swipeArrow: {
     color: '#00FF41',

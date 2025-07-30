@@ -1,10 +1,9 @@
 import { EventEmitter } from 'events';
 import { BattlePhase } from '../types/battle';
 
-// Timer configuration constants (single source of truth for battle timing)
 const TIMER_CONFIG = {
-  COUNTDOWN_DURATION: 3,  // Countdown phase duration in seconds
-  BATTLE_DURATION: 20,    // Battle phase duration in seconds
+  COUNTDOWN_DURATION: 3,
+  BATTLE_DURATION: 20,
 } as const;
 
 interface BattleTimer {
@@ -63,7 +62,6 @@ export class BattleTimerService extends EventEmitter {
     this.clearTimerIntervals(timer);
     timer.isActive = false;
     this.timers.delete(battleId);
-    
     console.log(`Timer stopped for battle ${battleId}`);
   }
 
@@ -79,13 +77,11 @@ export class BattleTimerService extends EventEmitter {
    */
   public getTimeRemaining(battleId: string): { countdown: number; battleTime: number; phase: BattlePhase } | null {
     const timer = this.timers.get(battleId);
-    if (!timer) return null;
-
-    return {
+    return timer ? {
       countdown: timer.countdown,
       battleTime: timer.battleTime,
       phase: timer.phase,
-    };
+    } : null;
   }
 
   /**
