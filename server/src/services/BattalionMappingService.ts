@@ -36,15 +36,13 @@ export class BattalionMappingService {
 
     // Use cached mapping when possible to avoid redundant object creation
     return aliveBattalions.map(battalion => {
-      const cacheKey = `${battalion.id}-${battalion.currentHealth}-${battalion.quantity}-${battalion.position.nodeIndex}`;
+      const movementState = movementStates?.get(battalion.id) || undefined;
+      const cacheKey = `${battalion.id}-${battalion.currentHealth}-${battalion.quantity}-${battalion.position.nodeIndex}-${movementState ? JSON.stringify(movementState) : 'undefined'}`;
       
       if (this.battalionCache.has(cacheKey)) {
+        // Return immutable copy to prevent shared mutable state
         const cached = this.battalionCache.get(cacheKey)!;
-        // Only update movement state if it changed
-        if (cached.movementState !== (movementStates?.get(battalion.id) || undefined)) {
-          cached.movementState = movementStates?.get(battalion.id) || undefined;
-        }
-        return cached;
+        return { ...cached };
       }
 
       const clientBattalion: ClientBattalion = {
@@ -60,7 +58,7 @@ export class BattalionMappingService {
         isUser: battalion.owner === NodeOwner.USER,
         mark: battalion.mark,
         stats: battalion.stats,
-        movementState: movementStates?.get(battalion.id) || undefined
+        movementState: movementState
       };
 
       this.battalionCache.set(cacheKey, clientBattalion);
