@@ -33,25 +33,39 @@ export const BattleBattalionManager = React.memo(({
     pollingInterval,
   });
 
+  const calculatedPollingInterval = React.useMemo(() => 
+    battleState?.phase === 'battle' 
+      ? ANIMATION_CONFIG.BATTLE_PHASE_POLLING_MS 
+      : ANIMATION_CONFIG.DEFAULT_POLLING_MS
+  , [battleState?.phase]);
+
   useEffect(() => {
-    setPollingInterval(
-      battleState?.phase === 'battle' 
-        ? ANIMATION_CONFIG.BATTLE_PHASE_POLLING_MS 
-        : ANIMATION_CONFIG.DEFAULT_POLLING_MS
+    setPollingInterval(calculatedPollingInterval);
+  }, [calculatedPollingInterval]);
+
+  const nodePositions = React.useMemo(() => {
+    if (!battleState?.nodes) return {};
+    return createNodePositionMap(battleState.nodes);
+  }, [battleState?.nodes]);
+
+  const movementStateMap = React.useMemo(() => {
+    if (!battleState?.movementStates) return new Map();
+    return new Map(battleState.movementStates.map(ms => [ms.battalionId, ms]));
+  }, [battleState?.movementStates]);
+
+  const filteredBattalions = React.useMemo(() => {
+    if (!battleState?.battalions) return [];
+    return battleState.battalions.filter(battalion => 
+      nodePositions[battalion.nodeIndex] !== undefined
     );
-  }, [battleState?.phase]);
+  }, [battleState?.battalions, nodePositions]);
 
   const renderBattalions = React.useMemo(() => {
     if (!battleState) return null;
 
-    const { battalions = [], nodes = [], movementStates = [] } = battleState;
-    const nodePositions = createNodePositionMap(nodes);
-    const movementStateMap = new Map(movementStates.map(ms => [ms.battalionId, ms]));
-
     return (
       <View style={styles.container}>
-        {battalions
-          .filter(battalion => nodePositions[battalion.nodeIndex] !== undefined)
+        {filteredBattalions
           .map((battalion) => {
             const nodePosition = nodePositions[battalion.nodeIndex];
             const movementState = movementStateMap.get(battalion.id);
@@ -71,7 +85,7 @@ export const BattleBattalionManager = React.memo(({
           })}
       </View>
     );
-  }, [battleState, battalionSize, showHealthBars]);
+  }, [battleState, battalionSize, showHealthBars, filteredBattalions, nodePositions, movementStateMap]);
 
   return (
     <BattleLoadingError

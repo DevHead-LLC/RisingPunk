@@ -84,12 +84,16 @@ export const BattleNetworkGrid = React.memo(({
     }
   }, [battleState, battleError]);
 
+  const nodes = React.useMemo(() => battleState?.nodes || [], [battleState?.nodes]);
+  const connections = React.useMemo(() => battleState?.networkConnections || [], [battleState?.networkConnections]);
+  const lineProperties = React.useMemo(() => battleState?.lineProperties || [], [battleState?.lineProperties]);
+
+  const neutralNodes = React.useMemo(() => 
+    nodes.filter(node => node.owner === 'neutral'), [nodes]
+  );
+
   const renderNetwork = React.useMemo(() => {
     if (!battleState) return null;
-
-    const nodes = battleState.nodes || [];
-    const connections = battleState.networkConnections || [];
-    const lineProperties = battleState.lineProperties || [];
 
     return (
       <View style={styles.container}>
@@ -144,7 +148,7 @@ export const BattleNetworkGrid = React.memo(({
         ))}
       </View>
     );
-  }, [battleState, lineWidth, lineColor, nodeSize, showNodeLabels]);
+  }, [battleState, lineWidth, lineColor, nodeSize, showNodeLabels, nodes, connections, lineProperties]);
 
   return (
     <BattleLoadingError

@@ -63,10 +63,9 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
     }
   }, [battleError]);
 
-  const renderOverlays = React.useMemo(() => {
+  const phaseData = React.useMemo(() => {
     if (!battleState) return null;
 
-    // Extract timer data from server response
     const phase = battleState.phase;
     const timeRemaining = battleState.timeRemaining || 20;
     const maxBattleTime = 20; // Fixed battle duration
@@ -82,24 +81,37 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
     const isCountdownPhase = clientPhase === BattlePhase.COUNTDOWN && timeRemaining <= 3 && timeRemaining > 0;
     const countdownValue = isCountdownPhase ? timeRemaining : 0;
 
+    return {
+      clientPhase,
+      battleTime,
+      maxBattleTime,
+      isCountdownPhase,
+      countdownValue,
+      isTimerVisible: clientPhase === BattlePhase.COUNTDOWN || clientPhase === BattlePhase.ACTIVE
+    };
+  }, [battleState]);
+
+  const renderOverlays = React.useMemo(() => {
+    if (!phaseData) return null;
+
     return (
       <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
         {/* Battle timer - always rendered and visible during countdown and active phases */}
         <BattleTimerDisplay
-          battleTime={battleTime}
-          maxBattleTime={maxBattleTime}
-          isVisible={clientPhase === BattlePhase.COUNTDOWN || clientPhase === BattlePhase.ACTIVE}
+          battleTime={phaseData.battleTime}
+          maxBattleTime={phaseData.maxBattleTime}
+          isVisible={phaseData.isTimerVisible}
         />
 
         {/* Countdown overlay - rendered on top when in COUNTDOWN phase */}
-        {isCountdownPhase && countdownValue > 0 && (
-          <BattleCountdownOverlay countdown={countdownValue} isVisible={true} />
+        {phaseData.isCountdownPhase && phaseData.countdownValue > 0 && (
+          <BattleCountdownOverlay countdown={phaseData.countdownValue} isVisible={true} />
         )}
 
         {/* No overlay for COMPLETE phase */}
       </View>
     );
-  }, [battleState]);
+  }, [phaseData]);
 
   return (
     <BattleLoadingError
