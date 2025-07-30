@@ -132,6 +132,7 @@ export class MovementService {
                 } else {
                   console.log(`📊 NO BATTALION TARGET: ${battalion.owner} ${battalion.type} cannot find any enemy battalion to attack (target may be destroyed or moved)`);
                   console.log(`🎯 MISSING TARGET: Target not found for ${battalion.owner} ${battalion.type}, will be handled by AttackService queue`);
+                  AttackService.queueMissingTargetRetargeting(battle.battleId, battalion.id);
                 }
               } else {
                 const targetNode = battle.nodes.find((n: any) => n.index === updatedMovementState.targetPosition.nodeIndex);

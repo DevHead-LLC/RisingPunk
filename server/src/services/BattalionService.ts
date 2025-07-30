@@ -139,8 +139,25 @@ export class BattalionService {
     
     const battalionConfigs = userBattalions || defaultUserBattalions;
     
-    return battalionConfigs.map((battalion, index) => 
-      this.createBattalion(
+    return battalionConfigs.map((battalion, index) => {
+      // Validate bot type
+      const validBotTypes = ['guardian', 'breacher', 'phreak'] as const;
+      const botType = battalion.type as string;
+      
+      if (!validBotTypes.includes(botType as any)) {
+        console.log(`⚠️ INVALID BOT TYPE: "${botType}" is not a valid bot type. Using 'guardian' as fallback.`);
+        battalion.type = 'guardian' as BotType;
+      }
+      
+      const validatedBotType = battalion.type as BotType;
+      
+      // Ensure the bot type exists in BOT_CONFIG
+      if (!BOT_CONFIG.USER_BOT_STATS[validatedBotType]) {
+        console.log(`⚠️ MISSING BOT CONFIG: "${validatedBotType}" not found in BOT_CONFIG. Using 'guardian' as fallback.`);
+        battalion.type = 'guardian' as BotType;
+      }
+      
+      return this.createBattalion(
         `user-battalion-${index}`,
         battalion.type as BotType,
         battalion.quantity,
@@ -148,8 +165,8 @@ export class BattalionService {
         NodeOwner.USER,
         BOT_CONFIG.USER_BOT_STATS[battalion.type as BotType].stats,
         nodes
-      )
-    );
+      );
+    });
   }
 
   static createEnemyBattalions(nodes: INode[]): IBattalion[] {

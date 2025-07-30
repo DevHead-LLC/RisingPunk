@@ -93,7 +93,11 @@ export class BattleController {
       const networkData = this.generateNetworkData(battle.nodes, screenWidth, screenHeight, battle);
 
       let targetingResults: any[] = [];
-      if (timerState?.phase === BattlePhase.ACTIVE && timerState.countdown === 0) {
+      // Use timerState if available, otherwise fall back to battle data
+      const currentPhase = timerState?.phase || battle.phase;
+      const currentCountdown = timerState?.countdown ?? battle.countdown;
+      
+      if (currentPhase === BattlePhase.ACTIVE && currentCountdown === 0) {
         if (BattalionService.getTargetingResults(battleId).length === 0) {
           await this.battleService.triggerInitialTargeting(battleId);
         }
