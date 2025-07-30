@@ -24,11 +24,11 @@ export const BattalionBotSelector = React.memo(({
   const [selectedType, setSelectedType] = useState<BotType | null>(null);
   const [quantity, setQuantity] = useState(0);
 
-  const handleSubmit = () => {
+  const handleSubmit = React.useCallback(() => {
     if (selectedType) {
       onSubmit({ botType: selectedType, quantity });
     }
-  };
+  }, [selectedType, quantity, onSubmit]);
 
   // Reset quantity when bot type changes
   useEffect(() => {

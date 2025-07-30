@@ -11,15 +11,30 @@ type Props = {
 };
 
 export const BotTypeCard = React.memo(({ type, count, isSelected, onSelect }: Props) => {
+  const cardStyle = React.useMemo(() => [
+    styles.card, 
+    isSelected && styles.selectedCard
+  ], [isSelected]);
+
+  const typeTextStyle = React.useMemo(() => [
+    styles.typeText, 
+    isSelected && styles.selectedText
+  ], [isSelected]);
+
+  const countTextStyle = React.useMemo(() => [
+    styles.countText, 
+    isSelected && styles.selectedCount
+  ], [isSelected]);
+
   return (
     <TouchableOpacity
-      style={[styles.card, isSelected && styles.selectedCard]}
+      style={cardStyle}
       onPress={() => onSelect(type)}
     >
-      <Text style={[styles.typeText, isSelected && styles.selectedText]}>
+      <Text style={typeTextStyle}>
         {type.toUpperCase()}
       </Text>
-      <Text style={[styles.countText, isSelected && styles.selectedCount]}>
+      <Text style={countTextStyle}>
         ({count})
       </Text>
     </TouchableOpacity>

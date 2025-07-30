@@ -10,6 +10,11 @@ type Props = {
 export const BattleTimerDisplay = React.memo(({ battleTime, maxBattleTime, isVisible }: Props) => {
   if (!isVisible) return null;
 
+  const progressFillStyle = React.useMemo(() => [
+    styles.progressFill,
+    { width: `${(battleTime / maxBattleTime) * 100}%` as any },
+  ], [battleTime, maxBattleTime]);
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -18,12 +23,7 @@ export const BattleTimerDisplay = React.memo(({ battleTime, maxBattleTime, isVis
       </View>
 
       <View style={styles.progressBar}>
-        <View
-          style={[
-            styles.progressFill,
-            { width: `${(battleTime / maxBattleTime) * 100}%` },
-          ]}
-        />
+        <View style={progressFillStyle} />
       </View>
     </View>
   );

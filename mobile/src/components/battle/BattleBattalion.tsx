@@ -63,7 +63,7 @@ export const BattleBattalion = React.memo(({
     }
   }, [movementState?.startTime, movementState?.movementStatus]);
   
-  const calculateSmoothPosition = () => {
+  const smoothPosition = React.useMemo(() => {
     if (!movementState) return position;
     
     if (movementState.movementStatus === 'arrived') {
@@ -89,9 +89,7 @@ export const BattleBattalion = React.memo(({
       (movementState.targetPosition.y - movementState.startPosition.y) * adjustedProgress;
     
     return { x: smoothX, y: smoothY };
-  };
-  
-  const smoothPosition = calculateSmoothPosition();
+  }, [movementState, position, currentTime, clientStartTime]);
   
   React.useEffect(() => {
     Animated.timing(animatedPosition, {
@@ -116,7 +114,7 @@ export const BattleBattalion = React.memo(({
   const borderColor = battalion.isUser ? '#4717F6' : '#FF4141';
   const attackRangeRadius = battalion.stats.range * 8;
 
-  const getShapeStyle = () => {
+  const getShapeStyle = React.useMemo(() => {
     const base = {
       width: size,
       height: size,
@@ -139,79 +137,95 @@ export const BattleBattalion = React.memo(({
       default:
         return base;
     }
-  };
+  }, [size, displayPosition.x, displayPosition.y, borderColor, battalion.type]);
 
-  const getHealthBarColor = () => {
-    if (healthPercentage > 60) return '#4CAF50';
-    if (healthPercentage > 30) return '#FF9800';
-    return '#F44336';
-  };
+  const getHealthBarColor = React.useMemo(() => {
+    return healthPercentage > 60 ? '#4CAF50' : healthPercentage > 30 ? '#FF9800' : '#F44336';
+  }, [healthPercentage]);
 
   const botTypeLabel = BOT_TYPE_LABELS[battalion.type] || '';
-  const quantityTextStyle = battalion.type === 'phreak' 
-    ? [styles.quantityText, { fontSize: 12 }, { transform: [{ rotate: '-45deg' }] }] 
-    : [styles.quantityText, { fontSize: 12 }];
-  const botTypeLabelStyle = [styles.botTypeText, { color: borderColor, fontSize: 11 }];
-  const markLabelStyle = [styles.markText, { color: borderColor, fontSize: 11 }];
+  const quantityTextStyle = React.useMemo(() => 
+    battalion.type === 'phreak' 
+      ? [styles.quantityText, { fontSize: 12 }, { transform: [{ rotate: '-45deg' }] }] 
+      : [styles.quantityText, { fontSize: 12 }]
+  , [battalion.type]);
 
-  const healthBarOffset = size / 2 + 15;
-  const labelRowOffset = size / 2 + 10;
+  const botTypeLabelStyle = React.useMemo(() => [
+    styles.botTypeText, 
+    { color: borderColor, fontSize: 11 }
+  ], [borderColor]);
+
+  const markLabelStyle = React.useMemo(() => [
+    styles.markText, 
+    { color: borderColor, fontSize: 11 }
+  ], [borderColor]);
+
+  const healthBarOffset = React.useMemo(() => size / 2 + 15, [size]);
+  const labelRowOffset = React.useMemo(() => size / 2 + 10, [size]);
+
+  const attackRangeStyle = React.useMemo(() => [
+    styles.attackRangeCircle,
+    {
+      left: displayPosition.x - attackRangeRadius,
+      top: displayPosition.y - attackRangeRadius,
+      width: attackRangeRadius * 2,
+      height: attackRangeRadius * 2,
+      borderRadius: attackRangeRadius,
+      borderWidth: 2,
+      borderColor: borderColor,
+      backgroundColor: 'transparent',
+      opacity: 0.3,
+    }
+  ], [displayPosition.x, displayPosition.y, attackRangeRadius, borderColor]);
+
+  const healthBarContainerStyle = React.useMemo(() => [
+    styles.healthBarContainer,
+    {
+      left: displayPosition.x - (size + 10) / 2,
+      top: displayPosition.y - healthBarOffset,
+      width: size + 10,
+    },
+  ], [displayPosition.x, displayPosition.y, size, healthBarOffset]);
+
+  const healthBarFillStyle = React.useMemo(() => [
+    styles.healthBarFill,
+    {
+      width: `${healthPercentage}%` as any,
+      backgroundColor: getHealthBarColor,
+    },
+  ], [healthPercentage, getHealthBarColor]);
+
+  const labelRowStyle = React.useMemo(() => [
+    styles.labelRow,
+    {
+      left: displayPosition.x - size / 2 - 2,
+      top: displayPosition.y + labelRowOffset,
+    },
+  ], [displayPosition.x, displayPosition.y, size, labelRowOffset]);
 
   return (
     <View style={styles.container}>
       {(movementState?.movementStatus === 'moving' || movementState?.movementStatus === 'arrived') && (
-        <View style={[
-          styles.attackRangeCircle,
-          {
-            left: displayPosition.x - attackRangeRadius,
-            top: displayPosition.y - attackRangeRadius,
-            width: attackRangeRadius * 2,
-            height: attackRangeRadius * 2,
-            borderRadius: attackRangeRadius,
-            borderWidth: 2,
-            borderColor: borderColor,
-            backgroundColor: 'transparent',
-            opacity: 0.3,
-          }
-        ]} />
+        <View style={attackRangeStyle} />
       )}
       
-      <View style={getShapeStyle()}>
+      <View style={getShapeStyle}>
         <View style={styles.quantityBackground}>
           <Text style={quantityTextStyle}>{battalion.quantity}</Text>
         </View>
       </View>
       
       {showHealthBar && (
-        <View style={[
-          styles.healthBarContainer,
-          {
-            left: displayPosition.x - (size + 10) / 2,
-            top: displayPosition.y - healthBarOffset,
-            width: size + 10,
-          },
-        ]}>
+        <View style={healthBarContainerStyle}>
           <View style={styles.healthBarBackground}>
             <View
-              style={[
-                styles.healthBarFill,
-                {
-                  width: `${healthPercentage}%`,
-                  backgroundColor: getHealthBarColor(),
-                },
-              ]}
+              style={healthBarFillStyle}
             />
           </View>
         </View>
       )}
       
-      <View style={[
-        styles.labelRow,
-        {
-          left: displayPosition.x - size / 2 - 2,
-          top: displayPosition.y + labelRowOffset,
-        },
-      ]}>
+      <View style={labelRowStyle}>
         <Text style={botTypeLabelStyle}>{botTypeLabel}</Text>
         <View style={{ width: 12 }} />
         <Text style={markLabelStyle}>Mk I</Text>

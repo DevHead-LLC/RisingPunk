@@ -114,7 +114,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
     };
   }, [token, assignToBattalion]);
 
-  const renderBattalionSlots = (names: string[], isEnemy = false, isLocked = false) => (
+  const renderBattalionSlots = React.useCallback((names: string[], isEnemy = false, isLocked = false) => (
     <View style={styles.battalionColumn}>
       {names.map(name => (
         <BattalionSlot
@@ -127,15 +127,15 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
         />
       ))}
     </View>
-  );
+  ), [assignments, handleBattalionPress]);
 
-  const renderCircleSlots = (count: number, isEnemy = false) => (
+  const renderCircleSlots = React.useCallback((count: number, isEnemy = false) => (
     <View style={isEnemy ? styles.circleColumnEnemy : styles.circleColumn}>
       {Array(count).fill(null).map((_, index) => (
         <CircleSlot key={index} isEnemy={isEnemy} />
       ))}
     </View>
-  );
+  ), []);
 
   return (
     <SafeAreaView style={styles.container}>
