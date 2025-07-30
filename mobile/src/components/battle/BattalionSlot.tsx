@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { COLORS, SIZING } from '../../styles/theme';
+import { toRomanNumeral } from '../../utils/formatUtils';
 
 export type BattalionAssignment = {
   botType: string;
@@ -23,17 +24,17 @@ export const BattalionSlot = React.memo(({
   onPress,
   assignment,
 }: Props) => {
-  const slotStyle = [
+  const slotStyle = React.useMemo(() => [
     styles.slot,
     isEnemy ? styles.enemySlot : styles.activeSlot,
     isLocked && (isEnemy ? styles.lockedEnemySlot : styles.lockedSlot),
-  ];
+  ], [isEnemy, isLocked]);
 
-  const textStyle = [
+  const textStyle = React.useMemo(() => [
     styles.slotText,
     isEnemy && styles.enemyText,
     isLocked && styles.lockedText,
-  ];
+  ], [isEnemy, isLocked]);
 
   if (isLocked && !isEnemy) {
     return (
@@ -139,9 +140,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-
-// Helper function for Roman numerals
-const toRomanNumeral = (num: number): string => {
-  const romanNumerals = ['I', 'II', 'III', 'IV'];
-  return romanNumerals[num - 1] || '';
-};

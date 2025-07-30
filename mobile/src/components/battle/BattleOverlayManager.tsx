@@ -4,9 +4,12 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Dimensions, ActivityIndicator, Text } from 'react-native';
-import { useGetBattleStateQuery } from '../../store/api/battleApi';
+import { View, StyleSheet } from 'react-native';
 import { BattlePhase } from '../../types/battleTypes';
+import { BattleLoadingError } from './BattleLoadingError';
+import { BattleCountdownOverlay } from './BattleCountdownOverlay';
+import { BattleTimerDisplay } from './BattleTimerDisplay';
+import { useBattleState } from '../../hooks/useBattleState';
 
 // Server phase types (from server/src/types/battle.ts)
 type ServerPhase = 'setup' | 'countdown' | 'active' | 'battle' | 'victory' | 'defeat' | 'complete';
@@ -29,9 +32,6 @@ const mapServerPhaseToClientPhase = (serverPhase: ServerPhase | undefined): Batt
   }
 };
 
-import { BattleCountdownOverlay } from './BattleCountdownOverlay';
-import { BattleTimerDisplay } from './BattleTimerDisplay';
-
 interface BattleOverlayManagerProps {
   battleId: string;
 }
@@ -39,27 +39,17 @@ interface BattleOverlayManagerProps {
 export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
   battleId,
 }) => {
-  // Debug: Log component render with battleId (reduced logging)
-  // console.log(`📱 OVERLAY RENDER: BattleOverlayManager rendered with battleId: ${battleId}`);
-
-  // Get screen dimensions for server calculations
-  const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-
   // Track logged errors to prevent spam
   const loggedErrors = useRef<Set<string>>(new Set());
 
-  // Direct API call to get battle state
   const {
     data: battleState,
     isLoading: battleLoading,
     error: battleError,
-  } = useGetBattleStateQuery(
-    { battleId, screenWidth, screenHeight },
-    {
-      pollingInterval: 1000, // Poll every 1 second for real-time updates
-      skip: !battleId,
-    }
-  );
+  } = useBattleState({
+    battleId,
+    pollingInterval: 1000,
+  });
 
   // SIMPLE LOG: Only log problems (once per error)
   useEffect(() => {
@@ -73,94 +63,57 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
     }
   }, [battleError]);
 
-  // Show loading state while fetching server data
-  if (battleLoading) {
+  const renderOverlays = React.useMemo(() => {
+    if (!battleState) return null;
+
+    // Extract timer data from server response
+    const phase = battleState.phase;
+    const timeRemaining = battleState.timeRemaining || 20;
+    const maxBattleTime = 20; // Fixed battle duration
+
+    // Map server phase to client phase
+    const clientPhase = mapServerPhaseToClientPhase(phase);
+
+    // Calculate battle time from time remaining for the timer display
+    const battleTime = maxBattleTime - timeRemaining;
+
+    // Determine if we're in countdown phase and show countdown overlay
+    // Server sends timeRemaining: 3,2,1 during countdown phase
+    const isCountdownPhase = clientPhase === BattlePhase.COUNTDOWN && timeRemaining <= 3 && timeRemaining > 0;
+    const countdownValue = isCountdownPhase ? timeRemaining : 0;
+
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4717F6" />
-        <Text style={styles.loadingText}>Loading overlays...</Text>
+      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+        {/* Battle timer - always rendered and visible during countdown and active phases */}
+        <BattleTimerDisplay
+          battleTime={battleTime}
+          maxBattleTime={maxBattleTime}
+          isVisible={clientPhase === BattlePhase.COUNTDOWN || clientPhase === BattlePhase.ACTIVE}
+        />
+
+        {/* Countdown overlay - rendered on top when in COUNTDOWN phase */}
+        {isCountdownPhase && countdownValue > 0 && (
+          <BattleCountdownOverlay countdown={countdownValue} isVisible={true} />
+        )}
+
+        {/* No overlay for COMPLETE phase */}
       </View>
     );
-  }
-
-  // Show error state if server data fails
-  if (battleError || !battleState) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Failed to load overlays</Text>
-        <Text style={styles.errorSubtext}>Please try again</Text>
-      </View>
-    );
-  }
-
-  // Extract timer data from server response
-  const phase = battleState.phase;
-  const timeRemaining = battleState.timeRemaining || 20;
-  const maxBattleTime = 20; // Fixed battle duration
-
-  // Map server phase to client phase
-  const clientPhase = mapServerPhaseToClientPhase(phase);
-
-  // Calculate battle time from time remaining for the timer display
-  const battleTime = maxBattleTime - timeRemaining;
-
-  // Determine if we're in countdown phase and show countdown overlay
-  // Server sends timeRemaining: 3,2,1 during countdown phase
-  const isCountdownPhase = clientPhase === BattlePhase.COUNTDOWN && timeRemaining <= 3 && timeRemaining > 0;
-  const countdownValue = isCountdownPhase ? timeRemaining : 0;
+  }, [battleState]);
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      {/* Battle timer - always rendered and visible during countdown and active phases */}
-      <BattleTimerDisplay
-        battleTime={battleTime}
-        maxBattleTime={maxBattleTime}
-        isVisible={clientPhase === BattlePhase.COUNTDOWN || clientPhase === BattlePhase.ACTIVE}
-      />
-
-      {/* Countdown overlay - rendered on top when in COUNTDOWN phase */}
-      {isCountdownPhase && countdownValue > 0 && (
-        <BattleCountdownOverlay countdown={countdownValue} isVisible={true} />
-      )}
-
-      {/* No overlay for COMPLETE phase */}
-    </View>
+    <BattleLoadingError
+      isLoading={battleLoading}
+      error={battleError}
+      loadingText="Loading overlays..."
+      errorText="Failed to load overlays"
+      errorSubtext="Please try again"
+    >
+      {renderOverlays}
+    </BattleLoadingError>
   );
 };
 
 const styles = StyleSheet.create({
-  loadingContainer: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.1)',
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#4717F6',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  errorContainer: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,0,0,0.1)',
-  },
-  errorText: {
-    color: '#FF4141',
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  errorSubtext: {
-    color: '#666666',
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 5,
-  },
+  // Styles moved to BattleLoadingError component
 });

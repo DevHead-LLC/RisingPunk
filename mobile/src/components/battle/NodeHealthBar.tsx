@@ -19,23 +19,27 @@ export const NodeHealthBar: React.FC<Props> = ({ node }) => {
   const barWidth = Math.min(progressPercentage, 100);
   const isUserControl = node.tugOfWarProgress > 0;
 
+  const containerStyle = React.useMemo(() => [
+    styles.container,
+    {
+      left: node.position.x - 20,
+      top: node.position.y - 35,
+    }
+  ], [node.position.x, node.position.y]);
+
+  const progressBarStyle = React.useMemo(() => [
+    styles.progressBar,
+    {
+      width: `${barWidth}%`,
+      backgroundColor: barColor,
+      alignSelf: isUserControl ? 'flex-start' : 'flex-end',
+    }
+  ], [barWidth, barColor, isUserControl]);
+
   return (
-    <View style={[
-      styles.container,
-      {
-        left: node.position.x - 20,
-        top: node.position.y - 35,
-      }
-    ]}>
+    <View style={containerStyle}>
       <View style={styles.backgroundBar}>
-        <View style={[
-          styles.progressBar,
-          {
-            width: `${barWidth}%`,
-            backgroundColor: barColor,
-            alignSelf: isUserControl ? 'flex-start' : 'flex-end',
-          }
-        ]} />
+        <View style={progressBarStyle} />
       </View>
       <Text style={styles.progressText}>
         {Math.abs(node.tugOfWarProgress).toFixed(0)}%

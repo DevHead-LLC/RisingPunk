@@ -7,9 +7,19 @@ type Props = {
 };
 
 export const CircleSlot = React.memo(({ isEnemy = false }: Props) => {
+  const containerStyle = React.useMemo(() => [
+    styles.container, 
+    isEnemy && styles.enemyCircle
+  ], [isEnemy]);
+
+  const textStyle = React.useMemo(() => [
+    styles.lockText, 
+    isEnemy && styles.enemyText
+  ], [isEnemy]);
+
   return (
-    <View style={[styles.container, isEnemy && styles.enemyCircle]}>
-      <Text style={[styles.lockText, isEnemy && styles.enemyText]}>
+    <View style={containerStyle}>
+      <Text style={textStyle}>
         {isEnemy ? '???' : '🔒'}
       </Text>
     </View>

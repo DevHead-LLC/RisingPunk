@@ -13,15 +13,15 @@ const MAX_BATTALION_SIZE = 250;
 export const QuantitySelector = React.memo(({ quantity, available, onChangeQuantity }: Props) => {
   const maxQuantity = Math.min(available, MAX_BATTALION_SIZE);
 
-  const adjustQuantity = (adjustment: number) => {
+  const adjustQuantity = React.useCallback((adjustment: number) => {
     const newValue = Math.min(Math.max(0, quantity + adjustment), maxQuantity);
     onChangeQuantity(newValue);
-  };
+  }, [quantity, maxQuantity, onChangeQuantity]);
 
-  const handleDirectInput = (text: string) => {
+  const handleDirectInput = React.useCallback((text: string) => {
     const value = parseInt(text) || 0;
     onChangeQuantity(Math.min(Math.max(0, value), maxQuantity));
-  };
+  }, [maxQuantity, onChangeQuantity]);
 
   return (
     <View style={styles.container}>
