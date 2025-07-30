@@ -81,12 +81,16 @@ export class BattleService {
   }
 
   private async handlePhaseChange(battleId: string, phase: BattlePhase): Promise<void> {
-    await this.updateBattle(battleId, { phase });
+    const updates: { phase: BattlePhase; countdown?: number; battleTime?: number } = { phase };
     
     if (phase === BattlePhase.ACTIVE) {
+      updates.countdown = 0;
+      updates.battleTime = 0;
       console.log(`🎮 BATTLE ACTIVE - Starting movement for ${battleId}`);
       BattalionService.startMovementUpdates(battleId);
     }
+    
+    await this.updateBattle(battleId, updates);
   }
 
   private async handleBattleEnd(battleId: string): Promise<void> {
