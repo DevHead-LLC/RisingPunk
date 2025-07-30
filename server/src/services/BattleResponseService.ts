@@ -19,39 +19,20 @@ export class BattleResponseService {
     mappedBattalions: ClientBattalion[],
     networkData: NetworkData,
     targetingResults: any[] = [],
-    retargetingStatus?: {nodeIndex: number, affectedBattalionIds: string[]}
+    retargetingStatus?: {nodeIndex: number, affectedBattalionIds: string[]},
+    movementStates?: Map<string, MovementState>,
+    timerState?: {countdown: number, battleTime: number, phase: any}
   ): BattleStateResponse {
     if (retargetingStatus) {
       console.log(`📡 CLIENT SYNC: Including retargeting status in response`);
       console.log(`📡 CLIENT SYNC: Node ${retargetingStatus.nodeIndex} captured, ${retargetingStatus.affectedBattalionIds.length} battalions affected`);
     }
 
-    return {
-      battleId: battle.battleId,
-      phase: battle.phase,
-      countdown: battle.countdown,
-      battleTime: battle.battleTime,
-      winner: battle.winner,
-      battalions: mappedBattalions,
-      nodes: networkData.updatedNodes,
-      networkConnections: networkData.networkConnections,
-      lineProperties: networkData.lineProperties,
-      targetingResults,
-      retargetingStatus,
-      lastUpdated: battle.updatedAt
-    };
-  }
+    // Use timer state if provided, otherwise use battle data
+    const currentPhase = timerState ? timerState.phase : battle.phase;
+    const currentCountdown = timerState ? timerState.countdown : battle.countdown;
+    const currentBattleTime = timerState ? timerState.battleTime : battle.battleTime;
 
-  static createBattleStateResponseWithTimer(
-    battle: IBattleDocument,
-    mappedBattalions: ClientBattalion[],
-    networkData: NetworkData,
-    currentPhase: any,
-    currentCountdown: number,
-    currentBattleTime: number,
-    targetingResults: any[] = [],
-    movementStates: Map<string, MovementState> = new Map()
-  ): BattleStateResponse {
     return {
       battleId: battle.battleId,
       phase: currentPhase,
@@ -63,7 +44,8 @@ export class BattleResponseService {
       networkConnections: networkData.networkConnections,
       lineProperties: networkData.lineProperties,
       targetingResults,
-      movementStates: Array.from(movementStates.values()),
+      retargetingStatus,
+      movementStates: movementStates ? Array.from(movementStates.values()) : undefined,
       lastUpdated: battle.updatedAt
     };
   }

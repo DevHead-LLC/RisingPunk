@@ -26,14 +26,15 @@ export class BattleService {
     return BattalionService.triggerInitialTargeting(battle.battalions, battle.nodes, battleId);
   }
 
-  async createBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number): Promise<IBattleDocument> {
-    const savedBattle = await BattleSetupService.createBattle(attackerId, defenderId, screenWidth, screenHeight);
+  async createBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number, nodeIndex: number}>): Promise<IBattleDocument> {
+    const battle = await BattleSetupService.createBattle(attackerId, defenderId, screenWidth, screenHeight, userBattalions);
     
-    ScreenDimensionService.setBattleScreenDimensions(savedBattle.battleId, screenWidth, screenHeight);
-    this.timerService.startTimer(savedBattle.battleId);
-    this.setupTimerListeners(savedBattle.battleId);
+    ScreenDimensionService.setBattleScreenDimensions(battle.battleId, screenWidth, screenHeight);
     
-    return savedBattle;
+    this.timerService.startTimer(battle.battleId);
+    this.setupTimerListeners(battle.battleId);
+    
+    return battle;
   }
   
   async getBattle(battleId: string): Promise<IBattleDocument | null> {

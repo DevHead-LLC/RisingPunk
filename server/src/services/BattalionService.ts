@@ -89,13 +89,8 @@ export class BattalionService {
     
     if (!battle) return;
 
-    if (battle.phase === 'COMPLETE') {
-      console.log(`⏹️ BATTLE ENDED: Skipping movement processing for completed battle ${battleId}`);
-      return;
-    }
-
-    await MovementService.updateBattleMovement(battleId, battle, targetingResults);
-    await AttackService.processActiveAttacks(battle);
+    // Use centralized movement state coordination
+    await MovementService.coordinateMovementState(battleId, battle, targetingResults);
   }
 
   static calculateTotalArmyHealth(battalions: IBattalion[]): number {
@@ -135,24 +130,43 @@ export class BattalionService {
     };
   }
 
-  static createUserBattalions(nodes: INode[]): IBattalion[] {
-    const userBattalions = [
+  static createUserBattalions(nodes: INode[], userBattalions?: Array<{type: string, quantity: number, nodeIndex: number}>): IBattalion[] {
+    const defaultUserBattalions = [
       { type: 'guardian' as BotType, quantity: 10, nodeIndex: 0 },
       { type: 'breacher' as BotType, quantity: 8, nodeIndex: 1 },
       { type: 'phreak' as BotType, quantity: 6, nodeIndex: 2 },
     ];
     
-    return userBattalions.map((battalion, index) => 
-      this.createBattalion(
+    const battalionConfigs = userBattalions || defaultUserBattalions;
+    
+    return battalionConfigs.map((battalion, index) => {
+      // Validate bot type
+      const validBotTypes = ['guardian', 'breacher', 'phreak'] as const;
+      const botType = battalion.type as string;
+      
+      if (!validBotTypes.includes(botType as any)) {
+        console.log(`⚠️ INVALID BOT TYPE: "${botType}" is not a valid bot type. Using 'guardian' as fallback.`);
+        battalion.type = 'guardian' as BotType;
+      }
+      
+      const validatedBotType = battalion.type as BotType;
+      
+      // Ensure the bot type exists in BOT_CONFIG
+      if (!BOT_CONFIG.USER_BOT_STATS[validatedBotType]) {
+        console.log(`⚠️ MISSING BOT CONFIG: "${validatedBotType}" not found in BOT_CONFIG. Using 'guardian' as fallback.`);
+        battalion.type = 'guardian' as BotType;
+      }
+      
+      return this.createBattalion(
         `user-battalion-${index}`,
-        battalion.type,
+        battalion.type as BotType,
         battalion.quantity,
         battalion.nodeIndex,
         NodeOwner.USER,
-        BOT_CONFIG.USER_BOT_STATS[battalion.type].stats,
+        BOT_CONFIG.USER_BOT_STATS[battalion.type as BotType].stats,
         nodes
-      )
-    );
+      );
+    });
   }
 
   static createEnemyBattalions(nodes: INode[]): IBattalion[] {

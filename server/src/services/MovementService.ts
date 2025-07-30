@@ -131,8 +131,8 @@ export class MovementService {
                   AttackService.startBattalionAttack(battalion, enemyBattalion.id);
                 } else {
                   console.log(`📊 NO BATTALION TARGET: ${battalion.owner} ${battalion.type} cannot find any enemy battalion to attack (target may be destroyed or moved)`);
-                  console.log(`🎯 MISSING TARGET RETARGETING: Queueing retargeting for ${battalion.owner} ${battalion.type} (target not found on arrival)`);
-                  AttackService.queueMissingTargetRetargeting(battleId, battalion.id);
+                  console.log(`🎯 MISSING TARGET: Target not found for ${battalion.owner} ${battalion.type}, will be handled by AttackService queue`);
+                  AttackService.queueMissingTargetRetargeting(battle.battleId, battalion.id);
                 }
               } else {
                 const targetNode = battle.nodes.find((n: any) => n.index === updatedMovementState.targetPosition.nodeIndex);
@@ -215,13 +215,20 @@ export class MovementService {
       nodeIndex: battalion.position.nodeIndex
     };
     
+    let movementState: MovementState | undefined;
+    
     if (movementType === 'initial') {
-      return this.initiateInitialMovement(battalion, targetNode, nodePositions, startPosition);
+      movementState = this.initiateInitialMovement(battalion, targetNode, nodePositions, startPosition);
     } else if (movementType === 'retargeting') {
-      return this.initiateRetargetingMovement(battalion, targetNode, fullPath!, nodePositions, startPosition, battle);
+      movementState = this.initiateRetargetingMovement(battalion, targetNode, fullPath!, nodePositions, startPosition, battle);
     }
     
-    return undefined;
+    if (movementState) {
+      // Ensure proper movement type progression
+      this.ensureMovementTypeProgression(movementState, movementType);
+    }
+    
+    return movementState;
   }
 
   private static initiateInitialMovement(battalion: IBattalion, targetNode: number, nodePositions: any[], startPosition: any): MovementState | undefined {
@@ -613,5 +620,44 @@ export class MovementService {
     return Array.from(movementStates.values()).filter(
       state => state.movementStatus === 'arrived'
     );
+  }
+
+  // ============================================================================
+  // CENTRALIZED MOVEMENT STATE COORDINATION
+  // ============================================================================
+
+  static async coordinateMovementState(battleId: string, battle: any, targetingResults: any[]): Promise<void> {
+    if (!battle) return;
+
+    if (battle.phase === 'COMPLETE') {
+      console.log(`⏹️ BATTLE ENDED: Skipping movement processing for completed battle ${battleId}`);
+      return;
+    }
+
+    // Update movement progress and handle arrivals
+    await this.updateBattleMovement(battleId, battle, targetingResults);
+    
+    // Process attacks after movement updates
+    const { AttackService } = require('./AttackService');
+    await AttackService.processActiveAttacks(battle);
+  }
+
+  static ensureMovementTypeProgression(movementState: MovementState, newType: 'initial' | 'retargeting' | 'interrupted_recovery'): void {
+    // Ensure proper progression: initial → retargeting → interrupted_recovery → retargeting
+    const validTransitions = {
+      'initial': ['retargeting', 'interrupted_recovery'],
+      'retargeting': ['interrupted_recovery', 'retargeting'],
+      'interrupted_recovery': ['retargeting']
+    };
+
+    const currentType = movementState.movementType || 'initial';
+    const allowedTransitions = validTransitions[currentType as keyof typeof validTransitions] || [];
+
+    if (allowedTransitions.includes(newType)) {
+      movementState.movementType = newType;
+      console.log(`🔄 MOVEMENT PROGRESSION: ${currentType} → ${newType}`);
+    } else {
+      console.log(`⚠️ INVALID MOVEMENT TRANSITION: ${currentType} → ${newType} (allowed: ${allowedTransitions.join(', ')})`);
+    }
   }
 } 

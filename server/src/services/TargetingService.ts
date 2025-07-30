@@ -4,6 +4,7 @@
  */
 
 import { IBattalion, INode, NodeOwner, BotType, BattalionTargetingResult } from '../types/battle';
+import { PathfindingService } from './PathfindingService';
 import { NETWORK_CONNECTIONS } from '../config/networkConfig';
 
 export class TargetingService {
@@ -82,6 +83,7 @@ export class TargetingService {
   
   /**
    * Check if target node is reachable from starting node via DIRECT network connections only
+   * Used for initial targeting - retargeting uses PathfindingService for full pathfinding
    */
   static isReachableViaNetwork(startingNode: number, targetNode: number): boolean {
     return NETWORK_CONNECTIONS.some(connection => 
