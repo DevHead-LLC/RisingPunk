@@ -27,7 +27,7 @@ export const BattleLoadingError: React.FC<BattleLoadingErrorProps> = ({
     );
   }
 
-  if (error || !children) {
+  if (error) {
     return (
       <View style={styles.container}>
         <Text style={styles.errorText}>{errorText}</Text>
