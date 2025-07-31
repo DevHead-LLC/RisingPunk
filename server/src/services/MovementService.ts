@@ -484,9 +484,19 @@ export class MovementService {
   }
 
   static getArrivedBattalions(movementStates: Map<string, MovementState>): MovementState[] {
-    return Array.from(movementStates.values()).filter(
+    const arrivedStates = Array.from(movementStates.values()).filter(
       state => state.movementStatus === 'arrived'
     );
+    
+    // Log invalid positions for debugging but don't filter them out
+    // This maintains existing behavior while providing visibility into data issues
+    arrivedStates.forEach(state => {
+      if (!BattalionPositionService.hasValidPositionInMovementState(state)) {
+        console.warn(`MovementService: Arrived battalion ${state.battalionId} has invalid position:`, state.targetPosition);
+      }
+    });
+    
+    return arrivedStates;
   }
 
   // ============================================================================
