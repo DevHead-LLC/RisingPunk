@@ -33,11 +33,16 @@ export class MovementService {
       return cached.positions;
     }
     
-    const screenDimensions = ScreenDimensionService.getBattleScreenDimensions(battleId);
-    const positions = calculateNodePositions(screenDimensions.width, screenDimensions.height);
-    
-    this.nodePositionCache.set(battleId, { positions, timestamp: now });
-    return positions;
+    try {
+      const screenDimensions = ScreenDimensionService.getBattleScreenDimensions(battleId);
+      const positions = calculateNodePositions(screenDimensions.width, screenDimensions.height);
+      
+      this.nodePositionCache.set(battleId, { positions, timestamp: now });
+      return positions;
+    } catch (error) {
+      console.error(`MovementService: Failed to get screen dimensions for battle ${battleId}:`, error);
+      throw new Error(`Screen dimensions not available for battle ${battleId}. Battle may not be properly initialized.`);
+    }
   }
 
   private static findBattalionById(battalions: any[], battalionId: string): any {
@@ -46,7 +51,12 @@ export class MovementService {
 
   private static getCachedService(serviceName: string): any {
     if (!this.serviceCache.has(serviceName)) {
-      this.serviceCache.set(serviceName, require(`./${serviceName}`));
+      try {
+        this.serviceCache.set(serviceName, require(`./${serviceName}`));
+      } catch (error) {
+        console.error(`MovementService: Failed to load service ${serviceName}:`, error);
+        throw new Error(`Service ${serviceName} not found or failed to load`);
+      }
     }
     return this.serviceCache.get(serviceName);
   }
@@ -114,6 +124,51 @@ export class MovementService {
     };
   }
 
+  private static createMovementState(
+    battalion: IBattalion,
+    startPosition: any,
+    targetPosition: any,
+    movementType: 'initial' | 'retargeting' | 'interrupted_recovery',
+    networkPath: number[],
+    estimatedDuration: number,
+    finalTarget: number,
+    isInterruptible: boolean = false,
+    additionalProps?: Partial<MovementState>
+  ): MovementState {
+    const baseState = this.createBaseMovementState(
+      battalion.id,
+      startPosition,
+      targetPosition,
+      movementType,
+      networkPath,
+      estimatedDuration,
+      finalTarget,
+      isInterruptible
+    );
+    
+    return { ...baseState, ...additionalProps };
+  }
+
+  private static calculateSameNodeAttackRangePosition(battalion: IBattalion, startPosition: any, nodePosition: any): { x: number, y: number } {
+    const baseAttackRange = battalion.stats.range || 50;
+    const sameNodeAttackRange = Math.min(baseAttackRange, 15);
+    
+    let attackRangeX;
+    if (battalion.owner === 'user') {
+      attackRangeX = nodePosition.x - sameNodeAttackRange;
+    } else {
+      attackRangeX = nodePosition.x + sameNodeAttackRange;
+    }
+    
+    const attackRangeY = nodePosition.y;
+    
+    const nodeRadius = 25;
+    const clampedX = Math.max(nodePosition.x - nodeRadius, Math.min(nodePosition.x + nodeRadius, attackRangeX));
+    const clampedY = Math.max(nodePosition.y - nodeRadius, Math.min(nodePosition.y + nodeRadius, attackRangeY));
+    
+    return { x: clampedX, y: clampedY };
+  }
+
   static getMovementStates(battleId: string): Map<string, MovementState> {
     return this.movementStates.get(battleId) || new Map();
   }
@@ -138,6 +193,9 @@ export class MovementService {
     // Clear cached data for this battle
     this.clearNodePositionCache(battleId);
     this.clearBattalionIndexCache(battleId);
+    
+    // Clear screen dimensions to prevent memory leak
+    ScreenDimensionService.clearBattleScreenDimensions(battleId);
   }
 
   static async updateBattleMovement(battleId: string, battle: any, targetingResults: any[]): Promise<void> {

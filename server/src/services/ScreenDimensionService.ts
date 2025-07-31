@@ -56,4 +56,8 @@ export class ScreenDimensionService {
   static getActiveBattleIds(): string[] {
     return Array.from(this.battleScreenDimensions.keys());
   }
+
+  static clearBattleScreenDimensions(battleId: string): void {
+    this.battleScreenDimensions.delete(battleId);
+  }
 } 
