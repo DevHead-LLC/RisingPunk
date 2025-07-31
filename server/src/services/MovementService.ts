@@ -485,7 +485,7 @@ export class MovementService {
 
   static getArrivedBattalions(movementStates: Map<string, MovementState>): MovementState[] {
     return Array.from(movementStates.values()).filter(
-      state => state.movementStatus === 'arrived' && BattalionPositionService.hasValidPositionInMovementState(state)
+      state => state.movementStatus === 'arrived'
     );
   }
 
