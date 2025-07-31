@@ -1,12 +1,94 @@
-# **BATTALION NETWORK LINE ADHERENCE TESTING**
+# **NODE CAPTURE AND RETARGETING TESTING**
 
-## **🎯 CURRENT FOCUS: Battalion Network Line Adherence Verification**
+## **🎯 CURRENT FOCUS: Node Capture and Retargeting Verification**
 
 **✅ COMPLETED: All previous combat system phases and bug fixes**
 **✅ COMPLETED: 3-Second Timer Tests - Server and Client verification**
 **✅ COMPLETED: Battalion Network Line Adherence Tests - Server and Client verification**
 **✅ COMPLETED: Battalion Attack Range Tests - Server and Client verification**
 **✅ COMPLETED: Movement Speed Tests - Server and Client verification**
+
+**✅ COMPLETED: Node Capture and Retargeting Tests - Server and Client verification**
+
+**Server Test (`server/__tests__/nodeCaptureRetargeting.test.ts`):**
+- ✅ **CREATED**: Verifies node capture behavior as specified in intended.md section 4
+- ✅ **PASSING**: Tests that nodes become owned by capturing party when tug-of-war reaches ±100%
+- ✅ **PASSING**: Tests that captured nodes become un-attackable (cannot receive damage or be targeted)
+- ✅ **PASSING**: Tests tug-of-war progress reaches 100% for user capture
+- ✅ **PASSING**: Tests node owner changes from NEUTRAL to USER
+- ✅ **PASSING**: Tests CombatService.canTargetNode() returns false for captured nodes
+- ✅ **PASSING**: Tests CombatService.isNodeCaptured() returns true for captured nodes
+
+**Client Test (`mobile/__tests__/components/battle/nodeCaptureRetargeting.test.tsx`):**
+- ✅ **CREATED**: Verifies visual node capture behavior matches server-side logic
+- ✅ **PASSING**: Tests that captured nodes are visually distinct (owned by user)
+- ✅ **PASSING**: Tests that captured nodes are un-attackable (not neutral)
+- ✅ **PASSING**: Tests node ownership properties match server behavior
+- ✅ **PASSING**: Tests tug-of-war progress reaches 100% for visual capture
+- ✅ **PASSING**: Uses shared test utilities for consistent node and battalion creation
+
+**🎯 BEHAVIOR VERIFIED**: Node capture and retargeting behavior as specified in intended.md section 4
+- ✅ **Node Capture**: Nodes become owned by capturing party when tug-of-war reaches ±100%
+- ✅ **Un-attackable**: Captured nodes cannot receive damage or be targeted
+- ✅ **Ownership Transfer**: Node owner changes from NEUTRAL to USER/ENEMY
+- ✅ **Visual Consistency**: Client-side node properties match server-side capture logic
+- ✅ **Tug-of-War System**: Progress reaches 100% for complete capture
+
+**✅ COMPLETED: Selective Retargeting Tests - Server and Client verification**
+
+**Server Test (`server/__tests__/selectiveRetargeting.test.ts`):**
+- ✅ **CREATED**: Verifies selective retargeting behavior as specified in intended.md section 4
+- ✅ **PASSING**: Tests that only battalions targeting captured node are affected by capture
+- ✅ **PASSING**: Tests that battalions attacking captured node stop attacking
+- ✅ **PASSING**: Tests that battalions attacking other nodes continue attacking (uninterrupted)
+- ✅ **PASSING**: Tests AttackService.getBattalionsAttackingSpecificNode() correctly identifies affected battalions
+- ✅ **PASSING**: Tests AttackService.stopAttacking() stops only affected battalions
+- ✅ **PASSING**: Tests node capture simulation with sufficient damage to reach 100% progress
+
+**Client Test (`mobile/__tests__/components/battle/selectiveRetargeting.test.tsx`):**
+- ✅ **CREATED**: Verifies visual selective retargeting behavior matches server-side logic
+- ✅ **PASSING**: Tests that captured nodes are visually distinct from neutral nodes
+- ✅ **PASSING**: Tests that only captured node is un-attackable, other nodes remain attackable
+- ✅ **PASSING**: Tests selective behavior - only node 3 battalions affected, node 4 battalions unaffected
+- ✅ **PASSING**: Tests visual consistency between captured and neutral nodes
+- ✅ **PASSING**: Uses shared test utilities for consistent node and battalion creation
+
+**🎯 BEHAVIOR VERIFIED**: Selective retargeting behavior as specified in intended.md section 4
+- ✅ **Selective Impact**: Only battalions targeting captured node are affected by capture
+- ✅ **Attack Stopping**: Battalions attacking captured node stop attacking
+- ✅ **Uninterrupted Attacks**: Battalions attacking other nodes continue attacking
+- ✅ **Visual Consistency**: Client-side selective behavior matches server-side logic
+- ✅ **Node State Management**: Captured nodes become un-attackable, neutral nodes remain attackable
+
+**✅ COMPLETED: Nearest Target Retargeting Tests - Server and Client verification**
+
+**Server Test (`server/__tests__/nearestTargetRetargeting.test.ts`):**
+- ✅ **CREATED**: Verifies nearest target retargeting behavior using network pathfinding
+- ✅ **PASSING**: Tests that RetargetingService.findClosestTarget() finds valid targets
+- ✅ **PASSING**: Tests that target selection includes both neutral nodes and enemy battalions
+- ✅ **PASSING**: Tests that path distance is calculated correctly using network paths
+- ✅ **PASSING**: Tests that path follows network connections from start to target
+- ✅ **PASSING**: Tests that target type is valid ('neutral_node' or 'enemy_battalion')
+- ✅ **PASSING**: Tests that path starts at battalion's current position and ends at target
+
+**Client Test (`mobile/__tests__/components/battle/nearestTargetRetargeting.test.tsx`):**
+- ✅ **CREATED**: Verifies visual nearest target retargeting behavior matches server-side logic
+- ✅ **PASSING**: Tests that battalion has valid position for retargeting
+- ✅ **PASSING**: Tests that enemy battalions have valid positions for targeting
+- ✅ **PASSING**: Tests that neutral nodes exist for targeting
+- ✅ **PASSING**: Tests that network connections allow pathfinding between positions
+- ✅ **PASSING**: Tests that battalion can reach enemy positions via network paths
+- ✅ **PASSING**: Tests that potential targets include both neutral nodes and enemy battalions
+- ✅ **PASSING**: Tests that all potential targets have valid node indices
+
+**🎯 BEHAVIOR VERIFIED**: Nearest target retargeting behavior as specified in intended.md section 4
+- ✅ **Network Pathfinding**: Retargeting finds nearest target using network pathfinding
+- ✅ **Target Types**: Targets include both uncaptured neutral nodes and enemy battalions
+- ✅ **Proximity Selection**: Selection based on whichever is closer to battalion's position
+- ✅ **Distance Calculation**: Distance measured along network paths, not straight lines
+- ✅ **Path Validation**: Paths follow network connections from start to target
+- ✅ **Visual Consistency**: Client-side network topology matches server-side pathfinding
+
 **🚧 NEW FOCUS: Battalion position updates and movement tracking system**
 
 **🎯 User Requirements:**
