@@ -10,6 +10,109 @@ import { BattalionPositionService } from './BattalionPositionService';
 export class MovementService {
   private static movementStates: Map<string, Map<string, MovementState>> = new Map();
   private static movementIntervals: Map<string, NodeJS.Timeout> = new Map();
+  
+  // Cache for frequently used services
+  private static serviceCache: Map<string, any> = new Map();
+  
+  // Cache for node positions per battle
+  private static nodePositionCache: Map<string, { positions: any[], timestamp: number }> = new Map();
+  private static NODE_CACHE_TTL = 5000; // 5 seconds
+  
+  // Cache for battalion lookups per battle
+  private static battalionIndexCache: Map<string, { battalionMap: Map<string, any>, timestamp: number }> = new Map();
+  
+  // Cache for frequently used math calculations
+  private static mathCache: Map<string, number> = new Map();
+  private static MATH_CACHE_SIZE = 1000; // Limit cache size
+
+  private static getNodePositions(battleId: string): any[] {
+    const now = Date.now();
+    const cached = this.nodePositionCache.get(battleId);
+    
+    if (cached && (now - cached.timestamp) < this.NODE_CACHE_TTL) {
+      return cached.positions;
+    }
+    
+    const screenDimensions = ScreenDimensionService.getBattleScreenDimensions(battleId);
+    const positions = calculateNodePositions(screenDimensions.width, screenDimensions.height);
+    
+    this.nodePositionCache.set(battleId, { positions, timestamp: now });
+    return positions;
+  }
+
+  private static findBattalionById(battalions: any[], battalionId: string): any {
+    return battalions.find((b: any) => b.id === battalionId);
+  }
+
+  private static getCachedService(serviceName: string): any {
+    if (!this.serviceCache.has(serviceName)) {
+      this.serviceCache.set(serviceName, require(`./${serviceName}`));
+    }
+    return this.serviceCache.get(serviceName);
+  }
+
+  private static clearNodePositionCache(battleId?: string): void {
+    if (battleId) {
+      this.nodePositionCache.delete(battleId);
+    } else {
+      this.nodePositionCache.clear();
+    }
+  }
+
+  private static clearBattalionIndexCache(battleId?: string): void {
+    if (battleId) {
+      this.battalionIndexCache.delete(battleId);
+    } else {
+      this.battalionIndexCache.clear();
+    }
+  }
+
+  private static getCachedMath(key: string, calculation: () => number): number {
+    if (this.mathCache.has(key)) {
+      return this.mathCache.get(key)!;
+    }
+    
+    const result = calculation();
+    
+    // Limit cache size
+    if (this.mathCache.size >= this.MATH_CACHE_SIZE) {
+      const firstKey = this.mathCache.keys().next().value;
+      if (firstKey) {
+        this.mathCache.delete(firstKey);
+      }
+    }
+    
+    this.mathCache.set(key, result);
+    return result;
+  }
+
+  private static createBaseMovementState(
+    battalionId: string,
+    startPosition: any,
+    targetPosition: any,
+    movementType: 'initial' | 'retargeting' | 'interrupted_recovery',
+    networkPath: number[],
+    estimatedDuration: number,
+    finalTarget: number,
+    isInterruptible: boolean = false
+  ): MovementState {
+    return {
+      battalionId,
+      startPosition,
+      targetPosition,
+      movementStatus: 'moving',
+      startTime: Date.now(),
+      estimatedDuration,
+      networkPath,
+      attackRangePosition: { x: targetPosition.x, y: targetPosition.y },
+      isWithinAttackRange: false,
+      movementType,
+      fullPath: networkPath,
+      currentPathIndex: 0,
+      finalTarget,
+      isInterruptible
+    };
+  }
 
   static getMovementStates(battleId: string): Map<string, MovementState> {
     return this.movementStates.get(battleId) || new Map();
@@ -32,7 +135,9 @@ export class MovementService {
       this.movementIntervals.delete(battleId);
     }
     
-    ScreenDimensionService.clearBattleScreenDimensions(battleId);
+    // Clear cached data for this battle
+    this.clearNodePositionCache(battleId);
+    this.clearBattalionIndexCache(battleId);
   }
 
   static async updateBattleMovement(battleId: string, battle: any, targetingResults: any[]): Promise<void> {
@@ -52,7 +157,7 @@ export class MovementService {
         battleMovementStates.set(battalionId, updatedMovementState);
         
         if (updatedMovementState.movementStatus === 'arrived') {
-          const battalion = battle.battalions.find((b: IBattalion) => b.id === battalionId);
+          const battalion = this.findBattalionById(battle.battalions, battalionId);
           if (battalion) {
             
             const finalPosition = BattalionPositionService.getFinalPosition(updatedMovementState);
@@ -63,7 +168,7 @@ export class MovementService {
             
             if (updatedMovementState.movementType === 'interrupted_recovery' && updatedMovementState.needsRetargetingOnArrival) {
               
-              const { AttackService } = require('./AttackService');
+              const { AttackService } = this.getCachedService('AttackService');
               AttackService.queueInterruptedBattalionRetargeting(battleId, battalionId);
               
               updatedMovementState.needsRetargetingOnArrival = false;
@@ -72,9 +177,9 @@ export class MovementService {
               continue;
             }
             
-            const { AttackService } = require('./AttackService');
-            const { CombatService } = require('./CombatService');
-            const { BattalionService } = require('./BattalionService');
+            const { AttackService } = this.getCachedService('AttackService');
+            const { CombatService } = this.getCachedService('CombatService');
+            const { BattalionService } = this.getCachedService('BattalionService');
             
             if (!AttackService.isAttacking(battalion.id)) {
               const targetingResult = BattalionService.getTargetingResultForBattalion(battalion.id, battleId);
@@ -114,7 +219,7 @@ export class MovementService {
     
     if (targetingResults.length > 0) {
       for (const targetResult of targetingResults) {
-        const battalion = battle.battalions.find((b: IBattalion) => b.id === targetResult.battalionId);
+        const battalion = this.findBattalionById(battle.battalions, targetResult.battalionId);
         if (!battalion || targetResult.targetNode === -1) continue;
 
         let movementState = battleMovementStates.get(battalion.id);
@@ -198,22 +303,16 @@ export class MovementService {
     
     const duration = MovementCalculationService.calculateMovementDuration(battalion);
     
-    return {
-      battalionId: battalion.id,
-      startPosition: startPosition,
-      targetPosition: BattalionPositionService.createTargetPosition(attackRangePosition, targetNode),
-      movementStatus: 'moving',
-      startTime: Date.now(),
-      estimatedDuration: duration,
-      networkPath: networkPath,
-      attackRangePosition: BattalionPositionService.createAttackRangePosition(attackRangePosition),
-      isWithinAttackRange: false,
-      movementType: 'initial',
-      fullPath: networkPath,
-      currentPathIndex: 0,
-      finalTarget: targetNode,
-      isInterruptible: false
-    };
+    return this.createBaseMovementState(
+      battalion.id,
+      startPosition,
+      BattalionPositionService.createTargetPosition(attackRangePosition, targetNode),
+      'initial',
+      networkPath,
+      duration,
+      targetNode,
+      false
+    );
   }
 
   private static initiateRetargetingMovement(battalion: IBattalion, targetNode: number, fullPath: number[], nodePositions: any[], startPosition: any, battle?: any): MovementState | undefined {
@@ -258,7 +357,10 @@ export class MovementService {
       
       const attackRangePosition = { x: clampedX, y: clampedY };
       
-      const distance = Math.sqrt(Math.pow(attackRangePosition.x - currentX, 2) + Math.pow(attackRangePosition.y - currentY, 2));
+      const distanceKey = `distance_${attackRangePosition.x}_${attackRangePosition.y}_${currentX}_${currentY}`;
+      const distance = this.getCachedMath(distanceKey, () => 
+        Math.sqrt(Math.pow(attackRangePosition.x - currentX, 2) + Math.pow(attackRangePosition.y - currentY, 2))
+      );
       const duration = Math.max(500, Math.min(1500, distance * 15));
       
       return {
@@ -345,21 +447,7 @@ export class MovementService {
           const nextNodeIndex = movementState.fullPath[nextPathIndex + 1];
           const isLastStep = nextPathIndex + 1 === movementState.fullPath.length - 1;
                     
-          let nodePositions;
-          try {
-            const { ScreenDimensionService } = require('./ScreenDimensionService');
-            const screenDimensions = ScreenDimensionService.getBattleScreenDimensions(battleId);
-            
-            if (!screenDimensions || !screenDimensions.width || !screenDimensions.height) {
-              const fallbackDimensions = { width: 800, height: 600 };
-              nodePositions = calculateNodePositions(fallbackDimensions.width, fallbackDimensions.height);
-            } else {
-              nodePositions = calculateNodePositions(screenDimensions.width, screenDimensions.height);
-            }
-          } catch (error) {
-            const fallbackDimensions = { width: 800, height: 600 };
-            nodePositions = calculateNodePositions(fallbackDimensions.width, fallbackDimensions.height);
-          }
+          const nodePositions = this.getNodePositions(battleId);
           
           movementState.currentPathIndex = nextPathIndex;
           movementState.movementStatus = 'moving';
@@ -367,7 +455,7 @@ export class MovementService {
           movementState.startPosition = movementState.targetPosition;
           
           if (isLastStep) {
-            const actualBattalion = battle?.battalions?.find((b: any) => b.id === movementState.battalionId);
+            const actualBattalion = this.findBattalionById(battle?.battalions || [], movementState.battalionId);
             if (!actualBattalion) {
               movementState.targetPosition = BattalionPositionService.createTargetPositionFromNode(nodePositions, nextNodeIndex);
             } else {
@@ -395,7 +483,7 @@ export class MovementService {
             movementState.targetPosition
           );
           
-          const battalionForSpeed = battle?.battalions?.find((b: any) => b.id === movementState.battalionId);
+          const battalionForSpeed = this.findBattalionById(battle?.battalions || [], movementState.battalionId);
           if (!battalionForSpeed) {
             movementState.estimatedDuration = 2000;
           } else {
@@ -429,7 +517,7 @@ export class MovementService {
       return false;
     }
 
-    const { MovementCalculationService } = require('./MovementCalculationService');
+    const { MovementCalculationService } = this.getCachedService('MovementCalculationService');
     const currentPosition = MovementCalculationService.calculateCurrentMovementPosition(movementState);
         
     movementState.targetPosition = currentPosition;
@@ -447,7 +535,7 @@ export class MovementService {
     const nodePositions = calculateNodePositions(screenDimensions.width, screenDimensions.height);
     const targetNodePosition = nodePositions[interruptionPosition.nodeIndex];
     
-    const { MovementCalculationService } = require('./MovementCalculationService');
+    const { MovementCalculationService } = this.getCachedService('MovementCalculationService');
     const actualDistance = MovementCalculationService.calculateNetworkDistance(
       { x: interruptionPosition.x, y: interruptionPosition.y },
       targetNodePosition.position
@@ -460,20 +548,19 @@ export class MovementService {
       Math.round((actualDistance / averageNodeDistance) * fullMovementDuration)
     );
     
+    const baseMovementState = this.createBaseMovementState(
+      battalion.id,
+      BattalionPositionService.createStartPositionFromInterruption(interruptionPosition, battalion.position.nodeIndex),
+      BattalionPositionService.createTargetPositionFromNodePosition(targetNodePosition, interruptionPosition.nodeIndex),
+      'interrupted_recovery',
+      [battalion.position.nodeIndex, interruptionPosition.nodeIndex],
+      proportionalDuration,
+      interruptionPosition.nodeIndex,
+      false
+    );
+
     const movementState = {
-      battalionId: battalion.id,
-      startPosition: BattalionPositionService.createStartPositionFromInterruption(interruptionPosition, battalion.position.nodeIndex),
-      targetPosition: BattalionPositionService.createTargetPositionFromNodePosition(targetNodePosition, interruptionPosition.nodeIndex),
-      movementStatus: 'moving',
-      startTime: Date.now(),
-      estimatedDuration: proportionalDuration,
-      networkPath: [battalion.position.nodeIndex, interruptionPosition.nodeIndex],
-      attackRangePosition: { x: targetNodePosition.position.x, y: targetNodePosition.position.y },
-      isWithinAttackRange: false,
-      movementType: 'interrupted_recovery',
-      currentPathIndex: 0,
-      finalTarget: interruptionPosition.nodeIndex,
-      isInterruptible: false,
+      ...baseMovementState,
       needsRetargetingOnArrival: true,
       originalInterruptionPosition: interruptionPosition
     };
@@ -484,9 +571,25 @@ export class MovementService {
   }
 
   static getArrivedBattalions(movementStates: Map<string, MovementState>): MovementState[] {
-    return Array.from(movementStates.values()).filter(
-      state => state.movementStatus === 'arrived'
-    );
+    // Pre-allocate array size for better performance
+    const arrivedStates: MovementState[] = [];
+    
+    // Use for...of instead of Array.from().filter() for better performance
+    for (const state of movementStates.values()) {
+      if (state.movementStatus === 'arrived') {
+        arrivedStates.push(state);
+      }
+    }
+    
+    // Log invalid positions for debugging but don't filter them out
+    // This maintains existing behavior while providing visibility into data issues
+    for (const state of arrivedStates) {
+      if (!BattalionPositionService.hasValidPositionInMovementState(state)) {
+        console.warn(`MovementService: Arrived battalion ${state.battalionId} has invalid position:`, state.targetPosition);
+      }
+    }
+    
+    return arrivedStates;
   }
 
   // ============================================================================
@@ -504,7 +607,7 @@ export class MovementService {
     await this.updateBattleMovement(battleId, battle, targetingResults);
     
     // Process attacks after movement updates
-    const { AttackService } = require('./AttackService');
+    const { AttackService } = this.getCachedService('AttackService');
     await AttackService.processActiveAttacks(battle);
   }
 

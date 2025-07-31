@@ -9,9 +9,6 @@ import { MovementService } from './MovementService';
 import { MovementState } from '../types/battle';
 import { Battle } from '../models/Battle';
 import { TargetingService } from './TargetingService';
-import { AttackService } from './AttackService';
-import { CombatService } from './CombatService';
-import { ScreenDimensionService } from './ScreenDimensionService';
 
 export class BattalionService {
   private static targetingResults: Map<string, BattalionTargetingResult[]> = new Map();
