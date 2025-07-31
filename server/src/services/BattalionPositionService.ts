@@ -145,12 +145,4 @@ export class BattalionPositionService {
       nodeIndex: interruptionNodeIndex
     };
   }
-
-  static hasValidPositionInMovementState(movementState: any): boolean {
-    if (!movementState || !movementState.targetPosition) {
-      return false;
-    }
-    
-    return this.isValidPosition(movementState.targetPosition);
-  }
 } 
