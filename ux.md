@@ -1,160 +1,372 @@
-# Battle System User Experience Documentation
+# Retargeting System Documentation
 
-## 1. User Experience Flow (Non-Technical Perspective)
+## Overview
+The retargeting system handles battalion redirection when their current target becomes invalid or captured. This document details the functions, dependencies, and step-by-step processes for all retargeting behaviors.
 
-### What the User Sees and Experiences
+## Initial Targeting Process (Pre-Retargeting Context)
 
-**3-Second Countdown:**
-The battle screen loads showing a network of 9 connected nodes - 3 blue (user) nodes on the left, 3 gray (neutral) nodes in the center, and 3 red (enemy) nodes on the right. Lines connect these nodes showing valid paths. Each user and enemy node has a colored battalion (army unit) positioned on it. A large countdown overlay appears showing "3", then "2", then "1", with "BATTLE STARTING" text below the number.
+### Step 1: Battle Initialization
+- **Function**: `BattleService.initializeBattle()`
+  - **Plain Language**: This function sets up the battle state, spawns battalions at their home nodes (0,1,2 for user, 6,7,8 for enemy), and prepares the battlefield.
 
-**Battle Begins:**
-The countdown disappears and battalions immediately start moving. Each battalion moves smoothly along the network lines toward one of the neutral nodes in the center. The user can see their blue battalions moving from left to center, while red enemy battalions move from right to center. Movement looks natural and follows the connection lines - battalions don't move in straight lines but follow the network paths.
+### Step 2: Initial Target Selection
+- **Function**: `TargetingService.assignInitialTargets()`
+  - **Plain Language**: When the countdown ends, each battalion randomly selects one of the three neutral nodes (3,4,5) as its initial target. This creates the chaotic opening where multiple battalions might target the same node.
 
-**Reaching Attack Positions:**
-Battalions don't move all the way to the neutral nodes. Instead, they stop when they get close enough to attack (based on their weapon range). Faster battalions arrive first, slower ones take longer. Once a battalion reaches its attack position, it stops moving and starts attacking.
+### Step 3: Initial Movement
+- **Function**: `MovementService.initiateMovement()` with `movementType: 'initial'`
+  - **Plain Language**: Battalions begin moving along network paths toward their chosen neutral nodes. They calculate the shortest path and move at their designated speed.
 
-**Periodic Attacking & Tug-of-War:**
-Above each neutral node, a health bar appears showing a tug-of-war battle. The bar starts empty (gray) and gradually fills with blue or red color as battalions attack. User battalions make the bar fill blue from the left, enemy battalions make it fill red from the right. Different battalion types attack at different speeds - some attack every second, others every few seconds. The user can see the health bar constantly changing as attacks happen.
+### Step 4: Attack Range Positioning
+- **Function**: Movement system stops at attack range
+  - **Plain Language**: Battalions don't move onto the node center but stop at attack range distance on the network line, maintaining their position while attacking.
 
-**Node Capture:**
-When the health bar reaches 100% for either side, the neutral node immediately changes color - gray becomes blue if user wins, or red if enemy wins. The health bar disappears since the node is now captured. All battalions that were attacking that node stop attacking since captured nodes can't be attacked anymore. The captured node stays that color permanently.
+### Step 5: Initial Combat
+- **Function**: `AttackService.startAttacking()`
+  - **Plain Language**: Battalions begin attacking their target nodes, applying tug-of-war damage that pushes the node's control percentage toward ±100%.
 
-**Battle Conclusion:**
-The battle continues until the 20-second timer runs out or some other victory condition is met. The user sees a real-time timer at the top showing battle time remaining. Throughout the battle, they can watch multiple tug-of-war battles happening simultaneously across different neutral nodes.
+## Data Structures
 
----
+### RetargetingTask (AttackService)
+```typescript
+interface RetargetingTask {
+  battleId: string;
+  capturedNodeIndex?: number;
+  affectedBattalionIds: string[];
+  timestamp: number;
+  triggerType?: 'node_capture' | 'battalion_destruction' | 'interrupted_recovery' | 'missing_target';
+  destroyedBattalionId?: string;
+  priority: number;
+}
+```
 
-## 2. Technical Flow (Detailed File-by-File Account)
+### RetargetingResult (RetargetingService)
+```typescript
+interface RetargetingResult {
+  battalionId: string;
+  currentNodeIndex: number;
+  newTargetNodeIndex: number;
+  pathToTarget: number[];
+  pathDistance: number;
+  targetType: 'neutral_node' | 'enemy_battalion';
+  targetBattalionId?: string;
+}
+```
 
-### Server-Side Battle Initialization
+### Priority System
+```typescript
+const RETARGETING_PRIORITIES = {
+  BATTALION_DESTRUCTION: 1,    // Highest priority - immediate response required
+  INTERRUPTED_RECOVERY: 1,     // Same priority as destruction - immediate response
+  MISSING_TARGET: 2,           // Medium priority - target not found
+  NODE_CAPTURE: 2              // Same priority as missing target - normal retargeting
+}
+```
 
-**`server/src/controllers/BattleController.ts`** receives the battle start request and calls **`server/src/services/BattleService.ts`** to create the battle. BattleService orchestrates the entire battle creation process by calling **`server/src/services/BattleSetupService.ts`** for core battle creation, then setting up screen dimensions via **`server/src/services/ScreenDimensionService.ts`**, and starting the timer service.
+## 1. Retargeting Due to Node Capture
 
-**`server/src/services/BattleSetupService.ts`** creates a new battle with 6 battalions (3 user, 3 enemy) positioned on their starting nodes (0,1,2 for user; 6,7,8 for enemy). It delegates battalion creation to **`server/src/services/BattalionService.ts`** which creates battalions with proper stats and calculates total army health. It uses **`server/src/services/NodeService.ts`** to set up 9 nodes with server-calculated positions. Neutral nodes (3,4,5) get tug-of-war progress initialized to 0 and max capture threshold set to total army health.
+### Step 1: Node Capture Detection
+- **Function**: `AttackService.processUnifiedAttack()`
+  - **Plain Language**: This function handles all combat damage calculations. When a battalion attacks a node, it applies tug-of-war damage, pushing the node's control percentage toward ±100%. Once it reaches the threshold, the node is marked as captured.
+- **Condition**: When node control reaches ±100%
+- **Action**: Mark node as captured by owner (User or Enemy)
+- **Data Update**: `node.owner = NodeOwner.USER/ENEMY`
 
-**`server/src/services/BattleTimer.ts`** starts a 3-second countdown timer, emitting countdown updates every second. When countdown reaches zero, it transitions the battle phase to ACTIVE and triggers the movement system.
+### Step 2: Identify Affected Battalions
+- **Function**: `AttackService.getBattalionsAttackingSpecificNode()`
+  - **Plain Language**: This function loops through all active attack states and finds every battalion that is currently attacking the specified node. It returns a list of battalion IDs that need to stop attacking and find new targets.
+- **Function**: `AttackService.stopAttacking()`
+  - **Plain Language**: This function removes a battalion from the attack state map, effectively stopping its attack. It sets the battalion's attacking flag to false and cleans up the attack record.
+- **Returns**: Array of battalion IDs currently attacking the captured node
+- **Action**: Stop all attacks on the captured node
 
-### Battle Start & Targeting
+### Step 3: Queue Retargeting Task
+- **Function**: `AttackService.queueRetargetingTask()`
+  - **Plain Language**: This function creates a retargeting task and adds it to a priority queue. Rather than immediately retargeting battalions, it schedules the work to be done in order, preventing race conditions when multiple nodes are captured simultaneously. The task includes all the information needed to retarget the affected battalions later.
+- **Creates**: RetargetingTask with:
+  - `triggerType: 'node_capture'`
+  - `capturedNodeIndex`: The node that was just captured
+  - `affectedBattalionIds`: Battalions that were attacking the node
+  - `priority: RETARGETING_PRIORITIES.NODE_CAPTURE` (2)
+- **Queue**: Added to `AttackService.retargetingQueue`
 
-**`server/src/services/BattleService.ts`** receives the phase change event and triggers initial targeting by calling **`server/src/services/BattalionService.ts`**. BattalionService delegates targeting to **`server/src/services/TargetingService.ts`** which assigns random neutral node targets to all battalions. TargetingService validates that each battalion can reach its target via network connections defined in **`server/src/config/networkConfig.ts`**, then returns targeting results showing which battalion targets which node.
+### Step 4: Check for Moving Battalions
+- **Function**: `AttackService.getMovingBattalionsTargetingNode()`
+  - **Plain Language**: This function searches through all movement states to find battalions that are currently in transit toward the node that was just captured. These battalions need to be interrupted mid-movement since their destination is no longer valid.
+- **Purpose**: Find battalions currently moving toward the captured node
+- **Checks**: Movement states where `targetNode === capturedNodeIndex`
 
-**`server/src/controllers/BattleController.ts`** receives client requests for battle state updates. When clients request battle state, it first retrieves the battle from the database, then updates screen dimensions only if they've changed via **`server/src/services/ScreenDimensionService.ts`** (smart update that prevents unnecessary overwrites and only occurs after battle existence verification), gets real-time timer values from BattleTimerService, and calculates updated node positions for the client's specific screen size using **`server/src/services/NodeService.ts`**. It also calculates line properties for network connections using **`server/src/config/networkConfig.ts`**.
+### Step 5: Interrupt Moving Battalions
+- **Function**: `MovementService.interruptRetargetingMovement()`
+  - **Plain Language**: This function stops a battalion exactly where it is on the network path. It calculates the battalion's current position based on how long it's been moving and its speed, then freezes it at those coordinates. The battalion is marked as "interrupted" so the system knows it needs special handling.
+- **Function**: `MovementCalculationService.calculateCurrentMovementPosition()`
+  - **Plain Language**: This function uses the elapsed time, movement speed, and path information to determine exactly where a battalion is located between nodes at any given moment.
+- **Actions**:
+  - Calculate current position
+  - Set `movementState.wasInterrupted = true`
+  - Store `movementState.interruptionPosition = currentPosition`
+  - Update battalion position to interruption coordinates
+  - Set `movementState.movementStatus = 'arrived'`
 
-### Movement System
+### Step 6: Queue Interrupted Battalion Recovery
+- **Function**: `AttackService.queueInterruptedBattalionRetargeting()`
+  - **Plain Language**: This function creates a high-priority task to handle battalions that were stopped mid-movement. These battalions need special recovery movement to get back to a node before they can retarget normally. The high priority (1) ensures they're handled before regular retargeting.
+- **Creates**: RetargetingTask with:
+  - `triggerType: 'interrupted_recovery'`
+  - `priority: RETARGETING_PRIORITIES.INTERRUPTED_RECOVERY` (1)
 
-**`server/src/services/BattalionService.ts`** orchestrates movement by calling **`server/src/services/MovementService.ts`** when the battle enters ACTIVE phase. MovementService handles battalion movement and delegates pure calculation utilities to **`server/src/services/MovementCalculationService.ts** for attack range calculations, distance calculations, and movement timing.
+### Step 7: Process Retargeting Queue
+- **Function**: `AttackService.processRetargetingQueue()`
+  - **Plain Language**: This function is the main queue processor. It sorts all pending retargeting tasks by priority (1 = highest), then processes them one by one with a 50ms delay between each to prevent overwhelming the system. It ensures only one queue processor runs at a time.
+- **Function**: `AttackService.executeRetargetingTask()`
+  - **Plain Language**: This function handles the actual retargeting work for node capture events. It processes both the battalions that were attacking and those that were moving toward the captured node.
+- **Process**: Sort queue by priority, process tasks sequentially
+- **Execution**: Routes to appropriate handler based on trigger type
 
-MovementService calculates the attack range position (not the target node center) using the battalion's range stat multiplied by 8 pixels per range unit. It determines if the battalion is already within range, calculates movement duration based on the battalion's speed stat, and returns movement state information with start position, target position, and timing.
+### Step 8: Find New Targets
+- **Function**: `RetargetingService.retargetBattalionsAfterCapture()`
+  - **Plain Language**: This function coordinates the retargeting process for multiple battalions. It determines each battalion's current position, identifies all valid targets (both nodes and enemies), and finds the best target for each battalion.
+- **Function**: `RetargetingService.getBattalionStartNode()`
+  - **Plain Language**: This function determines which network node a battalion should calculate distances from. For interrupted battalions, it uses their interruption position to find the nearest node. Otherwise, it uses the battalion's current node position.
+- **For Each Battalion**:
+  - Get current position
+  - Filter valid targets:
+    - Neutral nodes: `node.owner === NodeOwner.NEUTRAL`
+    - Enemy battalions: `battalion.owner !== attacker.owner`
+  - Call `RetargetingService.findClosestTarget()`
 
-BattalionService updates movement every 100ms by calling MovementService to check movement progress, which uses time-based calculations to determine if movement is complete. When a battalion's movement status changes to 'arrived', BattalionService triggers the attack system.
+### Step 9: Target Selection Algorithm
+- **Function**: `RetargetingService.findClosestTarget()`
+  - **Plain Language**: This is the core targeting logic. It evaluates every possible target (nodes and enemies), calculates the network path distance to each, and selects the closest one. If multiple targets are equally close, it randomly picks one to prevent predictable behavior.
+- **Function**: `PathfindingService.findNetworkPath()`
+  - **Plain Language**: This function uses graph traversal (likely Dijkstra's algorithm) to find the shortest path between two nodes following the network connections. It returns an array of node indices representing the path.
+- **Function**: `CombatService.canTargetBattalion()`
+  - **Plain Language**: This function checks if a battalion is a valid target (not destroyed, not on the same team).
+- **Process**:
+  1. Evaluate all neutral nodes:
+     - Calculate network path distance
+     - Track shortest distance and path
+  2. Evaluate all enemy battalions:
+     - Verify targetability
+     - Calculate path distance
+  3. For equidistant targets:
+     - Add to `candidateTargets` array
+     - Random selection
+  4. Return: Target info with path, distance, type
 
-### Attack & Combat System
+### Step 10: Update Battalion Targeting
+- **Function**: `BattalionService.updateTargetingResults()`
+  - **Plain Language**: This function saves the new targeting information in a map structure. It stores which target each battalion is assigned to, what type of target it is, and the path to reach it. This information is used by the movement system to guide battalions.
+- **Updates**: Store new targeting information for each battalion
+- **Data**: Links battalion ID to new target and path
 
-**`server/src/services/AttackService.ts`** manages periodic attacking. When a battalion arrives at its target, BattalionService starts the attack process, which calculates the attack interval based on the battalion's speed stat (faster = more frequent attacks). AttackService stores attack state for each attacking battalion and processes attacks when enough time has elapsed.
+### Step 11: Initiate Movement
+- **Function**: `AttackService.initiateRetargetingMovement()`
+  - **Plain Language**: This function starts battalions moving toward their new targets. It creates movement states that track the battalion's progress along the path, calculates how long the journey will take based on the battalion's speed, and begins the movement animation.
+- **Creates**: New movement states with:
+  - `movementType: 'retargeting'`
+  - Full path to new target
+  - Movement speed based on battalion stats
 
-**`server/src/services/CombatService.ts`** handles the actual damage calculations and tug-of-war mechanics. When AttackService processes an attack, CombatService calculates damage as (battalion offense × quantity), converts this to a percentage of total army health, and applies it to the node's tug-of-war progress. User attacks increase progress toward +100%, enemy attacks decrease toward -100%. When a node reaches ±100%, CombatService marks it as captured and changes its owner.
+## 2. Retargeting Due to Battalion Destruction
 
-### Client-Side Visualization
+### Step 1: Battalion Destruction Detection
+- **Function**: `AttackService.processUnifiedAttack()`
+  - **Plain Language**: This function handles battalion-to-battalion combat. It calculates damage based on the attacker's offense and quantity, reduces it by the defender's defense percentage, then applies it to the defender's health. When health reaches zero, the battalion is marked as destroyed.
+- **Condition**: When battalion health <= 0
+- **Action**: Set `battalion.isDestroyed = true`
+- **Save**: Battle state updated in database
 
-**`mobile/src/components/battle/BattleOverlayManager.tsx`** polls the server every second for battle state updates. It displays the countdown overlay during the countdown phase and shows the battle timer during the active phase. The component manages overlay visibility based on the current battle phase received from the server.
+### Step 2: Queue Destruction Retargeting
+- **Function**: `AttackService.queueBattalionDestructionRetargeting()`
+  - **Plain Language**: This function handles the immediate aftermath of battalion destruction. It first removes any attacks the destroyed battalion was making, then finds all enemy battalions that were targeting it. These battalions need new targets since their current target no longer exists.
+- **Function**: `AttackService.clearBattalionAttacks()`
+  - **Plain Language**: This function removes all attack records for a specific battalion from the attack state map.
+- **Actions**:
+  1. Clear destroyed battalion's attacks
+  2. Find affected battalions:
+     - Iterate through `AttackService.attackStates`
+     - Check for battalions targeting the destroyed one
+     - Stop their attacks
+  3. Create RetargetingTask:
+     - `triggerType: 'battalion_destruction'`
+     - `priority: RETARGETING_PRIORITIES.BATTALION_DESTRUCTION` (1)
+     - `destroyedBattalionId`: The destroyed battalion's ID
 
-**`mobile/src/components/battle/BattleNetworkGrid.tsx`** renders the 9 nodes and connecting lines using server-provided positions and line properties. It displays node colors based on ownership (blue/red/gray) and renders health bars for neutral nodes using **`mobile/src/components/battle/NodeHealthBar.tsx`**, which shows tug-of-war progress as a colored bar filling left-to-right for user or right-to-left for enemy.
+### Step 3: Process High Priority Queue
+- **Function**: `AttackService.processRetargetingQueue()`
+  - **Plain Language**: The same queue processor handles all retargeting, but battalion destruction has priority 1 (highest), so these tasks jump to the front of the queue. This ensures battalions don't waste time attacking non-existent targets.
+- **Note**: Priority 1 ensures immediate processing before other tasks
 
-**`mobile/src/components/battle/BattleBattalionManager.tsx`** renders all battalions using server-provided battalion data. It passes movement state information to **`mobile/src/components/battle/BattleBattalion.tsx`**, which handles smooth client-side movement interpolation between server updates. BattleBattalion calculates intermediate positions during movement and animates battalions smoothly from start to target positions.
+### Step 4: Execute Battalion Destruction Retargeting
+- **Function**: `AttackService.executeBattalionDestructionRetargeting()`
+  - **Plain Language**: This function processes the battalion destruction retargeting task. It uses the same retargeting logic as node capture but is triggered by battalion destruction instead. The affected battalions find new targets and begin moving.
+- **Process**: Same as node capture retargeting (Steps 8-11 above)
+- **Difference**: Higher priority ensures faster response
 
-### Data Flow & Communication
+### Step 5: Movement Interruption for Pursuers
+- **Check**: Any battalions moving toward destroyed battalion
+- **Action**: Queue missing target retargeting if battalion not found
+- **Note**: Battalions already in motion toward the destroyed target will discover it's missing when they arrive
 
-**`mobile/src/store/api/battleApi.ts`** defines the client-server API interface and provides the battle state query hook for real-time polling. **`server/src/services/BattleResponseService.ts`** formats server data for client consumption, converting server database models to client-friendly formats.
+## 3. Dynamic Pursuit (Battalion Movement Updates)
 
-**`server/src/services/BattalionMappingService.ts`** maps server battalion data to client format, adding movement state information. **`server/src/models/Battle.ts`** defines the database schema for battles, battalions, and nodes. **`server/src/types/battle.ts`** and **`mobile/src/types/battleTypes.ts`** provide shared type definitions for server-client communication.
+### Step 1: Battalion Movement Detection
+- **When**: A battalion begins moving to a new location
+- **Function**: Movement state updates trigger notification system
+  - **Plain Language**: When a battalion starts moving, the system needs to notify all enemy battalions that are targeting it. This allows pursuers to adjust their paths to intercept at the new destination rather than going to the old location.
 
----
+### Step 2: Identify Pursuing Battalions
+- **Check**: All battalions with `targetType === 'enemy_battalion'` and `targetBattalionId === movingBattalionId`
+  - **Plain Language**: The system searches through all active targeting states to find which enemy battalions are currently pursuing the moving battalion.
 
-## 3. Behavior Categorization by File Type
+### Step 3: Update Pursuit Paths
+- **Function**: Dynamic path recalculation
+  - **Plain Language**: For each pursuing battalion, the system recalculates the path to reach the moving battalion's new destination. This ensures pursuers don't waste time going to abandoned positions.
+- **Actions**:
+  - Recalculate path to new destination
+  - Update movement timing
+  - Adjust arrival estimates
 
-### Network: Nodes, Lines, and Position Calculations
+### Step 4: Continuous Coordination
+- **Real-time Updates**: Position updates every game tick
+  - **Plain Language**: As battalions move, their positions are continuously updated, allowing smooth pursuit animations and accurate interception calculations.
 
-**Server Files:**
-- `server/src/config/networkConfig.ts` - Network connection definitions, line property calculations, network topology
-- `server/src/services/NodeService.ts` - Node positioning calculations, node types, node creation with tug-of-war
-- `server/src/controllers/BattleController.ts` - `generateNetworkData()` method that recalculates positions for client screen sizes
-- `server/src/utils/battleUtils.ts` - `createNodePositionMap()` utility for position lookups
+## 4. Retargeting Due to Battalion Movement (Target Not Found)
 
-**Client Files:**
-- `mobile/src/components/battle/BattleNetworkGrid.tsx` - Network visualization, node and line rendering
-- `mobile/src/utils/battleUtils.ts` - `createNodePositionMap()` utility for position lookups
-- `mobile/src/types/battleTypes.ts` - Network connection and line property interfaces
+### Step 1: Battalion Arrival Detection
+- **Function**: `MovementService.updateBattleMovement()`
+  - **Plain Language**: This function is called every game tick to update all moving battalions. It calculates new positions based on elapsed time and speed, checks if battalions have reached their destinations, and triggers appropriate actions when they arrive.
+- **Condition**: When `movementState.movementStatus === 'arrived'`
+- **Check**: Target type and target existence
 
-### Movement: Pathfinding, Initial Movement vs. Retargeted Movement
+### Step 2: Target Verification
+- **Function**: `AttackService.startBattalionAttack()`
+  - **Plain Language**: This function initiates combat between two battalions. It creates an attack state that tracks the attacker, defender, and attack timing.
+- **For Enemy Battalion Targets**:
+  - Find target battalion by ID or position
+  - If found: Start attacking
+  - If not found: Proceed to Step 3
 
-**Server Files:**
-- `server/src/services/MovementService.ts` - Attack range calculations, movement initiation, progress updates, distance calculations, pathfinding logic, movement timing constants
-- `server/src/services/TargetingService.ts` - Initial targeting assignment, network path validation, reachability checks
-- `server/src/services/BattleService.ts` - Movement state management, movement update loop, battalion arrival detection
+### Step 3: Queue Missing Target Retargeting
+- **Function**: `AttackService.queueMissingTargetRetargeting()`
+  - **Plain Language**: This function handles the case where a battalion arrives at its destination but can't find its target (the enemy moved or was destroyed while the battalion was traveling). It queues a retargeting task so the battalion can find a new objective.
+- **Creates**: RetargetingTask with:
+  - `triggerType: 'missing_target'`
+  - `priority: RETARGETING_PRIORITIES.MISSING_TARGET` (2)
 
-**Client Files:**
-- `mobile/src/components/battle/BattleBattalion.tsx` - Smooth movement interpolation, client-side animation
-- `mobile/src/components/battle/BattleBattalionManager.tsx` - Battalion movement coordination, movement state handling
-- `mobile/src/types/battleTypes.ts` - MovementState interface definition
+### Step 4: Execute Missing Target Retargeting
+- **Function**: `AttackService.executeMissingTargetRetargeting()`
+  - **Plain Language**: This function processes the missing target scenario. It uses the standard retargeting logic to find a new target for the battalion that arrived at an empty location.
+- **Process**: Same retargeting flow (find new target, update, move)
 
-### Battalions: Attack Behaviors, Targeting, Combat Rules
+## Special Cases
 
-**Server Files:**
-- `server/src/services/AttackService.ts` - Periodic attack management, attack interval calculation, attack state tracking
-- `server/src/services/CombatService.ts` - Damage calculation, attack rules, tug-of-war damage application
-- `server/src/services/BattalionMappingService.ts` - Server-to-client battalion data mapping
-- `server/src/services/BattalionService.ts` - Battalion creation with proper stats, health calculation, battalion business logic
-- `server/src/services/BattleSetupService.ts` - Battle initialization that coordinates battalion creation
-- `server/src/services/BotService.ts` - Bot stats authority, battalion type definitions and statistics
-- `server/src/models/Battle.ts` - Battalion schema, stats definition, health and position properties
-- `server/src/types/battle.ts` - Battalion interfaces and ownership enums
+### Interrupted Recovery Movement
+When a battalion is moving and its target is captured:
 
-**Client Files:**
-- `mobile/src/store/api/battleApi.ts` - Battalion data interfaces for client consumption
-- `mobile/src/components/battle/BattleBattalion.tsx` - Battalion visualization, health bar display
-- `mobile/src/types/battleTypes.ts` - Movement state and battalion type definitions
+**Step 1: Recovery Initiation**
+- **Function**: `MovementService.handleInterruptedRecovery()`
+  - **Plain Language**: This function initiates the recovery process for battalions that were stopped mid-journey. It creates a special movement state that guides the battalion from its interruption point to the nearest node. The movement is marked as non-interruptible to prevent the battalion from getting stuck in an endless interruption loop.
+- **Creates**: Movement state with:
+  - `movementType: 'interrupted_recovery'`
+  - `isInterruptible: false` (prevents cascading interruptions)
+  - `needsRetargetingOnArrival: true`
 
-### Node Behaviors: Node Rules, Tug-of-War, Capture Mechanics
+**Step 2: Natural Movement to Nearest Node**
+- **Calculation Logic**:
+  - **Plain Language**: The system determines which node the battalion should move to based on how far it had traveled before being interrupted. If it was more than halfway to its destination, it continues forward; otherwise, it retreats to where it came from. This prevents battalions from making inefficient backwards movements.
+- **Calculate**: Nearest node based on interruption position
+  - If progress > 50%: Use target node
+  - If progress < 50%: Use start node
+- **Move**: At normal battalion speed (no teleportation)
 
-**Server Files:**
-- `server/src/services/CombatService.ts` - Tug-of-war mechanics, node capture detection, ownership changes, targeting validation
-- `server/src/services/NodeService.ts` - Node creation with tug-of-war system setup, node positioning authority
-- `server/src/models/Battle.ts` - Node schema with tug-of-war progress, capture threshold, ownership properties
-- `server/src/types/battle.ts` - Node interfaces, ownership enums, capture state definitions
-- `server/src/services/BattleSetupService.ts` - Battle initialization that coordinates node creation
+**Step 3: Retargeting Upon Arrival**
+- **Function Check**:
+  - **Plain Language**: When the battalion reaches the nearest node after recovery movement, the system automatically triggers a new retargeting process. This ensures the battalion doesn't idle at the node but immediately finds a new objective. The movement type is reset to normal retargeting.
+- **Condition**: `movementType === 'interrupted_recovery' && needsRetargetingOnArrival`
+- **Action**: Queue interrupted battalion retargeting
+- **Reset**: `movementType = 'retargeting'`
 
-**Client Files:**
-- `mobile/src/components/battle/NodeHealthBar.tsx` - Tug-of-war progress visualization, capture progress display
-- `mobile/src/components/battle/BattleNetworkGrid.tsx` - Node color changes on capture, ownership visualization
-- `mobile/src/store/api/battleApi.ts` - Node state interfaces for tug-of-war progress and ownership
+### Targeting Priority Rules
 
-### Timer System: Countdown and Battle Duration Management
+**Valid Targets**:
+1. **Neutral Nodes**: `node.owner === NodeOwner.NEUTRAL`
+2. **Enemy Battalions**: `battalion.owner !== attacker.owner && !battalion.isDestroyed`
 
-**Server Files:**
-- `server/src/services/BattleTimer.ts` - Timer authority, countdown duration (3s), battle duration (20s), phase transitions
-- `server/src/services/BattleService.ts` - Timer event handling, phase change coordination
-- `server/src/models/Battle.ts` - Timer state storage in database schema
+**Distance Calculation**:
+- Always uses network paths via `PathfindingService.findNetworkPath()`
+- Never straight-line distance
+- Accounts for network topology and connections
 
-**Client Files:**
-- `mobile/src/components/battle/BattleOverlayManager.tsx` - Countdown overlay display, battle timer visualization
-- `mobile/src/components/battle/BattleTimerDisplay.tsx` - Real-time timer display during active battle
+**Target Selection**:
+- Pure proximity-based (no priority system)
+- Whichever is closer (neutral node or enemy battalion)
+- Random selection for equidistant targets
 
----
+## Movement State Transitions
 
-## System Architecture Summary
+```
+initial → retargeting → interrupted_recovery → retargeting
+```
 
-### **Server Authority (Security Critical)**
-- All game logic calculations
-- Attack timing and damage
-- Movement validation and pathfinding
-- Node capture detection
-- Battle state management
-- Screen dimension adaptation
+**Key States**:
+- `moving`: Battalion in transit
+- `arrived`: Battalion reached destination
+- `interrupted`: Movement stopped due to target capture
 
-### **Client Visualization (Display Only)**  
-- Real-time polling for updates
-- Smooth movement interpolation
-- Health bar animations
-- Node color changes
-- UI overlay management
-- User input handling (future) 
+## Save Operations
+
+**Database Updates Occur**:
+1. After battalion destruction
+2. After node capture
+3. After position updates during movement
+4. After retargeting completion
+
+**Batched Operations**:
+- Multiple retargeting tasks processed sequentially
+- 50ms delay between queue items to prevent race conditions
+
+## Network Lock-In Rules
+
+**All Operations Respect**:
+- Battalions never leave network lines
+- Movement is node-to-node following NETWORK_CONNECTIONS
+- Attack range calculations use closest network position
+- Cross-network targeting is valid with proper pathfinding
+
+## Summary of All Retargeting Triggers
+
+1. **Node Capture** (`node_capture`)
+   - Triggered when a node reaches ±100% control
+   - Affects all battalions attacking or moving to that node
+   - Priority: 2
+
+2. **Battalion Destruction** (`battalion_destruction`)
+   - Triggered when a battalion's health reaches 0
+   - Affects all battalions targeting the destroyed battalion
+   - Priority: 1 (highest)
+
+3. **Interrupted Recovery** (`interrupted_recovery`)
+   - Triggered after a battalion is interrupted mid-movement
+   - Handles recovery movement to nearest node
+   - Priority: 1 (highest)
+
+4. **Missing Target** (`missing_target`)
+   - Triggered when a battalion arrives but can't find its target
+   - Handles cases where target moved or was destroyed during travel
+   - Priority: 2
+
+5. **Dynamic Pursuit** (not a retargeting trigger, but a movement update)
+   - Triggered when a battalion moves to a new location
+   - Updates pursuit paths for all battalions targeting it
+   - Real-time coordination without retargeting
+
+## Key System Behaviors
+
+- **Sequential Processing**: All retargeting tasks are processed one at a time with 50ms delays to prevent race conditions
+- **Priority Queue**: Higher priority tasks (1) are processed before lower priority tasks (2)
+- **No Teleportation**: Battalions always move naturally at their designated speeds
+- **Network Constraints**: All movement and positioning respects the network topology
+- **Proximity-Based Selection**: Target selection is purely based on network path distance
+- **Random Tiebreaker**: When multiple targets are equidistant, selection is random
