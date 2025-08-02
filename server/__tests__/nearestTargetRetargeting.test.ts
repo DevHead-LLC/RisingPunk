@@ -4,14 +4,18 @@
  */
 
 import { RetargetingService } from '../src/services/RetargetingService';
-import { createTestNodes, createTestBattalion, TEST_BOT_STATS } from './testUtils';
+import { createTestNodes, createTestBattalion, TEST_BOT_STATS, TEST_SCREEN_DIMENSIONS } from './testUtils';
 import { NodeOwner, BotType } from '../src/types/battle';
+import { ScreenDimensionService } from '../src/services/ScreenDimensionService';
 
 describe('Nearest Target Retargeting - Network Pathfinding', () => {
   test('retargeting finds nearest target using network pathfinding', () => {
     // Setup: Create nodes and battalions
     const nodes = createTestNodes();
     const battalion = createTestBattalion('user-1', 0, NodeOwner.USER, BotType.GUARDIAN);
+    
+    // Set up screen dimensions for the test battle
+    ScreenDimensionService.setBattleScreenDimensions('test-battle-id', TEST_SCREEN_DIMENSIONS.width, TEST_SCREEN_DIMENSIONS.height);
     
     // Create neutral nodes and enemy battalions for targeting
     const neutralNodes = nodes.filter(node => node.owner === NodeOwner.NEUTRAL);
@@ -25,7 +29,7 @@ describe('Nearest Target Retargeting - Network Pathfinding', () => {
     expect(enemyBattalions.length).toBeGreaterThan(0);
     
     // Find closest target using RetargetingService
-    const targetResult = RetargetingService.findClosestTarget(battalion, neutralNodes, enemyBattalions);
+    const targetResult = RetargetingService.findClosestTarget(battalion, neutralNodes, enemyBattalions, 'test-battle-id');
     
     // Verify target was found
     expect(targetResult).not.toBeNull();

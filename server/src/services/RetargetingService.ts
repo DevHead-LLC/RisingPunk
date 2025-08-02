@@ -14,11 +14,15 @@ export interface RetargetingResult {
 }
 
 export class RetargetingService {
-  static getBattalionStartNode(battalion: IBattalion, battleId?: string): number {
+  static getBattalionStartNode(battalion: IBattalion, battleId: string): number {
+    if (!battleId) {
+      throw new Error('battleId is required for getBattalionStartNode');
+    }
+    
     const { calculateNodePositions } = require('./NodeService');
     const { ScreenDimensionService } = require('./ScreenDimensionService');
     
-    const screenDimensions = ScreenDimensionService.getBattleScreenDimensions(battleId || 'temp');
+    const screenDimensions = ScreenDimensionService.getBattleScreenDimensions(battleId);
     const nodePositions = calculateNodePositions(screenDimensions.width, screenDimensions.height);
     
     let closestNodeIndex = battalion.position.nodeIndex;
@@ -45,7 +49,7 @@ export class RetargetingService {
     affectedBattalionIds: string[],
     allBattalions: IBattalion[],
     allNodes: INode[],
-    battleId?: string
+    battleId: string
   ): RetargetingResult[] {
     
     const retargetingResults: RetargetingResult[] = [];
@@ -89,7 +93,7 @@ export class RetargetingService {
     battalion: IBattalion,
     neutralNodes: INode[],
     enemyBattalions: IBattalion[],
-    battleId?: string
+    battleId: string
   ): {targetNodeIndex: number, pathToTarget: number[], pathDistance: number, targetType: 'neutral_node' | 'enemy_battalion', targetBattalionId?: string} | null {
     
     let closestDistance = Infinity;
