@@ -21,8 +21,6 @@ export class TargetingService {
   static assignInitialTargets(battalions: IBattalion[], nodes: INode[]): BattalionTargetingResult[] {
     const neutralNodeIndices = nodes.filter(node => node.owner === NodeOwner.NEUTRAL).map(node => node.index);
     
-    console.log('🎯 INITIAL TARGETING START');
-    console.log(`📊 Neutral nodes available: [${neutralNodeIndices.join(', ')}]`);
     
     const results = battalions.map(battalion => {
       const ownerLabel = battalion.owner === NodeOwner.USER ? 'user' : 'enemy';
@@ -31,8 +29,6 @@ export class TargetingService {
     
     const validTargets = results.filter(r => r.isValidTarget);
     const invalidTargets = results.filter(r => !r.isValidTarget);
-    console.log(`📊 TARGETING SUMMARY: ${validTargets.length} valid, ${invalidTargets.length} invalid`);
-    console.log('🎯 INITIAL TARGETING COMPLETE');
     
     return results;
   }
@@ -49,7 +45,6 @@ export class TargetingService {
     const validTargets = this.getValidTargets(startingNode, neutralNodeIndices);
     
     if (validTargets.length === 0) {
-      console.log(`❌ ${ownerLabel} ${battalion.type} at node ${startingNode}: NO VALID TARGETS`);
       return {
         battalionId: battalion.id,
         battalionType: battalion.type,
@@ -62,7 +57,6 @@ export class TargetingService {
     }
     
     const targetNode = validTargets[Math.floor(Math.random() * validTargets.length)];
-    console.log(`✅ ${ownerLabel} ${battalion.type} at node ${startingNode} targets node ${targetNode}`);
     
     return {
       battalionId: battalion.id,

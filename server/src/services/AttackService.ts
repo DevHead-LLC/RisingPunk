@@ -58,7 +58,6 @@ export class AttackService {
   static startAttacking(battalion: IBattalion, targetNodeIndex: number): void {
     // Check if battalion is already attacking
     if (this.isAttacking(battalion.id)) {
-      console.log(`🚫 ATTACK BLOCKED: ${battalion.owner} ${battalion.type} is already attacking, cannot start new attack`);
       return;
     }
     
@@ -74,13 +73,11 @@ export class AttackService {
     };
     
     this.attackStates.set(battalion.id, attackState);
-    console.log(`⚔️ ${battalion.owner} ${battalion.type} started attacking node ${targetNodeIndex} (interval: ${attackInterval}ms)`);
   }
 
   static startBattalionAttack(attacker: IBattalion, targetId: string): void {
     // Check if battalion is already attacking
     if (this.isAttacking(attacker.id)) {
-      console.log(`🚫 BATTALION ATTACK BLOCKED: ${attacker.owner} ${attacker.type} is already attacking, cannot start new battalion attack`);
       return;
     }
     
@@ -97,7 +94,6 @@ export class AttackService {
     };
     
     this.attackStates.set(attacker.id, attackState);
-    console.log(`⚔️ BATTALION ATTACK STARTED: ${attacker.owner} ${attacker.type} (${attacker.id}) → ${targetId} (interval: ${attackInterval}ms)`);
   }
 
   static processBattalionAttack(attacker: IBattalion, defender: IBattalion): boolean {
@@ -108,9 +104,7 @@ export class AttackService {
     const damage = CombatService.calculateBattalionDamage(attacker, defender);
     const destroyed = CombatService.applyBattalionDamage(defender, damage);
     
-    console.log(`⚔️ BATTALION ATTACK RESULT: ${attacker.owner} ${attacker.type} deals ${damage} damage to ${defender.owner} ${defender.type} (${defender.currentHealth} health remaining, destroyed: ${destroyed})`);
     
-    console.log(`⚔️ BATTALION ATTACK END: Returning destroyed=${destroyed}`);
     return destroyed;
   }
   
@@ -119,7 +113,6 @@ export class AttackService {
     if (attackState) {
       attackState.isAttacking = false;
       this.attackStates.delete(battalionId);
-      console.log(`🛑 Battalion ${battalionId} stopped attacking`);
     }
   }
   
@@ -131,13 +124,11 @@ export class AttackService {
     const damage = CombatService.calculateTugOfWarDamage(battalion);
     const captured = CombatService.applyTugOfWarDamage(node, damage, battalion.owner);
     
-    console.log(`⚔️ ${battalion.owner} ${battalion.type} dealt ${damage} damage to node ${node.index} (progress: ${node.tugOfWarProgress}%)`);
     
     return captured;
   }
   
   static getBattalionsAttackingSpecificNode(nodeIndex: number): string[] {
-    console.log(`🔍 SELECTIVE: Finding battalions attacking node ${nodeIndex} specifically`);
 
     const attackers: string[] = [];
     // Use direct iteration instead of creating intermediate arrays
@@ -147,7 +138,6 @@ export class AttackService {
       }
     }
 
-    console.log(`🔍 SELECTIVE: Found ${attackers.length} battalions attacking node ${nodeIndex}`);
     return attackers;
   }
   
@@ -170,7 +160,6 @@ export class AttackService {
 
   static clearBattalionAttacks(battalionId: string): void {
     this.attackStates.delete(battalionId);
-    console.log(`🧹 CLEARED ATTACKS: Removed attack state for battalion ${battalionId}`);
   }
 
   // ============================================================================
@@ -178,21 +167,18 @@ export class AttackService {
   // ============================================================================
 
   static async executeUnifiedRetargeting(battle: any, battalionIds: string[], source: string): Promise<void> {
-    console.log(`🎯 UNIFIED RETARGETING [${source}]: Processing ${battalionIds.length} battalions`);
     
     const retargetingResults = RetargetingService.retargetBattalionsAfterCapture(
       -1, // No specific captured node for unified retargeting
       battalionIds,
       battle.battalions,
-      battle.nodes
+      battle.nodes,
+      battle.battleId
     );
     
     if (retargetingResults.length > 0) {
       await BattalionService.updateTargetingResults(battle.battleId, retargetingResults);
       await this.initiateRetargetingMovement(battle, retargetingResults, source);
-      console.log(`🎯 UNIFIED RETARGETING [${source}]: ${retargetingResults.length} battalions retargeted`);
-    } else {
-      console.log(`🎯 UNIFIED RETARGETING [${source}]: No valid targets found for any battalions`);
     }
   }
 
@@ -211,7 +197,6 @@ export class AttackService {
     };
     
     this.retargetingQueue.push(task);
-    console.log(`📋 RETARGETING QUEUE: Added task for node ${capturedNodeIndex} capture (queue size: ${this.retargetingQueue.length})`);
     
     if (!this.isProcessingQueue) {
       this.processRetargetingQueue();
@@ -227,7 +212,6 @@ export class AttackService {
     for (const [battalionId, attackState] of this.attackStates) {
       if (attackState.targetType === 'battalion' && attackState.targetId === destroyedBattalionId) {
         affectedBattalions.push(battalionId);
-        console.log(`🎯 DESTRUCTION AFFECTED: Battalion ${battalionId} was targeting destroyed ${destroyedBattalionId}`);
         this.stopAttacking(battalionId);
       }
     }
@@ -243,18 +227,14 @@ export class AttackService {
       };
       
       this.retargetingQueue.push(task);
-      console.log(`📋 DESTRUCTION RETARGETING: ${affectedBattalions.length} battalions need new targets after ${destroyedBattalionId} destruction (queue size: ${this.retargetingQueue.length})`);
       
       if (!this.isProcessingQueue) {
         this.processRetargetingQueue();
       }
-    } else {
-      console.log(`📋 DESTRUCTION RETARGETING: No battalions were targeting destroyed ${destroyedBattalionId}`);
-    }
+    } 
   }
 
   static queueInterruptedBattalionRetargeting(battleId: string, battalionId: string): void {
-    console.log(`📋 INTERRUPTED RETARGETING: Queueing retargeting for recovered battalion ${battalionId}`);
     
     this.retargetingQueue.push({
       battleId,
@@ -280,7 +260,6 @@ export class AttackService {
     };
     
     this.retargetingQueue.push(task);
-    console.log(`📋 MISSING TARGET RETARGETING: Queueing retargeting for battalion ${battalionId} (queue size: ${this.retargetingQueue.length})`);
     
     this.processRetargetingQueue();
   }
@@ -289,7 +268,6 @@ export class AttackService {
     if (this.isProcessingQueue) return;
     
     this.isProcessingQueue = true;
-    console.log(`⚙️ RETARGETING QUEUE: Starting sequential processing`);
     
     this.retargetingQueue.sort((a, b) => a.priority - b.priority);
 
@@ -298,30 +276,24 @@ export class AttackService {
       
       const battle = await Battle.findOne({ battleId: task.battleId });
       if (!battle) {
-        console.log(`❌ RETARGETING ERROR: Battle ${task.battleId} not found`);
         continue;
       }
       
       try {
         switch (task.triggerType) {
           case 'node_capture':
-            console.log(`⚙️ RETARGETING QUEUE: Processing node capture ${task.capturedNodeIndex} (${task.affectedBattalionIds?.length || 0} battalions)`);
             await this.executeRetargetingTask(battle, task.capturedNodeIndex!, task.affectedBattalionIds!);
             break;
           case 'battalion_destruction':
-            console.log(`⚙️ RETARGETING QUEUE: Processing battalion destruction ${task.destroyedBattalionId} (${task.affectedBattalionIds?.length || 0} battalions)`);
             await this.executeBattalionDestructionRetargeting(battle, task.destroyedBattalionId!, task.affectedBattalionIds!);
             break;
           case 'interrupted_recovery':
-            console.log(`⚙️ RETARGETING QUEUE: Processing interrupted recovery ${task.affectedBattalionIds[0]}`);
             await this.executeInterruptedBattalionRetargeting(battle, task.affectedBattalionIds[0]);
             break;
           case 'missing_target':
-            console.log(`⚙️ RETARGETING QUEUE: Processing missing target retargeting ${task.affectedBattalionIds[0]}`);
             await this.executeMissingTargetRetargeting(battle, task.affectedBattalionIds[0]);
             break;
           default:
-            console.log(`❌ RETARGETING ERROR: Unknown trigger type ${task.triggerType}`);
         }
       } catch (error) {
         console.log(`❌ RETARGETING ERROR: Failed to process ${task.triggerType}:`, error);
@@ -331,7 +303,6 @@ export class AttackService {
     }
     
     this.isProcessingQueue = false;
-    console.log(`⚙️ RETARGETING QUEUE: Finished processing all tasks`);
   }
 
   // ============================================================================
@@ -348,7 +319,6 @@ export class AttackService {
           movementState.isInterruptible &&
           movementState.finalTarget === targetNodeIndex) {
         relevantBattalions.push(battalionId);
-        console.log(`🛑 INTERRUPT: Battalion ${battalionId} moving to captured node ${targetNodeIndex}`);
       }
     }
     
@@ -356,23 +326,19 @@ export class AttackService {
   }
 
   static async executeRetargetingTask(battle: any, capturedNodeIndex: number, affectedBattalionIds: string[]): Promise<void> {
-    console.log(`🎯 EXECUTING: Retargeting for node ${capturedNodeIndex} capture`);
     
     const movingBattalionsToThisNode = this.getMovingBattalionsTargetingNode(battle.battleId, capturedNodeIndex);
     if (movingBattalionsToThisNode.length > 0) {
-      console.log(`🛑 CAPTURE INTERRUPT: ${movingBattalionsToThisNode.length} battalions moving during capture`);
       
       const interruptedBattalions = new Set<string>();
       
       for (const battalionId of movingBattalionsToThisNode) {
         if (interruptedBattalions.has(battalionId)) {
-          console.log(`🛑 INTERRUPT SKIP: Battalion ${battalionId} already interrupted`);
           continue;
         }
         
-        const interrupted = MovementService.interruptRetargetingMovement(battalionId, battle.battleId);
+                  const interrupted = MovementService.interruptRetargetingMovement(battalionId, battle.battleId, battle);
         if (interrupted) {
-          console.log(`🛑 INTERRUPT: Stopping retargeting movement for battalion ${battalionId}`);
           interruptedBattalions.add(battalionId);
         }
       }
@@ -385,71 +351,58 @@ export class AttackService {
           const battalion = battle.battalions.find((b: any) => b.id === battalionId);
           
           if (movementState && battalion && movementState.wasInterrupted && movementState.interruptionPosition) {
-            console.log(`🚀 INTERRUPTED MOVEMENT: Battalion ${battalionId} will move from interruption coordinates (${movementState.interruptionPosition.x.toFixed(1)}, ${movementState.interruptionPosition.y.toFixed(1)}) to nearest node ${movementState.interruptionPosition.nodeIndex}`);
             
-            MovementService.initiateMovementToNearestNode(battalion, movementState.interruptionPosition, battle.battleId);
+            this.queueInterruptedBattalionRetargeting(battle.battleId, battalionId);
           }
         }
         
         await battle.save();
-        console.log(`💾 MOVEMENTS SAVED: Interrupted battalions now moving to nearest nodes`);
       }
     }
     
-    console.log(`⏸️ RETARGETING DEFERRED: Interrupted battalions will retarget after reaching nearest nodes`);
     
     if (affectedBattalionIds.length > 0) {
-      console.log(`🎯 IMMEDIATE RETARGETING: ${affectedBattalionIds.length} battalions already at nodes`);
       
       const retargetingResults = RetargetingService.retargetBattalionsAfterCapture(
         capturedNodeIndex,
         affectedBattalionIds,
         battle.battalions,
-        battle.nodes
+        battle.nodes,
+        battle.battleId
       );
       
       if (retargetingResults.length > 0) {
         await BattalionService.updateTargetingResults(battle.battleId, retargetingResults);
-        console.log(`🎯 INTEGRATION: Updated targeting for ${retargetingResults.length} battalions already at nodes`);
         await this.initiateRetargetingMovement(battle, retargetingResults, 'NODE_CAPTURE_RETARGETING');
       }
     }
   }
 
   static async executeBattalionDestructionRetargeting(battle: any, destroyedBattalionId: string, affectedBattalionIds: string[]): Promise<void> {
-    console.log(`💀 BATTALION DESTRUCTION RETARGETING: ${destroyedBattalionId} destroyed, ${affectedBattalionIds.length} battalions need new targets`);
     
     if (affectedBattalionIds.length > 0) {
       await this.executeUnifiedRetargeting(battle, affectedBattalionIds, 'BATTALION_DESTRUCTION');
-    } else {
-      console.log(`💀 BATTALION DESTRUCTION RETARGETING: No battalions were targeting destroyed ${destroyedBattalionId}`);
     }
   }
 
   static async executeInterruptedBattalionRetargeting(battle: any, battalionId: string): Promise<void> {
-    console.log(`🛑 INTERRUPTED BATTALION RETARGETING: Battalion ${battalionId} reached nearest node, now retargeting`);
     
     await this.executeUnifiedRetargeting(battle, [battalionId], 'INTERRUPTED_RECOVERY');
   }
 
   static async executeMissingTargetRetargeting(battle: any, battalionId: string): Promise<void> {
-    console.log(`🎯 MISSING TARGET RETARGETING: Battalion ${battalionId} target not found, retargeting`);
     
     await this.executeUnifiedRetargeting(battle, [battalionId], 'MISSING_TARGET');
   }
 
   static async initiateRetargetingMovement(battle: any, retargetingResults: any[], source: string = 'REGULAR_RETARGETING'): Promise<void> {
-    console.log(`🚀 MOVEMENT [${source}]: Initiating movement for ${retargetingResults.length} retargeted battalions`);
     
     for (const result of retargetingResults) {
       const battalion = battle.battalions.find((b: any) => b.id === result.battalionId);
       if (!battalion) {
-        console.log(`🚀 MOVEMENT ERROR: Battalion ${result.battalionId} not found for movement`);
         continue;
       }
-      
-      console.log(`📊 MOVEMENT INITIATION: ${battalion.owner} ${battalion.type}-type battalion at position node ${battalion.position.nodeIndex} initiating movement to target type: ${result.targetType} at node ${result.newTargetNodeIndex}`);
-      
+            
       const { MovementService } = require('./MovementService');
       const { ScreenDimensionService } = require('./ScreenDimensionService');
       
@@ -469,12 +422,9 @@ export class AttackService {
       if (movementState) {
         const battleMovementStates = MovementService.getMovementStates(battle.battleId);
         battleMovementStates.set(battalion.id, movementState);
-      } else {
-        console.log(`❌ MOVEMENT ERROR: Failed to create movement state for ${battalion.owner} ${battalion.type}`);
       }
     }
     
-    console.log(`🚀 MOVEMENT: Movement initiated for all retargeted battalions`);
   }
 
   // ============================================================================
@@ -482,7 +432,6 @@ export class AttackService {
   // ============================================================================
 
   static processUnifiedAttack(attacker: IBattalion, target: IBattalion | INode, targetType: 'battalion' | 'node'): boolean {
-    console.log(`⚔️ UNIFIED ATTACK: ${attacker.owner} ${attacker.type} attacking ${targetType} target`);
     
     if (targetType === 'battalion') {
       const defender = target as IBattalion;
@@ -499,7 +448,6 @@ export class AttackService {
 
   static async processActiveAttacks(battle: any): Promise<void> {
     if (battle.phase === 'COMPLETE') {
-      console.log(`⏹️ BATTLE ENDED: Skipping attack processing for completed battle ${battle.battleId}`);
       return;
     }
 
@@ -508,13 +456,11 @@ export class AttackService {
         const battalion = battle.battalions.find((b: IBattalion) => b.id === battalionId);
         
         if (!battalion) {
-          console.log(`⚠️ ATTACK PROCESSING: Battalion ${battalionId} not found, removing attack state`);
           this.stopAttacking(battalionId);
           continue;
         }
         
         if (battalion.isDestroyed || battalion.quantity <= 0 || battalion.currentHealth <= 0) {
-          console.log(`🚫 BATTALION ATTACK BLOCKED: Attacker ${battalionId} is destroyed/dead (destroyed: ${battalion.isDestroyed}, units: ${battalion.quantity}, health: ${battalion.currentHealth})`);
           this.stopAttacking(battalionId);
           continue;
         }
@@ -527,16 +473,13 @@ export class AttackService {
             attackState.lastAttackTime = Date.now();
             
             if (destroyed) {
-              console.log(`💀 BATTALION DESTROYED: ${defender.owner} ${defender.type} eliminated by ${battalion.owner} ${battalion.type}`);
               await battle.save();
               this.queueBattalionDestructionRetargeting(battle.battleId, defender.id);
             }
           } else {
             if (!defender) {
-              console.log(`🚫 BATTALION ATTACK FAILED: Target battalion ${attackState.targetId} not found in battle`);
               this.queueMissingTargetRetargeting(battle.battleId, battalionId);
             } else if (defender.isDestroyed) {
-              console.log(`🚫 BATTALION ATTACK FAILED: Target ${defender.owner} ${defender.type} is already destroyed`);
               this.queueMissingTargetRetargeting(battle.battleId, battalionId);
             }
             this.stopAttacking(battalionId);
@@ -553,13 +496,10 @@ export class AttackService {
               const affectedAttackers = this.getBattalionsAttackingSpecificNode(node.index);
               affectedAttackers.forEach(id => this.stopAttacking(id));
               
-              console.log(`🏆 NODE CAPTURED: Node ${node.index} captured by ${node.owner}!, stopping ${affectedAttackers.length} specific attacks`);
-              console.log(`📊 CAPTURE DETAILS: Node ${node.index} captured by ${node.owner}, affecting ${affectedAttackers.length} battalions that were attacking this node`);
               
               this.queueRetargetingTask(battle.battleId, node.index, affectedAttackers);
             }
           } else {
-            console.log(`🚫 NODE ATTACK FAILED: Node ${attackState.targetNodeIndex} missing or cannot be targeted`);
             this.stopAttacking(battalionId);
           }
         }

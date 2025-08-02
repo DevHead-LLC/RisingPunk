@@ -193,9 +193,6 @@ export class MovementService {
     // Clear cached data for this battle
     this.clearNodePositionCache(battleId);
     this.clearBattalionIndexCache(battleId);
-    
-    // Clear screen dimensions to prevent memory leak
-    ScreenDimensionService.clearBattleScreenDimensions(battleId);
   }
 
   static async updateBattleMovement(battleId: string, battle: any, targetingResults: any[]): Promise<void> {
@@ -213,6 +210,12 @@ export class MovementService {
       if (movementState.movementStatus === 'moving') {
         const updatedMovementState = this.updateMovementProgress(movementState, battleId, battle);
         battleMovementStates.set(battalionId, updatedMovementState);
+        
+        if (updatedMovementState.movementStatus === 'moving' && updatedMovementState.wasPositionUpdated) {
+          positionUpdated = true;
+          updatedMovementState.wasPositionUpdated = false;
+          battleMovementStates.set(battalionId, updatedMovementState);
+        }
         
         if (updatedMovementState.movementStatus === 'arrived') {
           const battalion = this.findBattalionById(battle.battalions, battalionId);
@@ -361,6 +364,8 @@ export class MovementService {
     
     const duration = MovementCalculationService.calculateMovementDuration(battalion);
     
+    console.log(`🛤️ PATH DECISION: ${battalion.id} initial movement from node ${battalion.position.nodeIndex} to ${targetNode} via path [${networkPath.join(' → ')}]`);
+    
     return this.createBaseMovementState(
       battalion.id,
       startPosition,
@@ -390,6 +395,8 @@ export class MovementService {
       if (!targetBattalion) {
         return undefined;
       }
+      
+      console.log(`🛤️ PATH DECISION: ${battalion.id} retargeting to same-node target ${targetNode} (target battalion: ${targetBattalion.id})`);
       
       const baseAttackRange = battalion.stats.range || 50;
       const sameNodeAttackRange = Math.min(baseAttackRange, 15);
@@ -455,18 +462,45 @@ export class MovementService {
       );
       targetPosition = BattalionPositionService.createTargetPositionFromAttackRange(attackRangePosition, nextNodeIndex);
       stepDistance = MovementCalculationService.calculateNetworkDistance(
-        nodePositions[battalion.position.nodeIndex].position, 
+        { x: battalion.position.x, y: battalion.position.y }, 
         attackRangePosition
       );
     } else {
       targetPosition = BattalionPositionService.createTargetPositionFromNode(nodePositions, nextNodeIndex);
       stepDistance = MovementCalculationService.calculateNetworkDistance(
-        nodePositions[battalion.position.nodeIndex].position,
+        { x: battalion.position.x, y: battalion.position.y },
         nodePositions[nextNodeIndex].position
       );
     }
     
     const duration = MovementCalculationService.calculateMovementDuration(battalion);
+    
+    console.log(`🛤️ PATH DECISION: ${battalion.id} retargeting from node ${battalion.position.nodeIndex} to ${fullPath[fullPath.length - 1]} via path [${fullPath.join(' → ')}]`);
+    
+    // Add distance calculation logs
+    const firstNodeIndex = fullPath[0];
+    const secondNodeIndex = fullPath[1];
+    const firstNodePosition = nodePositions[firstNodeIndex].position;
+    const secondNodePosition = nodePositions[secondNodeIndex].position;
+    const battalionActualPosition = { x: battalion.position.x, y: battalion.position.y };
+    
+    const distanceToFirstNode = Math.sqrt(
+      Math.pow(battalionActualPosition.x - firstNodePosition.x, 2) + 
+      Math.pow(battalionActualPosition.y - firstNodePosition.y, 2)
+    );
+    const distanceToSecondNode = Math.sqrt(
+      Math.pow(battalionActualPosition.x - secondNodePosition.x, 2) + 
+      Math.pow(battalionActualPosition.y - secondNodePosition.y, 2)
+    );
+    const distanceBetweenNodes = Math.sqrt(
+      Math.pow(firstNodePosition.x - secondNodePosition.x, 2) + 
+      Math.pow(firstNodePosition.y - secondNodePosition.y, 2)
+    );
+    
+    const tolerance = 2;
+    const isBattalionBetweenNodes = Math.abs(distanceToFirstNode + distanceToSecondNode - distanceBetweenNodes) < tolerance;
+    
+    console.log(`📏 DISTANCE CALC: ${battalion.id} - To first node ${firstNodeIndex}: ${distanceToFirstNode.toFixed(1)}, To second node ${secondNodeIndex}: ${distanceToSecondNode.toFixed(1)}, Between nodes: ${distanceBetweenNodes.toFixed(1)}, Is between: ${isBattalionBetweenNodes}`);
     
     return {
       battalionId: battalion.id,
@@ -495,7 +529,31 @@ export class MovementService {
     const completionThreshold = movementState.estimatedDuration + 50;
     const isComplete = elapsedTime >= completionThreshold;
     
+    if (!isComplete) {
+      const { MovementCalculationService } = this.getCachedService('MovementCalculationService');
+      const currentPosition = MovementCalculationService.calculateCurrentMovementPosition(movementState);
+      
+      const battalion = this.findBattalionById(battle?.battalions || [], movementState.battalionId);
+      if (battalion) {
+        if (BattalionPositionService.updateBattalionPosition(battalion, currentPosition)) {
+          movementState.wasPositionUpdated = true;
+          
+          // Log battalion position changes every 100ms
+          const now = Date.now();
+          if (!movementState.lastPositionLog || (now - movementState.lastPositionLog) >= 100) {
+            console.log(`📍 BATTALION POSITION: ${battalion.id} at (${currentPosition.x.toFixed(1)}, ${currentPosition.y.toFixed(1)})`);
+            movementState.lastPositionLog = now;
+          }
+        }
+      }
+    }
+    
     if (isComplete) {
+      // Log when battalion stops at resting position
+      const battalion = this.findBattalionById(battle?.battalions || [], movementState.battalionId);
+      if (battalion) {
+        console.log(`🛑 BATTALION RESTING: ${battalion.id} stopped at (${battalion.position.x.toFixed(1)}, ${battalion.position.y.toFixed(1)})`);
+      }
       
       if (movementState.movementType === 'retargeting' && movementState.fullPath && movementState.currentPathIndex !== undefined) {
         const nextPathIndex = movementState.currentPathIndex + 1;
@@ -566,7 +624,7 @@ export class MovementService {
     };
   }
 
-  static interruptRetargetingMovement(battalionId: string, battleId: string): boolean {
+  static interruptRetargetingMovement(battalionId: string, battleId: string, battle?: any): boolean {
     const battleMovementStates = this.movementStates.get(battleId);
     if (!battleMovementStates) return false;
 
@@ -582,51 +640,18 @@ export class MovementService {
     movementState.movementStatus = 'arrived';
     movementState.wasInterrupted = true;
     movementState.interruptionPosition = currentPosition;
+    
+    const battalion = this.findBattalionById(battle?.battalions || [], battalionId);
+    if (battalion) {
+      BattalionPositionService.updateBattalionPosition(battalion, currentPosition);
+    }
         
     battleMovementStates.set(battalionId, movementState);
 
     return true;
   }
 
-  static initiateMovementToNearestNode(battalion: any, interruptionPosition: any, battleId: string): void {    
-    const screenDimensions = ScreenDimensionService.getBattleScreenDimensions(battleId);
-    const nodePositions = calculateNodePositions(screenDimensions.width, screenDimensions.height);
-    const targetNodePosition = nodePositions[interruptionPosition.nodeIndex];
-    
-    const { MovementCalculationService } = this.getCachedService('MovementCalculationService');
-    const actualDistance = MovementCalculationService.calculateNetworkDistance(
-      { x: interruptionPosition.x, y: interruptionPosition.y },
-      targetNodePosition.position
-    );
-    
-    const fullMovementDuration = MovementCalculationService.calculateMovementDuration(battalion);
-    const averageNodeDistance = 300;
-    const proportionalDuration = Math.max(
-      500,
-      Math.round((actualDistance / averageNodeDistance) * fullMovementDuration)
-    );
-    
-    const baseMovementState = this.createBaseMovementState(
-      battalion.id,
-      BattalionPositionService.createStartPositionFromInterruption(interruptionPosition, battalion.position.nodeIndex),
-      BattalionPositionService.createTargetPositionFromNodePosition(targetNodePosition, interruptionPosition.nodeIndex),
-      'interrupted_recovery',
-      [battalion.position.nodeIndex, interruptionPosition.nodeIndex],
-      proportionalDuration,
-      interruptionPosition.nodeIndex,
-      false
-    );
 
-    const movementState = {
-      ...baseMovementState,
-      needsRetargetingOnArrival: true,
-      originalInterruptionPosition: interruptionPosition
-    };
-    
-    const battleMovementStates = this.movementStates.get(battleId) || new Map();
-    battleMovementStates.set(battalion.id, movementState);
-    this.movementStates.set(battleId, battleMovementStates);    
-  }
 
   static getArrivedBattalions(movementStates: Map<string, MovementState>): MovementState[] {
     // Pre-allocate array size for better performance

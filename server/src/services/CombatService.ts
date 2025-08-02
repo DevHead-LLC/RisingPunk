@@ -34,7 +34,6 @@ export class CombatService {
     const defenseReduction = baseDamage * (defender.stats.defense / 100);
     const finalDamage = Math.max(1, baseDamage - defenseReduction);
     
-    console.log(`📊 DAMAGE CALCULATION: ${attacker.owner} ${attacker.type} (${attacker.stats.offense}×${attacker.quantity}=${baseDamage}) attacks ${defender.owner} ${defender.type} (${defender.stats.defense}% defense) → ${defenseReduction.toFixed(1)} reduction = ${finalDamage} final damage`);
     
     return finalDamage;
   }
@@ -69,10 +68,6 @@ export class CombatService {
 
   static canTargetBattalion(battalion: IBattalion): boolean {
     const canTarget = !battalion.isDestroyed;
-    
-    if (!canTarget) {
-      console.log(`🚫 TARGETING BLOCKED: ${battalion.owner} ${battalion.type} cannot be targeted (destroyed: ${battalion.isDestroyed})`);
-    }
     
     return canTarget;
   }
@@ -136,7 +131,6 @@ export class CombatService {
       battalion.quantity = newQuantity;
       const newAttackPower = battalion.stats.offense * battalion.quantity;
       const oldAttackPower = battalion.stats.offense * originalQuantity;
-      console.log(`📊 UNIT RECALCULATION: ${battalion.owner} ${battalion.type} units: ${originalQuantity} → ${battalion.quantity} (attack power: ${oldAttackPower} → ${newAttackPower})`);
     }
   }
 } 

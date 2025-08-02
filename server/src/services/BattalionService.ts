@@ -16,7 +16,6 @@ export class BattalionService {
   private static botTypeCache = new Map<string, BotType>();
 
   static async triggerInitialTargeting(battalions: IBattalion[], nodes: INode[], battleId: string): Promise<BattalionTargetingResult[]> {
-    console.log('🎯 TRIGGERING INITIAL TARGETING for battle:', battleId);
     const results = TargetingService.assignInitialTargets(battalions, nodes);
     this.targetingResults.set(battleId, results);
     return results;
@@ -27,7 +26,6 @@ export class BattalionService {
   }
 
   static async updateTargetingResults(battleId: string, retargetingResults: Array<{battalionId: string, newTargetNodeIndex: number, pathToTarget: number[], targetType?: 'neutral_node' | 'enemy_battalion', targetBattalionId?: string}>): Promise<void> {
-    console.log(`🎯 BATTALION SERVICE: Updating targeting for ${retargetingResults.length} battalions`);
     
     const currentResults = this.getTargetingResults(battleId);
     
@@ -45,9 +43,6 @@ export class BattalionService {
         const targetInfo = retargetResult.targetType === 'enemy_battalion' 
           ? `${retargetResult.targetType} ${retargetResult.targetBattalionId} at node ${retargetResult.newTargetNodeIndex}`
           : `${retargetResult.targetType} at node ${retargetResult.newTargetNodeIndex}`;
-        console.log(`🎯 TARGETING UPDATE: Battalion ${retargetResult.battalionId} now targeting ${targetInfo}`);
-      } else {
-        console.log(`🎯 BATTALION SERVICE WARNING: Battalion ${retargetResult.battalionId} not found in current targeting results`);
       }
     });
     
@@ -59,10 +54,8 @@ export class BattalionService {
     const result = targetingResults.find(result => result.battalionId === battalionId);
     
     if (result) {
-      console.log(`🎯 TARGETING LOOKUP: Battalion ${battalionId} is targeting ${result.targetType || 'unknown'} at node ${result.targetNode}`);
       return result;
     } else {
-      console.log(`🎯 TARGETING LOOKUP: No targeting result found for battalion ${battalionId}`);
       return null;
     }
   }
@@ -111,8 +104,10 @@ export class BattalionService {
     const maxHealth = stats.health * quantity;
     const node = nodes[nodeIndex];
     
-    console.log(`🏗️ ${owner.toUpperCase()} BATTALION CREATED: ${type} (${quantity} units, ${maxHealth} total health, ${stats.health} per unit)`);
-    
+    if (!node) {
+      throw new Error(`Node index ${nodeIndex} not found in nodes array`);
+    }
+        
     return {
       id,
       type,
@@ -158,23 +153,24 @@ export class BattalionService {
     return validatedBotType;
   }
 
-  static createUserBattalions(nodes: INode[], userBattalions?: Array<{type: string, quantity: number, nodeIndex: number}>): IBattalion[] {
+  static createUserBattalions(nodes: INode[], userBattalions?: Array<{type: string, quantity: number}>): IBattalion[] {
     const defaultUserBattalions = [
-      { type: 'guardian' as BotType, quantity: 10, nodeIndex: 0 },
-      { type: 'breacher' as BotType, quantity: 8, nodeIndex: 1 },
-      { type: 'phreak' as BotType, quantity: 6, nodeIndex: 2 },
+      { type: 'guardian' as BotType, quantity: 10 },
+      { type: 'breacher' as BotType, quantity: 8 },
+      { type: 'phreak' as BotType, quantity: 6 },
     ];
     
     const battalionConfigs = userBattalions || defaultUserBattalions;
     
     return battalionConfigs.map((battalion, index) => {
       const validatedBotType = this.validateBotType(battalion.type);
+      const nodeIndex = index; // Assign to first 3 nodes (0, 1, 2)
       
       return this.createBattalion(
         `user-battalion-${index}`,
         validatedBotType,
         battalion.quantity,
-        battalion.nodeIndex,
+        nodeIndex,
         NodeOwner.USER,
         BOT_CONFIG.USER_BOT_STATS[validatedBotType].stats,
         nodes
@@ -202,43 +198,5 @@ export class BattalionService {
     );
   }
 
-  static updateBattalionPositions(battleId: string, battle: any): {
-    positionUpdates: Array<{battalionId: string, oldPosition: number, newPosition: number, coordinates: {x: number, y: number}}>,
-    movementUpdates: Array<{battalionId: string, movementState: MovementState}>
-  } {
-    const positionUpdates = [];
-    const movementUpdates = [];
-    const movementStates = MovementService.getMovementStates(battleId);
-    
-    for (const [battalionId, movementState] of movementStates) {
-      if (movementState.movementStatus === 'arrived') {
-        const battalion = battle.battalions.find((b: IBattalion) => b.id === battalionId);
-        if (battalion && battalion.position.nodeIndex !== movementState.targetPosition.nodeIndex) {
-          const oldPosition = battalion.position.nodeIndex;
-          
-          battalion.position.nodeIndex = movementState.targetPosition.nodeIndex;
-          battalion.position.x = movementState.targetPosition.x;
-          battalion.position.y = movementState.targetPosition.y;
-          
-          console.log(`🔄 SERVER POSITION: ${battalion.owner} ${battalion.type} moved ${oldPosition} → ${battalion.position.nodeIndex}`);
-          
-          positionUpdates.push({
-            battalionId: battalion.id,
-            oldPosition,
-            newPosition: battalion.position.nodeIndex,
-            coordinates: { x: battalion.position.x, y: battalion.position.y }
-          });
-        }
-      }
-      
-      if (movementState.movementStatus === 'moving') {
-        movementUpdates.push({
-          battalionId,
-          movementState
-        });
-      }
-    }
-    
-    return { positionUpdates, movementUpdates };
-  }
+
 } 

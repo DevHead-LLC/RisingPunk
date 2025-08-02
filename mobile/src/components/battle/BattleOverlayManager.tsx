@@ -57,7 +57,6 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
       // Create a unique key for this error to prevent duplicate logging
       const errorKey = JSON.stringify(battleError);
       if (!loggedErrors.current.has(errorKey)) {
-        console.log('❌ OVERLAY API ERROR:', battleError);
         loggedErrors.current.add(errorKey);
       }
     }

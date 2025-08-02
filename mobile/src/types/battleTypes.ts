@@ -15,7 +15,7 @@ export interface ClientBattalion {
   baseHealthPerUnit: number;
   isDestroyed: boolean;
   destroyedAt?: number;
-  nodeIndex: number;
+  position: { x: number; y: number };
   isUser: boolean;
   mark: number;
   stats: {

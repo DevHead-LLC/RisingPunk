@@ -15,7 +15,7 @@ interface Props {
     quantity: number;
     currentHealth: number;
     maxHealth: number;
-    nodeIndex: number;
+    position: { x: number; y: number };
     isUser: boolean;
     mark: number;
     stats: {

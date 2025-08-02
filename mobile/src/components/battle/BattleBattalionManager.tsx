@@ -56,9 +56,9 @@ export const BattleBattalionManager = React.memo(({
   const filteredBattalions = React.useMemo(() => {
     if (!battleState?.battalions) return [];
     return battleState.battalions.filter(battalion => 
-      nodePositions[battalion.nodeIndex] !== undefined
+      battalion.position && battalion.position.x !== undefined && battalion.position.y !== undefined
     );
-  }, [battleState?.battalions, nodePositions]);
+  }, [battleState?.battalions]);
 
   const renderBattalions = React.useMemo(() => {
     if (!battleState) return null;
@@ -67,16 +67,13 @@ export const BattleBattalionManager = React.memo(({
       <View style={styles.container}>
         {filteredBattalions
           .map((battalion) => {
-            const nodePosition = nodePositions[battalion.nodeIndex];
             const movementState = movementStateMap.get(battalion.id);
             
-            if (!nodePosition) return null;
-
             return (
               <BattleBattalion
                 key={battalion.id}
                 battalion={battalion}
-                position={nodePosition}
+                position={battalion.position}
                 movementState={movementState}
                 size={battalionSize}
                 showHealthBar={showHealthBars}
