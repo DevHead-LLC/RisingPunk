@@ -72,15 +72,6 @@ export const BattleNetworkGrid = React.memo(({
   useEffect(() => {
     if (battleState && battleState.nodes?.length > 0) {
       const firstNode = battleState.nodes[0];
-      if (!firstNode.index && firstNode.index !== 0) {
-        console.log('❌ NODES MISSING INDEX/OWNER - Server sending Mongoose docs');
-      }
-    }
-    if (battleState?.lineProperties && battleState.lineProperties.length > 0 && battleState.lineProperties[0].length === 0) {
-      console.log('❌ LINE PROPS ALL ZERO - Server calculation failed');
-    }
-    if (battleError) {
-      console.log('❌ NETWORK API ERROR:', battleError);
     }
   }, [battleState, battleError]);
 

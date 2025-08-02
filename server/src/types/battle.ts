@@ -19,6 +19,8 @@ export interface MovementState {
   interruptionPosition?: { x: number; y: number; nodeIndex: number };
   needsRetargetingOnArrival?: boolean;
   originalInterruptionPosition?: { x: number; y: number; nodeIndex: number };
+  wasPositionUpdated?: boolean;
+  lastPositionLog?: number;
 }
 
 export enum BattlePhase {
@@ -135,7 +137,7 @@ export interface ClientBattalion {
   baseHealthPerUnit: number;
   isDestroyed: boolean;
   destroyedAt?: number;
-  nodeIndex: number;
+  position: { x: number; y: number };
   isUser: boolean;
   mark: number;
   stats: BotStats;

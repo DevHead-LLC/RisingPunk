@@ -57,10 +57,9 @@ export class BattalionPositionService {
   }
 
   static createStartPosition(battalion: IBattalion, nodePositions: any[]): BattalionPosition {
-    const nodePosition = nodePositions[battalion.position.nodeIndex];
     return {
-      x: nodePosition.position.x,
-      y: nodePosition.position.y,
+      x: battalion.position.x,
+      y: battalion.position.y,
       nodeIndex: battalion.position.nodeIndex
     };
   }

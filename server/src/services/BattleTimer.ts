@@ -105,7 +105,6 @@ export class BattleTimerService extends EventEmitter {
     const timer = this.timers.get(battleId);
     if (!timer) return;
 
-    console.log(`Starting countdown for battle ${battleId}`);
 
     timer.countdownInterval = setInterval(() => {
       if (!timer.isActive) return;
@@ -135,7 +134,6 @@ export class BattleTimerService extends EventEmitter {
     timer.phase = BattlePhase.ACTIVE;
     timer.countdown = 0;
 
-    console.log(`Starting battle phase for battle ${battleId}`);
 
     this.emit('phaseChange', {
       battleId,
@@ -171,7 +169,6 @@ export class BattleTimerService extends EventEmitter {
     timer.phase = BattlePhase.COMPLETE;
     timer.isActive = false;
 
-    console.log(`Battle ${battleId} ended after ${timer.battleTime} seconds`);
 
     this.emit('battleEnd', {
       battleId,

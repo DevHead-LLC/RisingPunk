@@ -12,7 +12,7 @@ export interface BattleState {
     quantity: number;
     currentHealth: number;
     maxHealth: number;
-    nodeIndex: number;
+    position: { x: number; y: number };
     isUser: boolean;
     mark: number;
     stats: {
@@ -44,7 +44,6 @@ export interface StartBattleRequest {
   userBattalions: Array<{
     type: 'guardian' | 'breacher' | 'phreak';
     quantity: number;
-    nodeIndex: number;
   }>;
   screenWidth: number;
   screenHeight: number;

@@ -14,63 +14,82 @@ export interface RetargetingResult {
 }
 
 export class RetargetingService {
+  static getBattalionStartNode(battalion: IBattalion, battleId?: string): number {
+    const { calculateNodePositions } = require('./NodeService');
+    const { ScreenDimensionService } = require('./ScreenDimensionService');
+    
+    const screenDimensions = ScreenDimensionService.getBattleScreenDimensions(battleId || 'temp');
+    const nodePositions = calculateNodePositions(screenDimensions.width, screenDimensions.height);
+    
+    let closestNodeIndex = battalion.position.nodeIndex;
+    let closestDistance = Infinity;
+    
+    for (let i = 0; i < nodePositions.length; i++) {
+      const nodePos = nodePositions[i];
+      const distance = Math.sqrt(
+        Math.pow(battalion.position.x - nodePos.position.x, 2) + 
+        Math.pow(battalion.position.y - nodePos.position.y, 2)
+      );
+      
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestNodeIndex = i;
+      }
+    }
+    
+    return closestNodeIndex;
+  }
+
   static retargetBattalionsAfterCapture(
     capturedNodeIndex: number,
     affectedBattalionIds: string[],
     allBattalions: IBattalion[],
-    allNodes: INode[]
+    allNodes: INode[],
+    battleId?: string
   ): RetargetingResult[] {
-    console.log(`🎯 RETARGETING START: Node ${capturedNodeIndex} captured, ${affectedBattalionIds.length} battalions affected`);
     
     const retargetingResults: RetargetingResult[] = [];
     
     for (const battalionId of affectedBattalionIds) {
       const battalion = allBattalions.find(b => b.id === battalionId);
       if (!battalion) {
-        console.log(`🎯 RETARGETING ERROR: Battalion ${battalionId} not found`);
         continue;
       }
       
-      console.log(`🎯 TRACKING: Retargeting ${battalion.owner} ${battalion.type} (${battalionId}) from node ${battalion.position.nodeIndex}`);
+      const battalionStartNode = this.getBattalionStartNode(battalion, battleId);
       
       const neutralNodes = allNodes.filter(node => node.owner === NodeOwner.NEUTRAL);
       const enemyBattalions = allBattalions.filter(b => b.owner !== battalion.owner);
       
-      const targetResult = this.findClosestTarget(battalion, neutralNodes, enemyBattalions);
+      const targetResult = this.findClosestTarget(battalion, neutralNodes, enemyBattalions, battleId);
       if (targetResult) {
-        console.log(`🎯 PROXIMITY: Selected ${targetResult.targetType} at node ${targetResult.targetNodeIndex} (${targetResult.pathDistance} hops via ${targetResult.pathToTarget.join(' → ')})`);
         
         if (targetResult.targetType === 'enemy_battalion') {
           const targetBattalion = enemyBattalions.find(b => b.position.nodeIndex === targetResult.targetNodeIndex);
           if (targetBattalion) {
-            console.log(`🎯 DECISION: ${battalion.owner} ${battalion.type} (${battalionId}) → targeting ${targetBattalion.owner} ${targetBattalion.type} at node ${targetResult.targetNodeIndex}`);
           }
-        } else {
-          console.log(`🎯 DECISION: ${battalion.owner} ${battalion.type} (${battalionId}) → targeting neutral node ${targetResult.targetNodeIndex}`);
         }
         
         retargetingResults.push({
           battalionId: battalion.id,
-          currentNodeIndex: battalion.position.nodeIndex,
+          currentNodeIndex: battalionStartNode,
           newTargetNodeIndex: targetResult.targetNodeIndex,
           pathToTarget: targetResult.pathToTarget,
           pathDistance: targetResult.pathDistance,
           targetType: targetResult.targetType,
           targetBattalionId: targetResult.targetBattalionId
         });
-      } else {
-        console.log(`🎯 PROXIMITY ERROR: No reachable targets for ${battalion.owner} ${battalion.type}`);
-      }
+      } 
     }
     
-    console.log(`🎯 RETARGETING END: ${retargetingResults.length}/${affectedBattalionIds.length} battalions retargeted`);
     return retargetingResults;
   }
   
   static findClosestTarget(
     battalion: IBattalion,
     neutralNodes: INode[],
-    enemyBattalions: IBattalion[]
+    enemyBattalions: IBattalion[],
+    battleId?: string
   ): {targetNodeIndex: number, pathToTarget: number[], pathDistance: number, targetType: 'neutral_node' | 'enemy_battalion', targetBattalionId?: string} | null {
     
     let closestDistance = Infinity;
@@ -85,11 +104,13 @@ export class RetargetingService {
       }
     };
     
+    const battalionStartNode = this.getBattalionStartNode(battalion, battleId);
+    
     // Evaluate neutral nodes
     for (const node of neutralNodes) {
-      if (battalion.position.nodeIndex === node.index) continue;
+      if (battalionStartNode === node.index) continue;
       
-      const path = PathfindingService.findNetworkPath(battalion.position.nodeIndex, node.index);
+      const path = PathfindingService.findNetworkPath(battalionStartNode, node.index);
       if (path.length > 0) {
         evaluateTarget(node.index, path, path.length - 1, 'neutral_node');
       }
@@ -98,19 +119,17 @@ export class RetargetingService {
     // Evaluate enemy battalions
     for (const enemyBattalion of enemyBattalions) {
       if (!CombatService.canTargetBattalion(enemyBattalion)) {
-        console.log(`🎯 SKIPPING DESTROYED: ${enemyBattalion.owner} ${enemyBattalion.type} cannot be targeted`);
         continue;
       }
       
       let distance: number;
       let path: number[];
       
-      if (battalion.position.nodeIndex === enemyBattalion.position.nodeIndex) {
+      if (battalionStartNode === enemyBattalion.position.nodeIndex) {
         distance = 0;
-        path = [battalion.position.nodeIndex];
-        console.log(`🎯 SAME-NODE TARGET: ${battalion.owner} ${battalion.type} at node ${battalion.position.nodeIndex} can target ${enemyBattalion.owner} ${enemyBattalion.type} at same node`);
+        path = [battalionStartNode];
       } else {
-        path = PathfindingService.findNetworkPath(battalion.position.nodeIndex, enemyBattalion.position.nodeIndex);
+        path = PathfindingService.findNetworkPath(battalionStartNode, enemyBattalion.position.nodeIndex);
         if (path.length === 0) continue;
         distance = path.length - 1;
       }
@@ -119,17 +138,12 @@ export class RetargetingService {
     }
     
     if (candidateTargets.length === 0) {
-      console.log(`🎯 PROXIMITY ERROR: No reachable targets for battalion`);
       return null;
     }
     
     const selectedTarget = candidateTargets.length === 1 
       ? candidateTargets[0] 
       : candidateTargets[Math.floor(Math.random() * candidateTargets.length)];
-    
-    if (candidateTargets.length > 1) {
-      console.log(`🎯 PROXIMITY: Selected ${selectedTarget.targetType} at node ${selectedTarget.nodeIndex} (random from ${candidateTargets.length} equidistant)`);
-    }
     
     return {
       targetNodeIndex: selectedTarget.nodeIndex,

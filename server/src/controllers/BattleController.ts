@@ -60,7 +60,7 @@ export class BattleController {
   /**
    * Start a new battle
    */
-  async startBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number, nodeIndex: number}>): Promise<BattleStateResponse> {
+  async startBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number}>): Promise<BattleStateResponse> {
     try {
       const actualDefenderId = defenderId === 'computer' ? 'computer-opponent' : defenderId;
       const battle = await this.battleService.createBattle(attackerId, actualDefenderId, screenWidth, screenHeight, userBattalions);
@@ -82,8 +82,8 @@ export class BattleController {
       const battle = await this.battleService.getBattle(battleId);
       if (!battle) return null;
 
-      // Always ensure screen dimensions are set for this battle
-      ScreenDimensionService.setBattleScreenDimensions(battleId, screenWidth, screenHeight);
+      // Always ensure screen dimensions are set for this battle (only updates if changed)
+      ScreenDimensionService.updateScreenDimensionsIfChanged(battleId, screenWidth, screenHeight);
 
       const timerService = this.battleService.getTimerService();
       const timerState = timerService.getTimeRemaining(battleId);

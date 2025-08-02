@@ -10,7 +10,7 @@ import { BattalionService } from './BattalionService';
 
 export class BattleSetupService {
 
-  static async createBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number, nodeIndex: number}>): Promise<IBattleDocument> {
+  static async createBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number}>): Promise<IBattleDocument> {
     const battleId = `battle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
     const nodes = createNodesWithTugOfWar(0, screenWidth, screenHeight);

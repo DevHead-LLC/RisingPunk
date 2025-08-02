@@ -92,9 +92,9 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
   }, [assignToBattalion]);
 
   const userBattalions = React.useMemo(() => [
-    { type: 'guardian' as BotType, quantity: 10, nodeIndex: 0 },
-    { type: 'breacher' as BotType, quantity: 8, nodeIndex: 1 },
-    { type: 'phreak' as BotType, quantity: 6, nodeIndex: 2 },
+    { type: 'guardian' as BotType, quantity: 10 },
+    { type: 'breacher' as BotType, quantity: 8 },
+    { type: 'phreak' as BotType, quantity: 6 },
   ], []);
 
   const battleStartData = React.useMemo(() => ({

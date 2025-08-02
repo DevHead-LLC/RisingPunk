@@ -1,5 +1,7 @@
 // All types moved to battleTypes.ts (single source of truth)
 
+import { BattalionType } from './battleTypes';
+
 // BattalionType moved to battleTypes.ts (single source of truth)
 
 // CLARIFICATION: This file should only define types/interfaces/enums for the battle system.
@@ -9,8 +11,7 @@
 // DO NOT DELETE - Used across multiple battle components
 export interface BattalionPosition {
   type: BattalionType;
-  nodeIndex: number;
-  position: any; // Animated.ValueXY
+  position: { x: number; y: number };
   quantity: number;
   currentHealth?: number;
   mark: number;
