@@ -55,8 +55,11 @@ export class AttackService {
     return interval;
   }
   
-  static startAttacking(battalion: IBattalion, targetNodeIndex: number): void {
-    // Check if battalion is already attacking
+  static startAttack(
+    battalion: IBattalion, 
+    targetType: 'node' | 'battalion',
+    target: number | string
+  ): void {
     if (this.isAttacking(battalion.id)) {
       return;
     }
@@ -65,36 +68,18 @@ export class AttackService {
     
     const attackState: AttackState = {
       battalionId: battalion.id,
-      targetNodeIndex,
+      targetNodeIndex: targetType === 'node' ? target as number : -1,
       lastAttackTime: Date.now(),
       attackInterval,
       isAttacking: true,
-      targetType: 'node'
+      targetType,
+      targetId: targetType === 'battalion' ? target as string : undefined
     };
     
     this.attackStates.set(battalion.id, attackState);
   }
 
-  static startBattalionAttack(attacker: IBattalion, targetId: string): void {
-    // Check if battalion is already attacking
-    if (this.isAttacking(attacker.id)) {
-      return;
-    }
-    
-    const attackInterval = this.calculateAttackInterval(attacker.stats.speed);
-    
-    const attackState: AttackState = {
-      battalionId: attacker.id,
-      targetNodeIndex: -1,
-      lastAttackTime: Date.now(),
-      attackInterval,
-      isAttacking: true,
-      targetType: 'battalion',
-      targetId: targetId
-    };
-    
-    this.attackStates.set(attacker.id, attackState);
-  }
+
 
   static processBattalionAttack(attacker: IBattalion, defender: IBattalion): boolean {
     if (!CombatService.canTargetBattalion(defender)) {
