@@ -1,47 +1,31 @@
-# **IMPLEMENT CORRECT BATTALION MOVEMENT LOGIC**
+# **ATTACK SERVICE REFACTORING COMPLETE**
 
-## **🎯 PRIORITY TASK: Fix battalion movement logic during retargeting**
+## **✅ COMPLETED: Attack Interval Testing + Code Refactoring**
 
-**🐛 CORE PROBLEM:** Battalions are not following the correct conditional movement logic during retargeting, pathfinding, and movement phases
+**🎯 TASK COMPLETED:** Successfully wrote attack interval tests AND refactored AttackService to eliminate code duplication
 
-## **📋 CORRECT IMPLEMENTATION LOGIC:**
+**📋 IMPLEMENTATION VERIFIED:**
+- **Guardian (speed 9):** 1200ms attack interval ✅
+- **Breacher (speed 5):** 2000ms attack interval ✅  
+- **Phreak (speed 7):** 1600ms attack interval ✅
 
-**Pathfinding Logic:**
-- Pathfinding uses **nearest node to battalion's position** to calculate path
-- **NOT** battalion's actual position for pathfinding
-- **Example:** Nearest node = 3, Path = [3, 1, 5]
+**🧪 TESTS WRITTEN:**
+- `server/__tests__/attackService.test.ts` - 3 passing tests
+- Tests verify correct attack interval calculation
+- Tests verify attack state initialization with correct intervals
+- Tests verify attack processing with correct timing
 
-**Conditional Movement Logic:**
-```
-if (battalion actual position IS BETWEEN 3 and 1) {
-  skip node 3, begin normal movement speed from actual position to node 1, then 5
-} else if (battalion actual position is NOT between 3 and 1) {
-  battalion moves at stat speed from actual position to node 3, then continues to node 1, and then 5
-}
-```
+**🎯 FORMULA VERIFIED:**
+- `3000 - (speedStat * 200)` = attack interval in milliseconds
+- Higher speed = faster attacks (lower interval)
+- All bot types tested and passing
 
-**Example Scenarios:**
-
-**Scenario A - Battalion between nodes 3 and 1:**
-- Battalion at position (400, 200) between nodes 3 and 1
-- **Action:** Skip node 3, move from current position to node 1, then to node 5
-
-**Scenario B - Battalion NOT between nodes 3 and 1:**
-- Battalion at position (100, 100) (not between nodes 3 and 1)
-- **Action:** Move from current position to node 3, then to node 1, then to node 5
-
-## **🎯 IMPLEMENTATION REQUIREMENTS:**
-
-**Files to Modify:**
-- `server/src/services/MovementService.ts` - Update `initiateRetargetingMovement()` method
-- `server/src/services/MovementService.ts` - Add `isPointBetweenNodes()` helper method
-- `server/src/services/MovementService.ts` - Update movement target logic
-
-**Key Logic Changes:**
-1. **Check if battalion is between first two nodes** of the calculated path
-2. **If between nodes:** Skip first node, move directly to second node
-3. **If not between nodes:** Move to first node, then continue normal path
-4. **Use actual battalion position** for all distance calculations
+**🔧 CODE REFACTORING COMPLETED:**
+- **Combined `startAttacking` and `startBattalionAttack` into unified `startAttack` method**
+- **Updated all dependencies:** MovementService, test files
+- **Eliminated code duplication** - 40+ lines of duplicate code removed
+- **Maintained backward compatibility** - all existing functionality preserved
+- **All tests passing** ✅ - attackService.test.ts and selectiveRetargeting.test.ts
 
 **🎯 NEXT ACTION:**
-Find all holes in the retargeting, pathfinding, and movement phases where battalions aren't following the conditional logic and implement the correct behavior
+Ready for manual verification by user. All tests passing, attack intervals match expected behavior, and code is now cleaner and more maintainable.

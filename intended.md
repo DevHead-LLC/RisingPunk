@@ -163,3 +163,26 @@ Based on the user's example showing "round down" then "round up", two interpreta
 - Only neutral nodes can be attacked (owned nodes become un-attackable)
 - Retargeting only triggered by node capture of the specific node being attacked
 - **Server authority:** All movement, targeting, and positioning calculated server-side and sent to client
+
+## 8. Attack Service Architecture Improvements
+
+### **Waterfall Authority Structure:**
+- **Attack flow should follow a clear waterfall pattern:**
+  1. **Determine Target** - Identify if target is node or battalion
+  2. **Start Attack** - Initialize attack state with correct intervals
+  3. **Process Attack** - Handle attack timing and damage calculation
+  4. **Process Damage** - Apply damage to target (node control or battalion health)
+  5. **Process Capture/Destruction** - Handle node capture or battalion destruction
+  6. **Alert Affected Battalions** - Notify all battalions affected by the event
+
+### **Targeting Array System:**
+- **Each node and battalion should maintain targeting arrays:**
+  - **Nodes:** `targetingBattalions: string[]` - List of battalion IDs targeting this node
+  - **Battalions:** `targetingBattalions: string[]` - List of battalion IDs targeting this battalion
+- **Benefits of targeting arrays:**
+  - **O(1) lookups** instead of O(n) scans through all attack states
+  - **Direct relationships** - Each target knows exactly who's targeting it
+  - **Efficient retargeting** - Just iterate through targeting arrays
+  - **Simplified event handling** - Easy to notify affected battalions
+- **Current inefficiency:** `getBattalionsAttackingSpecificNode()` scans all attack states
+- **Improved approach:** Direct access to targeting arrays for immediate notification

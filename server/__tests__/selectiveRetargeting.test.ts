@@ -25,9 +25,9 @@ describe('Selective Retargeting - Only Affected Battalions', () => {
     const battalion3 = createTestBattalion('enemy-1', 6, NodeOwner.ENEMY, BotType.PHREAK);
     
     // Start attacks on different nodes
-    AttackService.startAttacking(battalion1, 3); // Battalion 1 attacking node 3
-    AttackService.startAttacking(battalion2, 4); // Battalion 2 attacking node 4 (different node)
-    AttackService.startAttacking(battalion3, 3); // Battalion 3 attacking node 3 (same node as battalion 1)
+    AttackService.startAttack(battalion1, 'node', 3); // Battalion 1 attacking node 3
+    AttackService.startAttack(battalion2, 'node', 4); // Battalion 2 attacking node 4 (different node)
+    AttackService.startAttack(battalion3, 'node', 3); // Battalion 3 attacking node 3 (same node as battalion 1)
     
     // Verify initial attack states
     expect(AttackService.isAttacking('user-1')).toBe(true);

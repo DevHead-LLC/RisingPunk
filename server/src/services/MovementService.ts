@@ -260,14 +260,14 @@ export class MovementService {
                 }
                 
                 if (enemyBattalion) {
-                  AttackService.startBattalionAttack(battalion, enemyBattalion.id);
+                  AttackService.startAttack(battalion, 'battalion', enemyBattalion.id);
                 } else {
                   AttackService.queueMissingTargetRetargeting(battle.battleId, battalion.id);
                 }
               } else {
                 const targetNode = battle.nodes.find((n: any) => n.index === updatedMovementState.targetPosition.nodeIndex);
                 if (targetNode && CombatService.canTargetNode(targetNode)) {
-                  AttackService.startAttacking(battalion, targetNode.index);
+                  AttackService.startAttack(battalion, 'node', targetNode.index);
                 }
               }
             }
