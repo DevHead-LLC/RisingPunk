@@ -1,31 +1,93 @@
-# **ATTACK SERVICE REFACTORING COMPLETE**
+# **BOT VALIDATION BUG FIXED + BATTLE END OVERLAY & POINT TRACKING SYSTEM**
 
-## **✅ COMPLETED: Attack Interval Testing + Code Refactoring**
+## **✅ COMPLETED: Bot Validation Bug Fix**
 
-**🎯 TASK COMPLETED:** Successfully wrote attack interval tests AND refactored AttackService to eliminate code duplication
+**🐛 BUG IDENTIFIED AND FIXED:**
+- **Issue:** `validateBotType` and `validateEnemyBotType` methods incorrectly shared the same `this.botTypeCache`
+- **Problem:** Bot types cached by one method would be used by the other without checking the correct configuration
+- **Risk:** Runtime errors when accessing bot stats or incorrect fallback bot types
 
-**📋 IMPLEMENTATION VERIFIED:**
-- **Guardian (speed 9):** 1200ms attack interval ✅
-- **Breacher (speed 5):** 2000ms attack interval ✅  
-- **Phreak (speed 7):** 1600ms attack interval ✅
+**🔧 FIX IMPLEMENTED:**
+- **Separate caches:** Created `userBotTypeCache` and `enemyBotTypeCache` 
+- **Proper validation:** Each method now validates against its own configuration:
+  - `validateBotType` → `BOT_CONFIG.USER_BOT_STATS`
+  - `validateEnemyBotType` → `BOT_CONFIG.ENEMY_BOT_STATS`
+- **No cross-contamination:** User and enemy bot validation are now completely independent
 
 **🧪 TESTS WRITTEN:**
-- `server/__tests__/attackService.test.ts` - 3 passing tests
-- Tests verify correct attack interval calculation
-- Tests verify attack state initialization with correct intervals
-- Tests verify attack processing with correct timing
+- `server/__tests__/botValidationBug.test.ts` - 4 passing tests
+- Tests verify the bug is fixed and separate caches work correctly
+- Tests demonstrate proper validation against respective configs
 
-**🎯 FORMULA VERIFIED:**
-- `3000 - (speedStat * 200)` = attack interval in milliseconds
-- Higher speed = faster attacks (lower interval)
-- All bot types tested and passing
+**📋 FILES MODIFIED:**
+- `server/src/services/BattalionService.ts` - Fixed shared cache issue
+- `server/__tests__/botValidationBug.test.ts` - Added comprehensive tests
 
-**🔧 CODE REFACTORING COMPLETED:**
-- **Combined `startAttacking` and `startBattalionAttack` into unified `startAttack` method**
-- **Updated all dependencies:** MovementService, test files
-- **Eliminated code duplication** - 40+ lines of duplicate code removed
-- **Maintained backward compatibility** - all existing functionality preserved
-- **All tests passing** ✅ - attackService.test.ts and selectiveRetargeting.test.ts
+## **🎯 CURRENT TASK: Battle End Overlay Screen & Point Tracking**
 
-**🎯 NEXT ACTION:**
-Ready for manual verification by user. All tests passing, attack intervals match expected behavior, and code is now cleaner and more maintainable.
+**📋 NEW REQUIREMENTS ADDED TO INTENDED.MD:**
+
+### **1. Battle Duration Update (30 seconds)**
+- **Change:** Increase battle duration from 20 to 30 seconds
+- **Files to update:**
+  - `server/src/services/BattleTimer.ts` - `BATTLE_DURATION: 30`
+  - `mobile/src/components/battle/BattleTimerDisplay.tsx` - Show 30-second countdown
+  - All timer-related client/server communication
+
+### **2. Battle End Conditions**
+- **Timer Expiration:** Battle ends when 30-second timer reaches 0
+- **Complete Elimination:** Battle ends when all opposing battalions are defeated
+- **Files to implement:**
+  - `server/src/services/BattleService.ts` - `checkBattleEndConditions()`, `handleBattleEnd()`
+  - `server/src/services/CombatService.ts` - `checkAllBattalionsDefeated()`
+
+### **3. Point Tracking System (Loss-Based Scoring)**
+- **Point Calculation:** Exponential scoring by bot Mark level
+  - Mark 1: 1 point per bot
+  - Mark 2: 2 points per bot  
+  - Mark 3: 4 points per bot
+  - Mark 4: 8 points per bot
+- **Starting Score:** `(botMark * botQuantity)` for each battalion
+- **Ending Score:** `Math.floor(botMark * remainingQuantity)` for each battalion
+- **Loss Calculation:** `startingScore - endingScore = losses`
+- **Winner Determination:** Side with fewer losses (closer to zero) wins
+- **Victory Messages:** "Attacker breach!" (attacker wins) vs "Breach defended!" (defender wins)
+- **Files to implement:**
+  - `server/src/services/PointTrackingService.ts` - Loss calculation and tracking
+  - `server/src/services/BattalionService.ts` - `calculateBattalionPoints()`
+  - `server/src/services/CombatService.ts` - `updateScoreAfterDamage()`
+
+### **4. Battle End Overlay Screen**
+- **Full-screen overlay** with loss summary and battalion losses
+- **Winner determination** based on fewer losses (closer to zero)
+- **Victory messages:** "Attacker breach!" vs "Breach defended!"
+- **Detailed breakdown** of individual battalion contributions to losses
+- **Files to implement:**
+  - `mobile/src/components/battle/BattleEndOverlay.tsx` - Main overlay component
+  - `mobile/src/components/battle/BattleLossBreakdown.tsx` - Loss breakdown
+  - `mobile/src/components/battle/BattalionLossDisplay.tsx` - Loss display
+  - `mobile/src/components/battle/VictoryMessage.tsx` - Victory message display
+
+### **5. Battle End Data Structure**
+- **Complete data package** sent to client when battle ends
+- **Score data:** Starting and ending scores for both sides
+- **Loss data:** Total losses and individual battalion losses with bot quantities by Mark level
+- **Winner data:** Determined winner based on fewer losses and victory message
+- **Files to implement:**
+  - `server/src/types/battle.ts` - `BattleEndData` interface
+  - `server/src/controllers/BattleController.ts` - Send battle end data
+  - `mobile/src/types/battleTypes.ts` - Client-side battle end types
+
+## **🎯 IMPLEMENTATION PRIORITY:**
+1. **Update battle duration** (30 seconds) - server and client
+2. **Implement point tracking system** - server-side calculation
+3. **Add battle end conditions** - timer and elimination detection
+4. **Create battle end overlay** - client-side display
+5. **Implement data structures** - server-client communication
+
+## **✅ PREVIOUS COMPLETED:**
+- Bot validation bug fix with separate caches
+- Attack Service refactoring with unified `startAttack` method
+- Attack interval testing and verification
+- Code duplication elimination
+- All tests passing
