@@ -23,15 +23,15 @@ export const TEST_SCREEN_DIMENSIONS = {
 
 // Shared test nodes with realistic positions
 export const createTestNodes = () => [
-  { index: 0, owner: 'user', tugOfWarProgress: 100, maxCaptureThreshold: 1000, position: { x: 96, y: 155 } },
-  { index: 1, owner: 'user', tugOfWarProgress: 100, maxCaptureThreshold: 1000, position: { x: 96, y: 425 } },
-  { index: 2, owner: 'user', tugOfWarProgress: 100, maxCaptureThreshold: 1000, position: { x: 96, y: 695 } },
-  { index: 3, owner: 'neutral', tugOfWarProgress: 0, maxCaptureThreshold: 1000, position: { x: 448, y: 155 } },
-  { index: 4, owner: 'neutral', tugOfWarProgress: 0, maxCaptureThreshold: 1000, position: { x: 448, y: 425 } },
-  { index: 5, owner: 'neutral', tugOfWarProgress: 0, maxCaptureThreshold: 1000, position: { x: 448, y: 695 } },
-  { index: 6, owner: 'enemy', tugOfWarProgress: -100, maxCaptureThreshold: 1000, position: { x: 800, y: 155 } },
-  { index: 7, owner: 'enemy', tugOfWarProgress: -100, maxCaptureThreshold: 1000, position: { x: 800, y: 425 } },
-  { index: 8, owner: 'enemy', tugOfWarProgress: -100, maxCaptureThreshold: 1000, position: { x: 800, y: 695 } }
+  { index: 0, owner: 'user' as const, tugOfWarProgress: 100, maxCaptureThreshold: 1000, position: { x: 96, y: 155 } },
+  { index: 1, owner: 'user' as const, tugOfWarProgress: 100, maxCaptureThreshold: 1000, position: { x: 96, y: 425 } },
+  { index: 2, owner: 'user' as const, tugOfWarProgress: 100, maxCaptureThreshold: 1000, position: { x: 96, y: 695 } },
+  { index: 3, owner: 'neutral' as const, tugOfWarProgress: 0, maxCaptureThreshold: 1000, position: { x: 448, y: 155 } },
+  { index: 4, owner: 'neutral' as const, tugOfWarProgress: 0, maxCaptureThreshold: 1000, position: { x: 448, y: 425 } },
+  { index: 5, owner: 'neutral' as const, tugOfWarProgress: 0, maxCaptureThreshold: 1000, position: { x: 448, y: 695 } },
+  { index: 6, owner: 'enemy' as const, tugOfWarProgress: -100, maxCaptureThreshold: 1000, position: { x: 800, y: 155 } },
+  { index: 7, owner: 'enemy' as const, tugOfWarProgress: -100, maxCaptureThreshold: 1000, position: { x: 800, y: 425 } },
+  { index: 8, owner: 'enemy' as const, tugOfWarProgress: -100, maxCaptureThreshold: 1000, position: { x: 800, y: 695 } }
 ];
 
 // Bot stats from BotService (single source of truth)
@@ -58,6 +58,31 @@ export const createTestBattalion = (
   mark: 1,
   stats: TEST_BOT_STATS[type]
 });
+
+// Battle Preparation Test Data
+export const TEST_USER_BOT_INVENTORY = {
+  guardian: 50,
+  breacher: 30,
+  phreak: 25
+};
+
+export const TEST_VALID_BATTALION_ASSIGNMENTS = {
+  'A': { botType: 'guardian', quantity: 15, markLevel: 1 },
+  'B': { botType: 'breacher', quantity: 12, markLevel: 1 },
+  'C': { botType: 'phreak', quantity: 8, markLevel: 1 }
+};
+
+export const TEST_MOCK_BATTALION_DATA = [
+  { type: 'guardian', quantity: 10 },
+  { type: 'breacher', quantity: 8 },
+  { type: 'phreak', quantity: 6 }
+];
+
+export const TEST_REAL_BATTALION_DATA = [
+  { type: 'guardian', quantity: 15 },
+  { type: 'breacher', quantity: 12 },
+  { type: 'phreak', quantity: 8 }
+];
 
 // Shared battle state factory
 export const createMockBattleState = (battalions: any[] = []): BattleState => ({

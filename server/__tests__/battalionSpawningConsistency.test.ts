@@ -8,68 +8,84 @@ describe('Battalion Spawning Consistency', () => {
     nodes = createNodesWithTugOfWar(0, 800, 600);
   });
 
-  test('should not use hardcoded nodeIndex values in config arrays', () => {
-    // This test will fail because enemy battalions currently have hardcoded nodeIndex values
-    // in their config array, while user battalions don't
+  test('should use random spawn for both user and enemy battalions', () => {
+    // Both user and enemy battalions now use random spawn
+    // User battalions: random selection from nodes 0, 1, 2
+    // Enemy battalions: random selection from nodes 6, 7, 8
     
     const userBattalions = BattalionService.createUserBattalions(nodes);
     const enemyBattalions = BattalionService.createEnemyBattalions(nodes);
 
-    // User battalions: config array has no nodeIndex values (good)
-    // Enemy battalions: config array has hardcoded nodeIndex values (bad)
-    
-    // Both should use array index calculation, not hardcoded values
-    userBattalions.forEach((battalion, index) => {
-      expect(battalion.position.nodeIndex).toBe(index); // Uses array index
+    // User battalions: random selection from nodes 0, 1, 2
+    userBattalions.forEach((battalion) => {
+      expect(battalion.position.nodeIndex).toBeGreaterThanOrEqual(0);
+      expect(battalion.position.nodeIndex).toBeLessThanOrEqual(2);
+      expect(battalion.owner).toBe('user');
     });
 
-    enemyBattalions.forEach((battalion, index) => {
-      expect(battalion.position.nodeIndex).toBe(index + 6); // Should use array index + offset
+    // Enemy battalions: random selection from nodes 6, 7, 8
+    enemyBattalions.forEach((battalion) => {
+      expect(battalion.position.nodeIndex).toBeGreaterThanOrEqual(6);
+      expect(battalion.position.nodeIndex).toBeLessThanOrEqual(8);
+      expect(battalion.owner).toBe('enemy');
     });
   });
 
-  test('should use consistent assignment method for both user and enemy battalions', () => {
+  test('should demonstrate consistent random spawn behaviors', () => {
     const userBattalions = BattalionService.createUserBattalions(nodes);
     const enemyBattalions = BattalionService.createEnemyBattalions(nodes);
 
-    // Both should use: nodeIndex = index + offset
-    // User: offset = 0, Enemy: offset = 6
+    // Both user and enemy battalions: random spawn (can vary each time)
     
-    userBattalions.forEach((battalion, index) => {
-      expect(battalion.position.nodeIndex).toBe(index + 0); // index calculation
+    // Test that user battalions use valid user nodes
+    const userNodeIndices = userBattalions.map(b => b.position.nodeIndex);
+    userNodeIndices.forEach(nodeIndex => {
+      expect(nodeIndex).toBeGreaterThanOrEqual(0);
+      expect(nodeIndex).toBeLessThanOrEqual(2);
     });
 
-    enemyBattalions.forEach((battalion, index) => {
-      expect(battalion.position.nodeIndex).toBe(index + 6); // index calculation
+    // Test that enemy battalions use valid enemy nodes
+    const enemyNodeIndices = enemyBattalions.map(b => b.position.nodeIndex);
+    enemyNodeIndices.forEach(nodeIndex => {
+      expect(nodeIndex).toBeGreaterThanOrEqual(6);
+      expect(nodeIndex).toBeLessThanOrEqual(8);
     });
   });
 
-  test('should demonstrate the hardcoded values issue', () => {
-    // This test will fail because it checks the actual config array structure
-    // User battalions: config array has no nodeIndex (clean)
-    // Enemy battalions: config array has hardcoded nodeIndex values (redundant)
+  test('should allow multiple battalions at same node for both sides', () => {
+    // Test that both user and enemy battalions can share nodes (random spawn)
     
-    // The issue is in the config array structure, not the final result
-    // Both achieve the same result but use different methods
+    // Test user battalions
+    let foundUserSharedNode = false;
+    const maxAttempts = 20;
     
-    // User battalions use: nodeIndex = index (calculated)
-    // Enemy battalions use: nodeIndex = battalion.nodeIndex (hardcoded)
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const testUserBattalions = BattalionService.createUserBattalions(nodes);
+      const userNodeIndices = testUserBattalions.map(b => b.position.nodeIndex);
+      const uniqueUserNodes = new Set(userNodeIndices);
+      
+      if (uniqueUserNodes.size < testUserBattalions.length) {
+        foundUserSharedNode = true;
+        break;
+      }
+    }
     
-    // This test will fail because we're checking that both use the same assignment method
-    // Currently they don't - user uses array index calculation, enemy uses hardcoded values
+    // Test enemy battalions
+    let foundEnemySharedNode = false;
     
-    const userBattalions = BattalionService.createUserBattalions(nodes);
-    const enemyBattalions = BattalionService.createEnemyBattalions(nodes);
-
-    // The inconsistency is that user uses: nodeIndex = index
-    // While enemy uses: nodeIndex = battalion.nodeIndex (hardcoded)
-    // Both should use: nodeIndex = index + offset
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const testEnemyBattalions = BattalionService.createEnemyBattalions(nodes);
+      const enemyNodeIndices = testEnemyBattalions.map(b => b.position.nodeIndex);
+      const uniqueEnemyNodes = new Set(enemyNodeIndices);
+      
+      if (uniqueEnemyNodes.size < testEnemyBattalions.length) {
+        foundEnemySharedNode = true;
+        break;
+      }
+    }
     
-    // This will fail because enemy battalions use hardcoded values in their config
-    expect(userBattalions[0].position.nodeIndex).toBe(0); // index 0
-    expect(enemyBattalions[0].position.nodeIndex).toBe(6); // hardcoded value
-    
-    // The fix: Remove hardcoded nodeIndex from enemy battalion config array
-    // and use: nodeIndex = index + 6 (calculated)
+    // With random spawn, should eventually find shared nodes for both sides
+    expect(foundUserSharedNode).toBe(true);
+    expect(foundEnemySharedNode).toBe(true);
   });
 }); 
