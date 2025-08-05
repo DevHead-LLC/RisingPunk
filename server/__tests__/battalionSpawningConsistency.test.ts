@@ -1,6 +1,5 @@
 import { BattalionService } from '../src/services/BattalionService';
 import { createNodesWithTugOfWar } from '../src/services/NodeService';
-import { NodeOwner } from '../src/types/battle';
 
 describe('Battalion Spawning Consistency', () => {
   let nodes: any[];

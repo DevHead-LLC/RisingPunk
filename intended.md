@@ -6,7 +6,7 @@
 - User clicks "Deploy Purge" in BattlePreparationScreen
 - 3-second countdown timer starts
 - Battalions spawn at their home nodes (0,1,2 for attacker, 6,7,8 for defender)
-  - **Note**: In MMO context, "attacker" and "defender" are relative to whoever is viewing the battle. A player will always see their own battalions as the attacker (nodes 0,1,2) and the opponent's battalions as the defender (nodes 6,7,8).
+  - **Note**: In MMO context, "attacker" and "defender" are relative to whoever initiated the battle. When viewing a saved battle, the original attacker's battalions are at nodes 0,1,2 and the original defender's battalions are at nodes 6,7,8, regardless of who is currently viewing the battle.
 
 #### **Associated Files:**
 - `mobile/src/screens/BattlePreparationScreen.tsx` - "Deploy Purge" button and battle start UI
@@ -26,7 +26,7 @@
 - **Battalion Spawning Logic**: intended.md states battalions spawn at "home nodes (0,1,2 for attacker, 6,7,8 for defender)" but BattalionService.ts shows:
   - Attacker battalions: `nodeIndex = index` (0,1,2) ✅ **CORRECT**
   - Defender battalions: `nodeIndex = index + 6` (6,7,8) ✅ **CORRECT**
-  - **Note**: In MMO context, "attacker" and "defender" are relative to whoever is viewing the battle. A player will always see their own battalions as the attacker (nodes 0,1,2) and the opponent's battalions as the defender (nodes 6,7,8).
+  - **Note**: In MMO context, "attacker" and "defender" are relative to whoever initiated the battle. When viewing a saved battle, the original attacker's battalions are at nodes 0,1,2 and the original defender's battalions are at nodes 6,7,8, regardless of who is currently viewing the battle.
 - **Countdown Timer**: intended.md specifies "3-second countdown timer" and BattleTimer.ts shows `COUNTDOWN_DURATION: 3` ✅ **CORRECT**
 - **Battle Phase Initialization**: intended.md doesn't specify initial phase, but BattleSetupService.ts sets `phase: BattlePhase.COUNTDOWN` ✅ **CORRECT**
 - **Timer Service Integration**: intended.md doesn't specify timer service usage, but BattleService.ts properly calls `this.timerService.startTimer(battle.battleId)` ✅ **CORRECT**
