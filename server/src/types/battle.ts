@@ -149,6 +149,7 @@ export interface BattleStateResponse {
   phase: BattlePhase;
   countdown: number;
   battleTime: number;
+  timeRemaining: number;
   winner?: NodeOwner;
   battalions: ClientBattalion[];
   nodes: INode[];

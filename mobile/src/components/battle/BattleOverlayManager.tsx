@@ -66,14 +66,23 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
     if (!battleState) return null;
 
     const phase = battleState.phase;
-    const timeRemaining = battleState.timeRemaining || 20;
-    const maxBattleTime = 20; // Fixed battle duration
+    const timeRemaining = battleState.timeRemaining || 45;
+    const maxBattleTime = 45; // Updated battle duration from 20 to 45 seconds
+
+    // DEBUG: Log the values we're receiving
+    console.log('🔍 BATTLE TIMER DEBUG:', {
+      phase,
+      timeRemaining,
+      battleState: battleState,
+      battleTime: timeRemaining
+    });
 
     // Map server phase to client phase
     const clientPhase = mapServerPhaseToClientPhase(phase);
 
-    // Calculate battle time from time remaining for the timer display
-    const battleTime = maxBattleTime - timeRemaining;
+    // For the timer display, we want to show time remaining (45s down to 0s)
+    // The server sends timeRemaining, so we use that directly for display
+    const battleTime = timeRemaining; // Use timeRemaining directly instead of calculating
 
     // Determine if we're in countdown phase and show countdown overlay
     // Server sends timeRemaining: 3,2,1 during countdown phase

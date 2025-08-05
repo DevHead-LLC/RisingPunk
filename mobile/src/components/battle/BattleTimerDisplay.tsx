@@ -10,14 +10,17 @@ type Props = {
 export const BattleTimerDisplay = React.memo(({ battleTime, maxBattleTime, isVisible }: Props) => {
   if (!isVisible) return null;
 
+  // battleTime now represents time remaining (45s down to 0s)
+  // Calculate progress as (time remaining) / (max time)
   const progressFillStyle = React.useMemo(() => [
     styles.progressFill,
     { width: `${(battleTime / maxBattleTime) * 100}%` as any },
   ], [battleTime, maxBattleTime]);
 
-  const timerText = React.useMemo(() => 
-    `${maxBattleTime - battleTime}s`
-  , [maxBattleTime, battleTime]);
+  // Display time remaining directly
+  const timerText = React.useMemo(() =>
+    `${battleTime}s`
+  , [battleTime]);
 
   return (
     <View style={styles.container}>

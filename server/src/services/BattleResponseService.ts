@@ -21,7 +21,7 @@ export class BattleResponseService {
     targetingResults: any[] = [],
     retargetingStatus?: {nodeIndex: number, affectedBattalionIds: string[]},
     movementStates?: Map<string, MovementState>,
-    timerState?: {countdown: number, battleTime: number, phase: any}
+    timerState?: {countdown: number, battleTime: number, timeRemaining: number, phase: any}
   ): BattleStateResponse {
     if (retargetingStatus) {
       console.log(`📡 CLIENT SYNC: Including retargeting status in response`);
@@ -33,6 +33,22 @@ export class BattleResponseService {
     const currentCountdown = timerState ? timerState.countdown : battle.countdown;
     const currentBattleTime = timerState ? timerState.battleTime : battle.battleTime;
 
+    // Use timeRemaining from timerState if available, otherwise calculate it
+    const timeRemaining = timerState?.timeRemaining !== undefined ? 
+      timerState.timeRemaining : 
+      (currentPhase === 'battle' ? (45 - currentBattleTime) : currentCountdown);
+
+    // DEBUG: Log what we're sending to client
+    console.log('📡 SERVER TIMER DEBUG:', {
+      battleId: battle.battleId,
+      currentPhase,
+      currentCountdown,
+      currentBattleTime,
+      timerState: timerState,
+      timeRemaining,
+      hasTimerState: !!timerState
+    });
+
     // Convert movement states to array only if needed
     const movementStatesArray = movementStates && movementStates.size > 0 ? Array.from(movementStates.values()) : undefined;
 
@@ -41,6 +57,7 @@ export class BattleResponseService {
       phase: currentPhase,
       countdown: currentCountdown,
       battleTime: currentBattleTime,
+      timeRemaining: timeRemaining,
       winner: battle.winner,
       battalions: mappedBattalions,
       nodes: networkData.updatedNodes,
