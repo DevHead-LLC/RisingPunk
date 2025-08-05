@@ -91,11 +91,28 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
     }
   }, [assignToBattalion]);
 
-  const userBattalions = React.useMemo(() => [
-    { type: 'guardian' as BotType, quantity: 10 },
-    { type: 'breacher' as BotType, quantity: 8 },
-    { type: 'phreak' as BotType, quantity: 6 },
-  ], []);
+  // Convert assignments to battalion data format
+  const convertAssignmentsToBattalionData = React.useCallback((assignments: Record<string, BattalionAssignment>) => {
+    const battalionData: Array<{type: BotType, quantity: number}> = [];
+    
+    // Convert assignments to battalion data format
+    Object.entries(assignments).forEach(([battalionId, assignment]) => {
+      if (assignment && assignment.quantity > 0) {
+        battalionData.push({
+          type: assignment.botType as BotType,
+          quantity: assignment.quantity
+        });
+      }
+    });
+    
+    return battalionData;
+  }, []);
+
+  // Use real assignments instead of hardcoded mock data
+  const userBattalions = React.useMemo(() => {
+    const realBattalions = convertAssignmentsToBattalionData(assignments);
+    return realBattalions;
+  }, [assignments, convertAssignmentsToBattalionData]);
 
   const battleStartData = React.useMemo(() => ({
     userBattalions,

@@ -96,3 +96,28 @@ export function isPointOnLineSegment(
   // Point is on line if sum of distances equals line length (within tolerance)
   return Math.abs(d1 + d2 - lineLength) < tolerance;
 } 
+
+// Battle Preparation Test Data
+export const TEST_USER_BOT_INVENTORY = {
+  guardian: 50,
+  breacher: 30,
+  phreak: 25
+};
+
+export const TEST_VALID_BATTALION_ASSIGNMENTS = [
+  { type: 'guardian', quantity: 15 },
+  { type: 'breacher', quantity: 12 },
+  { type: 'phreak', quantity: 8 }
+];
+
+export const TEST_INVALID_BATTALION_ASSIGNMENTS = [
+  { type: 'guardian', quantity: 15 },
+  { type: 'invalid_bot_type', quantity: 12 },
+  { type: 'phreak', quantity: 8 }
+];
+
+export const TEST_OVER_ASSIGNMENT_BATTALIONS = [
+  { type: 'guardian', quantity: 60 }, // More than available (50)
+  { type: 'breacher', quantity: 12 },
+  { type: 'phreak', quantity: 8 }
+]; 

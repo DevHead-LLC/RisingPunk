@@ -189,9 +189,16 @@ export class BattalionService {
     
     const battalionConfigs = userBattalions || defaultUserBattalions;
     
+    // Available user nodes (0, 1, 2) - allow multiple battalions at same node
+    const availableUserNodes = [0, 1, 2];
+    
     return battalionConfigs.map((battalion, index) => {
       const validatedBotType = this.validateBotType(battalion.type);
-      const nodeIndex = index; // Assign to first 3 nodes (0, 1, 2)
+      
+      // Random node selection from available user nodes
+      // Multiple battalions can share the same node
+      const randomNodeIndex = Math.floor(Math.random() * availableUserNodes.length);
+      const nodeIndex = availableUserNodes[randomNodeIndex];
       
       return this.createBattalion(
         `user-battalion-${index}`,
@@ -212,9 +219,16 @@ export class BattalionService {
       { type: 'phreak' as BotType, quantity: 7 },
     ];
     
+    // Available enemy nodes (6, 7, 8) - allow multiple battalions at same node
+    const availableEnemyNodes = [6, 7, 8];
+    
     return enemyBattalions.map((battalion, index) => {
       const validatedBotType = this.validateEnemyBotType(battalion.type);
-      const nodeIndex = index + 6; // Assign to last 3 nodes (6, 7, 8)
+      
+      // Random node selection from available enemy nodes
+      // Multiple battalions can share the same node
+      const randomNodeIndex = Math.floor(Math.random() * availableEnemyNodes.length);
+      const nodeIndex = availableEnemyNodes[randomNodeIndex];
       
       return this.createBattalion(
         `enemy-battalion-${index}`,
