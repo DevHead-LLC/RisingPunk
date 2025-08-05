@@ -114,6 +114,25 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
     return realBattalions;
   }, [assignments, convertAssignmentsToBattalionData]);
 
+  // Validate deployment - require at least one battalion with bots assigned
+  const validateDeployment = React.useCallback((assignments: Record<string, BattalionAssignment>): { isValid: boolean; message: string } => {
+    const hasValidAssignment = Object.values(assignments).some(
+      assignment => assignment && assignment.quantity > 0
+    );
+    
+    if (hasValidAssignment) {
+      return {
+        isValid: true,
+        message: 'Deployment ready!'
+      };
+    } else {
+      return {
+        isValid: false,
+        message: 'Please assign at least one battalion before deploying.'
+      };
+    }
+  }, []);
+
   const battleStartData = React.useMemo(() => ({
     userBattalions,
     screenWidth: SCREEN_WIDTH,
@@ -205,8 +224,18 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
       </View>
 
       <TouchableOpacity
-        style={styles.executeButton}
+        style={[
+          styles.executeButton,
+          !validateDeployment(assignments).isValid && styles.executeButtonDisabled
+        ]}
         onPress={async () => {
+          const validation = validateDeployment(assignments);
+          
+          if (!validation.isValid) {
+            console.log('Deployment validation failed:', validation.message);
+            return;
+          }
+
           try {
             const result = await startBattle(battleStartData).unwrap();
 
@@ -216,8 +245,14 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
             onBattleStart();
           }
         }}
+        disabled={!validateDeployment(assignments).isValid}
       >
-        <Text style={styles.executeText}>DEPLOY PURGE</Text>
+        <Text style={[
+          styles.executeText,
+          !validateDeployment(assignments).isValid && styles.executeTextDisabled
+        ]}>
+          DEPLOY PURGE
+        </Text>
       </TouchableOpacity>
 
       <BattalionBotSelector
@@ -315,6 +350,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 4,
   },
+  executeButtonDisabled: {
+    opacity: 0.5,
+    backgroundColor: 'rgba(153, 153, 153, 0.1)',
+    borderColor: '#999',
+  },
   executeText: {
     color: '#4717F6',
     fontSize: 18,
@@ -322,6 +362,10 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(71, 23, 246, 0.4)',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 10,
+  },
+  executeTextDisabled: {
+    color: '#999',
+    textShadowColor: 'transparent',
   },
   swipeIndicator: {
     alignSelf: 'flex-end',
