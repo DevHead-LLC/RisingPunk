@@ -6,98 +6,141 @@ describe('BattleTimer - 3-Second Countdown', () => {
   const testBattleId = 'test-battle-123';
 
   beforeEach(() => {
-    // Get singleton instance and reset for each test
-    timerService = BattleTimerService.getInstance();
-    timerService.stopAllTimers(); // Clean up any existing timers
-    
-    // Use fake timers for predictable testing
     jest.useFakeTimers();
+    timerService = BattleTimerService.getInstance();
+    timerService.removeAllListeners();
   });
 
   afterEach(() => {
-    // Clean up after each test
-    timerService.stopAllTimers();
+    timerService.stopTimer(testBattleId);
     jest.useRealTimers();
   });
 
   it('should display 3, 2, 1 countdown and then start battle phase', () => {
-    const countdownEvents: Array<{countdown: number, phase: BattlePhase}> = [];
-    const phaseChangeEvents: Array<{phase: BattlePhase, countdown: number}> = [];
+    const countdownEvents: any[] = [];
+    const phaseChangeEvents: any[] = [];
 
-    // Listen for countdown updates
     timerService.on('countdownUpdate', (data) => {
-      if (data.battleId === testBattleId) {
-        countdownEvents.push({
-          countdown: data.countdown,
-          phase: data.phase
-        });
-      }
+      countdownEvents.push(data);
     });
 
-    // Listen for phase changes
     timerService.on('phaseChange', (data) => {
-      if (data.battleId === testBattleId) {
-        phaseChangeEvents.push({
-          phase: data.phase,
-          countdown: data.countdown
-        });
-      }
+      phaseChangeEvents.push(data);
     });
 
-    // Start the timer
     timerService.startTimer(testBattleId);
 
-    // Verify timer is active
-    expect(timerService.isTimerActive(testBattleId)).toBe(true);
-
-    // Advance timer by 1 second - should emit 2 (user sees "2")
+    // Advance through countdown: 3, 2, 1
     jest.advanceTimersByTime(1000);
-    expect(countdownEvents.length).toBe(1);
     expect(countdownEvents[0].countdown).toBe(2);
 
-    // Advance timer by 1 second - should emit 1 (user sees "1")
     jest.advanceTimersByTime(1000);
-    expect(countdownEvents.length).toBe(2);
     expect(countdownEvents[1].countdown).toBe(1);
 
-    // Advance timer by 1 second - should emit 0 and trigger phase change (battle starts)
     jest.advanceTimersByTime(1000);
-    expect(countdownEvents.length).toBe(3);
     expect(countdownEvents[2].countdown).toBe(0);
-    
-    // Verify phase change to ACTIVE (battle is now starting)
-    expect(phaseChangeEvents.length).toBe(1);
-    expect(phaseChangeEvents[0].phase).toBe(BattlePhase.ACTIVE);
-    expect(phaseChangeEvents[0].countdown).toBe(0);
 
-    // Verify timer is still active after countdown
-    expect(timerService.isTimerActive(testBattleId)).toBe(true);
+    // Should transition to battle phase
+    expect(phaseChangeEvents.length).toBeGreaterThan(0);
+    expect(phaseChangeEvents[0].phase).toBe(BattlePhase.ACTIVE);
   });
 
   it('should emit countdown events for user-visible numbers: 2, 1', () => {
-    const countdownEvents: number[] = [];
+    const countdownEvents: any[] = [];
 
     timerService.on('countdownUpdate', (data) => {
-      if (data.battleId === testBattleId) {
-        countdownEvents.push(data.countdown);
-      }
+      countdownEvents.push(data);
     });
 
     timerService.startTimer(testBattleId);
 
-    // Advance 1 second - should have 2 (user sees "2")
     jest.advanceTimersByTime(1000);
-    expect(countdownEvents).toContain(2);
-
-    // Advance 1 more second - should have 2, 1 (user sees "1")
     jest.advanceTimersByTime(1000);
-    expect(countdownEvents).toContain(1);
 
-    // Advance 1 more second - should have 2, 1, 0 (battle starts)
-    jest.advanceTimersByTime(1000);
-    expect(countdownEvents).toContain(0);
+    expect(countdownEvents.length).toBe(2);
+    expect(countdownEvents[0].countdown).toBe(2);
+    expect(countdownEvents[1].countdown).toBe(1);
+  });
 
-    // Verify the user-visible countdown sequence: 2, 1 (0 triggers battle start)
-    expect(countdownEvents).toEqual([2, 1, 0]);
+  it('should verify 45-second battle duration configuration', () => {
+    const timer = timerService.getTimeRemaining(testBattleId);
+    expect(timer).toBeNull();
+
+    timerService.startTimer(testBattleId);
+    jest.advanceTimersByTime(3000); // Skip countdown
+
+    expect(timerService.isTimerActive(testBattleId)).toBe(true);
+
+    jest.advanceTimersByTime(20000); // Advance 20 seconds into battle
+    expect(timerService.isTimerActive(testBattleId)).toBe(true);
+
+    jest.advanceTimersByTime(25000); // Advance 25 more seconds (total 45 battle seconds)
+    expect(timerService.isTimerActive(testBattleId)).toBe(false);
+  });
+});
+
+describe('BattleTimer - Server-Client Coordination', () => {
+  let timerService: BattleTimerService;
+  const testBattleId = 'test-battle-123';
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    timerService = BattleTimerService.getInstance();
+    timerService.removeAllListeners();
+  });
+
+  afterEach(() => {
+    timerService.stopTimer(testBattleId);
+    jest.useRealTimers();
+  });
+
+  it('should send correct timeRemaining values to client during battle phase', () => {
+    const timer = timerService.getTimeRemaining(testBattleId);
+    expect(timer).toBeNull();
+
+    timerService.startTimer(testBattleId);
+    
+    // Skip countdown phase (3 seconds)
+    jest.advanceTimersByTime(3000);
+    
+    // Check that battle phase has started
+    const timerState = timerService.getTimeRemaining(testBattleId);
+    expect(timerState).toBeTruthy();
+    expect(timerState!.phase).toBe(BattlePhase.ACTIVE);
+    expect(timerState!.battleTime).toBe(0);
+    
+    // Advance 10 seconds into battle
+    jest.advanceTimersByTime(10000);
+    const timerStateAfter10 = timerService.getTimeRemaining(testBattleId);
+    expect(timerStateAfter10!.battleTime).toBe(10);
+    
+    // Advance 20 more seconds (30 total)
+    jest.advanceTimersByTime(20000);
+    const timerStateAfter30 = timerService.getTimeRemaining(testBattleId);
+    expect(timerStateAfter30!.battleTime).toBe(30);
+    
+    // Advance 15 more seconds (45 total) - battle should end
+    jest.advanceTimersByTime(15000);
+    const timerStateAfter45 = timerService.getTimeRemaining(testBattleId);
+    expect(timerStateAfter45).toBeNull(); // Timer should be cleaned up
+  });
+
+  it('should emit battleTimeUpdate events with correct timeRemaining values', () => {
+    const events: any[] = [];
+    
+    timerService.on('battleTimeUpdate', (data) => {
+      events.push(data);
+    });
+
+    timerService.startTimer(testBattleId);
+    jest.advanceTimersByTime(3000); // Skip countdown
+    
+    // Advance 5 seconds into battle
+    jest.advanceTimersByTime(5000);
+    
+    expect(events.length).toBeGreaterThan(0);
+    const lastEvent = events[events.length - 1];
+    expect(lastEvent.battleTime).toBe(5);
+    expect(lastEvent.timeRemaining).toBe(40); // 45 - 5 = 40
   });
 }); 

@@ -3,7 +3,7 @@ import { BattlePhase } from '../types/battle';
 
 const TIMER_CONFIG = {
   COUNTDOWN_DURATION: 3,
-  BATTLE_DURATION: 20,
+  BATTLE_DURATION: 45,
 } as const;
 
 interface BattleTimer {
@@ -75,13 +75,21 @@ export class BattleTimerService extends EventEmitter {
   /**
    * Get remaining time for a battle
    */
-  public getTimeRemaining(battleId: string): { countdown: number; battleTime: number; phase: BattlePhase } | null {
+  public getTimeRemaining(battleId: string): { countdown: number; battleTime: number; timeRemaining: number; phase: BattlePhase } | null {
     const timer = this.timers.get(battleId);
-    return timer ? {
+    if (!timer) return null;
+    
+    // Calculate time remaining (45 down to 0)
+    const timeRemaining = timer.phase === BattlePhase.ACTIVE ? 
+      TIMER_CONFIG.BATTLE_DURATION - timer.battleTime : 
+      timer.countdown;
+    
+    return {
       countdown: timer.countdown,
       battleTime: timer.battleTime,
+      timeRemaining: timeRemaining,
       phase: timer.phase,
-    } : null;
+    };
   }
 
   /**
@@ -124,7 +132,7 @@ export class BattleTimerService extends EventEmitter {
   }
 
   /**
-   * Start battle phase (20 seconds)
+   * Start battle phase (45 seconds)
    */
   private startBattlePhase(battleId: string): void {
     const timer = this.timers.get(battleId);
@@ -133,7 +141,6 @@ export class BattleTimerService extends EventEmitter {
     this.clearTimerIntervals(timer);
     timer.phase = BattlePhase.ACTIVE;
     timer.countdown = 0;
-
 
     this.emit('phaseChange', {
       battleId,
@@ -146,9 +153,13 @@ export class BattleTimerService extends EventEmitter {
 
       timer.battleTime++;
       
+      // Calculate time remaining (45 down to 0)
+      const timeRemaining = TIMER_CONFIG.BATTLE_DURATION - timer.battleTime;
+      
       this.emit('battleTimeUpdate', {
         battleId,
         battleTime: timer.battleTime,
+        timeRemaining: timeRemaining,
         phase: timer.phase,
       });
 

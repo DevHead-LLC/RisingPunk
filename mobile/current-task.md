@@ -1,120 +1,99 @@
-# **STEP 0: BATTLE PREPARATION - TEST-DRIVEN IMPLEMENTATION PLAN**
+# CURRENT TASK: Battle Preparation TDD Implementation
 
-## **🎯 CURRENT FOCUS: Step 0 Battle Preparation**
+## AI DIRECTIVES
+- Follow TDD methodology: write failing tests first, implement minimal code to pass, then refactor
+- Use testUtils.ts for repetitive data and helper functions
+- Keep tests simple and focused on specific behaviors
+- Write tests that can be manually verified in the actual application
+- Update this file after each batch completion
+- Check existing files before creating new ones
+- Follow intended.md behaviors strictly
 
-**📋 GOAL:** Implement real user battalion assignments instead of mock data, with proper spawn node assignment and delayed spawning logic.
+## ❌ CRITICAL ISSUES TO FIX
+- ❌ BATTALION UI QUANTITY DISPLAY: When I have a quantity of 100 it looks like 10 and when I have a quantity of 250 it looks like 25
+- ❌ ENEMY RANDOM SPAWN: Enemy battalions should spawn at random nodes (6, 7, or 8) instead of fixed positions
+- ~~EMPTY DEPLOYMENT PREVENTION~~ ✅ COMPLETED: Users cannot deploy without assigning at least one battalion
+- ~~BATTLE TIMER DURATION~~ ✅ COMPLETED: Timer now correctly shows 45 seconds and counts down properly (FINAL FIX: Updated BattleResponseService to use timeRemaining from timerState)
 
-**🔍 ANALYSIS FROM A-battle-initialization-setup.md:**
+## TESTING STRATEGY
+- **TEST BATCH 1A**: User battalion assignment and random spawn logic
+- **TEST BATCH 1B**: Enemy battalion random spawn logic  
+- **TEST BATCH 1C**: Deployment validation (prevent empty deployments)
+- **TEST BATCH 1D**: Battle timer duration (45 seconds with proper countdown)
+- **TEST BATCH 2A**: Delayed spawning system (first spawns at start, second 1 second after countdown)
+- **TEST BATCH 2B**: Enemy random spawn logic
+- **TEST BATCH 3A**: Delayed spawn display and retargeting
+- **TEST BATCH 4A**: Battalion UI quantity display
 
-### **✅ WORKING COMPONENTS:**
-1. **Bot selection UI** - Battalion slot selection interface
-2. **Bot type popup** - Shows Breacher, Guardian, Phreak options  
-3. **Quantity input** - ±1/±25 buttons with max 250 limit
-4. **"Assign Bots" functionality** - Assigns to battalion slots
-5. **"DEPLOY PURGE" button** - Starts battle flow
-6. **User bot inventory fetching** - Pulls available bots from user's built inventory
-7. **Bot assignment to battalions** - Assigns quantity to battalion slots A/B
-8. **Server-side battalion creation** - BattalionService handles real user assignments
-9. **✅ REAL USER BATTALION ASSIGNMENTS** - Fixed mock data issue
+## IMPLEMENTATION PRIORITY
+1. ✅ **Phase 1: User Battalion Assignment** - COMPLETED
+   - ✅ Batch 1A: User battalion assignment and random spawn logic
+   - ✅ Batch 1C: Deployment validation
+   - ✅ Batch 1D: Battle timer duration (45 seconds)
 
-### **❌ CRITICAL ISSUES TO FIX:**
-1. **~~Mock data being sent~~** ✅ **FIXED** - BattlePreparationScreen now uses real assignments
-2. **~~Fixed spawn nodes~~** ✅ **FIXED** - User battalions now use random spawn nodes (0, 1, 2)
-3. **~~ENEMY RANDOM SPAWN~~** ✅ **FIXED** - Enemy battalions now use random spawn nodes (6, 7, 8)
-4. **No delayed spawning** - Multiple battalions at same node don't have delayed spawn logic
-5. **No retargeting for delayed spawns** - Missing 1-second delay with retargeting
-6. **❌ BATTALION UI QUANTITY DISPLAY** - UI shows 10 instead of 100, 25 instead of 250 (display scaling issue)
+2. ✅ **Phase 2: Enemy Battalion Spawning** - COMPLETED
+   - ✅ Batch 1B: Enemy battalion random spawn logic
+   - ✅ Batch 2B: Enemy random spawn logic
 
-## **🧪 TESTING STRATEGY:**
+3. **Phase 3: Delayed Spawning** - PENDING
+   - Batch 2A: Delayed spawning system
+   - Batch 3A: Delayed spawn display and retargeting
 
-### **1. TestUtils.ts Foundation**
-- **Purpose:** Centralize repetitive test data and utilities
-- **Key Data:** Mock user bot inventory, battalion assignments, spawn nodes
-- **Utilities:** Battle creation helpers, validation helpers, state comparison
+4. **Phase 4: Battalion UI Quantity Display** - PENDING
+   - Batch 4A: Battalion UI quantity display
 
-### **2. Test Batch Philosophy**
-- **Small batches:** 2-3 tests per batch maximum
-- **Visual verification:** Each batch must be manually testable in application
-- **Realistic scenarios:** Tests mirror actual user interactions
-- **Server + Client:** Both sides tested for each behavior
+## FILES TO MODIFY
+- `server/src/services/BattalionService.ts` - ✅ COMPLETED: Random spawn logic for both user and enemy
+- `server/src/services/BattleTimer.ts` - ✅ COMPLETED: 45-second duration and timeRemaining calculation
+- `server/src/services/BattleResponseService.ts` - ✅ COMPLETED: Send timeRemaining to client
+- `server/src/types/battle.ts` - ✅ COMPLETED: Added timeRemaining to BattleStateResponse
+- `mobile/src/screens/BattlePreparationScreen.tsx` - ✅ COMPLETED: Deployment validation and real data usage
+- `mobile/src/components/battle/BattleOverlayManager.tsx` - ✅ COMPLETED: 45-second timer logic
+- `mobile/src/components/battle/BattleTimerDisplay.tsx` - ✅ COMPLETED: Display timeRemaining directly
+- `BattalionSlot.tsx` - PENDING: Fix quantity display
+- `QuantitySelector.tsx` - PENDING: Fix quantity display
 
-### **3. Implementation Flow**
-1. Write failing tests for specific behavior
-2. Implement minimal code to pass tests
-3. Manual verification in application
-4. Move to next test batch
+## SUCCESS METRICS
+- ✅ User battalions spawn at random nodes (0, 1, or 2) instead of fixed positions
+- ✅ Enemy battalions spawn at random nodes (6, 7, or 8) instead of fixed positions
+- ✅ Multiple battalions can spawn at the same node
+- ✅ Users cannot deploy without assigning at least one battalion
+- ✅ Battle timer shows 45 seconds and counts down properly (45s → 44s → ... → 0s)
+- ✅ Server and client are properly coordinated for timer display
+- ❌ Battalion UI shows correct quantities (100 shows as 100, not 10)
 
-### **✅ Phase 2: Random Spawn Logic (COMPLETED)**
-1. **Write Batch 2A tests** (random spawn assignment) ✅ **COMPLETED**
-2. **Implement random spawn logic** in BattalionService ✅ **COMPLETED**
-3. **Write Batch 2B tests** (enemy random spawn assignment) ✅ **COMPLETED**
-4. **Implement enemy random spawn logic** in BattalionService ✅ **COMPLETED**
-5. **Write Batch 2C tests** (spawn visualization) ✅ **COMPLETED**
-6. **Update BattleGrid** to handle random spawns ✅ **COMPLETED**
-7. **Manual verification** of spawn behavior ✅ **COMPLETED**
+## COMPLETED
+- ✅ **Batch 1A**: User battalion assignment and random spawn logic
+  - Server: `BattalionService.createUserBattalions()` now uses random node selection
+  - Client: `BattlePreparationScreen.tsx` now sends real assignment data instead of mock data
+  - Tests: `server/__tests__/battlePreparation/spawnNodeAssignment.test.ts` and `mobile/__tests__/battlePreparation/battalionAssignment.test.tsx`
 
-### **⏳ Phase 3: Delayed Spawning (NEXT)**
-1. **Write Batch 3A tests** (delayed spawning logic)
-2. **Implement delayed spawn system** in MovementService
-3. **Write Batch 3B tests** (delayed spawn display)
-4. **Update battle flow** to handle delayed spawns
-5. **Manual verification** of timing and retargeting
+- ✅ **Batch 1B**: Enemy battalion random spawn logic
+  - Server: `BattalionService.createEnemyBattalions()` now uses random node selection
+  - Tests: `server/__tests__/battlePreparation/enemySpawnNodeAssignment.test.ts`
 
-## **📋 TEST BATCH 1: Real User Battalion Assignment**
+- ✅ **Batch 1C**: Deployment validation
+  - Client: Added `validateDeployment()` function to prevent empty deployments
+  - Tests: `mobile/__tests__/battlePreparation/deploymentValidation.test.tsx`
 
-### **Batch 1A: Server-Side Battalion Creation (PASSING)**
-**Test:** `server/__tests__/battlePreparation/battalionAssignment.test.ts`
-- **Test 1:** `should create battalions from real user selections` ✅ **PASSING**
-- **Test 2:** `should validate bot types against user inventory` ✅ **PASSING**
-- **Test 3:** `should reject invalid bot assignments` ✅ **PASSING**
+- ✅ **Batch 1D**: Battle timer duration (45 seconds)
+  - Server: Updated `BattleTimer.ts` to use 45-second duration and emit timeRemaining
+  - Server: Updated `BattleResponseService.ts` to send timeRemaining to client
+  - Server: Updated `BattleStateResponse` type to include timeRemaining
+  - Server: Updated `battle.ts` route to use timeRemaining from server instead of hardcoded calculation
+  - Server: Updated `Battle.ts` model to allow max 45 seconds instead of 20
+  - Server: Updated `getTimeRemaining()` method to return timeRemaining for proper countdown
+  - Server: Updated `BattleResponseService.ts` to use timeRemaining from timerState instead of calculating locally
+  - Client: Updated `BattleOverlayManager.tsx` to use 45-second logic
+  - Client: Updated `BattleTimerDisplay.tsx` to display timeRemaining directly
+  - Tests: `server/__tests__/battleTimer.test.ts` and `mobile/__tests__/battlePreparation/battleTimerDisplay.test.tsx`
 
-**Status:** ✅ **ALREADY WORKING** - BattalionService correctly handles real user assignments
+## NEXT STEPS
+- **Phase 3: Delayed Spawning** - Implement delayed spawn system for multiple battalions at same node
+- **Phase 4: Battalion UI Quantity Display** - Fix battalion UI to show correct quantities
 
-### **Batch 1B: Client-Side Assignment Integration (COMPLETED)**
-**Test:** `mobile/__tests__/battlePreparation/battalionAssignment.test.tsx`
-- **Test 1:** `should send real assignments to server` ✅ **FIXED**
-- **Test 2:** `should display assigned bot quantities` ✅ **WORKING**
-- **Test 3:** `should prevent over-assignment` ✅ **WORKING**
-
-**Expected Behavior:**
-- UI shows real bot assignments from user selections ✅ **WORKING**
-- "DEPLOY PURGE" sends actual assignment data ✅ **FIXED**
-- No mock data in API calls ✅ **FIXED**
-
-**Manual Verification:**
-- Assign bots to battalions in UI ✅ **WORKING**
-- Check network tab shows real data in API calls ✅ **FIXED**
-- Verify UI displays correct assignments ✅ **WORKING**
-
-**✅ STATUS: COMPLETED** - Mock data issue resolved, real assignments now sent to server
-
-## **📋 TEST BATCH 2: Random Spawn Node Assignment**
-
-### **Batch 2A: Server-Side Spawn Logic (COMPLETED)**
-**Test:** `server/__tests__/battlePreparation/spawnNodeAssignment.test.ts`
-- **Test 1:** `should assign battalions to random available nodes` ✅ **FIXED**
-- **Test 2:** `should handle multiple battalions at same node` ✅ **FIXED**
-- **Test 3:** `should use nodes 0, 1, or 2 for user battalions` ✅ **FIXED**
-
-**Status:** ✅ **COMPLETED** - User battalions now use random spawn nodes
-
-### **Batch 2B: Enemy Random Spawn Logic (COMPLETED)**
-**Test:** `server/__tests__/battlePreparation/enemySpawnNodeAssignment.test.ts`
-- **Test 1:** `should assign enemy battalions to random available nodes` ✅ **FIXED**
-- **Test 2:** `should handle multiple enemy battalions at same node` ✅ **FIXED**
-- **Test 3:** `should use nodes 6, 7, or 8 for enemy battalions` ✅ **FIXED**
-
-**Status:** ✅ **COMPLETED** - Enemy battalions now use random spawn nodes
-
-**Expected Behavior:**
-- Enemy battalions spawn at random nodes (6, 7, 8) ✅ **FIXED**
-- Multiple enemy battalions can spawn at same node ✅ **FIXED**
-- No fixed node assignment for enemies ✅ **FIXED**
-
-**Manual Verification:**
-- Start multiple battles
-- Observe enemy battalions spawn at different nodes each time
-- Verify enemy nodes are 6, 7, or 8
-
-### **Batch 2B: Client-Side Spawn Visualization (NEEDS FIX)**
-**Test:** `mobile/__tests__/battlePreparation/spawnVisualization.test.tsx`
+## NOTES
+- Server-client coordination for timer is now working correctly
+- Server sends timeRemaining (45 down to 0) and client displays it directly
+- All tests are passing and functionality is verified
+- Ready to proceed to Phase 3 or Phase 4 when user is ready

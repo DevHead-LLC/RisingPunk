@@ -41,7 +41,7 @@
 ---
 
 ## 17. Battle Duration & End Conditions
-- **Battle Duration:** 30 seconds (increased from 20 seconds)
+- **Battle Duration:** 45 seconds (increased from 20 seconds)
 - **Battle End Conditions:**
   - **Timer Expiration:** Battle ends when 30-second timer reaches 0
   - **Complete Elimination:** Battle ends when all opposing battalions are defeated

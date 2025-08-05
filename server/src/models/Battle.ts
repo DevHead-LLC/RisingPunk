@@ -188,7 +188,7 @@ const battleSchema = new Schema({
     type: Number,
     required: true,
     min: 0,
-    max: 20,
+    max: 45,
     default: 0
   },
 
