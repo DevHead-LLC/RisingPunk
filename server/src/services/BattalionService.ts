@@ -180,22 +180,25 @@ export class BattalionService {
 
   static createEnemyBattalions(nodes: INode[]): IBattalion[] {
     const enemyBattalions = [
-      { type: 'guardian' as BotType, quantity: 8, nodeIndex: 6 },
-      { type: 'breacher' as BotType, quantity: 10, nodeIndex: 7 },
-      { type: 'phreak' as BotType, quantity: 7, nodeIndex: 8 },
+      { type: 'guardian' as BotType, quantity: 8 },
+      { type: 'breacher' as BotType, quantity: 10 },
+      { type: 'phreak' as BotType, quantity: 7 },
     ];
     
-    return enemyBattalions.map((battalion, index) => 
-      this.createBattalion(
+    return enemyBattalions.map((battalion, index) => {
+      const validatedBotType = this.validateBotType(battalion.type);
+      const nodeIndex = index + 6; // Assign to last 3 nodes (6, 7, 8)
+      
+      return this.createBattalion(
         `enemy-battalion-${index}`,
-        battalion.type,
+        validatedBotType,
         battalion.quantity,
-        battalion.nodeIndex,
+        nodeIndex,
         NodeOwner.ENEMY,
-        BOT_CONFIG.ENEMY_BOT_STATS[battalion.type].stats,
+        BOT_CONFIG.ENEMY_BOT_STATS[validatedBotType].stats,
         nodes
-      )
-    );
+      );
+    });
   }
 
 
