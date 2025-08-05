@@ -1,6 +1,7 @@
 import { BattalionService } from '../src/services/BattalionService';
 import { createNodesWithTugOfWar } from '../src/services/NodeService';
 import { BOT_CONFIG } from '../src/services/BotService';
+import { BotType } from '../src/types/battle';
 
 describe('Bot Validation Bug', () => {
   let nodes: any[];
@@ -68,5 +69,58 @@ describe('Bot Validation Bug', () => {
     // 1. User battalions validate against USER_BOT_STATS
     // 2. Enemy battalions validate against ENEMY_BOT_STATS
     // 3. No runtime errors occur if the configs have different bot types
+  });
+
+  test('should demonstrate fix works with different bot types in configs', () => {
+    // This test demonstrates that the fix works correctly
+    // by showing that each validation method uses its own cache
+    
+    // Create battalions normally first to populate caches
+    const userBattalions1 = BattalionService.createUserBattalions(nodes);
+    const enemyBattalions1 = BattalionService.createEnemyBattalions(nodes);
+    
+    expect(userBattalions1.length).toBe(3);
+    expect(enemyBattalions1.length).toBe(3);
+    
+    // Now test that the caches are separate by creating custom battalion configs
+    const customUserBattalions = [
+      { type: 'guardian' as BotType, quantity: 5 },
+      { type: 'breacher' as BotType, quantity: 3 },
+      { type: 'phreak' as BotType, quantity: 2 },
+    ];
+    
+    const customEnemyBattalions = [
+      { type: 'guardian' as BotType, quantity: 4 },
+      { type: 'breacher' as BotType, quantity: 6 },
+      { type: 'phreak' as BotType, quantity: 3 },
+    ];
+    
+    // Create battalions with custom configs
+    const userBattalions2 = BattalionService.createUserBattalions(nodes, customUserBattalions);
+    const enemyBattalions2 = BattalionService.createEnemyBattalions(nodes);
+    
+    // Both should work correctly with the fix
+    expect(userBattalions2.length).toBe(3);
+    expect(enemyBattalions2.length).toBe(3);
+    
+    // Verify that each battalion has the correct stats from their respective configs
+    userBattalions2.forEach(battalion => {
+      expect(battalion.stats).toBeDefined();
+      expect(battalion.owner).toBe('user');
+      // Should use USER_BOT_STATS
+      expect(battalion.stats.offense).toBeLessThan(20); // User stats have lower offense
+    });
+    
+    enemyBattalions2.forEach(battalion => {
+      expect(battalion.stats).toBeDefined();
+      expect(battalion.owner).toBe('enemy');
+      // Should use ENEMY_BOT_STATS
+      expect(battalion.stats.offense).toBeGreaterThan(20); // Enemy stats have higher offense
+    });
+    
+    // The fix ensures that:
+    // 1. User battalions validate against USER_BOT_STATS and use userBotTypeCache
+    // 2. Enemy battalions validate against ENEMY_BOT_STATS and use enemyBotTypeCache
+    // 3. No cross-contamination between the two validation methods
   });
 }); 

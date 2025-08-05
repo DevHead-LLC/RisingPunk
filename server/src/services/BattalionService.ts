@@ -13,7 +13,8 @@ import { TargetingService } from './TargetingService';
 export class BattalionService {
   private static targetingResults: Map<string, BattalionTargetingResult[]> = new Map();
   private static validBotTypes = ['guardian', 'breacher', 'phreak'] as const;
-  private static botTypeCache = new Map<string, BotType>();
+  private static userBotTypeCache = new Map<string, BotType>();
+  private static enemyBotTypeCache = new Map<string, BotType>();
 
   static async triggerInitialTargeting(battalions: IBattalion[], nodes: INode[], battleId: string): Promise<BattalionTargetingResult[]> {
     const results = TargetingService.assignInitialTargets(battalions, nodes);
@@ -129,14 +130,14 @@ export class BattalionService {
 
   private static validateBotType(botType: string): BotType {
     // Check cache first
-    if (this.botTypeCache.has(botType)) {
-      return this.botTypeCache.get(botType)!;
+    if (this.userBotTypeCache.has(botType)) {
+      return this.userBotTypeCache.get(botType)!;
     }
 
     // Validate bot type
     if (!this.validBotTypes.includes(botType as any)) {
       console.log(`⚠️ INVALID BOT TYPE: "${botType}" is not a valid bot type. Using 'guardian' as fallback.`);
-      this.botTypeCache.set(botType, 'guardian' as BotType);
+      this.userBotTypeCache.set(botType, 'guardian' as BotType);
       return 'guardian' as BotType;
     }
 
@@ -145,24 +146,24 @@ export class BattalionService {
     // Ensure the bot type exists in USER_BOT_STATS (for user battalions)
     if (!BOT_CONFIG.USER_BOT_STATS[validatedBotType]) {
       console.log(`⚠️ MISSING BOT CONFIG: "${validatedBotType}" not found in USER_BOT_STATS. Using 'guardian' as fallback.`);
-      this.botTypeCache.set(botType, 'guardian' as BotType);
+      this.userBotTypeCache.set(botType, 'guardian' as BotType);
       return 'guardian' as BotType;
     }
 
-    this.botTypeCache.set(botType, validatedBotType);
+    this.userBotTypeCache.set(botType, validatedBotType);
     return validatedBotType;
   }
 
   private static validateEnemyBotType(botType: string): BotType {
     // Check cache first
-    if (this.botTypeCache.has(botType)) {
-      return this.botTypeCache.get(botType)!;
+    if (this.enemyBotTypeCache.has(botType)) {
+      return this.enemyBotTypeCache.get(botType)!;
     }
 
     // Validate bot type
     if (!this.validBotTypes.includes(botType as any)) {
       console.log(`⚠️ INVALID BOT TYPE: "${botType}" is not a valid bot type. Using 'guardian' as fallback.`);
-      this.botTypeCache.set(botType, 'guardian' as BotType);
+      this.enemyBotTypeCache.set(botType, 'guardian' as BotType);
       return 'guardian' as BotType;
     }
 
@@ -171,11 +172,11 @@ export class BattalionService {
     // Ensure the bot type exists in ENEMY_BOT_STATS (for enemy battalions)
     if (!BOT_CONFIG.ENEMY_BOT_STATS[validatedBotType]) {
       console.log(`⚠️ MISSING BOT CONFIG: "${validatedBotType}" not found in ENEMY_BOT_STATS. Using 'guardian' as fallback.`);
-      this.botTypeCache.set(botType, 'guardian' as BotType);
+      this.enemyBotTypeCache.set(botType, 'guardian' as BotType);
       return 'guardian' as BotType;
     }
 
-    this.botTypeCache.set(botType, validatedBotType);
+    this.enemyBotTypeCache.set(botType, validatedBotType);
     return validatedBotType;
   }
 
