@@ -13,7 +13,7 @@
 - ❌ BATTALION UI QUANTITY DISPLAY: When I have a quantity of 100 it looks like 10 and when I have a quantity of 250 it looks like 25
 - ❌ ENEMY RANDOM SPAWN: Enemy battalions should spawn at random nodes (6, 7, or 8) instead of fixed positions
 - ~~EMPTY DEPLOYMENT PREVENTION~~ ✅ COMPLETED: Users cannot deploy without assigning at least one battalion
-- ~~BATTLE TIMER DURATION~~ ✅ COMPLETED: Timer now correctly shows 45 seconds and counts down properly (FINAL FIX: Updated BattleResponseService to use timeRemaining from timerState)
+- ~~BATTLE TIMER DURATION~~ ✅ COMPLETED: Timer now correctly shows 45 seconds and counts down properly (FINAL FIX: Updated BattleResponseService to use timeRemaining from timerState, cleaned up debug logging and hardcoded values)
 
 ## TESTING STRATEGY
 - **TEST BATCH 1A**: User battalion assignment and random spawn logic
@@ -84,8 +84,12 @@
   - Server: Updated `Battle.ts` model to allow max 45 seconds instead of 20
   - Server: Updated `getTimeRemaining()` method to return timeRemaining for proper countdown
   - Server: Updated `BattleResponseService.ts` to use timeRemaining from timerState instead of calculating locally
+  - Server: Added `getTimerConfig()` method to expose TIMER_CONFIG
   - Client: Updated `BattleOverlayManager.tsx` to use 45-second logic
   - Client: Updated `BattleTimerDisplay.tsx` to display timeRemaining directly
+  - Client: Created `battleConstants.ts` to centralize battle configuration
+  - Client: Replaced hardcoded values with BATTLE_CONFIG constants
+  - Cleanup: Removed debug console.log statements from both client and server
   - Tests: `server/__tests__/battleTimer.test.ts` and `mobile/__tests__/battlePreparation/battleTimerDisplay.test.tsx`
 
 ## NEXT STEPS

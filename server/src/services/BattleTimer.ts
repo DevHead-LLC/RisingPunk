@@ -73,6 +73,13 @@ export class BattleTimerService extends EventEmitter {
   }
 
   /**
+   * Get timer configuration
+   */
+  public static getTimerConfig() {
+    return TIMER_CONFIG;
+  }
+
+  /**
    * Get remaining time for a battle
    */
   public getTimeRemaining(battleId: string): { countdown: number; battleTime: number; timeRemaining: number; phase: BattlePhase } | null {

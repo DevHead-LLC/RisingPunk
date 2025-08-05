@@ -5,11 +5,12 @@
 
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { BattlePhase } from '../../types/battleTypes';
-import { BattleLoadingError } from './BattleLoadingError';
-import { BattleCountdownOverlay } from './BattleCountdownOverlay';
-import { BattleTimerDisplay } from './BattleTimerDisplay';
 import { useBattleState } from '../../hooks/useBattleState';
+import { BattleTimerDisplay } from './BattleTimerDisplay';
+import { BattleCountdownOverlay } from './BattleCountdownOverlay';
+import { BattleLoadingError } from './BattleLoadingError';
+import { BattlePhase } from '../../types/battleTypes';
+import { BATTLE_CONFIG } from '../../config/battleConstants';
 
 // Server phase types (from server/src/types/battle.ts)
 type ServerPhase = 'setup' | 'countdown' | 'active' | 'battle' | 'victory' | 'defeat' | 'complete';
@@ -66,16 +67,8 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
     if (!battleState) return null;
 
     const phase = battleState.phase;
-    const timeRemaining = battleState.timeRemaining || 45;
-    const maxBattleTime = 45; // Updated battle duration from 20 to 45 seconds
-
-    // DEBUG: Log the values we're receiving
-    console.log('🔍 BATTLE TIMER DEBUG:', {
-      phase,
-      timeRemaining,
-      battleState: battleState,
-      battleTime: timeRemaining
-    });
+    const timeRemaining = battleState.timeRemaining || BATTLE_CONFIG.BATTLE_DURATION;
+    const maxBattleTime = BATTLE_CONFIG.BATTLE_DURATION;
 
     // Map server phase to client phase
     const clientPhase = mapServerPhaseToClientPhase(phase);
@@ -86,7 +79,7 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
 
     // Determine if we're in countdown phase and show countdown overlay
     // Server sends timeRemaining: 3,2,1 during countdown phase
-    const isCountdownPhase = clientPhase === BattlePhase.COUNTDOWN && timeRemaining <= 3 && timeRemaining > 0;
+    const isCountdownPhase = clientPhase === BattlePhase.COUNTDOWN && timeRemaining <= BATTLE_CONFIG.COUNTDOWN_DURATION && timeRemaining > 0;
     const countdownValue = isCountdownPhase ? timeRemaining : 0;
 
     return {
