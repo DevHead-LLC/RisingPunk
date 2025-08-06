@@ -1,0 +1,4 @@
+export const BATTLE_CONFIG = {
+  BATTLE_DURATION: 45,
+  COUNTDOWN_DURATION: 3,
+} as const; 

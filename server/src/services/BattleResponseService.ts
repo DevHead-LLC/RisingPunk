@@ -6,6 +6,7 @@
 import { BattleStateResponse, ClientBattalion } from '../types/battle';
 import { IBattleDocument } from '../models/Battle';
 import { MovementState } from '../types/battle';
+import { BattleTimerService } from './BattleTimer';
 
 export interface NetworkData {
   networkConnections: any[];
@@ -36,18 +37,7 @@ export class BattleResponseService {
     // Use timeRemaining from timerState if available, otherwise calculate it
     const timeRemaining = timerState?.timeRemaining !== undefined ? 
       timerState.timeRemaining : 
-      (currentPhase === 'battle' ? (45 - currentBattleTime) : currentCountdown);
-
-    // DEBUG: Log what we're sending to client
-    console.log('📡 SERVER TIMER DEBUG:', {
-      battleId: battle.battleId,
-      currentPhase,
-      currentCountdown,
-      currentBattleTime,
-      timerState: timerState,
-      timeRemaining,
-      hasTimerState: !!timerState
-    });
+      (currentPhase === 'battle' ? (BattleTimerService.getTimerConfig().BATTLE_DURATION - currentBattleTime) : currentCountdown);
 
     // Convert movement states to array only if needed
     const movementStatesArray = movementStates && movementStates.size > 0 ? Array.from(movementStates.values()) : undefined;
