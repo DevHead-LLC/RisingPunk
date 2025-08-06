@@ -34,21 +34,19 @@ describe('Selective Retargeting - Client Visual Behavior', () => {
     // Verify node 3 is captured and un-attackable
     expect(node3.owner).toBe('user');
     expect(node3.tugOfWarProgress).toBe(100);
-    const isNode3Attackable = node3.owner === 'neutral';
-    expect(isNode3Attackable).toBe(false);
+    expect(node3.owner).not.toBe('neutral');
     
     // Verify node 4 is still neutral and attackable
     expect(node4.owner).toBe('neutral');
     expect(node4.tugOfWarProgress).toBe(0);
-    const isNode4Attackable = node4.owner === 'neutral';
-    expect(isNode4Attackable).toBe(true);
+    expect(node4.owner).toBe('neutral');
     
     // Verify selective behavior - only node 3 battalions should be affected
     const node3Battalions = battleState.battalions.filter(b => 
-      b.nodeIndex === 0 || b.nodeIndex === 6 // Battalions that would target node 3
+      b.isUser // User battalions
     );
     const node4Battalions = battleState.battalions.filter(b => 
-      b.nodeIndex === 1 // Battalion that would target node 4
+      !b.isUser // Enemy battalions
     );
     
     // Node 3 battalions should be affected by capture

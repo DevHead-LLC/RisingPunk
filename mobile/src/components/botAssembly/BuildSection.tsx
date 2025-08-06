@@ -53,7 +53,7 @@ export const BuildSection = React.memo(function BuildSection({
       {buildingProgress !== null && (
         <>
           <BuildTimer
-            quantity={parseInt(quantity) || 0}
+            _quantity={parseInt(quantity) || 0}
             buildTimePerUnit={1000}
             progress={buildingProgress}
           />

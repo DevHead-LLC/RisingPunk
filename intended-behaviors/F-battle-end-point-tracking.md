@@ -43,17 +43,17 @@
 ## 17. Battle Duration & End Conditions
 - **Battle Duration:** 45 seconds (increased from 20 seconds)
 - **Battle End Conditions:**
-  - **Timer Expiration:** Battle ends when 30-second timer reaches 0
+  - **Timer Expiration:** Battle ends when 45-second timer reaches 0
   - **Complete Elimination:** Battle ends when all opposing battalions are defeated
 - **Timer Management:** BattleTimer.ts manages countdown and triggers battle end
 - **End Detection:** BattleService.ts detects both timer expiration and complete elimination
 
 #### **Associated Files:**
-- `server/src/services/BattleTimer.ts` - `BATTLE_DURATION: 30` (updated from 20), `endBattle()` triggers battle end
+- `server/src/services/BattleTimer.ts` - `BATTLE_DURATION: 45` (updated from 20), `endBattle()` triggers battle end
 - `server/src/services/BattleService.ts` - `checkBattleEndConditions()`, `handleBattleEnd()` detect and handle battle end
 - `server/src/services/CombatService.ts` - `checkAllBattalionsDefeated()` detects complete elimination
 - `server/src/controllers/BattleController.ts` - Sends battle end state to client
-- `mobile/src/components/battle/BattleTimerDisplay.tsx` - Shows 30-second countdown timer
+- `mobile/src/components/battle/BattleTimerDisplay.tsx` - Shows 45-second countdown timer
 - `mobile/src/store/api/battleApi.ts` - Client-side battle end state handling
 - `server/src/types/battle.ts` - Defines battle end conditions and winner determination
 - `mobile/src/types/battleTypes.ts` - Client-side battle end types

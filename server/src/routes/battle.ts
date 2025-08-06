@@ -79,6 +79,7 @@ router.get<{ id: string }, BattleResponse>(
                battleState.phase === 'active' ? 'battle' : 
                battleState.phase === 'complete' ? 'victory' : 'setup',
         timeRemaining: battleState.timeRemaining || 0,
+        winner: battleState.winner,
         battalions: battleState.battalions || [],
         nodes: battleState.nodes || [],
         networkConnections: battleState.networkConnections || [],

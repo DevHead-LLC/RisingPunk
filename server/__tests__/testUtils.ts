@@ -98,6 +98,9 @@ export function isPointOnLineSegment(
 } 
 
 // Battle Preparation Test Data
+export const TEST_USER_ID = 'test-user-id';
+export const TEST_ENEMY_ID = 'test-enemy-id';
+
 export const TEST_USER_BOT_INVENTORY = {
   guardian: 50,
   breacher: 30,
