@@ -18,7 +18,7 @@ describe('Batch 1C: Deployment Validation', () => {
       
       // Verify at least one battalion has bots assigned
       const hasValidAssignment = Object.values(assignments).some(
-        assignment => assignment && assignment.quantity > 0
+        assignment => assignment && (assignment as any).quantity > 0
       );
       
       expect(hasValidAssignment).toBe(true);
@@ -37,7 +37,7 @@ describe('Batch 1C: Deployment Validation', () => {
       
       // Verify no battalions have bots assigned
       const hasValidAssignment = Object.values(assignments).some(
-        assignment => assignment && assignment.quantity > 0
+        assignment => assignment && (assignment as any).quantity > 0
       );
       
       expect(hasValidAssignment).toBe(false);
@@ -56,7 +56,7 @@ describe('Batch 1C: Deployment Validation', () => {
       
       // Verify all assignments have zero quantity
       const hasValidAssignment = Object.values(assignments).some(
-        assignment => assignment && assignment.quantity > 0
+        assignment => assignment && (assignment as any).quantity > 0
       );
       
       expect(hasValidAssignment).toBe(false);
@@ -94,7 +94,7 @@ describe('Batch 1C: Deployment Validation', () => {
       
       // Verify at least one battalion has valid assignment
       const hasValidAssignment = Object.values(assignments).some(
-        assignment => assignment && assignment.quantity > 0
+        assignment => assignment && (assignment as any).quantity > 0
       );
       
       expect(hasValidAssignment).toBe(true);
@@ -137,13 +137,13 @@ describe('Batch 1C: Deployment Validation', () => {
 // Helper functions for testing
 function validateDeployment(assignments: Record<string, any>): boolean {
   return Object.values(assignments).some(
-    assignment => assignment && assignment.quantity > 0
+    assignment => assignment && (assignment as any).quantity > 0
   );
 }
 
 function validateDeploymentWithMessage(assignments: Record<string, any>): { isValid: boolean; message: string } {
   const hasValidAssignment = Object.values(assignments).some(
-    assignment => assignment && assignment.quantity > 0
+    assignment => assignment && (assignment as any).quantity > 0
   );
   
   if (hasValidAssignment) {

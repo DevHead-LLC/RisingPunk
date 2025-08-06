@@ -4,8 +4,9 @@ import { NetworkConnection, LineProperties, MovementState } from '../../types/ba
 
 export interface BattleState {
   battleId: string;
-  phase: 'setup' | 'countdown' | 'battle' | 'victory' | 'defeat';
+  phase: 'setup' | 'countdown' | 'battle' | 'victory' | 'defeat' | 'complete';
   timeRemaining: number;
+  winner?: 'user' | 'enemy';
   battalions: Array<{
     id: string;
     type: 'guardian' | 'breacher' | 'phreak';

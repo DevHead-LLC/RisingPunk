@@ -9,7 +9,9 @@ import { useBattleState } from '../../hooks/useBattleState';
 import { BattleTimerDisplay } from './BattleTimerDisplay';
 import { BattleCountdownOverlay } from './BattleCountdownOverlay';
 import { BattleLoadingError } from './BattleLoadingError';
+import { BattleEndOverlay } from './BattleEndOverlay';
 import { BattlePhase } from '../../types/battleTypes';
+import { NodeOwner } from '../../types/battleTypes';
 import { BATTLE_CONFIG } from '../../config/battleConstants';
 
 // Server phase types (from server/src/types/battle.ts)
@@ -35,10 +37,12 @@ const mapServerPhaseToClientPhase = (serverPhase: ServerPhase | undefined): Batt
 
 interface BattleOverlayManagerProps {
   battleId: string;
+  onClose?: () => void;
 }
 
 export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
   battleId,
+  onClose,
 }) => {
   // Track logged errors to prevent spam
   const loggedErrors = useRef<Set<string>>(new Set());
@@ -82,6 +86,17 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
     const isCountdownPhase = clientPhase === BattlePhase.COUNTDOWN && timeRemaining <= BATTLE_CONFIG.COUNTDOWN_DURATION && timeRemaining > 0;
     const countdownValue = isCountdownPhase ? timeRemaining : 0;
 
+    // Debug logging for battle end
+    if (clientPhase === BattlePhase.COMPLETE) {
+      console.log('🔍 BATTLE END DETECTED:', {
+        phase: phase,
+        clientPhase: clientPhase,
+        winner: battleState.winner,
+        onClose: !!onClose,
+        timeRemaining: timeRemaining
+      });
+    }
+
     return {
       clientPhase,
       battleTime,
@@ -90,10 +105,16 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
       countdownValue,
       isTimerVisible: clientPhase === BattlePhase.COUNTDOWN || clientPhase === BattlePhase.ACTIVE
     };
-  }, [battleState]);
+  }, [battleState, onClose]);
 
   const renderOverlays = React.useMemo(() => {
     if (!phaseData) return null;
+
+    // Check if battle end overlay should be shown
+    const shouldShowBattleEnd = phaseData.clientPhase === BattlePhase.COMPLETE && 
+                               battleState?.winner && 
+                               onClose && 
+                               (battleState.winner === 'user' || battleState.winner === 'enemy');
 
     return (
       <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
@@ -109,10 +130,16 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
           <BattleCountdownOverlay countdown={phaseData.countdownValue} isVisible={true} />
         )}
 
-        {/* No overlay for COMPLETE phase */}
+        {/* Battle end overlay - rendered when battle is complete */}
+        {shouldShowBattleEnd && (
+          <BattleEndOverlay 
+            winner={battleState.winner === 'user' ? NodeOwner.USER : NodeOwner.ENEMY}
+            onContinue={onClose}
+          />
+        )}
       </View>
     );
-  }, [phaseData]);
+  }, [phaseData, battleState, onClose]);
 
   return (
     <BattleLoadingError

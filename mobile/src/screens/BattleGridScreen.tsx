@@ -34,6 +34,7 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
         {/* Overlays (countdown, timer) - self-contained with its own API call */}
         <BattleOverlayManager
           battleId={battleId}
+          onClose={_onClose}
         />
 
         {/* Network visualization - self-contained with its own API call */}

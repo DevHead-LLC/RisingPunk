@@ -28,16 +28,9 @@ describe('Node Capture and Retargeting - Client Visual Behavior', () => {
     expect(capturedNode.tugOfWarProgress).toBe(100);
     
     // Verify node is visually captured (owned by user)
-    const isUserOwned = capturedNode.owner === 'user';
-    const isEnemyOwned = capturedNode.owner === 'enemy';
-    const isNeutral = capturedNode.owner === 'neutral';
-    
-    expect(isUserOwned).toBe(true);
-    expect(isEnemyOwned).toBe(false);
-    expect(isNeutral).toBe(false);
+    expect(capturedNode.owner).toBe('user');
     
     // Verify node is un-attackable (not neutral)
-    const isAttackable = capturedNode.owner === 'neutral';
-    expect(isAttackable).toBe(false);
+    expect(capturedNode.owner).not.toBe('neutral');
   });
 }); 

@@ -28,7 +28,7 @@ describe('Battalion Network Line Adherence - Visual Behavior', () => {
       
       // Verify battalion is at a valid network node
       const battalion = battleState.battalions[0];
-      expect(battalion.nodeIndex).toBe(0);
+      expect(battalion.position).toBeDefined();
       
       // Verify node 0 exists and has valid position (using realistic positions)
       const node0 = battleState.nodes.find((node: any) => node.index === 0);

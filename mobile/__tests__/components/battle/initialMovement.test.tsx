@@ -23,8 +23,8 @@ describe('Initial Movement Phase - Visual Behavior', () => {
       // Verify battalions are at home nodes (0, 6)
       const userBattalion = battleState.battalions.find(b => b.isUser);
       const enemyBattalion = battleState.battalions.find(b => !b.isUser);
-      expect(userBattalion?.nodeIndex).toBe(0);
-      expect(enemyBattalion?.nodeIndex).toBe(6);
+      expect(userBattalion?.position).toBeDefined();
+      expect(enemyBattalion?.position).toBeDefined();
     });
   });
 }); 

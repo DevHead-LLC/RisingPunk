@@ -28,7 +28,7 @@ export const LevelSection = React.memo(function LevelSection({
           <BotTypeCard
             key={`${type}-${level}`}
             type={type}
-            level={level}
+            _level={level}
             isLocked={isLocked}
             isSelected={!isLocked && selectedType === type}
             count={botCounts[type]}

@@ -27,14 +27,12 @@ export const NodeHealthBar: React.FC<Props> = ({ node }) => {
     }
   ], [node.position.x, node.position.y]);
 
-  const progressBarStyle = React.useMemo(() => [
-    styles.progressBar,
-    {
-      width: `${barWidth}%`,
-      backgroundColor: barColor,
-      alignSelf: isUserControl ? 'flex-start' : 'flex-end',
-    }
-  ], [barWidth, barColor, isUserControl]);
+  const progressBarStyle = React.useMemo(() => ({
+    ...styles.progressBar,
+    width: barWidth,
+    backgroundColor: barColor,
+    alignSelf: isUserControl ? 'flex-start' as const : 'flex-end' as const,
+  }), [barWidth, barColor, isUserControl]);
 
   return (
     <View style={containerStyle}>

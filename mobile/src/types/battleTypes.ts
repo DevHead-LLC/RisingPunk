@@ -6,6 +6,12 @@ export enum BattalionType {
   BREACHER = 'breacher'
 }
 
+export enum NodeOwner {
+  USER = 'user',
+  ENEMY = 'enemy',
+  NEUTRAL = 'neutral'
+}
+
 export interface ClientBattalion {
   id: string;
   type: 'guardian' | 'breacher' | 'phreak';
