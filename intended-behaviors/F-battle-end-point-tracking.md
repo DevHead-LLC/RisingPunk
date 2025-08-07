@@ -47,6 +47,7 @@
   - **Complete Elimination:** Battle ends when all opposing battalions are defeated
 - **Timer Management:** BattleTimer.ts manages countdown and triggers battle end
 - **End Detection:** BattleService.ts detects both timer expiration and complete elimination
+- **Winner Determination:** Based on loss tracking system (see section 18)
 
 #### **Associated Files:**
 - `server/src/services/BattleTimer.ts` - `BATTLE_DURATION: 45` (updated from 20), `endBattle()` triggers battle end
@@ -115,10 +116,12 @@
   - **Example:** Mark 2 × 5 remaining bots = Math.floor(2 × 5) = 10 points
 - **Loss Calculation:** Starting score minus ending score = total losses
   - **Formula:** `startingScore - endingScore = losses`
-  - **Example:** Starting 50 points, ending 0 points = -50 losses
-- **Winner Determination:** Side with fewer losses (closer to zero) wins
+  - **Example:** Starting 50 points, ending 0 points = 50 losses (positive number)
+- **Winner Determination:** Side with fewer losses wins
   - **Attacker wins:** "Attacker breach!" (attacker had fewer losses)
   - **Defender wins:** "Breach defended!" (defender had fewer losses)
+  - **Complete Victory:** When one side has 0 remaining battalions
+- **Implementation:** PointTrackingService handles all loss calculations as the authority
 
 #### **Associated Files:**
 - `server/src/services/PointTrackingService.ts` - `calculateStartingScore()`, `calculateEndingScore()`, `trackBattleScores()`

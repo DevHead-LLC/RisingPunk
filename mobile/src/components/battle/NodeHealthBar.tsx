@@ -14,10 +14,15 @@ interface Props {
 export const NodeHealthBar: React.FC<Props> = ({ node }) => {
   if (node.owner !== 'neutral') return null;
 
+  // tugOfWarProgress is -100 to +100, convert to 0-100% for display
   const progressPercentage = Math.abs(node.tugOfWarProgress);
   const barColor = node.tugOfWarProgress > 0 ? '#4717F6' : node.tugOfWarProgress < 0 ? '#FF4141' : '#666666';
-  const barWidth = Math.min(progressPercentage, 100);
+  // Convert percentage to pixels (container is 40px wide)
+  const barWidth = (progressPercentage / 100) * 40;
   const isUserControl = node.tugOfWarProgress > 0;
+
+  // Debug logging to see actual values
+  console.log(`🔍 HEALTH BAR DEBUG: Node ${node.index} - tugOfWarProgress: ${node.tugOfWarProgress}, progressPercentage: ${progressPercentage}, barWidth: ${barWidth}px`);
 
   const containerStyle = React.useMemo(() => [
     styles.container,

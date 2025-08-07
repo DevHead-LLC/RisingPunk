@@ -47,17 +47,22 @@ export const createTestBattalion = (
   nodeIndex: number,
   isUser: boolean = true,
   type: 'guardian' | 'breacher' | 'phreak' = 'guardian'
-) => ({
-  id,
-  type,
-  quantity: 10,
-  currentHealth: 1000,
-  maxHealth: 1000,
-  nodeIndex,
-  isUser,
-  mark: 1,
-  stats: TEST_BOT_STATS[type]
-});
+) => {
+  const nodes = createTestNodes();
+  const node = nodes.find(n => n.index === nodeIndex);
+  
+  return {
+    id,
+    type,
+    quantity: 10,
+    currentHealth: 1000,
+    maxHealth: 1000,
+    position: node ? { x: node.position.x, y: node.position.y } : { x: 0, y: 0 },
+    isUser,
+    mark: 1,
+    stats: TEST_BOT_STATS[type]
+  };
+};
 
 // Battle Preparation Test Data
 export const TEST_USER_BOT_INVENTORY = {

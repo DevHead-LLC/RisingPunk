@@ -11,11 +11,20 @@ export class CombatService {
   }
 
   static applyTugOfWarDamage(node: INode, damage: number, attackerOwner: NodeOwner): boolean {
+    // Safety check to prevent division by zero
+    if (!node.maxCaptureThreshold || node.maxCaptureThreshold <= 0) {
+      console.warn(`⚠️ COMBAT WARNING: Node ${node.index} has invalid maxCaptureThreshold (${node.maxCaptureThreshold}), using fallback value`);
+      node.maxCaptureThreshold = 1000; // Fallback value
+    }
+    
     const damagePercentage = (damage / node.maxCaptureThreshold) * 100;
     const direction = attackerOwner === NodeOwner.USER ? +damagePercentage : -damagePercentage;
     node.tugOfWarProgress += direction;
     
     node.tugOfWarProgress = Math.max(-100, Math.min(100, node.tugOfWarProgress));
+    
+    // Debug logging
+    console.log(`🔍 COMBAT DEBUG: Node ${node.index} - damage: ${damage}, maxCaptureThreshold: ${node.maxCaptureThreshold}, damagePercentage: ${damagePercentage}, direction: ${direction}, new tugOfWarProgress: ${node.tugOfWarProgress}`);
     
     if (Math.abs(node.tugOfWarProgress) >= 100) {
       node.owner = node.tugOfWarProgress > 0 ? NodeOwner.USER : NodeOwner.ENEMY;

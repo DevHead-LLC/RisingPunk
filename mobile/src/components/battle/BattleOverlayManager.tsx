@@ -135,6 +135,7 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
           <BattleEndOverlay 
             winner={battleState.winner === 'user' ? NodeOwner.USER : NodeOwner.ENEMY}
             onContinue={onClose}
+            battleEndData={battleState.battleEndData}
           />
         )}
       </View>

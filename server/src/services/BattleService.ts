@@ -5,6 +5,7 @@ import { BattalionService } from './BattalionService';
 import { BattleSetupService } from './BattleSetupService';
 import { AttackService } from './AttackService';
 import { ScreenDimensionService } from './ScreenDimensionService';
+import { PointTrackingService } from './PointTrackingService';
 
 export class BattleService {
   private timerService: BattleTimerService;
@@ -115,6 +116,16 @@ export class BattleService {
 
   private async handleBattleEnd(battleId: string): Promise<void> {
     BattalionService.stopMovementUpdates(battleId);
-    await this.endBattle(battleId, NodeOwner.ENEMY);
+    
+    const battle = await this.getBattle(battleId);
+    if (!battle) return;
+
+    // Calculate losses and determine winner
+    const battleLosses = PointTrackingService.calculateBattleLosses(
+      battle.startingBattalions || [],
+      battle.battalions
+    );
+
+    await this.endBattle(battleId, battleLosses.winner);
   }
 } 
