@@ -206,19 +206,6 @@ export const fetchInitialData = createAsyncThunk(
         return rejectWithValue('No authentication token');
       }
 
-      // Fetch user profile to get updated unlockedFeatures
-      const userResponse = await fetch(`${API_URL}/api/users/profile`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (userResponse.ok) {
-        const userData = await userResponse.json();
-        // Update the user state with fresh data
-        dispatch(setCredentials({ token, user: userData }));
-      }
-
       // Fetch balance
       const balanceResponse = await fetch(`${API_URL}/api/balance`, {
         headers: {
