@@ -32,6 +32,46 @@ interface UserResponse {
 
 const router: Router = express.Router();
 
+// Test endpoint to create a test user (development only)
+router.post('/create-test-user', async (req, res): Promise<void> => {
+  try {
+    // Check if test user already exists
+    const existingUser = await User.findOne({ handle: 'testuser' });
+    
+    if (existingUser) {
+      res.json({
+        message: 'Test user already exists',
+        credentials: {
+          handle: 'testuser',
+          accessKey: 'testpass123'
+        }
+      });
+      return;
+    }
+
+    // Create test user
+    const user = new User({
+      email: 'test@example.com',
+      handle: 'testuser',
+      hashedAccessKey: 'testpass123'
+    });
+
+    await user.save();
+
+    res.json({
+      message: 'Test user created successfully',
+      credentials: {
+        handle: 'testuser',
+        accessKey: 'testpass123'
+      }
+    });
+
+  } catch (error) {
+    console.error('Test user creation error:', error);
+    res.status(500).json({ error: 'Failed to create test user' });
+  }
+});
+
 // Register new user
 router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
   '/register', 

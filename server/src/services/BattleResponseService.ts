@@ -131,8 +131,8 @@ export class BattleResponseService {
     // Determine victory message
     const victoryMessage = battleLosses.winner === NodeOwner.USER ? 'Breach defended!' : 'Attacker breach!';
     
-    // Determine end condition
-    const endCondition = battle.battleTime >= 45 ? 'timer' : 'elimination';
+    // Determine end condition - use stored condition or fallback to timer logic
+    const endCondition = (battle as any).endCondition || (battle.battleTime >= 45 ? 'timer' : 'elimination');
     
     // Calculate battle duration
     const battleDuration = battle.endTime && battle.startTime 

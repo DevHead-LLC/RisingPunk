@@ -139,4 +139,20 @@ export class CombatService {
       const oldAttackPower = battalion.stats.offense * originalQuantity;
     }
   }
+
+  // ============================================================================
+  // BATTLE END DETECTION METHODS
+  // ============================================================================
+
+  static checkAllBattalionsDefeated(battalions: IBattalion[], owner: NodeOwner): boolean {
+    const ownerBattalions = battalions.filter(b => b.owner === owner);
+    return ownerBattalions.every(battalion => battalion.isDestroyed);
+  }
+
+  static checkCompleteElimination(battalions: IBattalion[]): { userEliminated: boolean; enemyEliminated: boolean } {
+    const userEliminated = this.checkAllBattalionsDefeated(battalions, NodeOwner.USER);
+    const enemyEliminated = this.checkAllBattalionsDefeated(battalions, NodeOwner.ENEMY);
+    
+    return { userEliminated, enemyEliminated };
+  }
 } 
