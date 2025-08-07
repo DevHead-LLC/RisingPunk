@@ -46,6 +46,8 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
 }) => {
   // Track logged errors to prevent spam
   const loggedErrors = useRef<Set<string>>(new Set());
+  // Track if battle end has been logged to prevent multiple logs
+  const battleEndLogged = useRef<boolean>(false);
 
   const {
     data: battleState,
@@ -86,8 +88,8 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
     const isCountdownPhase = clientPhase === BattlePhase.COUNTDOWN && timeRemaining <= BATTLE_CONFIG.COUNTDOWN_DURATION && timeRemaining > 0;
     const countdownValue = isCountdownPhase ? timeRemaining : 0;
 
-    // Debug logging for battle end
-    if (clientPhase === BattlePhase.COMPLETE) {
+    // Debug logging for battle end - only log once
+    if (clientPhase === BattlePhase.COMPLETE && !battleEndLogged.current) {
       console.log('🔍 BATTLE END DETECTED:', {
         phase: phase,
         clientPhase: clientPhase,
@@ -95,6 +97,12 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
         onClose: !!onClose,
         timeRemaining: timeRemaining
       });
+      battleEndLogged.current = true;
+    }
+
+    // Reset battle end logged flag when battle is not complete
+    if (clientPhase !== BattlePhase.COMPLETE) {
+      battleEndLogged.current = false;
     }
 
     return {

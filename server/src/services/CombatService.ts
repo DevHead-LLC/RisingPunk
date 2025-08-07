@@ -23,9 +23,6 @@ export class CombatService {
     
     node.tugOfWarProgress = Math.max(-100, Math.min(100, node.tugOfWarProgress));
     
-    // Debug logging
-    console.log(`🔍 COMBAT DEBUG: Node ${node.index} - damage: ${damage}, maxCaptureThreshold: ${node.maxCaptureThreshold}, damagePercentage: ${damagePercentage}, direction: ${direction}, new tugOfWarProgress: ${node.tugOfWarProgress}`);
-    
     if (Math.abs(node.tugOfWarProgress) >= 100) {
       node.owner = node.tugOfWarProgress > 0 ? NodeOwner.USER : NodeOwner.ENEMY;
       return true;
