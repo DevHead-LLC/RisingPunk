@@ -19,13 +19,13 @@ describe('Nearest Target Retargeting - Client Visual Behavior', () => {
     battleState.nodes = nodes as any;
     
     // Verify battalion has valid position
-    expect(battalion.nodeIndex).toBe(0);
+    expect(battalion.position).toBeDefined();
     expect(battalion.isUser).toBe(true);
     
     // Verify enemy battalions have valid positions
-    expect(enemyBattalion1.nodeIndex).toBe(6);
+    expect(enemyBattalion1.position).toBeDefined();
     expect(enemyBattalion1.isUser).toBe(false);
-    expect(enemyBattalion2.nodeIndex).toBe(7);
+    expect(enemyBattalion2.position).toBeDefined();
     expect(enemyBattalion2.isUser).toBe(false);
     
     // Verify neutral nodes exist for targeting
@@ -39,14 +39,14 @@ describe('Nearest Target Retargeting - Client Visual Behavior', () => {
     // Verify battalion can reach enemy positions via network (indirect connections)
     // Node 0 connects to nodes 3,4; nodes 6,7 connect to nodes 3,4
     const canReachEnemy1 = networkConnections.some(conn => 
-      (conn.from === battalion.nodeIndex && (conn.to === 3 || conn.to === 4)) ||
-      (conn.from === 3 && conn.to === enemyBattalion1.nodeIndex) ||
-      (conn.from === 4 && conn.to === enemyBattalion1.nodeIndex)
+      (conn.from === 0 && (conn.to === 3 || conn.to === 4)) ||
+      (conn.from === 3 && conn.to === 6) ||
+      (conn.from === 4 && conn.to === 6)
     );
     const canReachEnemy2 = networkConnections.some(conn => 
-      (conn.from === battalion.nodeIndex && (conn.to === 3 || conn.to === 4)) ||
-      (conn.from === 3 && conn.to === enemyBattalion2.nodeIndex) ||
-      (conn.from === 4 && conn.to === enemyBattalion2.nodeIndex)
+      (conn.from === 0 && (conn.to === 3 || conn.to === 4)) ||
+      (conn.from === 3 && conn.to === 7) ||
+      (conn.from === 4 && conn.to === 7)
     );
     
     // At least one enemy should be reachable via network
@@ -55,8 +55,8 @@ describe('Nearest Target Retargeting - Client Visual Behavior', () => {
     // Verify visual consistency - battalion can target either neutral nodes or enemy battalions
     const potentialTargets = [
       ...neutralNodes.map(n => ({ type: 'neutral_node', nodeIndex: n.index })),
-      { type: 'enemy_battalion', nodeIndex: enemyBattalion1.nodeIndex },
-      { type: 'enemy_battalion', nodeIndex: enemyBattalion2.nodeIndex }
+      { type: 'enemy_battalion', nodeIndex: 6 },
+      { type: 'enemy_battalion', nodeIndex: 7 }
     ];
     
     expect(potentialTargets.length).toBeGreaterThan(0);

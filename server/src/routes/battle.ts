@@ -88,7 +88,8 @@ router.get<{ id: string }, BattleResponse>(
         victoryCondition: battleState.winner ? {
           winner: battleState.winner === 'user' ? 'user' : 'enemy',
           reason: 'timeout'
-        } : undefined
+        } : undefined,
+        battleEndData: battleState.battleEndData
       };
 
       res.json({ success: true, data: clientBattleState });

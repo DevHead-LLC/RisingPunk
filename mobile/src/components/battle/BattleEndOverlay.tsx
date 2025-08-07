@@ -1,13 +1,18 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { NodeOwner } from '../../types/battleTypes';
+import { BattleEndData } from '../../store/api/battleApi';
+import { BattleLossBreakdown } from './BattleLossBreakdown';
 
 interface BattleEndOverlayProps {
   winner: NodeOwner;
   onContinue: () => void;
+  battleEndData?: BattleEndData;
 }
 
-export const BattleEndOverlay: React.FC<BattleEndOverlayProps> = ({ winner, onContinue }) => {
+export const BattleEndOverlay: React.FC<BattleEndOverlayProps> = ({ winner, onContinue, battleEndData }) => {
+
+
 
   const getWinnerText = () => {
     try {
@@ -26,6 +31,19 @@ export const BattleEndOverlay: React.FC<BattleEndOverlayProps> = ({ winner, onCo
       console.error('❌ Error in handleContinue:', error);
     }
   };
+
+  if (battleEndData) {
+    return (
+      <View style={styles.overlay} testID="battle-end-overlay">
+        <View style={styles.container}>
+          <BattleLossBreakdown battleEndData={battleEndData} />
+          <TouchableOpacity style={styles.continueButton} onPress={handleContinue} testID="continue-button">
+            <Text style={styles.continueButtonText}>Continue</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.overlay} testID="battle-end-overlay">
@@ -57,11 +75,12 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: '#1a1a1a',
     borderRadius: 12,
-    padding: 30,
+    padding: 0,
     margin: 20,
-    alignItems: 'center',
     borderWidth: 2,
     borderColor: '#333333',
+    flex: 1,
+    maxHeight: '90%',
   },
   title: {
     fontSize: 24,

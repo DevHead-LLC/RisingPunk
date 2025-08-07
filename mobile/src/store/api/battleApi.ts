@@ -2,6 +2,40 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
 import { NetworkConnection, LineProperties, MovementState } from '../../types/battleTypes';
 
+export interface BattalionLoss {
+  battalionId: string;
+  type: 'guardian' | 'breacher' | 'phreak';
+  mark: number;
+  startingQuantity: number;
+  endingQuantity: number;
+  startingPoints: number;
+  endingPoints: number;
+  losses: number;
+  owner: 'user' | 'enemy';
+}
+
+export interface BattleLosses {
+  userLosses: number;
+  enemyLosses: number;
+  winner: 'user' | 'enemy';
+  userStartingPoints: number;
+  userEndingPoints: number;
+  enemyStartingPoints: number;
+  enemyEndingPoints: number;
+  battalionLosses: BattalionLoss[];
+  victoryMessage: string;
+  endCondition: 'timer' | 'elimination';
+  battleDuration: number;
+}
+
+export interface BattleEndData {
+  battleId: string;
+  winner: 'user' | 'enemy';
+  losses: BattleLosses;
+  endTime: Date;
+  phase: 'setup' | 'countdown' | 'battle' | 'victory' | 'defeat' | 'complete';
+}
+
 export interface BattleState {
   battleId: string;
   phase: 'setup' | 'countdown' | 'battle' | 'victory' | 'defeat' | 'complete';
@@ -39,6 +73,7 @@ export interface BattleState {
     winner: 'user' | 'enemy';
     reason: 'elimination' | 'timeout' | 'tie';
   };
+  battleEndData?: BattleEndData;
 }
 
 export interface StartBattleRequest {

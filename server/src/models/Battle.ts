@@ -192,6 +192,8 @@ const battleSchema = new Schema({
     default: 0
   },
 
+  startingBattalions: [battalionSchema],
+
   battalions: [battalionSchema],
   nodes: [nodeSchema]
 }, {

@@ -104,6 +104,7 @@ export interface IBattle extends Document {
   winner?: NodeOwner;
   countdown: number;
   battleTime: number;
+  startingBattalions?: IBattalion[];
   battalions: IBattalion[];
   nodes: INode[];
   createdAt: Date;
@@ -159,6 +160,41 @@ export interface BattleStateResponse {
   movementStates?: MovementState[];
   retargetingStatus?: {nodeIndex: number, affectedBattalionIds: string[]};
   lastUpdated: Date;
+  battleEndData?: BattleEndData;
+}
+
+export interface BattalionLoss {
+  battalionId: string;
+  type: BotType;
+  mark: number;
+  startingQuantity: number;
+  endingQuantity: number;
+  startingPoints: number;
+  endingPoints: number;
+  losses: number;
+  owner: NodeOwner;
+}
+
+export interface BattleLosses {
+  userLosses: number;
+  enemyLosses: number;
+  winner: NodeOwner;
+  userStartingPoints: number;
+  userEndingPoints: number;
+  enemyStartingPoints: number;
+  enemyEndingPoints: number;
+  battalionLosses: BattalionLoss[];
+  victoryMessage: string;
+  endCondition: 'timer' | 'elimination';
+  battleDuration: number;
+}
+
+export interface BattleEndData {
+  battleId: string;
+  winner: NodeOwner;
+  losses: BattleLosses;
+  endTime: Date;
+  phase: BattlePhase;
 }
 
 export interface RetargetingQueueTask {
