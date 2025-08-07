@@ -21,9 +21,6 @@ export const NodeHealthBar: React.FC<Props> = ({ node }) => {
   const barWidth = (progressPercentage / 100) * 40;
   const isUserControl = node.tugOfWarProgress > 0;
 
-  // Debug logging to see actual values
-  console.log(`🔍 HEALTH BAR DEBUG: Node ${node.index} - tugOfWarProgress: ${node.tugOfWarProgress}, progressPercentage: ${progressPercentage}, barWidth: ${barWidth}px`);
-
   const containerStyle = React.useMemo(() => [
     styles.container,
     {
