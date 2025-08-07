@@ -5,6 +5,29 @@ import { Request, Response } from 'express';
 
 const router = express.Router();
 
+router.get('/profile', auth, async (req: Request, res: Response) => {
+  try {
+    const user = await User.findById(req.user._id).select('handle email level unlockedFeatures');
+    
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    res.json({
+      handle: user.handle,
+      email: user.email,
+      level: user.level,
+      unlockedFeatures: {
+        hackRig: user.unlockedFeatures?.hackRig || false
+      }
+    });
+  } catch (error) {
+    console.error('Server error:', error);
+    res.status(500).json({ message: 'Error fetching user profile' });
+  }
+});
+
 router.post('/unlock-hack-rig', auth, async (req: Request, res: Response) => {
   try {
     const user = await User.findByIdAndUpdate(

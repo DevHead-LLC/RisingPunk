@@ -1,7 +1,8 @@
-import React, {useRef, useState} from 'react';
+import React, {useRef, useState, useEffect} from 'react';
 import {View, StyleSheet, TouchableOpacity, Image, Text, Animated, Alert} from 'react-native';
 import { COLORS, SIZING } from '../../styles/theme';
 import { useAppSelector } from '../../store/hooks';
+import { API_URL } from '../../config';
 
 type Props = {
   onPress: () => void;
@@ -10,11 +11,40 @@ type Props = {
 
 export const HackRigDisplay = ({ onPress, onNavigateToBattle }: Props) => {
   const user = useAppSelector((state) => state.auth.user);
-
+  const token = useAppSelector((state) => state.auth.token);
+  const [isLocked, setIsLocked] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  const isLocked = !user?.unlockedFeatures?.hackRig;
+  // Fetch hack rig status from database on component mount
+  useEffect(() => {
+    const fetchHackRigStatus = async () => {
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_URL}/api/users/profile`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const userData = await response.json();
+          setIsLocked(!userData.unlockedFeatures?.hackRig);
+        }
+      } catch (error) {
+        console.error('Failed to fetch hack rig status:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchHackRigStatus();
+  }, [token]);
 
   const startPulseAnimation = () => {
     Animated.loop(
@@ -70,6 +100,29 @@ export const HackRigDisplay = ({ onPress, onNavigateToBattle }: Props) => {
       ]
     );
   };
+
+  // Show loading state while fetching
+  if (isLoading) {
+    return (
+      <View style={[styles.moduleContainer, styles.moduleDisabled]}>
+        <View style={styles.touchable}>
+          <View style={styles.imageContainer}>
+            <Image
+              source={require('../../assets/images/hacker-rig.png')}
+              style={styles.moduleImage}
+            />
+            <View style={styles.lockOverlay}>
+              <Text style={styles.lockText}>🔒</Text>
+            </View>
+          </View>
+          <View style={styles.moduleTextContainer}>
+            <Text style={styles.moduleTitle}>HACK RIG</Text>
+            <Text style={styles.moduleDescription}>Loading...</Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <Animated.View

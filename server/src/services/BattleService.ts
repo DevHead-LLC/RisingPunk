@@ -6,6 +6,9 @@ import { BattleSetupService } from './BattleSetupService';
 import { AttackService } from './AttackService';
 import { ScreenDimensionService } from './ScreenDimensionService';
 import { PointTrackingService } from './PointTrackingService';
+import { CombatService } from './CombatService';
+import { User } from '../models/User';
+import mongoose from 'mongoose';
 
 export class BattleService {
   private timerService: BattleTimerService;
@@ -120,12 +123,103 @@ export class BattleService {
     const battle = await this.getBattle(battleId);
     if (!battle) return;
 
-    // Calculate losses and determine winner
-    const battleLosses = PointTrackingService.calculateBattleLosses(
-      battle.startingBattalions || [],
-      battle.battalions
-    );
+    // Check for complete elimination first
+    const eliminationResult = CombatService.checkCompleteElimination(battle.battalions);
+    
+    let winner: NodeOwner;
+    let endCondition: 'timer' | 'elimination' = 'timer';
+    
+    if (eliminationResult.userEliminated && eliminationResult.enemyEliminated) {
+      // Both sides eliminated - determine winner by losses
+      const battleLosses = PointTrackingService.calculateBattleLosses(
+        battle.startingBattalions || [],
+        battle.battalions
+      );
+      winner = battleLosses.winner;
+      endCondition = 'elimination';
+    } else if (eliminationResult.userEliminated) {
+      // User eliminated - enemy wins
+      winner = NodeOwner.ENEMY;
+      endCondition = 'elimination';
+    } else if (eliminationResult.enemyEliminated) {
+      // Enemy eliminated - user wins
+      winner = NodeOwner.USER;
+      endCondition = 'elimination';
+    } else {
+      // Timer expiration - determine winner by losses
+      const battleLosses = PointTrackingService.calculateBattleLosses(
+        battle.startingBattalions || [],
+        battle.battalions
+      );
+      winner = battleLosses.winner;
+      endCondition = 'timer';
+    }
 
-    await this.endBattle(battleId, battleLosses.winner);
+    // Store end condition for response
+    (battle as any).endCondition = endCondition;
+    await battle.save();
+
+    // Unlock hack rig if user wins by elimination
+    if (winner === NodeOwner.USER && endCondition === 'elimination') {
+      await this.unlockHackRigForUser(battle.attackerId);
+    }
+
+    await this.endBattle(battleId, winner);
+  }
+
+  private async unlockHackRigForUser(userId: string): Promise<void> {
+    try {
+      // Convert string ID to ObjectId for MongoDB query
+      const objectId = new mongoose.Types.ObjectId(userId);
+      const user = await User.findById(objectId);
+      
+      if (!user) {
+        console.log(`⚠️ BATTLE VICTORY: User ${userId} not found for hack rig unlock`);
+        return;
+      }
+
+      // Only unlock if not already unlocked
+      if (!user.unlockedFeatures?.hackRig) {
+        user.unlockedFeatures = user.unlockedFeatures || {};
+        user.unlockedFeatures.hackRig = true;
+        await user.save();
+        console.log(`🎉 BATTLE VICTORY: Hack rig unlocked for user ${userId}`);
+      } else {
+        console.log(`ℹ️ BATTLE VICTORY: Hack rig already unlocked for user ${userId}`);
+      }
+    } catch (error) {
+      console.error('❌ BATTLE VICTORY: Failed to unlock hack rig for user', userId, error);
+    }
+  }
+
+  async checkBattleEndConditions(battleId: string): Promise<{ shouldEnd: boolean; winner?: NodeOwner; endCondition?: 'timer' | 'elimination' }> {
+    const battle = await this.getBattle(battleId);
+    if (!battle || battle.phase !== BattlePhase.ACTIVE) {
+      return { shouldEnd: false };
+    }
+
+    // Check for complete elimination
+    const eliminationResult = CombatService.checkCompleteElimination(battle.battalions);
+    
+    if (eliminationResult.userEliminated || eliminationResult.enemyEliminated) {
+      let winner: NodeOwner;
+      
+      if (eliminationResult.userEliminated && eliminationResult.enemyEliminated) {
+        // Both sides eliminated - determine winner by losses
+        const battleLosses = PointTrackingService.calculateBattleLosses(
+          battle.startingBattalions || [],
+          battle.battalions
+        );
+        winner = battleLosses.winner;
+      } else if (eliminationResult.userEliminated) {
+        winner = NodeOwner.ENEMY;
+      } else {
+        winner = NodeOwner.USER;
+      }
+      
+      return { shouldEnd: true, winner, endCondition: 'elimination' };
+    }
+
+    return { shouldEnd: false };
   }
 } 

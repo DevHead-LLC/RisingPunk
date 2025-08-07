@@ -14,6 +14,8 @@ import {DigitalBarracksLocation} from '../components/turf/DigitalBarracksLocatio
 import {BattlePreparationScreen} from './BattlePreparationScreen';
 import {BattleGridScreen} from './BattleGridScreen';
 import {ErrorBoundary} from '../components/common/ErrorBoundary';
+import {useAppDispatch} from '../store/hooks';
+import {fetchInitialData} from '../store/slices/authSlice';
 
 const DiagonalLines = memo(() => (
   <>
@@ -58,13 +60,22 @@ const ScrollViewMemo = memo(function ScrollViewMemo({
 });
 
 export function TurfScreen(): React.JSX.Element {
-  const [currentScreen, setCurrentScreen] = useState('turf');
-  const [battleId, setBattleId] = useState<string | undefined>(undefined);
+  const [currentScreen, setCurrentScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map'>('turf');
+  const [battleId, setBattleId] = useState<string | null>(null);
   const horizontalScrollRef = useRef<ScrollView>(null);
+  const dispatch = useAppDispatch();
 
-  const navigateToScreen = useCallback((screen: string) => {
+  const navigateToScreen = useCallback((screen: 'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map') => {
+    console.log('🔍 navigateToScreen called with:', screen);
     setCurrentScreen(screen);
   }, []);
+
+  const handleBattleEnd = useCallback(() => {
+    console.log('🔍 handleBattleEnd called - navigating to hackRig');
+    // Temporarily remove fetchInitialData to test navigation
+    // dispatch(fetchInitialData());
+    navigateToScreen('hackRig');
+  }, [dispatch, navigateToScreen]);
 
   const centerView = useCallback(() => {
     const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -93,29 +104,31 @@ export function TurfScreen(): React.JSX.Element {
           onNavigateToBotAssembly={() => navigateToScreen('botAssembly')}
           onNavigateToBattle={() => navigateToScreen('battlePrep')}
         />;
+      case 'barracks':
+        return <HomeScreen
+          onClose={() => navigateToScreen('turf')}
+          onNavigateToMap={() => navigateToScreen('map')}
+          onNavigateToBotAssembly={() => navigateToScreen('botAssembly')}
+          onNavigateToBattle={() => navigateToScreen('battlePrep')}
+        />;
+      case 'map':
+        return <HackMapScreen
+          onClose={() => navigateToScreen('hackRig')}
+        />;
+      case 'botAssembly':
+        return <BotAssemblyScreen
+          onClose={() => navigateToScreen('turf')}
+        />;
       case 'battlePrep':
         return <BattlePreparationScreen
-          onClose={() => {
-            navigateToScreen('turf');
-            setTimeout(() => navigateToScreen('hackRig'), 0);
-          }}
+          onClose={() => navigateToScreen('turf')}
           onBattleStart={(newBattleId) => {
-            // Store battleId in component state for BattleGridScreen
             setBattleId(newBattleId);
             navigateToScreen('battle');
           }}
         />;
-      case 'map':
-        return <HackMapScreen onClose={() => navigateToScreen('hackRig')} />;
-      case 'botAssembly':
-        return <BotAssemblyScreen onClose={() => navigateToScreen('hackRig')} />;
-      case 'barracks':
-        return <DigitalBarracksScreen onClose={() => navigateToScreen('turf')} />;
-      case 'profile':
-        return <ProfileScreen onClose={() => navigateToScreen('turf')} />;
       case 'battle':
         if (!battleId) {
-          // If no battleId, redirect to battle prep
           return <BattlePreparationScreen
             onClose={() => {
               navigateToScreen('turf');
@@ -129,10 +142,7 @@ export function TurfScreen(): React.JSX.Element {
         }
         return <BattleGridScreen
           battleId={battleId}
-          _onClose={() => {
-            navigateToScreen('turf');
-            setTimeout(() => navigateToScreen('hackRig'), 0);
-          }}
+          _onClose={handleBattleEnd}
         />;
       default:
         return (
@@ -155,7 +165,7 @@ export function TurfScreen(): React.JSX.Element {
           </View>
         );
     }
-  }, [currentScreen, navigateToScreen, battleId]);
+  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd]);
 
   return renderScreen();
 }

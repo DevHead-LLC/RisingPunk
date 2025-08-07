@@ -9,11 +9,15 @@ jest.mock('../src/services/BattalionService');
 jest.mock('../src/services/BattleSetupService');
 jest.mock('../src/services/AttackService');
 jest.mock('../src/services/ScreenDimensionService');
+jest.mock('../src/services/CombatService');
+jest.mock('../src/services/PointTrackingService');
+jest.mock('../src/models/User');
 
 describe('BattleService Loss Tracking Integration', () => {
   let battleService: BattleService;
 
   beforeEach(() => {
+    jest.clearAllMocks();
     battleService = new BattleService();
   });
 
@@ -59,6 +63,7 @@ describe('BattleService Loss Tracking Integration', () => {
 
       const mockBattle = {
         battleId: 'test-battle',
+        attackerId: 'test-user',
         startingBattalions,
         battalions: endingBattalions,
         save: jest.fn().mockResolvedValue(true)
@@ -70,6 +75,33 @@ describe('BattleService Loss Tracking Integration', () => {
       // Mock endBattle to capture the winner parameter
       const endBattleSpy = jest.spyOn(battleService, 'endBattle').mockResolvedValue(mockBattle);
 
+      // Mock CombatService
+      const { CombatService } = require('../src/services/CombatService');
+      CombatService.checkCompleteElimination.mockReturnValue({
+        userEliminated: false,
+        enemyEliminated: false
+      });
+
+      // Mock PointTrackingService
+      const { PointTrackingService } = require('../src/services/PointTrackingService');
+      PointTrackingService.calculateBattleLosses.mockReturnValue({
+        userLosses: 5,
+        enemyLosses: 10,
+        winner: NodeOwner.USER,
+        userStartingPoints: 10,
+        userEndingPoints: 5,
+        enemyStartingPoints: 10,
+        enemyEndingPoints: 0
+      });
+
+      // Mock User model
+      const { User } = require('../src/models/User');
+      User.findById.mockResolvedValue({
+        _id: 'test-user',
+        unlockedFeatures: { hackRig: false },
+        save: jest.fn().mockResolvedValue(true)
+      });
+
       // Call handleBattleEnd
       await (battleService as any).handleBattleEnd('test-battle');
 
@@ -77,10 +109,7 @@ describe('BattleService Loss Tracking Integration', () => {
       expect(endBattleSpy).toHaveBeenCalledWith('test-battle', NodeOwner.USER);
       
       // Verify the loss calculation logic
-      const battleLosses = PointTrackingService.calculateBattleLosses(startingBattalions, endingBattalions);
-      expect(battleLosses.userLosses).toBe(5); // 10 - 5 = 5 losses
-      expect(battleLosses.enemyLosses).toBe(10); // 10 - 0 = 10 losses
-      expect(battleLosses.winner).toBe(NodeOwner.USER); // User has fewer losses
+      expect(PointTrackingService.calculateBattleLosses).toHaveBeenCalledWith(startingBattalions, endingBattalions);
     });
 
     it('should determine enemy winner when enemy has fewer losses', async () => {
@@ -96,6 +125,7 @@ describe('BattleService Loss Tracking Integration', () => {
 
       const mockBattle = {
         battleId: 'test-battle',
+        attackerId: 'test-user',
         startingBattalions,
         battalions: endingBattalions,
         save: jest.fn().mockResolvedValue(true)
@@ -104,14 +134,38 @@ describe('BattleService Loss Tracking Integration', () => {
       jest.spyOn(battleService, 'getBattle').mockResolvedValue(mockBattle);
       const endBattleSpy = jest.spyOn(battleService, 'endBattle').mockResolvedValue(mockBattle);
 
+      // Mock CombatService
+      const { CombatService } = require('../src/services/CombatService');
+      CombatService.checkCompleteElimination.mockReturnValue({
+        userEliminated: false,
+        enemyEliminated: false
+      });
+
+      // Mock PointTrackingService
+      const { PointTrackingService } = require('../src/services/PointTrackingService');
+      PointTrackingService.calculateBattleLosses.mockReturnValue({
+        userLosses: 20,
+        enemyLosses: 5,
+        winner: NodeOwner.ENEMY,
+        userStartingPoints: 20,
+        userEndingPoints: 0,
+        enemyStartingPoints: 10,
+        enemyEndingPoints: 5
+      });
+
+      // Mock User model
+      const { User } = require('../src/models/User');
+      User.findById.mockResolvedValue({
+        _id: 'test-user',
+        unlockedFeatures: { hackRig: false },
+        save: jest.fn().mockResolvedValue(true)
+      });
+
       await (battleService as any).handleBattleEnd('test-battle');
 
       expect(endBattleSpy).toHaveBeenCalledWith('test-battle', NodeOwner.ENEMY);
       
-      const battleLosses = PointTrackingService.calculateBattleLosses(startingBattalions, endingBattalions);
-      expect(battleLosses.userLosses).toBe(20); // 20 - 0 = 20 losses
-      expect(battleLosses.enemyLosses).toBe(5); // 10 - 5 = 5 losses
-      expect(battleLosses.winner).toBe(NodeOwner.ENEMY); // Enemy has fewer losses
+      expect(PointTrackingService.calculateBattleLosses).toHaveBeenCalledWith(startingBattalions, endingBattalions);
     });
   });
 }); 

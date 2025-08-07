@@ -1,5 +1,6 @@
 import express, { Request, Response, Router } from 'express';
 import { BattleController } from '../controllers/BattleController';
+import auth from '../middleware/auth';
 
 interface StartBattleRequest extends Request {
   body: {
@@ -26,6 +27,7 @@ const battleController = new BattleController();
 
 router.post<{}, BattleResponse, StartBattleRequest['body']>(
   '/start',
+  auth,
   async (req, res): Promise<void> => {
     try {
       const { userBattalions, defenderId, screenWidth, screenHeight } = req.body;
@@ -35,7 +37,7 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
         return;
       }
       
-      const battle = await battleController.startBattle('test-user-id', defenderId || 'computer', screenWidth, screenHeight, userBattalions);
+      const battle = await battleController.startBattle(req.user._id, defenderId || 'computer', screenWidth, screenHeight, userBattalions);
       res.status(201).json({ battleId: battle.battleId });
     } catch (error) {
       console.error('Start battle error:', error);
@@ -49,6 +51,7 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
 
 router.get<{ id: string }, BattleResponse>(
   '/:id/state',
+  auth,
   async (req, res): Promise<void> => {
     try {
       const { id } = req.params;
@@ -67,7 +70,7 @@ router.get<{ id: string }, BattleResponse>(
         return;
       }
 
-      const battleState = await battleController.getBattleState(id, 'test-user-id', width, height);
+      const battleState = await battleController.getBattleState(id, req.user._id, width, height);
       if (!battleState) {
         res.status(404).json({ success: false, error: 'Battle not found' });
         return;
