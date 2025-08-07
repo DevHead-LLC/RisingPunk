@@ -66,14 +66,10 @@ export function TurfScreen(): React.JSX.Element {
   const dispatch = useAppDispatch();
 
   const navigateToScreen = useCallback((screen: 'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map') => {
-    console.log('🔍 navigateToScreen called with:', screen);
     setCurrentScreen(screen);
   }, []);
 
   const handleBattleEnd = useCallback(() => {
-    console.log('🔍 handleBattleEnd called - navigating to hackRig');
-    // Temporarily remove fetchInitialData to test navigation
-    // dispatch(fetchInitialData());
     navigateToScreen('hackRig');
   }, [dispatch, navigateToScreen]);
 
@@ -105,11 +101,8 @@ export function TurfScreen(): React.JSX.Element {
           onNavigateToBattle={() => navigateToScreen('battlePrep')}
         />;
       case 'barracks':
-        return <HomeScreen
+        return <DigitalBarracksScreen
           onClose={() => navigateToScreen('turf')}
-          onNavigateToMap={() => navigateToScreen('map')}
-          onNavigateToBotAssembly={() => navigateToScreen('botAssembly')}
-          onNavigateToBattle={() => navigateToScreen('battlePrep')}
         />;
       case 'map':
         return <HackMapScreen
@@ -123,7 +116,7 @@ export function TurfScreen(): React.JSX.Element {
         return <BattlePreparationScreen
           onClose={() => navigateToScreen('turf')}
           onBattleStart={(newBattleId) => {
-            setBattleId(newBattleId);
+            setBattleId(newBattleId || null);
             navigateToScreen('battle');
           }}
         />;
@@ -135,7 +128,7 @@ export function TurfScreen(): React.JSX.Element {
               setTimeout(() => navigateToScreen('hackRig'), 0);
             }}
             onBattleStart={(newBattleId) => {
-              setBattleId(newBattleId);
+              setBattleId(newBattleId || null);
               navigateToScreen('battle');
             }}
           />;
@@ -161,7 +154,7 @@ export function TurfScreen(): React.JSX.Element {
                 </View>
               </ScrollViewMemo>
             </View>
-            <ProfileLocation onPress={() => navigateToScreen('profile')} />
+            <ProfileLocation onPress={() => navigateToScreen('turf')} />
           </View>
         );
     }
