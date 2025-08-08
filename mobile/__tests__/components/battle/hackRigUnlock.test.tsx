@@ -1,9 +1,11 @@
 import React from 'react';
-import { render, fireEvent, act } from '@testing-library/react-native';
+import { render, fireEvent, act, waitForElementToBeRemoved, waitFor } from '@testing-library/react-native';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { HackRigDisplay } from '../../../src/components/home/HackRigDisplay';
 import { authSlice } from '../../../src/store/slices/authSlice';
+
+declare const global: any;
 
 const createTestStore = (userState: any) => {
   return configureStore({
@@ -22,7 +24,11 @@ const createTestStore = (userState: any) => {
 };
 
 describe('Hack Rig Unlock Behavior', () => {
-  it('should show lock overlay when locked', () => {
+  it('should show lock overlay when locked', async () => {
+    (global as any).fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ unlockedFeatures: { hackRig: false } }),
+    });
     const mockNavigateToBattle = jest.fn();
     const mockOnPress = jest.fn();
     
@@ -44,11 +50,15 @@ describe('Hack Rig Unlock Behavior', () => {
       </Provider>
     );
 
-    // Should show lock overlay
+    await waitForElementToBeRemoved(() => getByText('Loading...'));
     expect(getByText('🔒')).toBeTruthy();
   });
 
-  it('should not show lock overlay when unlocked', () => {
+  it('should not show lock overlay when unlocked', async () => {
+    (global as any).fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ unlockedFeatures: { hackRig: true } }),
+    });
     const mockNavigateToBattle = jest.fn();
     const mockOnPress = jest.fn();
     
@@ -61,7 +71,7 @@ describe('Hack Rig Unlock Behavior', () => {
       }
     });
 
-    const { queryByText } = render(
+    const { queryByText, getByText } = render(
       <Provider store={store}>
         <HackRigDisplay
           onPress={mockOnPress}
@@ -70,11 +80,16 @@ describe('Hack Rig Unlock Behavior', () => {
       </Provider>
     );
 
-    // Should not show lock overlay
+    // Wait for loading to finish then assert no lock
+    await waitForElementToBeRemoved(() => getByText('Loading...'));
     expect(queryByText('🔒')).toBeNull();
   });
 
-  it('should handle undefined unlockedFeatures gracefully', () => {
+  it('should handle undefined unlockedFeatures gracefully', async () => {
+    (global as any).fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ unlockedFeatures: undefined }),
+    });
     const mockNavigateToBattle = jest.fn();
     const mockOnPress = jest.fn();
     
@@ -94,11 +109,11 @@ describe('Hack Rig Unlock Behavior', () => {
       </Provider>
     );
 
-    // Should show lock overlay when features undefined
+    await waitForElementToBeRemoved(() => getByText('Loading...'));
     expect(getByText('🔒')).toBeTruthy();
   });
 
-  it('should call correct navigation function based on lock status', () => {
+  it('should call correct navigation function based on lock status', async () => {
     const mockNavigateToBattle = jest.fn();
     const mockOnPress = jest.fn();
     
@@ -112,7 +127,12 @@ describe('Hack Rig Unlock Behavior', () => {
       }
     });
 
-    const { rerender } = render(
+    ;(global as any).fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ unlockedFeatures: { hackRig: false } }),
+    });
+
+    const { unmount, getByText, queryByText } = render(
       <Provider store={lockedStore}>
         <HackRigDisplay
           onPress={mockOnPress}
@@ -120,6 +140,7 @@ describe('Hack Rig Unlock Behavior', () => {
         />
       </Provider>
     );
+    await waitFor(() => expect(getByText('🔒')).toBeTruthy());
 
     // Component should be configured to call onNavigateToBattle when locked
     // (This is handled by the onPress prop logic in the component)
@@ -134,7 +155,14 @@ describe('Hack Rig Unlock Behavior', () => {
       }
     });
 
-    rerender(
+    ;(global as any).fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ unlockedFeatures: { hackRig: true } }),
+    });
+
+    unmount();
+
+    const { queryByText: queryByTextUnlocked } = render(
       <Provider store={unlockedStore}>
         <HackRigDisplay
           onPress={mockOnPress}
@@ -142,6 +170,7 @@ describe('Hack Rig Unlock Behavior', () => {
         />
       </Provider>
     );
+    await waitFor(() => expect(queryByTextUnlocked('🔒')).toBeNull());
 
     // Component should be configured to call onPress when unlocked
     // (This is handled by the onPress prop logic in the component)
