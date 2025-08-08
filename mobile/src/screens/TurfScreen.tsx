@@ -60,12 +60,12 @@ const ScrollViewMemo = memo(function ScrollViewMemo({
 });
 
 export function TurfScreen(): React.JSX.Element {
-  const [currentScreen, setCurrentScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map'>('turf');
+  const [currentScreen, setCurrentScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile'>('turf');
   const [battleId, setBattleId] = useState<string | null>(null);
   const horizontalScrollRef = useRef<ScrollView>(null);
   const dispatch = useAppDispatch();
 
-  const navigateToScreen = useCallback((screen: 'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map') => {
+  const navigateToScreen = useCallback((screen: 'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile') => {
     setCurrentScreen(screen);
   }, []);
 
@@ -107,6 +107,10 @@ export function TurfScreen(): React.JSX.Element {
       case 'map':
         return <HackMapScreen
           onClose={() => navigateToScreen('hackRig')}
+        />;
+      case 'profile':
+        return <ProfileScreen
+          onClose={() => navigateToScreen('turf')}
         />;
       case 'botAssembly':
         return <BotAssemblyScreen
@@ -154,7 +158,7 @@ export function TurfScreen(): React.JSX.Element {
                 </View>
               </ScrollViewMemo>
             </View>
-            <ProfileLocation onPress={() => navigateToScreen('turf')} />
+            <ProfileLocation onPress={() => navigateToScreen('profile')} />
           </View>
         );
     }
