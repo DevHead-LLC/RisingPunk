@@ -357,84 +357,22 @@ app.get('/api/map/:name', async (req: Request, res: Response) => {
         return;
       }
     } else {
-      // Sanitize: only one player house (entityName === 'YOU'), others are NPC; no houses on water/mountain; exactly 6 houses total
+      // Validate map and, if invalid, rebuild deterministically via MapService to avoid randomness
       const cells: any[] = (mapDoc as any).cells;
       const isBlocked = (c: any) => c.terrain === 'water' || c.terrain === 'mountain';
-      let playerCells = cells.filter(c => c.isOccupied && c.occupiedBy === 'player');
-      // Fix invalid player cells (not named YOU)
-      for (const c of playerCells) {
-        if (c.entityName !== 'YOU') {
-          c.occupiedBy = 'npc';
-          c.entityName = `COMP_FIX`;
-          didChange = true;
-        }
-      }
-      playerCells = cells.filter(c => c.isOccupied && c.occupiedBy === 'player' && c.entityName === 'YOU');
-      if (playerCells.length === 0) {
-        // Place YOU at deterministic location similar to MapService
-        const desired = { x: 8, y: 11 };
-        const indexFor = (x: number, y: number) => y * 50 + x;
-        const isValid = (cc: any) => !cc.isOccupied && !isBlocked(cc);
-        let px = desired.x; let py = desired.y;
-        const clamp = (v: number) => Math.min(Math.max(v, 0), 49);
-        const at = (x: number, y: number) => cells[indexFor(x, y)];
-        if (!isValid(at(px, py))) {
-          let found = false;
-          for (let radius = 1; radius < 50 && !found; radius++) {
-            for (let dy = -radius; dy <= radius && !found; dy++) {
-              for (let dx = -radius; dx <= radius && !found; dx++) {
-                const nx = clamp(px + dx); const ny = clamp(py + dy);
-                const cc = at(nx, ny);
-                if (isValid(cc)) { px = nx; py = ny; found = true; }
-              }
-            }
-          }
-        }
-        const you = at(px, py);
-        you.isOccupied = true; you.occupiedBy = 'player'; you.entityName = 'YOU';
-        didChange = true;
-      } else if (playerCells.length > 1) {
-        // Keep first, convert others to npc
-        for (let i = 1; i < playerCells.length; i++) {
-          playerCells[i].occupiedBy = 'npc';
-          playerCells[i].entityName = 'COMP_FIX';
-          didChange = true;
-        }
-      }
-      // Remove houses on blocked terrain
-      for (const c of cells) {
-        if (c.isOccupied && isBlocked(c)) {
-          c.isOccupied = false; c.occupiedBy = 'none'; c.entityName = '';
-          didChange = true;
-        }
-      }
-      // Ensure exactly 6 houses total (1 YOU + 5 NPC)
-      const freshPlayer = cells.filter(c => c.isOccupied && c.occupiedBy === 'player' && c.entityName === 'YOU');
+      const playerYou = cells.filter(c => c.isOccupied && c.occupiedBy === 'player' && c.entityName === 'YOU');
       const npcHouses = cells.filter(c => c.isOccupied && c.occupiedBy === 'npc');
-      const targetNpc = 5;
-      // Remove excess NPC houses
-      if (npcHouses.length > targetNpc) {
-        for (let i = targetNpc; i < npcHouses.length; i++) {
-          npcHouses[i].isOccupied = false; npcHouses[i].occupiedBy = 'none'; npcHouses[i].entityName = '';
-          didChange = true;
+      const blockedHouse = cells.some(c => c.isOccupied && isBlocked(c));
+      const invalidCounts = playerYou.length !== 1 || npcHouses.length !== 5;
+
+      if (blockedHouse || invalidCounts) {
+        await Map.deleteOne({ _id: (mapDoc as any)._id });
+        const recreated = await mapService.generateMap(name);
+        mapDoc = (recreated as any) || await Map.findOne({ name });
+        if (!mapDoc) {
+          res.status(500).json({ error: 'Failed to build map' });
+          return;
         }
-      }
-      // Add missing NPC houses
-      if (npcHouses.length < targetNpc) {
-        const needed = targetNpc - npcHouses.length;
-        let placed = 0;
-        const you = freshPlayer[0];
-        while (placed < needed) {
-          const idx = Math.floor(Math.random() * cells.length);
-          const c = cells[idx];
-          if (!c.isOccupied && !isBlocked(c) && !(you && c.x === you.x && c.y === you.y)) {
-            c.isOccupied = true; c.occupiedBy = 'npc'; c.entityName = `COMP${placed + 1}`;
-            placed++; didChange = true;
-          }
-        }
-      }
-      if (didChange) {
-        await (mapDoc as any).save();
       }
     }
 
