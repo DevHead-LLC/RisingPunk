@@ -1,12 +1,5 @@
-import React, {useEffect, useRef, useState} from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Animated,
-  PanResponder,
-} from 'react-native';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import { View, Text, StyleSheet, Animated, PanResponder, LayoutChangeEvent, Pressable, Image } from 'react-native';
 import { CloseButton } from '../components/common/CloseButton';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
@@ -48,7 +41,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
         pan.setOffset({ x: (pan as any).x._value, y: (pan as any).y._value });
         pan.setValue({ x: 0, y: 0 });
       },
-      onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
+      onPanResponderMove: (e, g) => {
+        lastVelocityRef.current = { vx: g.vx, vy: g.vy };
+        Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false })(e as any, g as any);
+      },
       onPanResponderRelease: (_evt, gesture) => {
         pan.flattenOffset();
         const speed = Math.hypot(gesture.vx, gesture.vy);
@@ -59,6 +55,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
             useNativeDriver: false,
           }).start();
         }
+        lastVelocityRef.current = { vx: 0, vy: 0 };
       },
       onPanResponderTerminate: () => {
         pan.flattenOffset();
@@ -68,6 +65,53 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
   const gridSize = grid.length || 50;
   const totalSize = gridSize * CELL_SIZE;
   const { data: mapData, isLoading } = useFetchMapQuery();
+  const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const [windowRange, setWindowRange] = useState<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>({ rowStart: 0, rowEnd: Math.min(14, gridSize - 1), colStart: 0, colEnd: Math.min(14, gridSize - 1) });
+  const lastVelocityRef = useRef<{ vx: number; vy: number }>({ vx: 0, vy: 0 });
+  const rafIdRef = useRef<number | null>(null);
+
+  // Precompute terrain style map and position style caches
+  const terrainStyleMap = useMemo(() => ({
+    water: styles.waterTerrain,
+    mountain: styles.mountainTerrain,
+    forest: styles.forestTerrain,
+    road: styles.roadTerrain,
+    grass: styles.grassTerrain,
+    dirt: styles.dirtTerrain,
+    plain: styles.plainTerrain,
+  } as Record<TerrainType, any>), []);
+
+  const xPosStyles = useMemo(() => {
+    return Array.from({ length: gridSize }, (_, x) => ({ position: 'absolute', left: x * CELL_SIZE, top: 0 }));
+  }, [gridSize]);
+
+  const rowPosStyles = useMemo(() => {
+    return Array.from({ length: gridSize }, (_, y) => ({ position: 'absolute', top: y * CELL_SIZE, left: 0 }));
+  }, [gridSize]);
+
+  const yPosStyles = useMemo(() => {
+    return Array.from({ length: gridSize }, (_, y) => ({ position: 'absolute', top: y * CELL_SIZE }));
+  }, [gridSize]);
+
+  const visibleCells = useMemo(() => {
+    const cells: Array<{ x: number; y: number; cell: CellData; selected: boolean }> = [];
+    for (let y = windowRange.rowStart; y <= windowRange.rowEnd; y++) {
+      const row = grid[y];
+      if (!row) continue;
+      for (let x = windowRange.colStart; x <= windowRange.colEnd; x++) {
+        const cell = row[x];
+        if (!cell) continue;
+        const selected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
+        cells.push({ x, y, cell, selected });
+      }
+    }
+    return cells;
+  }, [grid, windowRange, selectedCell]);
+
+  const [poolSize, setPoolSize] = useState<number>(0);
+  useEffect(() => {
+    setPoolSize(prev => Math.max(prev, visibleCells.length));
+  }, [visibleCells.length]);
 
   useEffect(() => {
     dispatch(setLoading(isLoading));
@@ -75,6 +119,57 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
       dispatch(setGrid(mapData.grid));
     }
   }, [mapData, isLoading, dispatch]);
+
+  const computeWindow = useCallback((panX: number, panY: number, width: number, height: number) => {
+    if (width <= 0 || height <= 0) {return;}
+    const baseBuffer = 8;
+    const speed = Math.hypot(lastVelocityRef.current.vx, lastVelocityRef.current.vy);
+    const lead = Math.min(8, Math.ceil(speed * 10));
+    const buffer = baseBuffer + lead;
+    const gridLeft = panX + MARGIN_SIZE;
+    const gridTop = panY + MARGIN_SIZE;
+    const startCol = Math.max(0, Math.floor((-gridLeft) / CELL_SIZE) - buffer);
+    const endCol = Math.min(gridSize - 1, Math.ceil((width - gridLeft) / CELL_SIZE) + buffer);
+    const startRow = Math.max(0, Math.floor((-gridTop) / CELL_SIZE) - buffer);
+    const endRow = Math.min(gridSize - 1, Math.ceil((height - gridTop) / CELL_SIZE) + buffer);
+    setWindowRange(prev => {
+      if (
+        prev.rowStart === startRow && prev.rowEnd === endRow &&
+        prev.colStart === startCol && prev.colEnd === endCol
+      ) {
+        return prev;
+      }
+      return { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
+    });
+  }, [gridSize]);
+
+  useEffect(() => {
+    const schedule = () => {
+      if (rafIdRef.current != null) return;
+      rafIdRef.current = requestAnimationFrame(() => {
+        rafIdRef.current = null;
+        computeWindow((pan as any).x._value, (pan as any).y._value, containerSize.width, containerSize.height);
+      });
+    };
+    const subX = pan.x.addListener(() => schedule());
+    const subY = pan.y.addListener(() => schedule());
+    // Initial compute
+    computeWindow((pan as any).x._value, (pan as any).y._value, containerSize.width, containerSize.height);
+    return () => {
+      pan.x.removeListener(subX);
+      pan.y.removeListener(subY);
+      if (rafIdRef.current != null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+    };
+  }, [pan, containerSize.width, containerSize.height, computeWindow]);
+
+  const onContainerLayout = useCallback((e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    setContainerSize({ width, height });
+    computeWindow((pan as any).x._value, (pan as any).y._value, width, height);
+  }, [computeWindow, pan]);
 
   const handleCellPress = (x: number, y: number, cellData: CellData) => {
     setSelectedCell({x, y, info: cellData});
@@ -87,12 +182,12 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
 
     return (
       <View style={styles.infoPanel}>
-        <TouchableOpacity
+        <Pressable
           style={styles.infoPanelClose}
           onPress={() => setSelectedCell(null)}
         >
           <Text style={styles.closeSymbol}>×</Text>
-        </TouchableOpacity>
+        </Pressable>
         <Text style={styles.coordsText}>
           GRID: ({selectedCell.x}, {selectedCell.y})
         </Text>
@@ -128,7 +223,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
 
       {renderInfoPanel()}
 
-      <View style={styles.dragContainer} {...panResponder.panHandlers}>
+      <View style={styles.dragContainer} onLayout={onContainerLayout} {...panResponder.panHandlers}>
         <Animated.View
           style={[
             styles.marginWrapper,
@@ -137,38 +232,151 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
           ]}
         >
           <View style={[styles.gridArea, { width: totalSize, height: totalSize }]}>
-            {grid.map((row, y) => (
-              <View key={y} style={styles.row}>
-                {row.map((cell, x) => (
-                  <TouchableOpacity
-                    key={`${x}-${y}`}
-                    style={[
-                      styles.cell,
-                      selectedCell?.x === x && selectedCell?.y === y && styles.selectedCell,
-                    ]}
-                    onPress={() => handleCellPress(x, y, cell)}
-                  >
-                    <View style={[styles.cellContent, getTerrainStyle(cell.terrain)]}>
-                      {getTerrainIcon(cell.terrain)}
-                      {cell.entity === 'house' && (
-                        <View
-                          style={[
-                            styles.entityOverlay,
-                            (cell.name === 'YOU' || cell.owner === 'player') ? styles.playerHouse : styles.enemyHouse,
-                          ]}
-                        />
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
+            {Array.from({ length: gridSize }).map((_, y) => (
+              <Row
+                key={y}
+                y={y}
+                row={grid[y]}
+                colStart={windowRange.colStart}
+                colEnd={windowRange.colEnd}
+                rowVisible={y >= windowRange.rowStart && y <= windowRange.rowEnd}
+                selectedCell={selectedCell}
+                onPress={handleCellPress}
+                rowStyle={rowPosStyles[y]}
+                xPosStyles={xPosStyles}
+                terrainStyleMap={terrainStyleMap}
+                disableTiles
+              />
             ))}
+
+            {Array.from({ length: poolSize }).map((_, i) => {
+              const assignment = visibleCells[i];
+              if (!assignment) {
+                return (
+                  <View key={`pool-${i}`} style={{ position: 'absolute', left: -10000, top: -10000, width: 1, height: 1 }} />
+                );
+              }
+              const { x, y, cell, selected } = assignment;
+              return (
+                <PoolTile
+                  key={`pool-${i}`}
+                  x={x}
+                  y={y}
+                  cell={cell}
+                  selected={selected}
+                  onPress={handleCellPress}
+                  xStyle={xPosStyles[x]}
+                  yStyle={yPosStyles[y]}
+                  terrainStyleMap={terrainStyleMap}
+                />
+              );
+            })}
           </View>
         </Animated.View>
       </View>
     </View>
   );
 };
+
+type TileProps = {
+  x: number;
+  y: number;
+  cell: CellData;
+  selected: boolean;
+  onPress: (x: number, y: number, cell: CellData) => void;
+  xStyle: any;
+  terrainStyleMap: Record<TerrainType, any>;
+};
+
+const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap }) => {
+  return (
+    <Pressable
+      style={[
+        styles.cell,
+        xStyle,
+        selected && styles.selectedCell,
+      ]}
+      onPress={() => onPress(x, y, cell)}
+    >
+      <View style={[styles.cellContent, terrainStyleMap[cell.terrain]]}>
+        {getTerrainIcon(cell.terrain)}
+        {cell.entity === 'house' && (
+          (cell.name === 'YOU' || cell.owner === 'player') ? (
+            <Image source={require('../assets/images/home.png')} style={styles.playerHomeIcon} resizeMode="contain" />
+          ) : (
+            <View style={[styles.entityOverlay, styles.enemyHouse]} />
+          )
+        )}
+      </View>
+    </Pressable>
+  );
+});
+
+type PoolTileProps = {
+  x: number;
+  y: number;
+  cell: CellData;
+  selected: boolean;
+  onPress: (x: number, y: number, cell: CellData) => void;
+  xStyle: any;
+  yStyle: any;
+  terrainStyleMap: Record<TerrainType, any>;
+};
+
+const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap }) => {
+  return (
+    <View style={[yStyle]}>
+      <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} />
+    </View>
+  );
+});
+
+type RowProps = {
+  y: number;
+  row: CellData[] | undefined;
+  colStart: number;
+  colEnd: number;
+  rowVisible: boolean;
+  selectedCell: { x: number; y: number; info: CellData } | null;
+  onPress: (x: number, y: number, cell: CellData) => void;
+  rowStyle: any;
+  xPosStyles: Array<any>;
+  terrainStyleMap: Record<TerrainType, any>;
+  disableTiles?: boolean;
+};
+
+const Row: React.FC<RowProps> = React.memo(({ y, row, colStart, colEnd, rowVisible, selectedCell, onPress, rowStyle, xPosStyles, terrainStyleMap, disableTiles }) => {
+  // Always render the row container (grid shell), but only mount tiles when visible
+  if (!row) {
+    return <View style={[styles.row, rowStyle]} />;
+  }
+
+  if (disableTiles) {
+    return <View style={[styles.row, rowStyle]} />;
+  }
+
+  const tiles = rowVisible
+    ? Array.from({ length: colEnd - colStart + 1 }).map((_, offset) => {
+        const x = colStart + offset;
+        const cell = row[x];
+        if (!cell) return null;
+        const isSelected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
+        return <Tile key={x} x={x} y={y} cell={cell} selected={isSelected} onPress={onPress} xStyle={xPosStyles[x]} terrainStyleMap={terrainStyleMap} />;
+      })
+    : null;
+
+  return (
+    <View style={[styles.row, rowStyle]}>
+      {tiles}
+    </View>
+  );
+}, (prev, next) => {
+  if (prev.rowVisible !== next.rowVisible) return false;
+  if (prev.colStart !== next.colStart || prev.colEnd !== next.colEnd) return false;
+  const prevSelInRow = prev.selectedCell && prev.selectedCell.y === prev.y ? prev.selectedCell.x : undefined;
+  const nextSelInRow = next.selectedCell && next.selectedCell.y === next.y ? next.selectedCell.x : undefined;
+  return prevSelInRow === nextSelInRow;
+});
 
 const getTerrainIcon = (terrain: TerrainType) => {
   switch (terrain) {
@@ -334,6 +542,10 @@ const styles = StyleSheet.create({
   },
   enemyHouse: {
     backgroundColor: 'rgba(204, 85, 0, 0.35)',
+  },
+  playerHomeIcon: {
+    width: CELL_SIZE - 10,
+    height: CELL_SIZE - 10,
   },
   playerEntity: {
     backgroundColor: 'rgba(0, 255, 65, 0.1)',
