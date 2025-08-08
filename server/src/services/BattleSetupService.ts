@@ -42,8 +42,8 @@ export class BattleSetupService {
     
     const enemyTotal = npc
       ? npc.battalions.reduce((total, battalion: any) => {
-          const botType = battalion.type as BotType;
-          const base = BOT_CONFIG.ENEMY_BOT_STATS[botType].stats;
+          const validatedType = BattalionService.validateEnemyBotType(battalion.type);
+          const base = BOT_CONFIG.ENEMY_BOT_STATS[validatedType].stats;
           const scaledHealth = Math.max(1, Math.round(base.health * npc.statMultipliers.health));
           return total + (scaledHealth * battalion.quantity);
         }, 0)
