@@ -14,12 +14,12 @@ export const mapApi = createApi({
   tagTypes: ['Map'],
   endpoints: (builder) => ({
     fetchMap: builder.query<any, void>({
-      query: () => '/map/main',
+      query: () => '/api/map/main',
       providesTags: ['Map'],
     }),
     updatePlayerPosition: builder.mutation<any, { x: number; y: number }>({
       query: (body) => ({
-        url: '/map/player-position',
+        url: '/api/map/player-position',
         method: 'POST',
         body,
       }),

@@ -3,7 +3,7 @@ import seedrandom from 'seedrandom';
 
 export class MapService {
   private rng: seedrandom.PRNG;
-  private readonly GRID_SIZE = 25;
+  private readonly GRID_SIZE = 50;
 
   constructor(seed: string = 'risingpunk-v1') {
     this.rng = seedrandom(seed);
@@ -40,15 +40,21 @@ export class MapService {
     // Generate rivers
     this.generateRivers(cells);
 
-    // Add entities
-    this.addEntities(cells);
+    // Generate roads
+    this.generateRoads(cells);
+
+    // Add open space variety (grass/dirt)
+    this.addOpenSpaces(cells);
+
+    // Add houses (entities)
+    this.addHouses(cells);
 
     // Create and save the map
     const map = new Map({
       name,
       gridSize: this.GRID_SIZE,
       cells,
-      version: 1
+      version: 2
     });
 
     return map.save();
@@ -116,34 +122,100 @@ export class MapService {
     }
   }
 
-  private addEntities(cells: any[]): void {
-    // Add player at 0,0
-    const startCell = cells[0];
-    startCell.isOccupied = true;
-    startCell.occupiedBy = 'player';
-    startCell.entityName = 'YOU';
-
-    // Add other entities
-    const addEntities = (type: 'player' | 'npc', count: number) => {
-      let placed = 0;
-      while (placed < count) {
-        const idx = this.randomInt(0, cells.length - 1);
-        const cell = cells[idx];
-        
-        if (cell.isOccupied || cell.x === 0 && cell.y === 0 || !cell.canBeOccupied) {
-          continue;
-        }
-
-        cell.isOccupied = true;
-        cell.occupiedBy = type;
-        cell.entityName = type === 'player' ? 
-          `Player${placed + 1}` : `NPC${placed + 1}`;
-        placed++;
+  private generateRoads(cells: any[]): void {
+    // Create a couple of winding roads horizontally and vertically
+    // Horizontal road
+    let y = this.randomInt(3, this.GRID_SIZE - 4);
+    for (let x = 0; x < this.GRID_SIZE; x++) {
+      const idx = y * this.GRID_SIZE + x;
+      if (cells[idx].terrain !== 'water' && cells[idx].terrain !== 'mountain') {
+        cells[idx].terrain = 'road';
       }
+      if (this.rng() < 0.35) {
+        y += this.randomInt(-1, 1);
+        y = Math.max(1, Math.min(this.GRID_SIZE - 2, y));
+      }
+    }
+    // Vertical road
+    let x = this.randomInt(3, this.GRID_SIZE - 4);
+    for (let yy = 0; yy < this.GRID_SIZE; yy++) {
+      const idx = yy * this.GRID_SIZE + x;
+      if (cells[idx].terrain !== 'water' && cells[idx].terrain !== 'mountain') {
+        cells[idx].terrain = 'road';
+      }
+      if (this.rng() < 0.35) {
+        x += this.randomInt(-1, 1);
+        x = Math.max(1, Math.min(this.GRID_SIZE - 2, x));
+      }
+    }
+  }
+
+  private addHouses(cells: any[]): void {
+    // Place exactly 6 houses total: 1 player, 5 NPC
+    const pickValidCellIndex = (): number => {
+      let tries = 0;
+      while (tries < 10000) {
+        const idx = this.randomInt(0, cells.length - 1);
+        const c = cells[idx];
+        if (!c.isOccupied && c.canBeOccupied && c.terrain !== 'water' && c.terrain !== 'mountain') {
+          return idx;
+        }
+        tries++;
+      }
+      return -1;
     };
 
-    // Add 8 friendly entities and 4 NPCs
-    addEntities('player', 8);
-    addEntities('npc', 4);
+    // Player house at a fixed coordinate that's not (0,0) and valid; search outward if blocked
+    const desired = { x: 8, y: 11 };
+    const indexFor = (x: number, y: number) => y * this.GRID_SIZE + x;
+    const isValid = (c: any) => !c.isOccupied && c.canBeOccupied && c.terrain !== 'water' && c.terrain !== 'mountain';
+    let px = desired.x;
+    let py = desired.y;
+    if (!isValid(cells[indexFor(px, py)])) {
+      let found = false;
+      for (let radius = 1; radius < Math.max(this.GRID_SIZE, this.GRID_SIZE) && !found; radius++) {
+        for (let dy = -radius; dy <= radius && !found; dy++) {
+          for (let dx = -radius; dx <= radius && !found; dx++) {
+            const nx = Math.min(Math.max(px + dx, 0), this.GRID_SIZE - 1);
+            const ny = Math.min(Math.max(py + dy, 0), this.GRID_SIZE - 1);
+            const c = cells[indexFor(nx, ny)];
+            if (isValid(c)) {
+              px = nx; py = ny; found = true;
+            }
+          }
+        }
+      }
+    }
+    const playerCell = cells[indexFor(px, py)];
+    playerCell.isOccupied = true;
+    playerCell.occupiedBy = 'player';
+    playerCell.entityName = 'YOU';
+
+    // Five NPC houses
+    let placed = 0;
+    while (placed < 5) {
+      const idx = pickValidCellIndex();
+      if (idx === -1) break;
+      const cell = cells[idx];
+      if ((cell.x === px && cell.y === py)) continue;
+      cell.isOccupied = true;
+      cell.occupiedBy = 'npc';
+      cell.entityName = `COMP${placed + 1}`;
+      placed++;
+    }
+  }
+
+  private addOpenSpaces(cells: any[]): void {
+    for (let i = 0; i < cells.length; i++) {
+      const c = cells[i];
+      if (c.terrain === 'plain') {
+        const r = this.rng();
+        if (r < 0.5) {
+          c.terrain = 'grass';
+        } else if (r < 0.7) {
+          c.terrain = 'dirt';
+        }
+      }
+    }
   }
 } 

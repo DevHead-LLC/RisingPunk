@@ -5,7 +5,7 @@ const CellSchema = new mongoose.Schema({
   y: { type: Number, required: true },
   terrain: {
     type: String,
-    enum: ['plain', 'mountain', 'water', 'forest'],
+    enum: ['plain', 'mountain', 'water', 'forest', 'road', 'grass', 'dirt'],
     required: true
   },
   isActive: { type: Boolean, default: true },
@@ -29,7 +29,7 @@ CellSchema.pre('save', function(next) {
 
 const MapSchema = new mongoose.Schema({
   name: { type: String, default: 'main' },
-  gridSize: { type: Number, default: 25 },
+  gridSize: { type: Number, default: 50 },
   cells: [CellSchema],
   version: { type: Number, default: 1 },
   lastUpdated: { type: Date, default: Date.now }

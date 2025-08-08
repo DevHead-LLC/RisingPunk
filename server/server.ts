@@ -333,15 +333,191 @@ const mapService = new MapService();
 // Get map data
 app.get('/api/map/:name', async (req: Request, res: Response) => {
   try {
-    let map = await Map.findOne({ name: req.params.name });
-    
-    if (!map) {
-      map = await mapService.generateMap(req.params.name);
+    const name = req.params.name;
+    let mapDoc = await Map.findOne({ name });
+    if (!mapDoc) {
+      const created = await mapService.generateMap(name);
+      mapDoc = (created as any) || await Map.findOne({ name });
     }
-    
-    res.json(map);
+
+    if (!mapDoc) {
+      res.status(500).json({ error: 'Failed to load map' });
+      return;
+    }
+
+    // Migrate old maps: enforce version >=2 and gridSize 50, friendly cleanup, and placement rules
+    let didChange = false;
+    const docAny = mapDoc as any;
+    if (!docAny.version || docAny.version < 2 || docAny.gridSize !== 50) {
+      await Map.deleteOne({ _id: docAny._id });
+      const recreated = await mapService.generateMap(name);
+      mapDoc = (recreated as any) || await Map.findOne({ name });
+      if (!mapDoc) {
+        res.status(500).json({ error: 'Failed to build map' });
+        return;
+      }
+    } else {
+      // Sanitize: only one player house (entityName === 'YOU'), others are NPC; no houses on water/mountain; exactly 6 houses total
+      const cells: any[] = (mapDoc as any).cells;
+      const isBlocked = (c: any) => c.terrain === 'water' || c.terrain === 'mountain';
+      let playerCells = cells.filter(c => c.isOccupied && c.occupiedBy === 'player');
+      // Fix invalid player cells (not named YOU)
+      for (const c of playerCells) {
+        if (c.entityName !== 'YOU') {
+          c.occupiedBy = 'npc';
+          c.entityName = `COMP_FIX`;
+          didChange = true;
+        }
+      }
+      playerCells = cells.filter(c => c.isOccupied && c.occupiedBy === 'player' && c.entityName === 'YOU');
+      if (playerCells.length === 0) {
+        // Place YOU at deterministic location similar to MapService
+        const desired = { x: 8, y: 11 };
+        const indexFor = (x: number, y: number) => y * 50 + x;
+        const isValid = (cc: any) => !cc.isOccupied && !isBlocked(cc);
+        let px = desired.x; let py = desired.y;
+        const clamp = (v: number) => Math.min(Math.max(v, 0), 49);
+        const at = (x: number, y: number) => cells[indexFor(x, y)];
+        if (!isValid(at(px, py))) {
+          let found = false;
+          for (let radius = 1; radius < 50 && !found; radius++) {
+            for (let dy = -radius; dy <= radius && !found; dy++) {
+              for (let dx = -radius; dx <= radius && !found; dx++) {
+                const nx = clamp(px + dx); const ny = clamp(py + dy);
+                const cc = at(nx, ny);
+                if (isValid(cc)) { px = nx; py = ny; found = true; }
+              }
+            }
+          }
+        }
+        const you = at(px, py);
+        you.isOccupied = true; you.occupiedBy = 'player'; you.entityName = 'YOU';
+        didChange = true;
+      } else if (playerCells.length > 1) {
+        // Keep first, convert others to npc
+        for (let i = 1; i < playerCells.length; i++) {
+          playerCells[i].occupiedBy = 'npc';
+          playerCells[i].entityName = 'COMP_FIX';
+          didChange = true;
+        }
+      }
+      // Remove houses on blocked terrain
+      for (const c of cells) {
+        if (c.isOccupied && isBlocked(c)) {
+          c.isOccupied = false; c.occupiedBy = 'none'; c.entityName = '';
+          didChange = true;
+        }
+      }
+      // Ensure exactly 6 houses total (1 YOU + 5 NPC)
+      const freshPlayer = cells.filter(c => c.isOccupied && c.occupiedBy === 'player' && c.entityName === 'YOU');
+      const npcHouses = cells.filter(c => c.isOccupied && c.occupiedBy === 'npc');
+      const targetNpc = 5;
+      // Remove excess NPC houses
+      if (npcHouses.length > targetNpc) {
+        for (let i = targetNpc; i < npcHouses.length; i++) {
+          npcHouses[i].isOccupied = false; npcHouses[i].occupiedBy = 'none'; npcHouses[i].entityName = '';
+          didChange = true;
+        }
+      }
+      // Add missing NPC houses
+      if (npcHouses.length < targetNpc) {
+        const needed = targetNpc - npcHouses.length;
+        let placed = 0;
+        const you = freshPlayer[0];
+        while (placed < needed) {
+          const idx = Math.floor(Math.random() * cells.length);
+          const c = cells[idx];
+          if (!c.isOccupied && !isBlocked(c) && !(you && c.x === you.x && c.y === you.y)) {
+            c.isOccupied = true; c.occupiedBy = 'npc'; c.entityName = `COMP${placed + 1}`;
+            placed++; didChange = true;
+          }
+        }
+      }
+      if (didChange) {
+        await (mapDoc as any).save();
+      }
+    }
+
+    const gridSize = (mapDoc as any).gridSize || 50;
+    const emptyGrid = Array.from({ length: gridSize }, () =>
+      Array.from({ length: gridSize }, () => ({ terrain: 'plain', entity: 'empty' }))
+    );
+
+    for (const c of (mapDoc as any).cells as any[]) {
+      const y = c.y;
+      const x = c.x;
+      const entity = c.isOccupied ? 'house' : 'empty';
+      const owner = c.isOccupied ? (c.occupiedBy === 'player' ? 'player' : 'enemy') : undefined;
+      const name = c.entityName || undefined;
+      emptyGrid[y][x] = {
+        terrain: c.terrain,
+        entity,
+        owner,
+        name,
+      } as any;
+    }
+
+    res.json({ grid: emptyGrid });
   } catch (error: any) {
     console.error('Map fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/map/player-position', auth, async (req: Request, res: Response) => {
+  try {
+    const { x, y } = req.body as { x: number; y: number };
+    if (typeof x !== 'number' || typeof y !== 'number') {
+      res.status(400).json({ error: 'Invalid coordinates' });
+      return;
+    }
+
+    let mapDoc = await Map.findOne({ name: 'main' });
+    if (!mapDoc) {
+      const created = await mapService.generateMap('main');
+      mapDoc = await Map.findOne({ name: 'main' });
+      if (!mapDoc && created) {
+        mapDoc = created as any;
+      }
+    }
+
+    if (!mapDoc) {
+      res.status(500).json({ error: 'Failed to load map' });
+      return;
+    }
+
+    // Clear previous player position
+    for (const c of (mapDoc as any).cells as any[]) {
+      if (c.entityName === 'YOU') {
+        c.isOccupied = false;
+        c.occupiedBy = 'none';
+        c.entityName = '';
+      }
+    }
+
+    const target = (mapDoc.cells as any[]).find((c) => c.x === x && c.y === y);
+    if (!target) {
+      res.status(404).json({ error: 'Target cell not found' });
+      return;
+    }
+    if (!target.canBeOccupied || target.terrain === 'mountain' || target.terrain === 'water') {
+      res.status(400).json({ error: 'Cell cannot be occupied' });
+      return;
+    }
+    if (target.isOccupied) {
+      res.status(400).json({ error: 'Cell already occupied' });
+      return;
+    }
+
+    target.isOccupied = true;
+    target.occupiedBy = 'player';
+    target.entityName = 'YOU';
+
+    await mapDoc.save();
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Player position update error:', error);
     res.status(500).json({ error: error.message });
   }
 });
