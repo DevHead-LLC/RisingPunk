@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
-export type TerrainType = 'plain' | 'mountain' | 'water' | 'forest';
+export type TerrainType = 'plain' | 'mountain' | 'water' | 'forest' | 'road' | 'grass' | 'dirt';
 export type EntityType = 'empty' | 'player' | 'npc' | 'house';
 
 export type CellData = {
@@ -19,7 +19,7 @@ export interface MapState {
   loading: boolean;
 }
 
-const GRID_SIZE = 25;
+const GRID_SIZE = 50;
 
 const initialFog = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(true));
 const initialGrid: GridData = Array(GRID_SIZE).fill(null).map(() =>

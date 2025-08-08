@@ -3,23 +3,21 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import { CloseButton } from '../components/common/CloseButton';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
-import { toggleLegend } from '../store/slices/uiSlice';
 import { setGrid, setLoading } from '../store/slices/mapSlice';
 import { useFetchMapQuery } from '../store/api/mapApi';
 
-const GRID_SIZE = 25;
-const CELL_SIZE = 60;
-const TOTAL_SIZE = GRID_SIZE * CELL_SIZE;
+const CELL_SIZE = 40;
 const MARGIN_SIZE = 80;
 
 
-type TerrainType = 'plain' | 'mountain' | 'water' | 'forest';
+type TerrainType = 'plain' | 'mountain' | 'water' | 'forest' | 'road' | 'grass' | 'dirt';
 type EntityType = 'empty' | 'player' | 'npc' | 'house';
 
 
@@ -41,8 +39,34 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
   const loading = useAppSelector((state) => state.map.loading);
 
   const [selectedCell, setSelectedCell] = useState<{x: number, y: number, info: CellData} | null>(null);
-  const isLegendExpanded = useAppSelector((state) => state.ui.map.legendExpanded);
-  const scrollViewRef = useRef<ScrollView>(null);
+  const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_evt, gesture) => Math.abs(gesture.dx) + Math.abs(gesture.dy) > 5,
+      onPanResponderGrant: () => {
+        pan.setOffset({ x: (pan as any).x._value, y: (pan as any).y._value });
+        pan.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
+      onPanResponderRelease: (_evt, gesture) => {
+        pan.flattenOffset();
+        const speed = Math.hypot(gesture.vx, gesture.vy);
+        if (speed > 0.05) {
+          Animated.decay(pan, {
+            velocity: { x: gesture.vx, y: gesture.vy },
+            deceleration: 0.995,
+            useNativeDriver: false,
+          }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        pan.flattenOffset();
+      },
+    })
+  ).current;
+  const gridSize = grid.length || 50;
+  const totalSize = gridSize * CELL_SIZE;
   const { data: mapData, isLoading } = useFetchMapQuery();
 
   useEffect(() => {
@@ -56,42 +80,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
     setSelectedCell({x, y, info: cellData});
   };
 
-  const renderLegend = () => (
-    <View style={[styles.legend, !isLegendExpanded && styles.legendCollapsed]}>
-      <TouchableOpacity
-        style={styles.legendTitleContainer}
-        onPress={() => dispatch(toggleLegend())}
-      >
-        <Text style={styles.legendTitle}>
-          {isLegendExpanded ? 'MAP LEGEND [-]' : 'LEGEND [+]'}
-        </Text>
-      </TouchableOpacity>
-      {isLegendExpanded && (
-        <View style={styles.legendItems}>
-          <View style={styles.legendItem}>
-            <Text style={[styles.terrainSymbol, styles.forestSymbol]}>♣</Text>
-            <Text style={styles.legendText}>Forest</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <Text style={[styles.terrainSymbol, styles.waterSymbol]}>~</Text>
-            <Text style={styles.legendText}>Water</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <Text style={[styles.terrainSymbol, styles.mountainSymbol]}>▲</Text>
-            <Text style={styles.legendText}>Mountain</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <Text style={[styles.terrainSymbol, styles.friendlySymbol]}>◉</Text>
-            <Text style={styles.legendText}>Friendly</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <Text style={[styles.terrainSymbol, styles.hostileSymbol]}>⊗</Text>
-            <Text style={styles.legendText}>Hostile</Text>
-          </View>
-        </View>
-      )}
-    </View>
-  );
+  const renderLegend = () => null;
 
   const renderInfoPanel = () => {
     if (!selectedCell) {return null;}
@@ -139,55 +128,44 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
 
       {renderInfoPanel()}
 
-      <ScrollView
-        ref={scrollViewRef}
-        horizontal={true}
-        directionalLockEnabled={false}
-        showsHorizontalScrollIndicator={false}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContainer}
-      >
-        <ScrollView
-          directionalLockEnabled={false}
-          showsHorizontalScrollIndicator={false}
-          showsVerticalScrollIndicator={false}
+      <View style={styles.dragContainer} {...panResponder.panHandlers}>
+        <Animated.View
+          style={[
+            styles.marginWrapper,
+            { width: totalSize + (MARGIN_SIZE * 2), height: totalSize + (MARGIN_SIZE * 2) },
+            { transform: [{ translateX: pan.x }, { translateY: pan.y }] },
+          ]}
         >
-          <View style={styles.marginWrapper}>
-            <View style={styles.gridArea}>
-              {grid.map((row, y) => (
-                <View key={y} style={styles.row}>
-                  {row.map((cell, x) => (
-                    <TouchableOpacity
-                      key={`${x}-${y}`}
-                      style={[
-                        styles.cell,
-                        selectedCell?.x === x && selectedCell?.y === y && styles.selectedCell,
-                      ]}
-                      onPress={() => handleCellPress(x, y, cell)}
-                    >
-                      <View style={[styles.cellContent, getTerrainStyle(cell.terrain)]}>
-                        {getTerrainIcon(cell.terrain)}
-                        {cell.entity !== 'empty' && (
-                          <View style={styles.entityContainer}>
-                            <Text style={[
-                              styles.terrainSymbol,
-                              cell.name === 'YOU' ? styles.playerSymbol :
-                              cell.owner === 'player' ? styles.friendlySymbol :
-                              styles.hostileSymbol,
-                            ]}>
-                              {cell.name === 'YOU' ? '⚡' : cell.owner === 'player' ? '◉' : '⊗'}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              ))}
-            </View>
+          <View style={[styles.gridArea, { width: totalSize, height: totalSize }]}>
+            {grid.map((row, y) => (
+              <View key={y} style={styles.row}>
+                {row.map((cell, x) => (
+                  <TouchableOpacity
+                    key={`${x}-${y}`}
+                    style={[
+                      styles.cell,
+                      selectedCell?.x === x && selectedCell?.y === y && styles.selectedCell,
+                    ]}
+                    onPress={() => handleCellPress(x, y, cell)}
+                  >
+                    <View style={[styles.cellContent, getTerrainStyle(cell.terrain)]}>
+                      {getTerrainIcon(cell.terrain)}
+                      {cell.entity === 'house' && (
+                        <View
+                          style={[
+                            styles.entityOverlay,
+                            (cell.name === 'YOU' || cell.owner === 'player') ? styles.playerHouse : styles.enemyHouse,
+                          ]}
+                        />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ))}
           </View>
-        </ScrollView>
-      </ScrollView>
+        </Animated.View>
+      </View>
     </View>
   );
 };
@@ -200,6 +178,12 @@ const getTerrainIcon = (terrain: TerrainType) => {
       return <Text style={[styles.terrainSymbol, styles.mountainSymbol]}>▲</Text>;
     case 'forest':
       return <Text style={[styles.terrainSymbol, styles.forestSymbol]}>♣</Text>;
+    case 'road':
+      return <Text style={[styles.terrainSymbol, styles.roadSymbol]}>≡</Text>;
+    case 'grass':
+      return null;
+    case 'dirt':
+      return null;
     default:
       return null;
   }
@@ -213,6 +197,12 @@ const getTerrainStyle = (terrain: TerrainType) => {
       return styles.mountainTerrain;
     case 'forest':
       return styles.forestTerrain;
+    case 'road':
+      return styles.roadTerrain;
+    case 'grass':
+      return styles.grassTerrain;
+    case 'dirt':
+      return styles.dirtTerrain;
     default:
       return styles.plainTerrain;
   }
@@ -222,6 +212,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
+  },
+  dragContainer: {
+    flex: 1,
+    overflow: 'hidden',
   },
   grid: {
     backgroundColor: 'rgba(26, 77, 51, 0.1)',
@@ -255,6 +249,18 @@ const styles = StyleSheet.create({
   waterTerrain: {
     backgroundColor: 'rgba(33, 150, 243, 0.1)',
     borderColor: 'rgba(33, 150, 243, 0.2)',
+  },
+  roadTerrain: {
+    backgroundColor: 'rgba(255, 193, 7, 0.06)',
+    borderColor: 'rgba(255, 193, 7, 0.2)',
+  },
+  grassTerrain: {
+    backgroundColor: 'rgba(76, 175, 80, 0.08)',
+    borderColor: 'rgba(76, 175, 80, 0.15)',
+  },
+  dirtTerrain: {
+    backgroundColor: 'rgba(160, 82, 45, 0.09)',
+    borderColor: 'rgba(160, 82, 45, 0.15)',
   },
   mountainTerrain: {
     backgroundColor: 'rgba(158, 158, 158, 0.1)',
@@ -314,6 +320,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
     height: '100%',
+  },
+  entityOverlay: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    right: 6,
+    bottom: 6,
+    borderRadius: 6,
+  },
+  playerHouse: {
+    backgroundColor: 'rgba(0, 255, 65, 0.35)',
+  },
+  enemyHouse: {
+    backgroundColor: 'rgba(204, 85, 0, 0.35)',
   },
   playerEntity: {
     backgroundColor: 'rgba(0, 255, 65, 0.1)',
@@ -414,6 +434,9 @@ const styles = StyleSheet.create({
   forestSymbol: {
     color: 'rgba(76, 175, 80, 0.8)',
   },
+  roadSymbol: {
+    color: 'rgba(255, 193, 7, 0.9)',
+  },
   friendlySymbol: {
     color: '#00ff41',
   },
@@ -434,19 +457,14 @@ const styles = StyleSheet.create({
     fontSize: 24,
   },
   marginWrapper: {
-    width: TOTAL_SIZE + (MARGIN_SIZE * 2),
-    height: TOTAL_SIZE + (MARGIN_SIZE * 2),
     backgroundColor: 'rgba(139, 0, 0, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   gridArea: {
-    width: TOTAL_SIZE,
-    height: TOTAL_SIZE,
     backgroundColor: '#000',
   },
   scrollContainer: {
-    width: TOTAL_SIZE + (MARGIN_SIZE * 2),    // Exact width of grid + margins
-    height: TOTAL_SIZE + (MARGIN_SIZE * 2),   // Exact height of grid + margins
+    // width/height are set dynamically on container View
   },
 });
