@@ -8,10 +8,12 @@ import { BattlePhase, IBattalion, INode, BotType } from '../types/battle';
 import { createNodesWithTugOfWar } from '../services/NodeService';
 import { BattalionService } from './BattalionService';
 import { PointTrackingService } from './PointTrackingService';
+import { BOT_CONFIG } from './BotService';
+import { NPCService } from './NPCService';
 
 export class BattleSetupService {
 
-  static async createBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number}>): Promise<IBattleDocument> {
+  static async createBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number}>, defenderNpcSlug?: string): Promise<IBattleDocument> {
     const battleId = `battle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
     // Calculate total army health based on expected battalion configurations
@@ -27,33 +29,46 @@ export class BattleSetupService {
     ];
     
     const battalionConfigs = userBattalions || defaultUserBattalions;
-    const allBattalionConfigs = [...battalionConfigs, ...defaultEnemyBattalions];
     
-    // Calculate total army health using bot stats
-    const BOT_CONFIG = {
-      USER_BOT_STATS: {
-        guardian: { health: 14, speed: 9, range: 4, offense: 8, defense: 6 },
-        breacher: { health: 18, speed: 5, range: 5, offense: 7, defense: 8 },
-        phreak: { health: 12, speed: 7, range: 9, offense: 6, defense: 5 }
-      },
-      ENEMY_BOT_STATS: {
-        guardian: { health: 12, speed: 8, range: 3, offense: 7, defense: 5 },
-        breacher: { health: 16, speed: 4, range: 4, offense: 6, defense: 7 },
-        phreak: { health: 10, speed: 6, range: 8, offense: 5, defense: 4 }
-      }
-    };
+    // Optionally load NPC for enemy side
+    const npc = defenderNpcSlug ? await NPCService.getNPCBySlug(defenderNpcSlug) : null;
     
-    const totalArmyHealth = allBattalionConfigs.reduce((total, battalion) => {
+    // Calculate total army health using bot stats authority
+    const userTotal = battalionConfigs.reduce((total, battalion) => {
       const botType = battalion.type as BotType;
-      const stats = BOT_CONFIG.USER_BOT_STATS[botType];
+      const stats = BOT_CONFIG.USER_BOT_STATS[botType].stats;
       return total + (stats.health * battalion.quantity);
     }, 0);
+    
+    const enemyTotal = npc
+      ? npc.battalions.reduce((total, battalion: any) => {
+          const botType = battalion.type as BotType;
+          const base = BOT_CONFIG.ENEMY_BOT_STATS[botType].stats;
+          const scaledHealth = Math.max(1, Math.round(base.health * npc.statMultipliers.health));
+          return total + (scaledHealth * battalion.quantity);
+        }, 0)
+      : defaultEnemyBattalions.reduce((total, battalion) => {
+          const botType = battalion.type as BotType;
+          const stats = BOT_CONFIG.ENEMY_BOT_STATS[botType].stats;
+          return total + (stats.health * battalion.quantity);
+        }, 0);
+    
+    const totalArmyHealth = userTotal + enemyTotal;
     
     // Now create nodes with the correct total army health
     const nodes = createNodesWithTugOfWar(totalArmyHealth, screenWidth, screenHeight);
     
     const userBattalionsList = BattalionService.createUserBattalions(nodes, userBattalions);
-    const enemyBattalions = BattalionService.createEnemyBattalions(nodes);
+
+    let enemyBattalions: IBattalion[];
+    if (npc) {
+      enemyBattalions = BattalionService.createEnemyBattalionsFromNPC(nodes, {
+        battalions: npc.battalions as any,
+        statMultipliers: npc.statMultipliers as any,
+      });
+    } else {
+      enemyBattalions = BattalionService.createEnemyBattalions(nodes);
+    }
     const battalions = [...userBattalionsList, ...enemyBattalions];
     
     // Store starting battalion states for loss tracking
