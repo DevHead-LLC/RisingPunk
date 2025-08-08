@@ -84,6 +84,7 @@ export interface StartBattleRequest {
   }>;
   screenWidth: number;
   screenHeight: number;
+  defenderNpcSlug?: string;
 }
 
 export const battleApi = createApi({

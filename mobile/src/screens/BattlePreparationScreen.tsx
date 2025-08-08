@@ -137,6 +137,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
     userBattalions,
     screenWidth: SCREEN_WIDTH,
     screenHeight: SCREEN_HEIGHT,
+    defenderNpcSlug: 'npc-small-corporation',
   }), [userBattalions]);
 
   useEffect(() => {

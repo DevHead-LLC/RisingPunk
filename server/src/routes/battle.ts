@@ -10,6 +10,7 @@ interface StartBattleRequest extends Request {
       nodeIndex: number;
     }>;
     defenderId?: string;
+    defenderNpcSlug?: string;
     screenWidth: number;
     screenHeight: number;
   }
@@ -30,14 +31,14 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
   auth,
   async (req, res): Promise<void> => {
     try {
-      const { userBattalions, defenderId, screenWidth, screenHeight } = req.body;
+      const { userBattalions, defenderId, defenderNpcSlug, screenWidth, screenHeight } = req.body;
       
       if (!screenWidth || !screenHeight) {
         res.status(400).json({ success: false, error: 'Screen dimensions are required' });
         return;
       }
       
-      const battle = await battleController.startBattle(req.user._id, defenderId || 'computer', screenWidth, screenHeight, userBattalions);
+      const battle = await battleController.startBattle(req.user._id, defenderId || 'computer', screenWidth, screenHeight, userBattalions, defenderNpcSlug);
       res.status(201).json({ battleId: battle.battleId });
     } catch (error) {
       console.error('Start battle error:', error);

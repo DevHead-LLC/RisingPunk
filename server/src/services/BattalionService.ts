@@ -243,4 +243,41 @@ export class BattalionService {
   }
 
 
+  static createEnemyBattalionsFromNPC(
+    nodes: INode[],
+    npc: {
+      battalions: Array<{ type: string; quantity: number }>;
+      statMultipliers: { health: number; speed: number; offense: number; defense: number; range: number };
+    }
+  ): IBattalion[] {
+    const availableEnemyNodes = [6, 7, 8];
+
+    return npc.battalions.map((battalion, index) => {
+      const validatedBotType = this.validateEnemyBotType(battalion.type);
+
+      const base = BOT_CONFIG.ENEMY_BOT_STATS[validatedBotType].stats;
+      const m = npc.statMultipliers;
+      const scaledStats = {
+        health: Math.max(1, Math.round(base.health * m.health)),
+        speed: Math.max(1, Math.round(base.speed * m.speed)),
+        range: Math.max(1, Math.round(base.range * m.range)),
+        offense: Math.max(1, Math.round(base.offense * m.offense)),
+        defense: Math.max(1, Math.round(base.defense * m.defense)),
+      };
+
+      const randomNodeIndex = Math.floor(Math.random() * availableEnemyNodes.length);
+      const nodeIndex = availableEnemyNodes[randomNodeIndex];
+
+      return this.createBattalion(
+        `enemy-battalion-${index}`,
+        validatedBotType,
+        battalion.quantity,
+        nodeIndex,
+        NodeOwner.ENEMY,
+        scaledStats,
+        nodes
+      );
+    });
+  }
+
 } 
