@@ -154,7 +154,7 @@ export class BattalionService {
     return validatedBotType;
   }
 
-  private static validateEnemyBotType(botType: string): BotType {
+  static validateEnemyBotType(botType: string): BotType {
     // Check cache first
     if (this.enemyBotTypeCache.has(botType)) {
       return this.enemyBotTypeCache.get(botType)!;
