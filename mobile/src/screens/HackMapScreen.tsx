@@ -6,7 +6,7 @@ import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { setGrid, setLoading } from '../store/slices/mapSlice';
 import { useFetchMapQuery } from '../store/api/mapApi';
 
-const CELL_SIZE = 40;
+const CELL_SIZE = 55;
 const MARGIN_SIZE = 80;
 
 
@@ -44,6 +44,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
       onPanResponderMove: (e, g) => {
         lastVelocityRef.current = { vx: g.vx, vy: g.vy };
         Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false })(e as any, g as any);
+        computeWindow((pan as any).x._value + g.dx, (pan as any).y._value + g.dy, containerSize.width, containerSize.height);
       },
       onPanResponderRelease: (_evt, gesture) => {
         pan.flattenOffset();
@@ -55,6 +56,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
             useNativeDriver: false,
           }).start();
         }
+        computeWindow((pan as any).x._value, (pan as any).y._value, containerSize.width, containerSize.height);
         lastVelocityRef.current = { vx: 0, vy: 0 };
       },
       onPanResponderTerminate: () => {
@@ -122,9 +124,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
 
   const computeWindow = useCallback((panX: number, panY: number, width: number, height: number) => {
     if (width <= 0 || height <= 0) {return;}
-    const baseBuffer = 8;
+    const baseBuffer = 12;
     const speed = Math.hypot(lastVelocityRef.current.vx, lastVelocityRef.current.vy);
-    const lead = Math.min(8, Math.ceil(speed * 10));
+    const lead = Math.min(16, Math.ceil(speed * 12));
     const buffer = baseBuffer + lead;
     const gridLeft = panX + MARGIN_SIZE;
     const gridTop = panY + MARGIN_SIZE;
@@ -145,11 +147,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
 
   useEffect(() => {
     const schedule = () => {
-      if (rafIdRef.current != null) return;
-      rafIdRef.current = requestAnimationFrame(() => {
-        rafIdRef.current = null;
-        computeWindow((pan as any).x._value, (pan as any).y._value, containerSize.width, containerSize.height);
-      });
+      computeWindow((pan as any).x._value, (pan as any).y._value, containerSize.width, containerSize.height);
     };
     const subX = pan.x.addListener(() => schedule());
     const subY = pan.y.addListener(() => schedule());
@@ -158,10 +156,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
     return () => {
       pan.x.removeListener(subX);
       pan.y.removeListener(subY);
-      if (rafIdRef.current != null) {
-        cancelAnimationFrame(rafIdRef.current);
-        rafIdRef.current = null;
-      }
+      // no-op
     };
   }, [pan, containerSize.width, containerSize.height, computeWindow]);
 
@@ -301,11 +296,25 @@ const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, x
       <View style={[styles.cellContent, terrainStyleMap[cell.terrain]]}>
         {getTerrainIcon(cell.terrain)}
         {cell.entity === 'house' && (
-          (cell.name === 'YOU' || cell.owner === 'player') ? (
-            <Image source={require('../assets/images/home.png')} style={styles.playerHomeIcon} resizeMode="contain" />
-          ) : (
-            <View style={[styles.entityOverlay, styles.enemyHouse]} />
-          )
+          <>
+            {(cell.name === 'YOU' || cell.owner === 'player') ? (
+              <Image source={require('../assets/images/home.png')} style={styles.playerHomeIcon} resizeMode="contain" />
+            ) : (
+              <View style={[styles.entityOverlay, styles.enemyHouse]} />
+            )}
+            <View style={styles.entityLabelContainer} pointerEvents="none">
+              <Text
+                style={[
+                  styles.entityLabel,
+                  (cell.name === 'YOU' || cell.owner === 'player') ? styles.playerLabel : styles.enemyLabel,
+                ]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {cell.name || (cell.owner === 'player' ? 'YOU' : 'NPC')}
+              </Text>
+            </View>
+          </>
         )}
       </View>
     </Pressable>
@@ -546,6 +555,24 @@ const styles = StyleSheet.create({
   playerHomeIcon: {
     width: CELL_SIZE - 10,
     height: CELL_SIZE - 10,
+  },
+  entityLabelContainer: {
+    position: 'absolute',
+    bottom: 2,
+    left: 2,
+    right: 2,
+    alignItems: 'center',
+  },
+  entityLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    paddingHorizontal: 2,
+  },
+  playerLabel: {
+    color: '#00ff41',
+  },
+  enemyLabel: {
+    color: '#cc5500',
   },
   playerEntity: {
     backgroundColor: 'rgba(0, 255, 65, 0.1)',
