@@ -94,6 +94,7 @@ export class BattleSetupService {
       startTime: new Date(),
       endTime: null,
       ...(unlockHackRigOnWin ? { unlockHackRigOnWin: true } as any : {}),
+      ...(defenderNpcSlug ? { defenderNpcSlug } as any : {}),
     });
 
     return await battle.save();

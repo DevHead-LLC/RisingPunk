@@ -37,7 +37,8 @@ router.get('/:name', async (req: Request, res: Response) => {
       const playerYou = cells.filter(c => c.isOccupied && c.occupiedBy === 'player' && c.entityName === 'YOU');
       const npcHouses = cells.filter(c => c.isOccupied && c.occupiedBy === 'npc');
       const blockedHouse = cells.some(c => c.isOccupied && isBlocked(c));
-      const invalidCounts = playerYou.length !== 1 || npcHouses.length !== 8;
+      // Allow dynamic NPC counts (defeat/respawn). Only enforce player house presence.
+      const invalidCounts = playerYou.length !== 1;
 
       if (blockedHouse || invalidCounts) {
         await Map.deleteOne({ _id: (mapDoc as any)._id });
