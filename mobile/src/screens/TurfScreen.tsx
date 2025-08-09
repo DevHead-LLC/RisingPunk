@@ -62,6 +62,8 @@ const ScrollViewMemo = memo(function ScrollViewMemo({
 export function TurfScreen(): React.JSX.Element {
   const [currentScreen, setCurrentScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile'>('turf');
   const [battleId, setBattleId] = useState<string | null>(null);
+  const [pendingNpcSlug, setPendingNpcSlug] = useState<string | null>(null);
+  const [returnContext, setReturnContext] = useState<{ origin: 'hackRig' | 'map'; mapPan?: { x: number; y: number } } | null>(null);
   const horizontalScrollRef = useRef<ScrollView>(null);
   const dispatch = useAppDispatch();
 
@@ -106,7 +108,20 @@ export function TurfScreen(): React.JSX.Element {
         />;
       case 'map':
         return <HackMapScreen
-          onClose={() => navigateToScreen('hackRig')}
+          restorePan={returnContext?.mapPan}
+          onClose={() => {
+            const slug = (globalThis as any).pendingNpcSlug as string | undefined;
+            if (slug) {
+              setPendingNpcSlug(slug);
+              const mapPan = (globalThis as any).pendingMapPan as { x: number; y: number } | undefined;
+              (globalThis as any).pendingNpcSlug = undefined;
+              (globalThis as any).pendingMapPan = undefined;
+              setReturnContext({ origin: 'map', mapPan });
+              navigateToScreen('battlePrep');
+              return;
+            }
+            navigateToScreen('hackRig');
+          }}
         />;
       case 'profile':
         return <ProfileScreen
@@ -123,6 +138,8 @@ export function TurfScreen(): React.JSX.Element {
             setBattleId(newBattleId || null);
             navigateToScreen('battle');
           }}
+          // @ts-ignore pass via global or extend props: we’ll store on window for now
+          defenderNpcSlug={pendingNpcSlug || undefined}
         />;
       case 'battle':
         if (!battleId) {
@@ -139,7 +156,15 @@ export function TurfScreen(): React.JSX.Element {
         }
         return <BattleGridScreen
           battleId={battleId}
-          _onClose={handleBattleEnd}
+          _onClose={() => {
+            // Return to origin without resetting app
+            if (returnContext?.origin === 'map') {
+              navigateToScreen('map');
+            } else {
+              navigateToScreen('hackRig');
+            }
+            setBattleId(null);
+          }}
         />;
       default:
         return (

@@ -30,8 +30,8 @@ export class BattleService {
     return BattalionService.triggerInitialTargeting(battle.battalions, battle.nodes, battleId);
   }
 
-  async createBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number}>, defenderNpcSlug?: string): Promise<IBattleDocument> {
-    const battle = await BattleSetupService.createBattle(attackerId, defenderId, screenWidth, screenHeight, userBattalions, defenderNpcSlug);
+  async createBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number}>, defenderNpcSlug?: string, unlockHackRigOnWin?: boolean): Promise<IBattleDocument> {
+    const battle = await BattleSetupService.createBattle(attackerId, defenderId, screenWidth, screenHeight, userBattalions, defenderNpcSlug, unlockHackRigOnWin === true);
     
     ScreenDimensionService.setBattleScreenDimensions(battle.battleId, screenWidth, screenHeight);
     

@@ -37,7 +37,7 @@ router.get('/:name', async (req: Request, res: Response) => {
       const playerYou = cells.filter(c => c.isOccupied && c.occupiedBy === 'player' && c.entityName === 'YOU');
       const npcHouses = cells.filter(c => c.isOccupied && c.occupiedBy === 'npc');
       const blockedHouse = cells.some(c => c.isOccupied && isBlocked(c));
-      const invalidCounts = playerYou.length !== 1 || npcHouses.length !== 5;
+      const invalidCounts = playerYou.length !== 1 || npcHouses.length !== 8;
 
       if (blockedHouse || invalidCounts) {
         await Map.deleteOne({ _id: (mapDoc as any)._id });
@@ -61,11 +61,13 @@ router.get('/:name', async (req: Request, res: Response) => {
       const entity = c.isOccupied ? 'house' : 'empty';
       const owner = c.isOccupied ? (c.occupiedBy === 'player' ? 'player' : 'enemy') : undefined;
       const name = c.entityName || undefined;
+      const npcSlug = c.occupiedBy === 'npc' ? (c.npcSlug || undefined) : undefined;
       emptyGrid[y][x] = {
         terrain: c.terrain,
         entity,
         owner,
         name,
+        npcSlug,
       } as any;
     }
 

@@ -195,7 +195,8 @@ const battleSchema = new Schema({
   startingBattalions: [battalionSchema],
 
   battalions: [battalionSchema],
-  nodes: [nodeSchema]
+  nodes: [nodeSchema],
+  unlockHackRigOnWin: { type: Boolean, default: false }
 }, {
   collection: 'battles',
   timestamps: true
