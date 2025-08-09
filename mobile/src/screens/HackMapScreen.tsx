@@ -49,6 +49,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const lastComputedPanRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const lastComputeTsRef = useRef<number>(0);
   // Restore pan position if provided (initialized after computeWindow definition)
+  const updateCurrentPan = (x: number, y: number) => {
+    currentPanRef.current = { x, y };
+  };
 
   const scheduleCompute = (x: number, y: number, vx: number = 0, vy: number = 0) => {
     // Update last known velocity on JS thread (safe)
@@ -81,6 +84,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       // Schedule JS-side window compute so tiles load beyond current view
       // @ts-ignore runOnJS bridge
       runOnJS(scheduleCompute)(x, y, g.velocityX ?? 0, g.velocityY ?? 0);
+      // Keep JS ref in sync with UI pan so pendingMapPan is accurate
+      // @ts-ignore
+      runOnJS(updateCurrentPan)(x, y);
     })
     .onEnd((g) => {
       // inertial decay on UI thread
@@ -91,6 +97,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       // Final compute to ensure filled window after release
       // @ts-ignore
       runOnJS(scheduleCompute)(x, y, g.velocityX ?? 0, g.velocityY ?? 0);
+      // Update JS ref with the last known pan at release time
+      // @ts-ignore
+      runOnJS(updateCurrentPan)(x, y);
     });
   const gridSize = grid.length || 50;
   const totalSize = gridSize * CELL_SIZE;
