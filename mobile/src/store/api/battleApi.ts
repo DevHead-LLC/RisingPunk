@@ -85,6 +85,7 @@ export interface StartBattleRequest {
   screenWidth: number;
   screenHeight: number;
   defenderNpcSlug?: string;
+  unlockHackRigOnWin?: boolean;
 }
 
 export const battleApi = createApi({

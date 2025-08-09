@@ -9,6 +9,8 @@ import { PointTrackingService } from './PointTrackingService';
 import { CombatService } from './CombatService';
 import { User } from '../models/User';
 import mongoose from 'mongoose';
+import { NPCRespawnService } from './NPCRespawnService';
+import { NPCService } from './NPCService';
 
 export class BattleService {
   private timerService: BattleTimerService;
@@ -30,8 +32,8 @@ export class BattleService {
     return BattalionService.triggerInitialTargeting(battle.battalions, battle.nodes, battleId);
   }
 
-  async createBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number}>, defenderNpcSlug?: string): Promise<IBattleDocument> {
-    const battle = await BattleSetupService.createBattle(attackerId, defenderId, screenWidth, screenHeight, userBattalions, defenderNpcSlug);
+  async createBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number}>, defenderNpcSlug?: string, unlockHackRigOnWin?: boolean): Promise<IBattleDocument> {
+    const battle = await BattleSetupService.createBattle(attackerId, defenderId, screenWidth, screenHeight, userBattalions, defenderNpcSlug, unlockHackRigOnWin === true);
     
     ScreenDimensionService.setBattleScreenDimensions(battle.battleId, screenWidth, screenHeight);
     
@@ -159,9 +161,24 @@ export class BattleService {
     (battle as any).endCondition = endCondition;
     await battle.save();
 
-    // Unlock hack rig if user wins by elimination
-    if (winner === NodeOwner.USER && endCondition === 'elimination') {
+    // Unlock hack rig if user wins by elimination (only if flagged)
+    if ((battle as any).unlockHackRigOnWin && winner === NodeOwner.USER && endCondition === 'elimination') {
       await this.unlockHackRigForUser(battle.attackerId);
+    }
+
+    // If battle was against an NPC and user won, clear NPC and schedule respawn
+    const npcSlug: string = (battle as any).defenderNpcSlug || '';
+    if (npcSlug && winner === NodeOwner.USER) {
+      try {
+        console.log('[NPC] Clearing from map now ->', npcSlug);
+        await NPCRespawnService.clearNpcFromMap(npcSlug, 'main');
+        const npcDoc: any = await NPCService.getNPCBySlug(npcSlug);
+        const delay = typeof npcDoc?.mapRecoverySeconds === 'number' ? npcDoc.mapRecoverySeconds : 300;
+        console.log('[NPC] Scheduling respawn in seconds ->', delay, npcSlug);
+        NPCRespawnService.scheduleRespawn(npcSlug, delay, 'main');
+      } catch (e) {
+        console.error('NPC respawn scheduling failed for', npcSlug, e);
+      }
     }
 
     await this.endBattle(battleId, winner);

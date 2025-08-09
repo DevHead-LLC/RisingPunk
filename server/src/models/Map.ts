@@ -16,7 +16,8 @@ const CellSchema = new mongoose.Schema({
     enum: ['none', 'player', 'npc'],
     default: 'none'
   },
-  entityName: { type: String, default: '' }
+  entityName: { type: String, default: '' },
+  npcSlug: { type: String, default: '' }
 });
 
 // Set canBeOccupied based on terrain type

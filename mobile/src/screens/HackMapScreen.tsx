@@ -1,5 +1,7 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import { View, Text, StyleSheet, Animated, PanResponder, LayoutChangeEvent, Pressable, Image } from 'react-native';
+import { View, Text, StyleSheet, LayoutChangeEvent, Pressable, Image } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { useSharedValue, useAnimatedStyle, withDecay, runOnJS } from 'react-native-reanimated';
 import { CloseButton } from '../components/common/CloseButton';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
@@ -20,57 +22,88 @@ type CellData = {
   entity: EntityType;
   owner?: 'player' | 'enemy';
   name?: string;
+  npcSlug?: string;
 };
 
 type Props = {
   onClose: () => void;
+  restorePan?: { x: number; y: number };
 };
 
-export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
+export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const dispatch = useAppDispatch();
   const grid = useAppSelector((state) => state.map.grid);
   const loading = useAppSelector((state) => state.map.loading);
 
   const [selectedCell, setSelectedCell] = useState<{x: number, y: number, info: CellData} | null>(null);
-  const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_evt, gesture) => Math.abs(gesture.dx) + Math.abs(gesture.dy) > 5,
-      onPanResponderGrant: () => {
-        pan.setOffset({ x: (pan as any).x._value, y: (pan as any).y._value });
-        pan.setValue({ x: 0, y: 0 });
-      },
-      onPanResponderMove: (e, g) => {
-        lastVelocityRef.current = { vx: g.vx, vy: g.vy };
-        Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false })(e as any, g as any);
-        computeWindow((pan as any).x._value + g.dx, (pan as any).y._value + g.dy, containerSize.width, containerSize.height);
-      },
-      onPanResponderRelease: (_evt, gesture) => {
-        pan.flattenOffset();
-        const speed = Math.hypot(gesture.vx, gesture.vy);
-        if (speed > 0.05) {
-          Animated.decay(pan, {
-            velocity: { x: gesture.vx, y: gesture.vy },
-            deceleration: 0.995,
-            useNativeDriver: false,
-          }).start();
-        }
-        computeWindow((pan as any).x._value, (pan as any).y._value, containerSize.width, containerSize.height);
-        lastVelocityRef.current = { vx: 0, vy: 0 };
-      },
-      onPanResponderTerminate: () => {
-        pan.flattenOffset();
-      },
+  const offsetX = useSharedValue(0);
+  const offsetY = useSharedValue(0);
+  const startX = useSharedValue(0);
+  const startY = useSharedValue(0);
+  const currentPanRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const computeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const [windowRange, setWindowRange] = useState<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>({ rowStart: 0, rowEnd: Math.min(14, (grid.length || 50) - 1), colStart: 0, colEnd: Math.min(14, (grid.length || 50) - 1) });
+  const lastVelocityRef = useRef<{ vx: number; vy: number }>({ vx: 0, vy: 0 });
+  const rafIdRef = useRef<number | null>(null);
+  const lastComputedPanRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const lastComputeTsRef = useRef<number>(0);
+  // Restore pan position if provided (initialized after computeWindow definition)
+  const updateCurrentPan = (x: number, y: number) => {
+    currentPanRef.current = { x, y };
+  };
+
+  const scheduleCompute = (x: number, y: number, vx: number = 0, vy: number = 0) => {
+    // Update last known velocity on JS thread (safe)
+    lastVelocityRef.current = { vx, vy };
+    if (computeDebounceRef.current) {
+      clearTimeout(computeDebounceRef.current);
+    }
+    computeDebounceRef.current = setTimeout(() => {
+      computeWindow(x, y, containerSize.width, containerSize.height);
+    }, 40);
+  };
+
+  const animatedMapStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: offsetX.value },
+      { translateY: offsetY.value },
+    ],
+  }));
+
+  const panGesture = Gesture.Pan()
+    .onStart(() => {
+      startX.value = offsetX.value;
+      startY.value = offsetY.value;
     })
-  ).current;
+    .onUpdate((g) => {
+      const x = startX.value + g.translationX;
+      const y = startY.value + g.translationY;
+      offsetX.value = x;
+      offsetY.value = y;
+      // Schedule JS-side window compute so tiles load beyond current view
+      // @ts-ignore runOnJS bridge
+      runOnJS(scheduleCompute)(x, y, g.velocityX ?? 0, g.velocityY ?? 0);
+      // Keep JS ref in sync with UI pan so pendingMapPan is accurate
+      // @ts-ignore
+      runOnJS(updateCurrentPan)(x, y);
+    })
+    .onEnd((g) => {
+      // inertial decay on UI thread
+      offsetX.value = withDecay({ velocity: g.velocityX, deceleration: 0.997 });
+      offsetY.value = withDecay({ velocity: g.velocityY, deceleration: 0.997 });
+      const x = startX.value + (g.translationX ?? 0);
+      const y = startY.value + (g.translationY ?? 0);
+      // Final compute to ensure filled window after release
+      // @ts-ignore
+      runOnJS(scheduleCompute)(x, y, g.velocityX ?? 0, g.velocityY ?? 0);
+      // Update JS ref with the last known pan at release time
+      // @ts-ignore
+      runOnJS(updateCurrentPan)(x, y);
+    });
   const gridSize = grid.length || 50;
   const totalSize = gridSize * CELL_SIZE;
   const { data: mapData, isLoading } = useFetchMapQuery();
-  const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
-  const [windowRange, setWindowRange] = useState<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>({ rowStart: 0, rowEnd: Math.min(14, gridSize - 1), colStart: 0, colEnd: Math.min(14, gridSize - 1) });
-  const lastVelocityRef = useRef<{ vx: number; vy: number }>({ vx: 0, vy: 0 });
-  const rafIdRef = useRef<number | null>(null);
 
   // Precompute terrain style map and position style caches
   const terrainStyleMap = useMemo(() => ({
@@ -124,47 +157,86 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
 
   const computeWindow = useCallback((panX: number, panY: number, width: number, height: number) => {
     if (width <= 0 || height <= 0) {return;}
+    const now = Date.now();
+    if (now - lastComputeTsRef.current < 40) {return;} // time-based throttle (~25 fps)
+    lastComputeTsRef.current = now;
+    // Skip tiny pan changes to reduce churn
+    const lx = lastComputedPanRef.current.x;
+    const ly = lastComputedPanRef.current.y;
+    if (Math.abs(panX - lx) < 8 && Math.abs(panY - ly) < 8) {
+      return;
+    }
+    lastComputedPanRef.current = { x: panX, y: panY };
     const baseBuffer = 12;
-    const speed = Math.hypot(lastVelocityRef.current.vx, lastVelocityRef.current.vy);
-    const lead = Math.min(16, Math.ceil(speed * 12));
-    const buffer = baseBuffer + lead;
+    const vx = lastVelocityRef.current.vx || 0;
+    const vy = lastVelocityRef.current.vy || 0;
+    const leadX = Math.min(20, Math.ceil(Math.abs(vx) * 14));
+    const leadY = Math.min(20, Math.ceil(Math.abs(vy) * 14));
+    const dirX = vx === 0 ? 0 : (vx > 0 ? 1 : -1);
+    const dirY = vy === 0 ? 0 : (vy > 0 ? 1 : -1);
+    const leftBuffer = baseBuffer + (dirX < 0 ? leadX : Math.floor(leadX * 0.25));
+    const rightBuffer = baseBuffer + (dirX > 0 ? leadX : Math.floor(leadX * 0.25));
+    const upBuffer = baseBuffer + (dirY < 0 ? leadY : Math.floor(leadY * 0.25));
+    const downBuffer = baseBuffer + (dirY > 0 ? leadY : Math.floor(leadY * 0.25));
     const gridLeft = panX + MARGIN_SIZE;
     const gridTop = panY + MARGIN_SIZE;
-    const startCol = Math.max(0, Math.floor((-gridLeft) / CELL_SIZE) - buffer);
-    const endCol = Math.min(gridSize - 1, Math.ceil((width - gridLeft) / CELL_SIZE) + buffer);
-    const startRow = Math.max(0, Math.floor((-gridTop) / CELL_SIZE) - buffer);
-    const endRow = Math.min(gridSize - 1, Math.ceil((height - gridTop) / CELL_SIZE) + buffer);
+    const baseStartCol = Math.floor((-gridLeft) / CELL_SIZE);
+    const baseEndCol = Math.ceil((width - gridLeft) / CELL_SIZE);
+    const baseStartRow = Math.floor((-gridTop) / CELL_SIZE);
+    const baseEndRow = Math.ceil((height - gridTop) / CELL_SIZE);
+    const startCol = Math.max(0, baseStartCol - leftBuffer);
+    const endCol = Math.min(gridSize - 1, baseEndCol + rightBuffer);
+    const startRow = Math.max(0, baseStartRow - upBuffer);
+    const endRow = Math.min(gridSize - 1, baseEndRow + downBuffer);
+    const cols = Math.max(0, endCol - startCol + 1);
+    const rows = Math.max(0, endRow - startRow + 1);
+    const expected = Math.ceil(cols * rows * 1.2);
+    setPoolSize(prev => (expected > prev + 50 ? expected : prev));
     setWindowRange(prev => {
-      if (
-        prev.rowStart === startRow && prev.rowEnd === endRow &&
-        prev.colStart === startCol && prev.colEnd === endCol
-      ) {
-        return prev;
-      }
+      const same = prev.rowStart === startRow && prev.rowEnd === endRow && prev.colStart === startCol && prev.colEnd === endCol;
+      if (same) return prev;
+      const smallShift =
+        Math.abs(prev.rowStart - startRow) < 2 &&
+        Math.abs(prev.rowEnd - endRow) < 2 &&
+        Math.abs(prev.colStart - startCol) < 2 &&
+        Math.abs(prev.colEnd - endCol) < 2;
+      if (smallShift) return prev; // require at least 2-cell change to update
       return { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
     });
   }, [gridSize]);
 
+  // Restore pan position if provided (now safe, computeWindow is defined)
   useEffect(() => {
-    const schedule = () => {
-      computeWindow((pan as any).x._value, (pan as any).y._value, containerSize.width, containerSize.height);
-    };
-    const subX = pan.x.addListener(() => schedule());
-    const subY = pan.y.addListener(() => schedule());
-    // Initial compute
-    computeWindow((pan as any).x._value, (pan as any).y._value, containerSize.width, containerSize.height);
+    if (restorePan) {
+      offsetX.value = restorePan.x;
+      offsetY.value = restorePan.y;
+      currentPanRef.current = { x: restorePan.x, y: restorePan.y };
+      requestAnimationFrame(() => {
+        computeWindow(restorePan.x, restorePan.y, containerSize.width, containerSize.height);
+      });
+    }
+  }, [restorePan, containerSize.width, containerSize.height, computeWindow, offsetX, offsetY]);
+
+  useEffect(() => {
+    // Initial compute on mount and when container changes
+    computeWindow(currentPanRef.current.x, currentPanRef.current.y, containerSize.width, containerSize.height);
     return () => {
-      pan.x.removeListener(subX);
-      pan.y.removeListener(subY);
-      // no-op
+      if (rafIdRef.current != null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      if (computeDebounceRef.current) {
+        clearTimeout(computeDebounceRef.current);
+        computeDebounceRef.current = null;
+      }
     };
-  }, [pan, containerSize.width, containerSize.height, computeWindow]);
+  }, [containerSize.width, containerSize.height, computeWindow]);
 
   const onContainerLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     setContainerSize({ width, height });
-    computeWindow((pan as any).x._value, (pan as any).y._value, width, height);
-  }, [computeWindow, pan]);
+    computeWindow(currentPanRef.current.x, currentPanRef.current.y, width, height);
+  }, [computeWindow]);
 
   const handleCellPress = (x: number, y: number, cellData: CellData) => {
     setSelectedCell({x, y, info: cellData});
@@ -200,6 +272,21 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
             ]}>
               STATUS: {selectedCell.info.owner === 'player' ? 'FRIENDLY' : 'HOSTILE'}
             </Text>
+            {selectedCell.info.owner !== 'player' && selectedCell.info.npcSlug && (
+              <Pressable
+                style={[styles.hackButton]}
+                onPress={() => {
+                  (globalThis as any).pendingNpcSlug = selectedCell.info.npcSlug;
+                  (globalThis as any).pendingMapPan = {
+                    x: currentPanRef.current.x,
+                    y: currentPanRef.current.y,
+                  };
+                  onClose();
+                }}
+              >
+                <Text style={styles.hackButtonText}>Hack Entity</Text>
+              </Pressable>
+            )}
           </>
         )}
       </View>
@@ -218,13 +305,14 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
 
       {renderInfoPanel()}
 
-      <View style={styles.dragContainer} onLayout={onContainerLayout} {...panResponder.panHandlers}>
+      <GestureDetector gesture={panGesture}>
         <Animated.View
           style={[
             styles.marginWrapper,
             { width: totalSize + (MARGIN_SIZE * 2), height: totalSize + (MARGIN_SIZE * 2) },
-            { transform: [{ translateX: pan.x }, { translateY: pan.y }] },
+            animatedMapStyle as any,
           ]}
+          onLayout={onContainerLayout}
         >
           <View style={[styles.gridArea, { width: totalSize, height: totalSize }]}>
             {Array.from({ length: gridSize }).map((_, y) => (
@@ -268,7 +356,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose }) => {
             })}
           </View>
         </Animated.View>
-      </View>
+      </GestureDetector>
     </View>
   );
 };
@@ -502,6 +590,20 @@ const styles = StyleSheet.create({
   backButtonText: {
     color: '#fff',
     fontSize: 24,
+    fontWeight: 'bold',
+  },
+  hackButton: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#00ff41',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+  },
+  hackButtonText: {
+    color: '#00ff41',
+    fontSize: 14,
     fontWeight: 'bold',
   },
   coordsDisplay: {

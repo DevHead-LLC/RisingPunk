@@ -15,11 +15,12 @@ import { API_URL } from '../config';
 type Props = {
   onClose: () => void;
   onBattleStart: (battleId?: string) => void;
+  defenderNpcSlug?: string;
 };
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: Props) => {
+export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, defenderNpcSlug }: Props) => {
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [selectedBattalion, setSelectedBattalion] = useState<string | null>(null);
@@ -137,8 +138,9 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart }: P
     userBattalions,
     screenWidth: SCREEN_WIDTH,
     screenHeight: SCREEN_HEIGHT,
-    defenderNpcSlug: 'npc-small-corporation',
-  }), [userBattalions]);
+    defenderNpcSlug: defenderNpcSlug || 'npc-small-corporation',
+    unlockHackRigOnWin: !defenderNpcSlug, // only true when battle started from hack rig flow
+  }), [userBattalions, defenderNpcSlug]);
 
   useEffect(() => {
     const fetchAssignments = async () => {

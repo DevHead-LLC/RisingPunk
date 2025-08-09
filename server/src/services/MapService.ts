@@ -151,7 +151,7 @@ export class MapService {
   }
 
   private addHouses(cells: any[]): void {
-    // Place exactly 6 houses total: 1 player, 5 NPC
+    // Place exactly 7 houses total: 1 player, 6 NPC (2 of each level)
     const pickValidCellIndex = (): number => {
       let tries = 0;
       while (tries < 10000) {
@@ -191,16 +191,28 @@ export class MapService {
     playerCell.occupiedBy = 'player';
     playerCell.entityName = 'YOU';
 
-    // Five NPC houses
+    // Eight NPC houses: 4 of level 1, 2 of level 2, 2 of level 3
+    const npcPool = [
+      { name: 'Small Corporation', slug: 'npc-small-corporation' },
+      { name: 'Small Corporation', slug: 'npc-small-corporation' },
+      { name: 'Small Corporation', slug: 'npc-small-corporation' },
+      { name: 'Small Corporation', slug: 'npc-small-corporation' },
+      { name: 'Small Bank', slug: 'npc-small-bank' },
+      { name: 'Small Bank', slug: 'npc-small-bank' },
+      { name: 'Large Corporation', slug: 'npc-large-corporation' },
+      { name: 'Large Corporation', slug: 'npc-large-corporation' },
+    ];
     let placed = 0;
-    while (placed < 5) {
+    while (placed < npcPool.length) {
       const idx = pickValidCellIndex();
       if (idx === -1) break;
       const cell = cells[idx];
       if ((cell.x === px && cell.y === py)) continue;
+      const npc = npcPool[placed];
       cell.isOccupied = true;
       cell.occupiedBy = 'npc';
-      cell.entityName = `COMP${placed + 1}`;
+      cell.entityName = npc.name;
+      (cell as any).npcSlug = npc.slug;
       placed++;
     }
   }
