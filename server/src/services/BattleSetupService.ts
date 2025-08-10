@@ -13,7 +13,7 @@ import { NPCService } from './NPCService';
 
 export class BattleSetupService {
 
-  static async createBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number}>, defenderNpcSlug?: string, unlockHackRigOnWin?: boolean): Promise<IBattleDocument> {
+  static async createBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number}>, defenderNpcSlug?: string, unlockHackRigOnWin?: boolean, defenderNpcInstanceId?: string): Promise<IBattleDocument> {
     const battleId = `battle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
     // Calculate total army health based on expected battalion configurations
@@ -95,6 +95,7 @@ export class BattleSetupService {
       endTime: null,
       ...(unlockHackRigOnWin ? { unlockHackRigOnWin: true } as any : {}),
       ...(defenderNpcSlug ? { defenderNpcSlug } as any : {}),
+      ...(defenderNpcInstanceId ? { defenderNpcInstanceId } as any : {}),
     });
 
     return await battle.save();

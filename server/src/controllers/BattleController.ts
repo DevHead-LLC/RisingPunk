@@ -60,10 +60,10 @@ export class BattleController {
   /**
    * Start a new battle
    */
-  async startBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number}>, defenderNpcSlug?: string, unlockHackRigOnWin?: boolean): Promise<BattleStateResponse> {
+  async startBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number}>, defenderNpcSlug?: string, unlockHackRigOnWin?: boolean, defenderNpcInstanceId?: string): Promise<BattleStateResponse> {
     try {
       const actualDefenderId = defenderId === 'computer' ? 'computer-opponent' : defenderId;
-      const battle = await this.battleService.createBattle(attackerId, actualDefenderId, screenWidth, screenHeight, userBattalions, defenderNpcSlug, unlockHackRigOnWin === true);
+      const battle = await this.battleService.createBattle(attackerId, actualDefenderId, screenWidth, screenHeight, userBattalions, defenderNpcSlug, unlockHackRigOnWin === true, defenderNpcInstanceId);
       const networkData = this.generateNetworkData(battle.nodes, screenWidth, screenHeight, battle);
       const mappedBattalions = BattalionMappingService.mapBattalionsForClient(battle.battalions);
       

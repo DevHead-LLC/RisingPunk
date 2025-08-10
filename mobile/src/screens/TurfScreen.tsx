@@ -64,6 +64,7 @@ export function TurfScreen(): React.JSX.Element {
   const [battleId, setBattleId] = useState<string | null>(null);
   const [pendingNpcSlug, setPendingNpcSlug] = useState<string | null>(null);
   const [returnContext, setReturnContext] = useState<{ origin: 'hackRig' | 'map'; mapPan?: { x: number; y: number } } | null>(null);
+  const [pendingNpcInstanceId, setPendingNpcInstanceId] = useState<string | null>(null);
   const horizontalScrollRef = useRef<ScrollView>(null);
   const dispatch = useAppDispatch();
 
@@ -113,8 +114,11 @@ export function TurfScreen(): React.JSX.Element {
             const slug = (globalThis as any).pendingNpcSlug as string | undefined;
             if (slug) {
               setPendingNpcSlug(slug);
+              const instanceId = (globalThis as any).pendingNpcInstanceId as string | undefined;
+              setPendingNpcInstanceId(instanceId || null);
               const mapPan = (globalThis as any).pendingMapPan as { x: number; y: number } | undefined;
               (globalThis as any).pendingNpcSlug = undefined;
+              (globalThis as any).pendingNpcInstanceId = undefined;
               (globalThis as any).pendingMapPan = undefined;
               setReturnContext({ origin: 'map', mapPan });
               navigateToScreen('battlePrep');
@@ -138,8 +142,10 @@ export function TurfScreen(): React.JSX.Element {
             setBattleId(newBattleId || null);
             navigateToScreen('battle');
           }}
-          // @ts-ignore pass via global or extend props: we’ll store on window for now
+          // @ts-ignore pass via global or extend props
           defenderNpcSlug={pendingNpcSlug || undefined}
+          // @ts-ignore
+          defenderNpcInstanceId={pendingNpcInstanceId || undefined}
         />;
       case 'battle':
         if (!battleId) {

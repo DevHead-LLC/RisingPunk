@@ -32,8 +32,8 @@ export class BattleService {
     return BattalionService.triggerInitialTargeting(battle.battalions, battle.nodes, battleId);
   }
 
-  async createBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number}>, defenderNpcSlug?: string, unlockHackRigOnWin?: boolean): Promise<IBattleDocument> {
-    const battle = await BattleSetupService.createBattle(attackerId, defenderId, screenWidth, screenHeight, userBattalions, defenderNpcSlug, unlockHackRigOnWin === true);
+  async createBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number}>, defenderNpcSlug?: string, unlockHackRigOnWin?: boolean, defenderNpcInstanceId?: string): Promise<IBattleDocument> {
+    const battle = await BattleSetupService.createBattle(attackerId, defenderId, screenWidth, screenHeight, userBattalions, defenderNpcSlug, unlockHackRigOnWin === true, defenderNpcInstanceId);
     
     ScreenDimensionService.setBattleScreenDimensions(battle.battleId, screenWidth, screenHeight);
     
@@ -168,14 +168,24 @@ export class BattleService {
 
     // If battle was against an NPC and user won, clear NPC and schedule respawn
     const npcSlug: string = (battle as any).defenderNpcSlug || '';
+    const npcInstanceId: string = (battle as any).defenderNpcInstanceId || '';
     if (npcSlug && winner === NodeOwner.USER) {
       try {
-        console.log('[NPC] Clearing from map now ->', npcSlug);
-        await NPCRespawnService.clearNpcFromMap(npcSlug, 'main');
+        if (npcInstanceId) {
+          console.log('[NPC] Clearing instance from map now ->', npcInstanceId);
+          await (NPCRespawnService as any).clearNpcInstanceFromMap(npcInstanceId, 'main');
+        } else {
+          console.log('[NPC] Clearing from map now ->', npcSlug);
+          await NPCRespawnService.clearNpcFromMap(npcSlug, 'main');
+        }
         const npcDoc: any = await NPCService.getNPCBySlug(npcSlug);
         const delay = typeof npcDoc?.mapRecoverySeconds === 'number' ? npcDoc.mapRecoverySeconds : 300;
-        console.log('[NPC] Scheduling respawn in seconds ->', delay, npcSlug);
-        NPCRespawnService.scheduleRespawn(npcSlug, delay, 'main');
+        console.log('[NPC] Scheduling respawn in seconds ->', delay, npcInstanceId || npcSlug);
+        if (npcInstanceId) {
+          (NPCRespawnService as any).scheduleRespawnForInstance(npcSlug, npcInstanceId, delay, 'main');
+        } else {
+          NPCRespawnService.scheduleRespawn(npcSlug, delay, 'main');
+        }
       } catch (e) {
         console.error('NPC respawn scheduling failed for', npcSlug, e);
       }

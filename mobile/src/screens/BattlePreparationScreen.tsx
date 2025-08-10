@@ -16,11 +16,12 @@ type Props = {
   onClose: () => void;
   onBattleStart: (battleId?: string) => void;
   defenderNpcSlug?: string;
+  defenderNpcInstanceId?: string;
 };
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, defenderNpcSlug }: Props) => {
+export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, defenderNpcSlug, defenderNpcInstanceId }: Props) => {
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [selectedBattalion, setSelectedBattalion] = useState<string | null>(null);
@@ -140,7 +141,8 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
     screenHeight: SCREEN_HEIGHT,
     defenderNpcSlug: defenderNpcSlug || 'npc-small-corporation',
     unlockHackRigOnWin: !defenderNpcSlug, // only true when battle started from hack rig flow
-  }), [userBattalions, defenderNpcSlug]);
+    defenderNpcInstanceId,
+  }), [userBattalions, defenderNpcSlug, defenderNpcInstanceId]);
 
   useEffect(() => {
     const fetchAssignments = async () => {

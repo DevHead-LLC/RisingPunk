@@ -55,7 +55,7 @@ router.get('/:name', async (req: Request, res: Response) => {
     const emptyGrid = Array.from({ length: gridSize }, () =>
       Array.from({ length: gridSize }, () => ({ terrain: 'plain', entity: 'empty' }))
     );
-
+    let mutated = false;
     for (const c of (mapDoc as any).cells as any[]) {
       const y = c.y;
       const x = c.x;
@@ -63,13 +63,24 @@ router.get('/:name', async (req: Request, res: Response) => {
       const owner = c.isOccupied ? (c.occupiedBy === 'player' ? 'player' : 'enemy') : undefined;
       const name = c.entityName || undefined;
       const npcSlug = c.occupiedBy === 'npc' ? (c.npcSlug || undefined) : undefined;
+      if (c.occupiedBy === 'npc' && npcSlug && !c.npcInstanceId) {
+        c.npcInstanceId = `${npcSlug}-${x}-${y}`;
+        mutated = true;
+      }
+      const npcInstanceId = c.occupiedBy === 'npc' ? (c.npcInstanceId || undefined) : undefined;
       emptyGrid[y][x] = {
         terrain: c.terrain,
         entity,
         owner,
         name,
         npcSlug,
+        npcInstanceId,
       } as any;
+    }
+
+    if (mutated) {
+      (mapDoc as any).markModified('cells');
+      await (mapDoc as any).save();
     }
 
     res.json({ grid: emptyGrid });

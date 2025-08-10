@@ -148,6 +148,7 @@ describe('Battle End Detection', () => {
       const mockBattle = {
         battleId: 'test-battle',
         attackerId: validObjectId,
+         unlockHackRigOnWin: true,
         battalions: [
           createMockBattalion('b1', NodeOwner.USER, 1, 10, false),
           createMockBattalion('b2', NodeOwner.ENEMY, 2, 5, true)
