@@ -1,12 +1,13 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import { View, Text, StyleSheet, LayoutChangeEvent, Pressable, Image } from 'react-native';
+import { View, Text, StyleSheet, LayoutChangeEvent, Pressable, Image, Dimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle, withDecay, runOnJS } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withDecay, runOnJS, useAnimatedReaction } from 'react-native-reanimated';
 import { CloseButton } from '../components/common/CloseButton';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { setGrid, setLoading } from '../store/slices/mapSlice';
 import { useFetchMapQuery } from '../store/api/mapApi';
+import { computePanBounds } from '../utils/mapPanBounds';
 
 const CELL_SIZE = 55;
 const MARGIN_SIZE = 80;
@@ -17,12 +18,13 @@ type EntityType = 'empty' | 'player' | 'npc' | 'house';
 
 
 
-type CellData = {
+  type CellData = {
   terrain: TerrainType;
   entity: EntityType;
   owner?: 'player' | 'enemy';
   name?: string;
   npcSlug?: string;
+    npcInstanceId?: string;
 };
 
 type Props = {
@@ -40,9 +42,15 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const offsetY = useSharedValue(0);
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
+  const minX = useSharedValue(-1000000);
+  const maxX = useSharedValue(1000000);
+  const minY = useSharedValue(-1000000);
+  const maxY = useSharedValue(1000000);
+  const boundsReady = useSharedValue(false);
   const currentPanRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const computeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const initialDims = Dimensions.get('window');
+  const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: initialDims.width, height: initialDims.height });
   const [windowRange, setWindowRange] = useState<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>({ rowStart: 0, rowEnd: Math.min(14, (grid.length || 50) - 1), colStart: 0, colEnd: Math.min(14, (grid.length || 50) - 1) });
   const lastVelocityRef = useRef<{ vx: number; vy: number }>({ vx: 0, vy: 0 });
   const rafIdRef = useRef<number | null>(null);
@@ -64,12 +72,32 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }, 40);
   };
 
-  const animatedMapStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: offsetX.value },
-      { translateY: offsetY.value },
-    ],
-  }));
+  const animatedMapStyle = useAnimatedStyle(() => {
+    const tx = boundsReady.value
+      ? Math.min(maxX.value, Math.max(minX.value, offsetX.value))
+      : offsetX.value;
+    const ty = boundsReady.value
+      ? Math.min(maxY.value, Math.max(minY.value, offsetY.value))
+      : offsetY.value;
+    return {
+      transform: [
+        { translateX: tx },
+        { translateY: ty },
+      ],
+    } as const;
+  });
+
+  useAnimatedReaction(
+    () => ({ x: offsetX.value, y: offsetY.value }),
+    (v, prev) => {
+      if (!prev || Math.abs(v.x - prev.x) > 6 || Math.abs(v.y - prev.y) > 6) {
+        const cx = boundsReady.value ? Math.min(maxX.value, Math.max(minX.value, v.x)) : v.x;
+        const cy = boundsReady.value ? Math.min(maxY.value, Math.max(minY.value, v.y)) : v.y;
+        runOnJS(scheduleCompute)(cx, cy, 0, 0);
+        runOnJS(updateCurrentPan)(cx, cy);
+      }
+    }
+  );
 
   const panGesture = Gesture.Pan()
     .onStart(() => {
@@ -77,8 +105,12 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       startY.value = offsetY.value;
     })
     .onUpdate((g) => {
-      const x = startX.value + g.translationX;
-      const y = startY.value + g.translationY;
+      let x = startX.value + g.translationX;
+      let y = startY.value + g.translationY;
+      if (boundsReady.value) {
+        x = Math.min(maxX.value, Math.max(minX.value, x));
+        y = Math.min(maxY.value, Math.max(minY.value, y));
+      }
       offsetX.value = x;
       offsetY.value = y;
       // Schedule JS-side window compute so tiles load beyond current view
@@ -89,17 +121,19 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       runOnJS(updateCurrentPan)(x, y);
     })
     .onEnd((g) => {
-      // inertial decay on UI thread
-      offsetX.value = withDecay({ velocity: g.velocityX, deceleration: 0.997 });
-      offsetY.value = withDecay({ velocity: g.velocityY, deceleration: 0.997 });
+      if (boundsReady.value) {
+        offsetX.value = withDecay({ velocity: g.velocityX, deceleration: 0.997, clamp: [minX.value, maxX.value] } as any);
+        offsetY.value = withDecay({ velocity: g.velocityY, deceleration: 0.997, clamp: [minY.value, maxY.value] } as any);
+      } else {
+        offsetX.value = withDecay({ velocity: g.velocityX, deceleration: 0.997 });
+        offsetY.value = withDecay({ velocity: g.velocityY, deceleration: 0.997 });
+      }
       const x = startX.value + (g.translationX ?? 0);
       const y = startY.value + (g.translationY ?? 0);
-      // Final compute to ensure filled window after release
-      // @ts-ignore
-      runOnJS(scheduleCompute)(x, y, g.velocityX ?? 0, g.velocityY ?? 0);
-      // Update JS ref with the last known pan at release time
-      // @ts-ignore
-      runOnJS(updateCurrentPan)(x, y);
+      const fx = boundsReady.value ? Math.min(maxX.value, Math.max(minX.value, x)) : x;
+      const fy = boundsReady.value ? Math.min(maxY.value, Math.max(minY.value, y)) : y;
+      runOnJS(scheduleCompute)(fx, fy, g.velocityX ?? 0, g.velocityY ?? 0);
+      runOnJS(updateCurrentPan)(fx, fy);
     });
   const gridSize = grid.length || 50;
   const totalSize = gridSize * CELL_SIZE;
@@ -238,6 +272,30 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     computeWindow(currentPanRef.current.x, currentPanRef.current.y, width, height);
   }, [computeWindow]);
 
+  useEffect(() => {
+    if (containerSize.width > 0 && containerSize.height > 0) {
+      const bounds = computePanBounds({
+        totalSize,
+        containerWidth: containerSize.width,
+        containerHeight: containerSize.height,
+        marginSize: MARGIN_SIZE,
+      });
+      minX.value = bounds.minX;
+      maxX.value = bounds.maxX;
+      minY.value = bounds.minY;
+      maxY.value = bounds.maxY;
+      boundsReady.value = true;
+      const clamped = {
+        x: Math.min(bounds.maxX, Math.max(bounds.minX, currentPanRef.current.x)),
+        y: Math.min(bounds.maxY, Math.max(bounds.minY, currentPanRef.current.y)),
+      };
+      offsetX.value = clamped.x;
+      offsetY.value = clamped.y;
+      currentPanRef.current = clamped;
+      computeWindow(clamped.x, clamped.y, containerSize.width, containerSize.height);
+    }
+  }, [containerSize.width, containerSize.height, totalSize, minX, maxX, minY, maxY, offsetX, offsetY]);
+
   const handleCellPress = (x: number, y: number, cellData: CellData) => {
     setSelectedCell({x, y, info: cellData});
   };
@@ -272,11 +330,12 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             ]}>
               STATUS: {selectedCell.info.owner === 'player' ? 'FRIENDLY' : 'HOSTILE'}
             </Text>
-            {selectedCell.info.owner !== 'player' && selectedCell.info.npcSlug && (
+              {selectedCell.info.owner !== 'player' && selectedCell.info.npcSlug && (
               <Pressable
                 style={[styles.hackButton]}
                 onPress={() => {
                   (globalThis as any).pendingNpcSlug = selectedCell.info.npcSlug;
+                    (globalThis as any).pendingNpcInstanceId = selectedCell.info.npcInstanceId;
                   (globalThis as any).pendingMapPan = {
                     x: currentPanRef.current.x,
                     y: currentPanRef.current.y,
@@ -298,7 +357,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} onLayout={onContainerLayout}>
       <CloseButton onPress={onClose} />
 
       {renderLegend()}
@@ -312,7 +371,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             { width: totalSize + (MARGIN_SIZE * 2), height: totalSize + (MARGIN_SIZE * 2) },
             animatedMapStyle as any,
           ]}
-          onLayout={onContainerLayout}
         >
           <View style={[styles.gridArea, { width: totalSize, height: totalSize }]}>
             {Array.from({ length: gridSize }).map((_, y) => (

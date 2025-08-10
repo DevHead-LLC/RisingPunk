@@ -213,6 +213,7 @@ export class MapService {
       cell.occupiedBy = 'npc';
       cell.entityName = npc.name;
       (cell as any).npcSlug = npc.slug;
+      (cell as any).npcInstanceId = `${npc.slug}-${cell.x}-${cell.y}-${Math.floor(this.rng()*1e6)}`;
       placed++;
     }
   }

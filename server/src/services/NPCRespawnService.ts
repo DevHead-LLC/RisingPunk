@@ -5,6 +5,7 @@ type RespawnTask = {
   npcSlug: string;
   runAt: number;
   mapName: string;
+  npcInstanceId?: string;
 };
 
 export class NPCRespawnService {
@@ -21,6 +22,28 @@ export class NPCRespawnService {
         c.occupiedBy = 'none';
         c.entityName = '';
         (c as any).npcSlug = '';
+        (c as any).npcInstanceId = '';
+        changed = true;
+      }
+    }
+    if (changed) {
+      doc.markModified('cells');
+      await doc.save();
+    }
+  }
+
+  static async clearNpcInstanceFromMap(npcInstanceId: string, mapName: string = 'main'): Promise<void> {
+    const doc: any = await MapModel.findOne({ name: mapName });
+    if (!doc) return;
+    const cells: any[] = doc.cells || [];
+    let changed = false;
+    for (const c of cells) {
+      if (c.isOccupied && c.occupiedBy === 'npc' && (c as any).npcInstanceId === npcInstanceId) {
+        c.isOccupied = false;
+        c.occupiedBy = 'none';
+        c.entityName = '';
+        (c as any).npcSlug = '';
+        (c as any).npcInstanceId = '';
         changed = true;
       }
     }
@@ -39,11 +62,21 @@ export class NPCRespawnService {
     this.scheduled.set(npcSlug, timeout);
   }
 
-  private static async respawnNpc(npcSlug: string, mapName: string = 'main'): Promise<void> {
+  static scheduleRespawnForInstance(npcSlug: string, npcInstanceId: string, delaySeconds: number, mapName: string = 'main'): void {
+    const key = `${mapName}:${npcInstanceId}`;
+    if (this.scheduled.has(key)) { return; }
+    const timeout = setTimeout(async () => {
+      this.scheduled.delete(key);
+      await this.respawnNpc(npcSlug, mapName, npcInstanceId);
+    }, Math.max(1, delaySeconds) * 1000);
+    this.scheduled.set(key, timeout);
+  }
+
+  private static async respawnNpc(npcSlug: string, mapName: string = 'main', npcInstanceId?: string): Promise<void> {
     const doc: any = await MapModel.findOne({ name: mapName });
     if (!doc) return;
     const cells: any[] = doc.cells || [];
-    const valid: any[] = cells.filter((c: any) => !c.isOccupied && c.canBeOccupied && c.terrain !== 'water' && c.terrain !== 'mountain');
+    const valid: any[] = cells.filter((c: any) => !c.isOccupied && c.canBeOccupied && c.terrain !== 'water' && c.terrain !== 'mountain' && c.terrain !== 'road');
     if (valid.length === 0) return;
     const idx = Math.floor(Math.random() * valid.length);
     const cell = valid[idx];
@@ -51,6 +84,11 @@ export class NPCRespawnService {
     cell.occupiedBy = 'npc';
     cell.entityName = this.titleForSlug(npcSlug);
     (cell as any).npcSlug = npcSlug;
+    if (npcInstanceId) {
+      (cell as any).npcInstanceId = npcInstanceId;
+    } else {
+      (cell as any).npcInstanceId = `${npcSlug}-${cell.x}-${cell.y}-${Math.floor(Math.random()*1e6)}`;
+    }
     doc.markModified('cells');
     await doc.save();
   }
