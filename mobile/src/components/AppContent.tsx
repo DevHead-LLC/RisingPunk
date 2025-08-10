@@ -7,10 +7,13 @@ import { useFetchBalanceQuery } from '../store/api/balanceApi';
 import { useFetchBotsQuery, useFetchBuildStateQuery } from '../store/api/botsApi';
 import { LoginScreen } from '../screens/LoginScreen';
 import { TurfScreen } from '../screens/TurfScreen';
+import { FinancialStatementsScreen } from '../screens/FinancialStatementsScreen';
+import { setFinancialStatements } from '../store/slices/uiSlice';
 
 
 const AppContent = memo(() => {
   const dispatch = useAppDispatch();
+  const showFinancials = useAppSelector((state) => state.ui.modals.financialStatements);
   const { token, isLoading } = useAppSelector((state) => state.auth);
   const balanceDisplayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -92,7 +95,14 @@ const AppContent = memo(() => {
     return <LoginScreen />;
   }
 
-  return <TurfScreen />;
+  return (
+    <>
+      <TurfScreen />
+      {showFinancials && (
+        <FinancialStatementsScreen onClose={() => dispatch(setFinancialStatements(false))} />
+      )}
+    </>
+  );
 });
 
 export default AppContent;
