@@ -1,8 +1,10 @@
 import React, { memo, useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useAppSelector } from '../../store/hooks';
 import { getCurrentBalance } from '../../store/slices/balanceSlice';
 import { SIZING, COLORS } from '../../styles/theme';
+import { useAppDispatch } from '../../store/hooks';
+import { setFinancialStatements } from '../../store/slices/uiSlice';
 
 // Utility function for formatting balance
 export function formatBalance(amount: number): string {
@@ -12,6 +14,7 @@ export function formatBalance(amount: number): string {
 
 export const Balance = memo(() => {
   const balance = useAppSelector(getCurrentBalance);
+  const dispatch = useAppDispatch();
   const [, setUpdateTrigger] = useState(0);
 
   // Force re-render every 10 seconds to update balance display
@@ -24,10 +27,10 @@ export const Balance = memo(() => {
   }, [balance]);
 
   return (
-    <View style={styles.balanceContainer}>
+    <TouchableOpacity style={styles.balanceContainer} onPress={() => dispatch(setFinancialStatements(true))} activeOpacity={0.8}>
       <Text style={styles.balanceLabel}>WALLET:</Text>
       <Text style={styles.balanceAmount}>${formatBalance(balance)}</Text>
-    </View>
+    </TouchableOpacity>
   );
 });
 

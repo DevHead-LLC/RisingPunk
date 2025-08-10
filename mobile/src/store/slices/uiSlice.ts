@@ -10,6 +10,7 @@ interface UIState {
     hackRigAlert: boolean;
     battleResults: boolean;
     botSelector: boolean;
+    financialStatements: boolean;
   };
   // Screen navigation state (for future use)
   screens: {
@@ -25,6 +26,7 @@ const initialState: UIState = {
     hackRigAlert: false,
     battleResults: false,
     botSelector: false,
+    financialStatements: false,
   },
   screens: {
     currentTurfScreen: 'home',
@@ -54,6 +56,10 @@ export const uiSlice = createSlice({
       state.modals.botSelector = action.payload;
     },
 
+    setFinancialStatements: (state, action: PayloadAction<boolean>) => {
+      state.modals.financialStatements = action.payload;
+    },
+
     // Screen navigation actions (for future use)
     setCurrentTurfScreen: (state, action: PayloadAction<string>) => {
       state.screens.currentTurfScreen = action.payload;
@@ -67,6 +73,7 @@ export const {
   setHackRigAlert,
   setBattleResults,
   setBotSelector,
+  setFinancialStatements,
   setCurrentTurfScreen,
 } = uiSlice.actions;
 
