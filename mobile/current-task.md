@@ -1,55 +1,48 @@
-### CURRENT TASK: Financial Statements Overlay
+### CURRENT TASK: Shared Map — User Home Locations
 
-Progress
-- Balance component now opens a Financial Statements overlay with three tabs and a close button.
+Scope
+- Set up and display per-user home locations on a single shared map. Remove unrelated work; focus solely on the five goals below.
 
-### Objectives
-- Ensure financial statements overlay matches app style while leaning slightly professional.
-- Tabs on left: Income Statement, Balance Sheet, Statement of Cash Flows. Each shows a prepared placeholder area for future data.
-- Close button top-right; opening/closing preserves the underlying view.
-- Show active career tier title in each tab (e.g., Barista (Tier 1)).
-- Balance Sheet must only show real assets/liabilities: for now, only Cash as an asset; liabilities none. Use current user wallet balance for existing users; use $1000 starting cash for new users.
-- Default tier for all users (until choice UI exists): `barista`.
+Goals
+1) Find/assign a location on the shared map for each user profile; everyone sees the same map and updates.
+2) When the current user opens the map, center on their home if possible (respect map clamping). Do not change the view when returning from a battle (previous pan is preserved).
+3) Visual styling: current user’s home has a blue background; other users’ homes have a gray background. This must not affect other map piece backgrounds.
+4) All users’ homes use the same home image. No NPCs use this image.
+5) Each user’s home label shows their handle (not "You").
 
-### Constraints
-- Follow `intended.md` general styling expectations; do not alter unrelated battle systems.
-- Avoid new sources of truth; reuse existing `ui` slice for modal control.
+Users to show (handles)
+- BertToast
+- IronLedger
+- VioletVector
+- NeonStrider
+- CipherBloom
+- SplatRat17
 
-### Plan (step-by-step)
-1) UI/State
-- Use `ui.modals.financialStatements` to control visibility; open from `Balance` tap; close via overlay's `CloseButton`.
+Authorities & constraints
+- Server is the source of truth for user identities and home placement; map data should reference `userId` and resolve handle server-side or via a dedicated field. Client renders only.
+- Do not modify battle systems or unrelated screens.
+- Keep a single source of truth; avoid duplicating user/handle data on the client.
 
-2) Layout & Styling
-- Left-side vertical tabs; content panel on the right; top-right reusable close button; respect theme `COLORS`/`SIZING`.
+Step-by-step plan (manual verify after each step)
+1) Server map data
+- Ensure each active user has exactly one home cell in the shared map data, tied to `userId` and handle, and using the shared home image; no NPC uses this image.
+- Manual check: map data includes entries for all six handles with `userId` present and a consistent home image reference.
 
-3) Content Structure (placeholders only)
-- Income Statement: Revenue → COGS → Gross Profit → Operating Expenses → Operating Income → Other → Taxes → Net Income.
-- Balance Sheet: Assets (current/non-current) → Liabilities (current/long-term) → Equity (paid-in, retained earnings).
-- Cash Flows: Operating → Investing → Financing → Net change in cash.
+2) Client rendering (labels and backgrounds)
+- Render homes for all users. Label = handle. Background = blue for current user, gray for others. Do not impact other map piece backgrounds.
+- Manual check: on the map, current user’s home shows blue; others show gray; labels match handles and never display "You".
 
-4) Backend Data & Endpoints
-- Collections:
-  - `finance_tier_templates` (global, immutable): base data for all users.
-  - `financial_tiers` (per-user overrides): only user-changed fields or full copies.
-- Models:
-  - `FinanceTemplate` (templates) and `FinanceTier` (user overrides) with tierKey, tierName, story, incomeStatement, balanceSheet, cashFlows.
-- Endpoints:
-  - GET `/api/users/finance/templates` → list global templates.
-  - GET `/api/users/finance/tiers` → list user overrides.
-  - GET `/api/users/finance/tiers/:tierKey` → single user override.
-- Seeding:
-  - Seed three templates (barista, graphic_designer, corporate_lawyer) into `finance_tier_templates`.
-  - Optionally pre-materialize user copies in `financial_tiers` (not required; overrides created on change).
-  - Update existing templates to remove non-cash balance sheet items (set `balanceSheet.assets = {}` and `balanceSheet.liabilities = {}`; `netWorthChange = 0`).
+3) Initial centering behavior
+- When navigating into the map (e.g., from Hack Rig), center on the current user’s home within clamp limits. When returning from a battle, restore the prior pan and do not recenter.
+- Manual check: fresh map entry centers on the user home; returning from battle preserves the prior view.
 
-5) Client Rendering Rules
-- Default tier selection: barista if present; later allow user selection.
-- Income Statement and Cash Flows: render from template/overrides data.
-- Balance Sheet: ignore template asset/liability lists for now; render:
-  - Assets: `Cash Balance` = current user wallet (from `balanceSlice.total`).
-  - Liabilities: `None` ($0.00).
-  - Net Worth (Cash) = current wallet.
+4) Shared home image
+- Confirm a single image asset is used for all user homes and that NPCs do not reference it.
+- Manual check: inspect assets and rendered homes; NPCs never display the home image.
 
-### Deliverables
-- Financial Statements overlay with left tabs, top-right close, and placeholders for each statement; opened from tappable balance.
-- Server endpoints available for finance templates and per-user overrides; templates seeded with three tiers.
+5) Handle display correctness
+- Ensure labels use each user’s handle resolved from server data; remove or bypass any "You" label logic for homes.
+- Manual check: all homes display handles exactly as listed above.
+
+Next action
+- Start with Step 1 (server map data for user homes), then pause for your manual verification before proceeding to Step 2.

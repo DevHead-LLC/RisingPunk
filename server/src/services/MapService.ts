@@ -1,4 +1,5 @@
 import { Map } from '../models/Map';
+import { User } from '../models/User';
 import seedrandom from 'seedrandom';
 
 export class MapService {
@@ -47,7 +48,7 @@ export class MapService {
     this.addOpenSpaces(cells);
 
     // Add houses (entities)
-    this.addHouses(cells);
+    await this.addHouses(cells);
 
     // Create and save the map
     const map = new Map({
@@ -150,8 +151,8 @@ export class MapService {
     }
   }
 
-  private addHouses(cells: any[]): void {
-    // Place exactly 7 houses total: 1 player, 6 NPC (2 of each level)
+  private async addHouses(cells: any[]): Promise<void> {
+    // Place player homes for all users and NPC houses
     const pickValidCellIndex = (): number => {
       let tries = 0;
       while (tries < 10000) {
@@ -164,32 +165,17 @@ export class MapService {
       }
       return -1;
     };
-
-    // Player house at a fixed coordinate that's not (0,0) and valid; search outward if blocked
-    const desired = { x: 8, y: 11 };
-    const indexFor = (x: number, y: number) => y * this.GRID_SIZE + x;
-    const isValid = (c: any) => !c.isOccupied && c.canBeOccupied && c.terrain !== 'water' && c.terrain !== 'mountain';
-    let px = desired.x;
-    let py = desired.y;
-    if (!isValid(cells[indexFor(px, py)])) {
-      let found = false;
-      for (let radius = 1; radius < Math.max(this.GRID_SIZE, this.GRID_SIZE) && !found; radius++) {
-        for (let dy = -radius; dy <= radius && !found; dy++) {
-          for (let dx = -radius; dx <= radius && !found; dx++) {
-            const nx = Math.min(Math.max(px + dx, 0), this.GRID_SIZE - 1);
-            const ny = Math.min(Math.max(py + dy, 0), this.GRID_SIZE - 1);
-            const c = cells[indexFor(nx, ny)];
-            if (isValid(c)) {
-              px = nx; py = ny; found = true;
-            }
-          }
-        }
-      }
+    // Create player homes for all users
+    const users = await User.find({}, { _id: 1, handle: 1 }).lean();
+    for (const user of users) {
+      const idx = pickValidCellIndex();
+      if (idx === -1) { break; }
+      const cell = cells[idx];
+      cell.isOccupied = true;
+      cell.occupiedBy = 'player';
+      cell.entityName = user.handle;
+      (cell as any).userId = (user as any)._id;
     }
-    const playerCell = cells[indexFor(px, py)];
-    playerCell.isOccupied = true;
-    playerCell.occupiedBy = 'player';
-    playerCell.entityName = 'YOU';
 
     // Eight NPC houses: 4 of level 1, 2 of level 2, 2 of level 3
     const npcPool = [
@@ -207,7 +193,6 @@ export class MapService {
       const idx = pickValidCellIndex();
       if (idx === -1) break;
       const cell = cells[idx];
-      if ((cell.x === px && cell.y === py)) continue;
       const npc = npcPool[placed];
       cell.isOccupied = true;
       cell.occupiedBy = 'npc';

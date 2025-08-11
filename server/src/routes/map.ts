@@ -2,6 +2,7 @@ import express, { Request, Response, Router } from 'express';
 import auth from '../middleware/auth';
 import { MapService } from '../services/MapService';
 import { Map } from '../models/Map';
+import { User } from '../models/User';
 
 const router: Router = express.Router();
 const mapService = new MapService();
@@ -31,23 +32,67 @@ router.get('/:name', async (req: Request, res: Response) => {
         return;
       }
     } else {
-      // Validate map and, if invalid, rebuild deterministically via MapService to avoid randomness
+      // Validate and normalize map: ensure per-user homes exist and no blocked occupied cells
       const cells: any[] = (mapDoc as any).cells;
       const isBlocked = (c: any) => c.terrain === 'water' || c.terrain === 'mountain';
-      const playerYou = cells.filter(c => c.isOccupied && c.occupiedBy === 'player' && c.entityName === 'YOU');
-      const npcHouses = cells.filter(c => c.isOccupied && c.occupiedBy === 'npc');
-      const blockedHouse = cells.some(c => c.isOccupied && isBlocked(c));
-      // Allow dynamic NPC counts (defeat/respawn). Only enforce player house presence.
-      const invalidCounts = playerYou.length !== 1;
-
-      if (blockedHouse || invalidCounts) {
-        await Map.deleteOne({ _id: (mapDoc as any)._id });
-        const recreated = await mapService.generateMap(name);
-        mapDoc = (recreated as any) || await Map.findOne({ name });
-        if (!mapDoc) {
-          res.status(500).json({ error: 'Failed to build map' });
-          return;
+      let mutatedForCleanup = false;
+      for (const c of cells) {
+        if (c.isOccupied && isBlocked(c)) {
+          c.isOccupied = false;
+          c.occupiedBy = 'none';
+          c.entityName = '';
+          c.userId = null;
+          mutatedForCleanup = true;
         }
+        if (c.isOccupied && c.occupiedBy === 'player' && (c.entityName === 'YOU' || !c.userId)) {
+          c.isOccupied = false;
+          c.occupiedBy = 'none';
+          c.entityName = '';
+          c.userId = null;
+          mutatedForCleanup = true;
+        }
+      }
+
+      // Ensure every user has a home
+      const users = await User.find({}, { _id: 1, handle: 1 }).lean();
+      const existingByUser: Map<string, any> = new globalThis.Map<string, any>();
+      for (const c of cells) {
+        if (c.isOccupied && c.occupiedBy === 'player' && c.userId) {
+          existingByUser.set(String(c.userId), c);
+        }
+      }
+
+      const pickValidIndex = (): number => {
+        let tries = 0;
+        while (tries < 10000) {
+          const idx = Math.floor(Math.random() * cells.length);
+          const cc = cells[idx];
+          if (!cc.isOccupied && cc.canBeOccupied && cc.terrain !== 'water' && cc.terrain !== 'mountain') {
+            return idx;
+          }
+          tries++;
+        }
+        return -1;
+      };
+
+      for (const u of users) {
+        const idStr = String((u as any)._id);
+        if (!existingByUser.has(idStr)) {
+          const idx = pickValidIndex();
+          if (idx !== -1) {
+            const c = cells[idx];
+            c.isOccupied = true;
+            c.occupiedBy = 'player';
+            c.entityName = (u as any).handle;
+            c.userId = (u as any)._id;
+            mutatedForCleanup = true;
+          }
+        }
+      }
+
+      if (mutatedForCleanup) {
+        (mapDoc as any).markModified('cells');
+        await (mapDoc as any).save();
       }
     }
 
@@ -73,6 +118,7 @@ router.get('/:name', async (req: Request, res: Response) => {
         entity,
         owner,
         name,
+        userId: c.userId ? String(c.userId) : undefined,
         npcSlug,
         npcInstanceId,
       } as any;
