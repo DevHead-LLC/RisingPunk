@@ -54,8 +54,7 @@ jobs:
           aws-region: ${{ env.REGION }}
 
       - name: Upload artifact to S3 (EB service bucket)
-      run: aws s3 cp "${{ env.ARTIFACT }}" "s3://${{ env.EB_BUCKET }}/${{ env.ARTIFACT }}" --acl bucket-owner-full-control
-        
+        run: aws s3 cp "${{ env.ARTIFACT }}" "s3://${{ env.EB_BUCKET }}/${{ env.ARTIFACT }}" --acl bucket-owner-full-control
 
       - name: Ensure EB application version exists (idempotent)
         run: |
