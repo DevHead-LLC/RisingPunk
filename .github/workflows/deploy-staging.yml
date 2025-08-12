@@ -9,11 +9,12 @@ on:
   workflow_dispatch:
 
 env:
-  ARTIFACT: rp-api-${{ github.sha }}.zip
   EB_BUCKET: ${{ secrets.EB_S3_BUCKET }}
   EB_APP:    ${{ secrets.EB_APP_NAME }}
   EB_ENV:    ${{ secrets.EB_ENV_NAME }}
   REGION:    ${{ secrets.AWS_REGION }}
+  EB_VERSION: ${{ github.sha }}
+  ARTIFACT: rp-api-${{ github.sha }}.zip
 
 jobs:
   build-deploy:
@@ -43,7 +44,7 @@ jobs:
 
       - name: Zip artifact (dist + runtime files)
         run: |
-          zip -r "${{ env.ARTIFACT }}" package.json package-lock.json Procfile dist \
+          zip -qr "${ARTIFACT}" package.json package-lock.json Procfile dist \
             -x "dist/mobile/*" "**/__tests__/**"
 
       - name: Configure AWS creds
@@ -53,22 +54,28 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.REGION }}
 
+      - name: Sanity check identity & bucket
+        run: |
+          aws sts get-caller-identity
+          aws s3 ls "s3://${EB_BUCKET}/" || true
+
       - name: Upload artifact to S3 (EB service bucket)
         run: aws s3 cp "${{ env.ARTIFACT }}" "s3://${{ env.EB_BUCKET }}/${{ env.ARTIFACT }}" --acl bucket-owner-full-control
+
 
       - name: Ensure EB application version exists (idempotent)
         run: |
           set -e
           EXISTS=$(aws elasticbeanstalk describe-application-versions \
-            --application-name "${{ env.EB_APP }}" \
-            --version-labels "${{ github.sha }}" \
+            --application-name "${EB_APP}" \
+            --version-labels "${EB_VERSION}" \
             --query 'length(ApplicationVersions)' --output text)
           if [ "$EXISTS" = "0" ]; then
-            echo "Creating EB application version for ${{ github.sha }} ..."
+            echo "Creating EB application version for ${EB_VERSION} ..."
             aws elasticbeanstalk create-application-version \
-              --application-name "${{ env.EB_APP }}" \
-              --version-label "${{ github.sha }}" \
-              --source-bundle S3Bucket="${{ env.EB_BUCKET }}",S3Key="${{ env.ARTIFACT }}"
+              --application-name "${EB_APP}" \
+              --version-label "${EB_VERSION}" \
+              --source-bundle S3Bucket="${EB_BUCKET}",S3Key="${ARTIFACT}"
           else
             echo "EB application version already exists; continuing."
           fi
@@ -76,8 +83,8 @@ jobs:
       - name: Deploy to environment
         run: |
           aws elasticbeanstalk update-environment \
-            --environment-name "${{ env.EB_ENV }}" \
-            --version-label "${{ github.sha }}"
+            --environment-name "${EB_ENV}" \
+            --version-label "${EB_VERSION}"
 
       - name: Wait for environment to finish updating
-        run: aws elasticbeanstalk wait environment-updated --environment-names "${{ env.EB_ENV }}"
+        run: aws elasticbeanstalk wait environment-updated --environment-names "${EB_ENV}"
