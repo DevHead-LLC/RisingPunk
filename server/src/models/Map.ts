@@ -18,7 +18,8 @@ const CellSchema = new mongoose.Schema({
   },
   entityName: { type: String, default: '' },
   npcSlug: { type: String, default: '' },
-  npcInstanceId: { type: String, default: '' }
+  npcInstanceId: { type: String, default: '' },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
 });
 
 // Set canBeOccupied based on terrain type

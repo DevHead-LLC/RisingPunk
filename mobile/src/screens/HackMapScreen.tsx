@@ -25,6 +25,7 @@ type EntityType = 'empty' | 'player' | 'npc' | 'house';
   name?: string;
   npcSlug?: string;
     npcInstanceId?: string;
+    userId?: string;
 };
 
 type Props = {
@@ -36,6 +37,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const dispatch = useAppDispatch();
   const grid = useAppSelector((state) => state.map.grid);
   const loading = useAppSelector((state) => state.map.loading);
+  const currentUserHandle = useAppSelector((state) => state.auth.user?.handle);
 
   const [selectedCell, setSelectedCell] = useState<{x: number, y: number, info: CellData} | null>(null);
   const offsetX = useSharedValue(0);
@@ -56,6 +58,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const rafIdRef = useRef<number | null>(null);
   const lastComputedPanRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const lastComputeTsRef = useRef<number>(0);
+  const hasCenteredOnHomeRef = useRef<boolean>(false);
   // Restore pan position if provided (initialized after computeWindow definition)
   const updateCurrentPan = (x: number, y: number) => {
     currentPanRef.current = { x, y };
@@ -293,8 +296,73 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       offsetY.value = clamped.y;
       currentPanRef.current = clamped;
       computeWindow(clamped.x, clamped.y, containerSize.width, containerSize.height);
+      // Bounds are now set; attempt centering on user's home
+      if (!restorePan && !hasCenteredOnHomeRef.current && currentUserHandle) {
+        // Inline center-on-home logic to avoid using computeWindow before declaration
+        const size = grid.length;
+        if (size) {
+          let homeX: number | null = null;
+          let homeY: number | null = null;
+          for (let y = 0; y < size; y++) {
+            const row = grid[y];
+            if (!row) continue;
+            for (let x = 0; x < row.length; x++) {
+              const cell = row[x] as any;
+              if (cell && cell.entity === 'house' && cell.name === currentUserHandle) {
+                homeX = x; homeY = y; break;
+              }
+            }
+            if (homeX != null) break;
+          }
+          if (homeX != null && homeY != null) {
+            const targetX = (containerSize.width / 2) - MARGIN_SIZE - ((homeX + 0.5) * CELL_SIZE);
+            const targetY = (containerSize.height / 2) - MARGIN_SIZE - ((homeY + 0.5) * CELL_SIZE);
+            const cx = Math.min(maxX.value, Math.max(minX.value, targetX));
+            const cy = Math.min(maxY.value, Math.max(minY.value, targetY));
+            offsetX.value = cx;
+            offsetY.value = cy;
+            currentPanRef.current = { x: cx, y: cy };
+            // Safe to call computeWindow here as it's declared earlier
+            computeWindow(cx, cy, containerSize.width, containerSize.height);
+            hasCenteredOnHomeRef.current = true;
+          }
+        }
+      }
     }
-  }, [containerSize.width, containerSize.height, totalSize, minX, maxX, minY, maxY, offsetX, offsetY]);
+  }, [containerSize.width, containerSize.height, totalSize, minX, maxX, minY, maxY, offsetX, offsetY, grid, currentUserHandle, restorePan]);
+
+  // Center on current user's home on initial entry (only if not returning from battle with restorePan)
+  useEffect(() => {
+    if (!boundsReady.value) return;
+    if (restorePan) return; // respect return-from-battle view
+    if (hasCenteredOnHomeRef.current) return;
+    if (!currentUserHandle) return;
+    const size = grid.length;
+    if (!size) return;
+    let homeX: number | null = null;
+    let homeY: number | null = null;
+    for (let y = 0; y < size; y++) {
+      const row = grid[y];
+      if (!row) continue;
+      for (let x = 0; x < row.length; x++) {
+        const cell = row[x];
+        if (cell && cell.entity === 'house' && cell.name === currentUserHandle) {
+          homeX = x; homeY = y; break;
+        }
+      }
+      if (homeX != null) break;
+    }
+    if (homeX == null || homeY == null) return;
+    const targetX = (containerSize.width / 2) - MARGIN_SIZE - ((homeX + 0.5) * CELL_SIZE);
+    const targetY = (containerSize.height / 2) - MARGIN_SIZE - ((homeY + 0.5) * CELL_SIZE);
+    const cx = Math.min(maxX.value, Math.max(minX.value, targetX));
+    const cy = Math.min(maxY.value, Math.max(minY.value, targetY));
+    offsetX.value = cx;
+    offsetY.value = cy;
+    currentPanRef.current = { x: cx, y: cy };
+    computeWindow(cx, cy, containerSize.width, containerSize.height);
+    hasCenteredOnHomeRef.current = true;
+  }, [grid, currentUserHandle, restorePan, containerSize.width, containerSize.height, minX, maxX, boundsReady, computeWindow, offsetX, offsetY]);
 
   const handleCellPress = (x: number, y: number, cellData: CellData) => {
     setSelectedCell({x, y, info: cellData});
@@ -386,6 +454,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                 rowStyle={rowPosStyles[y]}
                 xPosStyles={xPosStyles}
                 terrainStyleMap={terrainStyleMap}
+                currentUserHandle={currentUserHandle}
                 disableTiles
               />
             ))}
@@ -409,6 +478,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                   xStyle={xPosStyles[x]}
                   yStyle={yPosStyles[y]}
                   terrainStyleMap={terrainStyleMap}
+                  currentUserHandle={currentUserHandle}
                 />
               );
             })}
@@ -427,9 +497,15 @@ type TileProps = {
   onPress: (x: number, y: number, cell: CellData) => void;
   xStyle: any;
   terrainStyleMap: Record<TerrainType, any>;
+  currentUserHandle?: string | null;
 };
 
-const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap }) => {
+const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle }) => {
+  const houseBgStyle = cell.entity === 'house'
+    ? (cell.owner === 'player'
+        ? (cell.name === currentUserHandle ? styles.userHouseBg : styles.otherUserHouseBg)
+        : styles.enemyHouseBg)
+    : null;
   return (
     <Pressable
       style={[
@@ -439,20 +515,29 @@ const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, x
       ]}
       onPress={() => onPress(x, y, cell)}
     >
-      <View style={[styles.cellContent, terrainStyleMap[cell.terrain]]}>
-        {getTerrainIcon(cell.terrain)}
+      <View style={[styles.cellContent, terrainStyleMap[cell.terrain], houseBgStyle]}>
+        {cell.entity !== 'house' && getTerrainIcon(cell.terrain)}
         {cell.entity === 'house' && (
           <>
-            {(cell.name === 'YOU' || cell.owner === 'player') ? (
+            {cell.owner === 'player' ? (
               <Image source={require('../assets/images/home.png')} style={styles.playerHomeIcon} resizeMode="contain" />
             ) : (
-              <View style={[styles.entityOverlay, styles.enemyHouse]} />
+              <>
+                {(() => {
+                  const slug = (cell as any).npcSlug as string | undefined;
+                  if (slug === 'npc-small-corporation') {
+                    return <Image source={require('../assets/images/fog-building.png')} style={styles.playerHomeIcon} resizeMode="contain" />;
+                  }
+                  // default for small bank and large corporation
+                  return <Image source={require('../assets/images/fog-tall-building.png')} style={styles.playerHomeIcon} resizeMode="contain" />;
+                })()}
+              </>
             )}
             <View style={styles.entityLabelContainer} pointerEvents="none">
               <Text
                 style={[
                   styles.entityLabel,
-                  (cell.name === 'YOU' || cell.owner === 'player') ? styles.playerLabel : styles.enemyLabel,
+                  cell.owner === 'player' ? styles.playerLabel : styles.enemyLabel,
                 ]}
                 numberOfLines={1}
                 ellipsizeMode="tail"
@@ -476,12 +561,13 @@ type PoolTileProps = {
   xStyle: any;
   yStyle: any;
   terrainStyleMap: Record<TerrainType, any>;
+  currentUserHandle?: string | null;
 };
 
-const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap }) => {
+const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle }) => {
   return (
     <View style={[yStyle]}>
-      <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} />
+      <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} />
     </View>
   );
 });
@@ -498,9 +584,10 @@ type RowProps = {
   xPosStyles: Array<any>;
   terrainStyleMap: Record<TerrainType, any>;
   disableTiles?: boolean;
+  currentUserHandle?: string | null;
 };
 
-const Row: React.FC<RowProps> = React.memo(({ y, row, colStart, colEnd, rowVisible, selectedCell, onPress, rowStyle, xPosStyles, terrainStyleMap, disableTiles }) => {
+const Row: React.FC<RowProps> = React.memo(({ y, row, colStart, colEnd, rowVisible, selectedCell, onPress, rowStyle, xPosStyles, terrainStyleMap, disableTiles, currentUserHandle }) => {
   // Always render the row container (grid shell), but only mount tiles when visible
   if (!row) {
     return <View style={[styles.row, rowStyle]} />;
@@ -516,7 +603,7 @@ const Row: React.FC<RowProps> = React.memo(({ y, row, colStart, colEnd, rowVisib
         const cell = row[x];
         if (!cell) return null;
         const isSelected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
-        return <Tile key={x} x={x} y={y} cell={cell} selected={isSelected} onPress={onPress} xStyle={xPosStyles[x]} terrainStyleMap={terrainStyleMap} />;
+        return <Tile key={x} x={x} y={y} cell={cell} selected={isSelected} onPress={onPress} xStyle={xPosStyles[x]} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} />;
       })
     : null;
 
@@ -706,11 +793,17 @@ const styles = StyleSheet.create({
     bottom: 6,
     borderRadius: 6,
   },
-  playerHouse: {
-    backgroundColor: 'rgba(0, 255, 65, 0.35)',
+  userHouseBg: {
+    backgroundColor: 'rgba(52, 140, 255, 0.35)',
   },
-  enemyHouse: {
+  otherUserHouseBg: {
+    backgroundColor: 'rgba(128, 128, 128, 0.35)',
+  },
+  enemyHouseBg: {
     backgroundColor: 'rgba(204, 85, 0, 0.35)',
+  },
+  otherUserHouse: {
+    backgroundColor: 'rgba(128, 128, 128, 0.35)',
   },
   playerHomeIcon: {
     width: CELL_SIZE - 10,
