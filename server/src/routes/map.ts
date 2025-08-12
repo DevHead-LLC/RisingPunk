@@ -44,12 +44,24 @@ router.get('/:name', async (req: Request, res: Response) => {
           c.userId = null;
           mutatedForCleanup = true;
         }
-        if (c.isOccupied && c.occupiedBy === 'player' && !c.userId) {
-          c.isOccupied = false;
-          c.occupiedBy = 'none';
-          c.entityName = '';
-          c.userId = null;
-          mutatedForCleanup = true;
+        // Clear any player-occupied cells that are invalid or ephemeral markers
+        if (c.isOccupied && c.occupiedBy === 'player') {
+          // Remove orphaned player cells with no userId
+          if (!c.userId) {
+            c.isOccupied = false;
+            c.occupiedBy = 'none';
+            c.entityName = '';
+            c.userId = null;
+            mutatedForCleanup = true;
+          }
+          // Always remove any persisted 'YOU' marker as it is ephemeral
+          if (c.entityName === 'YOU') {
+            c.isOccupied = false;
+            c.occupiedBy = 'none';
+            c.entityName = '';
+            c.userId = null;
+            mutatedForCleanup = true;
+          }
         }
       }
 
@@ -81,20 +93,30 @@ router.get('/:name', async (req: Request, res: Response) => {
           const result = await Map.findOneAndUpdate(
             {
               _id: (mapDoc as any)._id,
+              // Ensure this user does not already have a home cell
               cells: { $not: { $elemMatch: { userId: (u as any)._id } } },
-              'cells.x': candidate.x,
-              'cells.y': candidate.y,
-              'cells.isOccupied': false,
-              'cells.canBeOccupied': true,
-              'cells.terrain': { $nin: ['water', 'mountain'] }
+              // Atomically target a single array element that matches all conditions
+              $and: [
+                {
+                  cells: {
+                    $elemMatch: {
+                      x: candidate.x,
+                      y: candidate.y,
+                      isOccupied: false,
+                      canBeOccupied: true,
+                      terrain: { $nin: ['water', 'mountain'] },
+                    },
+                  },
+                },
+              ],
             } as any,
             {
               $set: {
                 'cells.$.isOccupied': true,
                 'cells.$.occupiedBy': 'player',
                 'cells.$.entityName': (u as any).handle,
-                'cells.$.userId': (u as any)._id
-              }
+                'cells.$.userId': (u as any)._id,
+              },
             },
             { new: false }
           );
@@ -170,7 +192,8 @@ router.post('/player-position', auth, async (req: Request, res: Response) => {
 
     const authUserId: any = (req as any).user?._id;
     for (const c of (mapDoc as any).cells as any[]) {
-      if (c.isOccupied && c.occupiedBy === 'player' && c.entityName === 'YOU' && c.userId && String(c.userId) === String(authUserId)) {
+      // Remove any stale 'YOU' markers regardless of which user set them
+      if (c.isOccupied && c.occupiedBy === 'player' && c.entityName === 'YOU') {
         c.isOccupied = false;
         c.occupiedBy = 'none';
         c.entityName = '';

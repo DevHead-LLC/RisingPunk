@@ -4,7 +4,7 @@
  */
 
 import { IBattalion } from '../types/battle';
-import { NodePosition } from '../../../mobile/src/types/battleTypes';
+import { NodePosition } from '../types/battleTypes';
 
 const MOVEMENT_CONFIG = {
   BASE_MOVEMENT_TIME_MS: 20000,

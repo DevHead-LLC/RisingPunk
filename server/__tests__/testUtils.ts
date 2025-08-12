@@ -4,7 +4,7 @@
  */
 
 import { IBattalion, INode, NodeOwner, BotType } from '../src/types/battle';
-import { NodePosition } from '../../mobile/src/types/battleTypes';
+import { NodePosition } from '../src/types/battleTypes';
 
 // Shared network configuration (matches server/src/config/networkConfig.ts)
 export const TEST_NETWORK_CONNECTIONS = [

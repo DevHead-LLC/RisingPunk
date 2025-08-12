@@ -5,7 +5,7 @@
 
 import { MovementCalculationService } from '../src/services/MovementCalculationService';
 import { createTestBattalion, TEST_NODE_POSITIONS, isPointOnLineSegment } from './testUtils';
-import { NodePosition } from '../../mobile/src/types/battleTypes';
+import { NodePosition } from '../src/types/battleTypes';
 
 describe('Battalion Network Line Adherence', () => {
   describe('Movement calculations stay on network lines', () => {
