@@ -10,7 +10,7 @@ on:
 
 env:
   ARTIFACT: rp-api-${{ github.sha }}.zip
-  EB_BUCKET: ${{ secrets.EB_S3_BUCKET }}         # set to elasticbeanstalk-us-west-2-211125440777
+  EB_BUCKET: ${{ secrets.EB_S3_BUCKET }}
   EB_APP:    ${{ secrets.EB_APP_NAME }}
   EB_ENV:    ${{ secrets.EB_ENV_NAME }}
   REGION:    ${{ secrets.AWS_REGION }}
@@ -79,6 +79,5 @@ jobs:
             --environment-name "${{ env.EB_ENV }}" \
             --version-label "${{ github.sha }}"
 
-      # Optional: wait until the update finishes
       - name: Wait for environment to finish updating
         run: aws elasticbeanstalk wait environment-updated --environment-names "${{ env.EB_ENV }}"
