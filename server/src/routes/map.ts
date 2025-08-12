@@ -44,8 +44,16 @@ router.get('/:name', async (req: Request, res: Response) => {
           c.userId = null;
           mutatedForCleanup = true;
         }
-        // Clear invalid player-occupied cells (no userId). Do not clear valid 'YOU' markers globally.
+        // Clear invalid player-occupied cells (no userId)
         if (c.isOccupied && c.occupiedBy === 'player' && !c.userId) {
+          c.isOccupied = false;
+          c.occupiedBy = 'none';
+          c.entityName = '';
+          c.userId = null;
+          mutatedForCleanup = true;
+        }
+        // Always clear ephemeral 'YOU' markers regardless of userId to avoid persistence across map loads
+        if (c.isOccupied && c.occupiedBy === 'player' && c.entityName === 'YOU') {
           c.isOccupied = false;
           c.occupiedBy = 'none';
           c.entityName = '';
@@ -82,8 +90,8 @@ router.get('/:name', async (req: Request, res: Response) => {
           const result = await Map.findOneAndUpdate(
             {
               _id: (mapDoc as any)._id,
-              // Ensure this user does not already have a home cell
-              cells: { $not: { $elemMatch: { userId: (u as any)._id } } },
+              // Ensure this user does not already have a permanent home cell (ignore ephemeral 'YOU')
+              cells: { $not: { $elemMatch: { userId: (u as any)._id, occupiedBy: 'player', entityName: { $ne: 'YOU' } } } },
               // Atomically target a single array element that matches all conditions
               $and: [
                 {
@@ -181,10 +189,10 @@ router.post('/player-position', auth, async (req: Request, res: Response) => {
 
     const authUserId: any = (req as any).user?._id;
     for (const c of (mapDoc as any).cells as any[]) {
-      // Clear markers only for the authenticated user, or legacy invalid 'YOU' without userId
+      // Only clear ephemeral 'YOU' markers for this user, or legacy invalid 'YOU' without userId
       const belongsToAuthUser = c.userId && String(c.userId) === String(authUserId);
       const legacyInvalidYou = c.entityName === 'YOU' && !c.userId;
-      if (c.isOccupied && c.occupiedBy === 'player' && (belongsToAuthUser || legacyInvalidYou)) {
+      if (c.isOccupied && c.occupiedBy === 'player' && c.entityName === 'YOU' && (belongsToAuthUser || legacyInvalidYou)) {
         c.isOccupied = false;
         c.occupiedBy = 'none';
         c.entityName = '';
