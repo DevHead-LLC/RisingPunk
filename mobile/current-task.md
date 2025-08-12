@@ -1,48 +1,105 @@
-### CURRENT TASK: Shared Map — User Home Locations
+Got you. Here is the tight end-to-end plan from right now through TestFlight and then to production, optimized to avoid rework.
 
-Scope
-- Set up and display per-user home locations on a single shared map. Remove unrelated work; focus solely on the five goals below.
+# Phase A: Staging API on Elastic Beanstalk
 
-Goals
-1) Find/assign a location on the shared map for each user profile; everyone sees the same map and updates.
-2) When the current user opens the map, center on their home if possible (respect map clamping). Do not change the view when returning from a battle (previous pan is preserved).
-3) Visual styling: current user’s home has a blue background; other users’ homes have a gray background. This must not affect other map piece backgrounds.
-4) All users’ homes use the same home image. No NPCs use this image.
-5) Each user’s home label shows their handle (not "You").
+1. Create EB env
 
-Users to show (handles)
-- BertToast
-- IronLedger
-- VioletVector
-- NeonStrider
-- CipherBloom
-- SplatRat17
+* App: risingpunk-api
+* Env: rp-staging-api
+* Platform: Node.js 22 on Amazon Linux 2023
+* Type: Load balanced, min 1 max 1
+* Domain: leave blank
+* Create with Sample app
 
-Authorities & constraints
-- Server is the source of truth for user identities and home placement; map data should reference `userId` and resolve handle server-side or via a dedicated field. Client renders only.
-- Do not modify battle systems or unrelated screens.
-- Keep a single source of truth; avoid duplicating user/handle data on the client.
+2. After create
 
-Step-by-step plan (manual verify after each step)
-1) Server map data
-- Ensure each active user has exactly one home cell in the shared map data, tied to `userId` and handle, and using the shared home image; no NPC uses this image.
-- Manual check: map data includes entries for all six handles with `userId` present and a consistent home image reference.
+* Configuration → Load balancer → Health check path: `/health`
+* Configuration → Software → Env vars:
 
-2) Client rendering (labels and backgrounds)
-- Render homes for all users. Label = handle. Background = blue for current user, gray for others. Do not impact other map piece backgrounds.
-- Manual check: on the map, current user’s home shows blue; others show gray; labels match handles and never display "You".
+  * `NODE_ENV=staging`
+  * `PORT=8080`
+  * `MONGODB_URI=<atlas staging srv>`
+  * `JWT_SECRET=<random>`
 
-3) Initial centering behavior
-- When navigating into the map (e.g., from Hack Rig), center on the current user’s home within clamp limits. When returning from a battle, restore the prior pan and do not recenter.
-- Manual check: fresh map entry centers on the user home; returning from battle preserves the prior view.
+3. GitHub Actions deploy
 
-4) Shared home image
-- Confirm a single image asset is used for all user homes and that NPCs do not reference it.
-- Manual check: inspect assets and rendered homes; NPCs never display the home image.
+* S3 artifacts bucket and IAM user ready
+* Add repo secrets: `AWS_*`, `EB_APP_NAME`, `EB_ENV_NAME`, `EB_S3_BUCKET`
+* Workflow builds `server`, zips `dist + package.json + lock + Procfile`, creates EB version, updates env
+* Verify EB URL `/health` returns ok
 
-5) Handle display correctness
-- Ensure labels use each user’s handle resolved from server data; remove or bypass any "You" label logic for homes.
-- Manual check: all homes display handles exactly as listed above.
+# Phase B: TLS and Cloudflare for staging
 
-Next action
-- Start with Step 1 (server map data for user homes), then pause for your manual verification before proceeding to Step 2.
+1. ACM certificate in same region as EB
+
+* Request DNS validation for: `staging-api.risingpunk.com`, `api.risingpunk.com`
+* Add ACM CNAMEs in Cloudflare DNS
+* Wait until Issued
+
+2. Attach cert to ALB
+
+* EB → Load balancer → add HTTPS 443 listener with ACM cert
+* Keep HTTP 80 listener. Health checks on 80 are fine
+
+3. Cloudflare DNS and security
+
+* CNAME `staging-api` to EB CNAME
+* Orange cloud on
+* SSL/TLS mode Full (strict)
+* Cache rule: bypass for `staging-api.risingpunk.com/*`
+* Turn on WAF managed rules. Turn off features that mutate responses on this host
+
+# Phase C: Mobile app to staging
+
+1. Base URL for Release builds
+
+```
+export const API_URL = __DEV__
+  ? 'http://192.168.x.x:5001'
+  : 'https://staging-api.risingpunk.com';
+```
+
+2. Build TestFlight Build 2. Install. Smoke test login and core flows
+
+# Phase D: Hardening and observability
+
+* `helmet()` already in place
+* Simple rate limit on auth routes
+* `app.set('trust proxy', 1)` for Secure cookies behind CF+ALB
+* CORS allow `https://staging-api.risingpunk.com` and later `https://api.risingpunk.com`
+* CloudWatch logs enabled. Add an uptime check for `/health`
+* If large payloads later, add Nginx config via `.platform` to raise limits
+
+# Phase E: Production cut
+
+1. Atlas prod and EB prod
+
+* Create Atlas prod DB and user
+* Clone EB env to rp-prod-api or create new
+* Env vars: `NODE_ENV=production`, `MONGODB_URI=<prod>`, `JWT_SECRET=<new>`
+* Deploy via a second Actions workflow that targets prod env
+
+2. Cloudflare for prod
+
+* CNAME `api` to prod EB CNAME
+* Full (strict), bypass cache, WAF managed rules
+
+3. App flip
+
+* Update Release base URL to `https://api.risingpunk.com`
+* Build 3 for TestFlight. Then App Store submission when ready
+
+# Phase F: Nice to have but optional
+
+* Hidden environment picker inside the app for quick switching
+* Basic cost alarms. t3.micro is fine for now
+* Sentry or Crashlytics for the app
+
+# Success criteria
+
+* EB staging `/health` green over HTTPS at `staging-api.risingpunk.com`
+* TestFlight Build 2 talks to staging without your laptop running
+* A push to main under `server/` auto deploys to staging
+* Later, a tagged release deploys prod without changes to code
+
+Tell me when your EB env is created and I will guide the ACM request and Cloudflare DNS step.

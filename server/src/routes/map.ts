@@ -44,7 +44,7 @@ router.get('/:name', async (req: Request, res: Response) => {
           c.userId = null;
           mutatedForCleanup = true;
         }
-        if (c.isOccupied && c.occupiedBy === 'player' && (c.entityName === 'YOU' || !c.userId)) {
+        if (c.isOccupied && c.occupiedBy === 'player' && !c.userId) {
           c.isOccupied = false;
           c.occupiedBy = 'none';
           c.entityName = '';
@@ -53,47 +53,57 @@ router.get('/:name', async (req: Request, res: Response) => {
         }
       }
 
-      // Ensure every user has a home
-      const users = await User.find({}, { _id: 1, handle: 1 }).lean();
-      const existingByUser: Map<string, any> = new globalThis.Map<string, any>();
-      for (const c of cells) {
-        if (c.isOccupied && c.occupiedBy === 'player' && c.userId) {
-          existingByUser.set(String(c.userId), c);
-        }
-      }
-
-      const pickValidIndex = (): number => {
-        let tries = 0;
-        while (tries < 10000) {
-          const idx = Math.floor(Math.random() * cells.length);
-          const cc = cells[idx];
-          if (!cc.isOccupied && cc.canBeOccupied && cc.terrain !== 'water' && cc.terrain !== 'mountain') {
-            return idx;
-          }
-          tries++;
-        }
-        return -1;
-      };
-
-      for (const u of users) {
-        const idStr = String((u as any)._id);
-        if (!existingByUser.has(idStr)) {
-          const idx = pickValidIndex();
-          if (idx !== -1) {
-            const c = cells[idx];
-            c.isOccupied = true;
-            c.occupiedBy = 'player';
-            c.entityName = (u as any).handle;
-            c.userId = (u as any)._id;
-            mutatedForCleanup = true;
-          }
-        }
-      }
-
       if (mutatedForCleanup) {
         (mapDoc as any).markModified('cells');
         await (mapDoc as any).save();
       }
+
+      const users = await User.find({}, { _id: 1, handle: 1 }).lean();
+      const terrainIsValid = (cc: any) => !cc.isOccupied && cc.canBeOccupied && cc.terrain !== 'water' && cc.terrain !== 'mountain';
+      const pickValidCell = (): { x: number; y: number } | null => {
+        let tries = 0;
+        while (tries < 10000) {
+          const idx = Math.floor(Math.random() * cells.length);
+          const cc = cells[idx];
+          if (terrainIsValid(cc)) {
+            return { x: cc.x, y: cc.y };
+          }
+          tries++;
+        }
+        return null;
+      };
+
+      for (const u of users) {
+        let attempts = 0;
+        while (attempts < 10) {
+          const candidate = pickValidCell();
+          if (!candidate) break;
+          const result = await Map.findOneAndUpdate(
+            {
+              _id: (mapDoc as any)._id,
+              cells: { $not: { $elemMatch: { userId: (u as any)._id } } },
+              'cells.x': candidate.x,
+              'cells.y': candidate.y,
+              'cells.isOccupied': false,
+              'cells.canBeOccupied': true,
+              'cells.terrain': { $nin: ['water', 'mountain'] }
+            } as any,
+            {
+              $set: {
+                'cells.$.isOccupied': true,
+                'cells.$.occupiedBy': 'player',
+                'cells.$.entityName': (u as any).handle,
+                'cells.$.userId': (u as any)._id
+              }
+            },
+            { new: false }
+          );
+          if (result) break;
+          attempts++;
+        }
+      }
+
+      mapDoc = await Map.findOne({ name });
     }
 
     const gridSize = (mapDoc as any).gridSize || 50;
@@ -158,12 +168,13 @@ router.post('/player-position', auth, async (req: Request, res: Response) => {
       return;
     }
 
-    // Clear previous player position
+    const authUserId: any = (req as any).user?._id;
     for (const c of (mapDoc as any).cells as any[]) {
-      if (c.entityName === 'YOU') {
+      if (c.isOccupied && c.occupiedBy === 'player' && c.entityName === 'YOU' && c.userId && String(c.userId) === String(authUserId)) {
         c.isOccupied = false;
         c.occupiedBy = 'none';
         c.entityName = '';
+        c.userId = null;
       }
     }
 
@@ -184,6 +195,7 @@ router.post('/player-position', auth, async (req: Request, res: Response) => {
     target.isOccupied = true;
     target.occupiedBy = 'player';
     target.entityName = 'YOU';
+    target.userId = authUserId;
 
     await mapDoc.save();
 

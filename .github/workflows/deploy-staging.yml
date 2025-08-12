@@ -1,0 +1,68 @@
+name: Deploy API (staging)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'server/**'
+      - '.github/workflows/deploy-staging.yml'
+
+env:
+  ARTIFACT: rp-api-${{ github.sha }}.zip
+  EB_BUCKET: ${{ secrets.EB_S3_BUCKET }}
+  EB_APP: ${{ secrets.EB_APP_NAME }}
+  EB_ENV: ${{ secrets.EB_ENV_NAME }}
+  REGION: ${{ secrets.AWS_REGION }}
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: 'server/package-lock.json'
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build (ts -> dist)
+        run: npm run build
+
+      - name: Create Procfile
+        run: |
+          echo 'web: node dist/server/server.js' > Procfile
+
+      - name: Zip artifact (dist + runtime files)
+        run: |
+          zip -r ${{ env.ARTIFACT }} package.json package-lock.json Procfile dist \
+            -x "dist/mobile/*" "**/__tests__/**"
+
+      - name: Configure AWS creds
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.REGION }}
+
+      - name: Upload artifact to S3
+        run: aws s3 cp ${{ env.ARTIFACT }} s3://${{ env.EB_BUCKET }}/${{ env.ARTIFACT }}
+
+      - name: Create EB application version
+        run: |
+          aws elasticbeanstalk create-application-version \
+            --application-name "${{ env.EB_APP }}" \
+            --version-label "${{ github.sha }}" \
+            --source-bundle S3Bucket="${{ env.EB_BUCKET }}",S3Key="${{ env.ARTIFACT }}"
+
+      - name: Deploy to environment
+        run: |
+          aws elasticbeanstalk update-environment \
+            --environment-name "${{ env.EB_ENV }}" \
+            --version-label "${{ github.sha }}"

@@ -1,6 +1,6 @@
-console.log('Loading environment variables...');
-require('dotenv').config();
-console.log('Environment loaded. Connecting to MongoDB...');
+import helmet from 'helmet';
+import { CORS_ORIGINS, PORT } from './src/config/env';
+console.log('Environment loaded via dotenv-flow. Connecting to MongoDB...');
 
 const express = require('express');
 const mongoose = require('mongoose');
@@ -16,6 +16,7 @@ import { Error } from 'mongoose';
 import mapRoutes from './src/routes/map';
 import userRoutes from './src/routes/userRoutes';
 import battleRoutes from './src/routes/battle';
+import healthRoute from './src/routes/health';
 
 declare global {
   namespace Express {
@@ -29,7 +30,12 @@ declare global {
 const app = express();
 
 // Middleware
-app.use(cors());
+app.set('trust proxy', 1);
+app.use(helmet());
+app.use(cors({
+  origin: CORS_ORIGINS.length ? CORS_ORIGINS : true,
+  credentials: true,
+}));
 app.use(express.json());
 
 // MongoDB connection - simplified to match mongosh
@@ -331,6 +337,7 @@ app.use('/api/map', mapRoutes);
 
 app.use('/api/users', userRoutes);
 app.use('/api/battle', battleRoutes);
+app.use('/', healthRoute);
 
 app.post('/api/battalions/assign', auth, async (req: Request, res: Response) => {
   try {
@@ -393,8 +400,8 @@ app.post('/api/battalions/assign', auth, async (req: Request, res: Response) => 
   }
 });
 
-// Dynamic port selection - will try 5000 first, then increment if busy
-const startServer = (port = 5000, maxAttempts = 10) => {
+// Listen strictly on the configured PORT from env.ts
+const startServer = (port = PORT, maxAttempts = 0) => {
   try {
     const server = app.listen(port, () => {
       console.log(`✅ Server running successfully on port ${port}`);

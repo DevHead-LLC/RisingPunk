@@ -1,5 +1,0 @@
----
-alwaysApply: true
----
-
-Every time you take any action, you MUST ensure it's aligned with our intended.md behaviors I want to happen.  If anything conflicts with this, you must surface it as a question for me to clarify.  The intended.md file outlines the behaviors I expect for the application.  I don't want things that work to end up changing because you fail to pay attention to this file and behavior expectations.
