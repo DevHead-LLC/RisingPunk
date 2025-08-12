@@ -10,10 +10,10 @@ on:
 
 env:
   ARTIFACT: rp-api-${{ github.sha }}.zip
-  EB_BUCKET: ${{ secrets.EB_S3_BUCKET }}
-  EB_APP: ${{ secrets.EB_APP_NAME }}
-  EB_ENV: ${{ secrets.EB_ENV_NAME }}
-  REGION: ${{ secrets.AWS_REGION }}
+  EB_BUCKET: ${{ secrets.EB_S3_BUCKET }}         # set to elasticbeanstalk-us-west-2-211125440777
+  EB_APP:    ${{ secrets.EB_APP_NAME }}
+  EB_ENV:    ${{ secrets.EB_ENV_NAME }}
+  REGION:    ${{ secrets.AWS_REGION }}
 
 jobs:
   build-deploy:
@@ -21,6 +21,7 @@ jobs:
     defaults:
       run:
         working-directory: server
+
     steps:
       - uses: actions/checkout@v4
 
@@ -42,7 +43,7 @@ jobs:
 
       - name: Zip artifact (dist + runtime files)
         run: |
-          zip -r ${{ env.ARTIFACT }} package.json package-lock.json Procfile dist \
+          zip -r "${{ env.ARTIFACT }}" package.json package-lock.json Procfile dist \
             -x "dist/mobile/*" "**/__tests__/**"
 
       - name: Configure AWS creds
@@ -52,8 +53,8 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.REGION }}
 
-      - name: Upload artifact to S3
-        run: aws s3 cp ${{ env.ARTIFACT }} s3://${{ env.EB_BUCKET }}/${{ env.ARTIFACT }}
+      - name: Upload artifact to S3 (EB service bucket)
+        run: aws s3 cp "${{ env.ARTIFACT }}" "s3://${{ env.EB_BUCKET }}/${{ env.ARTIFACT }}"
 
       - name: Ensure EB application version exists (idempotent)
         run: |
@@ -77,3 +78,7 @@ jobs:
           aws elasticbeanstalk update-environment \
             --environment-name "${{ env.EB_ENV }}" \
             --version-label "${{ github.sha }}"
+
+      # Optional: wait until the update finishes
+      - name: Wait for environment to finish updating
+        run: aws elasticbeanstalk wait environment-updated --environment-names "${{ env.EB_ENV }}"

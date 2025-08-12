@@ -423,7 +423,7 @@ const startServer = (port = PORT, maxAttempts = 0) => {
       }
     });
   } catch (err) {
-    console.error('❌ Failed to start server:', err);
+    console.error('❌ Failed: to start server:', err);
     process.exit(1);
   }
 };
