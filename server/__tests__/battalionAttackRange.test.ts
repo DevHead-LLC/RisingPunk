@@ -5,7 +5,7 @@
 
 import { MovementCalculationService } from '../src/services/MovementCalculationService';
 import { createTestBattalion, TEST_NODE_POSITIONS, TEST_BOT_STATS } from './testUtils';
-import { NodePosition } from '../../mobile/src/types/battleTypes';
+import { NodePosition } from '../src/types/battleTypes';
 import { NodeOwner, BotType } from '../src/types/battle';
 
 describe('Battalion Attack Range', () => {
