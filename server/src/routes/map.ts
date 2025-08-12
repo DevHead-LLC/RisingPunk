@@ -44,24 +44,13 @@ router.get('/:name', async (req: Request, res: Response) => {
           c.userId = null;
           mutatedForCleanup = true;
         }
-        // Clear any player-occupied cells that are invalid or ephemeral markers
-        if (c.isOccupied && c.occupiedBy === 'player') {
-          // Remove orphaned player cells with no userId
-          if (!c.userId) {
-            c.isOccupied = false;
-            c.occupiedBy = 'none';
-            c.entityName = '';
-            c.userId = null;
-            mutatedForCleanup = true;
-          }
-          // Always remove any persisted 'YOU' marker as it is ephemeral
-          if (c.entityName === 'YOU') {
-            c.isOccupied = false;
-            c.occupiedBy = 'none';
-            c.entityName = '';
-            c.userId = null;
-            mutatedForCleanup = true;
-          }
+        // Clear invalid player-occupied cells (no userId). Do not clear valid 'YOU' markers globally.
+        if (c.isOccupied && c.occupiedBy === 'player' && !c.userId) {
+          c.isOccupied = false;
+          c.occupiedBy = 'none';
+          c.entityName = '';
+          c.userId = null;
+          mutatedForCleanup = true;
         }
       }
 
@@ -192,8 +181,10 @@ router.post('/player-position', auth, async (req: Request, res: Response) => {
 
     const authUserId: any = (req as any).user?._id;
     for (const c of (mapDoc as any).cells as any[]) {
-      // Remove any stale 'YOU' markers regardless of which user set them
-      if (c.isOccupied && c.occupiedBy === 'player' && c.entityName === 'YOU') {
+      // Clear markers only for the authenticated user, or legacy invalid 'YOU' without userId
+      const belongsToAuthUser = c.userId && String(c.userId) === String(authUserId);
+      const legacyInvalidYou = c.entityName === 'YOU' && !c.userId;
+      if (c.isOccupied && c.occupiedBy === 'player' && (belongsToAuthUser || legacyInvalidYou)) {
         c.isOccupied = false;
         c.occupiedBy = 'none';
         c.entityName = '';

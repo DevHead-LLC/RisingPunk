@@ -6,6 +6,7 @@ on:
     paths:
       - 'server/**'
       - '.github/workflows/deploy-staging.yml'
+  workflow_dispatch:
 
 env:
   ARTIFACT: rp-api-${{ github.sha }}.zip
@@ -37,7 +38,7 @@ jobs:
 
       - name: Create Procfile
         run: |
-          echo 'web: node dist/server/server.js' > Procfile
+          echo 'web: node dist/server.js' > Procfile
 
       - name: Zip artifact (dist + runtime files)
         run: |
