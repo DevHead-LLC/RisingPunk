@@ -79,12 +79,16 @@
 - **Action**: `s3:PutObjectAcl` (not `s3:GetObjectAcl`)
 - **Resource**: `resources/environments/e-2qegamu2wp/_runtime/_versions/risingpunk-api/*` (EB runtime directory, not our uploaded artifacts)
 
-**ROOT CAUSE**: The CI user needs `s3:PutObjectAcl` permissions on the EB environment's runtime directory, not just upload permissions.
+**ROOT CAUSE**: The CI user needs additional S3 permissions for the EB deployment process, not just upload permissions.
+
+**PROGRESS**: 
+- ✅ Fixed `s3:PutObjectAcl` on runtime directory
+- ❌ Now failing on `s3:GetBucketPolicy` on the bucket itself
 
 ### Next Steps
-1) **Add `s3:PutObjectAcl` permissions** to the `rp-github-deployer` user policy for the EB runtime directory
-2) **Remove the broad permission** from bucket policy once the targeted fix is in place
-3) **Test deployment** to confirm the issue is resolved
+1) **Add `s3:GetBucketPolicy` permission** to the `rp-github-deployer` user policy
+2) **Continue adding permissions as needed** until deployment succeeds
+3) **Remove the broad permission** from bucket policy once all targeted fixes are in place
 
 4) Workflow hygiene
 - Ensure the generated `Procfile` matches our server path: `web: node dist/server/server.js` (CI currently writes `web: node dist/server.js`; update it).
