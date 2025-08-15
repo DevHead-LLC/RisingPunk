@@ -54,12 +54,15 @@ export class NPCRespawnService {
   }
 
   static scheduleRespawn(npcSlug: string, delaySeconds: number, mapName: string = 'main'): void {
-    if (this.scheduled.has(npcSlug)) { return; }
+    const key = `${mapName}:${npcSlug}:${Date.now()}`;
+    const actualDelay = Math.max(1, delaySeconds) * 1000;
+    console.log('[NPCRespawn] Scheduling respawn for', npcSlug, 'with delay', actualDelay, 'ms');
     const timeout = setTimeout(async () => {
-      this.scheduled.delete(npcSlug);
+      console.log('[NPCRespawn] Timeout fired for', npcSlug);
+      this.scheduled.delete(key);
       await this.respawnNpc(npcSlug, mapName);
-    }, Math.max(1, delaySeconds) * 1000);
-    this.scheduled.set(npcSlug, timeout);
+    }, actualDelay);
+    this.scheduled.set(key, timeout);
   }
 
   static scheduleRespawnForInstance(npcSlug: string, npcInstanceId: string, delaySeconds: number, mapName: string = 'main'): void {
@@ -74,10 +77,16 @@ export class NPCRespawnService {
 
   private static async respawnNpc(npcSlug: string, mapName: string = 'main', npcInstanceId?: string): Promise<void> {
     const doc: any = await MapModel.findOne({ name: mapName });
-    if (!doc) return;
+    if (!doc) {
+      console.log('[NPCRespawn] No map document found for', mapName);
+      return;
+    }
     const cells: any[] = doc.cells || [];
     const valid: any[] = cells.filter((c: any) => !c.isOccupied && c.canBeOccupied && c.terrain !== 'water' && c.terrain !== 'mountain' && c.terrain !== 'road');
-    if (valid.length === 0) return;
+    if (valid.length === 0) {
+      console.log('[NPCRespawn] No valid cells found for respawn. Total cells:', cells.length, 'Valid cells:', valid.length);
+      return;
+    }
     const idx = Math.floor(Math.random() * valid.length);
     const cell = valid[idx];
     cell.isOccupied = true;
@@ -91,6 +100,7 @@ export class NPCRespawnService {
     }
     doc.markModified('cells');
     await doc.save();
+    console.log('[NPCRespawn] Successfully respawned', npcSlug, 'at', cell.x, cell.y);
   }
 
   private static titleForSlug(slug: string): string {
