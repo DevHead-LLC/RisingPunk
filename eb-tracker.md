@@ -84,7 +84,8 @@
 **PROGRESS**: 
 - ✅ Fixed `s3:PutObjectAcl` on runtime directory
 - ✅ Fixed `s3:GetBucketPolicy` on the bucket
-- ❌ Now failing on `s3:PutBucketPolicy` on the bucket itself
+- ✅ Fixed `s3:PutBucketPolicy` on the bucket
+- ❌ Now failing on `autoscaling:SuspendProcesses` on the Auto Scaling Group
 
 ### Next Steps
 1) **Add `s3:GetBucketPolicy` permission** to the `rp-github-deployer` user policy
