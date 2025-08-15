@@ -54,6 +54,7 @@
 - **Service role correctly configured**: EB environment is using `aws-elasticbeanstalk-service-role` as confirmed in console. Additional role `rp-aws-elasticbeanstalk-service-role` exists but is not being used.
 - **Service role permissions verified**: Both inline policies (`newPermission` and `ReadArtifactsForEB`) include `s3:GetObjectAcl` permissions for the correct S3 bucket. Permissions are correctly configured.
 - **ACL setting verified**: Latest uploaded object has correct ACL (Object=Read, Object ACL=Read+Write). The `--acl bucket-owner-full-control` flag is working correctly in CI.
+- **CI user permissions confirmed**: `rp-github-deployer` user lacks `s3:PutObjectAcl` permissions, confirming it can only upload with ACL flags but cannot modify ACLs after upload.
 
 ### Current Status Summary (2025-08-15)
 **ALL PERMISSIONS VERIFIED AND CORRECT:**
