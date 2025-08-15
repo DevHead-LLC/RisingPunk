@@ -140,7 +140,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     });
   const gridSize = grid.length || 50;
   const totalSize = gridSize * CELL_SIZE;
-  const { data: mapData, isLoading } = useFetchMapQuery();
+  const { data: mapData, isLoading, refetch } = useFetchMapQuery();
 
   // Precompute terrain style map and position style caches
   const terrainStyleMap = useMemo(() => ({
@@ -188,9 +188,18 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   useEffect(() => {
     dispatch(setLoading(isLoading));
     if (mapData && mapData.grid) {
+      console.log('[Map] Updating grid with fresh data from server');
       dispatch(setGrid(mapData.grid));
     }
   }, [mapData, isLoading, dispatch]);
+
+  // Force refresh map data when returning from battle to ensure NPCs are updated
+  useEffect(() => {
+    if (restorePan) {
+      console.log('[Map] Returning from battle, forcing map data refresh');
+      refetch();
+    }
+  }, [restorePan, refetch]);
 
   const computeWindow = useCallback((panX: number, panY: number, width: number, height: number) => {
     if (width <= 0 || height <= 0) {return;}
@@ -244,15 +253,40 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
   // Restore pan position if provided (now safe, computeWindow is defined)
   useEffect(() => {
-    if (restorePan) {
-      offsetX.value = restorePan.x;
-      offsetY.value = restorePan.y;
-      currentPanRef.current = { x: restorePan.x, y: restorePan.y };
+    if (restorePan && containerSize.width > 0 && containerSize.height > 0 && boundsReady.value) {
+      // Validate grid coordinates are within bounds
+      const gridSize = grid.length || 50;
+      if (restorePan.x < 0 || restorePan.x >= gridSize || restorePan.y < 0 || restorePan.y >= gridSize) {
+        console.log('[Map] Invalid grid coordinates for restore:', restorePan.x, restorePan.y, 'grid size:', gridSize);
+        return;
+      }
+      
+      // Check if there's still an entity at the restore coordinates
+      const cell = grid[restorePan.y]?.[restorePan.x];
+      if (cell) {
+        console.log('[Map] Cell at restore coordinates:', restorePan.x, restorePan.y, 'entity:', cell.entity, 'name:', cell.name);
+      } else {
+        console.log('[Map] No cell found at restore coordinates:', restorePan.x, restorePan.y);
+      }
+      
+      // Convert grid coordinates to pan coordinates (center the cell on screen)
+      const targetX = (containerSize.width / 2) - MARGIN_SIZE - ((restorePan.x + 0.5) * CELL_SIZE);
+      const targetY = (containerSize.height / 2) - MARGIN_SIZE - ((restorePan.y + 0.5) * CELL_SIZE);
+      
+      // Clamp to valid pan bounds
+      const clampedX = Math.min(maxX.value, Math.max(minX.value, targetX));
+      const clampedY = Math.min(maxY.value, Math.max(minY.value, targetY));
+      
+      console.log('[Map] Restoring pan to grid coordinates:', restorePan.x, restorePan.y, 'pan coordinates:', clampedX, clampedY);
+      
+      offsetX.value = clampedX;
+      offsetY.value = clampedY;
+      currentPanRef.current = { x: clampedX, y: clampedY };
       requestAnimationFrame(() => {
-        computeWindow(restorePan.x, restorePan.y, containerSize.width, containerSize.height);
+        computeWindow(clampedX, clampedY, containerSize.width, containerSize.height);
       });
     }
-  }, [restorePan, containerSize.width, containerSize.height, computeWindow, offsetX, offsetY]);
+  }, [restorePan, containerSize.width, containerSize.height, computeWindow, offsetX, offsetY, maxX, maxY, boundsReady, grid]);
 
   useEffect(() => {
     // Initial compute on mount and when container changes
@@ -404,9 +438,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                 onPress={() => {
                   (globalThis as any).pendingNpcSlug = selectedCell.info.npcSlug;
                     (globalThis as any).pendingNpcInstanceId = selectedCell.info.npcInstanceId;
+                  // Store the grid coordinates of the selected cell, not the pan coordinates
                   (globalThis as any).pendingMapPan = {
-                    x: currentPanRef.current.x,
-                    y: currentPanRef.current.y,
+                    x: selectedCell.x,
+                    y: selectedCell.y,
                   };
                   onClose();
                 }}

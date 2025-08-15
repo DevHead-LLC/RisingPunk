@@ -16,6 +16,7 @@ import {BattleGridScreen} from './BattleGridScreen';
 import {ErrorBoundary} from '../components/common/ErrorBoundary';
 import {useAppDispatch} from '../store/hooks';
 import {fetchInitialData} from '../store/slices/authSlice';
+import {mapApi} from '../store/api/mapApi';
 
 const DiagonalLines = memo(() => (
   <>
@@ -163,6 +164,11 @@ export function TurfScreen(): React.JSX.Element {
         return <BattleGridScreen
           battleId={battleId}
           _onClose={() => {
+            // Invalidate map cache to ensure fresh data after battle
+            // This prevents the "ghost NPC" issue where defeated NPCs still appear on the map
+            console.log('[Battle] Invalidating map cache after battle end');
+            dispatch(mapApi.util.invalidateTags(['Map']));
+            
             // Return to origin without resetting app
             if (returnContext?.origin === 'map') {
               navigateToScreen('map');

@@ -10,6 +10,7 @@ import { BattalionService } from './BattalionService';
 import { PointTrackingService } from './PointTrackingService';
 import { BOT_CONFIG } from './BotService';
 import { NPCService } from './NPCService';
+import { Map as MapModel } from '../models/Map';
 
 export class BattleSetupService {
 
@@ -32,6 +33,25 @@ export class BattleSetupService {
     
     // Optionally load NPC for enemy side
     const npc = defenderNpcSlug ? await NPCService.getNPCBySlug(defenderNpcSlug) : null;
+    
+    // Validate that NPC instance exists on map if instance ID is provided
+    if (defenderNpcInstanceId && defenderNpcSlug) {
+      const mapDoc = await MapModel.findOne({ name: 'main' });
+      if (!mapDoc) {
+        throw new Error('Map not found');
+      }
+      
+      const npcCell = mapDoc.cells.find((cell: any) => 
+        cell.npcInstanceId === defenderNpcInstanceId && 
+        cell.npcSlug === defenderNpcSlug &&
+        cell.isOccupied && 
+        cell.occupiedBy === 'npc'
+      );
+      
+      if (!npcCell) {
+        throw new Error(`NPC instance ${defenderNpcInstanceId} not found on map`);
+      }
+    }
     
     // Calculate total army health using bot stats authority
     const userTotal = battalionConfigs.reduce((total, battalion) => {
