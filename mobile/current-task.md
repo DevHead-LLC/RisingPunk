@@ -5,7 +5,24 @@
 - Implemented "next" button for multi-field forms and "done" for final inputs
 - Updated AuthInputs component to use new keyboard-aware inputs
 - Updated BuildControls component to use new keyboard-aware inputs
+- Updated QuantitySelector component to use new keyboard-aware inputs
+- Updated CustomInput component to extend KeyboardAwareInput
 - Created KeyboardDismissView wrapper for form containers
+- Updated ScreenContainer to include keyboard dismissal capability
+- Updated LoginScreen to use new AuthInputs component
+- Removed old renderInputWithCorner utility function usage
+
+**Key Features Implemented:**
+- ✅ Keyboard closes when clicking outside (via ScreenContainer and KeyboardDismissView)
+- ✅ "Next" button for intermediate fields with auto-focus
+- ✅ "Done" button for final fields with keyboard dismissal
+- ✅ Proper focus management between form inputs
+- ✅ Form submission on final input completion
+
+**Components Updated:**
+- AuthInputs, BuildControls, QuantitySelector, CustomInput
+- LoginScreen, ScreenContainer
+- All forms now have proper keyboard navigation and dismissal
 
 ### Repo housekeeping: Jest tests ignored repo-wide
 

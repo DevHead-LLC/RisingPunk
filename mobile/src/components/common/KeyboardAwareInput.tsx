@@ -1,9 +1,9 @@
 import React, { forwardRef } from 'react';
-import { View, TextInput, StyleSheet, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import { View, TextInput, StyleSheet, Keyboard } from 'react-native';
 import { COLORS } from '../../styles/theme';
 
-interface KeyboardAwareInputProps {
-  placeholder: string;
+export interface KeyboardAwareInputProps {
+  placeholder?: string;
   value: string;
   onChangeText: (text: string) => void;
   secureTextEntry?: boolean;
@@ -49,26 +49,24 @@ export const KeyboardAwareInput = forwardRef<TextInput, KeyboardAwareInputProps>
     };
 
     return (
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={styles.container}>
-          <TextInput
-            ref={ref}
-            style={[styles.input, style]}
-            placeholder={placeholder}
-            placeholderTextColor={COLORS.text.placeholder}
-            value={value}
-            onChangeText={onChangeText}
-            secureTextEntry={secureTextEntry}
-            keyboardType={keyboardType}
-            autoCapitalize={autoCapitalize}
-            returnKeyType={getReturnKeyType()}
-            onSubmitEditing={handleSubmitEditing}
-            blurOnSubmit={blurOnSubmit}
-            editable={editable}
-          />
-          <View style={styles.corner} />
-        </View>
-      </TouchableWithoutFeedback>
+      <View style={styles.container}>
+        <TextInput
+          ref={ref}
+          style={[styles.input, style]}
+          placeholder={placeholder}
+          placeholderTextColor={COLORS.text.placeholder}
+          value={value}
+          onChangeText={onChangeText}
+          secureTextEntry={secureTextEntry}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          returnKeyType={getReturnKeyType()}
+          onSubmitEditing={handleSubmitEditing}
+          blurOnSubmit={blurOnSubmit}
+          editable={editable}
+        />
+        <View style={styles.corner} />
+      </View>
     );
   }
 );

@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { SIZING } from '../../../styles/theme';
+import { KeyboardAwareInput } from '../../common/KeyboardAwareInput';
 
 type Props = {
   quantity: number;
@@ -42,12 +43,12 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
             <Text style={styles.buttonText}>-1</Text>
           </TouchableOpacity>
 
-          <TextInput
-            style={styles.input}
+          <KeyboardAwareInput
             value={quantity.toString()}
             onChangeText={handleDirectInput}
-            keyboardType="number-pad"
-            maxLength={3}
+            keyboardType="numeric"
+            style={styles.input}
+            isLastInput={true}
           />
 
           <TouchableOpacity

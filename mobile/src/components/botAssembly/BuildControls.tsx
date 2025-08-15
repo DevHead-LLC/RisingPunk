@@ -3,6 +3,7 @@ import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { COLORS, SIZING } from '../../styles/theme';
 import { BotType } from '../../types/bots';
 import { KeyboardAwareInput } from '../common/KeyboardAwareInput';
+import { KeyboardDismissView } from '../common/KeyboardDismissView';
 
 type BuildControlsProps = {
   selectedType: BotType | null;
@@ -20,28 +21,30 @@ export const BuildControls = React.memo(function BuildControls({
   onBuild,
 }: BuildControlsProps) {
   return (
-    <View style={styles.buildControlsRow}>
-      <KeyboardAwareInput
-        placeholder="Qty"
-        value={quantity}
-        onChangeText={onQuantityChange}
-        keyboardType="numeric"
-        style={styles.quantityInput}
-        editable={buildingProgress === null}
-        isLastInput={true}
-        onSubmitEditing={onBuild}
-      />
-      <TouchableOpacity
-        style={[
-          styles.buildButton,
-          (!selectedType || buildingProgress !== null) && styles.buildButtonDisabled,
-        ]}
-        onPress={onBuild}
-        disabled={!selectedType || buildingProgress !== null}
-      >
-        <Text style={styles.buildButtonText}>BUILD</Text>
-      </TouchableOpacity>
-    </View>
+    <KeyboardDismissView>
+      <View style={styles.buildControlsRow}>
+        <KeyboardAwareInput
+          placeholder="Qty"
+          value={quantity}
+          onChangeText={onQuantityChange}
+          keyboardType="numeric"
+          style={styles.quantityInput}
+          editable={buildingProgress === null}
+          isLastInput={true}
+          onSubmitEditing={onBuild}
+        />
+        <TouchableOpacity
+          style={[
+            styles.buildButton,
+            (!selectedType || buildingProgress !== null) && styles.buildButtonDisabled,
+          ]}
+          onPress={onBuild}
+          disabled={!selectedType || buildingProgress !== null}
+        >
+          <Text style={styles.buildButtonText}>BUILD</Text>
+        </TouchableOpacity>
+      </View>
+    </KeyboardDismissView>
   );
 });
 

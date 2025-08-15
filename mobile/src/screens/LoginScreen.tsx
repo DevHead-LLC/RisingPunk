@@ -4,12 +4,12 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
 } from 'react-native';
 import {COLORS, SIZING, styleGuide} from '../styles/theme';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { loginUser, registerUser, clearError } from '../store/slices/authSlice';
 import { TitleSection } from '../components/auth/TitleSection';
+import { AuthInputs } from '../components/auth/AuthInputs';
 import { useFormState } from '../hooks/useFormState';
 import { ScreenContainer } from '../components/common/ScreenContainer';
 
@@ -162,32 +162,13 @@ export const LoginScreen = () => {
     setFormData({ email: '', handle: '', accessKey: '', verifyAccessKey: '' });
   }, [clearFormError]);
 
-  const renderInputWithCorner = (
-    placeholder: string,
-    value: string,
-    onChangeText: (text: string) => void,
-    secureTextEntry?: boolean,
-    keyboardType?: 'email-address' | 'default'
-  ) => (
-    <View style={styles.inputWrapper}>
-      <TextInput
-        style={styles.input}
-        placeholder={placeholder}
-        placeholderTextColor={COLORS.text.placeholder}
-        value={value}
-        onChangeText={onChangeText}
-        secureTextEntry={secureTextEntry}
-        keyboardType={keyboardType}
-        autoCapitalize="none"
-      />
-      <View style={styles.inputCorner} />
-    </View>
-  );
-
   const renderLoginForm = () => (
     <View style={styles.formContainer}>
-      {renderInputWithCorner('HANDLE', formData.handle, handleInputChange('handle'))}
-      {renderInputWithCorner('ACCESS_KEY', formData.accessKey, handleInputChange('accessKey'), true)}
+      <AuthInputs
+        formType="login"
+        formData={formData}
+        handleInputChange={handleInputChange}
+      />
       <TouchableOpacity
         style={[
           styles.jackInButton,
@@ -204,10 +185,11 @@ export const LoginScreen = () => {
 
   const renderRegisterForm = () => (
     <View style={styles.formContainer}>
-      {renderInputWithCorner('ENTER_EMAIL', formData.email, handleInputChange('email'), false, 'email-address')}
-      {renderInputWithCorner('SELECT_HANDLE', formData.handle, handleInputChange('handle'))}
-      {renderInputWithCorner('SET_ACCESS_KEY', formData.accessKey, handleInputChange('accessKey'), true)}
-      {renderInputWithCorner('VERIFY_ACCESS_KEY', formData.verifyAccessKey, handleInputChange('verifyAccessKey'), true)}
+      <AuthInputs
+        formType="register"
+        formData={formData}
+        handleInputChange={handleInputChange}
+      />
       <TouchableOpacity
         style={[
           styles.jackInButton,
