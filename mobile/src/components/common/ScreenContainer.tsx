@@ -1,5 +1,5 @@
 import React from 'react';
-import { SafeAreaView, View, StyleSheet } from 'react-native';
+import { SafeAreaView, View, StyleSheet, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { COLORS } from '../../styles/theme';
 
 type Props = {
@@ -8,9 +8,11 @@ type Props = {
 
 export const ScreenContainer = ({ children }: Props) => (
   <SafeAreaView style={styles.safeArea}>
-    <View style={styles.container}>
-      {children}
-    </View>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <View style={styles.container}>
+        {children}
+      </View>
+    </TouchableWithoutFeedback>
   </SafeAreaView>
 );
 
