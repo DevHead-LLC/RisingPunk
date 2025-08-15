@@ -4,6 +4,8 @@ import {
   StyleSheet,
   SafeAreaView,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { selectBotType } from '../store/slices/botsSlice';
@@ -55,19 +57,25 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
   return (
     <SafeAreaView style={styles.container}>
       <BotAssemblyHeader onClose={onClose} />
-      <View style={styles.content}>
-        <ScrollView style={styles.botSelection}>
-          {levelSections}
-        </ScrollView>
-        <BuildSection
-          selectedType={bots.selectedType}
-          buildingProgress={bots.buildingProgress}
-          quantity={quantity}
-          onQuantityChange={handleQuantityChange}
-          onBuild={handleBuild}
-          botCost={BOT_COST}
-        />
-      </View>
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <View style={styles.content}>
+          <ScrollView style={styles.botSelection}>
+            {levelSections}
+          </ScrollView>
+          <BuildSection
+            selectedType={bots.selectedType}
+            buildingProgress={bots.buildingProgress}
+            quantity={quantity}
+            onQuantityChange={handleQuantityChange}
+            onBuild={handleBuild}
+            botCost={BOT_COST}
+          />
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -297,5 +305,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  keyboardAvoidingView: {
+    flex: 1,
   },
 });
