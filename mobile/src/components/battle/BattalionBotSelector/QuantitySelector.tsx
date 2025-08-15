@@ -49,6 +49,7 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
             keyboardType="numeric"
             style={styles.input}
             isLastInput={true}
+            maxLength={3}
           />
 
           <TouchableOpacity

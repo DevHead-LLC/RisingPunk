@@ -4,6 +4,8 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import {COLORS, SIZING, styleGuide} from '../styles/theme';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
@@ -207,19 +209,25 @@ export const LoginScreen = () => {
 
   return (
     <ScreenContainer>
-      <View style={styles.content}>
-        <View style={styles.container}>
-          <View style={styles.leftSide}>
-            <TitleSection />
-          </View>
-          <View style={styles.rightSide}>
-            <WelcomeMessage formType={formType} />
-            <ErrorMessage error={error} />
-            {formType === 'login' ? renderLoginForm() : renderRegisterForm()}
-            <ToggleFormButton formType={formType} onPress={toggleFormType} />
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <View style={styles.content}>
+          <View style={styles.container}>
+            <View style={styles.leftSide}>
+              <TitleSection />
+            </View>
+            <View style={styles.rightSide}>
+              <WelcomeMessage formType={formType} />
+              <ErrorMessage error={error} />
+              {formType === 'login' ? renderLoginForm() : renderRegisterForm()}
+              <ToggleFormButton formType={formType} onPress={toggleFormType} />
+            </View>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </ScreenContainer>
   );
 };
@@ -334,5 +342,8 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     backgroundColor: COLORS.buttonDisabled,
+  },
+  keyboardAvoidingView: {
+    flex: 1,
   },
 });
