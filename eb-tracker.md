@@ -38,32 +38,37 @@
 ### Tried
 - Tracking started; items above verified.
  - Validated object ACL on latest artifact and redeployed that version; deployment succeeded and environment switched to the SHA.
+- **2025-08-15**: Updated S3 bucket policy to include explicit `s3:GetObjectAcl` permissions for EB service role.
+- **2025-08-15**: Removed ACL verification step from CI workflow (was causing CI user permission errors).
+- **2025-08-15**: Manual ACL fixes work (proving the core issue is S3 permissions), but automated deployments still fail.
 
-### To‑try
-1) Verify object ACL on latest artifact (no paid services)
-- `aws s3api get-object-acl --bucket elasticbeanstalk-us-west-2-211125440777 --key rp-api-<sha>.zip` → expect bucket owner FULL_CONTROL.
+### Critical Findings (2025-08-15)
+- **Manual ACL fix works**: When we manually set the ACL on an S3 object to give bucket owner FULL_CONTROL, EB can deploy it successfully.
+- **CI upload ACL setting inconsistent**: The `--acl bucket-owner-full-control` flag in the CI workflow is not consistently setting the correct ACL.
+- **Bucket policy correctly applied**: The S3 bucket policy includes the `AllowEBServiceRoleGetObjectAcl` statement for the Elastic Beanstalk service role.
+- **GitHub secrets are correct**: `EB_S3_BUCKET` is set to `elasticbeanstalk-us-west-2-211125440777` as expected.
+- **The issue is not with GitHub secrets**: The problem is specifically with S3 permissions during the EB deployment phase.
+- **CI user permissions limited**: `rp-github-deployer` user can list bucket contents and upload objects, but cannot read bucket policy or object ACLs. This explains why the CI verification step failed.
+- **Account mismatch resolved**: Local credentials were pointing to wrong AWS account (324645618426). Now using correct account (211125440777) with `rp-github-deployer` credentials.
+- **EB environment service role issue**: The environment shows no service role (null), meaning it's using the default. Configuration access shows AccessDenied to `elasticbeanstalk-env-resources-us-west-2` bucket.
+- **Service role correctly configured**: EB environment is using `aws-elasticbeanstalk-service-role` as confirmed in console. Additional role `rp-aws-elasticbeanstalk-service-role` exists but is not being used.
+- **Service role permissions verified**: Both inline policies (`newPermission` and `ReadArtifactsForEB`) include `s3:GetObjectAcl` permissions for the correct S3 bucket. Permissions are correctly configured.
+- **ACL setting verified**: Latest uploaded object has correct ACL (Object=Read, Object ACL=Read+Write). The `--acl bucket-owner-full-control` flag is working correctly in CI.
 
-2) Add explicit bucket Allow for service role (then retry deploy)
-```json
-{
-  "Sid": "AllowServiceRoleGetObjectAcl",
-  "Effect": "Allow",
-  "Principal": {
-    "AWS": "arn:aws:iam::211125440777:role/aws-elasticbeanstalk-service-role"
-  },
-  "Action": [
-    "s3:GetObjectAcl",
-    "s3:GetObject",
-    "s3:GetObjectVersion"
-  ],
-  "Resource": "arn:aws:s3:::elasticbeanstalk-us-west-2-211125440777/*"
-}
-```
+### Current Status Summary (2025-08-15)
+**ALL PERMISSIONS VERIFIED AND CORRECT:**
+- ✅ **Bucket policy**: Includes `AllowEBServiceRoleGetObjectAcl` statement for `aws-elasticbeanstalk-service-role`
+- ✅ **Service role**: Environment uses `aws-elasticbeanstalk-service-role` 
+- ✅ **Inline policies**: Both `newPermission` and `ReadArtifactsForEB` include `s3:GetObjectAcl` permissions
+- ✅ **ACL setting**: Latest uploaded object has correct ACL (Object=Read, Object ACL=Read+Write)
+- ✅ **CI workflow**: Uses `--acl bucket-owner-full-control` and now includes explicit ACL setting step
 
-3) If still denied
-- Confirm Environment → Configuration → Service access is `aws-elasticbeanstalk-service-role`.
-- Temporarily add the same Allow for `arn:aws:iam::211125440777:role/aws-elasticbeanstalk-ec2-role` and retry.
-- As a workaround, upload to a fresh artifacts bucket created with Object Ownership = Bucket owner preferred (ACLs enabled from creation), point ApplicationVersion `SourceBundle` to that bucket, and retry.
+**THE MYSTERY**: Despite all permissions being correctly configured, deployments still fail with `s3:GetObjectAcl` AccessDenied.
+
+### Next Steps
+1) **Test the updated CI workflow** with explicit ACL setting step
+2) **Monitor deployment logs** to see if the explicit ACL setting resolves the issue
+3) **If still failing**, investigate if there's a different service or principal involved in the deployment process
 
 4) Workflow hygiene
 - Ensure the generated `Procfile` matches our server path: `web: node dist/server/server.js` (CI currently writes `web: node dist/server.js`; update it).
@@ -90,6 +95,8 @@
 
 ### Most likely culprit (rolling)
 - Previously: S3 object ACL on uploaded artifacts likely lacked bucket owner FULL_CONTROL (triggered EB `s3:GetObjectAcl` AccessDenied). Current artifact has correct ACL and deploys.
+- **2025-08-15 UPDATE**: Manual ACL fix works (proving the issue is S3 permissions), but CI/CD uploads still fail with `s3:GetObjectAcl` AccessDenied. Bucket policy was updated but permissions still not working for automated deployments.
+- **Root cause analysis**: The `--acl bucket-owner-full-control` flag in CI upload is not consistently setting the correct ACL, or the bucket policy is not being applied correctly to the Elastic Beanstalk service role.
 - Follow-up: Address EB event warning about Node.js version (platform default used instead of `package.json` engines); decide if we want to pin engines or ignore.
 
 ### Cross‑check vs guidance (Aug 2025)
