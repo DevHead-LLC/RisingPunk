@@ -74,12 +74,17 @@
 - The `s3:GetObjectAcl` error happens **during the deployment process** after the API calls succeed
 - **EC2 instance profile permissions verified**: Both inline policies (`readAcl` and `ReadEBArtifacts`) include `s3:GetObjectAcl` permissions
 
-**CRITICAL FINDING**: Both service role AND EC2 instance profile have correct `s3:GetObjectAcl` permissions, yet deployments still fail. This suggests a different service/principal is involved.
+**BREAKTHROUGH FINDING**: The broader permissions revealed the real issue!
+- **Principal**: `rp-github-deployer` (not service role or EC2 role)
+- **Action**: `s3:PutObjectAcl` (not `s3:GetObjectAcl`)
+- **Resource**: `resources/environments/e-2qegamu2wp/_runtime/_versions/risingpunk-api/*` (EB runtime directory, not our uploaded artifacts)
+
+**ROOT CAUSE**: The CI user needs `s3:PutObjectAcl` permissions on the EB environment's runtime directory, not just upload permissions.
 
 ### Next Steps
-1) **Test with broader permissions**: Temporarily add `s3:GetObjectAcl` to the bucket policy for all authenticated users to see if that resolves the issue
-2) **Check for other S3 buckets**: Verify if EB is accessing a different S3 bucket during deployment
-3) **Enable S3 data events in CloudTrail**: Configure CloudTrail to log S3 data events to see the actual `s3:GetObjectAcl` events
+1) **Add `s3:PutObjectAcl` permissions** to the `rp-github-deployer` user policy for the EB runtime directory
+2) **Remove the broad permission** from bucket policy once the targeted fix is in place
+3) **Test deployment** to confirm the issue is resolved
 
 4) Workflow hygiene
 - Ensure the generated `Procfile` matches our server path: `web: node dist/server/server.js` (CI currently writes `web: node dist/server.js`; update it).
