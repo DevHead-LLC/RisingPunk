@@ -1,3 +1,12 @@
+### Keyboard Improvements - Status: ✅ Done
+
+- Created KeyboardAwareInput component with proper keyboard navigation
+- Added keyboard dismissal on outside tap for all inputs
+- Implemented "next" button for multi-field forms and "done" for final inputs
+- Updated AuthInputs component to use new keyboard-aware inputs
+- Updated BuildControls component to use new keyboard-aware inputs
+- Created KeyboardDismissView wrapper for form containers
+
 ### Repo housekeeping: Jest tests ignored repo-wide
 
 - Jest test dirs and files are now ignored via root `.gitignore` to keep failing tests out of commits.

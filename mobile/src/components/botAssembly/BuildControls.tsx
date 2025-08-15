@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, TextInput, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { COLORS, SIZING } from '../../styles/theme';
 import { BotType } from '../../types/bots';
+import { KeyboardAwareInput } from '../common/KeyboardAwareInput';
 
 type BuildControlsProps = {
   selectedType: BotType | null;
@@ -20,14 +21,15 @@ export const BuildControls = React.memo(function BuildControls({
 }: BuildControlsProps) {
   return (
     <View style={styles.buildControlsRow}>
-      <TextInput
-        style={styles.quantityInput}
+      <KeyboardAwareInput
+        placeholder="Qty"
         value={quantity}
         onChangeText={onQuantityChange}
         keyboardType="numeric"
-        placeholder="Qty"
-        placeholderTextColor="rgba(255, 255, 255, 0.4)"
+        style={styles.quantityInput}
         editable={buildingProgress === null}
+        isLastInput={true}
+        onSubmitEditing={onBuild}
       />
       <TouchableOpacity
         style={[
