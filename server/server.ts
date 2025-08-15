@@ -414,7 +414,7 @@ const startServer = (port = PORT, maxAttempts = 0) => {
         if (maxAttempts > 0) {
           startServer(port + 1, maxAttempts - 1);
         } else {
-          console.error('❌ Failed to find an available port');
+          console.error('❌ Failed: to find an available port');
           process.exit(1);
         }
       } else {
