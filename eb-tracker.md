@@ -62,14 +62,24 @@
 - ✅ **Service role**: Environment uses `aws-elasticbeanstalk-service-role` 
 - ✅ **Inline policies**: Both `newPermission` and `ReadArtifactsForEB` include `s3:GetObjectAcl` permissions
 - ✅ **ACL setting**: Latest uploaded object has correct ACL (Object=Read, Object ACL=Read+Write)
-- ✅ **CI workflow**: Uses `--acl bucket-owner-full-control` and now includes explicit ACL setting step
+- ✅ **CI workflow**: Uses `--acl bucket-owner-full-control` (explicit ACL setting step removed due to CI user permissions)
 
-**THE MYSTERY**: Despite all permissions being correctly configured, deployments still fail with `s3:GetObjectAcl` AccessDenied.
+**DEPLOYMENT STATUS**: 
+- ✅ **S3 upload phase**: Works correctly with `--acl bucket-owner-full-control`
+- ❌ **EB deployment phase**: Still fails with `s3:GetObjectAcl` AccessDenied despite all permissions being correct
+
+**INVESTIGATION IN PROGRESS**: 
+- CloudTrail shows `CreateApplicationVersion` and `UpdateEnvironment` events succeed (triggered by `rp-github-deployer`)
+- `s3:GetObjectAcl` events are **data events** not visible in default CloudTrail (only management events are logged)
+- The `s3:GetObjectAcl` error happens **during the deployment process** after the API calls succeed
+- **EC2 instance profile permissions verified**: Both inline policies (`readAcl` and `ReadEBArtifacts`) include `s3:GetObjectAcl` permissions
+
+**CRITICAL FINDING**: Both service role AND EC2 instance profile have correct `s3:GetObjectAcl` permissions, yet deployments still fail. This suggests a different service/principal is involved.
 
 ### Next Steps
-1) **Test the updated CI workflow** with explicit ACL setting step
-2) **Monitor deployment logs** to see if the explicit ACL setting resolves the issue
-3) **If still failing**, investigate if there's a different service or principal involved in the deployment process
+1) **Test with broader permissions**: Temporarily add `s3:GetObjectAcl` to the bucket policy for all authenticated users to see if that resolves the issue
+2) **Check for other S3 buckets**: Verify if EB is accessing a different S3 bucket during deployment
+3) **Enable S3 data events in CloudTrail**: Configure CloudTrail to log S3 data events to see the actual `s3:GetObjectAcl` events
 
 4) Workflow hygiene
 - Ensure the generated `Procfile` matches our server path: `web: node dist/server/server.js` (CI currently writes `web: node dist/server.js`; update it).
