@@ -1,7 +1,7 @@
-// For iOS simulator
+// Base API URL: Dev -> local server; Release -> staging API
 export const API_URL = __DEV__
   ? 'http://localhost:5001'  // or 'http://10.0.2.2:5001' for Android emulator
-  : 'https://your-production-url.com';
+  : 'https://staging-api.risingpunk.com';
 
 // Animation timing constants
 export const ANIMATION_CONFIG = {
