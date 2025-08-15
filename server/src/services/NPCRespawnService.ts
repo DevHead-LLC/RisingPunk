@@ -18,6 +18,7 @@ export class NPCRespawnService {
     let changed = false;
     for (const c of cells) {
       if (c.isOccupied && c.occupiedBy === 'npc' && (c as any).npcSlug === npcSlug) {
+        console.log(`[NPCRespawn] Clearing NPC ${npcSlug} from cell (${c.x}, ${c.y})`);
         c.isOccupied = false;
         c.occupiedBy = 'none';
         c.entityName = '';
@@ -29,6 +30,9 @@ export class NPCRespawnService {
     if (changed) {
       doc.markModified('cells');
       await doc.save();
+      console.log(`[NPCRespawn] Cleared ${changed} NPC instances of type ${npcSlug} from map ${mapName}`);
+    } else {
+      console.log(`[NPCRespawn] No NPC instances of type ${npcSlug} found on map ${mapName}`);
     }
   }
 
@@ -39,6 +43,7 @@ export class NPCRespawnService {
     let changed = false;
     for (const c of cells) {
       if (c.isOccupied && c.occupiedBy === 'npc' && (c as any).npcInstanceId === npcInstanceId) {
+        console.log(`[NPCRespawn] Clearing NPC instance ${npcInstanceId} (${c.npcSlug}) from cell (${c.x}, ${c.y})`);
         c.isOccupied = false;
         c.occupiedBy = 'none';
         c.entityName = '';
@@ -50,6 +55,9 @@ export class NPCRespawnService {
     if (changed) {
       doc.markModified('cells');
       await doc.save();
+      console.log(`[NPCRespawn] Successfully cleared NPC instance ${npcInstanceId} from map ${mapName}`);
+    } else {
+      console.log(`[NPCRespawn] NPC instance ${npcInstanceId} not found on map ${mapName}`);
     }
   }
 
