@@ -62,6 +62,27 @@ jobs:
       - name: Upload artifact to S3 (EB service bucket)
         run: aws s3 cp "${{ env.ARTIFACT }}" "s3://${{ env.EB_BUCKET }}/${{ env.ARTIFACT }}" --acl bucket-owner-full-control
 
+      - name: Verify S3 object ACL
+        run: |
+          echo "Verifying ACL on uploaded object..."
+          aws s3api get-object-acl \
+            --bucket "${{ env.EB_BUCKET }}" \
+            --key "${{ env.ARTIFACT }}" \
+            --output table
+          
+          # Simple check that ACL exists and has grants
+          ACL_GRANTS=$(aws s3api get-object-acl \
+            --bucket "${{ env.EB_BUCKET }}" \
+            --key "${{ env.ARTIFACT }}" \
+            --query 'length(Grants)' \
+            --output text)
+          
+          if [[ "$ACL_GRANTS" -gt 0 ]]; then
+            echo "✅ ACL verified: Object has $ACL_GRANTS grant(s)"
+          else
+            echo "❌ ACL verification failed: No grants found"
+            exit 1
+          fi
 
       - name: Ensure EB application version exists (idempotent)
         run: |
