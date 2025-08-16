@@ -195,7 +195,26 @@ export class BattleTimerService extends EventEmitter {
 
       if (timer.battleTime >= TIMER_CONFIG.BATTLE_DURATION) {
         console.log(`⏰ BATTLE TIMER: Battle ${battleId} ending due to timer expiration (${timer.battleTime}s)`);
-        this.endBattleSync(battleId);
+        
+        // Clean up timer immediately (synchronous)
+        this.clearTimerIntervals(timer);
+        timer.phase = BattlePhase.COMPLETE;
+        timer.isActive = false;
+        
+        // Emit event immediately
+        this.emit('battleEnd', {
+          battleId,
+          battleTime: timer.battleTime,
+          phase: BattlePhase.COMPLETE,
+        });
+        
+        // Remove timer from map immediately
+        this.timers.delete(battleId);
+        
+        // Handle async battle processing without blocking timer cleanup
+        this.handleAsyncBattleEnd(battleId).catch(error => {
+          console.error(`❌ BATTLE TIMER: Error in async battle end processing for ${battleId}:`, error);
+        });
       }
     }, 1000);
   }
@@ -244,30 +263,19 @@ export class BattleTimerService extends EventEmitter {
     }
   }
 
-  private endBattleSync(battleId: string): void {
-    const timer = this.timers.get(battleId);
-    if (!timer) return;
-
-    this.clearTimerIntervals(timer);
-    timer.phase = BattlePhase.COMPLETE;
-    timer.isActive = false;
-
-    // Trigger battle end handling in BattleService
+  /**
+   * Handles asynchronous battle end processing.
+   * This method is called when a battle ends due to timer expiration.
+   * It ensures that the battle end logic is executed in the background
+   * without blocking the main timer loop.
+   */
+  private async handleAsyncBattleEnd(battleId: string): Promise<void> {
     try {
       const battleService = new BattleService();
-      battleService.processBattleEnd(battleId);
+      await battleService.processBattleEnd(battleId);
+      console.log(`✅ BATTLE TIMER: Async battle end processing for ${battleId} completed successfully.`);
     } catch (error) {
-      console.error(`❌ BATTLE TIMER: Error handling battle end for ${battleId}:`, error);
-      // Don't fail the timer cleanup on error - continue with normal cleanup
-      // The battle might not exist (e.g., during tests), so we continue with cleanup
+      console.error(`❌ BATTLE TIMER: Error in async battle end processing for ${battleId}:`, error);
     }
-
-    this.emit('battleEnd', {
-      battleId,
-      battleTime: timer.battleTime,
-      phase: BattlePhase.COMPLETE,
-    });
-
-    this.timers.delete(battleId);
   }
 } 
