@@ -12,6 +12,10 @@ export class NPCRespawnService {
   private static scheduled: globalThis.Map<string, NodeJS.Timeout> = new globalThis.Map();
 
   static async clearNpcFromMap(npcSlug: string, mapName: string = 'main'): Promise<void> {
+    console.warn('[NPCRespawn] WARNING: clearNpcFromMap called - this will clear ALL NPCs of type', npcSlug);
+    console.warn('[NPCRespawn] This method should only be used for emergency cleanup, not normal battle resolution');
+    console.warn('[NPCRespawn] Use clearNpcInstanceFromMap with specific npcInstanceId instead');
+    
     const doc: any = await MapModel.findOne({ name: mapName });
     if (!doc) return;
     const cells: any[] = doc.cells || [];
