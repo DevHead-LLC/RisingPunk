@@ -93,6 +93,44 @@
 - All existing functionality preserved including battle elimination
 - Tests continue to pass without modification
 
+### Concurrent Battle and Race Condition Fixes - Status: ✅ Done
+
+**Problem 1: Single Callback Overwrites Concurrent Battle Conditions**
+- BattleTimerService used a single global `eliminationCallback` property
+- When BattleService.setupTimerListeners() was called for each battle, it overwrote the previous callback
+- Only the most recently created battle's elimination conditions were checked, breaking elimination detection for other concurrent battles
+
+**Problem 2: Async Callbacks in Timers Cause Race Conditions**
+- The setInterval callback was async and called await eliminationCallback(battleId)
+- This created race conditions where multiple async operations could run concurrently
+- Led to duplicate battle end processing, inconsistent timer cleanup order, and potential event handler conflicts
+
+**Root Cause Analysis:**
+- Single callback registration system couldn't handle multiple concurrent battles
+- Async operations in timer loops created timing and synchronization issues
+- No proper cleanup of callbacks when battles ended
+
+**Fixes Implemented:**
+1. **Per-battle callback system**: Changed from single global callback to Map<string, EliminationCheckCallback>
+2. **Synchronous elimination checking**: Removed async/await from timer loop to prevent race conditions
+3. **Proper callback cleanup**: Added unregisterEliminationCallback method and cleanup in stopTimer
+4. **Promise-based battle ending**: Elimination detection now uses .then() to handle async battle end processing
+
+**Code Changes:**
+- BattleTimer: Changed from single `eliminationCallback` to `eliminationCallbacks: Map<string, EliminationCheckCallback>`
+- BattleTimer: Added `registerEliminationCallback(battleId, callback)` and `unregisterEliminationCallback(battleId)` methods
+- BattleTimer: Elimination checking now uses synchronous callback execution with promise handling
+- BattleTimer: stopTimer now properly cleans up elimination callbacks
+- BattleService: Updated to pass battleId when registering callbacks
+
+**Result:**
+- Multiple concurrent battles can now have elimination checking without interference
+- No more race conditions from async operations in timer loops
+- Proper cleanup of callbacks prevents memory leaks and stale references
+- Consistent timer cleanup order between elimination and time-based battle endings
+- All existing functionality preserved including battle elimination
+- Tests continue to pass without modification
+
 ### NPC Disappearance Bug Investigation & Fix - Status: ✅ Done
 
 **Problem Identified:**

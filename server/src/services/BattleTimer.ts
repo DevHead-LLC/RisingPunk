@@ -25,7 +25,7 @@ interface BattleTimer {
 export class BattleTimerService extends EventEmitter {
   private static instance: BattleTimerService;
   private timers: Map<string, BattleTimer> = new Map();
-  private eliminationCallback?: EliminationCheckCallback;
+  private eliminationCallbacks: Map<string, EliminationCheckCallback> = new Map();
 
   private constructor() {
     super();
@@ -39,10 +39,17 @@ export class BattleTimerService extends EventEmitter {
   }
 
   /**
-   * Register a callback for elimination checking
+   * Register a callback for elimination checking for a specific battle
    */
-  public registerEliminationCallback(callback: EliminationCheckCallback): void {
-    this.eliminationCallback = callback;
+  public registerEliminationCallback(battleId: string, callback: EliminationCheckCallback): void {
+    this.eliminationCallbacks.set(battleId, callback);
+  }
+
+  /**
+   * Unregister elimination callback for a specific battle
+   */
+  public unregisterEliminationCallback(battleId: string): void {
+    this.eliminationCallbacks.delete(battleId);
   }
 
   /**
@@ -76,6 +83,10 @@ export class BattleTimerService extends EventEmitter {
     this.clearTimerIntervals(timer);
     timer.isActive = false;
     this.timers.delete(battleId);
+    
+    // Clean up elimination callback for this battle
+    this.unregisterEliminationCallback(battleId);
+    
     console.log(`Timer stopped for battle ${battleId}`);
   }
 
@@ -187,18 +198,25 @@ export class BattleTimerService extends EventEmitter {
       // Check for elimination-based battle end on each tick
       // Only check if we have an active timer (which means there's a real battle)
       // AND if elimination checking is not disabled (e.g., during tests)
-      if (timer.isActive && !DISABLE_ELIMINATION_CHECK && this.eliminationCallback) {
+      if (timer.isActive && !DISABLE_ELIMINATION_CHECK && this.eliminationCallbacks.has(battleId)) {
         try {
-          // Use the callback to check for elimination
-          const shouldEnd = await this.eliminationCallback(battleId);
-          
-          if (shouldEnd) {
-            console.log(`🎯 BATTLE TIMER: Battle ${battleId} ending due to elimination`);
-            await this.endBattle(battleId);
-            return;
+          // Use the callback to check for elimination (synchronous check)
+          const callback = this.eliminationCallbacks.get(battleId);
+          if (callback) {
+            // Check elimination synchronously to avoid race conditions
+            callback(battleId).then(shouldEnd => {
+              if (shouldEnd && timer.isActive) {
+                console.log(`🎯 BATTLE TIMER: Battle ${battleId} ending due to elimination`);
+                this.endBattle(battleId).catch(error => {
+                  console.error(`❌ BATTLE TIMER: Error ending battle ${battleId}:`, error);
+                });
+              }
+            }).catch(error => {
+              console.error(`❌ BATTLE TIMER: Error checking elimination for battle ${battleId}:`, error);
+            });
           }
         } catch (error) {
-          console.error(`❌ BATTLE TIMER: Error checking elimination for battle ${battleId}:`, error);
+          console.error(`❌ BATTLE TIMER: Error in elimination check for battle ${battleId}:`, error);
           // Don't end the battle on error - continue with normal timer flow
         }
       }

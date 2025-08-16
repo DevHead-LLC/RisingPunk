@@ -94,7 +94,7 @@ export class BattleService {
     this.battleListeners.set(battleId, listeners);
     
     // Register elimination callback with BattleTimer
-    this.timerService.registerEliminationCallback(async (battleId: string) => {
+    this.timerService.registerEliminationCallback(battleId, async (battleId: string) => {
       const endConditions = await this.checkBattleEndConditions(battleId);
       return endConditions.shouldEnd;
     });
