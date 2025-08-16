@@ -226,6 +226,10 @@ app.post('/api/bots/build', auth, async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Insufficient balance' });
     }
 
+    // Deduct balance FIRST to ensure we have sufficient funds
+    user.balance.total -= totalCost;
+    await user.save();
+
     const buildTimePerUnit = 1000;
     const totalBuildTime = quantity * buildTimePerUnit;
     const startedAt = new Date().toISOString();
@@ -249,10 +253,8 @@ app.post('/api/bots/build', auth, async (req: Request, res: Response) => {
       botsBuilt: 0
     };
 
+    // Save build queue AFTER successful balance deduction
     await bot.save();
-
-    user.balance.total -= totalCost;
-    await user.save();
 
     res.json({ buildQueue: bot.buildQueue, bots: bot.bots });
 

@@ -13,7 +13,7 @@ export const balanceApi = createApi({
   }),
   tagTypes: ['Balance'],
   endpoints: (builder) => ({
-    fetchBalance: builder.query<{ total: number; ratePerSecond: number }, void>({
+    fetchBalance: builder.query<{ total: number; ratePerSecond: number; lastUpdated: string | Date }, void>({
       query: () => '/api/balance',
       providesTags: ['Balance'],
     }),
