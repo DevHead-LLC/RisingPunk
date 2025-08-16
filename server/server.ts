@@ -115,8 +115,33 @@ app.get('/api/dbcheck', async (req: Request, res: Response) => {
   }
 });
 
-// Update the balance endpoint
+// Get current balance without accumulating time
 app.get('/api/balance', auth, async (req: Request, res: Response) => {
+  try {
+    const user = await User.findById(req.user._id);
+    
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Return raw database balance without time accumulation
+    // Client will handle time-based calculations based on server's lastUpdated timestamp
+    const currentBalance = {
+      total: user.balance.total,
+      ratePerSecond: user.balance.ratePerSecond,
+      lastUpdated: user.balance.lastUpdated
+    };
+
+    res.json(currentBalance);
+  } catch (error: any) {
+    console.error('Balance fetch error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update balance endpoint that accumulates and saves time
+app.post('/api/balance/update', auth, async (req: Request, res: Response) => {
   try {
     const user = await User.findById(req.user._id);
     
@@ -135,7 +160,7 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
 
     res.json(user.balance);
   } catch (error: any) {
-    console.error('Balance fetch error:', error);
+    console.error('Balance update error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -192,6 +217,15 @@ app.post('/api/bots/build', auth, async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid build parameters' });
     }
 
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (user.balance.total < totalCost) {
+      return res.status(400).json({ error: 'Insufficient balance' });
+    }
+
     const buildTimePerUnit = 1000;
     const totalBuildTime = quantity * buildTimePerUnit;
     const startedAt = new Date().toISOString();
@@ -216,6 +250,10 @@ app.post('/api/bots/build', auth, async (req: Request, res: Response) => {
     };
 
     await bot.save();
+
+    user.balance.total -= totalCost;
+    await user.save();
+
     res.json({ buildQueue: bot.buildQueue, bots: bot.bots });
 
   } catch (error: any) {

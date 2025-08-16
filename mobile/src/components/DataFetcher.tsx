@@ -23,6 +23,7 @@ export const DataFetcher: React.FC<DataFetcherProps> = ({ children }) => {
       dispatch(updateBalance({
         total: balanceData.total,
         ratePerSecond: balanceData.ratePerSecond,
+        lastUpdated: balanceData.lastUpdated,
       }));
     }
   }, [balanceData, dispatch]);

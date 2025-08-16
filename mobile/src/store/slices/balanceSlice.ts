@@ -18,10 +18,11 @@ export const balanceSlice = createSlice({
   name: 'balance',
   initialState,
   reducers: {
-    updateBalance: (state, action: PayloadAction<{ total: number; ratePerSecond: number }>) => {
+    updateBalance: (state, action: PayloadAction<{ total: number; ratePerSecond: number; lastUpdated: string | Date }>) => {
       state.total = action.payload.total;
       state.ratePerSecond = action.payload.ratePerSecond;
-      state.lastUpdated = Date.now();
+      // Use server's lastUpdated timestamp, not client's current time
+      state.lastUpdated = new Date(action.payload.lastUpdated).getTime();
     },
     addToBalance: (state, action: PayloadAction<number>) => {
       if (state.total !== null) {

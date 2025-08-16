@@ -43,6 +43,7 @@ const AppContent = memo(() => {
       dispatch(updateBalance({
         total: balanceData.total,
         ratePerSecond: balanceData.ratePerSecond,
+        lastUpdated: balanceData.lastUpdated,
       }));
     }
   }, [balanceData, dispatch]);
