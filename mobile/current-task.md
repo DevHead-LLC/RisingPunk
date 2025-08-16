@@ -1,3 +1,35 @@
+### Login Screen Language Updates - Status: ✅ COMPLETED
+
+**Task:** Update language on Login Screen for both sign up and sign in views to match new terminology requirements.
+
+**Changes Implemented:**
+
+1. ✅ **Sign Up Form Fields Updated:**
+   - "ENTER_EMAIL" ✓ (correct)
+   - "SELECT_HANDLE (USERNAME)" ✓ (correct) 
+   - "SET_KEY (CREATE PWD)" ✓ (correct)
+   - "VERIFY_KEY" ✓ (correct)
+   - "INITIALIZE" button ✓ (correct)
+
+2. ✅ **Sign In Form Fields Updated:**
+   - "HANDLE (USERNAME)" ✓ (correct)
+   - "KEY (PWD)" ✓ (correct)
+   - "JACK_IN" button ✓ (correct)
+
+3. ✅ **Validation Messages Updated:**
+   - "ACCESS_KEY_TOO_SHORT" → "KEY_TOO_SHORT"
+   - "ACCESS_KEYS_DO_NOT_MATCH" → "KEYS_DO_NOT_MATCH"
+
+4. ✅ **Files Modified:**
+   - `mobile/src/components/auth/AuthInputs.tsx` - Updated all placeholder text
+   - `mobile/src/screens/LoginScreen.tsx` - Updated validation error messages
+
+**Result:** Login Screen now displays the exact language specified in requirements. All form fields, buttons, and error messages have been updated to match the new terminology.
+
+**Status: COMPLETED** ✅
+
+---
+
 ### Wallet Balance Synchronization - Status: ✅ CRITICAL ISSUE RESOLVED
 
 **CRITICAL ISSUE IDENTIFIED:**
