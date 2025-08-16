@@ -15,9 +15,11 @@
 1. **BattleService.ts**: Removed fallback to `clearNpcFromMap()`, now always uses instance-specific clearing
 2. **NPCRespawnService.ts**: Added deprecation warnings to `clearNpcFromMap()` to prevent accidental misuse
 3. **Safety**: System now fails safely if `npcInstanceId` is missing instead of clearing all NPCs
+4. **Battle Completion**: Fixed early return that was preventing battles from completing, preventing resource leaks
 
 **Code Changes:**
 - BattleService: NPC clearing logic now requires `npcInstanceId` and never falls back to bulk clear
+- BattleService: Battles always complete even if NPC handling fails, preventing state leaks
 - NPCRespawnService: Added warnings that `clearNpcFromMap()` is dangerous and should only be used for emergency cleanup
 - Map routes already had safety logic to generate missing `npcInstanceId` values
 
@@ -25,6 +27,7 @@
 - NPCs will no longer disappear in bulk during battles
 - Each NPC is individually tracked and respawned
 - System fails safely if instance ID is missing instead of causing data loss
+- Battles always complete properly, preventing resource leaks and inconsistent game state
 
 ### Keyboard Improvements - Status: ✅ Done
 

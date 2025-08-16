@@ -174,17 +174,19 @@ export class BattleService {
         if (npcInstanceId) {
           console.log('[NPC] Clearing instance from map now ->', npcInstanceId);
           await (NPCRespawnService as any).clearNpcInstanceFromMap(npcInstanceId, 'main');
+          
+          const npcDoc: any = await NPCService.getNPCBySlug(npcSlug);
+          const delay = typeof npcDoc?.mapRecoverySeconds === 'number' ? npcDoc.mapRecoverySeconds : 300;
+          console.log('[NPC] Scheduling respawn in seconds ->', delay, npcInstanceId);
+          (NPCRespawnService as any).scheduleRespawnForInstance(npcSlug, npcInstanceId, delay, 'main');
         } else {
           console.log('[NPC] WARNING: No npcInstanceId found, cannot safely clear NPC. This should not happen.');
           console.log('[NPC] NPC slug:', npcSlug, 'Battle ID:', battleId);
-          return;
+          console.log('[NPC] Battle will complete but NPC may remain on map until manually resolved.');
         }
-        const npcDoc: any = await NPCService.getNPCBySlug(npcSlug);
-        const delay = typeof npcDoc?.mapRecoverySeconds === 'number' ? npcDoc.mapRecoverySeconds : 300;
-        console.log('[NPC] Scheduling respawn in seconds ->', delay, npcInstanceId);
-        (NPCRespawnService as any).scheduleRespawnForInstance(npcSlug, npcInstanceId, delay, 'main');
       } catch (e) {
         console.error('NPC respawn scheduling failed for', npcSlug, e);
+        console.log('[NPC] Battle will complete but NPC handling failed. Manual intervention may be required.');
       }
     }
 
