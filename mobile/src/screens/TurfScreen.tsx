@@ -140,7 +140,7 @@ export function TurfScreen(): React.JSX.Element {
         />;
       case 'battlePrep':
         return <BattlePreparationScreen
-          onClose={() => navigateToScreen('turf')}
+          onClose={() => navigateToScreen(previousScreen)}
           onBattleStart={(newBattleId) => {
             setBattleId(newBattleId || null);
             navigateToScreen('battle');
@@ -153,10 +153,7 @@ export function TurfScreen(): React.JSX.Element {
       case 'battle':
         if (!battleId) {
           return <BattlePreparationScreen
-            onClose={() => {
-              navigateToScreen('turf');
-              setTimeout(() => navigateToScreen('hackRig'), 0);
-            }}
+            onClose={() => navigateToScreen(previousScreen)}
             onBattleStart={(newBattleId) => {
               setBattleId(newBattleId || null);
               navigateToScreen('battle');

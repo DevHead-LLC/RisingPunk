@@ -1,3 +1,41 @@
+### Bot Quantity Tracking Fix - Status: ✅ COMPLETED
+
+**Task:** Fix bot quantity tracking in battle preparation screen to accurately reflect available bots after assignments.
+
+**Issue Identified:**
+When bots are assigned to battalions in the battle preparation screen, the same quantity remains available for subsequent assignments, even if there are no remaining bots or insufficient quantity. This creates a critical bug where users can assign more bots than they actually have.
+
+**Root Cause Analysis:**
+The problem was in the `BattlePreparationScreen.tsx` component. The component was:
+1. **Passing total bot counts**: `availableBots={botCounts}` (total counts including assigned)
+2. **Not calculating available counts**: No logic to subtract assigned quantities from total counts
+3. **Not loading existing assignments**: The `fetchAssignments` function was calling `resetBattalions()` instead of loading existing assignments from the server
+
+**Fix Implemented:**
+Added client-side logic to calculate available bot counts by subtracting assigned quantities:
+
+1. **Added availableBots calculation**: Created a `useMemo` that calculates `totalBots - assignedQuantities`
+2. **Fixed assignment loading**: Modified `fetchAssignments` to properly load existing assignments from server instead of resetting them
+3. **Updated selector props**: Changed `BattalionBotSelector` to receive `availableBots` instead of `botCounts`
+4. **Fixed selector state persistence**: Added logic to reset selected bot type and quantity when switching between battalions
+5. **Enhanced validation**: Added warnings and disabled submit button when quantity exceeds available bots
+
+**Code Changes:**
+- `mobile/src/screens/BattlePreparationScreen.tsx` - Added available bot calculation and fixed assignment loading
+- `mobile/src/components/battle/BattalionBotSelector/index.tsx` - Added battalion change reset logic and enhanced validation
+- `mobile/src/components/battle/BattalionBotSelector/QuantitySelector.tsx` - Added insufficient bot warnings
+- `mobile/src/screens/TurfScreen.tsx` - Fixed BattlePreparationScreen close navigation to return to previous screen
+
+**Result:**
+- ✅ When you assign 200 Guardian bots to Battalion A, Battalion B now shows 0 available
+- ✅ Bot quantities now update correctly when assigned
+- ✅ Available quantities are properly calculated for subsequent assignments
+- ✅ No more ability to assign more bots than actually available
+
+**Status: COMPLETED** ✅
+
+---
+
 ### Login Screen Language Updates - Status: ✅ COMPLETED
 
 **Task:** Update language on Login Screen for both sign up and sign in views to match new terminology requirements.

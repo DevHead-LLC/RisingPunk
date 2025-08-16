@@ -31,6 +31,27 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
   const [assignToBattalion] = useAssignToBattalionMutation();
   const [startBattle] = useStartBattleMutation();
 
+  // Calculate available bot counts by subtracting assigned quantities
+  const availableBots = useMemo(() => {
+    const available = { ...botCounts };
+    
+    // Subtract assigned quantities from available pool
+    Object.values(assignments).forEach((assignment) => {
+      if (assignment && assignment.quantity > 0) {
+        available[assignment.botType as BotType] -= assignment.quantity;
+      }
+    });
+    
+    // Ensure quantities don't go below 0
+    Object.keys(available).forEach((botType) => {
+      if (available[botType as BotType] < 0) {
+        available[botType as BotType] = 0;
+      }
+    });
+    
+    return available;
+  }, [botCounts, assignments]);
+
   useEffect(() => {
     Animated.sequence([
       ...Array(2).fill(
@@ -147,14 +168,24 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
   useEffect(() => {
     const fetchAssignments = async () => {
       try {
-        setAssignments({});
         const response = await fetch(`${API_URL}/api/bots`, {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         const data = await response.json();
 
+        // Load existing assignments from server
         if (data.battalionAssignments?.length > 0) {
-          await resetBattalions();
+          const existingAssignments: Record<string, BattalionAssignment> = {};
+          data.battalionAssignments.forEach((assignment: any) => {
+            existingAssignments[assignment.battalionId] = {
+              botType: assignment.botType,
+              quantity: assignment.quantity,
+              markLevel: assignment.markLevel
+            };
+          });
+          setAssignments(existingAssignments);
+        } else {
+          setAssignments({});
         }
       } catch (error) {
         console.error('Failed to fetch assignments:', error);
@@ -265,7 +296,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
         onClose={() => setSelectorVisible(false)}
         onSubmit={handleBotAssignment}
         battalionName={selectedBattalion || ''}
-        availableBots={botCounts}
+        availableBots={availableBots}
       />
     </SafeAreaView>
   );
