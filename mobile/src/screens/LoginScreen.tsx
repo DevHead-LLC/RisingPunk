@@ -94,11 +94,11 @@ export const LoginScreen = () => {
           return false;
         }
         if (formData.accessKey.length < 6) {
-          setError('ACCESS_DENIED: ACCESS_KEY_TOO_SHORT');
+          setError('ACCESS_DENIED: KEY_TOO_SHORT');
           return false;
         }
         if (formData.accessKey !== formData.verifyAccessKey) {
-          setError('ACCESS_DENIED: ACCESS_KEYS_DO_NOT_MATCH');
+          setError('ACCESS_DENIED: KEYS_DO_NOT_MATCH');
           return false;
         }
       }

@@ -1,6 +1,8 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
 import { BotType } from '../slices/botsSlice';
+import { balanceApi } from './balanceApi';
+import { subtractFromBalance, addToBalance } from '../slices/balanceSlice';
 
 export const botsApi = createApi({
   reducerPath: 'botsApi',
@@ -32,6 +34,39 @@ export const botsApi = createApi({
         method: 'POST',
         body,
       }),
+      async onQueryStarted({ totalCost }, { dispatch, queryFulfilled, getState }) {
+        // Get current balance state before any updates
+        const state = getState() as any;
+        const currentBalance = state.balance?.total;
+        
+        // Check if we have sufficient funds for optimistic update
+        const hasSufficientFunds = currentBalance !== null && currentBalance !== undefined && currentBalance >= totalCost;
+        
+        // Optimistically update the balance immediately
+        const patchResult = dispatch(
+          balanceApi.util.updateQueryData('fetchBalance', undefined, (draft) => {
+            if (draft && hasSufficientFunds) {
+              draft.total -= totalCost;
+            }
+          })
+        );
+        
+        // Also update the balance slice state immediately (only if sufficient funds)
+        if (hasSufficientFunds) {
+          dispatch(subtractFromBalance(totalCost));
+        }
+
+        try {
+          await queryFulfilled;
+        } catch {
+          // If the build fails, revert the optimistic balance update
+          patchResult.undo();
+          // Only revert the balance slice update if we actually made the optimistic update
+          if (hasSufficientFunds) {
+            dispatch(addToBalance(totalCost));
+          }
+        }
+      },
       invalidatesTags: ['Bots'],
     }),
     assignToBattalion: builder.mutation<any, { botType: BotType; quantity: number; battalionId: string }>({

@@ -33,20 +33,20 @@ export const AuthInputs = memo(function AuthInputs({
     return (
       <KeyboardDismissView>
         <View>
-          <KeyboardAwareInput
-            placeholder="HANDLE"
-            value={formData.handle}
-            onChangeText={handleInputChange('handle')}
-            onSubmitEditing={() => focusNext(accessKeyRef)}
-          />
-          <KeyboardAwareInput
-            ref={accessKeyRef}
-            placeholder="ACCESS_KEY"
-            value={formData.accessKey}
-            onChangeText={handleInputChange('accessKey')}
-            secureTextEntry={true}
-            isLastInput={true}
-          />
+        <KeyboardAwareInput
+          placeholder="HANDLE (USERNAME)"
+          value={formData.handle}
+          onChangeText={handleInputChange('handle')}
+          onSubmitEditing={() => focusNext(accessKeyRef)}
+        />
+        <KeyboardAwareInput
+          ref={accessKeyRef}
+          placeholder="KEY (PWD)"
+          value={formData.accessKey}
+          onChangeText={handleInputChange('accessKey')}
+          secureTextEntry={true}
+          isLastInput={true}
+        />
         </View>
       </KeyboardDismissView>
     );
@@ -64,14 +64,14 @@ export const AuthInputs = memo(function AuthInputs({
         />
         <KeyboardAwareInput
           ref={handleRef}
-          placeholder="SELECT_HANDLE"
+          placeholder="SELECT_HANDLE (USERNAME)"
           value={formData.handle}
           onChangeText={handleInputChange('handle')}
           onSubmitEditing={() => focusNext(accessKeyRef)}
         />
         <KeyboardAwareInput
           ref={accessKeyRef}
-          placeholder="SET_ACCESS_KEY"
+          placeholder="SET_KEY (CREATE PWD)"
           value={formData.accessKey}
           onChangeText={handleInputChange('accessKey')}
           secureTextEntry={true}
@@ -79,7 +79,7 @@ export const AuthInputs = memo(function AuthInputs({
         />
         <KeyboardAwareInput
           ref={verifyAccessKeyRef}
-          placeholder="VERIFY_ACCESS_KEY"
+          placeholder="VERIFY_KEY"
           value={formData.verifyAccessKey}
           onChangeText={handleInputChange('verifyAccessKey')}
           secureTextEntry={true}
