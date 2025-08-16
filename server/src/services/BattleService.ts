@@ -67,6 +67,12 @@ export class BattleService {
     return updatedBattle;
   }
 
+  async processBattleEnd(battleId: string): Promise<void> {
+    // Public method to handle complete battle end processing
+    // This can be called from BattleTimer when elimination is detected
+    await this.handleBattleEnd(battleId);
+  }
+
   private setupTimerListeners(battleId: string): void {
     const listeners: Array<{ event: string; handler: (...args: any[]) => void }> = [];
     

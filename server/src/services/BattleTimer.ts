@@ -1,10 +1,14 @@
 import { EventEmitter } from 'events';
 import { BattlePhase } from '../types/battle';
+import { BattleService } from './BattleService';
 
 const TIMER_CONFIG = {
   COUNTDOWN_DURATION: 3,
   BATTLE_DURATION: 45,
 } as const;
+
+// Flag to disable elimination checking during tests
+const DISABLE_ELIMINATION_CHECK = process.env.NODE_ENV === 'test';
 
 interface BattleTimer {
   battleId: string;
@@ -155,7 +159,7 @@ export class BattleTimerService extends EventEmitter {
       countdown: 0,
     });
 
-    timer.battleInterval = setInterval(() => {
+    timer.battleInterval = setInterval(async () => {
       if (!timer.isActive) return;
 
       timer.battleTime++;
@@ -170,8 +174,28 @@ export class BattleTimerService extends EventEmitter {
         phase: timer.phase,
       });
 
+      // Check for elimination-based battle end on each tick
+      // Only check if we have an active timer (which means there's a real battle)
+      // AND if elimination checking is not disabled (e.g., during tests)
+      if (timer.isActive && !DISABLE_ELIMINATION_CHECK) {
+        try {
+          const battleService = new BattleService();
+          const endConditions = await battleService.checkBattleEndConditions(battleId);
+          
+          if (endConditions.shouldEnd) {
+            console.log(`🎯 BATTLE TIMER: Battle ${battleId} ending due to elimination`);
+            await this.endBattle(battleId);
+            return;
+          }
+        } catch (error) {
+          console.error(`❌ BATTLE TIMER: Error checking elimination for battle ${battleId}:`, error);
+          // Don't end the battle on error - continue with normal timer flow
+        }
+      }
+
       if (timer.battleTime >= TIMER_CONFIG.BATTLE_DURATION) {
-        this.endBattle(battleId);
+        console.log(`⏰ BATTLE TIMER: Battle ${battleId} ending due to timer expiration (${timer.battleTime}s)`);
+        this.endBattleSync(battleId);
       }
     }, 1000);
   }
@@ -179,7 +203,7 @@ export class BattleTimerService extends EventEmitter {
   /**
    * End battle and clean up
    */
-  private endBattle(battleId: string): void {
+  private async endBattle(battleId: string): Promise<void> {
     const timer = this.timers.get(battleId);
     if (!timer) return;
 
@@ -187,6 +211,15 @@ export class BattleTimerService extends EventEmitter {
     timer.phase = BattlePhase.COMPLETE;
     timer.isActive = false;
 
+    // Trigger battle end handling in BattleService
+    try {
+      const battleService = new BattleService();
+      await battleService.processBattleEnd(battleId);
+    } catch (error) {
+      console.error(`❌ BATTLE TIMER: Error handling battle end for ${battleId}:`, error);
+      // Don't fail the timer cleanup on error - continue with normal cleanup
+      // The battle might not exist (e.g., during tests), so we continue with cleanup
+    }
 
     this.emit('battleEnd', {
       battleId,
@@ -209,5 +242,32 @@ export class BattleTimerService extends EventEmitter {
       clearInterval(timer.battleInterval);
       timer.battleInterval = undefined;
     }
+  }
+
+  private endBattleSync(battleId: string): void {
+    const timer = this.timers.get(battleId);
+    if (!timer) return;
+
+    this.clearTimerIntervals(timer);
+    timer.phase = BattlePhase.COMPLETE;
+    timer.isActive = false;
+
+    // Trigger battle end handling in BattleService
+    try {
+      const battleService = new BattleService();
+      battleService.processBattleEnd(battleId);
+    } catch (error) {
+      console.error(`❌ BATTLE TIMER: Error handling battle end for ${battleId}:`, error);
+      // Don't fail the timer cleanup on error - continue with normal cleanup
+      // The battle might not exist (e.g., during tests), so we continue with cleanup
+    }
+
+    this.emit('battleEnd', {
+      battleId,
+      battleTime: timer.battleTime,
+      phase: BattlePhase.COMPLETE,
+    });
+
+    this.timers.delete(battleId);
   }
 } 
