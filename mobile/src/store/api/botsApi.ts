@@ -35,19 +35,24 @@ export const botsApi = createApi({
         body,
       }),
       async onQueryStarted({ totalCost }, { dispatch, queryFulfilled, getState }) {
+        // Get current balance state before any updates
+        const state = getState() as any;
+        const currentBalance = state.balance?.total;
+        
+        // Check if we have sufficient funds for optimistic update
+        const hasSufficientFunds = currentBalance !== null && currentBalance !== undefined && currentBalance >= totalCost;
+        
         // Optimistically update the balance immediately
         const patchResult = dispatch(
           balanceApi.util.updateQueryData('fetchBalance', undefined, (draft) => {
-            if (draft) {
+            if (draft && hasSufficientFunds) {
               draft.total -= totalCost;
             }
           })
         );
         
-        // Also update the balance slice state immediately
-        const state = getState() as any;
-        const currentBalance = state.balance?.total;
-        if (currentBalance !== null && currentBalance !== undefined) {
+        // Also update the balance slice state immediately (only if sufficient funds)
+        if (hasSufficientFunds) {
           dispatch(subtractFromBalance(totalCost));
         }
 
@@ -56,8 +61,8 @@ export const botsApi = createApi({
         } catch {
           // If the build fails, revert the optimistic balance update
           patchResult.undo();
-          // Also revert the balance slice update
-          if (currentBalance !== null && currentBalance !== undefined) {
+          // Only revert the balance slice update if we actually made the optimistic update
+          if (hasSufficientFunds) {
             dispatch(addToBalance(totalCost));
           }
         }

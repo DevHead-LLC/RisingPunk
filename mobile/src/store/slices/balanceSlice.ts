@@ -51,6 +51,9 @@ export const balanceSlice = createSlice({
       if (state.total !== null && state.total >= action.payload) {
         state.total -= action.payload;
         state.lastUpdated = Date.now();
+      } else {
+        // Log when subtraction fails for debugging
+        console.warn(`⚠️ BALANCE WARNING: Cannot subtract ${action.payload} from balance ${state.total} - insufficient funds`);
       }
     },
     triggerUpdate: (state) => {

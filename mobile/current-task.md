@@ -30,6 +30,36 @@
 
 ---
 
+### Critical Bug Fix: Balance Revert Logic - Status: ✅ COMPLETED
+
+**Bug Identified:**
+The optimistic balance update's revert logic didn't account for `subtractFromBalance` failing due to insufficient funds. If the initial subtraction didn't occur, the revert still added the amount back, potentially inflating the user's balance.
+
+**Root Cause:**
+1. **Optimistic Update**: Code optimistically updated both RTK Query cache AND balance slice state
+2. **subtractFromBalance Guard**: Function only subtracted if sufficient funds: `if (state.total !== null && state.total >= action.payload)`
+3. **Revert Logic**: Always called `addToBalance(totalCost)` regardless of whether subtraction occurred
+4. **Result**: Insufficient funds → no subtraction → revert adds funds → balance inflation
+
+**Fixes Implemented:**
+1. ✅ **Pre-flight Fund Check**: Added `hasSufficientFunds` check before optimistic updates
+2. ✅ **Conditional Optimistic Updates**: Only update balance if sufficient funds exist
+3. ✅ **Conditional Reverts**: Only revert balance changes if optimistic update actually occurred
+4. ✅ **Enhanced Logging**: Added warning logs when subtraction fails for debugging
+
+**Files Modified:**
+- `mobile/src/store/api/botsApi.ts` - Fixed optimistic update logic
+- `mobile/src/store/slices/balanceSlice.ts` - Added subtraction failure logging
+
+**Result:**
+- ✅ No more balance inflation from failed optimistic updates
+- ✅ Revert logic only operates when optimistic updates actually occurred
+- ✅ Better debugging visibility for balance-related issues
+
+**Status: CRITICAL BUG FIXED** ✅
+
+---
+
 ### Wallet Balance Synchronization - Status: ✅ CRITICAL ISSUE RESOLVED
 
 **CRITICAL ISSUE IDENTIFIED:**
