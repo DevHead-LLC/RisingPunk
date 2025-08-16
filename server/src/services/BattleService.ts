@@ -175,17 +175,14 @@ export class BattleService {
           console.log('[NPC] Clearing instance from map now ->', npcInstanceId);
           await (NPCRespawnService as any).clearNpcInstanceFromMap(npcInstanceId, 'main');
         } else {
-          console.log('[NPC] Clearing from map now ->', npcSlug);
-          await NPCRespawnService.clearNpcFromMap(npcSlug, 'main');
+          console.log('[NPC] WARNING: No npcInstanceId found, cannot safely clear NPC. This should not happen.');
+          console.log('[NPC] NPC slug:', npcSlug, 'Battle ID:', battleId);
+          return;
         }
         const npcDoc: any = await NPCService.getNPCBySlug(npcSlug);
         const delay = typeof npcDoc?.mapRecoverySeconds === 'number' ? npcDoc.mapRecoverySeconds : 300;
-        console.log('[NPC] Scheduling respawn in seconds ->', delay, npcInstanceId || npcSlug);
-        if (npcInstanceId) {
-          (NPCRespawnService as any).scheduleRespawnForInstance(npcSlug, npcInstanceId, delay, 'main');
-        } else {
-          NPCRespawnService.scheduleRespawn(npcSlug, delay, 'main');
-        }
+        console.log('[NPC] Scheduling respawn in seconds ->', delay, npcInstanceId);
+        (NPCRespawnService as any).scheduleRespawnForInstance(npcSlug, npcInstanceId, delay, 'main');
       } catch (e) {
         console.error('NPC respawn scheduling failed for', npcSlug, e);
       }
