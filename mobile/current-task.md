@@ -136,3 +136,30 @@ The balance calculation logic had a fundamental flaw:
 
 **Status: CRITICAL ISSUE RESOLVED** ✅
 The wallet balance system now maintains perfect synchronization between client, server, and database.
+
+---
+
+### BotAssemblyScreen Navigation Fix - Status: ✅ COMPLETED
+
+**Task:** Fix the close button navigation in BotAssemblyScreen to return to the previous screen instead of always going to TurfScreen.
+
+**Issue Identified:**
+- BotAssemblyScreen close button always navigated to `'turf'` regardless of where user came from
+- User expected to return to HomeScreen (hackRig) when coming from there
+- Navigation logic didn't track previous screen context
+
+**Fix Implemented:**
+1. ✅ **Added Previous Screen Tracking**: Added `previousScreen` state to TurfScreen
+2. ✅ **Updated Navigation Logic**: Modified `navigateToScreen` to track previous screen before changing current screen
+3. ✅ **Fixed BotAssembly Close**: BotAssemblyScreen now closes to `previousScreen` instead of hardcoded `'turf'`
+
+**Files Modified:**
+- `mobile/src/screens/TurfScreen.tsx` - Added previous screen tracking and updated navigation logic
+
+**Result:** 
+- ✅ Close button now returns user to the screen they came from
+- ✅ When coming from HomeScreen, close returns to HomeScreen
+- ✅ When coming from other screens, close returns to those screens
+- ✅ Navigation flow is now intuitive and user-friendly
+
+**Status: COMPLETED** ✅

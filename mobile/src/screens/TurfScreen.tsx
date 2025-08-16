@@ -66,12 +66,14 @@ export function TurfScreen(): React.JSX.Element {
   const [pendingNpcSlug, setPendingNpcSlug] = useState<string | null>(null);
   const [returnContext, setReturnContext] = useState<{ origin: 'hackRig' | 'map'; mapPan?: { x: number; y: number } } | null>(null);
   const [pendingNpcInstanceId, setPendingNpcInstanceId] = useState<string | null>(null);
+  const [previousScreen, setPreviousScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile'>('turf');
   const horizontalScrollRef = useRef<ScrollView>(null);
   const dispatch = useAppDispatch();
 
   const navigateToScreen = useCallback((screen: 'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile') => {
+    setPreviousScreen(currentScreen);
     setCurrentScreen(screen);
-  }, []);
+  }, [currentScreen]);
 
   const handleBattleEnd = useCallback(() => {
     navigateToScreen('hackRig');
@@ -134,7 +136,7 @@ export function TurfScreen(): React.JSX.Element {
         />;
       case 'botAssembly':
         return <BotAssemblyScreen
-          onClose={() => navigateToScreen('turf')}
+          onClose={() => navigateToScreen(previousScreen)}
         />;
       case 'battlePrep':
         return <BattlePreparationScreen
