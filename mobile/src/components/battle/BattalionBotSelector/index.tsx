@@ -35,6 +35,12 @@ export const BattalionBotSelector = React.memo(({
     setQuantity(0);
   }, [selectedType]);
 
+  // Reset selected type and quantity when battalion changes
+  useEffect(() => {
+    setSelectedType(null);
+    setQuantity(0);
+  }, [battalionName]);
+
   return (
     <Modal
       visible={isVisible}
@@ -74,11 +80,11 @@ export const BattalionBotSelector = React.memo(({
           )}
 
           <TouchableOpacity
-            style={[styles.deployButton, !selectedType && styles.deployButtonDisabled]}
+            style={[styles.deployButton, (!selectedType || quantity === 0 || quantity > availableBots[selectedType!]) && styles.deployButtonDisabled]}
             onPress={handleSubmit}
-            disabled={!selectedType || quantity === 0}
+            disabled={!selectedType || quantity === 0 || quantity > availableBots[selectedType!]}
           >
-            <Text style={[styles.deployButtonText, !selectedType && styles.deployButtonTextDisabled]}>
+            <Text style={[styles.deployButtonText, (!selectedType || quantity === 0 || quantity > availableBots[selectedType!]) && styles.deployButtonTextDisabled]}>
               ASSIGN BOTS
             </Text>
           </TouchableOpacity>
