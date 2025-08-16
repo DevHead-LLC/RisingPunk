@@ -67,6 +67,12 @@ export class BattleService {
     return updatedBattle;
   }
 
+  async processBattleEnd(battleId: string): Promise<void> {
+    // Public method to handle complete battle end processing
+    // This can be called from BattleTimer when elimination is detected
+    await this.handleBattleEnd(battleId);
+  }
+
   private setupTimerListeners(battleId: string): void {
     const listeners: Array<{ event: string; handler: (...args: any[]) => void }> = [];
     
@@ -86,6 +92,12 @@ export class BattleService {
     });
     
     this.battleListeners.set(battleId, listeners);
+    
+    // Register elimination callback with BattleTimer
+    this.timerService.registerEliminationCallback(battleId, async (battleId: string) => {
+      const endConditions = await this.checkBattleEndConditions(battleId);
+      return endConditions.shouldEnd;
+    });
   }
 
   private removeBattleListeners(battleId: string): void {
