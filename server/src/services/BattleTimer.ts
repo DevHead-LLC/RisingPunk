@@ -198,14 +198,15 @@ export class BattleTimerService extends EventEmitter {
       // Check for elimination-based battle end on each tick
       // Only check if we have an active timer (which means there's a real battle)
       // AND if elimination checking is not disabled (e.g., during tests)
-      if (timer.isActive && !DISABLE_ELIMINATION_CHECK && this.eliminationCallbacks.has(battleId)) {
+      // AND if the battle hasn't already ended
+      if (timer.isActive && timer.phase !== BattlePhase.COMPLETE && !DISABLE_ELIMINATION_CHECK && this.eliminationCallbacks.has(battleId)) {
         try {
           // Use the callback to check for elimination (synchronous check)
           const callback = this.eliminationCallbacks.get(battleId);
           if (callback) {
             // Check elimination synchronously to avoid race conditions
             callback(battleId).then(shouldEnd => {
-              if (shouldEnd && timer.isActive) {
+              if (shouldEnd && timer.isActive && timer.phase !== BattlePhase.COMPLETE) {
                 console.log(`🎯 BATTLE TIMER: Battle ${battleId} ending due to elimination`);
                 this.endBattle(battleId).catch(error => {
                   console.error(`❌ BATTLE TIMER: Error ending battle ${battleId}:`, error);
@@ -222,6 +223,12 @@ export class BattleTimerService extends EventEmitter {
       }
 
       if (timer.battleTime >= TIMER_CONFIG.BATTLE_DURATION) {
+        // Check if battle has already ended (e.g., by elimination) before processing timer expiration
+        if (timer.phase === BattlePhase.COMPLETE) {
+          console.log(`⏰ BATTLE TIMER: Battle ${battleId} already ended, skipping timer expiration`);
+          return;
+        }
+        
         console.log(`⏰ BATTLE TIMER: Battle ${battleId} ending due to timer expiration (${timer.battleTime}s)`);
         
         // Clean up timer immediately (synchronous)
@@ -231,6 +238,9 @@ export class BattleTimerService extends EventEmitter {
         
         // Remove timer from map immediately
         this.timers.delete(battleId);
+        
+        // Clean up elimination callback to prevent memory leak
+        this.unregisterEliminationCallback(battleId);
         
         // Emit battleEnd event to trigger BattleService battle end processing
         // BattleService will handle the async battle end processing
@@ -250,9 +260,18 @@ export class BattleTimerService extends EventEmitter {
     const timer = this.timers.get(battleId);
     if (!timer) return;
 
+    // Check if battle has already ended to prevent duplicate processing
+    if (timer.phase === BattlePhase.COMPLETE) {
+      console.log(`🎯 BATTLE TIMER: Battle ${battleId} already ended, skipping duplicate endBattle call`);
+      return;
+    }
+
     this.clearTimerIntervals(timer);
     timer.phase = BattlePhase.COMPLETE;
     timer.isActive = false;
+
+    // Clean up elimination callback to prevent memory leak
+    this.unregisterEliminationCallback(battleId);
 
     // Trigger battle end handling in BattleService
     try {

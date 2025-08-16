@@ -131,6 +131,45 @@
 - All existing functionality preserved including battle elimination
 - Tests continue to pass without modification
 
+### Duplicate Events and Memory Leak Fixes - Status: ✅ Done
+
+**Problem 1: Duplicate battleEnd Events**
+- Both timer expiration and elimination could trigger `endBattle()`, which emitted `battleEnd` events
+- A battle could be processed twice if it ended by elimination but the timer also expired
+- This caused duplicate battle end processing and inconsistent state
+
+**Problem 2: Memory Leak from Unregistered Callbacks**
+- Elimination callbacks weren't unregistered when battles ended by elimination
+- Only timer expiration was cleaning up callbacks
+- This led to memory leaks and potential stale callback references
+
+**Root Cause Analysis:**
+- Timer expiration logic didn't check if a battle had already ended
+- `endBattle()` method didn't unregister elimination callbacks
+- No state checking to prevent duplicate processing
+
+**Fixes Implemented:**
+1. **Battle state checking**: Added checks to prevent processing battles that have already ended
+2. **Callback cleanup in endBattle**: Elimination callbacks are now unregistered when battles end by elimination
+3. **Duplicate prevention**: Timer expiration skips battles that have already ended
+4. **State validation**: Multiple layers of state checking prevent duplicate processing
+
+**Code Changes:**
+- BattleTimer: Timer expiration now checks `timer.phase !== BattlePhase.COMPLETE` before processing
+- BattleTimer: `endBattle()` method now unregisters elimination callbacks
+- BattleTimer: Elimination checking skips battles that have already ended
+- BattleTimer: Added state validation in elimination callback execution
+- BattleTimer: Proper cleanup order prevents memory leaks
+
+**Result:**
+- No more duplicate battleEnd events
+- No more double-processing of battle completion
+- Elimination callbacks are properly cleaned up in all scenarios
+- Memory leaks are prevented through proper callback management
+- Battle state is consistently maintained
+- All existing functionality preserved including battle elimination
+- Tests continue to pass without modification
+
 ### NPC Disappearance Bug Investigation & Fix - Status: ✅ Done
 
 **Problem Identified:**
