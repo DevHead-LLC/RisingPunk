@@ -92,6 +92,12 @@ export class BattleService {
     });
     
     this.battleListeners.set(battleId, listeners);
+    
+    // Register elimination callback with BattleTimer
+    this.timerService.registerEliminationCallback(async (battleId: string) => {
+      const endConditions = await this.checkBattleEndConditions(battleId);
+      return endConditions.shouldEnd;
+    });
   }
 
   private removeBattleListeners(battleId: string): void {
