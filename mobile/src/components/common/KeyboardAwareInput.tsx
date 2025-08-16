@@ -13,6 +13,7 @@ export interface KeyboardAwareInputProps {
   onSubmitEditing?: () => void;
   blurOnSubmit?: boolean;
   style?: any;
+  containerStyle?: any;
   isLastInput?: boolean;
   editable?: boolean;
   maxLength?: number;
@@ -31,6 +32,7 @@ export const KeyboardAwareInput = forwardRef<TextInput, KeyboardAwareInputProps>
       onSubmitEditing,
       blurOnSubmit = true,
       style,
+      containerStyle,
       isLastInput = false,
       editable = true,
       maxLength,
@@ -51,7 +53,7 @@ export const KeyboardAwareInput = forwardRef<TextInput, KeyboardAwareInputProps>
     };
 
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, containerStyle]}>
         <TextInput
           ref={ref}
           style={[styles.input, style]}

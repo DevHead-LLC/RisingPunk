@@ -6,6 +6,8 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { selectBotType } from '../store/slices/botsSlice';
@@ -60,21 +62,23 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
       <KeyboardAvoidingView 
         style={styles.keyboardAvoidingView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 20}
       >
-        <View style={styles.content}>
-          <ScrollView style={styles.botSelection}>
-            {levelSections}
-          </ScrollView>
-          <BuildSection
-            selectedType={bots.selectedType}
-            buildingProgress={bots.buildingProgress}
-            quantity={quantity}
-            onQuantityChange={handleQuantityChange}
-            onBuild={handleBuild}
-            botCost={BOT_COST}
-          />
-        </View>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.content}>
+            <ScrollView style={styles.botSelection}>
+              {levelSections}
+            </ScrollView>
+            <BuildSection
+              selectedType={bots.selectedType}
+              buildingProgress={bots.buildingProgress}
+              quantity={quantity}
+              onQuantityChange={handleQuantityChange}
+              onBuild={handleBuild}
+              botCost={BOT_COST}
+            />
+          </View>
+        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -155,57 +159,8 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.6)',
     fontSize: SIZING.font.small,
   },
-  buildSection: {
-    flex: 1.5,
-    padding: SIZING.spacing.lg,
-    borderLeftWidth: 1,
-    borderLeftColor: 'rgba(0, 255, 65, 0.2)',
-  },
   buildInfo: {
     gap: SIZING.spacing.md,
-  },
-  buildTitle: {
-    color: '#4717F6',
-    fontSize: SIZING.font.h2,
-    fontWeight: 'bold',
-    marginBottom: SIZING.spacing.sm,
-  },
-  selectedBot: {
-    color: COLORS.text.primary,
-    fontSize: SIZING.font.body,
-    marginBottom: SIZING.spacing.xs,
-  },
-  quantityInput: {
-    flex: 1,
-    height: 40,
-    backgroundColor: 'rgba(26, 77, 51, 0.3)',
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 255, 65, 0.4)',
-    color: COLORS.text.primary,
-    textAlign: 'center',
-    fontSize: SIZING.font.body,
-  },
-  buildButton: {
-    width: 80,
-    height: 40,
-    backgroundColor: 'rgba(26, 77, 51, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 255, 65, 0.4)',
-  },
-  buildButtonDisabled: {
-    opacity: 0.5,
-    backgroundColor: 'rgba(26, 77, 51, 0.1)',
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  buildButtonText: {
-    color: COLORS.text.primary,
-    fontSize: SIZING.font.body,
-    fontWeight: 'bold',
-    letterSpacing: 1,
   },
   progressTitle: {
     color: COLORS.text.primary,

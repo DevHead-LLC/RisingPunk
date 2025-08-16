@@ -29,6 +29,7 @@ export const BuildControls = React.memo(function BuildControls({
           onChangeText={onQuantityChange}
           keyboardType="numeric"
           style={styles.quantityInput}
+          containerStyle={styles.quantityInputContainer}
           editable={buildingProgress === null}
           isLastInput={true}
           onSubmitEditing={onBuild}
@@ -64,6 +65,9 @@ const styles = StyleSheet.create({
     color: COLORS.text.primary,
     textAlign: 'center',
     fontSize: SIZING.font.body,
+  },
+  quantityInputContainer: {
+    flex: 1,
   },
   buildButton: {
     width: 80,
