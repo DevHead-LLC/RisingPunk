@@ -11,6 +11,7 @@ export interface IUser extends Document {
     nextLevel: number;
     total: number;
   };
+  armyBonus: { strength: number; defense: number; speed: number; health: number };
   balance: {
     total: number;
     ratePerSecond: number;

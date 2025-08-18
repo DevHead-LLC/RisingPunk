@@ -18,6 +18,7 @@ export const BattalionLossItem: React.FC<Props> = ({ battalionLoss }) => {
 
   const borderColor = battalionLoss.owner === 'user' ? '#4717F6' : '#FF4141';
   const isDestroyed = battalionLoss.endingQuantity === 0;
+  const losses = battalionLoss.startingQuantity - battalionLoss.endingQuantity;
 
   return (
     <View style={[styles.container, { borderLeftColor: borderColor }]} testID="battalion-loss-item">
@@ -30,19 +31,30 @@ export const BattalionLossItem: React.FC<Props> = ({ battalionLoss }) => {
         </Text>
       </View>
       
-      <View style={styles.details}>
-        <Text style={[styles.quantity, isDestroyed && styles.destroyedText]}>
-          {battalionLoss.startingQuantity} → {battalionLoss.endingQuantity}
-        </Text>
-        <Text style={[styles.losses, { color: borderColor }]}>
-          {battalionLoss.losses} losses
-        </Text>
-      </View>
-      
-      <View style={styles.points}>
-        <Text style={styles.pointsText}>
-          Points: {battalionLoss.startingPoints} → {battalionLoss.endingPoints}
-        </Text>
+      <View style={styles.stats}>
+        <View style={styles.statRow}>
+          <Text style={styles.statLabel}>Units:</Text>
+          <Text style={[styles.statValue, isDestroyed && styles.destroyedText]}>
+            {battalionLoss.startingQuantity} → {battalionLoss.endingQuantity}
+          </Text>
+          {losses > 0 && (
+            <Text style={[styles.losses, { color: borderColor }]}>
+              (-{losses})
+            </Text>
+          )}
+        </View>
+        
+        <View style={styles.statRow}>
+          <Text style={styles.statLabel}>Points:</Text>
+          <Text style={[styles.statValue, isDestroyed && styles.destroyedText]}>
+            {battalionLoss.startingPoints} → {battalionLoss.endingPoints}
+          </Text>
+          {battalionLoss.losses > 0 && (
+            <Text style={[styles.losses, { color: borderColor }]}>
+              (-{battalionLoss.losses})
+            </Text>
+          )}
+        </View>
       </View>
     </View>
   );
@@ -54,14 +66,14 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderRadius: 8,
     padding: 12,
-    marginVertical: 4,
-    marginHorizontal: 16,
+    marginVertical: 6,
+    marginHorizontal: 0,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   botType: {
     color: '#ffffff',
@@ -72,26 +84,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  details: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
+  stats: {
+    gap: 6,
   },
-  quantity: {
+  statRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statLabel: {
+    color: '#888888',
+    fontSize: 14,
+    minWidth: 50,
+  },
+  statValue: {
     color: '#cccccc',
     fontSize: 14,
+    fontWeight: '500',
   },
   losses: {
     fontSize: 14,
     fontWeight: '600',
-  },
-  points: {
-    marginTop: 4,
-  },
-  pointsText: {
-    color: '#888888',
-    fontSize: 12,
   },
   destroyedText: {
     textDecorationLine: 'line-through',

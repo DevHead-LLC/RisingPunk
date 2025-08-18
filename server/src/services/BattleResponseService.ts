@@ -46,7 +46,7 @@ export class BattleResponseService {
     // Calculate battle end data if battle is complete
     let battleEndData: BattleEndData | undefined;
     if (currentPhase === 'complete' && battle.winner) {
-      battleEndData = this.createBattleEndData(battle);
+      battleEndData = await this.createBattleEndData(battle);
     }
 
     // Get user level information for battle response
@@ -84,7 +84,7 @@ export class BattleResponseService {
     return response;
   }
 
-  private static createBattleEndData(battle: IBattleDocument): BattleEndData {
+  private static async createBattleEndData(battle: IBattleDocument): Promise<BattleEndData> {
     // Calculate losses using PointTrackingService
     const battleLosses = PointTrackingService.calculateBattleLosses(
       battle.startingBattalions || [],
@@ -151,6 +151,30 @@ export class BattleResponseService {
       ? Math.floor((battle.endTime.getTime() - battle.startTime.getTime()) / 1000)
       : 0;
 
+    // Get actual processed rewards if this was a user victory against NPC
+    let experienceGained: number | undefined;
+    let hackerRewards: number | undefined;
+    
+    if (battleLosses.winner === NodeOwner.USER && (battle as any).defenderNpcSlug) {
+      try {
+        // Check if rewards were already processed by looking for a rewards field
+        // If not, fall back to NPC data (for backward compatibility)
+        if ((battle as any).processedRewards) {
+          experienceGained = (battle as any).processedRewards.experienceGained;
+          hackerRewards = (battle as any).processedRewards.moneyGained;
+        } else {
+          const { NPCService } = require('./NPCService');
+          const npc = await NPCService.getNPCBySlug((battle as any).defenderNpcSlug);
+          if (npc) {
+            experienceGained = npc.battleExperienceReward;
+            hackerRewards = npc.victoryReward;
+          }
+        }
+      } catch (error) {
+        console.warn('Could not fetch rewards for battle end data:', error);
+      }
+    }
+
     const losses: BattleLosses = {
       userLosses: battleLosses.userLosses,
       enemyLosses: battleLosses.enemyLosses,
@@ -170,7 +194,9 @@ export class BattleResponseService {
       winner: battleLosses.winner,
       losses,
       endTime: battle.endTime || new Date(),
-      phase: battle.phase
+      phase: battle.phase,
+      experienceGained,
+      hackerRewards
     };
   }
 } 

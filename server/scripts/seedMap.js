@@ -129,12 +129,60 @@ async function seedMap() {
       }
     }
     
-    // Save the updated map using native MongoDB update
+    // Save the updated map using native MongoDB update - only update NPC-related fields
     console.log('💾 Saving updated map...');
-    await mongoose.connection.collection('maps').updateOne(
-      { _id: map._id },
-      { $set: { cells: map.cells } }
-    );
+    
+    // Create update operations for only the cells that have NPCs
+    const updateOperations = [];
+    map.cells.forEach((cell, index) => {
+      if (cell.occupiedBy === 'npc') {
+        updateOperations.push({
+          updateOne: {
+            filter: { _id: map._id, [`cells.${index}.x`]: cell.x, [`cells.${index}.y`]: cell.y },
+            update: {
+              $set: {
+                [`cells.${index}.isOccupied`]: cell.isOccupied,
+                [`cells.${index}.occupiedBy`]: cell.occupiedBy,
+                [`cells.${index}.entityName`]: cell.entityName,
+                [`cells.${index}.npcSlug`]: cell.npcSlug,
+                [`cells.${index}.npcInstanceId`]: cell.npcInstanceId,
+                [`cells.${index}.userId`]: cell.userId
+              }
+            }
+          }
+        });
+      }
+    });
+    
+    // Also clear any existing NPCs that are no longer valid
+    const clearOperations = [];
+    map.cells.forEach((cell, index) => {
+      if (cell.occupiedBy === 'npc' && !cell.npcSlug) {
+        clearOperations.push({
+          updateOne: {
+            filter: { _id: map._id, [`cells.${index}.x`]: cell.x, [`cells.${index}.y`]: cell.y },
+            update: {
+              $set: {
+                [`cells.${index}.isOccupied`]: false,
+                [`cells.${index}.occupiedBy`]: 'none',
+                [`cells.${index}.entityName`]: '',
+                [`cells.${index}.npcSlug`]: '',
+                [`cells.${index}.npcInstanceId`]: '',
+                [`cells.${index}.userId`]: null
+              }
+            }
+          }
+        });
+      }
+    });
+    
+    // Execute all updates
+    if (updateOperations.length > 0) {
+      await mongoose.connection.collection('maps').bulkWrite(updateOperations);
+    }
+    if (clearOperations.length > 0) {
+      await mongoose.connection.collection('maps').bulkWrite(clearOperations);
+    }
     
     console.log(`🎉 Successfully seeded map with ${totalPlaced} NPCs!`);
     console.log('\n📊 NPC Distribution:');

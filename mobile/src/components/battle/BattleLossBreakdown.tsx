@@ -8,7 +8,7 @@ interface Props {
 }
 
 export const BattleLossBreakdown: React.FC<Props> = ({ battleEndData }) => {
-  const { losses, winner } = battleEndData;
+  const { losses, winner, experienceGained, hackerRewards } = battleEndData;
   
   const userBattalions = losses.battalionLosses.filter(b => b.owner === 'user');
   const enemyBattalions = losses.battalionLosses.filter(b => b.owner === 'enemy');
@@ -20,7 +20,7 @@ export const BattleLossBreakdown: React.FC<Props> = ({ battleEndData }) => {
   const isCompleteVictory = losses.userLosses === 0 || losses.enemyLosses === 0;
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <Text style={styles.title}>Battle Results</Text>
         <Text style={[styles.victoryMessage, { color: winner === 'user' ? '#4717F6' : '#FF4141' }]}>
@@ -48,29 +48,56 @@ export const BattleLossBreakdown: React.FC<Props> = ({ battleEndData }) => {
         </View>
       </View>
 
+      {winner === 'user' && (experienceGained || hackerRewards) && (
+        <View style={styles.rewardsSection}>
+          <Text style={styles.sectionTitle}>Rewards</Text>
+          <View style={styles.rewardsContainer}>
+            {experienceGained && (
+              <View style={styles.rewardItem}>
+                <Text style={styles.rewardLabel}>Experience Gained</Text>
+                <Text style={styles.rewardValue}>{experienceGained} XP</Text>
+              </View>
+            )}
+            {hackerRewards && (
+              <View style={styles.rewardItem}>
+                <Text style={styles.rewardLabel}>Hacker Rewards</Text>
+                <Text style={styles.rewardValue}>${hackerRewards}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      )}
+
       <View style={styles.battalionSection}>
-        <Text style={styles.sectionTitle}>Battalion Losses</Text>
-        <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-          {userBattalions.length > 0 && (
-            <View style={styles.sideSection}>
-              <Text style={[styles.sideTitle, { color: '#4717F6' }]}>User Battalions</Text>
-              {userBattalions.map((battalion) => (
+        <Text style={styles.sectionTitle}>Battalion Results</Text>
+        
+        <View style={styles.userCard}>
+          <Text style={[styles.cardTitle, { color: '#4717F6' }]}>User Forces</Text>
+          <View style={styles.cardContent}>
+            {userBattalions.length > 0 ? (
+              userBattalions.map((battalion) => (
                 <BattalionLossItem key={battalion.battalionId} battalionLoss={battalion} />
-              ))}
-            </View>
-          )}
-          
-          {enemyBattalions.length > 0 && (
-            <View style={styles.sideSection}>
-              <Text style={[styles.sideTitle, { color: '#FF4141' }]}>Enemy Battalions</Text>
-              {enemyBattalions.map((battalion) => (
+              ))
+            ) : (
+              <Text style={styles.noBattalions}>No user battalions</Text>
+            )}
+          </View>
+        </View>
+        
+        <View style={styles.enemyCard}>
+          <Text style={[styles.cardTitle, { color: '#FF4141' }]}>Enemy Forces</Text>
+          <View style={styles.cardContent}>
+            {enemyBattalions.length > 0 ? (
+              enemyBattalions.map((battalion) => (
                 <BattalionLossItem key={battalion.battalionId} battalionLoss={battalion} />
-              ))}
-            </View>
-          )}
-        </ScrollView>
+              ))
+            ) : (
+              <Text style={styles.noBattalions}>No enemy battalions</Text>
+            )}
+          </View>
+        </View>
       </View>
-    </View>
+    </ScrollView>
   );
 };
 
@@ -81,31 +108,31 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 24,
     paddingHorizontal: 16,
   },
   title: {
     color: '#ffffff',
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   victoryMessage: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
     textAlign: 'center',
   },
   summary: {
     paddingHorizontal: 16,
-    marginBottom: 20,
+    marginBottom: 24,
   },
   lossSummary: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   lossText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
   },
   battleInfo: {
@@ -114,28 +141,78 @@ const styles = StyleSheet.create({
   },
   infoText: {
     color: '#888888',
-    fontSize: 14,
+    fontSize: 16,
   },
-  battalionSection: {
-    flex: 1,
+  rewardsSection: {
+    marginBottom: 24,
+    paddingHorizontal: 16,
   },
   sectionTitle: {
     color: '#ffffff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  rewardsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  rewardItem: {
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    padding: 16,
+    borderRadius: 12,
+    minWidth: 120,
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  rewardLabel: {
+    color: '#888888',
+    fontSize: 14,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  rewardValue: {
+    color: '#4CAF50',
     fontSize: 18,
     fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  battalionSection: {
     paddingHorizontal: 16,
-    marginBottom: 12,
+    paddingBottom: 20,
   },
-  scrollContainer: {
-    flex: 1,
-  },
-  sideSection: {
+  userCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#333333',
+    overflow: 'hidden',
     marginBottom: 16,
   },
-  sideTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    paddingHorizontal: 16,
-    marginBottom: 8,
+  enemyCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#333333',
+    overflow: 'hidden',
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    padding: 16,
+    textAlign: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  cardContent: {
+    padding: 16,
+  },
+  noBattalions: {
+    color: '#888888',
+    fontSize: 14,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 }); 

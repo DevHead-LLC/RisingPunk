@@ -195,6 +195,8 @@ export interface BattleEndData {
   losses: BattleLosses;
   endTime: Date;
   phase: BattlePhase;
+  experienceGained?: number;
+  hackerRewards?: number;
 }
 
 export interface RetargetingQueueTask {

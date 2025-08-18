@@ -36,10 +36,14 @@ export const BattleEndOverlay: React.FC<BattleEndOverlayProps> = ({ winner, onCo
     return (
       <View style={styles.overlay} testID="battle-end-overlay">
         <View style={styles.container}>
-          <BattleLossBreakdown battleEndData={battleEndData} />
-          <TouchableOpacity style={styles.continueButton} onPress={handleContinue} testID="continue-button">
-            <Text style={styles.continueButtonText}>Continue</Text>
-          </TouchableOpacity>
+          <View style={styles.contentContainer}>
+            <BattleLossBreakdown battleEndData={battleEndData} />
+          </View>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity style={styles.continueButton} onPress={handleContinue} testID="continue-button">
+              <Text style={styles.continueButtonText}>Continue</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     );
@@ -74,13 +78,23 @@ const styles = StyleSheet.create({
   },
   container: {
     backgroundColor: '#1a1a1a',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 0,
-    margin: 20,
+    margin: 16,
     borderWidth: 2,
     borderColor: '#333333',
     flex: 1,
-    maxHeight: '90%',
+    maxHeight: '95%',
+    minHeight: '80%',
+    width: '95%',
+  },
+  contentContainer: {
+    flex: 1,
+  },
+  buttonContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    paddingTop: 10,
   },
   title: {
     fontSize: 24,
@@ -98,15 +112,15 @@ const styles = StyleSheet.create({
   },
   continueButton: {
     backgroundColor: '#4CAF50',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 8,
-    minWidth: 120,
+    paddingHorizontal: 40,
+    paddingVertical: 18,
+    borderRadius: 12,
+    minWidth: 140,
     alignItems: 'center',
   },
   continueButtonText: {
     color: '#ffffff',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
   },
 }); 

@@ -43,9 +43,6 @@ export class ScreenDimensionService {
     const dimensionsChanged = !currentDimensions || currentDimensions.width !== width || currentDimensions.height !== height;
     
     if (dimensionsChanged) {
-      if (currentDimensions) {
-        console.log(`📱 Screen dimensions changed for battle ${battleId}: ${currentDimensions.width}x${currentDimensions.height} → ${width}x${height}`);
-      }
       this.setBattleScreenDimensions(battleId, width, height);
       return true;
     }

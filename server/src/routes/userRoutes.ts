@@ -71,15 +71,14 @@ router.post('/experience/add', auth, async (req: Request, res: Response) => {
       return;
     }
 
-    const { LevelingService } = require('../services/LevelingService');
-    
-    const result = await LevelingService.applyExperience(req.user._id, amount);
-    
-    res.json({
-      success: true,
-      message: `Experience added successfully${result.levelsGained > 0 ? `! Leveled up ${result.levelsGained} time(s)` : ''}`,
-      result
-    });
+    try {
+      const { LevelingService } = require('../services/LevelingService');
+      const result = await LevelingService.applyExperience(req.user._id, amount);
+      res.json(result);
+    } catch (error) {
+      console.error('Error applying experience:', error);
+      res.status(500).json({ error: 'Failed to apply experience' });
+    }
   } catch (error) {
     console.error('Experience add error:', error);
     res.status(500).json({ message: 'Error adding experience' });

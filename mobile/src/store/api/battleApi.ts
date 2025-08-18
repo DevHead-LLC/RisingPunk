@@ -35,6 +35,8 @@ export interface BattleEndData {
   losses: BattleLosses;
   endTime: Date;
   phase: 'setup' | 'countdown' | 'battle' | 'victory' | 'defeat' | 'complete';
+  experienceGained?: number;
+  hackerRewards?: number;
 }
 
 export interface BattleState {

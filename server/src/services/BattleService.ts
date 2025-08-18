@@ -11,6 +11,7 @@ import { User } from '../models/User';
 import mongoose from 'mongoose';
 import { NPCRespawnService } from './NPCRespawnService';
 import { NPCService } from './NPCService';
+import { BattleRewardService } from './BattleRewardService';
 
 export class BattleService {
   private timerService: BattleTimerService;
@@ -135,7 +136,9 @@ export class BattleService {
     BattalionService.stopMovementUpdates(battleId);
     
     const battle = await this.getBattle(battleId);
-    if (!battle) return;
+    if (!battle) {
+      return;
+    }
 
     // Check for complete elimination first
     const eliminationResult = CombatService.checkCompleteElimination(battle.battalions);
@@ -169,36 +172,60 @@ export class BattleService {
       endCondition = 'timer';
     }
 
-    // Store end condition for response
+    // Store end condition and winner for response
     (battle as any).endCondition = endCondition;
+    battle.winner = winner;
     await battle.save();
 
     // Unlock hack rig if user wins by elimination (only if flagged)
-    if ((battle as any).unlockHackRigOnWin && winner === NodeOwner.USER && endCondition === 'elimination') {
-      await this.unlockHackRigForUser(battle.attackerId);
+    if (winner === NodeOwner.USER && endCondition === 'elimination' && (battle as any).unlockHackRig) {
+      try {
+        const user = await User.findById(battle.attackerId);
+        if (!user) {
+          console.log(`⚠️ BATTLE VICTORY: User ${battle.attackerId} not found for hack rig unlock`);
+          return;
+        }
+
+        if (!user.unlockedFeatures?.hackRig) {
+          user.unlockedFeatures = user.unlockedFeatures || {};
+          user.unlockedFeatures.hackRig = true;
+          await user.save();
+          console.log(`🎉 BATTLE VICTORY: Hack rig unlocked for user ${battle.attackerId}`);
+        } else {
+          console.log(`ℹ️ BATTLE VICTORY: Hack rig already unlocked for user ${battle.attackerId}`);
+        }
+      } catch (error) {
+        console.error('Failed to unlock hack rig for user', battle.attackerId, error);
+      }
     }
 
     // If battle was against an NPC and user won, clear NPC and schedule respawn
     const npcSlug: string = (battle as any).defenderNpcSlug || '';
     const npcInstanceId: string = (battle as any).defenderNpcInstanceId || '';
+    
     if (npcSlug && winner === NodeOwner.USER) {
       try {
         if (npcInstanceId) {
-          console.log('[NPC] Clearing instance from map now ->', npcInstanceId);
           await (NPCRespawnService as any).clearNpcInstanceFromMap(npcInstanceId, 'main');
           
           const npcDoc: any = await NPCService.getNPCBySlug(npcSlug);
           const delay = typeof npcDoc?.mapRecoverySeconds === 'number' ? npcDoc.mapRecoverySeconds : 300;
-          console.log('[NPC] Scheduling respawn in seconds ->', delay, npcInstanceId);
           (NPCRespawnService as any).scheduleRespawnForInstance(npcSlug, npcInstanceId, delay, 'main');
         } else {
-          console.log('[NPC] WARNING: No npcInstanceId found, cannot safely clear NPC. This should not happen.');
-          console.log('[NPC] NPC slug:', npcSlug, 'Battle ID:', battleId);
-          console.log('[NPC] Battle will complete but NPC may remain on map until manually resolved.');
+          // Handle case where no npcInstanceId is available
         }
+      } catch (error) {
+        // NPC handling failed, but battle will complete
+      }
+    }
+
+    // Process battle rewards and bot losses if this was a battle against an NPC
+    if (npcSlug) {
+      try {
+        const result = await BattleRewardService.processBattleRewards(battle, battle.attackerId);
       } catch (e) {
-        console.error('NPC respawn scheduling failed for', npcSlug, e);
-        console.log('[NPC] Battle will complete but NPC handling failed. Manual intervention may be required.');
+        console.error('Battle reward processing failed for', battleId, e);
+        console.log('Battle will complete but reward handling failed. Manual intervention may be required.');
       }
     }
 

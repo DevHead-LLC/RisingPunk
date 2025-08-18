@@ -1,6 +1,7 @@
-import express, { Request, Response, Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { BattleController } from '../controllers/BattleController';
 import auth from '../middleware/auth';
+import { Battle } from '../models/Battle'; // Fixed import for Battle model
 
 interface StartBattleRequest extends Request {
   body: {
@@ -25,7 +26,7 @@ interface BattleResponse {
   battleId?: string;
 }
 
-const router: Router = express.Router();
+const router: Router = Router();
 const battleController = new BattleController();
 
 router.post<{}, BattleResponse, StartBattleRequest['body']>(
@@ -108,5 +109,64 @@ router.get<{ id: string }, BattleResponse>(
     }
   }
 );
+
+// Test endpoint to manually trigger battle rewards (for debugging)
+router.post('/test-rewards/:battleId', auth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { battleId } = req.params;
+    const battle = await Battle.findById(battleId);
+    
+    if (!battle) {
+      res.status(404).json({ error: 'Battle not found' });
+      return;
+    }
+    
+    const { BattleRewardService } = require('../services/BattleRewardService');
+    const result = await BattleRewardService.processBattleRewards(battle, battle.attackerId);
+    
+    res.json({
+      success: true,
+      result,
+      battle: {
+        battleId: battle.battleId,
+        winner: battle.winner,
+        defenderNpcSlug: (battle as any).defenderNpcSlug,
+        phase: battle.phase
+      }
+    });
+  } catch (error) {
+    console.error('Error testing rewards:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Debug endpoint to list recent battles
+router.get('/debug/recent-battles', auth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const battles = await Battle.find({ 
+      attackerId: req.user._id,
+      phase: 'complete'
+    })
+    .sort({ updatedAt: -1 })
+    .limit(10)
+    .lean();
+
+    res.json({
+      success: true,
+      battles: battles.map((battle: any) => ({
+        battleId: battle.battleId,
+        winner: battle.winner,
+        defenderNpcSlug: (battle as any).defenderNpcSlug,
+        defenderNpcInstanceId: (battle as any).defenderNpcInstanceId,
+        phase: battle.phase,
+        endTime: battle.endTime,
+        updatedAt: battle.updatedAt
+      }))
+    });
+  } catch (error) {
+    console.error('Debug battles error:', error);
+    res.status(500).json({ error: 'Failed to get recent battles' });
+  }
+});
 
 export default router; 
