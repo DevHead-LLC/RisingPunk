@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { NodeOwner } from '../../types/battleTypes';
 import { BattleEndData } from '../../store/api/battleApi';
 import { BattleLossBreakdown } from './BattleLossBreakdown';
+import { LevelUpAnimation } from '../common/LevelUpAnimation';
 
 interface BattleEndOverlayProps {
   winner: NodeOwner;
@@ -11,6 +12,23 @@ interface BattleEndOverlayProps {
 }
 
 export const BattleEndOverlay: React.FC<BattleEndOverlayProps> = ({ winner, onContinue, battleEndData }) => {
+  const [showLevelUpAnimation, setShowLevelUpAnimation] = useState(false);
+
+  useEffect(() => {
+    console.log('🔍 BattleEndOverlay: battleEndData received:', battleEndData);
+    console.log('🔍 BattleEndOverlay: levelUp data:', battleEndData?.levelUp);
+    
+    if (battleEndData?.levelUp && battleEndData.levelUp.levelsGained > 0) {
+      console.log('🎉 BattleEndOverlay: Triggering level up animation!');
+      setShowLevelUpAnimation(true);
+    } else {
+      console.log('🔍 BattleEndOverlay: No level up detected');
+    }
+  }, [battleEndData]);
+
+  const handleLevelUpAnimationComplete = () => {
+    setShowLevelUpAnimation(false);
+  };
 
 
 
@@ -35,6 +53,10 @@ export const BattleEndOverlay: React.FC<BattleEndOverlayProps> = ({ winner, onCo
   if (battleEndData) {
     return (
       <View style={styles.overlay} testID="battle-end-overlay">
+        <LevelUpAnimation
+          isVisible={showLevelUpAnimation}
+          onAnimationComplete={handleLevelUpAnimationComplete}
+        />
         <View style={styles.container}>
           <View style={styles.contentContainer}>
             <BattleLossBreakdown battleEndData={battleEndData} />
@@ -51,6 +73,10 @@ export const BattleEndOverlay: React.FC<BattleEndOverlayProps> = ({ winner, onCo
 
   return (
     <View style={styles.overlay} testID="battle-end-overlay">
+      <LevelUpAnimation
+        isVisible={showLevelUpAnimation}
+        onAnimationComplete={handleLevelUpAnimationComplete}
+      />
       <View style={styles.container}>
         <Text style={styles.title}>BATTLE COMPLETE</Text>
         <Text style={styles.winnerText} testID="winner-display">

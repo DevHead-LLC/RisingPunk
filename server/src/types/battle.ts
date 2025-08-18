@@ -197,6 +197,10 @@ export interface BattleEndData {
   phase: BattlePhase;
   experienceGained?: number;
   hackerRewards?: number;
+  levelUp?: {
+    levelsGained: number;
+    newLevel: number;
+  };
 }
 
 export interface RetargetingQueueTask {

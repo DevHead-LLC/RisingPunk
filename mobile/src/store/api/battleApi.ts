@@ -37,6 +37,10 @@ export interface BattleEndData {
   phase: 'setup' | 'countdown' | 'battle' | 'victory' | 'defeat' | 'complete';
   experienceGained?: number;
   hackerRewards?: number;
+  levelUp?: {
+    levelsGained: number;
+    newLevel: number;
+  };
 }
 
 export interface BattleState {
