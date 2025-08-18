@@ -44,6 +44,9 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
     dispatch(selectBotType(type));
   }, [dispatch]);
 
+  // TODO: Get user level from profile/state when implemented
+  const userLevel = 1; // Temporary hardcoded value
+
   const levelSections = useMemo(() => (
     LEVELS.map((level) => (
       <LevelSection
@@ -51,10 +54,11 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
         level={level}
         selectedType={bots.selectedType}
         botCounts={bots.botCounts}
+        userLevel={userLevel}
         onSelectBotType={handleSelectBotType}
       />
     ))
-  ), [bots.selectedType, bots.botCounts, handleSelectBotType]);
+  ), [bots.selectedType, bots.botCounts, userLevel, handleSelectBotType]);
 
   return (
     <SafeAreaView style={styles.container}>

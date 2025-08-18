@@ -6,46 +6,108 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { CloseButton } from '../components/common/CloseButton';
-import { useAppDispatch } from '../store/hooks';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { logout } from '../store/slices/authSlice';
-import { SIZING } from '../styles/theme';
+import { useGetProfileQuery } from '../store/api/authApi';
+import { useFetchBotStatsQuery } from '../store/api/botsApi';
+import { SIZING, COLORS } from '../styles/theme';
 import { Balance } from '../components/common/Balance';
 
+interface BotStats {
+  role: string;
+  stats: {
+    health: number;
+    offense: number;
+    defense: number;
+    speed: number;
+    range: number;
+  };
+}
+
 interface UserProfile {
-  username: string;
+  handle: string;
+  email: string;
   level: number;
   experience: {
     current: number;
     nextLevel: number;
+    total: number;
   };
-  armyBonus: {
-    strength: number;
-    defense: number;
-    speed: number;
-    health: number;
+  unlockedFeatures: {
+    hackRig: boolean;
   };
 }
 
 export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const dispatch = useAppDispatch();
+  const { token } = useAppSelector((state) => state.auth);
+  
+  // Use existing working APIs - only when authenticated
+  const { data: profileData, isLoading: profileLoading, error: profileError } = useGetProfileQuery(undefined, {
+    skip: !token,
+  });
+  const { data: botStatsData, isLoading: botStatsLoading, error: botStatsError } = useFetchBotStatsQuery(undefined, {
+    skip: !token,
+  });
 
   const handleLogout = () => {
     dispatch(logout());
   };
 
-  useEffect(() => {
-    setProfile({
-      username: 'Bert Toast',
-      level: 1,
-      experience: { current: 0, nextLevel: 1000 },
-      armyBonus: { strength: 0, defense: 0, speed: 0, health: 0 },
-    });
-  }, []);
+  // Transform API data to match our interface
+  const profile: UserProfile | null = profileData ? {
+    handle: profileData.handle,
+    email: profileData.email,
+    level: profileData.level,
+    experience: profileData.experience,
+    unlockedFeatures: profileData.unlockedFeatures
+  } : null;
 
-  if (!profile) {return <></>;}
+  const botStats: Record<string, BotStats> = botStatsData?.botStats || {};
+
+  const loading = profileLoading || botStatsLoading;
+
+
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <CloseButton onPress={onClose} />
+        <Balance />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.accent} />
+          <Text style={styles.loadingText}>Loading profile...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!token) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <CloseButton onPress={onClose} />
+        <Balance />
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Please log in to view profile</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <CloseButton onPress={onClose} />
+        <Balance />
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Failed to load profile</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const experiencePercentage = (profile.experience.current / profile.experience.nextLevel) * 100;
 
@@ -53,41 +115,83 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
     <SafeAreaView style={styles.container}>
       <CloseButton onPress={onClose} />
       <Balance />
-      <ScrollView style={styles.scrollView}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Compact Header */}
         <View style={styles.header}>
-          <Text style={styles.username}>{profile.username}</Text>
-          <View style={styles.levelContainer}>
+          <View style={styles.usernameContainer}>
+            <Text style={styles.username}>{profile.handle}</Text>
+          </View>
+          <View style={styles.levelBadge}>
             <Text style={styles.levelLabel}>LEVEL</Text>
             <Text style={styles.levelValue}>{profile.level}</Text>
           </View>
         </View>
 
-        <View style={styles.experienceCard}>
-          <Text style={styles.sectionTitle}>EXPERIENCE</Text>
-          <View style={styles.experienceDetails}>
-            <View style={styles.expCurrentContainer}>
+        {/* Compact Experience Section */}
+        <View style={styles.experienceSection}>
+          <View style={styles.expRow}>
+            <View style={styles.expItem}>
               <Text style={styles.expLabel}>TOTAL XP</Text>
-              <Text style={styles.expValue}>0</Text>
+              <Text style={styles.expValue}>{profile.experience.total.toLocaleString()}</Text>
             </View>
-            <View style={styles.expProgressContainer}>
+            <View style={styles.expItem}>
               <Text style={styles.expLabel}>NEXT LEVEL</Text>
-              <Text style={styles.expProgress}>0 / 1000</Text>
+              <Text style={styles.expValue}>{profile.experience.current.toLocaleString()} / {profile.experience.nextLevel.toLocaleString()}</Text>
             </View>
           </View>
           <View style={styles.progressContainer}>
-            <View style={[styles.progressBar, { width: `${experiencePercentage}%` }]} />
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${experiencePercentage}%` }]} />
+            </View>
+            <Text style={styles.progressText}>{Math.round(experiencePercentage)}%</Text>
           </View>
         </View>
 
-        <View style={styles.bonusCard}>
-          <Text style={styles.sectionTitle}>ARMY BONUSES</Text>
-          <View style={styles.bonusGrid}>
-            {Object.entries(profile.armyBonus).map(([stat, value]) => (
-              <View key={stat} style={styles.bonusItem}>
-                <Text style={styles.bonusLabel}>{stat.toUpperCase()}</Text>
-                <Text style={styles.bonusValue}>+{value}</Text>
+        {/* Bot Stats Section */}
+        <View style={styles.botStatsSection}>
+          <Text style={styles.sectionTitle}>BOT STATS</Text>
+          <View style={styles.botStatsGrid}>
+            {Object.entries(botStats).map(([type, stats]) => (
+              <View key={type} style={styles.botStatCard}>
+                <View style={styles.botStatHeader}>
+                  <Text style={styles.botType}>{type.toUpperCase()}</Text>
+                  <Text style={styles.botRole}>{stats.role}</Text>
+                </View>
+                <View style={styles.statsGrid}>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statLabel}>HP</Text>
+                    <Text style={styles.statValue}>{stats.stats.health}</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statLabel}>ATK</Text>
+                    <Text style={styles.statValue}>{stats.stats.offense}</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statLabel}>DEF</Text>
+                    <Text style={styles.statValue}>{Math.round(stats.stats.defense * 100)}%</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statLabel}>SPD</Text>
+                    <Text style={styles.statValue}>{stats.stats.speed}</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statLabel}>RNG</Text>
+                    <Text style={styles.statValue}>{stats.stats.range}</Text>
+                  </View>
+                </View>
               </View>
             ))}
+          </View>
+        </View>
+
+        {/* Features Section */}
+        <View style={styles.featuresSection}>
+          <Text style={styles.sectionTitle}>FEATURES</Text>
+          <View style={styles.featureItem}>
+            <Text style={styles.featureLabel}>HACK RIG</Text>
+            <Text style={[styles.featureValue, { color: profile.unlockedFeatures.hackRig ? COLORS.accent : COLORS.text.secondary }]}>
+              {profile.unlockedFeatures.hackRig ? 'UNLOCKED' : 'LOCKED'}
+            </Text>
           </View>
         </View>
 
@@ -108,107 +212,189 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: SIZING.spacing.md,
   },
-  header: {
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginVertical: SIZING.spacing.lg,
+  },
+  loadingText: {
+    color: '#00FF41',
+    fontSize: SIZING.font.body,
+    marginTop: SIZING.spacing.md,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    color: '#FF4B4B',
+    fontSize: SIZING.font.body,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SIZING.spacing.lg,
+    paddingHorizontal: SIZING.spacing.sm,
+  },
+  usernameContainer: {
+    flex: 1,
+    alignItems: 'center',
   },
   username: {
     color: '#4717F6',
     fontSize: SIZING.font.h1,
     fontWeight: 'bold',
-    marginBottom: SIZING.spacing.sm,
+    textAlign: 'center',
   },
-  levelContainer: {
+  levelBadge: {
+    backgroundColor: 'rgba(0, 255, 65, 0.1)',
+    borderWidth: 1,
+    borderColor: '#00FF41',
+    borderRadius: 12,
+    paddingHorizontal: SIZING.spacing.md,
+    paddingVertical: SIZING.spacing.sm,
     alignItems: 'center',
   },
   levelLabel: {
     color: 'rgba(255, 255, 255, 0.6)',
     fontSize: SIZING.font.small,
+    marginBottom: 2,
   },
   levelValue: {
     color: '#00FF41',
     fontSize: SIZING.font.h2,
     fontWeight: 'bold',
   },
-  experienceCard: {
-    backgroundColor: 'rgba(26, 77, 51, 0.3)',
+  experienceSection: {
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 65, 0.3)',
     borderRadius: 8,
     padding: SIZING.spacing.md,
     marginBottom: SIZING.spacing.md,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 255, 65, 0.4)',
   },
-  experienceDetails: {
+  expRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: SIZING.spacing.md,
-    marginTop: SIZING.spacing.sm,
+    marginBottom: SIZING.spacing.sm,
   },
-  expCurrentContainer: {
+  expItem: {
     alignItems: 'center',
-  },
-  expProgressContainer: {
-    alignItems: 'center',
+    flex: 1,
   },
   expLabel: {
     color: 'rgba(255, 255, 255, 0.6)',
     fontSize: SIZING.font.small,
-    marginBottom: SIZING.spacing.xs,
+    marginBottom: 4,
   },
   expValue: {
-    color: '#00FF41',
-    fontSize: SIZING.font.h2,
-    fontWeight: 'bold',
-  },
-  expProgress: {
     color: '#00FF41',
     fontSize: SIZING.font.body,
     fontWeight: 'bold',
   },
   progressContainer: {
-    height: 6,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    borderRadius: 3,
-    overflow: 'hidden',
+    alignItems: 'center',
   },
   progressBar: {
+    width: '100%',
+    height: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: SIZING.spacing.xs,
+  },
+  progressFill: {
     height: '100%',
     backgroundColor: '#00FF41',
+    borderRadius: 3,
   },
-  bonusCard: {
-    backgroundColor: 'rgba(26, 77, 51, 0.3)',
-    borderRadius: 8,
-    padding: SIZING.spacing.md,
-    marginBottom: SIZING.spacing.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 255, 65, 0.4)',
+  progressText: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: SIZING.font.small,
+  },
+  botStatsSection: {
+    marginBottom: SIZING.spacing.md,
   },
   sectionTitle: {
     color: '#4717F6',
     fontSize: SIZING.font.h2,
     fontWeight: 'bold',
-    marginBottom: SIZING.spacing.md,
+    marginBottom: SIZING.spacing.sm,
+    paddingHorizontal: SIZING.spacing.sm,
   },
-  bonusGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  botStatsGrid: {
     gap: SIZING.spacing.sm,
   },
-  bonusItem: {
-    width: '48%',
+  botStatCard: {
     backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    borderRadius: 4,
-    padding: SIZING.spacing.md,
-    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 65, 0.2)',
+    borderRadius: 6,
+    padding: SIZING.spacing.sm,
   },
-  bonusLabel: {
+  botStatHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SIZING.spacing.sm,
+  },
+  botType: {
+    color: '#00FF41',
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
+  botRole: {
     color: 'rgba(255, 255, 255, 0.6)',
     fontSize: SIZING.font.small,
-    marginBottom: SIZING.spacing.xs,
+    fontStyle: 'italic',
   },
-  bonusValue: {
-    color: '#9C27B0',
-    fontSize: SIZING.font.h2,
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SIZING.spacing.xs,
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    paddingHorizontal: SIZING.spacing.xs,
+    paddingVertical: 2,
+    borderRadius: 4,
+    minWidth: 60,
+    justifyContent: 'space-between',
+  },
+  statLabel: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: SIZING.font.small,
+    marginRight: 4,
+  },
+  statValue: {
+    color: '#00FF41',
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+  },
+  featuresSection: {
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 255, 65, 0.2)',
+    borderRadius: 8,
+    padding: SIZING.spacing.md,
+    marginBottom: SIZING.spacing.md,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  featureLabel: {
+    color: '#00FF41',
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
+  featureValue: {
+    fontSize: SIZING.font.body,
     fontWeight: 'bold',
   },
   disconnectButton: {

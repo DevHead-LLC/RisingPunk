@@ -16,7 +16,7 @@ export interface NetworkData {
 }
 
 export class BattleResponseService {
-  static createBattleStateResponse(
+  static async createBattleStateResponse(
     battle: IBattleDocument,
     mappedBattalions: ClientBattalion[],
     networkData: NetworkData,
@@ -24,7 +24,7 @@ export class BattleResponseService {
     retargetingStatus?: {nodeIndex: number, affectedBattalionIds: string[]},
     movementStates?: Map<string, MovementState>,
     timerState?: {countdown: number, battleTime: number, timeRemaining: number, phase: any}
-  ): BattleStateResponse {
+  ): Promise<BattleStateResponse> {
     if (retargetingStatus) {
       console.log(`📡 CLIENT SYNC: Including retargeting status in response`);
       console.log(`📡 CLIENT SYNC: Node ${retargetingStatus.nodeIndex} captured, ${retargetingStatus.affectedBattalionIds.length} battalions affected`);
@@ -49,6 +49,17 @@ export class BattleResponseService {
       battleEndData = this.createBattleEndData(battle);
     }
 
+    // Get user level information for battle response
+    let userLevelInfo = null;
+    try {
+      const { LevelingService } = require('./LevelingService');
+      if (battle.attackerId && battle.attackerId !== 'computer-opponent') {
+        userLevelInfo = await LevelingService.getLevelProgress(battle.attackerId);
+      }
+    } catch (error) {
+      console.warn('Could not fetch user level info for battle response:', error);
+    }
+
     const response = {
       battleId: battle.battleId,
       phase: currentPhase,
@@ -64,7 +75,8 @@ export class BattleResponseService {
       retargetingStatus,
       movementStates: movementStatesArray,
       lastUpdated: battle.updatedAt,
-      battleEndData
+      battleEndData,
+      userLevelInfo
     };
 
 

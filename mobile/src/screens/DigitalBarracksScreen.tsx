@@ -88,7 +88,9 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
                      stat === 'defense' ? 'DEFENSE ABILITY' :
                      stat.toUpperCase()}
                   </Text>
-                  <Text style={styles.statValue}>{String(value)}</Text>
+                  <Text style={styles.statValue}>
+                    {stat === 'defense' ? `${Math.round(Number(value) * 100)}%` : String(value)}
+                  </Text>
                 </View>
               )) : (
                 <Text style={styles.lockedText}>No stats available</Text>

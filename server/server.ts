@@ -43,10 +43,24 @@ mongoose.connect(process.env.MONGODB_URI, {
   dbName: 'RisingPunk',
   appName: 'mongosh+2.2.12'  // matching the working mongosh connection
 })
-.then(() => {
+.then(async () => {
   console.log('✅ MongoDB connected successfully');
   console.log('📦 Database:', mongoose.connection.db.databaseName);
   console.log('🔗 Connected to:', mongoose.connection.host);
+  
+  // Initialize leveling and bot stats services
+  try {
+    const { LevelingService } = require('./src/services/LevelingService');
+    const { BotStatsService } = require('./src/services/BotStatsService');
+    
+    await LevelingService.loadConfig();
+    await BotStatsService.loadConfigs();
+    
+    console.log('✅ Game services initialized successfully');
+  } catch (error) {
+    console.error('❌ Failed to initialize game services:', error);
+    process.exit(1);
+  }
 })
 .catch((err: Error) => {
   console.error('❌ MongoDB connection error:', err);
@@ -201,8 +215,17 @@ app.get('/api/bots', auth, async (req: Request, res: Response) => {
 // Get bot stats from server (single source of truth)
 app.get('/api/bots/stats', auth, async (req: Request, res: Response) => {
   try {
-    const { BOT_CONFIG } = await import('./src/services/BotService');
-    res.json({ botStats: BOT_CONFIG.USER_BOT_STATS });
+    const { BotService } = await import('./src/services/BotService');
+    const user = await User.findById(req.user._id);
+    const userLevel = user?.level || 1;
+    
+    const botStats: Record<string, any> = {};
+    for (const botType of ['guardian', 'breacher', 'phreak']) {
+      const config = await BotService.getUserBotStats(botType, userLevel);
+      botStats[botType] = config;
+    }
+    
+    res.json({ botStats });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
