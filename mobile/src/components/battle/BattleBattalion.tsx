@@ -159,9 +159,20 @@ export const BattleBattalion = React.memo(({
 
   const quantityTextStyle = React.useMemo(() => 
     battalion.type === 'phreak' 
-      ? [styles.quantityText, { fontSize: 12 }, { transform: [{ rotate: '-45deg' }] }] 
-      : [styles.quantityText, { fontSize: 12 }]
+      ? [styles.quantityText, { fontSize: 10 }, { transform: [{ rotate: '-45deg' }] }] 
+      : [styles.quantityText, { fontSize: 10 }]
   , [battalion.type]);
+
+  const formatQuantity = (quantity: number): string => {
+    if (quantity >= 1000) {
+      const kValue = quantity / 1000;
+      if (kValue >= 10) {
+        return `${Math.floor(kValue)}K`;
+      }
+      return `${kValue.toFixed(1)}K`;
+    }
+    return quantity.toString();
+  };
 
   const botTypeLabelStyle = React.useMemo(() => [
     styles.botTypeText, 
@@ -224,7 +235,7 @@ export const BattleBattalion = React.memo(({
       
       <View style={getShapeStyle}>
         <View style={styles.quantityBackground}>
-          <Text style={quantityTextStyle}>{battalion.quantity}</Text>
+          <Text style={quantityTextStyle}>{formatQuantity(battalion.quantity)}</Text>
         </View>
       </View>
       
@@ -272,7 +283,7 @@ const styles = StyleSheet.create({
   quantityBackground: {
     backgroundColor: '#000',
     borderRadius: 10,
-    width: 20,
+    width: 28,
     height: 20,
     alignItems: 'center',
     justifyContent: 'center',
