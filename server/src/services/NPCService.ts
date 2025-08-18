@@ -9,16 +9,14 @@ export type NPCDocument = {
   slug: string;
   name: string;
   title?: string;
-  tier: 1 | 2 | 3;
+  tier: number;
+  userLevelAssociation: number;
   battalions: NPCBattalionConfig[];
-  statMultipliers: {
-    health: number;
-    speed: number;
-    offense: number;
-    defense: number;
-    range: number;
-  };
+  battleExperienceReward: number;
+  victoryReward: number;
   mapRecoverySeconds: number;
+  createdAt?: Date;
+  updatedAt?: Date;
 };
 
 export class NPCService {

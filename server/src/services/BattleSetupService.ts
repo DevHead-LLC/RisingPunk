@@ -8,14 +8,26 @@ import { BattlePhase, IBattalion, INode, BotType } from '../types/battle';
 import { createNodesWithTugOfWar } from '../services/NodeService';
 import { BattalionService } from './BattalionService';
 import { PointTrackingService } from './PointTrackingService';
-import { BOT_CONFIG } from './BotService';
+import { BotService } from './BotService';
 import { NPCService } from './NPCService';
 import { Map as MapModel } from '../models/Map';
+import { User } from '../models/User';
 
 export class BattleSetupService {
 
   static async createBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number}>, defenderNpcSlug?: string, unlockHackRigOnWin?: boolean, defenderNpcInstanceId?: string): Promise<IBattleDocument> {
     const battleId = `battle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Get user level for bot stat calculations
+    let userLevel = 1;
+    if (attackerId !== 'computer-opponent') {
+      try {
+        const user = await User.findById(attackerId);
+        userLevel = user?.level || 1;
+      } catch (error) {
+        console.warn('Could not fetch user level, using default level 1:', error);
+      }
+    }
     
     // Calculate total army health based on expected battalion configurations
     const defaultUserBattalions = [
@@ -53,41 +65,48 @@ export class BattleSetupService {
       }
     }
     
-    // Calculate total army health using bot stats authority
-    const userTotal = battalionConfigs.reduce((total, battalion) => {
+    // Calculate total army health using new BotService
+    let userTotal = 0;
+    for (const battalion of battalionConfigs) {
       const botType = battalion.type as BotType;
-      const stats = BOT_CONFIG.USER_BOT_STATS[botType].stats;
-      return total + (stats.health * battalion.quantity);
-    }, 0);
+      const botConfig = await BotService.getUserBotStats(botType, userLevel);
+      userTotal += botConfig.stats.health * battalion.quantity;
+    }
     
-    const enemyTotal = npc
-      ? npc.battalions.reduce((total, battalion: any) => {
-          const validatedType = BattalionService.validateEnemyBotType(battalion.type);
-          const base = BOT_CONFIG.ENEMY_BOT_STATS[validatedType].stats;
-          const scaledHealth = Math.max(1, Math.round(base.health * npc.statMultipliers.health));
-          return total + (scaledHealth * battalion.quantity);
-        }, 0)
-      : defaultEnemyBattalions.reduce((total, battalion) => {
-          const botType = battalion.type as BotType;
-          const stats = BOT_CONFIG.ENEMY_BOT_STATS[botType].stats;
-          return total + (stats.health * battalion.quantity);
-        }, 0);
+    let enemyTotal = 0;
+    if (npc) {
+      // Use NPC's userLevelAssociation for bot stat scaling instead of statMultipliers
+      const npcLevel = npc.userLevelAssociation || 1;
+      for (const battalion of npc.battalions) {
+        const validatedType = BattalionService.validateEnemyBotType(battalion.type);
+        const botConfig = await BotService.getEnemyBotStats(validatedType, npcLevel);
+        enemyTotal += botConfig.stats.health * battalion.quantity;
+      }
+    } else {
+      for (const battalion of defaultEnemyBattalions) {
+        const botType = battalion.type as BotType;
+        const botConfig = await BotService.getEnemyBotStats(botType, userLevel);
+        enemyTotal += botConfig.stats.health * battalion.quantity;
+      }
+    }
     
     const totalArmyHealth = userTotal + enemyTotal;
     
     // Now create nodes with the correct total army health
     const nodes = createNodesWithTugOfWar(totalArmyHealth, screenWidth, screenHeight);
     
-    const userBattalionsList = BattalionService.createUserBattalions(nodes, userBattalions);
+    const userBattalionsList = await BattalionService.createUserBattalions(nodes, userLevel, userBattalions);
 
     let enemyBattalions: IBattalion[];
     if (npc) {
-      enemyBattalions = BattalionService.createEnemyBattalionsFromNPC(nodes, {
+      // Pass NPC level for proper bot stat scaling
+      const npcLevel = npc.userLevelAssociation || 1;
+      enemyBattalions = await BattalionService.createEnemyBattalionsFromNPC(nodes, npcLevel, {
         battalions: npc.battalions as any,
-        statMultipliers: npc.statMultipliers as any,
+        statMultipliers: { health: 1, speed: 1, offense: 1, defense: 1, range: 1 }, // Legacy parameter, not used
       });
     } else {
-      enemyBattalions = BattalionService.createEnemyBattalions(nodes);
+      enemyBattalions = await BattalionService.createEnemyBattalions(nodes, userLevel);
     }
     const battalions = [...userBattalionsList, ...enemyBattalions];
     

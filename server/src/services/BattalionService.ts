@@ -4,7 +4,7 @@
  */
 
 import { IBattalion, INode, NodeOwner, BotType, BattalionTargetingResult } from '../types/battle';
-import { BOT_CONFIG } from './BotService';
+import { BotService } from './BotService';
 import { MovementService } from './MovementService';
 import { MovementState } from '../types/battle';
 import { Battle } from '../models/Battle';
@@ -143,13 +143,8 @@ export class BattalionService {
 
     const validatedBotType = botType as BotType;
     
-    // Ensure the bot type exists in USER_BOT_STATS (for user battalions)
-    if (!BOT_CONFIG.USER_BOT_STATS[validatedBotType]) {
-      console.log(`⚠️ MISSING BOT CONFIG: "${validatedBotType}" not found in USER_BOT_STATS. Using 'guardian' as fallback.`);
-      this.userBotTypeCache.set(botType, 'guardian' as BotType);
-      return 'guardian' as BotType;
-    }
-
+    // Bot type validation is now handled by BotStatsService
+    // We'll validate when actually creating the battalion
     this.userBotTypeCache.set(botType, validatedBotType);
     return validatedBotType;
   }
@@ -169,18 +164,13 @@ export class BattalionService {
 
     const validatedBotType = botType as BotType;
     
-    // Ensure the bot type exists in ENEMY_BOT_STATS (for enemy battalions)
-    if (!BOT_CONFIG.ENEMY_BOT_STATS[validatedBotType]) {
-      console.log(`⚠️ MISSING BOT CONFIG: "${validatedBotType}" not found in ENEMY_BOT_STATS. Using 'guardian' as fallback.`);
-      this.enemyBotTypeCache.set(botType, 'guardian' as BotType);
-      return 'guardian' as BotType;
-    }
-
+    // Bot type validation is now handled by BotStatsService
+    // We'll validate when actually creating the battalion
     this.enemyBotTypeCache.set(botType, validatedBotType);
     return validatedBotType;
   }
 
-  static createUserBattalions(nodes: INode[], userBattalions?: Array<{type: string, quantity: number}>): IBattalion[] {
+  static async createUserBattalions(nodes: INode[], userLevel: number, userBattalions?: Array<{type: string, quantity: number}>): Promise<IBattalion[]> {
     const defaultUserBattalions = [
       { type: 'guardian' as BotType, quantity: 10 },
       { type: 'breacher' as BotType, quantity: 8 },
@@ -192,27 +182,34 @@ export class BattalionService {
     // Available user nodes (0, 1, 2) - allow multiple battalions at same node
     const availableUserNodes = [0, 1, 2];
     
-    return battalionConfigs.map((battalion, index) => {
+    const battalions: IBattalion[] = [];
+    
+    for (const battalion of battalionConfigs) {
       const validatedBotType = this.validateBotType(battalion.type);
+      
+      // Get stats from BotService based on user level
+      const botConfig = await BotService.getUserBotStats(validatedBotType, userLevel);
       
       // Random node selection from available user nodes
       // Multiple battalions can share the same node
       const randomNodeIndex = Math.floor(Math.random() * availableUserNodes.length);
       const nodeIndex = availableUserNodes[randomNodeIndex];
       
-      return this.createBattalion(
-        `user-battalion-${index}`,
+      battalions.push(this.createBattalion(
+        `user-battalion-${battalions.length}`,
         validatedBotType,
         battalion.quantity,
         nodeIndex,
         NodeOwner.USER,
-        BOT_CONFIG.USER_BOT_STATS[validatedBotType].stats,
+        botConfig.stats,
         nodes
-      );
-    });
+      ));
+    }
+    
+    return battalions;
   }
 
-  static createEnemyBattalions(nodes: INode[]): IBattalion[] {
+  static async createEnemyBattalions(nodes: INode[], userLevel: number): Promise<IBattalion[]> {
     const enemyBattalions = [
       { type: 'guardian' as BotType, quantity: 8 },
       { type: 'breacher' as BotType, quantity: 10 },
@@ -222,62 +219,77 @@ export class BattalionService {
     // Available enemy nodes (6, 7, 8) - allow multiple battalions at same node
     const availableEnemyNodes = [6, 7, 8];
     
-    return enemyBattalions.map((battalion, index) => {
+    const battalions: IBattalion[] = [];
+    
+    for (const battalion of enemyBattalions) {
       const validatedBotType = this.validateEnemyBotType(battalion.type);
+      
+      // Get stats from BotService based on user level
+      const botConfig = await BotService.getEnemyBotStats(validatedBotType, userLevel);
       
       // Random node selection from available enemy nodes
       // Multiple battalions can share the same node
       const randomNodeIndex = Math.floor(Math.random() * availableEnemyNodes.length);
       const nodeIndex = availableEnemyNodes[randomNodeIndex];
       
-      return this.createBattalion(
-        `enemy-battalion-${index}`,
+      battalions.push(this.createBattalion(
+        `enemy-battalion-${battalions.length}`,
         validatedBotType,
         battalion.quantity,
         nodeIndex,
         NodeOwner.ENEMY,
-        BOT_CONFIG.ENEMY_BOT_STATS[validatedBotType].stats,
+        botConfig.stats,
         nodes
-      );
-    });
+      ));
+    }
+    
+    return battalions;
   }
 
 
-  static createEnemyBattalionsFromNPC(
+  static async createEnemyBattalionsFromNPC(
     nodes: INode[],
+    userLevel: number,
     npc: {
       battalions: Array<{ type: string; quantity: number }>;
       statMultipliers: { health: number; speed: number; offense: number; defense: number; range: number };
     }
-  ): IBattalion[] {
+  ): Promise<IBattalion[]> {
     const availableEnemyNodes = [6, 7, 8];
 
-    return npc.battalions.map((battalion, index) => {
+    const battalions: IBattalion[] = [];
+
+    for (const battalion of npc.battalions) {
       const validatedBotType = this.validateEnemyBotType(battalion.type);
 
-      const base = BOT_CONFIG.ENEMY_BOT_STATS[validatedBotType].stats;
-      const m = npc.statMultipliers;
+      // Get stats from BotService based on user level (no statMultipliers needed)
+      const botConfig = await BotService.getEnemyBotStats(validatedBotType, userLevel);
+      const base = botConfig.stats;
+      
+      // No scaling needed - stats are already at the correct level
       const scaledStats = {
-        health: Math.max(1, Math.round(base.health * m.health)),
-        speed: Math.max(1, Math.round(base.speed * m.speed)),
-        range: Math.max(1, Math.round(base.range * m.range)),
-        offense: Math.max(1, Math.round(base.offense * m.offense)),
-        defense: Math.max(1, Math.round(base.defense * m.defense)),
+        health: base.health,
+        speed: base.speed,
+        range: base.range,
+        offense: base.offense,
+        defense: base.defense,
       };
 
       const randomNodeIndex = Math.floor(Math.random() * availableEnemyNodes.length);
       const nodeIndex = availableEnemyNodes[randomNodeIndex];
 
-      return this.createBattalion(
-        `enemy-battalion-${index}`,
+      battalions.push(this.createBattalion(
+        `enemy-battalion-${battalions.length}`,
         validatedBotType,
         battalion.quantity,
         nodeIndex,
         NodeOwner.ENEMY,
         scaledStats,
         nodes
-      );
-    });
+      ));
+    }
+
+    return battalions;
   }
 
 } 

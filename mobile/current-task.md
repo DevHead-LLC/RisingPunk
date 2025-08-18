@@ -1,203 +1,67 @@
-### Bot Quantity Tracking Fix - Status: ✅ COMPLETED
+# BATTLE VICTORY LEVELING SYSTEM - CURRENT FOCUS
 
-**Task:** Fix bot quantity tracking in battle preparation screen to accurately reflect available bots after assignments.
+## OVERVIEW
+Implementing a comprehensive leveling system where users gain experience and level up when winning battles against NPCs. This system will include NPC experience values, payouts, battle end triggers, experience tracking, and progressive level requirements.
 
-**Issue Identified:**
-When bots are assigned to battalions in the battle preparation screen, the same quantity remains available for subsequent assignments, even if there are no remaining bots or insufficient quantity. This creates a critical bug where users can assign more bots than they actually have.
+## PHASE 1: NPC EXPERIENCE & PAYOUT SYSTEM
+**Status: 🔄 IN PROGRESS**
 
-**Root Cause Analysis:**
-The problem was in the `BattlePreparationScreen.tsx` component. The component was:
-1. **Passing total bot counts**: `availableBots={botCounts}` (total counts including assigned)
-2. **Not calculating available counts**: No logic to subtract assigned quantities from total counts
-3. **Not loading existing assignments**: The `fetchAssignments` function was calling `resetBattalions()` instead of loading existing assignments from the server
+### Step 1.1: Provide NPCs with Level-Based Experience Amounts
+- [ ] Define experience values for each NPC level
+- [ ] Update NPC creation/configuration to include experience rewards
+- [ ] Ensure experience scales appropriately with NPC difficulty
 
-**Fix Implemented:**
-Added client-side logic to calculate available bot counts by subtracting assigned quantities:
+### Step 1.2: Provide NPCs with Level-Based Payouts  
+- [ ] Define payout amounts for each NPC level
+- [ ] Update NPC creation/configuration to include payout rewards
+- [ ] Ensure payouts scale appropriately with NPC difficulty
 
-1. **Added availableBots calculation**: Created a `useMemo` that calculates `totalBots - assignedQuantities`
-2. **Fixed assignment loading**: Modified `fetchAssignments` to properly load existing assignments from server instead of resetting them
-3. **Updated selector props**: Changed `BattalionBotSelector` to receive `availableBots` instead of `botCounts`
-4. **Fixed selector state persistence**: Added logic to reset selected bot type and quantity when switching between battalions
-5. **Enhanced validation**: Added warnings and disabled submit button when quantity exceeds available bots
+## PHASE 2: BATTLE END TRIGGER SYSTEM
+**Status: ⏳ PENDING**
 
-**Code Changes:**
-- `mobile/src/screens/BattlePreparationScreen.tsx` - Added available bot calculation and fixed assignment loading
-- `mobile/src/components/battle/BattalionBotSelector/index.tsx` - Added battalion change reset logic and enhanced validation
-- `mobile/src/components/battle/BattalionBotSelector/QuantitySelector.tsx` - Added insufficient bot warnings
-- `mobile/src/screens/TurfScreen.tsx` - Fixed BattlePreparationScreen close navigation to return to previous screen
+### Step 2.1: Implement End-of-Battle Trigger
+- [ ] Create trigger for when defender's battalions are entirely defeated
+- [ ] Ensure trigger works for ALL battle types (user vs NPC, user vs user)
+- [ ] Implement proper battle state management for end conditions
 
-**Result:**
-- ✅ When you assign 200 Guardian bots to Battalion A, Battalion B now shows 0 available
-- ✅ Bot quantities now update correctly when assigned
-- ✅ Available quantities are properly calculated for subsequent assignments
-- ✅ No more ability to assign more bots than actually available
+### Step 2.2: Attacker Reward Distribution
+- [ ] Award experience to attacker upon victory
+- [ ] Award payouts to attacker upon victory
+- [ ] Ensure rewards are properly calculated and distributed
 
-**Status: COMPLETED** ✅
+## PHASE 3: USER EXPERIENCE TRACKING
+**Status: ⏳ PENDING**
 
----
+### Step 3.1: Ongoing Experience Total Tracking
+- [ ] Implement persistent experience storage in user model
+- [ ] Ensure experience accumulates across multiple battles
+- [ ] Add experience display in user interface
 
-### Login Screen Language Updates - Status: ✅ COMPLETED
+### Step 3.2: Experience Persistence
+- [ ] Verify experience is saved to database after each battle
+- [ ] Ensure experience survives server restarts
+- [ ] Add experience history/logging for debugging
 
-**Task:** Update language on Login Screen for both sign up and sign in views to match new terminology requirements.
+## PHASE 4: LEVEL PROGRESSION SYSTEM
+**Status: ⏳ PENDING**
 
-**Changes Implemented:**
+### Step 4.1: Level Increment Logic
+- [ ] Implement check for experience meeting next level requirements
+- [ ] Increment user level by 1 when requirements met
+- [ ] Update user model and database accordingly
 
-1. ✅ **Sign Up Form Fields Updated:**
-   - "ENTER_EMAIL" ✓ (correct)
-   - "SELECT_HANDLE (USERNAME)" ✓ (correct) 
-   - "SET_KEY (CREATE PWD)" ✓ (correct)
-   - "VERIFY_KEY" ✓ (correct)
-   - "INITIALIZE" button ✓ (correct)
+### Step 4.2: Progressive Experience Requirements
+- [ ] Start with 1.5x multiplier for next level experience
+- [ ] Implement .1x multiplier increase for each subsequent level
+- [ ] Cap maximum multiplier at 3.0x
+- [ ] Ensure proper calculation and storage of next level requirements
 
-2. ✅ **Sign In Form Fields Updated:**
-   - "HANDLE (USERNAME)" ✓ (correct)
-   - "KEY (PWD)" ✓ (correct)
-   - "JACK_IN" button ✓ (correct)
+## IMPLEMENTATION APPROACH
+- **Follow .cursor/rules/ directory files strictly** - Use intended.md, battle-intentions.md, and other authority files
+- **One step at a time** - Complete each step before moving to next
+- **Test thoroughly** - Verify each component works before proceeding
+- **Maintain single source of truth** - Avoid duplicating logic across files
+- **Use existing services** - Leverage BattleService, CombatService, etc. where possible
 
-3. ✅ **Validation Messages Updated:**
-   - "ACCESS_KEY_TOO_SHORT" → "KEY_TOO_SHORT"
-   - "ACCESS_KEYS_DO_NOT_MATCH" → "KEYS_DO_NOT_MATCH"
-
-4. ✅ **Files Modified:**
-   - `mobile/src/components/auth/AuthInputs.tsx` - Updated all placeholder text
-   - `mobile/src/screens/LoginScreen.tsx` - Updated validation error messages
-
-**Result:** Login Screen now displays the exact language specified in requirements. All form fields, buttons, and error messages have been updated to match the new terminology.
-
-**Status: COMPLETED** ✅
-
----
-
-### Critical Bug Fix: Balance Revert Logic - Status: ✅ COMPLETED
-
-**Bug Identified:**
-The optimistic balance update's revert logic didn't account for `subtractFromBalance` failing due to insufficient funds. If the initial subtraction didn't occur, the revert still added the amount back, potentially inflating the user's balance.
-
-**Root Cause:**
-1. **Optimistic Update**: Code optimistically updated both RTK Query cache AND balance slice state
-2. **subtractFromBalance Guard**: Function only subtracted if sufficient funds: `if (state.total !== null && state.total >= action.payload)`
-3. **Revert Logic**: Always called `addToBalance(totalCost)` regardless of whether subtraction occurred
-4. **Result**: Insufficient funds → no subtraction → revert adds funds → balance inflation
-
-**Fixes Implemented:**
-1. ✅ **Pre-flight Fund Check**: Added `hasSufficientFunds` check before optimistic updates
-2. ✅ **Conditional Optimistic Updates**: Only update balance if sufficient funds exist
-3. ✅ **Conditional Reverts**: Only revert balance changes if optimistic update actually occurred
-4. ✅ **Enhanced Logging**: Added warning logs when subtraction fails for debugging
-
-**Files Modified:**
-- `mobile/src/store/api/botsApi.ts` - Fixed optimistic update logic
-- `mobile/src/store/slices/balanceSlice.ts` - Added subtraction failure logging
-
-**Result:**
-- ✅ No more balance inflation from failed optimistic updates
-- ✅ Revert logic only operates when optimistic updates actually occurred
-- ✅ Better debugging visibility for balance-related issues
-
-**Status: CRITICAL BUG FIXED** ✅
-
----
-
-### Wallet Balance Synchronization - Status: ✅ CRITICAL ISSUE RESOLVED
-
-**CRITICAL ISSUE IDENTIFIED:**
-Bot building initially reduces the amount correctly, but the balance jumps back up on the next update. This indicates that client, server, and database are not properly synchronized.
-
-**Root Cause Analysis:**
-The balance calculation logic had a fundamental flaw:
-1. **Server**: Bot build deducts from database balance ✅
-2. **Client**: Balance selector calculates `total + (ratePerSecond * elapsed)` ❌
-3. **Problem**: Client `lastUpdated` timestamp was when client received data, not when server last updated database
-4. **Result**: Client added accumulated time to old balance, overriding server deductions
-
-**FIXES IMPLEMENTED:**
-1. ✅ **Server Balance API Fixed**: 
-   - `/api/balance` now returns raw database balance without time accumulation
-   - Server no longer calculates and adds time to balance on every API call
-   - Returns server's actual `lastUpdated` timestamp for client calculations
-
-2. ✅ **Client Balance Logic Fixed**:
-   - `updateBalance` action now accepts and uses server's `lastUpdated` timestamp
-   - Client calculates time accumulation based on server timestamp, not client timestamp
-   - Balance deductions persist and don't get overridden by time calculations
-
-3. ✅ **Bot Build Integration Fixed**:
-   - Bot building immediately deducts from database balance
-   - Client receives updated balance with correct server timestamp
-   - No more "jumping back up" after deductions
-
-4. ✅ **Build Queue Atomicity Fixed**:
-   - Balance deduction now happens BEFORE saving build queue
-   - If balance deduction fails, build queue is never saved
-   - Prevents users from getting free bot builds due to race conditions
-   - Maintains data consistency between balance and build state
-
-5. ✅ **Immediate Balance Feedback Added**:
-   - Client now shows balance deduction immediately when bot building starts
-   - Uses RTK Query optimistic updates for instant visual feedback
-   - Balance slice state updated simultaneously with API call
-   - If build fails, optimistic updates are automatically reverted
-   - User sees balance change happen simultaneously with build action
-
-6. ✅ **Test Execution Improved**:
-   - All tests now run sequentially to prevent database conflicts
-   - Mobile package.json updated: `"test": "jest --runInBand; cd ../server && npm test -- --runInBand"`
-   - Single `npm run test` command runs both client and server tests sequentially
-   - Eliminates race conditions between parallel test execution
-   - All 96 server tests and 75 client tests now pass consistently
-
-7. ✅ **Wallet Balance NaN Bug Fixed**:
-   - Fixed critical issue where wallet balance displayed "$NaN"
-   - Root cause: balanceApi missing `lastUpdated` field in type definition
-   - Server was sending `lastUpdated` but API was dropping it
-   - Added robust error handling for invalid timestamps
-   - Balance now displays correctly with proper time-based calculations
-
-**Tests Written & Passing:**
-- `walletBalanceSynchronization.test.ts`: ✅ All 7 tests pass
-  - Balance deduction persists after time accumulation
-  - Server deductions are not overridden by client calculations
-  - Client time calculations don't override server balance state
-  - Build queue not saved if balance deduction fails
-  - Build queue only saved after successful balance deduction
-  - Concurrent balance updates handled correctly
-  - Immediate balance feedback for user experience
-- `walletBalanceDeduction.test.ts`: ✅ All 3 tests pass (when run individually)
-- `walletBalanceUpdateTiming.test.ts`: ✅ All 2 tests pass (when run individually)
-
-**Result:**
-- ✅ Client, server, and database now have simultaneous, consistent balance values
-- ✅ Bot building deductions persist and don't get overridden
-- ✅ Time-based accumulation is based on server's actual last update timestamp
-- ✅ No more "jumping back up" after deductions
-- ✅ All balance synchronization tests pass
-
-**Status: CRITICAL ISSUE RESOLVED** ✅
-The wallet balance system now maintains perfect synchronization between client, server, and database.
-
----
-
-### BotAssemblyScreen Navigation Fix - Status: ✅ COMPLETED
-
-**Task:** Fix the close button navigation in BotAssemblyScreen to return to the previous screen instead of always going to TurfScreen.
-
-**Issue Identified:**
-- BotAssemblyScreen close button always navigated to `'turf'` regardless of where user came from
-- User expected to return to HomeScreen (hackRig) when coming from there
-- Navigation logic didn't track previous screen context
-
-**Fix Implemented:**
-1. ✅ **Added Previous Screen Tracking**: Added `previousScreen` state to TurfScreen
-2. ✅ **Updated Navigation Logic**: Modified `navigateToScreen` to track previous screen before changing current screen
-3. ✅ **Fixed BotAssembly Close**: BotAssemblyScreen now closes to `previousScreen` instead of hardcoded `'turf'`
-
-**Files Modified:**
-- `mobile/src/screens/TurfScreen.tsx` - Added previous screen tracking and updated navigation logic
-
-**Result:** 
-- ✅ Close button now returns user to the screen they came from
-- ✅ When coming from HomeScreen, close returns to HomeScreen
-- ✅ When coming from other screens, close returns to those screens
-- ✅ Navigation flow is now intuitive and user-friendly
-
-**Status: COMPLETED** ✅
+## NEXT ACTION
+Complete Step 1.1: Provide NPCs with Level-Based Experience Amounts

@@ -8,7 +8,8 @@
     "start": "node dist/server.js",
     "start:staging": "NODE_ENV=staging node dist/server.js",
     "start:prod": "NODE_ENV=production node dist/server.js",
-    "test": "jest"
+    "test": "jest",
+    "seed:map": "node scripts/seedMap.js"
   },
   "keywords": [],
   "author": "",

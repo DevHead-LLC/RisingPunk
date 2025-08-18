@@ -9,7 +9,7 @@ const router = express.Router();
 
 router.get('/profile', auth, async (req: Request, res: Response) => {
   try {
-    const user = await User.findById(req.user._id).select('handle email level unlockedFeatures');
+    const user = await User.findById(req.user._id).select('handle email level experience unlockedFeatures');
     
     if (!user) {
       res.status(404).json({ message: 'User not found' });
@@ -20,6 +20,11 @@ router.get('/profile', auth, async (req: Request, res: Response) => {
       handle: user.handle,
       email: user.email,
       level: user.level,
+      experience: {
+        current: user.experience?.current || 0,
+        nextLevel: user.experience?.nextLevel || 1000,
+        total: user.experience?.total || 0
+      },
       unlockedFeatures: {
         hackRig: user.unlockedFeatures?.hackRig || false
       }
@@ -54,6 +59,30 @@ router.post('/unlock-hack-rig', auth, async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Server error:', error);
     res.status(500).json({ message: 'Error unlocking hack rig' });
+  }
+});
+
+router.post('/experience/add', auth, async (req: Request, res: Response) => {
+  try {
+    const { amount } = req.body;
+    
+    if (!amount || typeof amount !== 'number' || amount <= 0) {
+      res.status(400).json({ message: 'Valid experience amount required' });
+      return;
+    }
+
+    const { LevelingService } = require('../services/LevelingService');
+    
+    const result = await LevelingService.applyExperience(req.user._id, amount);
+    
+    res.json({
+      success: true,
+      message: `Experience added successfully${result.levelsGained > 0 ? `! Leveled up ${result.levelsGained} time(s)` : ''}`,
+      result
+    });
+  } catch (error) {
+    console.error('Experience add error:', error);
+    res.status(500).json({ message: 'Error adding experience' });
   }
 });
 

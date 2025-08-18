@@ -17,22 +17,37 @@ export interface AuthResponse {
   user: {
     id: string;
     email: string;
-    username: string;
-    hackRigUnlocked: boolean;
+    handle: string;
+    level: number;
+    experience: {
+      current: number;
+      nextLevel: number;
+      total: number;
+    };
+    unlockedFeatures: {
+      hackRig: boolean;
+    };
   };
 }
 
 export interface ProfileResponse {
-  id: string;
+  handle: string;
   email: string;
-  username: string;
-  hackRigUnlocked: boolean;
+  level: number;
+  experience: {
+    current: number;
+    nextLevel: number;
+    total: number;
+  };
+  unlockedFeatures: {
+    hackRig: boolean;
+  };
 }
 
 export const authApi = createApi({
   reducerPath: 'authApi',
   baseQuery: fetchBaseQuery({
-    baseUrl: 'http://localhost:3000',
+    baseUrl: 'http://localhost:5001',
     prepareHeaders: (headers, { getState }) => {
       const state = getState() as RootState;
       const token = state.auth?.token;
@@ -66,7 +81,7 @@ export const authApi = createApi({
     }),
 
     getProfile: builder.query<ProfileResponse, void>({
-      query: () => '/api/user/profile',
+      query: () => '/api/users/profile',
       providesTags: ['User'],
     }),
 

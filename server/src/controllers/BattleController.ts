@@ -67,7 +67,7 @@ export class BattleController {
       const networkData = this.generateNetworkData(battle.nodes, screenWidth, screenHeight, battle);
       const mappedBattalions = BattalionMappingService.mapBattalionsForClient(battle.battalions);
       
-      return BattleResponseService.createBattleStateResponse(battle, mappedBattalions, networkData);
+      return await BattleResponseService.createBattleStateResponse(battle, mappedBattalions, networkData);
     } catch (error) {
       console.error('BattleController startBattle error:', error);
       throw new Error('Failed to start battle');
@@ -104,7 +104,7 @@ export class BattleController {
         targetingResults = BattalionService.getTargetingResults(battleId);
       }
 
-      return BattleResponseService.createBattleStateResponse(
+      return await BattleResponseService.createBattleStateResponse(
         battle, 
         mappedBattalions, 
         networkData, 

@@ -6,6 +6,11 @@ export interface IUser extends Document {
   handle: string;
   hashedAccessKey: string;
   level: number;
+  experience: {
+    current: number;
+    nextLevel: number;
+    total: number;
+  };
   balance: {
     total: number;
     ratePerSecond: number;
@@ -39,11 +44,15 @@ const userSchema = new Schema({
   experience: {
     current: {
       type: Number,
-      default: 1000
+      default: 0
     },
     nextLevel: {
       type: Number,
       default: 1000
+    },
+    total: {
+      type: Number,
+      default: 0
     }
   },
   armyBonus: {
