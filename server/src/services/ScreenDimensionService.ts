@@ -43,9 +43,7 @@ export class ScreenDimensionService {
     const dimensionsChanged = !currentDimensions || currentDimensions.width !== width || currentDimensions.height !== height;
     
     if (dimensionsChanged) {
-      if (currentDimensions) {
-        this.setBattleScreenDimensions(battleId, width, height);
-      }
+      this.setBattleScreenDimensions(battleId, width, height);
       return true;
     }
     
