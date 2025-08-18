@@ -154,14 +154,22 @@ export class BattleResponseService {
     // Get actual processed rewards if this was a user victory against NPC
     let experienceGained: number | undefined;
     let hackerRewards: number | undefined;
+    let levelUp: { levelsGained: number; newLevel: number } | undefined;
     
     if (battleLosses.winner === NodeOwner.USER && (battle as any).defenderNpcSlug) {
       try {
+        console.log(`🔍 BATTLE RESPONSE: Checking for processed rewards in battle:`, battle.battleId);
+        console.log(`🔍 BATTLE RESPONSE: Battle processedRewards field:`, (battle as any).processedRewards);
+        
         // Check if rewards were already processed by looking for a rewards field
         // If not, fall back to NPC data (for backward compatibility)
         if ((battle as any).processedRewards) {
           experienceGained = (battle as any).processedRewards.experienceGained;
           hackerRewards = (battle as any).processedRewards.moneyGained;
+          levelUp = (battle as any).processedRewards.levelUp;
+          
+          console.log(`🔍 BATTLE RESPONSE: Found processed rewards:`, (battle as any).processedRewards);
+          console.log(`🔍 BATTLE RESPONSE: Level up data:`, levelUp);
         } else {
           const { NPCService } = require('./NPCService');
           const npc = await NPCService.getNPCBySlug((battle as any).defenderNpcSlug);
@@ -189,14 +197,19 @@ export class BattleResponseService {
       battleDuration
     };
 
-    return {
+    const battleEndData = {
       battleId: battle.battleId,
       winner: battleLosses.winner,
       losses,
       endTime: battle.endTime || new Date(),
       phase: battle.phase,
       experienceGained,
-      hackerRewards
+      hackerRewards,
+      levelUp
     };
+    
+    console.log(`🔍 BATTLE RESPONSE: Returning battle end data:`, battleEndData);
+    
+    return battleEndData;
   }
 } 

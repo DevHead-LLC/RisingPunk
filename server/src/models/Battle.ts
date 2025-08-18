@@ -196,10 +196,13 @@ const battleSchema = new Schema({
 
   battalions: [battalionSchema],
   nodes: [nodeSchema],
-  unlockHackRigOnWin: { type: Boolean, default: false }
-  ,
+  unlockHackRigOnWin: { type: Boolean, default: false },
   defenderNpcSlug: { type: String, default: '' },
-  defenderNpcInstanceId: { type: String, default: '' }
+  defenderNpcInstanceId: { type: String, default: '' },
+  processedRewards: {
+    type: Schema.Types.Mixed,
+    default: undefined
+  }
 }, {
   collection: 'battles',
   timestamps: true

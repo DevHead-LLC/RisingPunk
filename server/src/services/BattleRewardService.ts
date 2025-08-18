@@ -12,6 +12,10 @@ export interface BattleRewardResult {
   experienceGained?: number;
   moneyGained?: number;
   botLosses?: { [key in BotType]: number };
+  levelUp?: {
+    levelsGained: number;
+    newLevel: number;
+  };
   error?: string;
 }
 
@@ -69,6 +73,7 @@ export class BattleRewardService {
       // Only give experience and money rewards if user won
       let experienceGained: number | undefined;
       let moneyGained: number | undefined;
+      let levelUp: { levelsGained: number; newLevel: number } | undefined;
 
       if (userWon) {
         // Check if this is a complete victory (enemy has 0 remaining battalions)
@@ -86,41 +91,59 @@ export class BattleRewardService {
           return { success: true, botLosses }; // Still return bot losses even if no rewards
         }
 
-        // Update user experience
+        // Update user experience using LevelingService to trigger level ups
         experienceGained = npc.battleExperienceReward;
-        const user = await User.findById(userId);
-        if (!user) {
-          return { success: true, botLosses }; // Still return bot losses even if no rewards
-        }
-
+        
+        console.log(`🔍 BATTLE REWARDS: Processing experience gain of ${experienceGained} for user ${userId}`);
+        
         if (experienceGained) {
-          user.experience.current += experienceGained;
-          user.experience.total += experienceGained;
+          const { LevelingService } = require('./LevelingService');
+          const levelingResult = await LevelingService.applyExperience(userId, experienceGained);
+          
+          console.log(`🔍 BATTLE REWARDS: LevelingService result:`, levelingResult);
+          
+          // Check if user leveled up
+          if (levelingResult.levelsGained > 0) {
+            console.log(`🎉 LEVEL UP: User ${userId} gained ${levelingResult.levelsGained} level(s)! New level: ${levelingResult.level}`);
+            levelUp = {
+              levelsGained: levelingResult.levelsGained,
+              newLevel: levelingResult.level
+            };
+          } else {
+            console.log(`🔍 BATTLE REWARDS: No level up - levelsGained: ${levelingResult.levelsGained}`);
+          }
         }
 
         // Update user balance
         moneyGained = npc.victoryReward;
         if (moneyGained) {
-          user.balance.total += moneyGained;
-          user.balance.lastUpdated = new Date();
+          const user = await User.findById(userId);
+          if (user) {
+            user.balance.total += moneyGained;
+            user.balance.lastUpdated = new Date();
+            await user.save();
+          }
         }
-
-        await user.save();
       }
 
       // Store processed rewards in battle document for client response
       (battle as any).processedRewards = {
         experienceGained,
         moneyGained,
-        botLosses
+        botLosses,
+        levelUp
       };
+      
+      console.log(`🔍 BATTLE REWARDS: Storing processed rewards in battle:`, (battle as any).processedRewards);
+      
       await battle.save();
 
       return {
         success: true,
         experienceGained,
         moneyGained,
-        botLosses
+        botLosses,
+        levelUp
       };
 
     } catch (error) {

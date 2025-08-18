@@ -140,11 +140,14 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
 
         {/* Battle end overlay - rendered when battle is complete */}
         {shouldShowBattleEnd && (
-          <BattleEndOverlay 
-            winner={battleState.winner === 'user' ? NodeOwner.USER : NodeOwner.ENEMY}
-            onContinue={onClose}
-            battleEndData={battleState.battleEndData}
-          />
+          <>
+            {console.log('🔍 BattleOverlayManager: Rendering BattleEndOverlay with battleEndData:', battleState.battleEndData)}
+            <BattleEndOverlay 
+              winner={battleState.winner === 'user' ? NodeOwner.USER : NodeOwner.ENEMY}
+              onContinue={onClose}
+              battleEndData={battleState.battleEndData}
+            />
+          </>
         )}
       </View>
     );

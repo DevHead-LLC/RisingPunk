@@ -99,6 +99,8 @@ router.get<{ id: string }, BattleResponse>(
         battleEndData: battleState.battleEndData
       };
 
+      console.log(`🔍 BATTLE ROUTE: Sending client battle state with battleEndData:`, battleState.battleEndData);
+
       res.json({ success: true, data: clientBattleState });
     } catch (error) {
       console.error('Get battle state error:', error);

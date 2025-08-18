@@ -178,7 +178,7 @@ export class BattleService {
     await battle.save();
 
     // Unlock hack rig if user wins by elimination (only if flagged)
-    if (winner === NodeOwner.USER && endCondition === 'elimination' && (battle as any).unlockHackRig) {
+    if (winner === NodeOwner.USER && endCondition === 'elimination' && (battle as any).unlockHackRigOnWin) {
       try {
         const user = await User.findById(battle.attackerId);
         if (!user) {
