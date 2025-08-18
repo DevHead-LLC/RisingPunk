@@ -215,7 +215,7 @@ app.get('/api/bots', auth, async (req: Request, res: Response) => {
 // Get bot stats from server (single source of truth)
 app.get('/api/bots/stats', auth, async (req: Request, res: Response) => {
   try {
-    const { BotService } = await import('./src/services/BotService');
+    const { BotService } = require('./src/services/BotService');
     const user = await User.findById(req.user._id);
     const userLevel = user?.level || 1;
     

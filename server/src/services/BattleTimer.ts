@@ -86,8 +86,6 @@ export class BattleTimerService extends EventEmitter {
     
     // Clean up elimination callback for this battle
     this.unregisterEliminationCallback(battleId);
-    
-    console.log(`Timer stopped for battle ${battleId}`);
   }
 
   /**
@@ -207,7 +205,6 @@ export class BattleTimerService extends EventEmitter {
             // Check elimination synchronously to avoid race conditions
             callback(battleId).then(shouldEnd => {
               if (shouldEnd && timer.isActive && timer.phase !== BattlePhase.COMPLETE) {
-                console.log(`🎯 BATTLE TIMER: Battle ${battleId} ending due to elimination`);
                 this.endBattle(battleId).catch(error => {
                   console.error(`❌ BATTLE TIMER: Error ending battle ${battleId}:`, error);
                 });
@@ -225,13 +222,9 @@ export class BattleTimerService extends EventEmitter {
       if (timer.battleTime >= TIMER_CONFIG.BATTLE_DURATION) {
         // Check if battle has already ended (e.g., by elimination) before processing timer expiration
         if (timer.phase === BattlePhase.COMPLETE) {
-          console.log(`⏰ BATTLE TIMER: Battle ${battleId} already ended, skipping timer expiration`);
           return;
         }
         
-        console.log(`⏰ BATTLE TIMER: Battle ${battleId} ending due to timer expiration (${timer.battleTime}s)`);
-        
-        // Clean up timer immediately (synchronous)
         this.clearTimerIntervals(timer);
         timer.phase = BattlePhase.COMPLETE;
         timer.isActive = false;
@@ -262,7 +255,6 @@ export class BattleTimerService extends EventEmitter {
 
     // Check if battle has already ended to prevent duplicate processing
     if (timer.phase === BattlePhase.COMPLETE) {
-      console.log(`🎯 BATTLE TIMER: Battle ${battleId} already ended, skipping duplicate endBattle call`);
       return;
     }
 
@@ -277,7 +269,6 @@ export class BattleTimerService extends EventEmitter {
     try {
       // This part of the logic needs to be refactored to use the event system
       // For now, we'll just log the attempt and continue with normal cleanup
-      console.log(`🎯 BATTLE TIMER: Attempting to process battle end for ${battleId}`);
       // await this.emit('processBattleEnd', { battleId }); // This would require a listener
     } catch (error) {
       console.error(`❌ BATTLE TIMER: Error handling battle end for ${battleId}:`, error);
