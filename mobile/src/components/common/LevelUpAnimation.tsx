@@ -48,10 +48,7 @@ export const LevelUpAnimation: React.FC<LevelUpAnimationProps> = ({
 
 
   useEffect(() => {
-    console.log('🔍 LevelUpAnimation: isVisible changed to:', isVisible);
-    
     if (isVisible) {
-      console.log('🎉 LevelUpAnimation: Starting animation sequence!');
       // Reset animations
       borderAnimation.setValue(0);
       popupAnimation.setValue(0);

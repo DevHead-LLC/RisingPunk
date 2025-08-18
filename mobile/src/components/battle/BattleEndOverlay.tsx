@@ -15,14 +15,8 @@ export const BattleEndOverlay: React.FC<BattleEndOverlayProps> = ({ winner, onCo
   const [showLevelUpAnimation, setShowLevelUpAnimation] = useState(false);
 
   useEffect(() => {
-    console.log('🔍 BattleEndOverlay: battleEndData received:', battleEndData);
-    console.log('🔍 BattleEndOverlay: levelUp data:', battleEndData?.levelUp);
-    
     if (battleEndData?.levelUp && battleEndData.levelUp.levelsGained > 0) {
-      console.log('🎉 BattleEndOverlay: Triggering level up animation!');
       setShowLevelUpAnimation(true);
-    } else {
-      console.log('🔍 BattleEndOverlay: No level up detected');
     }
   }, [battleEndData]);
 
