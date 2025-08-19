@@ -19,6 +19,11 @@ export interface IUser extends Document {
   };
   unlockedFeatures: {
     hackRig: boolean;
+    researchCenter: boolean;
+  };
+  researchCenterBuild?: {
+    startedAt: Date | null;
+    completesAt: Date | null;
   };
   verifyAccessKey(accessKey: string): Promise<boolean>;
 }
@@ -92,6 +97,20 @@ const userSchema = new Schema({
     hackRig: {
       type: Boolean,
       default: false
+    },
+    researchCenter: {
+      type: Boolean,
+      default: false
+    }
+  },
+  researchCenterBuild: {
+    startedAt: {
+      type: Date,
+      default: null
+    },
+    completesAt: {
+      type: Date,
+      default: null
     }
   }
 }, { 

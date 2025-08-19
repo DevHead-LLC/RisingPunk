@@ -6,6 +6,7 @@ import {DigitalBarracksScreen} from './DigitalBarracksScreen';
 import {ProfileScreen} from './ProfileScreen';
 import {HackMapScreen} from './HackMapScreen';
 import {BotAssemblyScreen} from './BotAssemblyScreen';
+import {ResearchScreen} from './ResearchScreen';
 
 import {COLORS} from '../styles/theme';
 import {ProfileLocation} from '../components/turf/ProfileLocation';
@@ -62,16 +63,16 @@ const ScrollViewMemo = memo(function ScrollViewMemo({
 });
 
 export function TurfScreen(): React.JSX.Element {
-  const [currentScreen, setCurrentScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile'>('turf');
+  const [currentScreen, setCurrentScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research'>('turf');
   const [battleId, setBattleId] = useState<string | null>(null);
   const [pendingNpcSlug, setPendingNpcSlug] = useState<string | null>(null);
   const [returnContext, setReturnContext] = useState<{ origin: 'hackRig' | 'map'; mapPan?: { x: number; y: number } } | null>(null);
   const [pendingNpcInstanceId, setPendingNpcInstanceId] = useState<string | null>(null);
-  const [previousScreen, setPreviousScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile'>('turf');
+  const [previousScreen, setPreviousScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research'>('turf');
   const horizontalScrollRef = useRef<ScrollView>(null);
   const dispatch = useAppDispatch();
 
-  const navigateToScreen = useCallback((screen: 'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile') => {
+  const navigateToScreen = useCallback((screen: 'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research') => {
     setPreviousScreen(currentScreen);
     setCurrentScreen(screen);
   }, [currentScreen]);
@@ -135,6 +136,10 @@ export function TurfScreen(): React.JSX.Element {
         return <ProfileScreen
           onClose={() => navigateToScreen('turf')}
         />;
+      case 'research':
+        return <ResearchScreen
+          onClose={() => navigateToScreen('turf')}
+        />;
       case 'botAssembly':
         return <BotAssemblyScreen
           onClose={() => navigateToScreen(previousScreen)}
@@ -192,7 +197,7 @@ export function TurfScreen(): React.JSX.Element {
                     <HomeLocation onPress={() => navigateToScreen('hackRig')} />
                     <DigitalBarracksLocation onPress={() => navigateToScreen('barracks')} />
                   </View>
-                  <ResearchCenterLocation />
+                  <ResearchCenterLocation onNavigateToResearch={() => navigateToScreen('research')} />
                 </View>
               </ScrollViewMemo>
             </View>

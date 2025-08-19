@@ -27,6 +27,7 @@ export interface AuthResponse {
     };
     unlockedFeatures: {
       hackRig: boolean;
+      researchCenter: boolean;
     };
   };
 }
@@ -42,7 +43,34 @@ export interface ProfileResponse {
   };
   unlockedFeatures: {
     hackRig: boolean;
+    researchCenter: boolean;
   };
+}
+
+export interface UnlockResearchCenterResponse {
+  success: boolean;
+  balance: {
+    total: number;
+    ratePerSecond: number;
+    lastUpdated: string;
+  };
+  researchCenterBuild: {
+    startedAt: string;
+    completesAt: string;
+  };
+  unlockedFeatures: {
+    hackRig: boolean;
+    researchCenter: boolean;
+  };
+}
+
+export interface ResearchCenterStatusResponse {
+  isUnlocked: boolean;
+  buildStatus: {
+    startedAt: string;
+    completesAt: string;
+    timeRemaining: number;
+  } | null;
 }
 
 export const authApi = createApi({
@@ -93,6 +121,19 @@ export const authApi = createApi({
       }),
       invalidatesTags: ['User'],
     }),
+
+    unlockResearchCenter: builder.mutation<UnlockResearchCenterResponse, void>({
+      query: () => ({
+        url: '/api/users/unlock-research-center',
+        method: 'POST',
+      }),
+      invalidatesTags: ['User'],
+    }),
+
+    getResearchCenterStatus: builder.query<ResearchCenterStatusResponse, void>({
+      query: () => '/api/users/research-center-status',
+      providesTags: ['User'],
+    }),
   }),
 });
 
@@ -101,4 +142,6 @@ export const {
   useRegisterMutation,
   useGetProfileQuery,
   useUnlockHackRigMutation,
+  useUnlockResearchCenterMutation,
+  useGetResearchCenterStatusQuery,
 } = authApi;
