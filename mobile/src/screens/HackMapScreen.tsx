@@ -8,25 +8,13 @@ import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { setGrid, setLoading } from '../store/slices/mapSlice';
 import { useFetchMapQuery } from '../store/api/mapApi';
 import { computePanBounds } from '../utils/mapPanBounds';
+import { CellData, TerrainType, EntityType } from '../types/map';
 
 const CELL_SIZE = 55;
 const MARGIN_SIZE = 80;
 
 
-type TerrainType = 'plain' | 'mountain' | 'water' | 'forest' | 'road' | 'grass' | 'dirt';
-type EntityType = 'empty' | 'player' | 'npc' | 'house';
 
-
-
-  type CellData = {
-  terrain: TerrainType;
-  entity: EntityType;
-  owner?: 'player' | 'enemy';
-  name?: string;
-  npcSlug?: string;
-    npcInstanceId?: string;
-    userId?: string;
-};
 
 type Props = {
   onClose: () => void;
@@ -426,6 +414,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             <Text style={styles.entityText}>
               ENTITY: {selectedCell.info.name || 'UNKNOWN'}
             </Text>
+            {selectedCell.info.owner !== 'player' && selectedCell.info.npcLevel && (
+              <Text style={styles.npcLevelModalText}>
+                LEVEL: {selectedCell.info.npcLevel}
+              </Text>
+            )}
             <Text style={[
               styles.statusText,
               selectedCell.info.owner === 'player' ? styles.friendlyText : styles.hostileText,
@@ -580,6 +573,12 @@ const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, x
                 {cell.name || (cell.owner === 'player' ? 'YOU' : 'NPC')}
               </Text>
             </View>
+            {/* NPC Level Indicator */}
+            {cell.owner !== 'player' && cell.npcLevel && (
+              <View style={styles.npcLevelContainer} pointerEvents="none">
+                <Text style={styles.npcLevelText}>{cell.npcLevel}</Text>
+              </View>
+            )}
           </>
         )}
       </View>
@@ -861,6 +860,30 @@ const styles = StyleSheet.create({
   },
   enemyLabel: {
     color: '#cc5500',
+  },
+  npcLevelContainer: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    minWidth: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  npcLevelText: {
+    color: '#00ff41',
+    fontSize: 10,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  npcLevelModalText: {
+    color: '#ff6b35',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 5,
   },
   playerEntity: {
     backgroundColor: 'rgba(0, 255, 65, 0.1)',

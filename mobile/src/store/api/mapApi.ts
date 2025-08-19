@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
+import { MapResponse } from '../../types/map';
 
 export const mapApi = createApi({
   reducerPath: 'mapApi',
@@ -13,7 +14,7 @@ export const mapApi = createApi({
   }),
   tagTypes: ['Map'],
   endpoints: (builder) => ({
-    fetchMap: builder.query<any, void>({
+    fetchMap: builder.query<MapResponse, void>({
       query: () => '/api/map/main',
       providesTags: ['Map'],
     }),
