@@ -11,6 +11,7 @@ import {COLORS} from '../styles/theme';
 import {ProfileLocation} from '../components/turf/ProfileLocation';
 import {HomeLocation} from '../components/turf/HomeLocation';
 import {DigitalBarracksLocation} from '../components/turf/DigitalBarracksLocation';
+import {ResearchCenterLocation} from '../components/turf/ResearchCenterLocation';
 import {BattlePreparationScreen} from './BattlePreparationScreen';
 import {BattleGridScreen} from './BattleGridScreen';
 import {ErrorBoundary} from '../components/common/ErrorBoundary';
@@ -191,6 +192,7 @@ export function TurfScreen(): React.JSX.Element {
                     <HomeLocation onPress={() => navigateToScreen('hackRig')} />
                     <DigitalBarracksLocation onPress={() => navigateToScreen('barracks')} />
                   </View>
+                  <ResearchCenterLocation />
                 </View>
               </ScrollViewMemo>
             </View>
