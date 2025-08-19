@@ -66,21 +66,12 @@ export const balanceSlice = createSlice({
 export const { updateBalance, addToBalance, subtractFromBalance, triggerUpdate } = balanceSlice.actions;
 export default balanceSlice.reducer;
 
-// Selector to get the current balance (raw database value, no time-based accrual)
-// The server handles all balance calculations and time-based updates
+// Selector to get the current balance (with time-based accrual)
+// Updates every 10 seconds to match API polling interval
 export const getCurrentBalance = (state: { balance: BalanceState }) => {
-  // Safety check for undefined state
-  if (!state || !state.balance) {
-    return 0;
-  }
-
-  const { total } = state.balance;
-  
-  // Handle null or invalid values
-  if (total === null || total === undefined || isNaN(total)) {
-    return 0;
-  }
-  
-  // Return raw database balance without time-based calculations
-  return total;
+  const { total, ratePerSecond, lastUpdated } = state.balance;
+  if (total === null || lastUpdated === null) return 0;
+  const elapsed = (Date.now() - lastUpdated) / 1000;
+  const roundedElapsed = Math.floor(elapsed / 10) * 10;
+  return Math.floor(total + ratePerSecond * roundedElapsed);
 };

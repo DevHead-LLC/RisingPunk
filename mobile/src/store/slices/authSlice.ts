@@ -3,6 +3,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../../config';
 import { updateBalance } from './balanceSlice';
 import { setBots, setBuildState } from './botsSlice';
+import { authApi } from '../api/authApi';
+import { balanceApi } from '../api/balanceApi';
+import { botsApi } from '../api/botsApi';
+import { mapApi } from '../api/mapApi';
 
 // Types
 export interface User {
@@ -44,6 +48,12 @@ export const loginUser = createAsyncThunk(
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
+
+      // Clear any existing RTK Query cache to ensure fresh data for new user
+      dispatch(authApi.util.resetApiState());
+      dispatch(balanceApi.util.resetApiState());
+      dispatch(botsApi.util.resetApiState());
+      dispatch(mapApi.util.resetApiState());
 
       // Fetch initial data after successful login
       try {
@@ -123,6 +133,12 @@ export const registerUser = createAsyncThunk(
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
 
+      // Clear any existing RTK Query cache to ensure fresh data for new user
+      dispatch(authApi.util.resetApiState());
+      dispatch(balanceApi.util.resetApiState());
+      dispatch(botsApi.util.resetApiState());
+      dispatch(mapApi.util.resetApiState());
+
       return data;
     } catch (error) {
       if (error instanceof TypeError && error.message.includes('Network request failed')) {
@@ -170,9 +186,16 @@ export const unlockHackRig = createAsyncThunk(
 
 export const logoutUser = createAsyncThunk(
   'auth/logout',
-  async () => {
+  async (_, { dispatch }) => {
     await AsyncStorage.removeItem('token');
     await AsyncStorage.removeItem('user');
+    
+    // Clear RTK Query cache to prevent data leakage between users
+    // Using proper RTK Query utility methods to avoid serializable warnings
+    dispatch(authApi.util.resetApiState());
+    dispatch(balanceApi.util.resetApiState());
+    dispatch(botsApi.util.resetApiState());
+    dispatch(mapApi.util.resetApiState());
   }
 );
 
