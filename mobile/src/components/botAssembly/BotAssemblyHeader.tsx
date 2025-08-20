@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { COLORS, SIZING } from '../../styles/theme';
+import { useResponsiveDimensions } from '../../hooks/useResponsiveDimensions';
 import { Balance } from '../common/Balance';
 import { CloseButton } from '../common/CloseButton';
 
@@ -11,12 +12,14 @@ type BotAssemblyHeaderProps = {
 export const BotAssemblyHeader = React.memo(function BotAssemblyHeader({
   onClose,
 }: BotAssemblyHeaderProps) {
+  const { isSmallDevice } = useResponsiveDimensions();
+  
   return (
     <>
       <CloseButton onPress={onClose} />
-      <View style={styles.header}>
+      <View style={[styles.header, isSmallDevice && styles.smallDeviceHeader]}>
         <Balance />
-        <Text style={styles.title}>BOT_ASSEMBLY</Text>
+        <Text style={[styles.title, isSmallDevice && styles.smallDeviceTitle]}>BOT_ASSEMBLY</Text>
       </View>
     </>
   );
@@ -29,10 +32,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingBottom: 10,
   },
+  smallDeviceHeader: {
+    height: 80,
+    paddingBottom: 8,
+  },
   title: {
     color: COLORS.text.primary,
     fontSize: SIZING.font.h2,
     fontWeight: 'bold',
     letterSpacing: 2,
+  },
+  smallDeviceTitle: {
+    fontSize: SIZING.font.body,
+    letterSpacing: 1,
   },
 });

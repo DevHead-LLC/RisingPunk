@@ -1,4 +1,4 @@
-# REDUX MIDDLEWARE PERFORMANCE WARNING - CURRENT PRIORITY
+# IPHONE 12 SCREEN COMPATIBILITY - CURRENT PRIORITY
 
 ## AI Directives
 - Check existing files and logic first before creating new code
@@ -7,45 +7,45 @@
 - Update this file after every task
 
 ## CURRENT GOAL
-Resolve Redux middleware performance warnings that occur during screen navigation and idle periods.
+Resolve iPhone 12 screen size compatibility issues where UI elements don't fit properly on smaller screens.
 
-## STATUS: Investigating - First Attempt Failed
+## STATUS: Implementing Responsive Design System
 
-### ATTEMPTED SOLUTIONS ❌
-1. **Middleware Configuration Optimization**: Added immutableCheck.ignoredPaths for large arrays
-2. **Targeted Path Ignoring**: Ignored map.grid, map.fog, and RTK Query cache paths
-3. **Result**: Warnings still occur (33ms vs 32ms threshold)
-4. **Status**: First approach failed - need different strategy
+### IMPLEMENTED SOLUTIONS ✅
+1. **Enhanced Theme System**: Updated theme.ts with device-specific scaling factors
+2. **Responsive Hook**: Created useResponsiveDimensions hook for real-time screen handling
+3. **Utility Functions**: Added responsiveUtils.ts for consistent sizing across app
+4. **BotAssembly Updates**: Modified BotAssemblyScreen and BotAssemblyHeader for better small device support
+5. **BuildTimer Fixes**: Resolved timer validation and dependency issues to prevent stuttering and stale values
 
-### SECOND ATTEMPT 🔄
-1. **Complete Middleware Disabling**: Disabled both immutableCheck and serializableCheck
-2. **Approach**: Remove performance overhead entirely in development mode
-3. **Status**: Testing - should eliminate warnings completely
-4. **Trade-off**: Lose development-time validation but gain performance
+### DEVICE SCALING STRATEGY
+**iPhone 12 (≤844px)**: 0.85x scale factor - reduced padding, smaller fonts
+**iPhone 13/14/15 (≤932px)**: 0.9x scale factor - moderate scaling
+**iPhone 16+ (>932px)**: 1.0x scale factor - full size
 
-### PROBLEM ANALYSIS
-**Warning Details**:
-- ImmutableStateInvariantMiddleware: 33ms (threshold: 32ms)
-- Occurs during screen navigation (TurfScreen → ResearchScreen)
-- Also happens during idle periods
-- Affects development mode performance
+### KEY CHANGES MADE
+- **Theme System**: All font sizes, spacing, and dimensions now scale based on device
+- **Responsive Hook**: Handles orientation changes and provides device type detection
+- **Component Updates**: BotAssembly components now adapt to smaller screens
+- **Keyboard Handling**: Adjusted keyboard offsets for small devices
+- **Timer Optimization**: Fixed BuildTimer validation, removed progress from dependencies, added separate progress sync
 
-**Root Cause Investigation**:
-- Large state objects: 50x50 grid arrays (2500 cells)
-- Complex battle state with arrays of battalions/nodes
-- RTK Query cache storing large API responses
-- Middleware trying to validate immutable state on large objects
+### BUILD TIMER FIXES ✅
+- **Validation Issue**: Removed incorrect `startTime <= 0` check that rejected valid timestamps
+- **Stale Values**: Added proper cleanup when buildStartTime is invalid/missing
+- **Dependency Issues**: Separated progress sync into its own useEffect to prevent frequent re-runs
+- **Performance**: Timer now updates smoothly without visual stuttering
 
 ### NEXT ACTIONS
-1. **Test Second Attempt**: Verify that disabling middleware eliminates warnings
-2. **If Successful**: Document solution and consider re-enabling with optimizations
-3. **If Still Failing**: Investigate deeper state structure issues
-4. **Monitor Performance**: Ensure no new issues introduced by disabled middleware
+1. **Test on iPhone 12 Simulator**: Verify BotAssembly screen fits properly
+2. **Apply to Other Screens**: Extend responsive system to other problematic screens
+3. **Global Implementation**: Use responsiveUtils throughout app for consistency
+4. **Performance Testing**: Ensure responsive calculations don't impact performance
 
 ## NOTES
-- First attempt with immutableCheck.ignoredPaths failed to resolve warnings
-- Second attempt disables both problematic middleware completely
-- This approach trades development validation for performance
-- Warnings occur during screen navigation and idle periods
-- Performance impact is in development mode only (production unaffected)
-- Must test solutions thoroughly before considering them complete
+- iPhone 12 has 844px height vs iPhone 16's 932px+ height
+- Responsive system automatically detects device type and applies appropriate scaling
+- All existing functionality preserved while adding device compatibility
+- System handles orientation changes dynamically
+- Scaling factors can be easily adjusted for future devices
+- BuildTimer now properly handles edge cases and provides smooth updates

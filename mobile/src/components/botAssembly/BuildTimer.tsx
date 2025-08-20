@@ -23,11 +23,18 @@ export const BuildTimer = React.memo(function BuildTimer({
   const botsBuilt = Math.floor((currentProgress / 100) * totalBuildQuantity);
 
   useEffect(() => {
-    if (!buildStartTime || totalBuildQuantity === 0) return;
+    if (!buildStartTime || totalBuildQuantity === 0) {
+      setCurrentProgress(0);
+      setTimeLeft(0);
+      return;
+    }
 
-    // Validate buildStartTime to prevent calculation errors
     const startTime = new Date(buildStartTime).getTime();
-    if (isNaN(startTime) || startTime <= 0) return;
+    if (isNaN(startTime)) {
+      setCurrentProgress(0);
+      setTimeLeft(0);
+      return;
+    }
 
     const updateProgress = () => {
       const now = Date.now();
@@ -40,7 +47,6 @@ export const BuildTimer = React.memo(function BuildTimer({
       } else {
         const newProgress = (elapsed / totalTime) * 100;
         
-        // Safety check: if we're way off from server progress, sync up
         if (Math.abs(newProgress - progress) > 15) {
           setCurrentProgress(progress);
         } else {
@@ -55,7 +61,11 @@ export const BuildTimer = React.memo(function BuildTimer({
     const timer = setInterval(updateProgress, 1000);
 
     return () => clearInterval(timer);
-  }, [buildStartTime, totalBuildQuantity, buildTimePerUnit, progress]);
+  }, [buildStartTime, totalBuildQuantity, buildTimePerUnit]);
+
+  useEffect(() => {
+    setCurrentProgress(progress);
+  }, [progress]);
 
   const formattedTime = useMemo(() => {
     const seconds = Math.floor(timeLeft / 1000);

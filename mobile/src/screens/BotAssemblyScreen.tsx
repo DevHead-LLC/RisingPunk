@@ -13,12 +13,12 @@ import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { selectBotType } from '../store/slices/botsSlice';
 import { useStartBuildMutation } from '../store/api/botsApi';
 import { COLORS, SIZING } from '../styles/theme';
+import { useResponsiveDimensions } from '../hooks/useResponsiveDimensions';
 import { LevelSection } from '../components/botAssembly/LevelSection';
 import { BuildSection } from '../components/botAssembly/BuildSection';
 import { BotAssemblyHeader } from '../components/botAssembly/BotAssemblyHeader';
 
 type BotType = 'breacher' | 'guardian' | 'phreak';
-
 
 const LEVELS = [1, 2, 3, 4];
 
@@ -28,6 +28,7 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
   const [quantity, setQuantity] = useState('1');
   const [startBuild] = useStartBuildMutation();
   const BOT_COST = 1;
+  const { isSmallDevice, scaleFactor } = useResponsiveDimensions();
 
   const handleBuild = useCallback(() => {
     if (!bots.selectedType) {return;}
@@ -44,8 +45,7 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
     dispatch(selectBotType(type));
   }, [dispatch]);
 
-  // TODO: Get user level from profile/state when implemented
-  const userLevel = 1; // Temporary hardcoded value
+  const userLevel = 1;
 
   const levelSections = useMemo(() => (
     LEVELS.map((level) => (
@@ -66,10 +66,14 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
       <KeyboardAvoidingView 
         style={styles.keyboardAvoidingView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 20}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? (isSmallDevice ? 40 : 60) : 20}
       >
         <View style={styles.content}>
-          <ScrollView style={styles.botSelection}>
+          <ScrollView 
+            style={styles.botSelection}
+            contentContainerStyle={isSmallDevice ? styles.smallDeviceContent : undefined}
+            showsVerticalScrollIndicator={false}
+          >
             {levelSections}
           </ScrollView>
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -112,6 +116,9 @@ const styles = StyleSheet.create({
   botSelection: {
     flex: 0.35,
     padding: SIZING.spacing.lg,
+  },
+  smallDeviceContent: {
+    paddingBottom: SIZING.spacing.lg,
   },
   levelSection: {
     marginVertical: SIZING.spacing.md,

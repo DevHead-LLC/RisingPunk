@@ -1,6 +1,33 @@
-import { Dimensions } from 'react-native';
+import { Dimensions, Platform } from 'react-native';
 
 const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window');
+
+// Device-specific scaling factors
+const getDeviceScaleFactor = () => {
+  const screenHeight = Math.max(WINDOW_WIDTH, WINDOW_HEIGHT);
+  
+  // iPhone 12 and similar smaller devices
+  if (screenHeight <= 844) {
+    return 0.85;
+  }
+  
+  // iPhone 13/14/15
+  if (screenHeight <= 932) {
+    return 0.9;
+  }
+  
+  // iPhone 16 and larger
+  if (screenHeight > 932) {
+    return 1.0;
+  }
+  
+  return 0.9; // Default fallback
+};
+
+const deviceScaleFactor = getDeviceScaleFactor();
+
+// Responsive sizing that scales based on device
+const createResponsiveSize = (baseSize: number) => Math.round(baseSize * deviceScaleFactor);
 
 type ThemeSizing = {
   font: {
@@ -24,6 +51,7 @@ type ThemeSizing = {
       vertical: number;
     };
     maxContentWidth: number;
+    scaleFactor: number;
   };
 };
 
@@ -48,26 +76,27 @@ export const COLORS = {
 
 export const SIZING: ThemeSizing = {
   font: {
-    h1: 76,
-    h2: 24,
-    body: 16,
-    small: 14,
-    large: 22,
+    h1: createResponsiveSize(76),
+    h2: createResponsiveSize(24),
+    body: createResponsiveSize(16),
+    small: createResponsiveSize(14),
+    large: createResponsiveSize(22),
   },
   spacing: {
-    xs: 4,
-    sm: 8,
-    md: 16,
-    lg: 24,
+    xs: createResponsiveSize(4),
+    sm: createResponsiveSize(8),
+    md: createResponsiveSize(16),
+    lg: createResponsiveSize(24),
   },
   screen: {
     width: WINDOW_WIDTH,
     height: WINDOW_HEIGHT,
     padding: {
-      horizontal: 20,
-      vertical: 10,
+      horizontal: createResponsiveSize(20),
+      vertical: createResponsiveSize(10),
     },
     maxContentWidth: 800,
+    scaleFactor: deviceScaleFactor,
   },
 };
 
@@ -78,10 +107,10 @@ export const styleGuide = {
     textShadowRadius: 15,
   },
   inputField: {
-    height: 48,
+    height: createResponsiveSize(48),
     backgroundColor: COLORS.inputBg,
     color: COLORS.primary,
-    paddingHorizontal: 15,
+    paddingHorizontal: createResponsiveSize(15),
     fontSize: SIZING.font.body,
     borderWidth: 1,
     borderColor: COLORS.buttonBg,
@@ -90,8 +119,8 @@ export const styleGuide = {
     position: 'absolute' as const,
     right: 0,
     top: 0,
-    width: 10,
-    height: 10,
+    width: createResponsiveSize(10),
+    height: createResponsiveSize(10),
     borderTopWidth: 1,
     borderRightWidth: 1,
     borderColor: COLORS.primary,
