@@ -68,21 +68,21 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 20}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View style={styles.content}>
-            <ScrollView style={styles.botSelection}>
-              {levelSections}
-            </ScrollView>
+        <View style={styles.content}>
+          <ScrollView style={styles.botSelection}>
+            {levelSections}
+          </ScrollView>
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <BuildSection
-              selectedType={bots.selectedType}
+              selectedType={bots.buildingProgress !== null ? bots.buildQueue?.type || bots.selectedType : bots.selectedType}
               buildingProgress={bots.buildingProgress}
               quantity={quantity}
               onQuantityChange={handleQuantityChange}
               onBuild={handleBuild}
               botCost={BOT_COST}
             />
-          </View>
-        </TouchableWithoutFeedback>
+          </TouchableWithoutFeedback>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

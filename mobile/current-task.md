@@ -1,4 +1,4 @@
-# NPC LEVEL VISIBILITY IMPROVEMENT - CURRENT PRIORITY
+# REDUX MIDDLEWARE PERFORMANCE WARNING - CURRENT PRIORITY
 
 ## AI Directives
 - Check existing files and logic first before creating new code
@@ -7,65 +7,45 @@
 - Update this file after every task
 
 ## CURRENT GOAL
-Improve NPC visibility on HackMapScreen by adding level indicators (1, 5, 10, 15, 20) to both the map grid and modal popup.
+Resolve Redux middleware performance warnings that occur during screen navigation and idle periods.
 
-## STATUS: Complete - NPC Level Display Implemented
+## STATUS: Investigating - First Attempt Failed
 
-### COMPLETED ✅
-1. **Research Center Build Functionality**: Complete and production ready
-2. **NPC Level Analysis**: Identified NPC structure with userLevelAssociation field
-3. **Map Seeding Analysis**: Confirmed NPC levels 1, 5, 10, 15, 20 distribution
-4. **Server-Side Implementation**: Added NPC level extraction and inclusion in map API
-5. **Client-Side Types**: Created map types with NPC level support
-6. **Grid Display**: Added level indicator in top-right corner of NPC squares
-7. **Modal Enhancement**: Included level information in NPC attack modal
-8. **UI Styling**: Professional level indicator with matrix-style colors
+### ATTEMPTED SOLUTIONS ❌
+1. **Middleware Configuration Optimization**: Added immutableCheck.ignoredPaths for large arrays
+2. **Targeted Path Ignoring**: Ignored map.grid, map.fog, and RTK Query cache paths
+3. **Result**: Warnings still occur (33ms vs 32ms threshold)
+4. **Status**: First approach failed - need different strategy
 
-### IMPLEMENTATION DETAILS
-**Server-Side Changes**:
-- Added `getNPCLevelFromSlug()` function to extract level from NPC slug
-- Modified map API response to include `npcLevel` field
-- Level mapping based on seeding script distribution (1, 5, 10, 15, 20)
+### SECOND ATTEMPT 🔄
+1. **Complete Middleware Disabling**: Disabled both immutableCheck and serializableCheck
+2. **Approach**: Remove performance overhead entirely in development mode
+3. **Status**: Testing - should eliminate warnings completely
+4. **Trade-off**: Lose development-time validation but gain performance
 
-**Client-Side Changes**:
-- Created `mobile/src/types/map.ts` with proper TypeScript interfaces
-- Updated `mapApi.ts` to use new types
-- Added NPC level indicator to both `Tile` and `PoolTile` components
-- Enhanced modal popup to display NPC level prominently
-- Added professional styling for level indicators
+### PROBLEM ANALYSIS
+**Warning Details**:
+- ImmutableStateInvariantMiddleware: 33ms (threshold: 32ms)
+- Occurs during screen navigation (TurfScreen → ResearchScreen)
+- Also happens during idle periods
+- Affects development mode performance
 
-**UI Features**:
-- **Grid Display**: Small black badge with green text in top-right corner of NPC squares
-- **Modal Display**: Orange "LEVEL: X" text below entity name
-- **Positioning**: Top-right corner for grid, below entity name for modal
-- **Styling**: Matrix-style colors (#00ff41 for grid, #ff6b35 for modal)
+**Root Cause Investigation**:
+- Large state objects: 50x50 grid arrays (2500 cells)
+- Complex battle state with arrays of battalions/nodes
+- RTK Query cache storing large API responses
+- Middleware trying to validate immutable state on large objects
 
-### NPC LEVEL STRUCTURE
-- **Level 1**: 20 NPCs (npc-neon-shiv, npc-chrome-havoc, npc-zero-grain, npc-ash-circuit, npc-vanta-razor)
-- **Level 5**: 17 NPCs (npc-pulse-hex, npc-iris-vex, npc-rust-specter, npc-lume-strike, npc-cipher-ash)
-- **Level 10**: 13 NPCs (npc-hollow-syn, npc-rift-breaker, npc-echo-shard, npc-grim-vector, npc-nova-skorn)
-- **Level 15**: 5 NPCs (npc-talon-flux, npc-oblivion-byte, npc-drift-reaver, npc-static-venom, npc-wraith-node)
-- **Level 20**: 2 NPCs (npc-shard-viper, npc-kryo-jackal, npc-spectra-void, npc-iron-phage, npc-neuro-scythe)
-
-### FILES MODIFIED
-- ✅ `server/src/routes/map.ts` - Added NPC level extraction and inclusion
-- ✅ `mobile/src/types/map.ts` - Created new map types with NPC level support
-- ✅ `mobile/src/store/api/mapApi.ts` - Updated to use new types
-- ✅ `mobile/src/screens/HackMapScreen.tsx` - Added level display to grid and modal
-
-### NEXT ACTION
-Test the NPC level visibility implementation:
-1. Start server and mobile app
-2. Navigate to HackMapScreen
-3. Verify NPC squares show level indicators in top-right corner
-4. Click on NPC to verify modal shows level information
-5. Confirm level display matches expected values (1, 5, 10, 15, 20)
+### NEXT ACTIONS
+1. **Test Second Attempt**: Verify that disabling middleware eliminates warnings
+2. **If Successful**: Document solution and consider re-enabling with optimizations
+3. **If Still Failing**: Investigate deeper state structure issues
+4. **Monitor Performance**: Ensure no new issues introduced by disabled middleware
 
 ## NOTES
-- NPCs are stored in database with userLevelAssociation field
-- Map seeding script already distributes NPCs by level
-- Level extraction based on NPC slug patterns from seeding script
-- Level display is subtle but visible in corner of NPC squares
-- Modal shows level prominently for attack decision making
-- Matrix-style color scheme maintains game aesthetic
-- Ready for testing and user feedback
+- First attempt with immutableCheck.ignoredPaths failed to resolve warnings
+- Second attempt disables both problematic middleware completely
+- This approach trades development validation for performance
+- Warnings occur during screen navigation and idle periods
+- Performance impact is in development mode only (production unaffected)
+- Must test solutions thoroughly before considering them complete

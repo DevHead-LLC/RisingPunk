@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { BotTypeCard } from './BotTypeCard';
-import { BotDescription } from './BotDescription';
 import { SIZING } from '../../styles/theme';
 
 type BotType = 'breacher' | 'guardian' | 'phreak';
@@ -37,9 +36,6 @@ export const LevelSection = React.memo(function LevelSection({
               count={botCounts[type]}
               onPress={() => !isLocked && onSelectBotType(type)}
             />
-            {!isLocked && selectedType === type && (
-              <BotDescription type={type} userLevel={userLevel} />
-            )}
           </View>
         ))}
       </View>
