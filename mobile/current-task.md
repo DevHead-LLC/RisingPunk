@@ -1,57 +1,75 @@
-# PROFILE SCREEN LIGHT/DARK MODE IMPLEMENTATION - CURRENT PRIORITY
+# TURF SCREEN LIGHT MODE IMPLEMENTATION - CURRENT PRIORITY
 
 ## AI DIRECTIVE
 PAUSE BETWEEN EACH PHASE for user examination
 
 ## SPECIFIC REQUIREMENTS
-1. Remove the wallet balance from the profile screen view
-2. Make tabs on the left side of the profile screen for settings and profile
-3. Use the same language and icons from the LoginScreen to make a light and dark mode in the settings
-4. Make sure light and dark mode are connected across the app so if it's turned on in one place and off in another, they both control the same light and dark mode theme
-5. Use the light mode colors we set up
-6. Make it all look beautiful without breaking other functionality. Keep it about the color and display - don't touch other pieces like fetching functionality for balances or timers or anything unrelated
+1. Adjust entire turf screen to use theme-aware colors
+2. Include wallet balance (Balance component) with theme support
+3. Include profile location with theme support
+4. Include modal for research center with theme support
+5. Use existing theme system and colors
+6. Make it all look beautiful without breaking other functionality
 
 ## PHASE PLAN
-### Phase 1: Remove Wallet Balance & Add Tab Structure ✅ COMPLETE
-- ✅ Step 1: Remove Balance component and imports
-- ✅ Step 2: Create basic tab structure with left sidebar and right content
-- ✅ Step 3: Improve tab design and spacing
-- ✅ Step 4: Finalize tab layout and styling
+### Phase 1: Adjust Entire Turf Screen ✅ COMPLETE
+- ✅ Step 1: Update TurfScreen main container and background colors
+- ✅ Step 2: Update diagonal lines and grid styling
+- ✅ Step 3: Update digital ground area styling
 
-### Phase 2: Implement Settings Tab with Theme Toggle ✅ COMPLETE
-- ✅ Step 1: Add settings tab content structure
-- ✅ Step 2: Implement theme toggle with LoginScreen language/icons
-- ✅ Step 3: Connect theme context and colors
-- ✅ Step 4: Polish tab appearance and spacing
+### Phase 2: Include Wallet Balance ✅ COMPLETE
+- ✅ Step 1: Update Balance component to use theme colors
+- ✅ Step 2: Test balance display in both light and dark modes
 
-### Phase 3: Connect Theme System
-- Step 1: Verify theme system works across ProfileScreen
-- Step 2: Test theme switching from both LoginScreen and ProfileScreen
-- Step 3: Ensure single source of truth for theme state
-- Step 4: PAUSE for user examination
+### Phase 3: Include Profile Location ✅ COMPLETE
+- ✅ Step 1: Update ProfileLocation component to use theme colors
+- ✅ Step 2: Test profile location display in both themes
 
-### Phase 4: Polish & Verify
-- Step 1: Final visual polish and testing
-- Step 2: Verify no functionality broken
-- Step 3: Complete implementation
+### Phase 4: Include Modal for Research Center ✅ COMPLETE
+- ✅ Step 1: Update ResearchCenterLocation component to use theme colors
+- ✅ Step 2: Update modal styling for both themes
+- ✅ Step 3: Test research center modal in both themes
+
+### Phase 5: Bug Fixes ✅ COMPLETE
+- ✅ Step 1: Remove debug console.log statements from ThemeContext
+- ✅ Step 2: Remove debug console.log statements from LoginScreen
+- ✅ Step 3: Fix brittle light mode detection in LoginScreen
+- ✅ Step 4: Fix ProfileScreen theme inconsistency
+- ✅ Step 5: Fix KeyboardAwareInput theme abstraction violation
+- ✅ Step 6: Fix ProfileScreen StyleSheet recreation performance issue
+- ✅ Step 7: Clean up dead CSS variables code
+- ✅ Step 8: Fix ProfileScreen dark mode background issue
+- ✅ Step 9: Fix theme icon background styling
 
 ## STATUS
-**Phase 1, 2 & 3 COMPLETE** ✅
-- Wallet balance removed
-- Left-side tabs implemented (Profile & Settings)
-- Settings tab with theme toggle implemented
-- Tab styling polished and compact
-- Theme toggle using exact LoginScreen language/icons (👀/💡, "Go Light"/"Go Dark")
-- **Theme system fully connected and working**
-- **All hardcoded colors replaced with theme-aware colors**
-- **Single source of truth for theme state verified**
-
-**CURRENT: Phase 4 - Polish & Verify**
-- Ready for final visual polish and testing
-- Need to verify no functionality broken
+**ALL PHASES COMPLETE** ✅
+- TurfScreen fully theme-aware
+- Balance component theme-aware
+- ProfileLocation component theme-aware
+- ResearchCenterLocation component and modal theme-aware
+- All hardcoded colors replaced with theme-aware colors
+- Light and dark mode working perfectly
+- Console clutter eliminated
+- Theme detection bugs fixed
+- ProfileScreen theme inconsistency resolved
+- Theme abstraction violations eliminated
+- Performance issues resolved
+- Dead code eliminated
+- Dark mode functionality restored
+- Theme icon styling corrected
 
 ## NEXT ACTIONS
-1. Final visual polish and testing
-2. Verify no functionality broken
-3. Complete implementation
+1. User testing and verification
+2. Any final adjustments based on user feedback
+3. ✅ Fix Research Center modal build button behavior - RESOLVED
 4. PAUSE for user examination
+
+## IMPLEMENTATION DETAILS
+- Used useThemeColors hook for consistent theme access
+- Replaced all hardcoded COLORS references with theme-aware colors
+- Maintained existing functionality while adding theme support
+- All components now respond to theme changes in real-time
+- Cleaned up debug logging for production use
+- Fixed brittle theme detection logic
+- ✅ Fixed server-side balance update logic - balance now increases $10 every 10 seconds
+- ✅ Research Center modal build button now properly enables when balance >= $50,000

@@ -2,6 +2,7 @@ import React, { forwardRef } from 'react';
 import { View, TextInput, StyleSheet, Keyboard } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { useTheme } from '../../context/ThemeContext';
 import { createThemeAwareStyleGuide } from '../../styles/theme';
 
 export interface KeyboardAwareInputProps {
@@ -42,7 +43,8 @@ export const KeyboardAwareInput = forwardRef<TextInput, KeyboardAwareInputProps>
     ref
   ) {
     const colors = useThemeColors();
-    const isLightMode = colors.background === '#F5F5DC'; // Check if light mode
+    const { themeMode } = useTheme();
+    const isLightMode = themeMode === 'light';
     const themeStyles = createThemeAwareStyleGuide(isLightMode);
 
     const handleSubmitEditing = () => {

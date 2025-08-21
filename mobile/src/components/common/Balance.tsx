@@ -2,7 +2,8 @@ import React, { memo, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useAppSelector } from '../../store/hooks';
 import { getCurrentBalance } from '../../store/slices/balanceSlice';
-import { SIZING, COLORS } from '../../styles/theme';
+import { SIZING } from '../../styles/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { useAppDispatch } from '../../store/hooks';
 import { setFinancialStatements } from '../../store/slices/uiSlice';
 
@@ -13,6 +14,7 @@ export function formatBalance(amount: number): string {
 }
 
 export const Balance = memo(() => {
+  const colors = useThemeColors();
   const balance = useAppSelector(getCurrentBalance);
   const dispatch = useAppDispatch();
   const [, setUpdateTrigger] = useState(0);
@@ -27,9 +29,9 @@ export const Balance = memo(() => {
   }, [balance]);
 
   return (
-    <TouchableOpacity style={styles.balanceContainer} onPress={() => dispatch(setFinancialStatements(true))} activeOpacity={0.8}>
-      <Text style={styles.balanceLabel}>WALLET:</Text>
-      <Text style={styles.balanceAmount}>${formatBalance(balance)}</Text>
+    <TouchableOpacity style={[styles.balanceContainer, { backgroundColor: colors.accent, borderColor: colors.primary }]} onPress={() => dispatch(setFinancialStatements(true))} activeOpacity={0.8}>
+      <Text style={[styles.balanceLabel, { color: colors.text.secondary }]}>WALLET:</Text>
+      <Text style={[styles.balanceAmount, { color: colors.matrix }]}>${formatBalance(balance)}</Text>
     </TouchableOpacity>
   );
 });
@@ -41,22 +43,18 @@ const styles = StyleSheet.create({
     left: SIZING.spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.accent,
     padding: SIZING.spacing.xs,
     paddingHorizontal: SIZING.spacing.sm,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: COLORS.primary,
     maxWidth: 180,
     zIndex: 9999,
   },
   balanceLabel: {
-    color: COLORS.text.secondary,
     marginRight: SIZING.spacing.xs,
     fontSize: SIZING.font.small,
   },
   balanceAmount: {
-    color: COLORS.matrix,
     fontSize: SIZING.font.small,
     fontWeight: 'bold',
   },

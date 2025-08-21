@@ -170,13 +170,6 @@ export const LoginScreen = () => {
   }, [clearFormError]);
 
   const renderLoginForm = () => {
-    console.log('DEBUG: Button background color being applied:', colors.buttonBg);
-    console.log('DEBUG: Is light mode:', colors.background === '#F5F5DC');
-    console.log('DEBUG: isSubmitDisabled:', isSubmitDisabled);
-    console.log('DEBUG: isLoading:', isLoading);
-    console.log('DEBUG: isFormValid:', isFormValid);
-    console.log('DEBUG: Form data:', formData);
-    
     return (
       <View style={styles.formContainer}>
         <AuthInputs

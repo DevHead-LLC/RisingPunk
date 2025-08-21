@@ -35,13 +35,11 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
 
   const toggleTheme = () => {
     const newMode = themeMode === 'dark' ? 'light' : 'dark';
-    console.log('Toggling theme from', themeMode, 'to', newMode);
     setThemeModeState(newMode);
     saveThemePreference(newMode);
   };
 
   const setThemeMode = (mode: ThemeMode) => {
-    console.log('Setting theme mode to:', mode);
     setThemeModeState(mode);
     saveThemePreference(mode);
   };

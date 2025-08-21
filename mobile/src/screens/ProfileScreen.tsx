@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { logout } from '../store/slices/authSlice';
 import { useGetProfileQuery } from '../store/api/authApi';
 import { useFetchBotStatsQuery } from '../store/api/botsApi';
-import { SIZING, COLORS } from '../styles/theme';
+import { SIZING } from '../styles/theme';
 import { useTheme } from '../context/ThemeContext';
 import { useThemeColors } from '../hooks/useThemeColors';
 
@@ -44,6 +44,328 @@ interface UserProfile {
 
 type TabType = 'profile' | 'settings';
 
+const createProfileStyles = (colors: any) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  mainLayout: {
+    flexDirection: 'row',
+    flex: 1,
+  },
+  leftSidebar: {
+    width: SIZING.spacing.md * 8,
+    backgroundColor: colors.background + '33',
+    paddingVertical: SIZING.spacing.md,
+    paddingRight: SIZING.spacing.sm,
+    borderRightWidth: 1,
+    borderRightColor: colors.text.primary + '1A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 0,
+  },
+  leftTab: {
+    paddingVertical: SIZING.spacing.sm,
+    paddingHorizontal: SIZING.spacing.xs,
+    alignItems: 'center',
+    marginBottom: SIZING.spacing.sm,
+    marginLeft: SIZING.spacing.sm,
+    borderRadius: 8,
+    minHeight: 40,
+    justifyContent: 'center',
+    width: '80%',
+  },
+  activeLeftTab: {
+    backgroundColor: colors.matrix + '1A',
+    borderWidth: 1,
+    borderColor: colors.matrix,
+  },
+  leftTabText: {
+    color: colors.text.primary + '99',
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    lineHeight: SIZING.font.small + 4,
+  },
+  activeLeftTabText: {
+    color: colors.matrix,
+    fontWeight: 'bold',
+  },
+  rightContent: {
+    flex: 1,
+    padding: SIZING.spacing.md,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: colors.matrix,
+    fontSize: SIZING.font.body,
+    marginTop: SIZING.spacing.md,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.error + '1A',
+    borderWidth: 1,
+    borderColor: colors.error,
+    borderRadius: 8,
+    margin: SIZING.spacing.lg,
+    padding: SIZING.spacing.lg,
+  },
+  errorText: {
+    color: colors.error,
+    fontSize: SIZING.font.body,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SIZING.spacing.lg,
+    paddingHorizontal: SIZING.spacing.sm,
+  },
+  usernameContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  username: {
+    color: colors.secondary,
+    fontSize: SIZING.font.h1,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  levelBadge: {
+    backgroundColor: colors.matrix + '1A',
+    borderWidth: 1,
+    borderColor: colors.matrix,
+    borderRadius: 8,
+    padding: SIZING.spacing.sm,
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  levelLabel: {
+    color: colors.text.secondary,
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.xs,
+  },
+  levelValue: {
+    color: colors.matrix,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
+  experienceSection: {
+    backgroundColor: colors.matrix + '1A',
+    borderWidth: 1,
+    borderColor: colors.matrix,
+    borderRadius: 8,
+    padding: SIZING.spacing.md,
+    marginBottom: SIZING.spacing.lg,
+    marginHorizontal: SIZING.spacing.sm,
+  },
+  expRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: SIZING.spacing.md,
+  },
+  expItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  expLabel: {
+    color: colors.text.secondary,
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.xs,
+  },
+  expValue: {
+    color: colors.text.primary,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
+  progressContainer: {
+    alignItems: 'center',
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: colors.background + '4D',
+    borderRadius: 4,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.matrix,
+    marginBottom: SIZING.spacing.sm,
+    width: '100%',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.matrix,
+    borderRadius: 4,
+  },
+  progressText: {
+    color: colors.matrix,
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+  },
+  botStatsSection: {
+    marginBottom: SIZING.spacing.lg,
+    marginHorizontal: SIZING.spacing.sm,
+  },
+  sectionTitle: {
+    color: colors.secondary,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.md,
+    textAlign: 'center',
+  },
+  botStatsGrid: {
+    gap: SIZING.spacing.md,
+  },
+  botStatCard: {
+    backgroundColor: colors.matrix + '1A',
+    borderWidth: 1,
+    borderColor: colors.matrix,
+    borderRadius: 8,
+    padding: SIZING.spacing.md,
+  },
+  botStatHeader: {
+    alignItems: 'center',
+    marginBottom: SIZING.spacing.md,
+  },
+  botType: {
+    color: colors.text.primary,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.xs,
+  },
+  botRole: {
+    color: colors.matrix,
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-around',
+    gap: SIZING.spacing.sm,
+  },
+  statItem: {
+    alignItems: 'center',
+    minWidth: 60,
+  },
+  statLabel: {
+    color: colors.text.secondary,
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.xs,
+  },
+  statValue: {
+    color: colors.matrix,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
+  featuresSection: {
+    marginBottom: SIZING.spacing.lg,
+    marginHorizontal: SIZING.spacing.sm,
+  },
+  featureItem: {
+    backgroundColor: colors.matrix + '1A',
+    borderWidth: 1,
+    borderColor: colors.matrix,
+    borderRadius: 8,
+    padding: SIZING.spacing.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  featureLabel: {
+    color: colors.text.primary,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
+  featureValue: {
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
+  disconnectButton: {
+    backgroundColor: colors.background + 'CC',
+    borderWidth: 2,
+    borderColor: colors.error,
+    borderRadius: 8,
+    paddingVertical: SIZING.spacing.md,
+    paddingHorizontal: SIZING.spacing.lg,
+    alignItems: 'center',
+    marginTop: SIZING.spacing.lg,
+    marginHorizontal: SIZING.spacing.md,
+  },
+  disconnectText: {
+    color: colors.error,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
+  settingsContainer: {
+    flex: 1,
+    padding: SIZING.spacing.md,
+  },
+  settingsTitle: {
+    color: colors.text.primary,
+    fontSize: SIZING.font.h2,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.lg,
+    textAlign: 'center',
+  },
+  settingCard: {
+    backgroundColor: colors.matrix + '1A',
+    borderWidth: 1,
+    borderColor: colors.matrix,
+    borderRadius: 8,
+    padding: SIZING.spacing.lg,
+    marginBottom: SIZING.spacing.md,
+  },
+  settingLabel: {
+    color: colors.text.primary,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.md,
+    textAlign: 'center',
+  },
+  themeToggle: {
+    alignItems: 'center',
+  },
+  themeToggleContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZING.spacing.md,
+  },
+  themeIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: colors.matrix + '1A',
+    borderWidth: 2,
+    borderColor: colors.matrix,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  themeIconContainerDark: {
+    backgroundColor: colors.text.primary,
+    borderColor: colors.text.primary,
+  },
+  themeIcon: {
+    fontSize: SIZING.font.large,
+  },
+  themeToggleText: {
+    color: colors.text.primary,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
+});
+
 export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
   const dispatch = useAppDispatch();
   const { token } = useAppSelector((state) => state.auth);
@@ -51,323 +373,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const { themeMode, toggleTheme } = useTheme();
   const colors = useThemeColors();
   
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    mainLayout: {
-      flexDirection: 'row',
-      flex: 1,
-    },
-    leftSidebar: {
-      width: SIZING.spacing.md * 8,
-      backgroundColor: 'rgba(0, 0, 0, 0.2)',
-      paddingVertical: SIZING.spacing.md,
-      paddingRight: SIZING.spacing.sm,
-      borderRightWidth: 1,
-      borderRightColor: 'rgba(255, 255, 255, 0.1)',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingTop: 0,
-    },
-    leftTab: {
-      paddingVertical: SIZING.spacing.sm,
-      paddingHorizontal: SIZING.spacing.xs,
-      alignItems: 'center',
-      marginBottom: SIZING.spacing.sm,
-      marginLeft: SIZING.spacing.sm,
-      borderRadius: 8,
-      minHeight: 40,
-      justifyContent: 'center',
-      width: '80%',
-    },
-    activeLeftTab: {
-      backgroundColor: 'rgba(0, 255, 65, 0.1)',
-      borderWidth: 1,
-      borderColor: colors.matrix,
-    },
-    leftTabText: {
-      color: 'rgba(255, 255, 255, 0.6)',
-      fontSize: SIZING.font.small,
-      fontWeight: 'bold',
-      textAlign: 'center',
-      lineHeight: SIZING.font.small + 4,
-    },
-    activeLeftTabText: {
-      color: colors.matrix,
-      fontWeight: 'bold',
-    },
-    rightContent: {
-      flex: 1,
-      padding: SIZING.spacing.md,
-    },
-    scrollView: {
-      flex: 1,
-    },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    loadingText: {
-      color: colors.matrix,
-      fontSize: SIZING.font.body,
-      marginTop: SIZING.spacing.md,
-    },
-    errorContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    errorText: {
-      color: colors.error,
-      fontSize: SIZING.font.body,
-    },
-    header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: SIZING.spacing.lg,
-      paddingHorizontal: SIZING.spacing.sm,
-    },
-    usernameContainer: {
-      flex: 1,
-      alignItems: 'center',
-    },
-    username: {
-      color: colors.secondary,
-      fontSize: SIZING.font.h1,
-      fontWeight: 'bold',
-      textAlign: 'center',
-    },
-    levelBadge: {
-      backgroundColor: 'rgba(0, 255, 65, 0.1)',
-      borderWidth: 1,
-      borderColor: colors.matrix,
-      borderRadius: 12,
-      paddingHorizontal: SIZING.spacing.md,
-      paddingVertical: SIZING.spacing.sm,
-    },
-    levelText: {
-      color: colors.text.primary,
-      fontSize: SIZING.font.small,
-      fontWeight: 'bold',
-    },
-    levelNumber: {
-      color: colors.matrix,
-      fontSize: SIZING.font.h2,
-      fontWeight: 'bold',
-    },
-    levelLabel: {
-      color: colors.text.primary,
-      fontSize: SIZING.font.small,
-      fontWeight: 'bold',
-      textAlign: 'center',
-    },
-    levelValue: {
-      color: colors.matrix,
-      fontSize: SIZING.font.h2,
-      fontWeight: 'bold',
-      textAlign: 'center',
-    },
-    experienceSection: {
-      borderWidth: 1,
-      borderColor: colors.matrix,
-      borderRadius: 8,
-      padding: SIZING.spacing.md,
-      marginBottom: SIZING.spacing.lg,
-    },
-    expRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginBottom: SIZING.spacing.md,
-    },
-    expItem: {
-      alignItems: 'center',
-      flex: 1,
-    },
-    expLabel: {
-      color: colors.text.secondary,
-      fontSize: SIZING.font.small,
-      marginBottom: SIZING.spacing.xs,
-    },
-    expValue: {
-      color: colors.matrix,
-      fontSize: SIZING.font.body,
-      fontWeight: 'bold',
-    },
-    progressContainer: {
-      alignItems: 'center',
-    },
-    progressBar: {
-      height: 8,
-      backgroundColor: 'rgba(0, 0, 0, 0.3)',
-      borderRadius: 4,
-      marginBottom: SIZING.spacing.sm,
-      width: '100%',
-    },
-    progressFill: {
-      height: '100%',
-      backgroundColor: colors.matrix,
-      borderRadius: 4,
-    },
-    progressText: {
-      color: colors.text.secondary,
-      fontSize: SIZING.font.small,
-      textAlign: 'center',
-    },
-    nextLevelText: {
-      color: colors.matrix,
-      fontSize: SIZING.font.body,
-      fontWeight: 'bold',
-      textAlign: 'center',
-    },
-    botStatsSection: {
-      marginBottom: SIZING.spacing.lg,
-    },
-    sectionTitle: {
-      color: colors.secondary,
-      fontSize: SIZING.font.h2,
-      fontWeight: 'bold',
-      marginBottom: SIZING.spacing.md,
-    },
-    botStatsGrid: {
-      gap: SIZING.spacing.sm,
-    },
-    botStatCard: {
-      borderWidth: 1,
-      borderColor: colors.matrix,
-      borderRadius: 8,
-      padding: SIZING.spacing.md,
-      marginBottom: SIZING.spacing.sm,
-    },
-    botStatHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: SIZING.spacing.sm,
-    },
-    botType: {
-      color: colors.matrix,
-      fontSize: SIZING.font.body,
-      fontWeight: 'bold',
-    },
-    botRole: {
-      color: colors.text.secondary,
-      fontSize: SIZING.font.small,
-      fontStyle: 'italic',
-    },
-    statsGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: SIZING.spacing.xs,
-    },
-    statItem: {
-      alignItems: 'center',
-      minWidth: 50,
-    },
-    statLabel: {
-      color: colors.text.primary,
-      fontSize: SIZING.font.small,
-      marginBottom: 2,
-    },
-    statValue: {
-      color: colors.matrix,
-      fontSize: SIZING.font.small,
-      fontWeight: 'bold',
-    },
-    featuresSection: {
-      marginBottom: SIZING.spacing.lg,
-    },
-    featureItem: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      borderWidth: 1,
-      borderColor: colors.matrix,
-      borderRadius: 8,
-      padding: SIZING.spacing.md,
-    },
-    featureLabel: {
-      color: colors.matrix,
-      fontSize: SIZING.font.body,
-      fontWeight: 'bold',
-    },
-    featureValue: {
-      fontSize: SIZING.font.small,
-      fontWeight: 'bold',
-    },
-    disconnectButton: {
-      backgroundColor: 'rgba(255, 0, 0, 0.1)',
-      borderWidth: 1,
-      borderColor: colors.error,
-      borderRadius: 8,
-      padding: SIZING.spacing.md,
-      alignItems: 'center',
-      marginTop: SIZING.spacing.lg,
-    },
-    disconnectText: {
-      color: colors.error,
-      fontSize: SIZING.font.body,
-      fontWeight: 'bold',
-    },
-    settingsContainer: {
-      flex: 1,
-      padding: SIZING.spacing.md,
-    },
-    settingsTitle: {
-      color: colors.text.primary,
-      fontSize: SIZING.font.h2,
-      fontWeight: 'bold',
-      marginBottom: SIZING.spacing.lg,
-      textAlign: 'center',
-    },
-    settingCard: {
-      borderWidth: 1,
-      borderColor: colors.matrix,
-      borderRadius: 8,
-      padding: SIZING.spacing.md,
-      marginBottom: SIZING.spacing.md,
-    },
-    settingLabel: {
-      color: colors.matrix,
-      fontSize: SIZING.font.body,
-      fontWeight: 'bold',
-      marginBottom: SIZING.spacing.md,
-    },
-    themeToggle: {
-      borderWidth: 1,
-      borderColor: colors.matrix,
-      borderRadius: 8,
-      padding: SIZING.spacing.md,
-    },
-    themeToggleContent: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    themeIconContainer: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    themeIcon: {
-      fontSize: SIZING.font.h2,
-    },
-    themeToggleText: {
-      color: colors.matrix,
-      fontSize: SIZING.font.body,
-      fontWeight: 'bold',
-    },
-    themeIconContainerDark: {
-      backgroundColor: 'rgba(0, 0, 0, 0.8)',
-      borderWidth: 2,
-      borderColor: '#000000',
-    },
-  });
+  const styles = useMemo(() => createProfileStyles(colors), [colors]);
   
   // Use existing working APIs - only when authenticated
   const { data: profileData, isLoading: profileLoading, error: profileError } = useGetProfileQuery(undefined, {
@@ -399,7 +405,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
       <SafeAreaView style={styles.container}>
         <CloseButton onPress={onClose} />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.accent} />
+          <ActivityIndicator size="large" color={colors.accent} />
           <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
       </SafeAreaView>
@@ -533,7 +539,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                 <Text style={styles.sectionTitle}>FEATURES</Text>
                 <View style={styles.featureItem}>
                   <Text style={styles.featureLabel}>HACK RIG</Text>
-                  <Text style={[styles.featureValue, { color: profile.unlockedFeatures.hackRig ? COLORS.accent : COLORS.text.secondary }]}>
+                  <Text style={[styles.featureValue, { color: profile.unlockedFeatures.hackRig ? colors.accent : colors.text.secondary }]}>
                     {profile.unlockedFeatures.hackRig ? 'UNLOCKED' : 'LOCKED'}
                   </Text>
                 </View>

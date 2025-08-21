@@ -8,7 +8,7 @@ import {HackMapScreen} from './HackMapScreen';
 import {BotAssemblyScreen} from './BotAssemblyScreen';
 import {ResearchScreen} from './ResearchScreen';
 
-import {COLORS} from '../styles/theme';
+import {useThemeColors} from '../hooks/useThemeColors';
 import {ProfileLocation} from '../components/turf/ProfileLocation';
 import {HomeLocation} from '../components/turf/HomeLocation';
 import {DigitalBarracksLocation} from '../components/turf/DigitalBarracksLocation';
@@ -20,13 +20,13 @@ import {useAppDispatch} from '../store/hooks';
 import {fetchInitialData} from '../store/slices/authSlice';
 import {mapApi} from '../store/api/mapApi';
 
-const DiagonalLines = memo(() => (
+const DiagonalLines = memo(({ colors }: { colors: any }) => (
   <>
-    <View style={styles.line1} />
-    <View style={styles.line2} />
-    <View style={styles.line3} />
-    <View style={styles.thickLine1} />
-    <View style={styles.thickLine2} />
+    <View style={[styles.line1, { backgroundColor: colors.matrix + '1A' }]} />
+    <View style={[styles.line2, { backgroundColor: colors.matrix + '14' }]} />
+    <View style={[styles.line3, { backgroundColor: colors.matrix + '1F' }]} />
+    <View style={[styles.thickLine1, { backgroundColor: colors.matrix + '0D' }]} />
+    <View style={[styles.thickLine2, { backgroundColor: colors.matrix + '08' }]} />
   </>
 ));
 
@@ -63,6 +63,7 @@ const ScrollViewMemo = memo(function ScrollViewMemo({
 });
 
 export function TurfScreen(): React.JSX.Element {
+  const colors = useThemeColors();
   const [currentScreen, setCurrentScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research'>('turf');
   const [battleId, setBattleId] = useState<string | null>(null);
   const [pendingNpcSlug, setPendingNpcSlug] = useState<string | null>(null);
@@ -185,15 +186,15 @@ export function TurfScreen(): React.JSX.Element {
         />;
       default:
         return (
-          <View style={styles.container}>
+          <View style={[styles.container, { backgroundColor: colors.background }]}>
             <ErrorBoundary>
               <Balance />
             </ErrorBoundary>
             <View style={styles.scrollWrapper}>
               <ScrollViewMemo horizontalScrollRef={horizontalScrollRef}>
-                <View style={styles.scrollContent}>
-                  <DiagonalLines />
-                  <View style={styles.digitalGround}>
+                <View style={[styles.scrollContent, { backgroundColor: colors.background, borderColor: colors.secondary + '99' }]}>
+                  <DiagonalLines colors={colors} />
+                  <View style={[styles.digitalGround, { backgroundColor: colors.matrix + '0D', borderColor: colors.matrix + '33' }]}>
                     <HomeLocation onPress={() => navigateToScreen('hackRig')} />
                     <DigitalBarracksLocation onPress={() => navigateToScreen('barracks')} />
                   </View>
@@ -205,7 +206,7 @@ export function TurfScreen(): React.JSX.Element {
           </View>
         );
     }
-  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd]);
+  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors]);
 
   return renderScreen();
 }
@@ -213,7 +214,6 @@ export function TurfScreen(): React.JSX.Element {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
     zIndex: 1,
   },
   turfGrid: {
@@ -241,9 +241,6 @@ const styles = StyleSheet.create({
     left: 700,
     width: 600,
     height: 220,
-    backgroundColor: 'rgba(0, 255, 65, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 255, 65, 0.2)',
     borderRadius: 8,
     zIndex: 1,
   },
@@ -255,9 +252,7 @@ const styles = StyleSheet.create({
     width: 2000,
     height: 2000,
     position: 'relative',
-    backgroundColor: COLORS.background,
     borderWidth: 3,
-    borderColor: 'rgba(71, 23, 246, 0.6)',
     borderRadius: 8,
   },
   gridBackground: {
@@ -267,14 +262,12 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     borderWidth: 1,
-    borderColor: COLORS.matrix,
     opacity: 0.1,
   },
   line1: {
     position: 'absolute',
     width: '200%',
     height: 1,
-    backgroundColor: 'rgba(0, 255, 65, 0.1)',
     transform: [{ rotate: '45deg' }],
     top: '20%',
     left: '-50%',
@@ -283,7 +276,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '200%',
     height: 1,
-    backgroundColor: 'rgba(0, 255, 65, 0.08)',
     transform: [{ rotate: '-30deg' }],
     top: '40%',
     left: '-50%',
@@ -292,7 +284,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '200%',
     height: 1,
-    backgroundColor: 'rgba(0, 255, 65, 0.12)',
     transform: [{ rotate: '15deg' }],
     top: '60%',
     left: '-50%',
@@ -301,7 +292,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '200%',
     height: 3,
-    backgroundColor: 'rgba(0, 255, 65, 0.05)',
     transform: [{ rotate: '-60deg' }],
     top: '30%',
     left: '-50%',
@@ -310,7 +300,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '200%',
     height: 4,
-    backgroundColor: 'rgba(0, 255, 65, 0.03)',
     transform: [{ rotate: '75deg' }],
     top: '70%',
     left: '-50%',

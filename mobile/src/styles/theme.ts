@@ -95,30 +95,6 @@ export const LIGHT_COLORS = {
   neutral: '#2E2E2E', // Darker neutral for better readability
 };
 
-// CSS Variables for Universal Use
-export const CSS_VARIABLES = {
-  // Background Colors
-  '--bg-primary': 'var(--theme-background)',
-  '--bg-secondary': 'var(--theme-accent)',
-  '--bg-input': 'var(--theme-inputBg)',
-  '--bg-button': 'var(--theme-buttonBg)',
-  
-  // Text Colors
-  '--text-primary': 'var(--theme-text-primary)',
-  '--text-secondary': 'var(--theme-text-secondary)',
-  '--text-accent': 'var(--theme-text-accent)',
-  '--text-placeholder': 'var(--theme-text-placeholder)',
-  
-  // Accent Colors
-  '--accent-primary': 'var(--theme-primary)',
-  '--accent-secondary': 'var(--theme-secondary)',
-  '--accent-matrix': 'var(--theme-matrix)',
-  
-  // Status Colors
-  '--status-error': 'var(--theme-error)',
-  '--status-neutral': 'var(--theme-neutral)',
-};
-
 export const COLORS = DARK_COLORS; // Default to dark theme for backward compatibility
 
 export const SIZING: ThemeSizing = {
