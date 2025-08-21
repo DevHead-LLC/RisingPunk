@@ -9,8 +9,8 @@ interface BuildCountdownTimerProps {
 
 export const BuildCountdownTimer: React.FC<BuildCountdownTimerProps> = ({ completesAt, onComplete }) => {
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-
+  const intervalRef = useRef<number | null>(null);
+ 
   useEffect(() => {
     const updateTimer = () => {
       const now = new Date().getTime();

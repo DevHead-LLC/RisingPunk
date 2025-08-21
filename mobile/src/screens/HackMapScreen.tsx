@@ -31,6 +31,159 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const colors = useThemeColors();
   const { themeMode } = useTheme();
 
+  // Memoize the styles object to prevent unnecessary re-renders
+  const memoizedStyles = useMemo(() => getStyles(colors, themeMode), [colors, themeMode]);
+  const styles = memoizedStyles;
+
+  const getTerrainIcon = (terrain: TerrainType) => {
+    switch (terrain) {
+      case 'water':
+        return <Text style={[styles.terrainSymbol, styles.waterSymbol]}>~</Text>;
+      case 'mountain':
+        return <Text style={[styles.terrainSymbol, styles.mountainSymbol]}>▲</Text>;
+      case 'forest':
+        return <Text style={[styles.terrainSymbol, styles.forestSymbol]}>♣</Text>;
+      case 'road':
+        return <Text style={[styles.terrainSymbol, styles.roadSymbol]}>≡</Text>;
+      case 'grass':
+        return null;
+      case 'dirt':
+        return null;
+      default:
+        return null;
+    }
+  };
+
+  const getTerrainStyle = (terrain: TerrainType) => {
+    switch (terrain) {
+      case 'water':
+        return styles.waterTerrain;
+      case 'mountain':
+        return styles.mountainTerrain;
+      case 'forest':
+        return styles.forestTerrain;
+      case 'road':
+        return styles.roadTerrain;
+      case 'grass':
+        return styles.grassTerrain;
+      case 'dirt':
+        return styles.dirtTerrain;
+      default:
+        return styles.plainTerrain;
+    }
+  };
+
+  const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles }) => {
+    const houseBgStyle = cell.entity === 'house'
+      ? (cell.owner === 'player'
+          ? (cell.name === currentUserHandle ? styles.userHouseBg : styles.otherUserHouseBg)
+          : styles.enemyHouseBg)
+      : null;
+    return (
+      <Pressable
+        style={[
+          styles.cell,
+          xStyle,
+          selected && styles.selectedCell,
+        ]}
+        onPress={() => onPress(x, y, cell)}
+      >
+        <View style={[styles.cellContent, terrainStyleMap[cell.terrain], houseBgStyle]}>
+          {cell.entity !== 'house' && getTerrainIcon(cell.terrain)}
+          {cell.entity === 'house' && (
+            <>
+              {cell.owner === 'player' ? (
+                <Image source={require('../assets/images/home.png')} style={styles.playerHomeIcon} resizeMode="contain" />
+              ) : (
+                <>
+                  {(() => {
+                    const slug = (cell as any).npcSlug as string | undefined;
+                    if (slug === 'npc-small-corporation') {
+                      return <Image source={require('../assets/images/fog-building.png')} style={styles.playerHomeIcon} resizeMode="contain" />;
+                    }
+                    // default for small bank and large corporation
+                    return <Image source={require('../assets/images/fog-tall-building.png')} style={styles.playerHomeIcon} resizeMode="contain" />;
+                  })()}
+                </>
+              )}
+              <View style={styles.entityLabelContainer} pointerEvents="none">
+                <Text
+                  style={[
+                    styles.entityLabel,
+                    cell.owner === 'player' ? styles.playerLabel : styles.enemyLabel,
+                  ]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {cell.name || (cell.owner === 'player' ? 'YOU' : 'NPC')}
+                </Text>
+              </View>
+              {/* NPC Level Indicator */}
+              {cell.owner !== 'player' && cell.npcLevel && (
+                <View style={styles.npcLevelContainer} pointerEvents="none">
+                  <Text style={styles.npcLevelText}>{cell.npcLevel}</Text>
+                </View>
+              )}
+            </>
+          )}
+        </View>
+      </Pressable>
+    );
+  });
+
+  const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles }) => {
+    return (
+      <View style={[yStyle]}>
+        <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} />
+      </View>
+    );
+  });
+
+  type RowProps = {
+    y: number;
+    row: CellData[] | undefined;
+    colStart: number;
+    colEnd: number;
+    rowVisible: boolean;
+    selectedCell: { x: number; y: number; info: CellData } | null;
+    onPress: (x: number, y: number, cell: CellData) => void;
+    rowStyle: any;
+    xPosStyles: Array<any>;
+    terrainStyleMap: Record<TerrainType, any>;
+    disableTiles?: boolean;
+    currentUserHandle?: string | null;
+    colors: ReturnType<typeof useThemeColors>;
+    themeMode: 'light' | 'dark';
+    styles: any;
+  };
+
+  const Row: React.FC<RowProps> = ({ y, row, colStart, colEnd, rowVisible, selectedCell, onPress, rowStyle, xPosStyles, terrainStyleMap, disableTiles, currentUserHandle, colors, themeMode, styles }) => {
+    // Always render the row container (grid shell), but only mount tiles when visible
+    if (!row) {
+      return <View style={[styles.row, rowStyle]} />;
+    }
+
+    if (disableTiles) {
+      return <View style={[styles.row, rowStyle]} />;
+    }
+
+    const tiles = rowVisible
+      ? Array.from({ length: colEnd - colStart + 1 }).map((_, offset) => {
+          const x = colStart + offset;
+          const cell = row[x];
+          if (!cell) return null;
+          const isSelected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
+          return <Tile key={`${x}-${y}`} x={x} y={y} cell={cell} selected={isSelected} onPress={onPress} xStyle={xPosStyles[x]} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} />;
+        })
+      : null;
+
+    return (
+      <View style={[styles.row, rowStyle]}>
+        {tiles}
+      </View>
+    );
+  };
+
   const [selectedCell, setSelectedCell] = useState<{x: number, y: number, info: CellData} | null>(null);
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
@@ -41,31 +194,138 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const minY = useSharedValue(-1000000);
   const maxY = useSharedValue(1000000);
   const boundsReady = useSharedValue(false);
-  const currentPanRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  const computeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialDims = Dimensions.get('window');
   const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: initialDims.width, height: initialDims.height });
   const [windowRange, setWindowRange] = useState<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>({ rowStart: 0, rowEnd: Math.min(14, (grid.length || 50) - 1), colStart: 0, colEnd: Math.min(14, (grid.length || 50) - 1) });
+  const [isMapReady, setIsMapReady] = useState<boolean>(false);
+  
+  // Static vs Dynamic Data Separation
+  const [staticTerrainData, setStaticTerrainData] = useState<Record<string, TerrainType>>({});
+  const [dynamicEntityData, setDynamicEntityData] = useState<Record<string, any>>({});
+  const [terrainDataLoaded, setTerrainDataLoaded] = useState<boolean>(false);
+  
+  // Phase 7A: Virtual Scrolling - Only render visible tiles
+  const [virtualViewport, setVirtualViewport] = useState<{ 
+    visibleTiles: Set<string>; 
+    renderCount: number; 
+    totalTiles: number 
+  }>({ visibleTiles: new Set(), renderCount: 0, totalTiles: 0 });
+  
   const lastVelocityRef = useRef<{ vx: number; vy: number }>({ vx: 0, vy: 0 });
   const rafIdRef = useRef<number | null>(null);
   const lastComputedPanRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const lastComputeTsRef = useRef<number>(0);
   const hasCenteredOnHomeRef = useRef<boolean>(false);
-  // Restore pan position if provided (initialized after computeWindow definition)
-  const updateCurrentPan = (x: number, y: number) => {
-    currentPanRef.current = { x, y };
-  };
+  const isPanningRef = useRef<boolean>(false);
+  const panStartTimeRef = useRef<number>(0);
+  const panEndTimeRef = useRef<number>(0);
+  
+  // Convert refs to shared values to prevent worklet capture warnings
+  const lastVelocity = useSharedValue<{ vx: number; vy: number }>({ vx: 0, vy: 0 });
+  const rafId = useSharedValue<number | null>(null);
+  const lastComputedPan = useSharedValue<{ x: number; y: number }>({ x: 0, y: 0 });
+  const lastComputeTs = useSharedValue<number>(0);
+  const hasCenteredOnHome = useSharedValue<boolean>(false);
+  const isPanning = useSharedValue<boolean>(false);
+  const panStartTime = useSharedValue<number>(0);
+  const panEndTime = useSharedValue<number>(0);
+  
+  // Check if panning is truly complete (no more decay animation)
+  const isPanningComplete = useCallback(() => {
+    const timeSincePanEnd = Date.now() - panEndTime.value;
+    const velocityThreshold = 0.1; // Very small velocity threshold
+    
+    // Consider panning complete if:
+    // 1. We're not actively panning AND
+    // 2. It's been more than 100ms since pan end AND
+    // 3. Current velocity is very low
+    const complete = !isPanning.value && 
+           timeSincePanEnd > 100 && 
+           Math.abs(lastVelocity.value.vx) < velocityThreshold && 
+           Math.abs(lastVelocity.value.vy) < velocityThreshold;
+    
+    // Debug log for pan completion status
+    if (complete && timeSincePanEnd > 200) { // Only log occasionally
+      console.log('[Map] Panning complete - ready for immediate interaction');
+    }
+    
+    return complete;
+  }, []);
+
+  // NOTE: If you're still getting "Reading from 'value' during component render" warnings,
+  // you can temporarily disable strict mode in Reanimated config to test functionality.
+  // See: https://docs.swmansion.com/react-native-reanimated/docs/debugging/logger-configuration
 
   const scheduleCompute = (x: number, y: number, vx: number = 0, vy: number = 0) => {
     // Update last known velocity on JS thread (safe)
-    lastVelocityRef.current = { vx, vy };
-    if (computeDebounceRef.current) {
-      clearTimeout(computeDebounceRef.current);
+    lastVelocity.value = { vx, vy };
+    
+    // Use requestAnimationFrame instead of setTimeout for better performance
+    if (rafId.value) {
+      cancelAnimationFrame(rafId.value);
     }
-    computeDebounceRef.current = setTimeout(() => {
+    rafId.value = requestAnimationFrame(() => {
       computeWindow(x, y, containerSize.width, containerSize.height);
-    }, 40);
+      rafId.value = null;
+    });
   };
+
+  // Force pan completion when needed (e.g., for immediate interaction)
+  const forcePanCompletion = useCallback(() => {
+    if (isPanning.value) {
+      // Stop any ongoing pan gesture
+      isPanning.value = false;
+      panEndTime.value = Date.now();
+      
+      // Reset velocity to stop decay animation
+      lastVelocity.value = { vx: 0, vy: 0 };
+      
+      // Force immediate window compute
+      const currentX = lastComputedPan.value.x;
+      const currentY = lastComputedPan.value.y;
+      scheduleCompute(currentX, currentY, 0, 0);
+    }
+  }, []);
+
+  // Phase 7A: Virtual Scrolling - Calculate which tiles are actually visible
+  const calculateVirtualViewport = useCallback((panX: number, panY: number, width: number, height: number) => {
+    if (width <= 0 || height <= 0) return;
+    
+    // Calculate the exact visible area in grid coordinates
+    const gridLeft = panX + MARGIN_SIZE;
+    const gridTop = panY + MARGIN_SIZE;
+    
+    // Convert screen coordinates to grid coordinates
+    const startCol = Math.floor((-gridLeft) / CELL_SIZE);
+    const endCol = Math.ceil((width - gridLeft) / CELL_SIZE);
+    const startRow = Math.floor((-gridTop) / CELL_SIZE);
+    const endRow = Math.ceil((height - gridTop) / CELL_SIZE);
+    
+    // Clamp to grid bounds
+    const gridSize = grid.length || 50;
+    const clampedStartCol = Math.max(0, startCol);
+    const clampedEndCol = Math.min(gridSize - 1, endCol);
+    const clampedStartRow = Math.max(0, startRow);
+    const clampedEndRow = Math.min(gridSize - 1, endRow);
+    
+    // Generate visible tile keys (only what's actually on screen)
+    const visibleTiles = new Set<string>();
+    for (let y = clampedStartRow; y <= clampedEndRow; y++) {
+      for (let x = clampedStartCol; x <= clampedEndCol; x++) {
+        visibleTiles.add(`${x},${y}`);
+      }
+    }
+    
+    // Update virtual viewport state
+    const totalTiles = (clampedEndRow - clampedStartRow + 1) * (clampedEndCol - clampedStartCol + 1);
+    setVirtualViewport(prev => ({
+      visibleTiles,
+      renderCount: visibleTiles.size,
+      totalTiles
+    }));
+    
+    console.log(`[Map] Phase 7A: Virtual viewport calculated - ${visibleTiles.size} tiles visible out of ${totalTiles} total`);
+  }, [grid]);
 
   const animatedMapStyle = useAnimatedStyle(() => {
     const tx = boundsReady.value
@@ -83,13 +343,21 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   });
 
   useAnimatedReaction(
-    () => ({ x: offsetX.value, y: offsetY.value }),
+    () => {
+      // Phase 7A: Fix Reanimated warning by creating new objects instead of modifying shared ones
+      return { x: offsetX.value, y: offsetY.value };
+    },
     (v, prev) => {
-      if (!prev || Math.abs(v.x - prev.x) > 6 || Math.abs(v.y - prev.y) > 6) {
+      // Only react to significant changes and when actively panning
+      if (!prev || Math.abs(v.x - prev.x) > 4 || Math.abs(v.y - prev.y) > 4) {
         const cx = boundsReady.value ? Math.min(maxX.value, Math.max(minX.value, v.x)) : v.x;
         const cy = boundsReady.value ? Math.min(maxY.value, Math.max(minY.value, v.y)) : v.y;
+        
+        // Update shared values directly instead of calling functions that access refs
+        lastComputedPan.value = { x: cx, y: cy };
+        
+        // Schedule compute using runOnJS but with minimal ref access
         runOnJS(scheduleCompute)(cx, cy, 0, 0);
-        runOnJS(updateCurrentPan)(cx, cy);
       }
     }
   );
@@ -98,6 +366,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     .onStart(() => {
       startX.value = offsetX.value;
       startY.value = offsetY.value;
+      isPanning.value = true;
+      panStartTime.value = Date.now();
     })
     .onUpdate((g) => {
       let x = startX.value + g.translationX;
@@ -108,82 +378,201 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       }
       offsetX.value = x;
       offsetY.value = y;
+      
+      // Update shared values directly instead of calling functions that access refs
+      lastComputedPan.value = { x, y };
+      
       // Schedule JS-side window compute so tiles load beyond current view
-      // @ts-ignore runOnJS bridge
       runOnJS(scheduleCompute)(x, y, g.velocityX ?? 0, g.velocityY ?? 0);
-      // Keep JS ref in sync with UI pan so pendingMapPan is accurate
-      // @ts-ignore
-      runOnJS(updateCurrentPan)(x, y);
     })
     .onEnd((g) => {
+      // Mark panning as ended
+      isPanning.value = false;
+      panEndTime.value = Date.now();
+      
       if (boundsReady.value) {
-        offsetX.value = withDecay({ velocity: g.velocityX, deceleration: 0.997, clamp: [minX.value, maxX.value] } as any);
-        offsetY.value = withDecay({ velocity: g.velocityY, deceleration: 0.997, clamp: [minY.value, maxY.value] } as any);
+        // Reduce decay animation duration for faster completion
+        offsetX.value = withDecay({ 
+          velocity: g.velocityX, 
+          deceleration: 0.95, // Increased from 0.997 for faster stop
+          clamp: [minX.value, maxX.value] 
+        } as any);
+        offsetY.value = withDecay({ 
+          velocity: g.velocityY, 
+          deceleration: 0.95, // Increased from 0.997 for faster stop
+          clamp: [minY.value, maxY.value] 
+        } as any);
       } else {
-        offsetX.value = withDecay({ velocity: g.velocityX, deceleration: 0.997 });
-        offsetY.value = withDecay({ velocity: g.velocityY, deceleration: 0.997 });
+        offsetX.value = withDecay({ velocity: g.velocityX, deceleration: 0.95 });
+        offsetY.value = withDecay({ velocity: g.velocityY, deceleration: 0.95 });
       }
-      const x = startX.value + (g.translationX ?? 0);
-      const y = startY.value + (g.translationY ?? 0);
-      const fx = boundsReady.value ? Math.min(maxX.value, Math.max(minX.value, x)) : x;
-      const fy = boundsReady.value ? Math.min(maxY.value, Math.max(minY.value, y)) : y;
-      runOnJS(scheduleCompute)(fx, fy, g.velocityX ?? 0, g.velocityY ?? 0);
-      runOnJS(updateCurrentPan)(fx, fy);
+      
+      // Single final compute on pan end - no duplicate calls
+      const finalX = boundsReady.value ? Math.min(maxX.value, Math.max(minX.value, startX.value + (g.translationX ?? 0))) : startX.value + (g.translationX ?? 0);
+      const finalY = boundsReady.value ? Math.min(maxY.value, Math.max(minY.value, startY.value + (g.translationY ?? 0))) : startY.value + (g.translationY ?? 0);
+      
+      // Use requestAnimationFrame for smoother final positioning
+      requestAnimationFrame(() => {
+        runOnJS(scheduleCompute)(finalX, finalY, 0, 0);
+        // Update shared value directly instead of calling function that accesses refs
+        lastComputedPan.value = { x: finalX, y: finalY };
+      });
     });
   const gridSize = grid.length || 50;
   const totalSize = gridSize * CELL_SIZE;
   const { data: mapData, isLoading, refetch } = useFetchMapQuery();
 
   // Precompute terrain style map and position style caches
-  const terrainStyleMap = useMemo(() => ({
-    water: getStyles(colors, themeMode).waterTerrain,
-    mountain: getStyles(colors, themeMode).mountainTerrain,
-    forest: getStyles(colors, themeMode).forestTerrain,
-    road: getStyles(colors, themeMode).roadTerrain,
-    grass: getStyles(colors, themeMode).grassTerrain,
-    dirt: getStyles(colors, themeMode).dirtTerrain,
-    plain: getStyles(colors, themeMode).plainTerrain,
-  } as Record<TerrainType, any>), [colors, themeMode]);
+  // Memoized with stable references to prevent unnecessary re-renders
+  const terrainStyleMap = useMemo(() => {
+    const styles = {
+      water: getTerrainStyle('water'),
+      mountain: getTerrainStyle('mountain'),
+      forest: getTerrainStyle('forest'),
+      road: getTerrainStyle('road'),
+      grass: getTerrainStyle('grass'),
+      dirt: getTerrainStyle('dirt'),
+      plain: getTerrainStyle('plain'),
+    };
+    return styles;
+  }, [colors, themeMode]) as Record<TerrainType, any>;
 
-  const xPosStyles = useMemo(() => {
-    return Array.from({ length: gridSize }, (_, x) => ({ position: 'absolute', left: x * CELL_SIZE, top: 0 }));
-  }, [gridSize]);
+  const xPosStyles = useMemo(() => 
+    Array.from({ length: gridSize }, (_, x) => ({ position: 'absolute' as const, left: x * CELL_SIZE, top: 0 })), 
+    [gridSize]
+  );
 
-  const rowPosStyles = useMemo(() => {
-    return Array.from({ length: gridSize }, (_, y) => ({ position: 'absolute', top: y * CELL_SIZE, left: 0 }));
-  }, [gridSize]);
+  const rowPosStyles = useMemo(() => 
+    Array.from({ length: gridSize }, (_, y) => ({ position: 'absolute' as const, top: y * CELL_SIZE, left: 0 })), 
+    [gridSize]
+  );
 
-  const yPosStyles = useMemo(() => {
-    return Array.from({ length: gridSize }, (_, y) => ({ position: 'absolute', top: y * CELL_SIZE }));
-  }, [gridSize]);
+  const yPosStyles = useMemo(() => 
+    Array.from({ length: gridSize }, (_, y) => ({ position: 'absolute' as const, top: y * CELL_SIZE })), 
+    [gridSize]
+  );
 
   const visibleCells = useMemo(() => {
-    const cells: Array<{ x: number; y: number; cell: CellData; selected: boolean }> = [];
-    for (let y = windowRange.rowStart; y <= windowRange.rowEnd; y++) {
-      const row = grid[y];
-      if (!row) continue;
-      for (let x = windowRange.colStart; x <= windowRange.colEnd; x++) {
-        const cell = row[x];
-        if (!cell) continue;
-        const selected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
-        cells.push({ x, y, cell, selected });
+    const cells: Array<{ x: number; y: number; cell: CellData }> = [];
+    
+    // Only compute if terrain data is loaded
+    if (!terrainDataLoaded) return cells;
+    
+    // Phase 7A: Virtual Scrolling - Only render tiles that are actually visible
+    if (virtualViewport.visibleTiles.size > 0) {
+      // Use virtual viewport for ultra-efficient rendering
+      virtualViewport.visibleTiles.forEach(tileKey => {
+        const [x, y] = tileKey.split(',').map(Number);
+        const terrain = staticTerrainData[tileKey];
+        const entity = dynamicEntityData[tileKey];
+        
+        if (!terrain) return;
+        
+        // Create cell data by combining static terrain with dynamic entities
+        const cell: CellData = {
+          terrain,
+          entity: entity?.entity || 'empty',
+          owner: entity?.owner,
+          name: entity?.name,
+          userId: entity?.userId,
+          npcSlug: entity?.npcSlug,
+          npcInstanceId: entity?.npcInstanceId,
+          npcLevel: entity?.npcLevel,
+        } as any;
+        
+        cells.push({ x, y, cell });
+      });
+      
+      console.log(`[Map] Phase 7A: Virtual scrolling active - rendering ${cells.length} tiles instead of ${(windowRange.rowEnd - windowRange.rowStart + 1) * (windowRange.colEnd - windowRange.colStart + 1)}`);
+    } else {
+      // Fallback to original logic if virtual viewport not ready
+      for (let y = windowRange.rowStart; y <= windowRange.rowEnd; y++) {
+        for (let x = windowRange.colStart; x <= windowRange.colEnd; x++) {
+          const key = `${x},${y}`;
+          const terrain = staticTerrainData[key];
+          const entity = dynamicEntityData[key];
+          
+          if (!terrain) continue;
+          
+          // Create cell data by combining static terrain with dynamic entities
+          const cell: CellData = {
+            terrain,
+            entity: entity?.entity || 'empty',
+            owner: entity?.owner,
+            name: entity?.name,
+            userId: entity?.userId,
+            npcSlug: entity?.npcSlug,
+            npcInstanceId: entity?.npcInstanceId,
+            npcLevel: entity?.npcLevel,
+          } as any;
+          
+          cells.push({ x, y, cell });
+        }
       }
     }
+    
     return cells;
-  }, [grid, windowRange, selectedCell]);
+  }, [virtualViewport.visibleTiles, virtualViewport.visibleTiles.size, windowRange.rowStart, windowRange.rowEnd, windowRange.colStart, windowRange.colEnd, staticTerrainData, dynamicEntityData, terrainDataLoaded]);
 
-  const [poolSize, setPoolSize] = useState<number>(0);
-  useEffect(() => {
-    setPoolSize(prev => Math.max(prev, visibleCells.length));
-  }, [visibleCells.length]);
+
+
+  // Separate static terrain data from dynamic entity data for optimal loading
+  const separateStaticAndDynamicData = useCallback((gridData: any[][]) => {
+    const terrain: Record<string, TerrainType> = {};
+    const entities: Record<string, any> = {};
+    
+    for (let y = 0; y < gridData.length; y++) {
+      const row = gridData[y];
+      if (!row) continue;
+      for (let x = 0; x < row.length; x++) {
+        const cell = row[x];
+        if (!cell) continue;
+        
+        const key = `${x},${y}`;
+        
+        // Terrain is static - load once and cache
+        terrain[key] = cell.terrain;
+        
+        // Entities are dynamic - only load what's needed
+        if (cell.entity !== 'empty') {
+          entities[key] = {
+            entity: cell.entity,
+            owner: cell.owner,
+            name: cell.name,
+            userId: cell.userId,
+            npcSlug: cell.npcSlug,
+            npcInstanceId: cell.npcInstanceId,
+            npcLevel: cell.npcLevel,
+          };
+        }
+      }
+    }
+    
+    return { terrain, entities };
+  }, []);
 
   useEffect(() => {
     dispatch(setLoading(isLoading));
     if (mapData && mapData.grid) {
       console.log('[Map] Updating grid with fresh data from server');
+      
+      // Separate static and dynamic data
+      const { terrain, entities } = separateStaticAndDynamicData(mapData.grid);
+      setStaticTerrainData(terrain);
+      setDynamicEntityData(entities);
+      setTerrainDataLoaded(true);
+      
       dispatch(setGrid(mapData.grid));
     }
-  }, [mapData, isLoading, dispatch]);
+  }, [mapData, isLoading, dispatch, separateStaticAndDynamicData]);
+
+  // Update only dynamic entity data (NPCs, houses, etc.) without full grid refresh
+  const updateEntityData = useCallback((updates: Record<string, any>) => {
+    setDynamicEntityData(prev => ({
+      ...prev,
+      ...updates
+    }));
+  }, []);
 
   // Force refresh map data when returning from battle to ensure NPCs are updated
   useEffect(() => {
@@ -195,53 +584,49 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
   const computeWindow = useCallback((panX: number, panY: number, width: number, height: number) => {
     if (width <= 0 || height <= 0) {return;}
+    
+    // Reduce throttle from 40ms to 16ms for 60fps responsiveness
     const now = Date.now();
-    if (now - lastComputeTsRef.current < 40) {return;} // time-based throttle (~25 fps)
-    lastComputeTsRef.current = now;
+    if (now - lastComputeTs.value < 16) {return;} // 60fps throttle
+    lastComputeTs.value = now;
+    
     // Skip tiny pan changes to reduce churn
-    const lx = lastComputedPanRef.current.x;
-    const ly = lastComputedPanRef.current.y;
-    if (Math.abs(panX - lx) < 8 && Math.abs(panY - ly) < 8) {
+    const lx = lastComputedPan.value.x;
+    const ly = lastComputedPan.value.y;
+    if (Math.abs(panX - lx) < 4 && Math.abs(panY - ly) < 4) { // Reduced from 8 to 4 for precision
       return;
     }
-    lastComputedPanRef.current = { x: panX, y: panY };
-    const baseBuffer = 12;
-    const vx = lastVelocityRef.current.vx || 0;
-    const vy = lastVelocityRef.current.vy || 0;
-    const leadX = Math.min(20, Math.ceil(Math.abs(vx) * 14));
-    const leadY = Math.min(20, Math.ceil(Math.abs(vy) * 14));
-    const dirX = vx === 0 ? 0 : (vx > 0 ? 1 : -1);
-    const dirY = vy === 0 ? 0 : (vy > 0 ? 1 : -1);
-    const leftBuffer = baseBuffer + (dirX < 0 ? leadX : Math.floor(leadX * 0.25));
-    const rightBuffer = baseBuffer + (dirX > 0 ? leadX : Math.floor(leadX * 0.25));
-    const upBuffer = baseBuffer + (dirY < 0 ? leadY : Math.floor(leadY * 0.25));
-    const downBuffer = baseBuffer + (dirY > 0 ? leadY : Math.floor(leadY * 0.25));
+    lastComputedPan.value = { x: panX, y: panY };
+    
+    // Phase 7A: Virtual Scrolling - Calculate exact visible tiles (no buffer)
+    calculateVirtualViewport(panX, panY, width, height);
+    
+    // Simplified buffer calculation - removed complex velocity math
+    const baseBuffer = 8; // Reduced from 12 for better performance
     const gridLeft = panX + MARGIN_SIZE;
     const gridTop = panY + MARGIN_SIZE;
     const baseStartCol = Math.floor((-gridLeft) / CELL_SIZE);
     const baseEndCol = Math.ceil((width - gridLeft) / CELL_SIZE);
     const baseStartRow = Math.floor((-gridTop) / CELL_SIZE);
     const baseEndRow = Math.ceil((height - gridTop) / CELL_SIZE);
-    const startCol = Math.max(0, baseStartCol - leftBuffer);
-    const endCol = Math.min(gridSize - 1, baseEndCol + rightBuffer);
-    const startRow = Math.max(0, baseStartRow - upBuffer);
-    const endRow = Math.min(gridSize - 1, baseEndRow + downBuffer);
-    const cols = Math.max(0, endCol - startCol + 1);
-    const rows = Math.max(0, endRow - startRow + 1);
-    const expected = Math.ceil(cols * rows * 1.2);
-    setPoolSize(prev => (expected > prev + 50 ? expected : prev));
+    const startCol = Math.max(0, baseStartCol - baseBuffer);
+    const endCol = Math.min(gridSize - 1, baseEndCol + baseBuffer);
+    const startRow = Math.max(0, baseStartRow - baseBuffer);
+    const endRow = Math.min(gridSize - 1, baseEndRow + baseBuffer);
+    
     setWindowRange(prev => {
       const same = prev.rowStart === startRow && prev.rowEnd === endRow && prev.colStart === startCol && prev.colEnd === endCol;
       if (same) return prev;
+      // Reduced small shift threshold from 2 to 1 for more responsive updates
       const smallShift =
-        Math.abs(prev.rowStart - startRow) < 2 &&
-        Math.abs(prev.rowEnd - endRow) < 2 &&
-        Math.abs(prev.colStart - startCol) < 2 &&
-        Math.abs(prev.colEnd - endCol) < 2;
-      if (smallShift) return prev; // require at least 2-cell change to update
+        Math.abs(prev.rowStart - startRow) < 1 &&
+        Math.abs(prev.rowEnd - endRow) < 1 &&
+        Math.abs(prev.colStart - startCol) < 1 &&
+        Math.abs(prev.colEnd - endCol) < 1;
+      if (smallShift) return prev;
       return { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
     });
-  }, [gridSize]);
+  }, [gridSize, calculateVirtualViewport]);
 
   // Restore pan position if provided (now safe, computeWindow is defined)
   useEffect(() => {
@@ -273,33 +658,47 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       
       offsetX.value = clampedX;
       offsetY.value = clampedY;
-      currentPanRef.current = { x: clampedX, y: clampedY };
+      lastComputedPan.value = { x: clampedX, y: clampedY };
       requestAnimationFrame(() => {
         computeWindow(clampedX, clampedY, containerSize.width, containerSize.height);
       });
     }
-  }, [restorePan, containerSize.width, containerSize.height, computeWindow, offsetX, offsetY, maxX, maxY, boundsReady, grid]);
+  }, [restorePan, containerSize.width, containerSize.height, computeWindow, offsetX, offsetY, maxX, maxY, grid]);
 
   useEffect(() => {
-    // Initial compute on mount and when container changes
-    computeWindow(currentPanRef.current.x, currentPanRef.current.y, containerSize.width, containerSize.height);
-    return () => {
-      if (rafIdRef.current != null) {
-        cancelAnimationFrame(rafIdRef.current);
-        rafIdRef.current = null;
-      }
-      if (computeDebounceRef.current) {
-        clearTimeout(computeDebounceRef.current);
-        computeDebounceRef.current = null;
-      }
-    };
+    // Only compute initial window after bounds are ready and container is set
+    if (containerSize.width > 0 && containerSize.height > 0) {
+      // Use a ref to track if we've done initial compute to avoid Reanimated warnings
+      const checkBoundsAndCompute = () => {
+        if (boundsReady.value) {
+          computeWindow(lastComputedPan.value.x, lastComputedPan.value.y, containerSize.width, containerSize.height);
+        }
+      };
+      
+      // Check immediately and also set up a small delay to ensure bounds are set
+      checkBoundsAndCompute();
+      const timeoutId = setTimeout(() => {
+        checkBoundsAndCompute();
+        setIsMapReady(true); // Mark map as ready after initial compute
+      }, 100);
+      
+      return () => {
+        clearTimeout(timeoutId);
+        if (rafId.value != null) {
+          cancelAnimationFrame(rafId.value);
+          rafId.value = null;
+        }
+        // Reset pan state on cleanup
+        isPanning.value = false;
+      };
+    }
   }, [containerSize.width, containerSize.height, computeWindow]);
 
   const onContainerLayout = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     setContainerSize({ width, height });
-    computeWindow(currentPanRef.current.x, currentPanRef.current.y, width, height);
-  }, [computeWindow]);
+    // Don't call computeWindow here - let the useEffect handle it after bounds are ready
+  }, []);
 
   useEffect(() => {
     if (containerSize.width > 0 && containerSize.height > 0) {
@@ -315,15 +714,15 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       maxY.value = bounds.maxY;
       boundsReady.value = true;
       const clamped = {
-        x: Math.min(bounds.maxX, Math.max(bounds.minX, currentPanRef.current.x)),
-        y: Math.min(bounds.maxY, Math.max(bounds.minY, currentPanRef.current.y)),
+        x: Math.min(bounds.maxX, Math.max(bounds.minX, lastComputedPan.value.x)),
+        y: Math.min(bounds.maxY, Math.max(bounds.minY, lastComputedPan.value.y)),
       };
       offsetX.value = clamped.x;
       offsetY.value = clamped.y;
-      currentPanRef.current = clamped;
+      lastComputedPan.value = clamped;
       computeWindow(clamped.x, clamped.y, containerSize.width, containerSize.height);
       // Bounds are now set; attempt centering on user's home
-      if (!restorePan && !hasCenteredOnHomeRef.current && currentUserHandle) {
+      if (!restorePan && !hasCenteredOnHome.value && currentUserHandle) {
         // Inline center-on-home logic to avoid using computeWindow before declaration
         const size = grid.length;
         if (size) {
@@ -347,10 +746,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             const cy = Math.min(maxY.value, Math.max(minY.value, targetY));
             offsetX.value = cx;
             offsetY.value = cy;
-            currentPanRef.current = { x: cx, y: cy };
-            // Safe to call computeWindow here as it's declared earlier
+            lastComputedPan.value = { x: cx, y: cy };
             computeWindow(cx, cy, containerSize.width, containerSize.height);
-            hasCenteredOnHomeRef.current = true;
+            hasCenteredOnHome.value = true;
           }
         }
       }
@@ -361,7 +759,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   useEffect(() => {
     if (!boundsReady.value) return;
     if (restorePan) return; // respect return-from-battle view
-    if (hasCenteredOnHomeRef.current) return;
+    if (hasCenteredOnHome.value) return;
     if (!currentUserHandle) return;
     const size = grid.length;
     if (!size) return;
@@ -385,53 +783,55 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     const cy = Math.min(maxY.value, Math.max(minY.value, targetY));
     offsetX.value = cx;
     offsetY.value = cy;
-    currentPanRef.current = { x: cx, y: cy };
+    lastComputedPan.value = { x: cx, y: cy };
     computeWindow(cx, cy, containerSize.width, containerSize.height);
-    hasCenteredOnHomeRef.current = true;
+    hasCenteredOnHome.value = true;
   }, [grid, currentUserHandle, restorePan, containerSize.width, containerSize.height, minX, maxX, boundsReady, computeWindow, offsetX, offsetY]);
 
-  const handleCellPress = (x: number, y: number, cellData: CellData) => {
+  const handleCellPress = useCallback((x: number, y: number, cellData: CellData) => {
+    // Allow clicking even while panning - this provides immediate feedback
+    // The modal will still work, and the pan will continue if user keeps dragging
     setSelectedCell({x, y, info: cellData});
-  };
+  }, []);
 
-  const renderLegend = () => null;
 
-  const renderInfoPanel = () => {
+
+  const renderInfoPanel = useCallback(() => {
     if (!selectedCell) {return null;}
 
     return (
-      <View style={getStyles(colors, themeMode).infoPanel}>
+      <View style={styles.infoPanel}>
         <Pressable
-          style={getStyles(colors, themeMode).infoPanelClose}
+          style={styles.infoPanelClose}
           onPress={() => setSelectedCell(null)}
         >
-          <Text style={getStyles(colors, themeMode).closeSymbol}>×</Text>
+          <Text style={styles.closeSymbol}>×</Text>
         </Pressable>
-        <Text style={getStyles(colors, themeMode).coordsText}>
+        <Text style={styles.coordsText}>
           GRID: ({selectedCell.x}, {selectedCell.y})
         </Text>
-        <Text style={getStyles(colors, themeMode).terrainText}>
+        <Text style={styles.terrainText}>
           TERRAIN: {selectedCell.info.terrain.toUpperCase()}
         </Text>
         {selectedCell.info.entity !== 'empty' && (
           <>
-            <Text style={getStyles(colors, themeMode).entityText}>
+            <Text style={styles.entityText}>
               ENTITY: {selectedCell.info.name || 'UNKNOWN'}
             </Text>
             {selectedCell.info.owner !== 'player' && selectedCell.info.npcLevel && (
-              <Text style={getStyles(colors, themeMode).npcLevelModalText}>
+              <Text style={styles.npcLevelModalText}>
                 LEVEL: {selectedCell.info.npcLevel}
               </Text>
             )}
             <Text style={[
-              getStyles(colors, themeMode).statusText,
-              selectedCell.info.owner === 'player' ? getStyles(colors, themeMode).friendlyText : getStyles(colors, themeMode).hostileText,
+              styles.statusText,
+              selectedCell.info.owner === 'player' ? styles.friendlyText : styles.hostileText,
             ]}>
               STATUS: {selectedCell.info.owner === 'player' ? 'FRIENDLY' : 'HOSTILE'}
             </Text>
               {selectedCell.info.owner !== 'player' && selectedCell.info.npcSlug && (
               <Pressable
-                style={[getStyles(colors, themeMode).hackButton]}
+                style={[styles.hackButton]}
                 onPress={() => {
                   (globalThis as any).pendingNpcSlug = selectedCell.info.npcSlug;
                     (globalThis as any).pendingNpcInstanceId = selectedCell.info.npcInstanceId;
@@ -443,67 +843,42 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                   onClose();
                 }}
               >
-                <Text style={getStyles(colors, themeMode).hackButtonText}>Hack Entity</Text>
+                <Text style={styles.hackButtonText}>Hack Entity</Text>
               </Pressable>
             )}
           </>
         )}
       </View>
     );
-  };
+  }, [selectedCell, styles]);
 
-  if (loading) {
-    return <View style={getStyles(colors, themeMode).container}><LoadingSpinner /></View>;
+  if (loading || !isMapReady || !terrainDataLoaded) {
+    return <View style={styles.container}><LoadingSpinner /></View>;
   }
 
   return (
-    <View style={getStyles(colors, themeMode).container} onLayout={onContainerLayout}>
+    <View style={styles.container} onLayout={onContainerLayout}>
       <CloseButton onPress={onClose} />
 
-      {renderLegend()}
-
       {renderInfoPanel()}
+
+
 
       <GestureDetector gesture={panGesture}>
         <Animated.View
           style={[
-            getStyles(colors, themeMode).marginWrapper,
+            styles.marginWrapper,
             { width: totalSize + (MARGIN_SIZE * 2), height: totalSize + (MARGIN_SIZE * 2) },
             animatedMapStyle as any,
           ]}
         >
-          <View style={[getStyles(colors, themeMode).gridArea, { width: totalSize, height: totalSize }]}>
-            {Array.from({ length: gridSize }).map((_, y) => (
-              <Row
-                key={y}
-                y={y}
-                row={grid[y]}
-                colStart={windowRange.colStart}
-                colEnd={windowRange.colEnd}
-                rowVisible={y >= windowRange.rowStart && y <= windowRange.rowEnd}
-                selectedCell={selectedCell}
-                onPress={handleCellPress}
-                rowStyle={rowPosStyles[y]}
-                xPosStyles={xPosStyles}
-                terrainStyleMap={terrainStyleMap}
-                currentUserHandle={currentUserHandle}
-                disableTiles
-                colors={colors}
-                themeMode={themeMode}
-              />
-            ))}
-
-            {Array.from({ length: poolSize }).map((_, i) => {
-              const assignment = visibleCells[i];
-              if (!assignment) {
-                return (
-                  <View key={`pool-${i}`} style={{ position: 'absolute', left: -10000, top: -10000, width: 1, height: 1 }} />
-                );
-              }
-              const { x, y, cell, selected } = assignment;
+          <View style={[styles.gridArea, { width: totalSize, height: totalSize }]}>
+            {visibleCells.map((assignment, i) => {
+              const { x, y, cell } = assignment;
+              const selected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
               return (
                 <PoolTile
-                  key={`pool-${i}`}
+                  key={`${x}-${y}`}
                   x={x}
                   y={y}
                   cell={cell}
@@ -515,6 +890,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                   currentUserHandle={currentUserHandle}
                   colors={colors}
                   themeMode={themeMode}
+                  styles={styles}
                 />
               );
             })}
@@ -523,9 +899,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       </GestureDetector>
     </View>
   );
-};
-
-type TileProps = {
+};type TileProps = {
   x: number;
   y: number;
   cell: CellData;
@@ -536,67 +910,8 @@ type TileProps = {
   currentUserHandle?: string | null;
   colors: ReturnType<typeof useThemeColors>;
   themeMode: 'light' | 'dark';
-};
-
-const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle, colors, themeMode }) => {
-  const houseBgStyle = cell.entity === 'house'
-    ? (cell.owner === 'player'
-        ? (cell.name === currentUserHandle ? getStyles(colors, themeMode).userHouseBg : getStyles(colors, themeMode).otherUserHouseBg)
-        : getStyles(colors, themeMode).enemyHouseBg)
-    : null;
-  return (
-    <Pressable
-      style={[
-        getStyles(colors, themeMode).cell,
-        xStyle,
-        selected && getStyles(colors, themeMode).selectedCell,
-      ]}
-      onPress={() => onPress(x, y, cell)}
-    >
-      <View style={[getStyles(colors, themeMode).cellContent, terrainStyleMap[cell.terrain], houseBgStyle]}>
-        {cell.entity !== 'house' && getTerrainIcon(cell.terrain, colors)}
-        {cell.entity === 'house' && (
-          <>
-            {cell.owner === 'player' ? (
-              <Image source={require('../assets/images/home.png')} style={getStyles(colors, themeMode).playerHomeIcon} resizeMode="contain" />
-            ) : (
-              <>
-                {(() => {
-                  const slug = (cell as any).npcSlug as string | undefined;
-                  if (slug === 'npc-small-corporation') {
-                    return <Image source={require('../assets/images/fog-building.png')} style={getStyles(colors, themeMode).playerHomeIcon} resizeMode="contain" />;
-                  }
-                  // default for small bank and large corporation
-                  return <Image source={require('../assets/images/fog-tall-building.png')} style={getStyles(colors, themeMode).playerHomeIcon} resizeMode="contain" />;
-                })()}
-              </>
-            )}
-            <View style={getStyles(colors, themeMode).entityLabelContainer} pointerEvents="none">
-              <Text
-                style={[
-                  getStyles(colors, themeMode).entityLabel,
-                  cell.owner === 'player' ? getStyles(colors, themeMode).playerLabel : getStyles(colors, themeMode).enemyLabel,
-                ]}
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
-                {cell.name || (cell.owner === 'player' ? 'YOU' : 'NPC')}
-              </Text>
-            </View>
-            {/* NPC Level Indicator */}
-            {cell.owner !== 'player' && cell.npcLevel && (
-              <View style={getStyles(colors, themeMode).npcLevelContainer} pointerEvents="none">
-                <Text style={getStyles(colors, themeMode).npcLevelText}>{cell.npcLevel}</Text>
-              </View>
-            )}
-          </>
-        )}
-      </View>
-    </Pressable>
-  );
-});
-
-type PoolTileProps = {
+  styles: any;
+};type PoolTileProps = {
   x: number;
   y: number;
   cell: CellData;
@@ -608,105 +923,8 @@ type PoolTileProps = {
   currentUserHandle?: string | null;
   colors: ReturnType<typeof useThemeColors>;
   themeMode: 'light' | 'dark';
-};
-
-const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode }) => {
-  return (
-    <View style={[yStyle]}>
-      <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} />
-    </View>
-  );
-});
-
-type RowProps = {
-  y: number;
-  row: CellData[] | undefined;
-  colStart: number;
-  colEnd: number;
-  rowVisible: boolean;
-  selectedCell: { x: number; y: number; info: CellData } | null;
-  onPress: (x: number, y: number, cell: CellData) => void;
-  rowStyle: any;
-  xPosStyles: Array<any>;
-  terrainStyleMap: Record<TerrainType, any>;
-  disableTiles?: boolean;
-  currentUserHandle?: string | null;
-  colors: ReturnType<typeof useThemeColors>;
-  themeMode: 'light' | 'dark';
-};
-
-const Row: React.FC<RowProps> = React.memo(({ y, row, colStart, colEnd, rowVisible, selectedCell, onPress, rowStyle, xPosStyles, terrainStyleMap, disableTiles, currentUserHandle, colors, themeMode }) => {
-  // Always render the row container (grid shell), but only mount tiles when visible
-  if (!row) {
-    return <View style={[getStyles(colors, themeMode).row, rowStyle]} />;
-  }
-
-  if (disableTiles) {
-    return <View style={[getStyles(colors, themeMode).row, rowStyle]} />;
-  }
-
-  const tiles = rowVisible
-    ? Array.from({ length: colEnd - colStart + 1 }).map((_, offset) => {
-        const x = colStart + offset;
-        const cell = row[x];
-        if (!cell) return null;
-        const isSelected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
-        return <Tile key={x} x={x} y={y} cell={cell} selected={isSelected} onPress={onPress} xStyle={xPosStyles[x]} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} />;
-      })
-    : null;
-
-  return (
-    <View style={[getStyles(colors, themeMode).row, rowStyle]}>
-      {tiles}
-    </View>
-  );
-}, (prev, next) => {
-  if (prev.rowVisible !== next.rowVisible) return false;
-  if (prev.colStart !== next.colStart || prev.colEnd !== next.colEnd) return false;
-  const prevSelInRow = prev.selectedCell && prev.selectedCell.y === prev.y ? prev.selectedCell.x : undefined;
-  const nextSelInRow = next.selectedCell && next.selectedCell.y === next.y ? next.selectedCell.x : undefined;
-  return prevSelInRow === nextSelInRow;
-});
-
-const getTerrainIcon = (terrain: TerrainType, colors: ReturnType<typeof useThemeColors>) => {
-  switch (terrain) {
-    case 'water':
-      return <Text style={[getStyles(colors, 'light').terrainSymbol, getStyles(colors, 'light').waterSymbol]}>~</Text>;
-    case 'mountain':
-      return <Text style={[getStyles(colors, 'light').terrainSymbol, getStyles(colors, 'light').mountainSymbol]}>▲</Text>;
-    case 'forest':
-      return <Text style={[getStyles(colors, 'light').terrainSymbol, getStyles(colors, 'light').forestSymbol]}>♣</Text>;
-    case 'road':
-      return <Text style={[getStyles(colors, 'light').terrainSymbol, getStyles(colors, 'light').roadSymbol]}>≡</Text>;
-    case 'grass':
-      return null;
-    case 'dirt':
-      return null;
-    default:
-      return null;
-  }
-};
-
-const getTerrainStyle = (terrain: TerrainType, colors: ReturnType<typeof useThemeColors>) => {
-  switch (terrain) {
-    case 'water':
-      return getStyles(colors, 'light').waterTerrain;
-    case 'mountain':
-      return getStyles(colors, 'light').mountainTerrain;
-    case 'forest':
-      return getStyles(colors, 'light').forestTerrain;
-    case 'road':
-      return getStyles(colors, 'light').roadTerrain;
-    case 'grass':
-      return getStyles(colors, 'light').grassTerrain;
-    case 'dirt':
-      return getStyles(colors, 'light').dirtTerrain;
-    default:
-      return getStyles(colors, 'light').plainTerrain;
-  }
-};
-
-const getStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light' | 'dark') => StyleSheet.create({
+  styles: any;
+};const getStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light' | 'dark') => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -928,39 +1146,7 @@ const getStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light'
     color: colors.matrix,
     fontSize: 14,
   },
-  legend: {
-    position: 'absolute',
-    top: 20,
-    left: 20,
-    backgroundColor: themeMode === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(0, 0, 0, 0.9)',
-    padding: 15,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.matrix,
-    zIndex: 2,
-  },
-  legendCollapsed: {
-    backgroundColor: themeMode === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(0, 0, 0, 0.9)',
-    padding: 10,
-  },
-  legendTitle: {
-    color: colors.matrix,
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  legendItems: {
-    gap: 8,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  legendText: {
-    color: themeMode === 'light' ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.8)',
-    fontSize: 12,
-  },
+
   statusText: {
     fontSize: 14,
     marginTop: 5,
@@ -981,10 +1167,7 @@ const getStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light'
     alignItems: 'center',
     zIndex: 3,
   },
-  legendTitleContainer: {
-    width: '100%',
-    padding: 5,
-  },
+
   terrainSymbol: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -1032,3 +1215,9 @@ const getStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light'
     // width/height are set dynamically on container View
   },
 });
+
+
+
+
+
+

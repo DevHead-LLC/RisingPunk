@@ -69,6 +69,7 @@ export const loginUser = createAsyncThunk(
           dispatch(updateBalance({
             total: balanceData.total,
             ratePerSecond: balanceData.ratePerSecond,
+            lastUpdated: new Date().toISOString(),
           }));
         }
 
@@ -132,12 +133,6 @@ export const registerUser = createAsyncThunk(
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
-
-      // Clear any existing RTK Query cache to ensure fresh data for new user
-      dispatch(authApi.util.resetApiState());
-      dispatch(balanceApi.util.resetApiState());
-      dispatch(botsApi.util.resetApiState());
-      dispatch(mapApi.util.resetApiState());
 
       return data;
     } catch (error) {
@@ -241,6 +236,7 @@ export const fetchInitialData = createAsyncThunk(
         dispatch(updateBalance({
           total: balanceData.total,
           ratePerSecond: balanceData.ratePerSecond,
+          lastUpdated: new Date().toISOString(),
         }));
       }
 
