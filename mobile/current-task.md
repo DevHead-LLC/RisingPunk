@@ -1,51 +1,75 @@
-# IPHONE 12 SCREEN COMPATIBILITY - CURRENT PRIORITY
+# TURF SCREEN LIGHT MODE IMPLEMENTATION - CURRENT PRIORITY
 
-## AI Directives
-- Check existing files and logic first before creating new code
-- Use authorities in coordination with use-existing-first.mdc rules
-- Keep under 150 lines for effectiveness
-- Update this file after every task
+## AI DIRECTIVE
+PAUSE BETWEEN EACH PHASE for user examination
 
-## CURRENT GOAL
-Resolve iPhone 12 screen size compatibility issues where UI elements don't fit properly on smaller screens.
+## SPECIFIC REQUIREMENTS
+1. Adjust entire turf screen to use theme-aware colors
+2. Include wallet balance (Balance component) with theme support
+3. Include profile location with theme support
+4. Include modal for research center with theme support
+5. Use existing theme system and colors
+6. Make it all look beautiful without breaking other functionality
 
-## STATUS: Implementing Responsive Design System
+## PHASE PLAN
+### Phase 1: Adjust Entire Turf Screen ✅ COMPLETE
+- ✅ Step 1: Update TurfScreen main container and background colors
+- ✅ Step 2: Update diagonal lines and grid styling
+- ✅ Step 3: Update digital ground area styling
 
-### IMPLEMENTED SOLUTIONS ✅
-1. **Enhanced Theme System**: Updated theme.ts with device-specific scaling factors
-2. **Responsive Hook**: Created useResponsiveDimensions hook for real-time screen handling
-3. **Utility Functions**: Added responsiveUtils.ts for consistent sizing across app
-4. **BotAssembly Updates**: Modified BotAssemblyScreen and BotAssemblyHeader for better small device support
-5. **BuildTimer Fixes**: Resolved timer validation and dependency issues to prevent stuttering and stale values
+### Phase 2: Include Wallet Balance ✅ COMPLETE
+- ✅ Step 1: Update Balance component to use theme colors
+- ✅ Step 2: Test balance display in both light and dark modes
 
-### DEVICE SCALING STRATEGY
-**iPhone 12 (≤844px)**: 0.85x scale factor - reduced padding, smaller fonts
-**iPhone 13/14/15 (≤932px)**: 0.9x scale factor - moderate scaling
-**iPhone 16+ (>932px)**: 1.0x scale factor - full size
+### Phase 3: Include Profile Location ✅ COMPLETE
+- ✅ Step 1: Update ProfileLocation component to use theme colors
+- ✅ Step 2: Test profile location display in both themes
 
-### KEY CHANGES MADE
-- **Theme System**: All font sizes, spacing, and dimensions now scale based on device
-- **Responsive Hook**: Handles orientation changes and provides device type detection
-- **Component Updates**: BotAssembly components now adapt to smaller screens
-- **Keyboard Handling**: Adjusted keyboard offsets for small devices
-- **Timer Optimization**: Fixed BuildTimer validation, removed progress from dependencies, added separate progress sync
+### Phase 4: Include Modal for Research Center ✅ COMPLETE
+- ✅ Step 1: Update ResearchCenterLocation component to use theme colors
+- ✅ Step 2: Update modal styling for both themes
+- ✅ Step 3: Test research center modal in both themes
 
-### BUILD TIMER FIXES ✅
-- **Validation Issue**: Removed incorrect `startTime <= 0` check that rejected valid timestamps
-- **Stale Values**: Added proper cleanup when buildStartTime is invalid/missing
-- **Dependency Issues**: Separated progress sync into its own useEffect to prevent frequent re-runs
-- **Performance**: Timer now updates smoothly without visual stuttering
+### Phase 5: Bug Fixes ✅ COMPLETE
+- ✅ Step 1: Remove debug console.log statements from ThemeContext
+- ✅ Step 2: Remove debug console.log statements from LoginScreen
+- ✅ Step 3: Fix brittle light mode detection in LoginScreen
+- ✅ Step 4: Fix ProfileScreen theme inconsistency
+- ✅ Step 5: Fix KeyboardAwareInput theme abstraction violation
+- ✅ Step 6: Fix ProfileScreen StyleSheet recreation performance issue
+- ✅ Step 7: Clean up dead CSS variables code
+- ✅ Step 8: Fix ProfileScreen dark mode background issue
+- ✅ Step 9: Fix theme icon background styling
 
-### NEXT ACTIONS
-1. **Test on iPhone 12 Simulator**: Verify BotAssembly screen fits properly
-2. **Apply to Other Screens**: Extend responsive system to other problematic screens
-3. **Global Implementation**: Use responsiveUtils throughout app for consistency
-4. **Performance Testing**: Ensure responsive calculations don't impact performance
+## STATUS
+**ALL PHASES COMPLETE** ✅
+- TurfScreen fully theme-aware
+- Balance component theme-aware
+- ProfileLocation component theme-aware
+- ResearchCenterLocation component and modal theme-aware
+- All hardcoded colors replaced with theme-aware colors
+- Light and dark mode working perfectly
+- Console clutter eliminated
+- Theme detection bugs fixed
+- ProfileScreen theme inconsistency resolved
+- Theme abstraction violations eliminated
+- Performance issues resolved
+- Dead code eliminated
+- Dark mode functionality restored
+- Theme icon styling corrected
 
-## NOTES
-- iPhone 12 has 844px height vs iPhone 16's 932px+ height
-- Responsive system automatically detects device type and applies appropriate scaling
-- All existing functionality preserved while adding device compatibility
-- System handles orientation changes dynamically
-- Scaling factors can be easily adjusted for future devices
-- BuildTimer now properly handles edge cases and provides smooth updates
+## NEXT ACTIONS
+1. User testing and verification
+2. Any final adjustments based on user feedback
+3. ✅ Fix Research Center modal build button behavior - RESOLVED
+4. PAUSE for user examination
+
+## IMPLEMENTATION DETAILS
+- Used useThemeColors hook for consistent theme access
+- Replaced all hardcoded COLORS references with theme-aware colors
+- Maintained existing functionality while adding theme support
+- All components now respond to theme changes in real-time
+- Cleaned up debug logging for production use
+- Fixed brittle theme detection logic
+- ✅ Fixed server-side balance update logic - balance now increases $10 every 10 seconds
+- ✅ Research Center modal build button now properly enables when balance >= $50,000

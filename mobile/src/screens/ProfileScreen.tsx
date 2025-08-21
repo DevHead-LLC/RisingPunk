@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,8 +13,9 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { logout } from '../store/slices/authSlice';
 import { useGetProfileQuery } from '../store/api/authApi';
 import { useFetchBotStatsQuery } from '../store/api/botsApi';
-import { SIZING, COLORS } from '../styles/theme';
-import { Balance } from '../components/common/Balance';
+import { SIZING } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
+import { useThemeColors } from '../hooks/useThemeColors';
 
 interface BotStats {
   role: string;
@@ -41,9 +42,338 @@ interface UserProfile {
   };
 }
 
+type TabType = 'profile' | 'settings';
+
+const createProfileStyles = (colors: any) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  mainLayout: {
+    flexDirection: 'row',
+    flex: 1,
+  },
+  leftSidebar: {
+    width: SIZING.spacing.md * 8,
+    backgroundColor: colors.background + '33',
+    paddingVertical: SIZING.spacing.md,
+    paddingRight: SIZING.spacing.sm,
+    borderRightWidth: 1,
+    borderRightColor: colors.text.primary + '1A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 0,
+  },
+  leftTab: {
+    paddingVertical: SIZING.spacing.sm,
+    paddingHorizontal: SIZING.spacing.xs,
+    alignItems: 'center',
+    marginBottom: SIZING.spacing.sm,
+    marginLeft: SIZING.spacing.sm,
+    borderRadius: 8,
+    minHeight: 40,
+    justifyContent: 'center',
+    width: '80%',
+  },
+  activeLeftTab: {
+    backgroundColor: colors.matrix + '1A',
+    borderWidth: 1,
+    borderColor: colors.matrix,
+  },
+  leftTabText: {
+    color: colors.text.primary + '99',
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    lineHeight: SIZING.font.small + 4,
+  },
+  activeLeftTabText: {
+    color: colors.matrix,
+    fontWeight: 'bold',
+  },
+  rightContent: {
+    flex: 1,
+    padding: SIZING.spacing.md,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: colors.matrix,
+    fontSize: SIZING.font.body,
+    marginTop: SIZING.spacing.md,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.error + '1A',
+    borderWidth: 1,
+    borderColor: colors.error,
+    borderRadius: 8,
+    margin: SIZING.spacing.lg,
+    padding: SIZING.spacing.lg,
+  },
+  errorText: {
+    color: colors.error,
+    fontSize: SIZING.font.body,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SIZING.spacing.lg,
+    paddingHorizontal: SIZING.spacing.sm,
+  },
+  usernameContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  username: {
+    color: colors.secondary,
+    fontSize: SIZING.font.h1,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  levelBadge: {
+    backgroundColor: colors.matrix + '1A',
+    borderWidth: 1,
+    borderColor: colors.matrix,
+    borderRadius: 8,
+    padding: SIZING.spacing.sm,
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  levelLabel: {
+    color: colors.text.secondary,
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.xs,
+  },
+  levelValue: {
+    color: colors.matrix,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
+  experienceSection: {
+    backgroundColor: colors.matrix + '1A',
+    borderWidth: 1,
+    borderColor: colors.matrix,
+    borderRadius: 8,
+    padding: SIZING.spacing.md,
+    marginBottom: SIZING.spacing.lg,
+    marginHorizontal: SIZING.spacing.sm,
+  },
+  expRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: SIZING.spacing.md,
+  },
+  expItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  expLabel: {
+    color: colors.text.secondary,
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.xs,
+  },
+  expValue: {
+    color: colors.text.primary,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
+  progressContainer: {
+    alignItems: 'center',
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: colors.background + '4D',
+    borderRadius: 4,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.matrix,
+    marginBottom: SIZING.spacing.sm,
+    width: '100%',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.matrix,
+    borderRadius: 4,
+  },
+  progressText: {
+    color: colors.matrix,
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+  },
+  botStatsSection: {
+    marginBottom: SIZING.spacing.lg,
+    marginHorizontal: SIZING.spacing.sm,
+  },
+  sectionTitle: {
+    color: colors.secondary,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.md,
+    textAlign: 'center',
+  },
+  botStatsGrid: {
+    gap: SIZING.spacing.md,
+  },
+  botStatCard: {
+    backgroundColor: colors.matrix + '1A',
+    borderWidth: 1,
+    borderColor: colors.matrix,
+    borderRadius: 8,
+    padding: SIZING.spacing.md,
+  },
+  botStatHeader: {
+    alignItems: 'center',
+    marginBottom: SIZING.spacing.md,
+  },
+  botType: {
+    color: colors.text.primary,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.xs,
+  },
+  botRole: {
+    color: colors.matrix,
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-around',
+    gap: SIZING.spacing.sm,
+  },
+  statItem: {
+    alignItems: 'center',
+    minWidth: 60,
+  },
+  statLabel: {
+    color: colors.text.secondary,
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.xs,
+  },
+  statValue: {
+    color: colors.matrix,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
+  featuresSection: {
+    marginBottom: SIZING.spacing.lg,
+    marginHorizontal: SIZING.spacing.sm,
+  },
+  featureItem: {
+    backgroundColor: colors.matrix + '1A',
+    borderWidth: 1,
+    borderColor: colors.matrix,
+    borderRadius: 8,
+    padding: SIZING.spacing.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  featureLabel: {
+    color: colors.text.primary,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
+  featureValue: {
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
+  disconnectButton: {
+    backgroundColor: colors.background + 'CC',
+    borderWidth: 2,
+    borderColor: colors.error,
+    borderRadius: 8,
+    paddingVertical: SIZING.spacing.md,
+    paddingHorizontal: SIZING.spacing.lg,
+    alignItems: 'center',
+    marginTop: SIZING.spacing.lg,
+    marginHorizontal: SIZING.spacing.md,
+  },
+  disconnectText: {
+    color: colors.error,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
+  settingsContainer: {
+    flex: 1,
+    padding: SIZING.spacing.md,
+  },
+  settingsTitle: {
+    color: colors.text.primary,
+    fontSize: SIZING.font.h2,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.lg,
+    textAlign: 'center',
+  },
+  settingCard: {
+    backgroundColor: colors.matrix + '1A',
+    borderWidth: 1,
+    borderColor: colors.matrix,
+    borderRadius: 8,
+    padding: SIZING.spacing.lg,
+    marginBottom: SIZING.spacing.md,
+  },
+  settingLabel: {
+    color: colors.text.primary,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.md,
+    textAlign: 'center',
+  },
+  themeToggle: {
+    alignItems: 'center',
+  },
+  themeToggleContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZING.spacing.md,
+  },
+  themeIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: colors.matrix + '1A',
+    borderWidth: 2,
+    borderColor: colors.matrix,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  themeIconContainerDark: {
+    backgroundColor: colors.text.primary,
+    borderColor: colors.text.primary,
+  },
+  themeIcon: {
+    fontSize: SIZING.font.large,
+  },
+  themeToggleText: {
+    color: colors.text.primary,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
+});
+
 export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
   const dispatch = useAppDispatch();
   const { token } = useAppSelector((state) => state.auth);
+  const [activeTab, setActiveTab] = useState<TabType>('profile');
+  const { themeMode, toggleTheme } = useTheme();
+  const colors = useThemeColors();
+  
+  const styles = useMemo(() => createProfileStyles(colors), [colors]);
   
   // Use existing working APIs - only when authenticated
   const { data: profileData, isLoading: profileLoading, error: profileError } = useGetProfileQuery(undefined, {
@@ -70,15 +400,12 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
 
   const loading = profileLoading || botStatsLoading;
 
-
-
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
         <CloseButton onPress={onClose} />
-        <Balance />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.accent} />
+          <ActivityIndicator size="large" color={colors.accent} />
           <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
       </SafeAreaView>
@@ -89,7 +416,6 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
     return (
       <SafeAreaView style={styles.container}>
         <CloseButton onPress={onClose} />
-        <Balance />
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Please log in to view profile</Text>
         </View>
@@ -101,7 +427,6 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
     return (
       <SafeAreaView style={styles.container}>
         <CloseButton onPress={onClose} />
-        <Balance />
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Failed to load profile</Text>
         </View>
@@ -114,300 +439,146 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   return (
     <SafeAreaView style={styles.container}>
       <CloseButton onPress={onClose} />
-      <Balance />
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Compact Header */}
-        <View style={styles.header}>
-          <View style={styles.usernameContainer}>
-            <Text style={styles.username}>{profile.handle}</Text>
-          </View>
-          <View style={styles.levelBadge}>
-            <Text style={styles.levelLabel}>LEVEL</Text>
-            <Text style={styles.levelValue}>{profile.level}</Text>
-          </View>
+      
+      <View style={styles.mainLayout}>
+        {/* LEFT SIDE TABS - AS REQUESTED */}
+        <View style={styles.leftSidebar}>
+          <TouchableOpacity
+            style={[styles.leftTab, activeTab === 'profile' && styles.activeLeftTab]}
+            onPress={() => setActiveTab('profile')}
+          >
+            <Text style={[styles.leftTabText, activeTab === 'profile' && styles.activeLeftTabText]}>
+              PROFILE
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.leftTab, activeTab === 'settings' && styles.activeLeftTab]}
+            onPress={() => setActiveTab('settings')}
+          >
+            <Text style={[styles.leftTabText, activeTab === 'settings' && styles.activeLeftTabText]}>
+              SETTINGS
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Compact Experience Section */}
-        <View style={styles.experienceSection}>
-          <View style={styles.expRow}>
-            <View style={styles.expItem}>
-              <Text style={styles.expLabel}>TOTAL XP</Text>
-              <Text style={styles.expValue}>{profile.experience.total.toLocaleString()}</Text>
-            </View>
-            <View style={styles.expItem}>
-              <Text style={styles.expLabel}>NEXT LEVEL</Text>
-              <Text style={styles.expValue}>{profile.experience.current.toLocaleString()} / {profile.experience.nextLevel.toLocaleString()}</Text>
-            </View>
-          </View>
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${experiencePercentage}%` }]} />
-            </View>
-            <Text style={styles.progressText}>{Math.round(experiencePercentage)}%</Text>
-          </View>
-        </View>
-
-        {/* Bot Stats Section */}
-        <View style={styles.botStatsSection}>
-          <Text style={styles.sectionTitle}>BOT STATS</Text>
-          <View style={styles.botStatsGrid}>
-            {Object.entries(botStats).map(([type, stats]) => (
-              <View key={type} style={styles.botStatCard}>
-                <View style={styles.botStatHeader}>
-                  <Text style={styles.botType}>{type.toUpperCase()}</Text>
-                  <Text style={styles.botRole}>{stats.role}</Text>
+        {/* RIGHT SIDE CONTENT */}
+        <View style={styles.rightContent}>
+          {activeTab === 'profile' ? (
+            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+              {/* Compact Header */}
+              <View style={styles.header}>
+                <View style={styles.usernameContainer}>
+                  <Text style={styles.username}>{profile.handle}</Text>
                 </View>
-                <View style={styles.statsGrid}>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statLabel}>HP</Text>
-                    <Text style={styles.statValue}>{stats.stats.health}</Text>
-                  </View>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statLabel}>ATK</Text>
-                    <Text style={styles.statValue}>{stats.stats.offense}</Text>
-                  </View>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statLabel}>DEF</Text>
-                    <Text style={styles.statValue}>{Math.round(stats.stats.defense * 100)}%</Text>
-                  </View>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statLabel}>SPD</Text>
-                    <Text style={styles.statValue}>{stats.stats.speed}</Text>
-                  </View>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statLabel}>RNG</Text>
-                    <Text style={styles.statValue}>{stats.stats.range}</Text>
-                  </View>
+                <View style={styles.levelBadge}>
+                  <Text style={styles.levelLabel}>LEVEL</Text>
+                  <Text style={styles.levelValue}>{profile.level}</Text>
                 </View>
               </View>
-            ))}
-          </View>
-        </View>
 
-        {/* Features Section */}
-        <View style={styles.featuresSection}>
-          <Text style={styles.sectionTitle}>FEATURES</Text>
-          <View style={styles.featureItem}>
-            <Text style={styles.featureLabel}>HACK RIG</Text>
-            <Text style={[styles.featureValue, { color: profile.unlockedFeatures.hackRig ? COLORS.accent : COLORS.text.secondary }]}>
-              {profile.unlockedFeatures.hackRig ? 'UNLOCKED' : 'LOCKED'}
-            </Text>
-          </View>
-        </View>
+              {/* Compact Experience Section */}
+              <View style={styles.experienceSection}>
+                <View style={styles.expRow}>
+                  <View style={styles.expItem}>
+                    <Text style={styles.expLabel}>TOTAL XP</Text>
+                    <Text style={styles.expValue}>{profile.experience.total.toLocaleString()}</Text>
+                  </View>
+                  <View style={styles.expItem}>
+                    <Text style={styles.expLabel}>NEXT LEVEL</Text>
+                    <Text style={styles.expValue}>{profile.experience.current.toLocaleString()} / {profile.experience.nextLevel.toLocaleString()}</Text>
+                  </View>
+                </View>
+                <View style={styles.progressContainer}>
+                  <View style={styles.progressBar}>
+                    <View style={[styles.progressFill, { width: `${experiencePercentage}%` }]} />
+                  </View>
+                  <Text style={styles.progressText}>{Math.round(experiencePercentage)}%</Text>
+                </View>
+              </View>
 
-        <TouchableOpacity style={styles.disconnectButton} onPress={handleLogout}>
-          <Text style={styles.disconnectText}>DISCONNECT</Text>
-        </TouchableOpacity>
-      </ScrollView>
+              {/* Bot Stats Section */}
+              <View style={styles.botStatsSection}>
+                <Text style={styles.sectionTitle}>BOT STATS</Text>
+                <View style={styles.botStatsGrid}>
+                  {Object.entries(botStats).map(([type, stats]) => (
+                    <View key={type} style={styles.botStatCard}>
+                      <View style={styles.botStatHeader}>
+                        <Text style={styles.botType}>{type.toUpperCase()}</Text>
+                        <Text style={styles.botRole}>{stats.role}</Text>
+                      </View>
+                      <View style={styles.statsGrid}>
+                        <View style={styles.statItem}>
+                          <Text style={styles.statLabel}>HP</Text>
+                          <Text style={styles.statValue}>{stats.stats.health}</Text>
+                        </View>
+                        <View style={styles.statItem}>
+                          <Text style={styles.statLabel}>ATK</Text>
+                          <Text style={styles.statValue}>{stats.stats.offense}</Text>
+                        </View>
+                        <View style={styles.statItem}>
+                          <Text style={styles.statLabel}>DEF</Text>
+                          <Text style={styles.statValue}>{Math.round(stats.stats.defense * 100)}%</Text>
+                        </View>
+                        <View style={styles.statItem}>
+                          <Text style={styles.statLabel}>SPD</Text>
+                          <Text style={styles.statValue}>{stats.stats.speed}</Text>
+                        </View>
+                        <View style={styles.statItem}>
+                          <Text style={styles.statLabel}>RNG</Text>
+                          <Text style={styles.statValue}>{stats.stats.range}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+              {/* Features Section */}
+              <View style={styles.featuresSection}>
+                <Text style={styles.sectionTitle}>FEATURES</Text>
+                <View style={styles.featureItem}>
+                  <Text style={styles.featureLabel}>HACK RIG</Text>
+                  <Text style={[styles.featureValue, { color: profile.unlockedFeatures.hackRig ? colors.accent : colors.text.secondary }]}>
+                    {profile.unlockedFeatures.hackRig ? 'UNLOCKED' : 'LOCKED'}
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity style={styles.disconnectButton} onPress={handleLogout}>
+                <Text style={styles.disconnectText}>DISCONNECT</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          ) : (
+            <View style={styles.settingsContainer}>
+              <Text style={styles.settingsTitle}>SETTINGS</Text>
+              
+              {/* Theme Toggle Section */}
+              <View style={styles.settingCard}>
+                <Text style={styles.settingLabel}>APPEARANCE</Text>
+                <TouchableOpacity
+                  style={styles.themeToggle}
+                  onPress={toggleTheme}
+                >
+                  <View style={styles.themeToggleContent}>
+                    <View style={[
+                      styles.themeIconContainer,
+                      themeMode === 'light' && styles.themeIconContainerDark
+                    ]}>
+                      <Text style={styles.themeIcon}>
+                        {themeMode === 'light' ? '👀' : '💡'}
+                      </Text>
+                    </View>
+                    <Text style={styles.themeToggleText}>
+                      {themeMode === 'light' ? 'Go Dark' : 'Go Light'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  scrollView: {
-    flex: 1,
-    padding: SIZING.spacing.md,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    color: '#00FF41',
-    fontSize: SIZING.font.body,
-    marginTop: SIZING.spacing.md,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    color: '#FF4B4B',
-    fontSize: SIZING.font.body,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SIZING.spacing.lg,
-    paddingHorizontal: SIZING.spacing.sm,
-  },
-  usernameContainer: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  username: {
-    color: '#4717F6',
-    fontSize: SIZING.font.h1,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  levelBadge: {
-    backgroundColor: 'rgba(0, 255, 65, 0.1)',
-    borderWidth: 1,
-    borderColor: '#00FF41',
-    borderRadius: 12,
-    paddingHorizontal: SIZING.spacing.md,
-    paddingVertical: SIZING.spacing.sm,
-    alignItems: 'center',
-  },
-  levelLabel: {
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: SIZING.font.small,
-    marginBottom: 2,
-  },
-  levelValue: {
-    color: '#00FF41',
-    fontSize: SIZING.font.h2,
-    fontWeight: 'bold',
-  },
-  experienceSection: {
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 255, 65, 0.3)',
-    borderRadius: 8,
-    padding: SIZING.spacing.md,
-    marginBottom: SIZING.spacing.md,
-  },
-  expRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: SIZING.spacing.sm,
-  },
-  expItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  expLabel: {
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: SIZING.font.small,
-    marginBottom: 4,
-  },
-  expValue: {
-    color: '#00FF41',
-    fontSize: SIZING.font.body,
-    fontWeight: 'bold',
-  },
-  progressContainer: {
-    alignItems: 'center',
-  },
-  progressBar: {
-    width: '100%',
-    height: 6,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    borderRadius: 3,
-    overflow: 'hidden',
-    marginBottom: SIZING.spacing.xs,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#00FF41',
-    borderRadius: 3,
-  },
-  progressText: {
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: SIZING.font.small,
-  },
-  botStatsSection: {
-    marginBottom: SIZING.spacing.md,
-  },
-  sectionTitle: {
-    color: '#4717F6',
-    fontSize: SIZING.font.h2,
-    fontWeight: 'bold',
-    marginBottom: SIZING.spacing.sm,
-    paddingHorizontal: SIZING.spacing.sm,
-  },
-  botStatsGrid: {
-    gap: SIZING.spacing.sm,
-  },
-  botStatCard: {
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 255, 65, 0.2)',
-    borderRadius: 6,
-    padding: SIZING.spacing.sm,
-  },
-  botStatHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SIZING.spacing.sm,
-  },
-  botType: {
-    color: '#00FF41',
-    fontSize: SIZING.font.body,
-    fontWeight: 'bold',
-  },
-  botRole: {
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: SIZING.font.small,
-    fontStyle: 'italic',
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SIZING.spacing.xs,
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    paddingHorizontal: SIZING.spacing.xs,
-    paddingVertical: 2,
-    borderRadius: 4,
-    minWidth: 60,
-    justifyContent: 'space-between',
-  },
-  statLabel: {
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: SIZING.font.small,
-    marginRight: 4,
-  },
-  statValue: {
-    color: '#00FF41',
-    fontSize: SIZING.font.small,
-    fontWeight: 'bold',
-  },
-  featuresSection: {
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 255, 65, 0.2)',
-    borderRadius: 8,
-    padding: SIZING.spacing.md,
-    marginBottom: SIZING.spacing.md,
-  },
-  featureItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  featureLabel: {
-    color: '#00FF41',
-    fontSize: SIZING.font.body,
-    fontWeight: 'bold',
-  },
-  featureValue: {
-    fontSize: SIZING.font.body,
-    fontWeight: 'bold',
-  },
-  disconnectButton: {
-    backgroundColor: 'rgba(255, 75, 75, 0.1)',
-    borderRadius: 4,
-    padding: SIZING.spacing.md,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 75, 75, 0.4)',
-  },
-  disconnectText: {
-    color: '#FF4B4B',
-    fontSize: SIZING.font.body,
-    fontWeight: 'bold',
-  },
-});

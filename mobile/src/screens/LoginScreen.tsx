@@ -7,19 +7,21 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import {COLORS, SIZING, styleGuide} from '../styles/theme';
+import {SIZING, styleGuide} from '../styles/theme';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { loginUser, registerUser, clearError } from '../store/slices/authSlice';
 import { TitleSection } from '../components/auth/TitleSection';
 import { AuthInputs } from '../components/auth/AuthInputs';
 import { useFormState } from '../hooks/useFormState';
 import { ScreenContainer } from '../components/common/ScreenContainer';
+import { useThemeColors } from '../hooks/useThemeColors';
 
 type FormType = 'login' | 'register';
 
 const WelcomeMessage = memo(function WelcomeMessage({ formType }: { formType: FormType }) {
+  const colors = useThemeColors();
   return (
-    <Text style={styles.welcomeText}>
+    <Text style={[styles.welcomeText, { color: colors.secondary }]}>
       {formType === 'login' ? 'WELCOME BACK!' : 'WELCOME!'}
     </Text>
   );
@@ -32,9 +34,10 @@ const ToggleFormButton = memo(function ToggleFormButton({
   formType: FormType;
   onPress: () => void;
 }) {
+  const colors = useThemeColors();
   return (
     <TouchableOpacity style={styles.toggleButton} onPress={onPress}>
-      <Text style={styles.toggleText}>
+      <Text style={[styles.toggleText, { color: colors.matrix }]}>
         {formType === 'login' ? 'NEW_IDENTITY (SIGN_UP)' : 'EXISTING_IDENTITY (SIGN_IN)'}
       </Text>
     </TouchableOpacity>
@@ -43,7 +46,8 @@ const ToggleFormButton = memo(function ToggleFormButton({
 
 const ErrorMessage = memo(function ErrorMessage({ error }: { error: string | null }) {
   if (!error) {return null;}
-  return <Text style={styles.errorText}>{error}</Text>;
+  const colors = useThemeColors();
+  return <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>;
 });
 
 export const LoginScreen = () => {
@@ -57,6 +61,7 @@ export const LoginScreen = () => {
     verifyAccessKey: '',
   });
   const { isLoading: formLoading, error: formError, setLoading, setError, clearError: clearFormError } = useFormState();
+  const colors = useThemeColors();
 
   // Combine loading states
   const isLoading = authLoading || formLoading;
@@ -164,26 +169,38 @@ export const LoginScreen = () => {
     setFormData({ email: '', handle: '', accessKey: '', verifyAccessKey: '' });
   }, [clearFormError]);
 
-  const renderLoginForm = () => (
-    <View style={styles.formContainer}>
-      <AuthInputs
-        formType="login"
-        formData={formData}
-        handleInputChange={handleInputChange}
-      />
-      <TouchableOpacity
-        style={[
-          styles.jackInButton,
-          isSubmitDisabled && styles.buttonDisabled,
-        ]}
-        onPress={handleSubmit}
-        disabled={isSubmitDisabled}
-      >
-        <Text style={styles.jackInText}>JACK_IN</Text>
-        <View style={styles.buttonCorner} />
-      </TouchableOpacity>
-    </View>
-  );
+  const renderLoginForm = () => {
+    return (
+      <View style={styles.formContainer}>
+        <AuthInputs
+          formType="login"
+          formData={formData}
+          handleInputChange={handleInputChange}
+        />
+        <TouchableOpacity
+          style={[
+            styles.jackInButton,
+            { 
+              backgroundColor: isSubmitDisabled ? colors.buttonDisabled : colors.buttonBg,
+              zIndex: 999,
+              elevation: 999,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 3.84,
+            },
+          ]}
+          onPress={handleSubmit}
+          disabled={isSubmitDisabled}
+        >
+          <Text style={[styles.jackInText, { color: '#FFFFFF' }]}>
+            JACK_IN
+          </Text>
+          <View style={[styles.buttonCorner, { borderColor: colors.primary }]} />
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   const renderRegisterForm = () => (
     <View style={styles.formContainer}>
@@ -195,14 +212,23 @@ export const LoginScreen = () => {
       <TouchableOpacity
         style={[
           styles.jackInButton,
-          styles.createButton,
-          isSubmitDisabled && styles.buttonDisabled,
+          { 
+            backgroundColor: isSubmitDisabled ? colors.buttonDisabled : colors.buttonBg,
+            zIndex: 999,
+            elevation: 999,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.25,
+            shadowRadius: 3.84,
+          },
         ]}
         onPress={handleSubmit}
         disabled={isSubmitDisabled}
       >
-        <Text style={styles.jackInText}>INITIALIZE</Text>
-        <View style={styles.buttonCorner} />
+        <Text style={[styles.jackInText, { color: '#FFFFFF' }]}>
+          INITIALIZE
+        </Text>
+        <View style={[styles.buttonCorner, { borderColor: colors.primary }]} />
       </TouchableOpacity>
     </View>
   );
@@ -215,7 +241,7 @@ export const LoginScreen = () => {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <View style={styles.content}>
-          <View style={styles.container}>
+          <View style={[styles.container, { backgroundColor: colors.background }]}>
             <View style={styles.leftSide}>
               <TitleSection />
             </View>
@@ -243,7 +269,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: COLORS.background,
   },
   leftSide: {
     flex: 1,
@@ -264,17 +289,14 @@ const styles = StyleSheet.create({
   },
   formBox: {
     width: '80%',
-    backgroundColor: COLORS.accent,
     borderRadius: 4,
     padding: SIZING.spacing.lg + SIZING.spacing.sm,
     borderLeftWidth: 2,
-    borderLeftColor: COLORS.primary,
   },
   formHeader: {
     marginBottom: SIZING.spacing.lg,
   },
   formTitle: {
-    color: COLORS.text.primary,
     fontSize: SIZING.font.h2,
     fontWeight: '500',
   },
@@ -292,11 +314,9 @@ const styles = StyleSheet.create({
   },
   inputCorner: {
     ...styleGuide.cornerDecoration,
-    borderColor: COLORS.primary,
   },
   jackInButton: {
     height: 48,
-    backgroundColor: COLORS.buttonBg,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: SIZING.spacing.sm,
@@ -306,7 +326,6 @@ const styles = StyleSheet.create({
     ...styleGuide.cornerDecoration,
   },
   jackInText: {
-    color: COLORS.text.primary,
     fontSize: SIZING.font.body + 2,
     fontWeight: '500',
     letterSpacing: 1,
@@ -316,7 +335,6 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   toggleText: {
-    color: COLORS.matrix,
     fontSize: SIZING.font.small,
     letterSpacing: 1,
   },
@@ -327,23 +345,19 @@ const styles = StyleSheet.create({
     marginTop: SIZING.spacing.xs,
   },
   welcomeText: {
-    color: COLORS.secondary,
     fontSize: SIZING.font.h2 - 2,
     fontWeight: '500',
-    marginBottom: SIZING.spacing.md,
-    letterSpacing: 2,
-    opacity: 0.8,
-  },
-  errorText: {
-    color: '#FF0033',
-    fontSize: SIZING.font.small,
-    marginBottom: SIZING.spacing.sm,
-    letterSpacing: 1,
   },
   buttonDisabled: {
-    backgroundColor: COLORS.buttonDisabled,
+    opacity: 0.5,
   },
   keyboardAvoidingView: {
     flex: 1,
+  },
+  errorText: {
+    color: '#ff4444',
+    fontSize: SIZING.font.small,
+    marginBottom: SIZING.spacing.sm,
+    textAlign: 'center',
   },
 });

@@ -129,7 +129,7 @@ app.get('/api/dbcheck', async (req: Request, res: Response) => {
   }
 });
 
-// Get current balance without accumulating time
+// Get current balance and automatically update it with accumulated time
 app.get('/api/balance', auth, async (req: Request, res: Response) => {
   try {
     const user = await User.findById(req.user._id);
@@ -139,8 +139,20 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
       return;
     }
 
-    // Return raw database balance without time accumulation
-    // Client will handle time-based calculations based on server's lastUpdated timestamp
+    // Calculate and update accumulated balance
+    const now = new Date();
+    const secondsElapsed = (now.getTime() - user.balance.lastUpdated.getTime()) / 1000;
+    const accumulatedAmount = Math.floor(secondsElapsed * user.balance.ratePerSecond);
+    
+    // Only update if there's accumulated amount to add
+    if (accumulatedAmount > 0) {
+      user.balance.total += accumulatedAmount;
+      user.balance.lastUpdated = now;
+      await user.save();
+      console.log(`💰 BALANCE UPDATE: User ${user.handle} gained $${accumulatedAmount} (${secondsElapsed.toFixed(1)}s elapsed)`);
+    }
+
+    // Return updated balance
     const currentBalance = {
       total: user.balance.total,
       ratePerSecond: user.balance.ratePerSecond,

@@ -1,15 +1,18 @@
 import React, {memo} from 'react';
 import {TouchableOpacity, View, Text, Image, StyleSheet} from 'react-native';
-import {COLORS, SIZING} from '../../styles/theme';
+import {SIZING} from '../../styles/theme';
+import {useThemeColors} from '../../hooks/useThemeColors';
 
 type ProfileLocationProps = {
   onPress: () => void;
 };
 
 export const ProfileLocation = memo(function ProfileLocation({ onPress }: ProfileLocationProps) {
+  const colors = useThemeColors();
+
   return (
     <TouchableOpacity
-      style={[styles.location, styles.profilePosition]}
+      style={[styles.location, styles.profilePosition, { borderColor: colors.primary }]}
       onPress={onPress}
     >
       <View style={styles.profileContainer}>
@@ -18,7 +21,7 @@ export const ProfileLocation = memo(function ProfileLocation({ onPress }: Profil
           style={styles.locationIcon}
         />
       </View>
-      <Text style={styles.profileLabel}>PROFILE</Text>
+      <Text style={[styles.profileLabel, { color: colors.primary }]}>PROFILE</Text>
     </TouchableOpacity>
   );
 });
@@ -46,11 +49,9 @@ const styles = StyleSheet.create({
     right: SIZING.spacing.lg,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: COLORS.primary,
     borderRadius: 4,
   },
   profileLabel: {
-    color: COLORS.primary,
     fontSize: SIZING.font.small,
     letterSpacing: 1,
     position: 'absolute',

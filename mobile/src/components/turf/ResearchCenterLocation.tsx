@@ -1,7 +1,9 @@
 import React, {memo, useState, useEffect} from 'react';
 import {TouchableOpacity, View, Text, Image, StyleSheet, Modal, Alert} from 'react-native';
-import {COLORS, SIZING} from '../../styles/theme';
+import {SIZING} from '../../styles/theme';
+import {useThemeColors} from '../../hooks/useThemeColors';
 import { useUnlockResearchCenterMutation, useGetProfileQuery, useGetResearchCenterStatusQuery } from '../../store/api/authApi';
+import { useFetchBalanceQuery } from '../../store/api/balanceApi';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { updateBalance } from '../../store/slices/balanceSlice';
 import { BuildCountdownTimer } from './BuildCountdownTimer';
@@ -12,17 +14,25 @@ type ResearchCenterLocationProps = {
 };
 
 export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onPress, onNavigateToResearch }: ResearchCenterLocationProps) {
+  const colors = useThemeColors();
   const [showPopup, setShowPopup] = useState(false);
   const [unlockResearchCenter] = useUnlockResearchCenterMutation();
   const { data: profile, isLoading } = useGetProfileQuery();
   const { data: buildStatus, isLoading: buildStatusLoading, refetch: refetchBuildStatus } = useGetResearchCenterStatusQuery();
+  const { data: balanceData, isLoading: balanceLoading } = useFetchBalanceQuery();
   const dispatch = useAppDispatch();
-  const currentBalance = useAppSelector((state) => state.balance.total);
+  
+  // Use both sources to ensure we have the most up-to-date balance
+  const currentBalance = balanceData?.total || useAppSelector((state) => state.balance.total);
+  
+  // Ensure balance is a number
+  const numericBalance = typeof currentBalance === 'string' ? parseFloat(currentBalance) : currentBalance;
 
   const isUnlocked = buildStatus?.isUnlocked || false;
   const isBuilding = buildStatus?.buildStatus !== null;
   const RESEARCH_CENTER_COST = 50000;
-  const hasSufficientFunds = currentBalance !== null && currentBalance >= RESEARCH_CENTER_COST;
+  
+  const hasSufficientFunds = numericBalance !== null && !isNaN(numericBalance as number) && numericBalance >= RESEARCH_CENTER_COST;
 
   const handlePress = () => {
     if (isBuilding) {
@@ -31,6 +41,15 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
     } else if (isUnlocked) {
       if (onNavigateToResearch) onNavigateToResearch();
     } else {
+      // Only show modal if we have valid balance data
+      if (balanceLoading || currentBalance === null || currentBalance === undefined) {
+        Alert.alert(
+          'Loading Balance',
+          'Please wait while we load your current balance.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
       setShowPopup(true);
     }
   };
@@ -72,12 +91,12 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
   };
 
   return (
-    <View style={styles.researchCenterContainer}>
+    <View style={[styles.researchCenterContainer, { backgroundColor: colors.matrix + '0D', borderColor: colors.matrix + '33' }]}>
       <TouchableOpacity
         style={styles.location}
         onPress={handlePress}
       >
-        <View style={styles.iconContainer}>
+        <View style={[styles.iconContainer, { borderColor: colors.matrix }]}>
           <Image
             source={isBuilding 
               ? require('../../assets/images/underConstruction.png')
@@ -90,19 +109,15 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
         </View>
       </TouchableOpacity>
       
-      {/* Label positioned inside the green opaque area, under the card image */}
-              <Text style={styles.locationLabel}>
-          {isBuilding ? 'UNDER CONSTRUCTION' : 'RESEARCH CENTER'}
-        </Text>
+      <Text style={[styles.locationLabel, { color: colors.secondary }]}>
+        {isBuilding ? 'UNDER CONSTRUCTION' : 'RESEARCH CENTER'}
+      </Text>
       
-      {/* Timer positioned below the entire green opaque area */}
       {isBuilding && buildStatus?.buildStatus && (
         <View style={styles.timerContainer}>
           <BuildCountdownTimer
             completesAt={buildStatus.buildStatus.completesAt}
             onComplete={() => {
-              // Refetch build status when timer completes
-              // This will trigger the auto-completion check on the server
               refetchBuildStatus();
             }}
           />
@@ -125,24 +140,35 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
           activeOpacity={1}
         >
           <TouchableOpacity 
-            style={styles.popup} 
+            style={[styles.popup, { backgroundColor: colors.background, borderColor: colors.matrix }]} 
             onPress={() => {}} 
             activeOpacity={1}
           >
-            <Text style={styles.popupTitle}>Build Research Center</Text>
-            <Text style={styles.popupPrice}>$50,000</Text>
-            <Text style={styles.buildTime}>Time to build: 1 hour</Text>
+            <Text style={[styles.popupTitle, { color: colors.secondary }]}>Build Research Center</Text>
+            <Text style={[styles.popupPrice, { color: colors.matrix }]}>$50,000</Text>
+            <Text style={[styles.buildTime, { color: colors.secondary }]}>Time to build: 1 hour</Text>
             <TouchableOpacity 
-              style={[styles.buildButton, !hasSufficientFunds && styles.buildButtonDisabled]} 
+              style={[
+                styles.buildButton, 
+                { 
+                  backgroundColor: hasSufficientFunds ? colors.matrix : colors.buttonDisabled,
+                  opacity: hasSufficientFunds ? 1 : 0.6
+                }
+              ]} 
               onPress={handleBuild}
               disabled={!hasSufficientFunds}
             >
-              <Text style={[styles.buildButtonText, !hasSufficientFunds && styles.buildButtonTextDisabled]}>
+              <Text style={[
+                styles.buildButtonText, 
+                { 
+                  color: hasSufficientFunds ? colors.background : colors.text.secondary 
+                }
+              ]}>
                 Build Research Center
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-              <Text style={styles.closeButtonText}>Close</Text>
+            <TouchableOpacity style={[styles.closeButton, { borderColor: colors.matrix }]} onPress={handleClose}>
+              <Text style={[styles.closeButtonText, { color: colors.secondary }]}>Close</Text>
             </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
@@ -159,33 +185,28 @@ const styles = StyleSheet.create({
     transform: [{translateX: -150}],
     width: 300,
     height: '11%',
-    backgroundColor: 'rgba(0, 255, 65, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 255, 65, 0.2)',
     borderRadius: 8,
     zIndex: 1,
-    justifyContent: 'flex-start', // Align to top
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingBottom: SIZING.spacing.lg, // Responsive bottom padding
-    paddingTop: SIZING.spacing.md, // Responsive top padding
+    paddingBottom: SIZING.spacing.lg,
+    paddingTop: SIZING.spacing.md,
   },
   location: {
     alignItems: 'center',
-    justifyContent: 'flex-start', // Stack items from top
+    justifyContent: 'flex-start',
     padding: SIZING.spacing.sm,
     backgroundColor: 'transparent',
     zIndex: 3,
-    // height: '100%', // Remove fixed height
-    paddingTop: SIZING.spacing.md, // Add top padding
+    paddingTop: SIZING.spacing.md,
   },
   iconContainer: {
     width: 120,
-    height: 120, // Back to original height
+    height: 120,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: COLORS.matrix,
     borderRadius: 4,
     padding: SIZING.spacing.xs,
   },
@@ -195,7 +216,6 @@ const styles = StyleSheet.create({
     resizeMode: 'contain' as const,
   },
   locationLabel: {
-    color: COLORS.secondary,
     fontSize: SIZING.font.body,
     letterSpacing: 2,
     textAlign: 'center',
@@ -206,13 +226,13 @@ const styles = StyleSheet.create({
   },
   timerContainer: {
     position: 'absolute',
-    top: '115%', // Below the entire green opaque area
+    top: '115%',
     left: '50%',
-    transform: [{ translateX: -70 }], // Center the timer
+    transform: [{ translateX: -70 }],
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: SIZING.spacing.md, // Space below the green area
-    width: 140, // Match timer minWidth
+    marginTop: SIZING.spacing.md,
+    width: 140,
   },
   modalOverlay: {
     position: 'absolute',
@@ -226,11 +246,9 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   popup: {
-    backgroundColor: COLORS.background,
     padding: SIZING.spacing.lg,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: COLORS.matrix,
     alignItems: 'center',
     minWidth: 400,
     maxWidth: 500,
@@ -244,26 +262,22 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   popupTitle: {
-    color: COLORS.secondary,
     fontSize: SIZING.font.body,
     fontWeight: 'bold',
     marginBottom: SIZING.spacing.sm,
     textAlign: 'center',
   },
   popupPrice: {
-    color: COLORS.matrix,
     fontSize: SIZING.font.body,
     marginBottom: SIZING.spacing.sm,
     textAlign: 'center',
   },
   buildTime: {
-    color: COLORS.secondary,
     fontSize: SIZING.font.small,
     marginBottom: SIZING.spacing.md,
     textAlign: 'center',
   },
   buildButton: {
-    backgroundColor: COLORS.matrix,
     paddingHorizontal: SIZING.spacing.lg,
     paddingVertical: SIZING.spacing.md,
     borderRadius: 6,
@@ -271,29 +285,19 @@ const styles = StyleSheet.create({
     minWidth: 200,
     alignItems: 'center',
   },
-  buildButtonDisabled: {
-    backgroundColor: COLORS.buttonDisabled,
-    opacity: 0.6,
-  },
   buildButtonText: {
-    color: COLORS.background,
     fontSize: SIZING.font.small,
     fontWeight: 'bold',
     textAlign: 'center',
     letterSpacing: 1,
   },
-  buildButtonTextDisabled: {
-    color: COLORS.text.secondary,
-  },
   closeButton: {
     paddingHorizontal: SIZING.spacing.lg,
     paddingVertical: SIZING.spacing.sm,
     borderWidth: 1,
-    borderColor: COLORS.matrix,
     borderRadius: 4,
   },
   closeButtonText: {
-    color: COLORS.secondary,
     fontSize: SIZING.font.small,
     textAlign: 'center',
   },
