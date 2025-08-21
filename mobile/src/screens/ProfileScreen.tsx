@@ -11,7 +11,7 @@ import {
 import { CloseButton } from '../components/common/CloseButton';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { logout } from '../store/slices/authSlice';
-import { useGetProfileQuery } from '../store/api/authApi';
+import { useGetProfileQuery, useGetResearchCenterStatusQuery } from '../store/api/authApi';
 import { useFetchBotStatsQuery } from '../store/api/botsApi';
 import { SIZING } from '../styles/theme';
 import { useTheme } from '../context/ThemeContext';
@@ -39,6 +39,7 @@ interface UserProfile {
   };
   unlockedFeatures: {
     hackRig: boolean;
+    researchCenter: boolean;
   };
 }
 
@@ -272,25 +273,44 @@ const createProfileStyles = (colors: any) => StyleSheet.create({
   featuresSection: {
     marginBottom: SIZING.spacing.lg,
     marginHorizontal: SIZING.spacing.sm,
+    backgroundColor: colors.background + '66',
+    borderWidth: 1,
+    borderColor: colors.matrix + '33',
+    borderRadius: 12,
+    padding: SIZING.spacing.md,
   },
   featureItem: {
-    backgroundColor: colors.matrix + '1A',
-    borderWidth: 1,
-    borderColor: colors.matrix,
-    borderRadius: 8,
+    backgroundColor: colors.matrix + '15',
+    borderWidth: 2,
+    borderColor: colors.matrix + '66',
+    borderRadius: 10,
     padding: SIZING.spacing.md,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: SIZING.spacing.sm,
+    shadowColor: colors.matrix,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   featureLabel: {
     color: colors.text.primary,
     fontSize: SIZING.font.body,
     fontWeight: 'bold',
+    letterSpacing: 1,
   },
   featureValue: {
     fontSize: SIZING.font.body,
     fontWeight: 'bold',
+    letterSpacing: 1,
+    paddingHorizontal: SIZING.spacing.sm,
+    paddingVertical: SIZING.spacing.xs,
+    borderRadius: 6,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.matrix + '40',
   },
   disconnectButton: {
     backgroundColor: colors.background + 'CC',
@@ -382,6 +402,9 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const { data: botStatsData, isLoading: botStatsLoading, error: botStatsError } = useFetchBotStatsQuery(undefined, {
     skip: !token,
   });
+  const { data: researchCenterData, isLoading: researchCenterLoading } = useGetResearchCenterStatusQuery(undefined, {
+    skip: !token,
+  });
 
   const handleLogout = () => {
     dispatch(logout());
@@ -393,7 +416,10 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
     email: profileData.email,
     level: profileData.level,
     experience: profileData.experience,
-    unlockedFeatures: profileData.unlockedFeatures
+    unlockedFeatures: {
+      hackRig: profileData.unlockedFeatures?.hackRig || false,
+      researchCenter: researchCenterData?.isUnlocked || false,
+    }
   } : null;
 
   const botStats: Record<string, BotStats> = botStatsData?.botStats || {};
@@ -539,8 +565,28 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                 <Text style={styles.sectionTitle}>FEATURES</Text>
                 <View style={styles.featureItem}>
                   <Text style={styles.featureLabel}>HACK RIG</Text>
-                  <Text style={[styles.featureValue, { color: profile.unlockedFeatures.hackRig ? colors.accent : colors.text.secondary }]}>
+                  <Text style={[
+                    styles.featureValue, 
+                    { 
+                      color: profile.unlockedFeatures.hackRig ? colors.matrix : colors.text.secondary,
+                      borderColor: profile.unlockedFeatures.hackRig ? colors.matrix : colors.text.secondary + '66',
+                      backgroundColor: profile.unlockedFeatures.hackRig ? colors.matrix + '15' : colors.text.secondary + '15'
+                    }
+                  ]}>
                     {profile.unlockedFeatures.hackRig ? 'UNLOCKED' : 'LOCKED'}
+                  </Text>
+                </View>
+                <View style={styles.featureItem}>
+                  <Text style={styles.featureLabel}>RESEARCH CENTER</Text>
+                  <Text style={[
+                    styles.featureValue, 
+                    { 
+                      color: profile.unlockedFeatures.researchCenter ? colors.matrix : colors.text.secondary,
+                      borderColor: profile.unlockedFeatures.researchCenter ? colors.matrix : colors.text.secondary + '66',
+                      backgroundColor: profile.unlockedFeatures.researchCenter ? colors.matrix + '15' : colors.text.secondary + '15'
+                    }
+                  ]}>
+                    {profile.unlockedFeatures.researchCenter ? 'UNLOCKED' : 'LOCKED'}
                   </Text>
                 </View>
               </View>

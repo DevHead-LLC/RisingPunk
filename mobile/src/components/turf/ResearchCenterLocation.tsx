@@ -23,7 +23,7 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
   const dispatch = useAppDispatch();
   
   // Use both sources to ensure we have the most up-to-date balance
-  const currentBalance = balanceData?.total || useAppSelector((state) => state.balance.total);
+  const currentBalance = balanceData?.total ?? useAppSelector((state) => state.balance.total);
   
   // Ensure balance is a number
   const numericBalance = typeof currentBalance === 'string' ? parseFloat(currentBalance) : currentBalance;

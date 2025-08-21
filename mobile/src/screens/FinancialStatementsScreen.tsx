@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
-import { COLORS, SIZING } from '../styles/theme';
+import { SIZING } from '../styles/theme';
 import { CloseButton } from '../components/common/CloseButton';
 import { useAppSelector } from '../store/hooks';
 import { getCurrentBalance } from '../store/slices/balanceSlice';
 import { useFetchFinanceTemplatesQuery, useFetchUserFinanceTiersQuery } from '../store/api/userFinanceApi';
+import { useTheme } from '../context/ThemeContext';
+import { useThemeColors } from '../hooks/useThemeColors';
 
 type Props = {
   onClose: () => void;
@@ -17,6 +19,8 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
   const { data: templatesData } = useFetchFinanceTemplatesQuery();
   const { data: userTiersData } = useFetchUserFinanceTiersQuery();
   const currentCash = useAppSelector(getCurrentBalance);
+  const { themeMode } = useTheme();
+  const colors = useThemeColors();
 
   const merged = useMemo(() => {
     const templates = templatesData?.templates || [];
@@ -30,6 +34,121 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
     // Default pick: barista (Tier 1) if present; else first template
     return byKey['barista'] || templates[0] || null;
   }, [templatesData, userTiersData]);
+
+  const getStyles = () => ({
+    container: {
+      position: 'absolute' as const,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: colors.background,
+      zIndex: 2000,
+    },
+    contentWrapper: {
+      flex: 1,
+      flexDirection: 'row' as const,
+    },
+    sidebar: {
+      width: 220,
+      borderRightWidth: 1,
+      borderRightColor: themeMode === 'light' ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.08)',
+      paddingTop: SIZING.spacing.lg,
+      paddingHorizontal: SIZING.spacing.md,
+      gap: SIZING.spacing.sm,
+      backgroundColor: themeMode === 'light' ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.6)',
+    },
+    title: {
+      color: themeMode === 'light' ? colors.text.primary : '#cfd8dc',
+      fontSize: SIZING.font.large,
+      fontWeight: 'bold' as const,
+      marginBottom: SIZING.spacing.sm,
+    },
+    tabButton: {
+      paddingVertical: SIZING.spacing.sm,
+      paddingHorizontal: SIZING.spacing.sm,
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: themeMode === 'light' ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.08)',
+      backgroundColor: themeMode === 'light' ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.02)',
+    },
+    tabButtonActive: {
+      backgroundColor: themeMode === 'light' ? 'rgba(71,23,246,0.1)' : 'rgba(71,23,246,0.15)',
+      borderColor: themeMode === 'light' ? 'rgba(71,23,246,0.3)' : 'rgba(71,23,246,0.5)',
+    },
+    tabText: {
+      color: themeMode === 'light' ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)',
+      fontSize: SIZING.font.body,
+    },
+    tabTextActive: {
+      color: themeMode === 'light' ? colors.secondary : '#b39ddb',
+      fontWeight: 'bold' as const,
+    },
+    mainPanel: {
+      flex: 1,
+      padding: SIZING.spacing.lg,
+    },
+    placeholderBox: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: themeMode === 'light' ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.12)',
+      borderRadius: 8,
+      backgroundColor: themeMode === 'light' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.25)',
+      padding: SIZING.spacing.lg,
+      justifyContent: 'flex-start' as const,
+      alignItems: 'stretch' as const,
+    },
+    scrollContent: {
+      paddingBottom: SIZING.spacing.lg,
+    },
+    placeholderTitle: {
+      color: themeMode === 'light' ? colors.text.primary : '#e8eaf6',
+      fontSize: SIZING.font.h2,
+      marginBottom: SIZING.spacing.md,
+      textAlign: 'left' as const,
+    },
+    placeholderSubtitle: {
+      color: themeMode === 'light' ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)',
+      fontSize: SIZING.font.small,
+      textAlign: 'center' as const,
+      lineHeight: 18,
+    },
+    listContainer: {
+      gap: SIZING.spacing.xs,
+    },
+    row: {
+      flexDirection: 'row' as const,
+      justifyContent: 'space-between' as const,
+      alignItems: 'center' as const,
+      paddingVertical: 6,
+      borderBottomWidth: 1,
+      borderBottomColor: themeMode === 'light' ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)',
+    },
+    keyText: {
+      color: themeMode === 'light' ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.85)',
+      fontSize: SIZING.font.body,
+      maxWidth: '70%'
+    },
+    valText: {
+      color: themeMode === 'light' ? colors.secondary : '#b39ddb',
+      fontSize: SIZING.font.body,
+      fontWeight: 'bold' as const,
+    },
+    sectionTitle: {
+      color: themeMode === 'light' ? colors.text.primary : '#cfd8dc',
+      fontSize: SIZING.font.large,
+      marginTop: SIZING.spacing.sm,
+      marginBottom: SIZING.spacing.xs,
+    },
+    tierTitle: {
+      color: themeMode === 'light' ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)',
+      fontSize: SIZING.font.body,
+      marginTop: -8,
+      marginBottom: SIZING.spacing.sm,
+    },
+  });
+
+  const styles = getStyles();
 
   const TabButton = ({ label, tab }: { label: string; tab: TabKey }) => (
     <TouchableOpacity
@@ -142,7 +261,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#0E0B16',
     zIndex: 2000,
   },
   contentWrapper: {
