@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { COLORS, SIZING } from '../../styles/theme';
+import { SIZING } from '../../styles/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 type BotTypeCardProps = {
   type: string;
@@ -19,15 +20,17 @@ export const BotTypeCard = React.memo(function BotTypeCard({
   count,
   onPress,
 }: BotTypeCardProps) {
+  const colors = useThemeColors();
+
   const cardContent = (
     <View style={styles.botCardContent}>
-      <Text style={styles.botType}>{type.toUpperCase()}</Text>
+      <Text style={[styles.botType, { color: colors.text.primary }]}>{type.toUpperCase()}</Text>
       {!isLocked ? (
-        <Text style={styles.botCount}>
+        <Text style={[styles.botCount, { color: colors.text.placeholder }]}>
           Owned: {count}
         </Text>
       ) : (
-        <Text style={styles.lockedText}>🔒 LOCKED</Text>
+        <Text style={[styles.lockedText, { color: colors.text.placeholder }]}>🔒 LOCKED</Text>
       )}
     </View>
   );
@@ -38,6 +41,10 @@ export const BotTypeCard = React.memo(function BotTypeCard({
         style={[
           styles.botCard,
           styles.botCardLocked,
+          {
+            backgroundColor: colors.accent + '20',
+            borderColor: colors.text.placeholder + '40',
+          }
         ]}
       >
         {cardContent}
@@ -50,6 +57,14 @@ export const BotTypeCard = React.memo(function BotTypeCard({
       style={[
         styles.botCard,
         isSelected && styles.botCardSelected,
+        {
+          backgroundColor: colors.accent + '30',
+          borderColor: colors.matrix + '40',
+        },
+        isSelected && {
+          backgroundColor: colors.accent + '60',
+          borderColor: colors.matrix + '80',
+        }
       ]}
       onPress={onPress}
     >
@@ -62,10 +77,8 @@ const styles = StyleSheet.create({
   botCard: {
     width: '100%',
     padding: SIZING.spacing.md,
-    backgroundColor: 'rgba(26, 77, 51, 0.3)',
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: 'rgba(0, 255, 65, 0.4)',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -73,25 +86,19 @@ const styles = StyleSheet.create({
   },
   botCardLocked: {
     opacity: 0.5,
-    backgroundColor: 'rgba(26, 77, 51, 0.1)',
-    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   botCardSelected: {
-    backgroundColor: 'rgba(26, 77, 51, 0.6)',
-    borderColor: 'rgba(0, 255, 65, 0.8)',
+    borderWidth: 2,
   },
   botType: {
-    color: COLORS.text.primary,
     fontSize: SIZING.font.body,
     fontWeight: 'bold',
     marginBottom: SIZING.spacing.xs,
   },
   botCount: {
-    color: 'rgba(255, 255, 255, 0.6)',
     fontSize: SIZING.font.small,
   },
   lockedText: {
-    color: 'rgba(255, 255, 255, 0.6)',
     fontSize: SIZING.font.small,
     fontWeight: 'bold',
   },

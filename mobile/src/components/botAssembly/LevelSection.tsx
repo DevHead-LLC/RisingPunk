@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { BotTypeCard } from './BotTypeCard';
 import { SIZING } from '../../styles/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 type BotType = 'breacher' | 'guardian' | 'phreak';
 
@@ -21,10 +22,11 @@ export const LevelSection = React.memo(function LevelSection({
   onSelectBotType,
 }: LevelSectionProps) {
   const isLocked = level > 1; // Marks 2-4 are locked for now
+  const colors = useThemeColors();
 
   return (
     <View style={styles.levelSection}>
-      <Text style={styles.levelTitle}>MARK {level}</Text>
+      <Text style={[styles.levelTitle, { color: colors.secondary }]}>MARK {level}</Text>
       <View style={styles.botGrid}>
         {(['breacher', 'guardian', 'phreak'] as BotType[]).map((type) => (
           <View key={`${type}-${level}`} style={styles.botContainer}>
@@ -48,7 +50,6 @@ const styles = StyleSheet.create({
     marginBottom: SIZING.spacing.lg,
   },
   levelTitle: {
-    color: '#4717F6',
     fontSize: SIZING.font.h2,
     fontWeight: 'bold',
     marginBottom: SIZING.spacing.md,

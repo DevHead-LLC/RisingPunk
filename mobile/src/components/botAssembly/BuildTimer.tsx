@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, SIZING } from '../../styles/theme';
+import { SIZING } from '../../styles/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { useAppSelector } from '../../store/hooks';
 
 type BuildTimerProps = {
@@ -19,6 +20,7 @@ export const BuildTimer = React.memo(function BuildTimer({
   const buildStartTime = useAppSelector((state) => state.bots.buildStartTime);
   const [currentProgress, setCurrentProgress] = useState<number>(progress);
   const [timeLeft, setTimeLeft] = useState<number>(0);
+  const colors = useThemeColors();
 
   const botsBuilt = Math.floor((currentProgress / 100) * totalBuildQuantity);
 
@@ -84,10 +86,10 @@ export const BuildTimer = React.memo(function BuildTimer({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.progressText} numberOfLines={1}>
+      <Text style={[styles.progressText, { color: colors.text.primary }]} numberOfLines={1}>
         {`${botsBuilt}/${totalBuildQuantity}`}
       </Text>
-      <Text style={styles.timerText} numberOfLines={1}>
+      <Text style={[styles.timerText, { color: colors.text.primary }]} numberOfLines={1}>
         {formattedTime}
       </Text>
     </View>
@@ -102,13 +104,11 @@ const styles = StyleSheet.create({
     marginBottom: SIZING.spacing.xs,
   },
   progressText: {
-    color: COLORS.text.primary,
     fontSize: SIZING.font.small,
     fontWeight: 'bold',
     width: 100,
   },
   timerText: {
-    color: COLORS.text.primary,
     fontSize: SIZING.font.small,
     fontWeight: 'bold',
     flex: 1,

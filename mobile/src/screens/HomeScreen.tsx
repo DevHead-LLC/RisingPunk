@@ -1,9 +1,10 @@
 import React, {memo} from 'react';
 import {View, StyleSheet} from 'react-native';
-import { COLORS, SIZING } from '../styles/theme';
+import { SIZING } from '../styles/theme';
 import { CloseButton } from '../components/common/CloseButton';
 import { HackRigDisplay } from '../components/home/HackRigDisplay';
 import { BotAssembly } from '../components/home/BotAssembly';
+import { useThemeColors } from '../hooks/useThemeColors';
 
 type HomeScreenProps = {
   onClose: () => void;
@@ -18,8 +19,10 @@ export const HomeScreen = memo(function HomeScreen({
   onNavigateToBotAssembly,
   onNavigateToBattle,
 }: HomeScreenProps): React.JSX.Element {
+  const colors = useThemeColors();
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <CloseButton onPress={onClose} />
       <View style={styles.content}>
         <HackRigDisplay
@@ -35,7 +38,6 @@ export const HomeScreen = memo(function HomeScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
   },
   content: {
     flex: 1,

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, SIZING } from '../../styles/theme';
+import { SIZING } from '../../styles/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { BotType } from '../../types/bots';
 import { useAppSelector } from '../../store/hooks';
 
@@ -22,6 +23,7 @@ export const BuildStatus = React.memo(function BuildStatus({
   botCost,
 }: BuildStatusProps) {
   const buildQueue = useAppSelector((state) => state.bots.buildQueue);
+  const colors = useThemeColors();
 
   const calculateCost = () => {
     // For active builds, use the stored totalCost
@@ -36,14 +38,14 @@ export const BuildStatus = React.memo(function BuildStatus({
   };
 
   return (
-    <View style={styles.buildStatus}>
+    <View style={[styles.buildStatus, { backgroundColor: colors.accent + '10' }]}>
       <View style={styles.statusRow}>
-        <Text style={styles.statusLabel}>Type:</Text>
-        <Text style={styles.statusValue}>{selectedType || 'N/A'}</Text>
+        <Text style={[styles.statusLabel, { color: colors.text.placeholder }]}>Type:</Text>
+        <Text style={[styles.statusValue, { color: colors.text.primary }]}>{selectedType || 'N/A'}</Text>
       </View>
       <View style={styles.statusRow}>
-        <Text style={styles.statusLabel}>Total Cost:</Text>
-        <Text style={styles.statusValue}>
+        <Text style={[styles.statusLabel, { color: colors.text.placeholder }]}>Total Cost:</Text>
+        <Text style={[styles.statusValue, { color: colors.text.primary }]}>
           {`$${formatBalance(calculateCost())}`}
         </Text>
       </View>
@@ -53,7 +55,6 @@ export const BuildStatus = React.memo(function BuildStatus({
 
 const styles = StyleSheet.create({
   buildStatus: {
-    backgroundColor: 'rgba(26, 77, 51, 0.1)',
     borderRadius: 4,
     padding: SIZING.spacing.sm,
   },
@@ -63,11 +64,9 @@ const styles = StyleSheet.create({
     marginBottom: SIZING.spacing.xs,
   },
   statusLabel: {
-    color: 'rgba(255, 255, 255, 0.6)',
     fontSize: SIZING.font.small,
   },
   statusValue: {
-    color: COLORS.text.primary,
     fontSize: SIZING.font.small,
     fontWeight: 'bold',
   },

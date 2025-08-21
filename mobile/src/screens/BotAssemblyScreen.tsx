@@ -12,8 +12,9 @@ import {
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { selectBotType } from '../store/slices/botsSlice';
 import { useStartBuildMutation } from '../store/api/botsApi';
-import { COLORS, SIZING } from '../styles/theme';
+import { SIZING } from '../styles/theme';
 import { useResponsiveDimensions } from '../hooks/useResponsiveDimensions';
+import { useThemeColors } from '../hooks/useThemeColors';
 import { LevelSection } from '../components/botAssembly/LevelSection';
 import { BuildSection } from '../components/botAssembly/BuildSection';
 import { BotAssemblyHeader } from '../components/botAssembly/BotAssemblyHeader';
@@ -29,6 +30,7 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
   const [startBuild] = useStartBuildMutation();
   const BOT_COST = 1;
   const { isSmallDevice, scaleFactor } = useResponsiveDimensions();
+  const colors = useThemeColors();
 
   const handleBuild = useCallback(() => {
     if (!bots.selectedType) {return;}
@@ -61,7 +63,7 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
   ), [bots.selectedType, bots.botCounts, userLevel, handleSelectBotType]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <BotAssemblyHeader onClose={onClose} />
       <KeyboardAvoidingView 
         style={styles.keyboardAvoidingView}
@@ -95,7 +97,6 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
   },
   header: {
     height: 100,
@@ -104,7 +105,6 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   title: {
-    color: COLORS.text.primary,
     fontSize: SIZING.font.h2,
     fontWeight: 'bold',
     letterSpacing: 2,
@@ -124,7 +124,6 @@ const styles = StyleSheet.create({
     marginVertical: SIZING.spacing.md,
   },
   levelTitle: {
-    color: '#4717F6',
     fontSize: SIZING.font.h2,
     fontWeight: 'bold',
     marginBottom: SIZING.spacing.sm,
@@ -137,10 +136,8 @@ const styles = StyleSheet.create({
   botCard: {
     width: '100%',
     padding: SIZING.spacing.md,
-    backgroundColor: 'rgba(26, 77, 51, 0.3)',
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: 'rgba(0, 255, 65, 0.4)',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -148,61 +145,49 @@ const styles = StyleSheet.create({
   },
   botCardLocked: {
     opacity: 0.5,
-    backgroundColor: 'rgba(26, 77, 51, 0.1)',
-    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   botCardSelected: {
-    backgroundColor: 'rgba(26, 77, 51, 0.6)',
-    borderColor: 'rgba(0, 255, 65, 0.8)',
+    borderWidth: 2,
   },
   botType: {
-    color: COLORS.text.primary,
     fontSize: SIZING.font.body,
     fontWeight: 'bold',
     marginBottom: SIZING.spacing.xs,
   },
   botDescription: {
-    color: 'rgba(255, 255, 255, 0.6)',
     fontSize: SIZING.font.small,
     marginBottom: SIZING.spacing.md,
   },
   botCount: {
-    color: 'rgba(255, 255, 255, 0.6)',
     fontSize: SIZING.font.small,
   },
   buildInfo: {
     gap: SIZING.spacing.md,
   },
   progressTitle: {
-    color: COLORS.text.primary,
     fontSize: SIZING.font.h2,
     fontWeight: 'bold',
     marginBottom: SIZING.spacing.sm,
     letterSpacing: 1,
   },
   progressDetails: {
-    color: 'rgba(255, 255, 255, 0.6)',
     fontSize: SIZING.font.body,
     marginBottom: SIZING.spacing.sm,
   },
   progressBar: {
     height: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     borderRadius: 2,
     overflow: 'hidden',
     marginVertical: SIZING.spacing.xs,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: 'rgba(0, 255, 65, 0.6)',
   },
   progressText: {
-    color: COLORS.text.primary,
     fontSize: SIZING.font.small,
     textAlign: 'center',
   },
   estimatedTime: {
-    color: 'rgba(255, 255, 255, 0.6)',
     fontSize: SIZING.font.small,
     textAlign: 'center',
     marginTop: SIZING.spacing.xs,
@@ -213,7 +198,6 @@ const styles = StyleSheet.create({
   buildProgress: {
     marginTop: SIZING.spacing.md,
     padding: SIZING.spacing.sm,
-    backgroundColor: 'rgba(26, 77, 51, 0.2)',
     borderRadius: 4,
   },
   selectedBotInfo: {
@@ -225,7 +209,6 @@ const styles = StyleSheet.create({
     marginBottom: SIZING.spacing.xs,
   },
   costText: {
-    color: 'rgba(255, 255, 255, 0.6)',
     fontSize: SIZING.font.small,
     marginBottom: SIZING.spacing.md,
   },
@@ -235,23 +218,19 @@ const styles = StyleSheet.create({
     marginBottom: SIZING.spacing.xs,
   },
   statusLabel: {
-    color: 'rgba(255, 255, 255, 0.6)',
     fontSize: SIZING.font.small,
   },
   statusValue: {
-    color: COLORS.text.primary,
     fontSize: SIZING.font.small,
     fontWeight: 'bold',
   },
   buildStatus: {
-    backgroundColor: 'rgba(26, 77, 51, 0.1)',
     borderRadius: 4,
     padding: SIZING.spacing.sm,
   },
   fixedControls: {
     padding: SIZING.spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 255, 65, 0.1)',
   },
   statusScroll: {
     flex: 1,
@@ -262,7 +241,6 @@ const styles = StyleSheet.create({
     padding: SIZING.spacing.lg,
   },
   lockedText: {
-    color: 'rgba(255, 255, 255, 0.6)',
     fontSize: SIZING.font.small,
     fontWeight: 'bold',
   },

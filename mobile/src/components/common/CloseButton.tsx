@@ -1,20 +1,28 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { COLORS, SIZING } from '../../styles/theme';
+import { SIZING } from '../../styles/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 interface CloseButtonProps {
   onPress: () => void;
 }
 
-export const CloseButton = ({ onPress }: CloseButtonProps) => (
-  <TouchableOpacity
-    style={styles.closeButton}
-    onPress={onPress}
-    testID="close-button"
-  >
-    <Text style={styles.closeButtonText}>×</Text>
-  </TouchableOpacity>
-);
+export const CloseButton = ({ onPress }: CloseButtonProps) => {
+  const colors = useThemeColors();
+  
+  return (
+    <TouchableOpacity
+      style={[styles.closeButton, { 
+        backgroundColor: colors.primary,
+        borderColor: colors.secondary,
+      }]}
+      onPress={onPress}
+      testID="close-button"
+    >
+      <Text style={[styles.closeButtonText, { color: colors.background }]}>×</Text>
+    </TouchableOpacity>
+  );
+};
 
 const styles = StyleSheet.create({
   closeButton: {
@@ -26,14 +34,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 22,
-    backgroundColor: '#b39ddb',
     borderWidth: 2,
-    borderColor: COLORS.secondary,
     zIndex: 1000,
   },
   closeButtonText: {
     fontSize: 28,
-    color: COLORS.background,
     marginTop: -2,
   },
 });

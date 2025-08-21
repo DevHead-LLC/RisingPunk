@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { SIZING } from '../../styles/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 type BuildProgressBarProps = {
   progress: number;
@@ -9,12 +10,17 @@ type BuildProgressBarProps = {
 export const BuildProgressBar = React.memo(function BuildProgressBar({
   progress,
 }: BuildProgressBarProps) {
+  const colors = useThemeColors();
+
   return (
-    <View style={styles.progressBar}>
+    <View style={[styles.progressBar, { backgroundColor: colors.text.placeholder + '30' }]}>
       <View
         style={[
           styles.progressFill,
-          { width: `${progress}%` },
+          { 
+            width: `${progress}%`,
+            backgroundColor: colors.matrix + '60',
+          },
         ]}
       />
     </View>
@@ -24,13 +30,11 @@ export const BuildProgressBar = React.memo(function BuildProgressBar({
 const styles = StyleSheet.create({
   progressBar: {
     height: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     borderRadius: 2,
     overflow: 'hidden',
     marginVertical: SIZING.spacing.xs,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: 'rgba(0, 255, 65, 0.6)',
   },
 });

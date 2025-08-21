@@ -1,7 +1,8 @@
 import React, {useRef, useState, useEffect} from 'react';
 import {View, StyleSheet, TouchableOpacity, Image, Text, Animated, Alert} from 'react-native';
-import { COLORS, SIZING } from '../../styles/theme';
+import { SIZING } from '../../styles/theme';
 import { useAppSelector } from '../../store/hooks';
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { API_URL } from '../../config';
 
 type Props = {
@@ -10,6 +11,7 @@ type Props = {
 };
 
 export const HackRigDisplay = ({ onPress, onNavigateToBattle }: Props) => {
+  const colors = useThemeColors();
   const user = useAppSelector((state) => state.auth.user);
   const token = useAppSelector((state) => state.auth.token);
   const [isLocked, setIsLocked] = useState(true);
@@ -104,9 +106,15 @@ export const HackRigDisplay = ({ onPress, onNavigateToBattle }: Props) => {
   // Show loading state while fetching
   if (isLoading) {
     return (
-      <View style={[styles.moduleContainer, styles.moduleDisabled]}>
+      <View style={[styles.moduleContainer, styles.moduleDisabled, { 
+        backgroundColor: colors.accent + 'E6',
+        borderColor: colors.secondary 
+      }]}>
         <View style={styles.touchable}>
-          <View style={styles.imageContainer}>
+          <View style={[styles.imageContainer, { 
+            backgroundColor: colors.inputBg + '4D',
+            borderColor: colors.matrix 
+          }]}>
             <Image
               source={require('../../assets/images/hacker-rig.png')}
               style={styles.moduleImage}
@@ -116,8 +124,8 @@ export const HackRigDisplay = ({ onPress, onNavigateToBattle }: Props) => {
             </View>
           </View>
           <View style={styles.moduleTextContainer}>
-            <Text style={styles.moduleTitle}>HACK RIG</Text>
-            <Text style={styles.moduleDescription}>Loading...</Text>
+            <Text style={[styles.moduleTitle, { color: colors.primary }]}>HACK RIG</Text>
+            <Text style={[styles.moduleDescription, { color: colors.text.secondary }]}>Loading...</Text>
           </View>
         </View>
       </View>
@@ -128,6 +136,10 @@ export const HackRigDisplay = ({ onPress, onNavigateToBattle }: Props) => {
     <Animated.View
       style={[
         styles.moduleContainer,
+        { 
+          backgroundColor: colors.accent + 'E6',
+          borderColor: colors.secondary 
+        },
         isLocked && styles.moduleDisabled,
         isAlertOpen && styles.warningBorder,
         { transform: [{ scale: pulseAnim }] },
@@ -137,7 +149,10 @@ export const HackRigDisplay = ({ onPress, onNavigateToBattle }: Props) => {
         style={styles.touchable}
         onPress={isLocked ? handlePress : onPress}
       >
-        <View style={styles.imageContainer}>
+        <View style={[styles.imageContainer, { 
+          backgroundColor: colors.inputBg + '4D',
+          borderColor: colors.matrix 
+        }]}>
           <Image
             source={require('../../assets/images/hacker-rig.png')}
             style={styles.moduleImage}
@@ -149,8 +164,8 @@ export const HackRigDisplay = ({ onPress, onNavigateToBattle }: Props) => {
           )}
         </View>
         <View style={styles.moduleTextContainer}>
-          <Text style={styles.moduleTitle}>HACK RIG</Text>
-          <Text style={styles.moduleDescription}>Access the network</Text>
+          <Text style={[styles.moduleTitle, { color: colors.primary }]}>HACK RIG</Text>
+          <Text style={[styles.moduleDescription, { color: colors.text.secondary }]}>Access the network</Text>
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -161,10 +176,8 @@ const styles = StyleSheet.create({
   moduleContainer: {
     width: '45%',
     aspectRatio: 1,
-    backgroundColor: 'rgba(10, 10, 10, 0.9)',
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: COLORS.secondary,
     overflow: 'hidden',
   },
   touchable: {
@@ -177,11 +190,9 @@ const styles = StyleSheet.create({
   imageContainer: {
     width: '100%',
     aspectRatio: 1.5,
-    backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: 4,
     marginBottom: SIZING.spacing.sm,
     borderWidth: 1,
-    borderColor: COLORS.matrix,
     padding: SIZING.spacing.xs,
   },
   moduleImage: {
@@ -194,13 +205,11 @@ const styles = StyleSheet.create({
     marginTop: 'auto',
   },
   moduleTitle: {
-    color: '#b39ddb',
     fontSize: SIZING.font.body,
     fontWeight: 'bold',
     letterSpacing: 2,
   },
   moduleDescription: {
-    color: '#9C27B0',
     fontSize: SIZING.font.small,
     marginTop: SIZING.spacing.xs,
   },
