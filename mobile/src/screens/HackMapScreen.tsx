@@ -9,6 +9,8 @@ import { setGrid, setLoading } from '../store/slices/mapSlice';
 import { useFetchMapQuery } from '../store/api/mapApi';
 import { computePanBounds } from '../utils/mapPanBounds';
 import { CellData, TerrainType, EntityType } from '../types/map';
+import { useThemeColors } from '../hooks/useThemeColors';
+import { useTheme } from '../context/ThemeContext';
 
 const CELL_SIZE = 55;
 const MARGIN_SIZE = 80;
@@ -26,6 +28,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const grid = useAppSelector((state) => state.map.grid);
   const loading = useAppSelector((state) => state.map.loading);
   const currentUserHandle = useAppSelector((state) => state.auth.user?.handle);
+  const colors = useThemeColors();
+  const { themeMode } = useTheme();
 
   const [selectedCell, setSelectedCell] = useState<{x: number, y: number, info: CellData} | null>(null);
   const offsetX = useSharedValue(0);
@@ -132,14 +136,14 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
   // Precompute terrain style map and position style caches
   const terrainStyleMap = useMemo(() => ({
-    water: styles.waterTerrain,
-    mountain: styles.mountainTerrain,
-    forest: styles.forestTerrain,
-    road: styles.roadTerrain,
-    grass: styles.grassTerrain,
-    dirt: styles.dirtTerrain,
-    plain: styles.plainTerrain,
-  } as Record<TerrainType, any>), []);
+    water: getStyles(colors, themeMode).waterTerrain,
+    mountain: getStyles(colors, themeMode).mountainTerrain,
+    forest: getStyles(colors, themeMode).forestTerrain,
+    road: getStyles(colors, themeMode).roadTerrain,
+    grass: getStyles(colors, themeMode).grassTerrain,
+    dirt: getStyles(colors, themeMode).dirtTerrain,
+    plain: getStyles(colors, themeMode).plainTerrain,
+  } as Record<TerrainType, any>), [colors, themeMode]);
 
   const xPosStyles = useMemo(() => {
     return Array.from({ length: gridSize }, (_, x) => ({ position: 'absolute', left: x * CELL_SIZE, top: 0 }));
@@ -396,38 +400,38 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     if (!selectedCell) {return null;}
 
     return (
-      <View style={styles.infoPanel}>
+      <View style={getStyles(colors, themeMode).infoPanel}>
         <Pressable
-          style={styles.infoPanelClose}
+          style={getStyles(colors, themeMode).infoPanelClose}
           onPress={() => setSelectedCell(null)}
         >
-          <Text style={styles.closeSymbol}>×</Text>
+          <Text style={getStyles(colors, themeMode).closeSymbol}>×</Text>
         </Pressable>
-        <Text style={styles.coordsText}>
+        <Text style={getStyles(colors, themeMode).coordsText}>
           GRID: ({selectedCell.x}, {selectedCell.y})
         </Text>
-        <Text style={styles.terrainText}>
+        <Text style={getStyles(colors, themeMode).terrainText}>
           TERRAIN: {selectedCell.info.terrain.toUpperCase()}
         </Text>
         {selectedCell.info.entity !== 'empty' && (
           <>
-            <Text style={styles.entityText}>
+            <Text style={getStyles(colors, themeMode).entityText}>
               ENTITY: {selectedCell.info.name || 'UNKNOWN'}
             </Text>
             {selectedCell.info.owner !== 'player' && selectedCell.info.npcLevel && (
-              <Text style={styles.npcLevelModalText}>
+              <Text style={getStyles(colors, themeMode).npcLevelModalText}>
                 LEVEL: {selectedCell.info.npcLevel}
               </Text>
             )}
             <Text style={[
-              styles.statusText,
-              selectedCell.info.owner === 'player' ? styles.friendlyText : styles.hostileText,
+              getStyles(colors, themeMode).statusText,
+              selectedCell.info.owner === 'player' ? getStyles(colors, themeMode).friendlyText : getStyles(colors, themeMode).hostileText,
             ]}>
               STATUS: {selectedCell.info.owner === 'player' ? 'FRIENDLY' : 'HOSTILE'}
             </Text>
               {selectedCell.info.owner !== 'player' && selectedCell.info.npcSlug && (
               <Pressable
-                style={[styles.hackButton]}
+                style={[getStyles(colors, themeMode).hackButton]}
                 onPress={() => {
                   (globalThis as any).pendingNpcSlug = selectedCell.info.npcSlug;
                     (globalThis as any).pendingNpcInstanceId = selectedCell.info.npcInstanceId;
@@ -439,7 +443,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                   onClose();
                 }}
               >
-                <Text style={styles.hackButtonText}>Hack Entity</Text>
+                <Text style={getStyles(colors, themeMode).hackButtonText}>Hack Entity</Text>
               </Pressable>
             )}
           </>
@@ -449,11 +453,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   };
 
   if (loading) {
-    return <View style={styles.container}><LoadingSpinner /></View>;
+    return <View style={getStyles(colors, themeMode).container}><LoadingSpinner /></View>;
   }
 
   return (
-    <View style={styles.container} onLayout={onContainerLayout}>
+    <View style={getStyles(colors, themeMode).container} onLayout={onContainerLayout}>
       <CloseButton onPress={onClose} />
 
       {renderLegend()}
@@ -463,12 +467,12 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       <GestureDetector gesture={panGesture}>
         <Animated.View
           style={[
-            styles.marginWrapper,
+            getStyles(colors, themeMode).marginWrapper,
             { width: totalSize + (MARGIN_SIZE * 2), height: totalSize + (MARGIN_SIZE * 2) },
             animatedMapStyle as any,
           ]}
         >
-          <View style={[styles.gridArea, { width: totalSize, height: totalSize }]}>
+          <View style={[getStyles(colors, themeMode).gridArea, { width: totalSize, height: totalSize }]}>
             {Array.from({ length: gridSize }).map((_, y) => (
               <Row
                 key={y}
@@ -484,6 +488,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                 terrainStyleMap={terrainStyleMap}
                 currentUserHandle={currentUserHandle}
                 disableTiles
+                colors={colors}
+                themeMode={themeMode}
               />
             ))}
 
@@ -507,6 +513,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                   yStyle={yPosStyles[y]}
                   terrainStyleMap={terrainStyleMap}
                   currentUserHandle={currentUserHandle}
+                  colors={colors}
+                  themeMode={themeMode}
                 />
               );
             })}
@@ -526,46 +534,48 @@ type TileProps = {
   xStyle: any;
   terrainStyleMap: Record<TerrainType, any>;
   currentUserHandle?: string | null;
+  colors: ReturnType<typeof useThemeColors>;
+  themeMode: 'light' | 'dark';
 };
 
-const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle }) => {
+const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle, colors, themeMode }) => {
   const houseBgStyle = cell.entity === 'house'
     ? (cell.owner === 'player'
-        ? (cell.name === currentUserHandle ? styles.userHouseBg : styles.otherUserHouseBg)
-        : styles.enemyHouseBg)
+        ? (cell.name === currentUserHandle ? getStyles(colors, themeMode).userHouseBg : getStyles(colors, themeMode).otherUserHouseBg)
+        : getStyles(colors, themeMode).enemyHouseBg)
     : null;
   return (
     <Pressable
       style={[
-        styles.cell,
+        getStyles(colors, themeMode).cell,
         xStyle,
-        selected && styles.selectedCell,
+        selected && getStyles(colors, themeMode).selectedCell,
       ]}
       onPress={() => onPress(x, y, cell)}
     >
-      <View style={[styles.cellContent, terrainStyleMap[cell.terrain], houseBgStyle]}>
-        {cell.entity !== 'house' && getTerrainIcon(cell.terrain)}
+      <View style={[getStyles(colors, themeMode).cellContent, terrainStyleMap[cell.terrain], houseBgStyle]}>
+        {cell.entity !== 'house' && getTerrainIcon(cell.terrain, colors)}
         {cell.entity === 'house' && (
           <>
             {cell.owner === 'player' ? (
-              <Image source={require('../assets/images/home.png')} style={styles.playerHomeIcon} resizeMode="contain" />
+              <Image source={require('../assets/images/home.png')} style={getStyles(colors, themeMode).playerHomeIcon} resizeMode="contain" />
             ) : (
               <>
                 {(() => {
                   const slug = (cell as any).npcSlug as string | undefined;
                   if (slug === 'npc-small-corporation') {
-                    return <Image source={require('../assets/images/fog-building.png')} style={styles.playerHomeIcon} resizeMode="contain" />;
+                    return <Image source={require('../assets/images/fog-building.png')} style={getStyles(colors, themeMode).playerHomeIcon} resizeMode="contain" />;
                   }
                   // default for small bank and large corporation
-                  return <Image source={require('../assets/images/fog-tall-building.png')} style={styles.playerHomeIcon} resizeMode="contain" />;
+                  return <Image source={require('../assets/images/fog-tall-building.png')} style={getStyles(colors, themeMode).playerHomeIcon} resizeMode="contain" />;
                 })()}
               </>
             )}
-            <View style={styles.entityLabelContainer} pointerEvents="none">
+            <View style={getStyles(colors, themeMode).entityLabelContainer} pointerEvents="none">
               <Text
                 style={[
-                  styles.entityLabel,
-                  cell.owner === 'player' ? styles.playerLabel : styles.enemyLabel,
+                  getStyles(colors, themeMode).entityLabel,
+                  cell.owner === 'player' ? getStyles(colors, themeMode).playerLabel : getStyles(colors, themeMode).enemyLabel,
                 ]}
                 numberOfLines={1}
                 ellipsizeMode="tail"
@@ -575,8 +585,8 @@ const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, x
             </View>
             {/* NPC Level Indicator */}
             {cell.owner !== 'player' && cell.npcLevel && (
-              <View style={styles.npcLevelContainer} pointerEvents="none">
-                <Text style={styles.npcLevelText}>{cell.npcLevel}</Text>
+              <View style={getStyles(colors, themeMode).npcLevelContainer} pointerEvents="none">
+                <Text style={getStyles(colors, themeMode).npcLevelText}>{cell.npcLevel}</Text>
               </View>
             )}
           </>
@@ -596,12 +606,14 @@ type PoolTileProps = {
   yStyle: any;
   terrainStyleMap: Record<TerrainType, any>;
   currentUserHandle?: string | null;
+  colors: ReturnType<typeof useThemeColors>;
+  themeMode: 'light' | 'dark';
 };
 
-const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle }) => {
+const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode }) => {
   return (
     <View style={[yStyle]}>
-      <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} />
+      <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} />
     </View>
   );
 });
@@ -619,16 +631,18 @@ type RowProps = {
   terrainStyleMap: Record<TerrainType, any>;
   disableTiles?: boolean;
   currentUserHandle?: string | null;
+  colors: ReturnType<typeof useThemeColors>;
+  themeMode: 'light' | 'dark';
 };
 
-const Row: React.FC<RowProps> = React.memo(({ y, row, colStart, colEnd, rowVisible, selectedCell, onPress, rowStyle, xPosStyles, terrainStyleMap, disableTiles, currentUserHandle }) => {
+const Row: React.FC<RowProps> = React.memo(({ y, row, colStart, colEnd, rowVisible, selectedCell, onPress, rowStyle, xPosStyles, terrainStyleMap, disableTiles, currentUserHandle, colors, themeMode }) => {
   // Always render the row container (grid shell), but only mount tiles when visible
   if (!row) {
-    return <View style={[styles.row, rowStyle]} />;
+    return <View style={[getStyles(colors, themeMode).row, rowStyle]} />;
   }
 
   if (disableTiles) {
-    return <View style={[styles.row, rowStyle]} />;
+    return <View style={[getStyles(colors, themeMode).row, rowStyle]} />;
   }
 
   const tiles = rowVisible
@@ -637,12 +651,12 @@ const Row: React.FC<RowProps> = React.memo(({ y, row, colStart, colEnd, rowVisib
         const cell = row[x];
         if (!cell) return null;
         const isSelected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
-        return <Tile key={x} x={x} y={y} cell={cell} selected={isSelected} onPress={onPress} xStyle={xPosStyles[x]} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} />;
+        return <Tile key={x} x={x} y={y} cell={cell} selected={isSelected} onPress={onPress} xStyle={xPosStyles[x]} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} />;
       })
     : null;
 
   return (
-    <View style={[styles.row, rowStyle]}>
+    <View style={[getStyles(colors, themeMode).row, rowStyle]}>
       {tiles}
     </View>
   );
@@ -654,16 +668,16 @@ const Row: React.FC<RowProps> = React.memo(({ y, row, colStart, colEnd, rowVisib
   return prevSelInRow === nextSelInRow;
 });
 
-const getTerrainIcon = (terrain: TerrainType) => {
+const getTerrainIcon = (terrain: TerrainType, colors: ReturnType<typeof useThemeColors>) => {
   switch (terrain) {
     case 'water':
-      return <Text style={[styles.terrainSymbol, styles.waterSymbol]}>~</Text>;
+      return <Text style={[getStyles(colors, 'light').terrainSymbol, getStyles(colors, 'light').waterSymbol]}>~</Text>;
     case 'mountain':
-      return <Text style={[styles.terrainSymbol, styles.mountainSymbol]}>▲</Text>;
+      return <Text style={[getStyles(colors, 'light').terrainSymbol, getStyles(colors, 'light').mountainSymbol]}>▲</Text>;
     case 'forest':
-      return <Text style={[styles.terrainSymbol, styles.forestSymbol]}>♣</Text>;
+      return <Text style={[getStyles(colors, 'light').terrainSymbol, getStyles(colors, 'light').forestSymbol]}>♣</Text>;
     case 'road':
-      return <Text style={[styles.terrainSymbol, styles.roadSymbol]}>≡</Text>;
+      return <Text style={[getStyles(colors, 'light').terrainSymbol, getStyles(colors, 'light').roadSymbol]}>≡</Text>;
     case 'grass':
       return null;
     case 'dirt':
@@ -673,36 +687,36 @@ const getTerrainIcon = (terrain: TerrainType) => {
   }
 };
 
-const getTerrainStyle = (terrain: TerrainType) => {
+const getTerrainStyle = (terrain: TerrainType, colors: ReturnType<typeof useThemeColors>) => {
   switch (terrain) {
     case 'water':
-      return styles.waterTerrain;
+      return getStyles(colors, 'light').waterTerrain;
     case 'mountain':
-      return styles.mountainTerrain;
+      return getStyles(colors, 'light').mountainTerrain;
     case 'forest':
-      return styles.forestTerrain;
+      return getStyles(colors, 'light').forestTerrain;
     case 'road':
-      return styles.roadTerrain;
+      return getStyles(colors, 'light').roadTerrain;
     case 'grass':
-      return styles.grassTerrain;
+      return getStyles(colors, 'light').grassTerrain;
     case 'dirt':
-      return styles.dirtTerrain;
+      return getStyles(colors, 'light').dirtTerrain;
     default:
-      return styles.plainTerrain;
+      return getStyles(colors, 'light').plainTerrain;
   }
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light' | 'dark') => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: colors.background,
   },
   dragContainer: {
     flex: 1,
     overflow: 'hidden',
   },
   grid: {
-    backgroundColor: 'rgba(26, 77, 51, 0.1)',
+    backgroundColor: themeMode === 'light' ? 'rgba(26, 77, 51, 0.05)' : 'rgba(26, 77, 51, 0.1)',
   },
   row: {
     flexDirection: 'row',
@@ -711,14 +725,14 @@ const styles = StyleSheet.create({
     width: CELL_SIZE,
     height: CELL_SIZE,
     borderWidth: 1,
-    borderColor: 'rgba(0, 255, 65, 0.1)',
+    borderColor: themeMode === 'light' ? 'rgba(0, 100, 0, 0.2)' : 'rgba(0, 255, 65, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(26, 77, 51, 0.02)',
+    backgroundColor: themeMode === 'light' ? 'rgba(26, 77, 51, 0.02)' : 'rgba(26, 77, 51, 0.02)',
   },
   selectedCell: {
-    backgroundColor: 'rgba(0, 255, 65, 0.1)',
-    borderColor: 'rgba(0, 255, 65, 0.3)',
+    backgroundColor: themeMode === 'light' ? 'rgba(0, 100, 0, 0.15)' : 'rgba(0, 255, 65, 0.1)',
+    borderColor: themeMode === 'light' ? 'rgba(0, 100, 0, 0.4)' : 'rgba(0, 255, 65, 0.3)',
   },
   cellContent: {
     width: '100%',
@@ -727,32 +741,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   plainTerrain: {
-    backgroundColor: 'rgba(26, 77, 51, 0.05)',
-    borderColor: 'rgba(0, 255, 65, 0.1)',
+    backgroundColor: themeMode === 'light' ? 'rgba(26, 77, 51, 0.08)' : 'rgba(26, 77, 51, 0.05)',
+    borderColor: themeMode === 'light' ? 'rgba(0, 100, 0, 0.2)' : 'rgba(0, 255, 65, 0.1)',
   },
   waterTerrain: {
-    backgroundColor: 'rgba(33, 150, 243, 0.1)',
-    borderColor: 'rgba(33, 150, 243, 0.2)',
+    backgroundColor: themeMode === 'light' ? 'rgba(12, 132, 231, 0.44)' : 'rgba(33, 150, 243, 0.1)',
+    borderColor: themeMode === 'light' ? 'rgba(33, 150, 243, 0.3)' : 'rgba(33, 150, 243, 0.2)',
   },
   roadTerrain: {
-    backgroundColor: 'rgba(255, 193, 7, 0.06)',
-    borderColor: 'rgba(255, 193, 7, 0.2)',
+    backgroundColor: themeMode === 'light' ? 'rgba(202, 155, 13, 0.63)' : 'rgba(255, 193, 7, 0.29)',
+    borderColor: themeMode === 'light' ? 'rgba(255, 193, 7, 0.3)' : 'rgba(255, 193, 7, 0.2)',
   },
   grassTerrain: {
-    backgroundColor: 'rgba(76, 175, 80, 0.08)',
-    borderColor: 'rgba(76, 175, 80, 0.15)',
+    backgroundColor: themeMode === 'light' ? 'rgba(76, 175, 80, 0.25)' : 'rgba(19, 232, 26, 0.08)',
+    borderColor: themeMode === 'light' ? 'rgba(76, 175, 80, 0.4)' : 'rgba(76, 175, 80, 0.25)',
   },
   dirtTerrain: {
-    backgroundColor: 'rgba(160, 82, 45, 0.09)',
-    borderColor: 'rgba(160, 82, 45, 0.15)',
+    backgroundColor: themeMode === 'light' ? 'rgba(160, 82, 45, 0.12)' : 'rgba(160, 82, 45, 0.09)',
+    borderColor: themeMode === 'light' ? 'rgba(160, 82, 45, 0.25)' : 'rgba(160, 82, 45, 0.15)',
   },
   mountainTerrain: {
-    backgroundColor: 'rgba(158, 158, 158, 0.1)',
-    borderColor: 'rgba(158, 158, 158, 0.2)',
+    backgroundColor: themeMode === 'light' ? 'rgba(158, 158, 158, 0.54)' : 'rgba(158, 158, 158, 0.1)',
+    borderColor: themeMode === 'light' ? 'rgba(158, 158, 158, 0.3)' : 'rgba(158, 158, 158, 0.2)',
   },
   forestTerrain: {
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-    borderColor: 'rgba(76, 175, 80, 0.2)',
+    backgroundColor: themeMode === 'light' ? 'rgba(76, 175, 79, 0.42)' : 'rgba(4, 75, 7, 0.45)',
+    borderColor: themeMode === 'light' ? 'rgba(76, 175, 80, 0.3)' : 'rgba(76, 175, 80, 0.2)',
   },
   backButton: {
     position: 'absolute',
@@ -761,27 +775,27 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#4a90e2',
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1,
   },
   backButtonText: {
-    color: '#fff',
+    color: colors.background,
     fontSize: 24,
     fontWeight: 'bold',
   },
   hackButton: {
     marginTop: 10,
     borderWidth: 1,
-    borderColor: '#00ff41',
+    borderColor: colors.matrix,
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 4,
     alignSelf: 'flex-start',
   },
   hackButtonText: {
-    color: '#00ff41',
+    color: colors.matrix,
     fontSize: 14,
     fontWeight: 'bold',
   },
@@ -789,26 +803,26 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 20,
     left: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: themeMode === 'light' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.8)',
     padding: 15,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#00ff41',
+    borderColor: colors.matrix,
     zIndex: 1,
   },
   coordsText: {
-    color: '#00ff41',
+    color: colors.matrix,
     fontSize: 14,
     fontFamily: 'monospace',
   },
   entityName: {
-    color: '#00ff41',
+    color: colors.matrix,
     fontSize: 16,
     fontWeight: 'bold',
     marginTop: 8,
   },
   entityDetails: {
-    color: 'rgba(0, 255, 65, 0.7)',
+    color: themeMode === 'light' ? 'rgba(0, 100, 0, 0.8)' : 'rgba(0, 255, 65, 0.7)',
     fontSize: 12,
     marginTop: 4,
   },
@@ -828,16 +842,16 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   userHouseBg: {
-    backgroundColor: 'rgba(52, 140, 255, 0.35)',
+    backgroundColor: themeMode === 'light' ? 'rgba(52, 140, 255, 0.4)' : 'rgba(52, 140, 255, 0.35)',
   },
   otherUserHouseBg: {
-    backgroundColor: 'rgba(128, 128, 128, 0.35)',
+    backgroundColor: themeMode === 'light' ? 'rgba(128, 128, 128, 0.4)' : 'rgba(128, 128, 128, 0.35)',
   },
   enemyHouseBg: {
-    backgroundColor: 'rgba(204, 85, 0, 0.35)',
+    backgroundColor: themeMode === 'light' ? 'rgba(204, 85, 0, 0.4)' : 'rgba(204, 85, 0, 0.35)',
   },
   otherUserHouse: {
-    backgroundColor: 'rgba(128, 128, 128, 0.35)',
+    backgroundColor: themeMode === 'light' ? 'rgba(128, 128, 128, 0.4)' : 'rgba(128, 128, 128, 0.35)',
   },
   playerHomeIcon: {
     width: CELL_SIZE - 10,
@@ -856,16 +870,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   playerLabel: {
-    color: '#00ff41',
+    color: themeMode === 'light' ? 'white' : colors.matrix,
   },
   enemyLabel: {
-    color: '#cc5500',
+    color: 'white',
   },
   npcLevelContainer: {
     position: 'absolute',
     top: 2,
     right: 2,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: themeMode === 'light' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(64, 167, 4, 0.9)',
     borderRadius: 8,
     paddingHorizontal: 4,
     paddingVertical: 2,
@@ -874,63 +888,63 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   npcLevelText: {
-    color: '#00ff41',
+    color: 'black',
     fontSize: 10,
     fontWeight: 'bold',
     textAlign: 'center',
   },
   npcLevelModalText: {
-    color: '#ff6b35',
+    color: themeMode === 'light' ? '#ff6b35' : '#ff6b35',
     fontSize: 14,
     fontWeight: 'bold',
     marginBottom: 5,
   },
   playerEntity: {
-    backgroundColor: 'rgba(0, 255, 65, 0.1)',
+    backgroundColor: themeMode === 'light' ? 'rgba(0, 100, 0, 0.15)' : 'rgba(0, 255, 65, 0.1)',
   },
   enemyEntity: {
-    backgroundColor: 'rgba(255, 65, 65, 0.1)',
+    backgroundColor: themeMode === 'light' ? 'rgba(255, 65, 65, 0.15)' : 'rgba(255, 65, 65, 0.1)',
   },
   infoPanel: {
     position: 'absolute',
     top: '50%',
     left: '50%',
     transform: [{ translateX: -100 }, { translateY: -50 }],
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    backgroundColor: themeMode === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(0, 0, 0, 0.9)',
     padding: 15,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#00ff41',
+    borderColor: colors.matrix,
     zIndex: 2,
     minWidth: 200,
     paddingTop: 30,
   },
   terrainText: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: themeMode === 'light' ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.8)',
     fontSize: 14,
     marginBottom: 5,
   },
   entityText: {
-    color: '#00ff41',
+    color: colors.matrix,
     fontSize: 14,
   },
   legend: {
     position: 'absolute',
     top: 20,
     left: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    backgroundColor: themeMode === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(0, 0, 0, 0.9)',
     padding: 15,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#00ff41',
+    borderColor: colors.matrix,
     zIndex: 2,
   },
   legendCollapsed: {
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    backgroundColor: themeMode === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(0, 0, 0, 0.9)',
     padding: 10,
   },
   legendTitle: {
-    color: '#00ff41',
+    color: colors.matrix,
     fontSize: 12,
     fontWeight: 'bold',
     marginBottom: 10,
@@ -944,7 +958,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   legendText: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: themeMode === 'light' ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.8)',
     fontSize: 12,
   },
   statusText: {
@@ -952,10 +966,10 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   friendlyText: {
-    color: '#00ff41',
+    color: colors.matrix,
   },
   hostileText: {
-    color: '#ff4141',
+    color: themeMode === 'light' ? '#cc0000' : '#ff4141',
   },
   infoPanelClose: {
     position: 'absolute',
@@ -976,25 +990,25 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   waterSymbol: {
-    color: 'rgba(33, 150, 243, 0.8)',
+    color: themeMode === 'light' ? 'rgba(33, 150, 243, 0.9)' : 'rgba(33, 150, 243, 0.8)',
   },
   mountainSymbol: {
-    color: 'rgba(158, 158, 158, 0.8)',
+    color: themeMode === 'light' ? 'rgba(158, 158, 158, 0.9)' : 'rgba(158, 158, 158, 0.8)',
   },
   forestSymbol: {
-    color: 'rgba(76, 175, 80, 0.8)',
+    color: themeMode === 'light' ? 'rgba(76, 175, 80, 0.9)' : 'rgba(76, 175, 80, 0.8)',
   },
   roadSymbol: {
-    color: 'rgba(255, 193, 7, 0.9)',
+    color: themeMode === 'light' ? 'rgba(255, 193, 7, 0.9)' : 'rgba(255, 193, 7, 0.9)',
   },
   friendlySymbol: {
-    color: '#00ff41',
+    color: colors.matrix,
   },
   hostileSymbol: {
-    color: '#ff4141',
+    color: themeMode === 'light' ? '#cc0000' : '#ff4141',
   },
   closeSymbol: {
-    color: '#00ff41',
+    color: colors.matrix,
     fontSize: 24,
     fontWeight: 'bold',
   },
@@ -1003,16 +1017,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   playerSymbol: {
-    color: '#00ffff',
+    color: themeMode === 'light' ? '#0066cc' : '#00ffff',
     fontSize: 24,
   },
   marginWrapper: {
-    backgroundColor: 'rgba(139, 0, 0, 0.15)',
+    backgroundColor: themeMode === 'light' ? 'rgba(139, 0, 0, 0.08)' : 'rgba(139, 0, 0, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   gridArea: {
-    backgroundColor: '#000',
+    backgroundColor: colors.background,
   },
   scrollContainer: {
     // width/height are set dynamically on container View
