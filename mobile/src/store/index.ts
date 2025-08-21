@@ -31,65 +31,8 @@ export const store = configureStore({
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
-      serializableCheck: {
-        ignoredActions: [
-          'persist/PERSIST',
-          'persist/REHYDRATE',
-          // RTK Query authApi actions
-          'authApi/executeQuery/fulfilled',
-          'authApi/executeQuery/rejected',
-          'authApi/executeQuery/pending',
-          'authApi/executeMutation/fulfilled',
-          'authApi/executeMutation/rejected',
-          'authApi/executeMutation/pending',
-          // RTK Query balanceApi actions
-          'balanceApi/executeQuery/fulfilled',
-          'balanceApi/executeQuery/rejected',
-          'balanceApi/executeQuery/pending',
-          'balanceApi/executeMutation/fulfilled',
-          'balanceApi/executeMutation/rejected',
-          'balanceApi/executeMutation/pending',
-          // RTK Query botsApi actions
-          'botsApi/executeQuery/fulfilled',
-          'botsApi/executeQuery/rejected',
-          'botsApi/executeQuery/pending',
-          'botsApi/executeMutation/fulfilled',
-          'botsApi/executeMutation/rejected',
-          'botsApi/executeMutation/pending',
-          // RTK Query mapApi actions
-          'mapApi/executeQuery/fulfilled',
-          'mapApi/executeQuery/rejected',
-          'mapApi/executeQuery/pending',
-          'mapApi/executeMutation/fulfilled',
-          'mapApi/executeMutation/rejected',
-          'mapApi/executeMutation/pending',
-          // RTK Query battleApi actions
-          'battleApi/executeQuery/fulfilled',
-          'battleApi/executeQuery/rejected',
-          'battleApi/executeQuery/pending',
-          'battleApi/executeMutation/fulfilled',
-          'battleApi/executeMutation/rejected',
-          'battleApi/executeMutation/pending',
-        ],
-        ignoredActionPaths: [
-          'payload.timestamp',
-          'meta.baseQueryMeta.request',
-          'meta.baseQueryMeta.response',
-        ],
-        ignoredPaths: [
-          'some.path.to.ignore',
-          'authApi.queries',
-          'authApi.mutations',
-          'balanceApi.queries',
-          'balanceApi.mutations',
-          'botsApi.queries',
-          'botsApi.mutations',
-          'mapApi.queries',
-          'mapApi.mutations',
-          'battleApi.queries',
-          'battleApi.mutations',
-        ],
-      },
+      immutableCheck: false,
+      serializableCheck: false,
     })
     .prepend(storageListener.middleware)
     .concat(baseApi.middleware)

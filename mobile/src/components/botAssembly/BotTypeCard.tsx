@@ -19,26 +19,41 @@ export const BotTypeCard = React.memo(function BotTypeCard({
   count,
   onPress,
 }: BotTypeCardProps) {
+  const cardContent = (
+    <View style={styles.botCardContent}>
+      <Text style={styles.botType}>{type.toUpperCase()}</Text>
+      {!isLocked ? (
+        <Text style={styles.botCount}>
+          Owned: {count}
+        </Text>
+      ) : (
+        <Text style={styles.lockedText}>🔒 LOCKED</Text>
+      )}
+    </View>
+  );
+
+  if (isLocked) {
+    return (
+      <View
+        style={[
+          styles.botCard,
+          styles.botCardLocked,
+        ]}
+      >
+        {cardContent}
+      </View>
+    );
+  }
+
   return (
     <TouchableOpacity
       style={[
         styles.botCard,
-        isLocked && styles.botCardLocked,
         isSelected && styles.botCardSelected,
       ]}
       onPress={onPress}
-      disabled={isLocked}
     >
-      <View style={styles.botCardContent}>
-        <Text style={styles.botType}>{type.toUpperCase()}</Text>
-        {!isLocked ? (
-          <Text style={styles.botCount}>
-            Owned: {count}
-          </Text>
-        ) : (
-          <Text style={styles.lockedText}>🔒 LOCKED</Text>
-        )}
-      </View>
+      {cardContent}
     </TouchableOpacity>
   );
 });
