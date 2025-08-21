@@ -55,14 +55,15 @@ type ThemeSizing = {
   };
 };
 
-export const COLORS = {
+// Dark Theme Colors (Current Design)
+export const DARK_COLORS = {
   background: '#0E0B16',
   primary: '#A239CA',
   secondary: '#4717F6',
   accent: '#1A1625',
   inputBg: '#201C2B',
-  buttonBg: '#2D2640',
-  buttonDisabled: 'rgba(0, 255, 65, 0.05)',
+  buttonBg: '#2E7D32', // Darker green when enabled
+  buttonDisabled: 'rgba(102, 102, 102, 0.6)', // Gray with 0.6 opacity when disabled
   matrix: '#00FF41',
   text: {
     primary: '#A239CA',
@@ -73,6 +74,52 @@ export const COLORS = {
   error: '#ff4444',
   neutral: '#666666',
 };
+
+// Light Theme Colors (Optimized for Daylight Viewing)
+export const LIGHT_COLORS = {
+  background: '#F5F5DC', // Beige - professional, easy on eyes
+  primary: '#A239CA', // Keep same pinkish purple as dark mode for "Rising"
+  secondary: '#4717F6', // Keep same blue as dark mode for "Punk"
+  accent: '#E8E4D9', // Light tan accent
+  inputBg: '#F8F6F0', // Off-white with slight beige tint
+  buttonBg: '#6A4C93', // Slightly dark purple (just under vibrant full purple)
+  buttonDisabled: '#9E9E9E', // Gray-ish box for disabled state
+  matrix: '#004D00', // Much darker green for better readability
+  text: {
+    primary: '#000000', // Black text for tagline
+    secondary: '#4717F6', // Keep same blue as dark mode
+    accent: '#004D00', // Darker green for "Punk?!" and signup
+    placeholder: 'rgba(26, 11, 61, 0.7)', // Darker placeholder with higher opacity
+  },
+  error: '#B71C1C', // Darker red for better contrast
+  neutral: '#2E2E2E', // Darker neutral for better readability
+};
+
+// CSS Variables for Universal Use
+export const CSS_VARIABLES = {
+  // Background Colors
+  '--bg-primary': 'var(--theme-background)',
+  '--bg-secondary': 'var(--theme-accent)',
+  '--bg-input': 'var(--theme-inputBg)',
+  '--bg-button': 'var(--theme-buttonBg)',
+  
+  // Text Colors
+  '--text-primary': 'var(--theme-text-primary)',
+  '--text-secondary': 'var(--theme-text-secondary)',
+  '--text-accent': 'var(--theme-text-accent)',
+  '--text-placeholder': 'var(--theme-text-placeholder)',
+  
+  // Accent Colors
+  '--accent-primary': 'var(--theme-primary)',
+  '--accent-secondary': 'var(--theme-secondary)',
+  '--accent-matrix': 'var(--theme-matrix)',
+  
+  // Status Colors
+  '--status-error': 'var(--theme-error)',
+  '--status-neutral': 'var(--theme-neutral)',
+};
+
+export const COLORS = DARK_COLORS; // Default to dark theme for backward compatibility
 
 export const SIZING: ThemeSizing = {
   font: {
@@ -127,4 +174,38 @@ export const styleGuide = {
   },
 };
 
-export type ThemeColors = typeof COLORS;
+// Theme-aware style guide
+export const createThemeAwareStyleGuide = (isLightMode: boolean) => {
+  const colors = isLightMode ? LIGHT_COLORS : DARK_COLORS;
+  
+  return {
+    matrixGlow: {
+      textShadowColor: isLightMode ? 'rgba(0, 100, 0, 0.3)' : 'rgba(0, 255, 65, 0.5)', // Darker green glow for light theme
+      textShadowOffset: {width: 0, height: 0},
+      textShadowRadius: isLightMode ? 8 : 15,
+    },
+    inputField: {
+      height: createResponsiveSize(48),
+      backgroundColor: colors.inputBg,
+      color: colors.text.primary,
+      paddingHorizontal: createResponsiveSize(15),
+      fontSize: SIZING.font.body,
+      borderWidth: isLightMode ? 2 : 1, // Thicker borders for light theme
+      borderColor: isLightMode ? colors.primary + '60' : colors.buttonBg, // 60 = 37% opacity for better visibility
+      borderRadius: isLightMode ? 6 : 0, // Rounded corners for light theme
+    },
+    cornerDecoration: {
+      position: 'absolute' as const,
+      right: 0,
+      top: 0,
+      width: createResponsiveSize(10),
+      height: createResponsiveSize(10),
+      borderTopWidth: 1,
+      borderRightWidth: 1,
+      borderColor: colors.primary,
+    },
+  };
+};
+
+export type ThemeColors = typeof DARK_COLORS;
+export type LightThemeColors = typeof LIGHT_COLORS;

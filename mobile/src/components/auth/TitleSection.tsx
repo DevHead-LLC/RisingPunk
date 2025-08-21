@@ -1,24 +1,31 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, SIZING, styleGuide } from '../../styles/theme';
+import { SIZING, styleGuide } from '../../styles/theme';
+import { LightModeToggle } from './LightModeToggle';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 export function TitleSection(): React.JSX.Element {
+  const colors = useThemeColors();
+
   return (
     <View style={styles.container}>
       <View style={styles.titleContainer}>
         <View style={styles.titleWrapper}>
-          <Text style={styles.titleTop}>Ri</Text>
-          <Text style={styles.dollarSign}>$</Text>
-          <Text style={styles.titleTop}>ing</Text>
+          <Text style={[styles.titleTop, { color: colors.primary }]}>Ri</Text>
+          <Text style={[styles.dollarSign, { color: colors.matrix }]}>$</Text>
+          <Text style={[styles.titleTop, { color: colors.primary }]}>ing</Text>
         </View>
-        <Text style={styles.titleBottom}>Punk</Text>
+        <Text style={[styles.titleBottom, { color: colors.secondary }]}>Punk</Text>
         <View style={styles.taglineContainer}>
-          <Text style={styles.taglineText}>
-            Earn money... or be a <Text style={styles.punkText}>Punk?!</Text>
+          <Text style={[styles.taglineText, { color: colors.text.primary }]}>
+            Earn money... or be a <Text style={[styles.punkText, { color: colors.text.accent }]}>Punk?!</Text>
           </Text>
         </View>
       </View>
-      <Text style={styles.versionText}>ALPHA_0.1.0</Text>
+      <View style={styles.bottomRow}>
+        <Text style={[styles.versionText, { color: colors.text.secondary }]}>ALPHA_0.1.0</Text>
+        <LightModeToggle />
+      </View>
     </View>
   );
 }
@@ -39,20 +46,17 @@ const styles = StyleSheet.create({
   },
   titleTop: {
     fontSize: SIZING.font.h1,
-    color: COLORS.primary,
     fontWeight: 'bold',
     letterSpacing: 3,
   },
   dollarSign: {
     fontSize: SIZING.font.h1 - 16,
-    color: COLORS.matrix,
     fontWeight: 'bold',
     marginTop: SIZING.spacing.sm,
     ...styleGuide.matrixGlow,
   },
   titleBottom: {
     fontSize: SIZING.font.h1,
-    color: COLORS.secondary,
     fontWeight: 'bold',
     letterSpacing: 3,
     marginTop: -15,
@@ -62,20 +66,21 @@ const styles = StyleSheet.create({
     marginLeft: SIZING.spacing.xs,
   },
   taglineText: {
-    color: COLORS.text.secondary,
     fontSize: SIZING.font.body,
     opacity: 0.8,
   },
   punkText: {
-    color: COLORS.matrix,
     fontWeight: '600',
   },
-  versionText: {
-    color: COLORS.text.secondary,
-    fontSize: SIZING.font.small,
-    opacity: 0.7,
+  bottomRow: {
     position: 'absolute',
     bottom: '5%',
     left: '5%',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  versionText: {
+    fontSize: SIZING.font.small,
+    opacity: 0.7,
   },
 });

@@ -1,6 +1,8 @@
 import React, { forwardRef } from 'react';
 import { View, TextInput, StyleSheet, Keyboard } from 'react-native';
-import { COLORS } from '../../styles/theme';
+import { SIZING } from '../../styles/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
+import { createThemeAwareStyleGuide } from '../../styles/theme';
 
 export interface KeyboardAwareInputProps {
   placeholder?: string;
@@ -39,6 +41,10 @@ export const KeyboardAwareInput = forwardRef<TextInput, KeyboardAwareInputProps>
     },
     ref
   ) {
+    const colors = useThemeColors();
+    const isLightMode = colors.background === '#F5F5DC'; // Check if light mode
+    const themeStyles = createThemeAwareStyleGuide(isLightMode);
+
     const handleSubmitEditing = () => {
       if (onSubmitEditing) {
         onSubmitEditing();
@@ -56,9 +62,19 @@ export const KeyboardAwareInput = forwardRef<TextInput, KeyboardAwareInputProps>
       <View style={[styles.container, containerStyle]}>
         <TextInput
           ref={ref}
-          style={[styles.input, style]}
+          style={[
+            styles.input,
+            {
+              backgroundColor: colors.inputBg,
+              color: colors.text.primary,
+              borderColor: isLightMode ? colors.primary + '60' : colors.buttonBg,
+              borderWidth: isLightMode ? 2 : 1,
+              borderRadius: isLightMode ? 6 : 0,
+            },
+            style
+          ]}
           placeholder={placeholder}
-          placeholderTextColor={COLORS.text.placeholder}
+          placeholderTextColor={colors.text.placeholder}
           value={value}
           onChangeText={onChangeText}
           secureTextEntry={secureTextEntry}
@@ -70,7 +86,7 @@ export const KeyboardAwareInput = forwardRef<TextInput, KeyboardAwareInputProps>
           editable={editable}
           maxLength={maxLength}
         />
-        <View style={styles.corner} />
+        <View style={[styles.corner, { borderColor: colors.primary }]} />
       </View>
     );
   }
@@ -79,13 +95,12 @@ export const KeyboardAwareInput = forwardRef<TextInput, KeyboardAwareInputProps>
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
-    marginBottom: 8,
+    marginBottom: SIZING.spacing.sm,
   },
   input: {
     height: 42,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    color: COLORS.text.primary,
-    paddingHorizontal: 12,
+    paddingHorizontal: SIZING.spacing.sm,
+    fontSize: SIZING.font.body,
   },
   corner: {
     position: 'absolute',
@@ -93,7 +108,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: 10,
     height: 10,
-    borderColor: COLORS.primary,
     borderRightWidth: 2,
     borderBottomWidth: 2,
   },

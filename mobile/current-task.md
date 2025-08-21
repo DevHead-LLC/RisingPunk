@@ -1,4 +1,4 @@
-# IPHONE 12 SCREEN COMPATIBILITY - CURRENT PRIORITY
+# LIGHT MODE TOGGLE IMPLEMENTATION - CURRENT PRIORITY
 
 ## AI Directives
 - Check existing files and logic first before creating new code
@@ -7,45 +7,55 @@
 - Update this file after every task
 
 ## CURRENT GOAL
-Resolve iPhone 12 screen size compatibility issues where UI elements don't fit properly on smaller screens.
+Add a Light Mode toggle to the AuthScreen (login screen) with a clean, cyberpunk aesthetic.
 
-## STATUS: Implementing Responsive Design System
+## STATUS: Light/Dark Theme System Complete for AuthScreen
 
 ### IMPLEMENTED SOLUTIONS ✅
-1. **Enhanced Theme System**: Updated theme.ts with device-specific scaling factors
-2. **Responsive Hook**: Created useResponsiveDimensions hook for real-time screen handling
-3. **Utility Functions**: Added responsiveUtils.ts for consistent sizing across app
-4. **BotAssembly Updates**: Modified BotAssemblyScreen and BotAssemblyHeader for better small device support
-5. **BuildTimer Fixes**: Resolved timer validation and dependency issues to prevent stuttering and stale values
+1. **Theme Context System**: Created comprehensive ThemeContext with AsyncStorage persistence
+2. **Dual Color Schemes**: Implemented both dark (current) and light (daylight-optimized) themes
+3. **Universal CSS Variables**: Added CSS variable system for consistent theming across app
+4. **AuthScreen Integration**: Complete theme switching for login screen with all components
+5. **Theme-Aware Components**: All AuthScreen components now respond to theme changes
 
-### DEVICE SCALING STRATEGY
-**iPhone 12 (≤844px)**: 0.85x scale factor - reduced padding, smaller fonts
-**iPhone 13/14/15 (≤932px)**: 0.9x scale factor - moderate scaling
-**iPhone 16+ (>932px)**: 1.0x scale factor - full size
+### THEME FEATURES
+- **Dark Theme**: Current cyberpunk design (default)
+- **Light Theme**: Professional daylight-optimized with:
+  - Beige background (#F5F5DC) for comfortable viewing
+  - "Rising" text: Same pinkish purple (#A239CA) as dark mode
+  - "Punk" text: Same blue (#4717F6) as dark mode
+  - Tagline: Black text with darker green (#004D00) for "Punk?!"
+  - Darker purple button (#3D0C91) for better contrast
+  - Darker green (#004D00) for signup text and accents
+  - Input fields: Perfect as-is (no changes needed)
+- **Persistent Storage**: Theme preference saved to AsyncStorage
+- **Smooth Transitions**: Instant theme switching across all components
 
-### KEY CHANGES MADE
-- **Theme System**: All font sizes, spacing, and dimensions now scale based on device
-- **Responsive Hook**: Handles orientation changes and provides device type detection
-- **Component Updates**: BotAssembly components now adapt to smaller screens
-- **Keyboard Handling**: Adjusted keyboard offsets for small devices
-- **Timer Optimization**: Fixed BuildTimer validation, removed progress from dependencies, added separate progress sync
+### TECHNICAL IMPLEMENTATION ✅
+- **ThemeContext**: React Context with useTheme hook
+- **Color Schemes**: DARK_COLORS and LIGHT_COLORS with CSS variables
+- **Theme Provider**: Integrated into AppProviders for app-wide access
+- **Dynamic Styling**: All colors now applied dynamically via useThemeColors hook
+- **Enhanced Input Styling**: Theme-aware input fields with better borders and contrast
+- **Backward Compatibility**: Existing components continue to work
 
-### BUILD TIMER FIXES ✅
-- **Validation Issue**: Removed incorrect `startTime <= 0` check that rejected valid timestamps
-- **Stale Values**: Added proper cleanup when buildStartTime is invalid/missing
-- **Dependency Issues**: Separated progress sync into its own useEffect to prevent frequent re-runs
-- **Performance**: Timer now updates smoothly without visual stuttering
+### COMPONENTS UPDATED ✅
+- **LightModeToggle**: Now fully functional with theme context
+- **TitleSection**: Dynamic colors for title, tagline, and version
+- **LoginScreen**: Complete theme integration for all UI elements including submit buttons
+- **AuthInputs**: Complete theme integration with proper input styling
+- **KeyboardAwareInput**: Theme-aware input fields with borders and colors
+- **AppProviders**: ThemeProvider integration complete
 
 ### NEXT ACTIONS
-1. **Test on iPhone 12 Simulator**: Verify BotAssembly screen fits properly
-2. **Apply to Other Screens**: Extend responsive system to other problematic screens
-3. **Global Implementation**: Use responsiveUtils throughout app for consistency
-4. **Performance Testing**: Ensure responsive calculations don't impact performance
+1. **Test Theme Switching**: Verify AuthScreen theme switching works correctly, especially submit button colors
+2. **Profile Screen**: Add same theme toggle and styling
+3. **Other Screens**: Extend theme system to remaining app screens
+4. **Additional Components**: Update any remaining components that need theming
 
 ## NOTES
-- iPhone 12 has 844px height vs iPhone 16's 932px+ height
-- Responsive system automatically detects device type and applies appropriate scaling
-- All existing functionality preserved while adding device compatibility
-- System handles orientation changes dynamically
-- Scaling factors can be easily adjusted for future devices
-- BuildTimer now properly handles edge cases and provides smooth updates
+- Theme system is fully functional for AuthScreen
+- Light theme optimized for daylight viewing with proper contrast
+- All colors now managed through theme context
+- Ready to extend to other screens and components
+- CSS variables system provides foundation for universal theming
