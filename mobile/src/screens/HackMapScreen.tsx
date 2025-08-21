@@ -194,8 +194,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const minY = useSharedValue(-1000000);
   const maxY = useSharedValue(1000000);
   const boundsReady = useSharedValue(false);
-  const currentPanRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  const computeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialDims = Dimensions.get('window');
   const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: initialDims.width, height: initialDims.height });
   const [windowRange, setWindowRange] = useState<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>({ rowStart: 0, rowEnd: Math.min(14, (grid.length || 50) - 1), colStart: 0, colEnd: Math.min(14, (grid.length || 50) - 1) });
@@ -222,24 +220,29 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const panStartTimeRef = useRef<number>(0);
   const panEndTimeRef = useRef<number>(0);
   
-  // Restore pan position if provided (initialized after computeWindow definition)
-  const updateCurrentPan = (x: number, y: number) => {
-    currentPanRef.current = { x, y };
-  };
-
+  // Convert refs to shared values to prevent worklet capture warnings
+  const lastVelocity = useSharedValue<{ vx: number; vy: number }>({ vx: 0, vy: 0 });
+  const rafId = useSharedValue<number | null>(null);
+  const lastComputedPan = useSharedValue<{ x: number; y: number }>({ x: 0, y: 0 });
+  const lastComputeTs = useSharedValue<number>(0);
+  const hasCenteredOnHome = useSharedValue<boolean>(false);
+  const isPanning = useSharedValue<boolean>(false);
+  const panStartTime = useSharedValue<number>(0);
+  const panEndTime = useSharedValue<number>(0);
+  
   // Check if panning is truly complete (no more decay animation)
   const isPanningComplete = useCallback(() => {
-    const timeSincePanEnd = Date.now() - panEndTimeRef.current;
+    const timeSincePanEnd = Date.now() - panEndTime.value;
     const velocityThreshold = 0.1; // Very small velocity threshold
     
     // Consider panning complete if:
     // 1. We're not actively panning AND
     // 2. It's been more than 100ms since pan end AND
     // 3. Current velocity is very low
-    const complete = !isPanningRef.current && 
+    const complete = !isPanning.value && 
            timeSincePanEnd > 100 && 
-           Math.abs(lastVelocityRef.current.vx) < velocityThreshold && 
-           Math.abs(lastVelocityRef.current.vy) < velocityThreshold;
+           Math.abs(lastVelocity.value.vx) < velocityThreshold && 
+           Math.abs(lastVelocity.value.vy) < velocityThreshold;
     
     // Debug log for pan completion status
     if (complete && timeSincePanEnd > 200) { // Only log occasionally
@@ -249,33 +252,37 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     return complete;
   }, []);
 
+  // NOTE: If you're still getting "Reading from 'value' during component render" warnings,
+  // you can temporarily disable strict mode in Reanimated config to test functionality.
+  // See: https://docs.swmansion.com/react-native-reanimated/docs/debugging/logger-configuration
+
   const scheduleCompute = (x: number, y: number, vx: number = 0, vy: number = 0) => {
     // Update last known velocity on JS thread (safe)
-    lastVelocityRef.current = { vx, vy };
+    lastVelocity.value = { vx, vy };
     
     // Use requestAnimationFrame instead of setTimeout for better performance
-    if (rafIdRef.current) {
-      cancelAnimationFrame(rafIdRef.current);
+    if (rafId.value) {
+      cancelAnimationFrame(rafId.value);
     }
-    rafIdRef.current = requestAnimationFrame(() => {
+    rafId.value = requestAnimationFrame(() => {
       computeWindow(x, y, containerSize.width, containerSize.height);
-      rafIdRef.current = null;
+      rafId.value = null;
     });
   };
 
   // Force pan completion when needed (e.g., for immediate interaction)
   const forcePanCompletion = useCallback(() => {
-    if (isPanningRef.current) {
+    if (isPanning.value) {
       // Stop any ongoing pan gesture
-      isPanningRef.current = false;
-      panEndTimeRef.current = Date.now();
+      isPanning.value = false;
+      panEndTime.value = Date.now();
       
       // Reset velocity to stop decay animation
-      lastVelocityRef.current = { vx: 0, vy: 0 };
+      lastVelocity.value = { vx: 0, vy: 0 };
       
       // Force immediate window compute
-      const currentX = currentPanRef.current.x;
-      const currentY = currentPanRef.current.y;
+      const currentX = lastComputedPan.value.x;
+      const currentY = lastComputedPan.value.y;
       scheduleCompute(currentX, currentY, 0, 0);
     }
   }, []);
@@ -345,8 +352,12 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       if (!prev || Math.abs(v.x - prev.x) > 4 || Math.abs(v.y - prev.y) > 4) {
         const cx = boundsReady.value ? Math.min(maxX.value, Math.max(minX.value, v.x)) : v.x;
         const cy = boundsReady.value ? Math.min(maxY.value, Math.max(minY.value, v.y)) : v.y;
+        
+        // Update shared values directly instead of calling functions that access refs
+        lastComputedPan.value = { x: cx, y: cy };
+        
+        // Schedule compute using runOnJS but with minimal ref access
         runOnJS(scheduleCompute)(cx, cy, 0, 0);
-        runOnJS(updateCurrentPan)(cx, cy);
       }
     }
   );
@@ -355,8 +366,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     .onStart(() => {
       startX.value = offsetX.value;
       startY.value = offsetY.value;
-      isPanningRef.current = true;
-      panStartTimeRef.current = Date.now();
+      isPanning.value = true;
+      panStartTime.value = Date.now();
     })
     .onUpdate((g) => {
       let x = startX.value + g.translationX;
@@ -368,15 +379,16 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       offsetX.value = x;
       offsetY.value = y;
       
+      // Update shared values directly instead of calling functions that access refs
+      lastComputedPan.value = { x, y };
+      
       // Schedule JS-side window compute so tiles load beyond current view
       runOnJS(scheduleCompute)(x, y, g.velocityX ?? 0, g.velocityY ?? 0);
-      // Keep JS ref in sync with UI pan so pendingMapPan is accurate
-      runOnJS(updateCurrentPan)(x, y);
     })
     .onEnd((g) => {
       // Mark panning as ended
-      isPanningRef.current = false;
-      panEndTimeRef.current = Date.now();
+      isPanning.value = false;
+      panEndTime.value = Date.now();
       
       if (boundsReady.value) {
         // Reduce decay animation duration for faster completion
@@ -391,7 +403,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           clamp: [minY.value, maxY.value] 
         } as any);
       } else {
-        offsetX.value = withDecay({ velocity: g.velocityY, deceleration: 0.95 });
+        offsetX.value = withDecay({ velocity: g.velocityX, deceleration: 0.95 });
         offsetY.value = withDecay({ velocity: g.velocityY, deceleration: 0.95 });
       }
       
@@ -402,7 +414,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       // Use requestAnimationFrame for smoother final positioning
       requestAnimationFrame(() => {
         runOnJS(scheduleCompute)(finalX, finalY, 0, 0);
-        runOnJS(updateCurrentPan)(finalX, finalY);
+        // Update shared value directly instead of calling function that accesses refs
+        lastComputedPan.value = { x: finalX, y: finalY };
       });
     });
   const gridSize = grid.length || 50;
@@ -574,16 +587,16 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     
     // Reduce throttle from 40ms to 16ms for 60fps responsiveness
     const now = Date.now();
-    if (now - lastComputeTsRef.current < 16) {return;} // 60fps throttle
-    lastComputeTsRef.current = now;
+    if (now - lastComputeTs.value < 16) {return;} // 60fps throttle
+    lastComputeTs.value = now;
     
     // Skip tiny pan changes to reduce churn
-    const lx = lastComputedPanRef.current.x;
-    const ly = lastComputedPanRef.current.y;
+    const lx = lastComputedPan.value.x;
+    const ly = lastComputedPan.value.y;
     if (Math.abs(panX - lx) < 4 && Math.abs(panY - ly) < 4) { // Reduced from 8 to 4 for precision
       return;
     }
-    lastComputedPanRef.current = { x: panX, y: panY };
+    lastComputedPan.value = { x: panX, y: panY };
     
     // Phase 7A: Virtual Scrolling - Calculate exact visible tiles (no buffer)
     calculateVirtualViewport(panX, panY, width, height);
@@ -645,7 +658,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       
       offsetX.value = clampedX;
       offsetY.value = clampedY;
-      currentPanRef.current = { x: clampedX, y: clampedY };
+      lastComputedPan.value = { x: clampedX, y: clampedY };
       requestAnimationFrame(() => {
         computeWindow(clampedX, clampedY, containerSize.width, containerSize.height);
       });
@@ -658,7 +671,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       // Use a ref to track if we've done initial compute to avoid Reanimated warnings
       const checkBoundsAndCompute = () => {
         if (boundsReady.value) {
-          computeWindow(currentPanRef.current.x, currentPanRef.current.y, containerSize.width, containerSize.height);
+          computeWindow(lastComputedPan.value.x, lastComputedPan.value.y, containerSize.width, containerSize.height);
         }
       };
       
@@ -671,12 +684,12 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       
       return () => {
         clearTimeout(timeoutId);
-        if (rafIdRef.current != null) {
-          cancelAnimationFrame(rafIdRef.current);
-          rafIdRef.current = null;
+        if (rafId.value != null) {
+          cancelAnimationFrame(rafId.value);
+          rafId.value = null;
         }
         // Reset pan state on cleanup
-        isPanningRef.current = false;
+        isPanning.value = false;
       };
     }
   }, [containerSize.width, containerSize.height, computeWindow]);
@@ -701,15 +714,15 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       maxY.value = bounds.maxY;
       boundsReady.value = true;
       const clamped = {
-        x: Math.min(bounds.maxX, Math.max(bounds.minX, currentPanRef.current.x)),
-        y: Math.min(bounds.maxY, Math.max(bounds.minY, currentPanRef.current.y)),
+        x: Math.min(bounds.maxX, Math.max(bounds.minX, lastComputedPan.value.x)),
+        y: Math.min(bounds.maxY, Math.max(bounds.minY, lastComputedPan.value.y)),
       };
       offsetX.value = clamped.x;
       offsetY.value = clamped.y;
-      currentPanRef.current = clamped;
+      lastComputedPan.value = clamped;
       computeWindow(clamped.x, clamped.y, containerSize.width, containerSize.height);
       // Bounds are now set; attempt centering on user's home
-      if (!restorePan && !hasCenteredOnHomeRef.current && currentUserHandle) {
+      if (!restorePan && !hasCenteredOnHome.value && currentUserHandle) {
         // Inline center-on-home logic to avoid using computeWindow before declaration
         const size = grid.length;
         if (size) {
@@ -733,10 +746,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             const cy = Math.min(maxY.value, Math.max(minY.value, targetY));
             offsetX.value = cx;
             offsetY.value = cy;
-            currentPanRef.current = { x: cx, y: cy };
-            // Safe to call computeWindow here as it's declared earlier
+            lastComputedPan.value = { x: cx, y: cy };
             computeWindow(cx, cy, containerSize.width, containerSize.height);
-            hasCenteredOnHomeRef.current = true;
+            hasCenteredOnHome.value = true;
           }
         }
       }
@@ -747,7 +759,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   useEffect(() => {
     if (!boundsReady.value) return;
     if (restorePan) return; // respect return-from-battle view
-    if (hasCenteredOnHomeRef.current) return;
+    if (hasCenteredOnHome.value) return;
     if (!currentUserHandle) return;
     const size = grid.length;
     if (!size) return;
@@ -771,9 +783,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     const cy = Math.min(maxY.value, Math.max(minY.value, targetY));
     offsetX.value = cx;
     offsetY.value = cy;
-    currentPanRef.current = { x: cx, y: cy };
+    lastComputedPan.value = { x: cx, y: cy };
     computeWindow(cx, cy, containerSize.width, containerSize.height);
-    hasCenteredOnHomeRef.current = true;
+    hasCenteredOnHome.value = true;
   }, [grid, currentUserHandle, restorePan, containerSize.width, containerSize.height, minX, maxX, boundsReady, computeWindow, offsetX, offsetY]);
 
   const handleCellPress = useCallback((x: number, y: number, cellData: CellData) => {

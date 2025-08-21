@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Dimensions, TouchableOpacity, Animated } from 'react-native';
-import { COLORS, SIZING } from '../styles/theme';
+import { SIZING } from '../styles/theme';
+import { useThemeColors } from '../hooks/useThemeColors';
 import { CloseButton } from '../components/common/CloseButton';
 import { BattalionSlot } from '../components/battle/BattalionSlot';
 import { CircleSlot } from '../components/battle/CircleSlot';
@@ -22,6 +23,7 @@ type Props = {
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, defenderNpcSlug, defenderNpcInstanceId }: Props) => {
+  const colors = useThemeColors();
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [selectedBattalion, setSelectedBattalion] = useState<string | null>(null);
@@ -222,21 +224,21 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
   ), []);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <CloseButton onPress={onClose} />
 
       <View style={styles.fixedHeader}>
-        <Text style={styles.title}>BATTLE PREPARATION</Text>
+        <Text style={[styles.title, { color: colors.secondary, textShadowColor: colors.secondary + '66' }]}>BATTLE PREPARATION</Text>
       </View>
 
       <View style={styles.mainContainer}>
         <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
           {/* User Forces Screen */}
           <View style={styles.screen}>
-            <Text style={styles.subtitle}>[USER FORCES]</Text>
+            <Text style={[styles.subtitle, { color: colors.text.accent }]}>[USER FORCES]</Text>
             <Animated.View style={[styles.swipeIndicator, swipeIndicatorStyle]}>
-              <Text style={styles.swipeArrow}>⟶</Text>
-              <Text style={styles.swipeText}>ENEMY FORCES</Text>
+              <Text style={[styles.swipeArrow, { color: colors.text.accent }]}>⟶</Text>
+              <Text style={[styles.swipeText, { color: colors.text.accent }]}>ENEMY FORCES</Text>
             </Animated.View>
             <View style={styles.battalionsContainer}>
               {renderBattalionSlots(['E', 'F'], false, true)}
@@ -248,7 +250,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
 
           {/* Enemy Forces Screen */}
           <View style={styles.screen}>
-            <Text style={styles.subtitleEnemy}>[ENEMY FORCES]</Text>
+            <Text style={[styles.subtitleEnemy, { color: colors.error }]}>[ENEMY FORCES]</Text>
             <View style={[styles.battalionsContainer, styles.battalionsContainerEnemy]}>
               {renderCircleSlots(3, true)}
               {renderBattalionSlots(['A', 'B'], true)}
@@ -262,7 +264,15 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       <TouchableOpacity
         style={[
           styles.executeButton,
-          !validateDeployment(assignments).isValid && styles.executeButtonDisabled
+          { 
+            backgroundColor: colors.secondary + '1A',
+            borderColor: colors.secondary 
+          },
+          !validateDeployment(assignments).isValid && {
+            opacity: 0.5,
+            backgroundColor: colors.neutral + '1A',
+            borderColor: colors.neutral
+          }
         ]}
         onPress={async () => {
           const validation = validateDeployment(assignments);
@@ -285,7 +295,14 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       >
         <Text style={[
           styles.executeText,
-          !validateDeployment(assignments).isValid && styles.executeTextDisabled
+          { 
+            color: colors.secondary,
+            textShadowColor: colors.secondary + '66'
+          },
+          !validateDeployment(assignments).isValid && {
+            color: colors.neutral,
+            textShadowColor: 'transparent'
+          }
         ]}>
           DEPLOY PURGE
         </Text>
@@ -305,7 +322,6 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
   },
   fixedHeader: {
     position: 'absolute',
@@ -325,23 +341,19 @@ const styles = StyleSheet.create({
     paddingTop: SIZING.spacing.lg,
   },
   title: {
-    color: '#4717F6',
     fontSize: 32,
     fontWeight: 'bold',
-    textShadowColor: 'rgba(71, 23, 246, 0.4)',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 10,
     textAlign: 'center',
   },
   subtitle: {
-    color: '#00FF41',
     fontSize: 24,
     marginBottom: SIZING.spacing.sm,
     marginTop: SIZING.spacing.sm * 6,
     marginRight: SIZING.spacing.sm * 14,
   },
   subtitleEnemy: {
-    color: '#FF4141',
     fontSize: 24,
     marginBottom: SIZING.spacing.sm,
     marginTop: SIZING.spacing.sm * 5,
@@ -379,29 +391,16 @@ const styles = StyleSheet.create({
     marginHorizontal: SIZING.spacing.sm,
     marginBottom: SIZING.spacing.sm,
     height: 50,
-    backgroundColor: 'rgba(71, 23, 246, 0.1)',
     borderWidth: 1,
-    borderColor: '#4717F6',
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 4,
   },
-  executeButtonDisabled: {
-    opacity: 0.5,
-    backgroundColor: 'rgba(153, 153, 153, 0.1)',
-    borderColor: '#999',
-  },
   executeText: {
-    color: '#4717F6',
     fontSize: 18,
     fontWeight: 'bold',
-    textShadowColor: 'rgba(71, 23, 246, 0.4)',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 10,
-  },
-  executeTextDisabled: {
-    color: '#999',
-    textShadowColor: 'transparent',
   },
   swipeIndicator: {
     alignSelf: 'flex-end',
@@ -412,11 +411,9 @@ const styles = StyleSheet.create({
     marginTop: -SIZING.spacing.lg * 1.5,
   },
   swipeArrow: {
-    color: '#00FF41',
     fontSize: 24,
   },
   swipeText: {
-    color: '#00FF41',
     fontSize: 12,
     letterSpacing: 1,
   },

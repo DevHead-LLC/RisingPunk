@@ -127,7 +127,7 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
     keyText: {
       color: themeMode === 'light' ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.85)',
       fontSize: SIZING.font.body,
-      maxWidth: '70%'
+      flex: 0.7
     },
     valText: {
       color: themeMode === 'light' ? colors.secondary : '#b39ddb',
