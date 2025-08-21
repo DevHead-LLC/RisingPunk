@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, SIZING } from '../../styles/theme';
+import { SIZING } from '../../styles/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { BotType } from '../../types/bots';
 import { BuildControls } from './BuildControls';
 import { BuildStatus } from './BuildStatus';
@@ -25,12 +26,14 @@ export const BuildSection = React.memo(function BuildSection({
   onBuild,
   botCost,
 }: BuildSectionProps) {
+  const colors = useThemeColors();
+
   return (
-    <View style={styles.buildSection}>
-      <Text style={styles.buildTitle}>BUILD CONTROLS</Text>
+    <View style={[styles.buildSection, { borderLeftColor: colors.matrix + '20' }]}>
+      <Text style={[styles.buildTitle, { color: colors.secondary }]}>BUILD CONTROLS</Text>
 
       <View style={styles.selectedBotInfo}>
-        <Text style={styles.selectedBot}>
+        <Text style={[styles.selectedBot, { color: colors.text.primary }]}>
           {selectedType ? selectedType.toUpperCase() : 'NO BOT SELECTED'}
         </Text>
         {selectedType && <BotDescription type={selectedType} />}
@@ -69,10 +72,8 @@ const styles = StyleSheet.create({
     flex: 1.5,
     padding: SIZING.spacing.lg,
     borderLeftWidth: 1,
-    borderLeftColor: 'rgba(0, 255, 65, 0.2)',
   },
   buildTitle: {
-    color: '#4717F6',
     fontSize: SIZING.font.h2,
     fontWeight: 'bold',
     marginBottom: SIZING.spacing.sm,
@@ -81,7 +82,6 @@ const styles = StyleSheet.create({
     marginBottom: SIZING.spacing.sm,
   },
   selectedBot: {
-    color: COLORS.text.primary,
     fontSize: SIZING.font.body,
     marginBottom: SIZING.spacing.xs,
   },

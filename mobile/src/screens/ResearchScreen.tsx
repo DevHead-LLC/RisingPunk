@@ -1,13 +1,18 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
-import { COLORS, SIZING } from '../styles/theme';
+import { SIZING } from '../styles/theme';
 import { CloseButton } from '../components/common/CloseButton';
+import { useThemeColors } from '../hooks/useThemeColors';
 
 type ResearchScreenProps = {
   onClose: () => void;
 };
 
 export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Element {
+  const colors = useThemeColors();
+  
+  const styles = createStyles(colors);
+  
   return (
     <SafeAreaView style={styles.container}>
       <CloseButton onPress={onClose} />
@@ -18,10 +23,10 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
   },
   content: {
     flex: 1,
@@ -29,7 +34,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   researchText: {
-    color: COLORS.secondary,
+    color: colors.text.primary,
     fontSize: SIZING.font.h2,
     textAlign: 'center',
   },

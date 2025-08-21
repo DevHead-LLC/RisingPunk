@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text, StyleSheet } from 'react-native';
 import { SIZING } from '../../styles/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { BotType } from '../../types/bots';
 
 type BotDescriptionProps = {
@@ -15,14 +16,15 @@ const getBotDescription = (type: BotType) => ({
 })[type];
 
 export const BotDescription = React.memo(function BotDescription({ type }: BotDescriptionProps) {
+  const colors = useThemeColors();
+
   return (
-    <Text style={styles.botDescription}>{getBotDescription(type)}</Text>
+    <Text style={[styles.botDescription, { color: colors.text.placeholder }]}>{getBotDescription(type)}</Text>
   );
 });
 
 const styles = StyleSheet.create({
   botDescription: {
-    color: 'rgba(255, 255, 255, 0.6)',
     fontSize: SIZING.font.small,
     marginBottom: SIZING.spacing.md,
   },

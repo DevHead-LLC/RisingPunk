@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { COLORS, SIZING } from '../../styles/theme';
+import { SIZING } from '../../styles/theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 import { BotType } from '../../types/bots';
 import { KeyboardAwareInput } from '../common/KeyboardAwareInput';
 import { KeyboardDismissView } from '../common/KeyboardDismissView';
@@ -20,6 +21,8 @@ export const BuildControls = React.memo(function BuildControls({
   onQuantityChange,
   onBuild,
 }: BuildControlsProps) {
+  const colors = useThemeColors();
+
   return (
     <KeyboardDismissView>
       <View style={styles.buildControlsRow}>
@@ -28,7 +31,11 @@ export const BuildControls = React.memo(function BuildControls({
           value={quantity}
           onChangeText={onQuantityChange}
           keyboardType="numeric"
-          style={styles.quantityInput}
+          style={[styles.quantityInput, {
+            backgroundColor: colors.accent + '30',
+            borderColor: colors.matrix + '40',
+            color: colors.text.primary,
+          }]}
           containerStyle={styles.quantityInputContainer}
           editable={buildingProgress === null}
           isLastInput={true}
@@ -37,12 +44,18 @@ export const BuildControls = React.memo(function BuildControls({
         <TouchableOpacity
           style={[
             styles.buildButton,
-            (!selectedType || buildingProgress !== null) && styles.buildButtonDisabled,
+            {
+              backgroundColor: colors.accent + '30',
+              borderColor: colors.matrix + '40',
+            },
+            (!selectedType || buildingProgress !== null) && [styles.buildButtonDisabled, {
+              backgroundColor: colors.accent + '40',
+            }],
           ]}
           onPress={onBuild}
           disabled={!selectedType || buildingProgress !== null}
         >
-          <Text style={styles.buildButtonText}>BUILD</Text>
+          <Text style={[styles.buildButtonText, { color: colors.text.primary }]}>BUILD</Text>
         </TouchableOpacity>
       </View>
     </KeyboardDismissView>
@@ -58,11 +71,8 @@ const styles = StyleSheet.create({
   quantityInput: {
     flex: 1,
     height: 40,
-    backgroundColor: 'rgba(26, 77, 51, 0.3)',
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: 'rgba(0, 255, 65, 0.4)',
-    color: COLORS.text.primary,
     textAlign: 'center',
     fontSize: SIZING.font.body,
   },
@@ -72,25 +82,20 @@ const styles = StyleSheet.create({
   buildButton: {
     width: 80,
     height: 40,
-    backgroundColor: 'rgba(26, 77, 51, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: 'rgba(0, 255, 65, 0.4)',
   },
   buildButtonDisabled: {
     opacity: 0.5,
-    backgroundColor: 'rgba(26, 77, 51, 0.4)',
   },
   buildButtonText: {
-    color: COLORS.text.primary,
     fontSize: SIZING.font.body,
     fontWeight: 'bold',
     letterSpacing: 1,
   },
   buildTitle: {
-    color: '#4717F6',
     fontSize: SIZING.font.h2,
     fontWeight: 'bold',
     marginBottom: SIZING.spacing.sm,
@@ -98,15 +103,12 @@ const styles = StyleSheet.create({
   button: {
     width: 80,
     height: 40,
-    backgroundColor: '#444',
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: 'rgba(0, 255, 65, 0.4)',
   },
   buttonText: {
-    color: COLORS.text.primary,
     fontSize: SIZING.font.body,
     fontWeight: 'bold',
     letterSpacing: 1,
