@@ -323,8 +323,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       renderCount: visibleTiles.size,
       totalTiles
     }));
-    
-    console.log(`[Map] Phase 7A: Virtual viewport calculated - ${visibleTiles.size} tiles visible out of ${totalTiles} total`);
   }, [grid]);
 
   const animatedMapStyle = useAnimatedStyle(() => {
@@ -482,8 +480,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         
         cells.push({ x, y, cell });
       });
-      
-      console.log(`[Map] Phase 7A: Virtual scrolling active - rendering ${cells.length} tiles instead of ${(windowRange.rowEnd - windowRange.rowStart + 1) * (windowRange.colEnd - windowRange.colStart + 1)}`);
     } else {
       // Fallback to original logic if virtual viewport not ready
       for (let y = windowRange.rowStart; y <= windowRange.rowEnd; y++) {
@@ -659,8 +655,26 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       offsetX.value = clampedX;
       offsetY.value = clampedY;
       lastComputedPan.value = { x: clampedX, y: clampedY };
+      
+      // Force tile loading by triggering a virtual viewport refresh
       requestAnimationFrame(() => {
+        // First compute the window at the restored position
         computeWindow(clampedX, clampedY, containerSize.width, containerSize.height);
+        
+        // Force a virtual viewport refresh to ensure tiles load
+        const forceRefresh = () => {
+          // Trigger virtual viewport calculation
+          calculateVirtualViewport(clampedX, clampedY, containerSize.width, containerSize.height);
+          
+          // Force a re-render by updating the virtual viewport state
+          setVirtualViewport(prev => ({
+            ...prev,
+            renderCount: prev.renderCount + 1
+          }));
+        };
+        
+        // Execute the force refresh
+        forceRefresh();
       });
     }
   }, [restorePan, containerSize.width, containerSize.height, computeWindow, offsetX, offsetY, maxX, maxY, grid]);
@@ -713,14 +727,17 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       minY.value = bounds.minY;
       maxY.value = bounds.maxY;
       boundsReady.value = true;
-      const clamped = {
-        x: Math.min(bounds.maxX, Math.max(bounds.minX, lastComputedPan.value.x)),
-        y: Math.min(bounds.maxY, Math.max(bounds.minY, lastComputedPan.value.y)),
-      };
-      offsetX.value = clamped.x;
-      offsetY.value = clamped.y;
-      lastComputedPan.value = clamped;
-      computeWindow(clamped.x, clamped.y, containerSize.width, containerSize.height);
+      // Don't reset pan position if we're returning from battle with a specific restore position
+      if (!restorePan) {
+        const clamped = {
+          x: Math.min(bounds.maxX, Math.max(bounds.minX, lastComputedPan.value.x)),
+          y: Math.min(bounds.maxY, Math.max(bounds.minY, lastComputedPan.value.y)),
+        };
+        offsetX.value = clamped.x;
+        offsetY.value = clamped.y;
+        lastComputedPan.value = clamped;
+        computeWindow(clamped.x, clamped.y, containerSize.width, containerSize.height);
+      }
       // Bounds are now set; attempt centering on user's home
       if (!restorePan && !hasCenteredOnHome.value && currentUserHandle) {
         // Inline center-on-home logic to avoid using computeWindow before declaration
@@ -1215,9 +1232,3 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     // width/height are set dynamically on container View
   },
 });
-
-
-
-
-
-
