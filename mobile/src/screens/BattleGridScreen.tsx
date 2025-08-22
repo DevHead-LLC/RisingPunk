@@ -8,7 +8,8 @@ import { View, SafeAreaView, Text } from 'react-native';
 import { BattleNetworkGrid } from '../components/battle/BattleNetworkGrid';
 import { BattleBattalionManager } from '../components/battle/BattleBattalionManager';
 import { BattleOverlayManager } from '../components/battle/BattleOverlayManager';
-import { battleGridStyles } from '../styles/battleGridStyles';
+import { battleGridStyles, createThemeAwareBattleGridStyles } from '../styles/battleGridStyles';
+import { useThemeColors } from '../hooks/useThemeColors';
 
 type Props = {
   _onClose?: () => void;
@@ -16,21 +17,24 @@ type Props = {
 };
 
 export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
+  const colors = useThemeColors();
+  const themeStyles = createThemeAwareBattleGridStyles(colors);
+
   // Handle missing battleId
   if (!battleId) {
     return (
-      <SafeAreaView style={battleGridStyles.container} testID="battle-grid-screen">
-        <View style={battleGridStyles.loadingContainer}>
-          <Text style={battleGridStyles.errorText}>No battle ID provided</Text>
-          <Text style={battleGridStyles.errorSubtext}>Please start a battle first</Text>
+      <SafeAreaView style={themeStyles.container} testID="battle-grid-screen">
+        <View style={themeStyles.loadingContainer}>
+          <Text style={themeStyles.errorText}>No battle ID provided</Text>
+          <Text style={themeStyles.errorSubtext}>Please start a battle first</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={battleGridStyles.container} testID="battle-grid-screen">
-      <View style={battleGridStyles.battleArea}>
+    <SafeAreaView style={themeStyles.container} testID="battle-grid-screen">
+      <View style={themeStyles.battleArea}>
         {/* Overlays (countdown, timer) - self-contained with its own API call */}
         <BattleOverlayManager
           battleId={battleId}
@@ -38,11 +42,10 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
         />
 
         {/* Network visualization - self-contained with its own API call */}
-        <View style={battleGridStyles.networkContainer}>
+        <View style={themeStyles.networkContainer}>
           <BattleNetworkGrid
             battleId={battleId}
             nodeSize={20}
-            lineColor="#666666"
             lineWidth={2}
             showNodeLabels={true}
           />

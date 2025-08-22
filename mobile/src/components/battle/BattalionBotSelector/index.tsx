@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, Modal, TouchableOpacity } from 'react-native';
 import { CloseButton } from '../../common/CloseButton';
 import { BotTypeCard } from './BotTypeCard';
-import { styles } from './styles';
+import { createStyles } from './styles';
+import { useThemeColors } from '../../../hooks/useThemeColors';
+import { useTheme } from '../../../context/ThemeContext';
 import { BotType } from '../../../types/bots';
 import { QuantitySelector } from './QuantitySelector';
 
@@ -21,6 +23,9 @@ export const BattalionBotSelector = React.memo(({
   battalionName,
   availableBots,
 }: Props) => {
+  const colors = useThemeColors();
+  const { themeMode } = useTheme();
+  const styles = createStyles({ ...colors, themeMode });
   const [selectedType, setSelectedType] = useState<BotType | null>(null);
   const [quantity, setQuantity] = useState(0);
 

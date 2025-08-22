@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 interface Props {
   node: {
@@ -12,11 +13,13 @@ interface Props {
 }
 
 export const NodeHealthBar: React.FC<Props> = ({ node }) => {
+  const colors = useThemeColors();
+  
   if (node.owner !== 'neutral') return null;
 
   // tugOfWarProgress is -100 to +100, convert to 0-100% for display
   const progressPercentage = Math.abs(node.tugOfWarProgress);
-  const barColor = node.tugOfWarProgress > 0 ? '#4717F6' : node.tugOfWarProgress < 0 ? '#FF4141' : '#666666';
+  const barColor = node.tugOfWarProgress > 0 ? colors.secondary : node.tugOfWarProgress < 0 ? colors.error : colors.neutral;
   // Convert percentage to pixels (container is 40px wide)
   const barWidth = (progressPercentage / 100) * 40;
   const isUserControl = node.tugOfWarProgress > 0;
@@ -38,10 +41,10 @@ export const NodeHealthBar: React.FC<Props> = ({ node }) => {
 
   return (
     <View style={containerStyle}>
-      <View style={styles.backgroundBar}>
+      <View style={[styles.backgroundBar, { backgroundColor: colors.progressBarBg }]}>
         <View style={progressBarStyle} />
       </View>
-      <Text style={styles.progressText}>
+      <Text style={[styles.progressText, { color: colors.text.primary }]}>
         {Math.abs(node.tugOfWarProgress).toFixed(0)}%
       </Text>
     </View>
@@ -57,7 +60,6 @@ const styles = StyleSheet.create({
   backgroundBar: {
     width: '100%',
     height: 4,
-    backgroundColor: '#333333',
     borderRadius: 2,
     overflow: 'hidden',
   },
@@ -67,7 +69,6 @@ const styles = StyleSheet.create({
   },
   progressText: {
     fontSize: 8,
-    color: '#FFFFFF',
     marginTop: 2,
     fontWeight: 'bold',
   },

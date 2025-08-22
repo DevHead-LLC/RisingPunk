@@ -8,6 +8,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { NodeHealthBar } from './NodeHealthBar';
 import { BattleLoadingError } from './BattleLoadingError';
 import { useBattleState } from '../../hooks/useBattleState';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 export interface NetworkConnection {
   from: number;
@@ -37,29 +38,14 @@ interface Props {
   showNodeLabels?: boolean;
 }
 
-const getNodeColor = React.useCallback((owner: 'user' | 'enemy' | 'neutral'): string => {
-  switch (owner) {
-    case 'user': return '#4717F6';
-    case 'enemy': return '#FF4141';
-    default: return '#666666';
-  }
-}, []);
-
-const getNodeBorderColor = React.useCallback((owner: 'user' | 'enemy' | 'neutral'): string => {
-  switch (owner) {
-    case 'user': return '#7C3AED';
-    case 'enemy': return '#EF4444';
-    default: return '#9CA3AF';
-  }
-}, []);
-
 export const BattleNetworkGrid = React.memo(({
   battleId,
   nodeSize = 20,
-  lineColor = '#666666',
+  lineColor,
   lineWidth = 2,
   showNodeLabels = true,
 }: Props) => {
+  const colors = useThemeColors();
   const {
     data: battleState,
     isLoading: battleLoading,
@@ -83,8 +69,26 @@ export const BattleNetworkGrid = React.memo(({
     nodes.filter(node => node.owner === 'neutral'), [nodes]
   );
 
+  const getNodeColor = React.useCallback((owner: 'user' | 'enemy' | 'neutral'): string => {
+    switch (owner) {
+      case 'user': return colors.secondary;
+      case 'enemy': return colors.error;
+      default: return colors.accent; // Use accent color instead of neutral for better contrast
+    }
+  }, [colors]);
+
+  const getNodeBorderColor = React.useCallback((owner: 'user' | 'enemy' | 'neutral'): string => {
+    switch (owner) {
+      case 'user': return colors.primary;
+      case 'enemy': return colors.error;
+      default: return colors.neutral; // Keep neutral border for definition
+    }
+  }, [colors]);
+
   const renderNetwork = React.useMemo(() => {
     if (!battleState) return null;
+
+    const currentLineColor = lineColor || colors.neutral;
 
     return (
       <View style={styles.container}>
@@ -100,7 +104,7 @@ export const BattleNetworkGrid = React.memo(({
                 {
                   width: lineProps.length,
                   height: lineWidth,
-                  backgroundColor: lineColor,
+                  backgroundColor: currentLineColor,
                   left: lineProps.left,
                   top: lineProps.top - lineWidth / 2,
                   transform: [{ rotate: `${lineProps.angle}deg` }],
@@ -128,7 +132,15 @@ export const BattleNetworkGrid = React.memo(({
               ]}
             >
               {showNodeLabels && (
-                <Text style={styles.nodeLabel}>{node.index}</Text>
+                <Text style={[
+                  styles.nodeLabel, 
+                  { 
+                    color: node.owner === 'neutral' ? colors.text.primary : colors.text.primary,
+                    textShadowColor: node.owner === 'neutral' ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.25)',
+                    textShadowOffset: { width: 0, height: 1 },
+                    textShadowRadius: node.owner === 'neutral' ? 2 : 1,
+                  }
+                ]}>{node.index}</Text>
               )}
             </View>
             
@@ -139,7 +151,7 @@ export const BattleNetworkGrid = React.memo(({
         ))}
       </View>
     );
-  }, [battleState, lineWidth, lineColor, nodeSize, showNodeLabels, nodes, connections, lineProperties]);
+  }, [battleState, lineWidth, lineColor, nodeSize, showNodeLabels, nodes, connections, lineProperties, colors, getNodeColor, getNodeBorderColor]);
 
   return (
     <BattleLoadingError
@@ -162,14 +174,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    shadowColor: '#000',
+    shadowColor: 'rgba(0, 0, 0, 0.25)',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
   },
   nodeLabel: {
-    color: '#FFFFFF',
     fontSize: 10,
     fontWeight: 'bold',
     textAlign: 'center',

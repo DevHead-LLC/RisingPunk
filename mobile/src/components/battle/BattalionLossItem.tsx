@@ -1,12 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { BattalionLoss } from '../../store/api/battleApi';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 interface Props {
   battalionLoss: BattalionLoss;
 }
 
 export const BattalionLossItem: React.FC<Props> = ({ battalionLoss }) => {
+  const colors = useThemeColors();
+  
   const getBotTypeDisplay = (type: string, mark: number) => {
     const typeNames = {
       guardian: 'Guardian',
@@ -16,14 +19,14 @@ export const BattalionLossItem: React.FC<Props> = ({ battalionLoss }) => {
     return `${typeNames[type as keyof typeof typeNames]} Mk ${mark === 1 ? 'I' : mark === 2 ? 'II' : mark === 3 ? 'III' : 'IV'}`;
   };
 
-  const borderColor = battalionLoss.owner === 'user' ? '#4717F6' : '#FF4141';
+  const borderColor = battalionLoss.owner === 'user' ? colors.secondary : colors.error;
   const isDestroyed = battalionLoss.endingQuantity === 0;
   const losses = battalionLoss.startingQuantity - battalionLoss.endingQuantity;
 
   return (
-    <View style={[styles.container, { borderLeftColor: borderColor }]} testID="battalion-loss-item">
+    <View style={[styles.container, { borderLeftColor: borderColor, backgroundColor: colors.accent }]} testID="battalion-loss-item">
       <View style={styles.header}>
-        <Text style={[styles.botType, isDestroyed && styles.destroyedText]}>
+        <Text style={[styles.botType, { color: colors.text.primary }, isDestroyed && styles.destroyedText]}>
           {getBotTypeDisplay(battalionLoss.type, battalionLoss.mark)}
         </Text>
         <Text style={[styles.owner, { color: borderColor }]}>
@@ -33,8 +36,8 @@ export const BattalionLossItem: React.FC<Props> = ({ battalionLoss }) => {
       
       <View style={styles.stats}>
         <View style={styles.statRow}>
-          <Text style={styles.statLabel}>Units:</Text>
-          <Text style={[styles.statValue, isDestroyed && styles.destroyedText]}>
+          <Text style={[styles.statLabel, { color: colors.neutral }]}>Units:</Text>
+          <Text style={[styles.statValue, { color: colors.text.primary }, isDestroyed && styles.destroyedText]}>
             {battalionLoss.startingQuantity} → {battalionLoss.endingQuantity}
           </Text>
           {losses > 0 && (
@@ -45,8 +48,8 @@ export const BattalionLossItem: React.FC<Props> = ({ battalionLoss }) => {
         </View>
         
         <View style={styles.statRow}>
-          <Text style={styles.statLabel}>Points:</Text>
-          <Text style={[styles.statValue, isDestroyed && styles.destroyedText]}>
+          <Text style={[styles.statLabel, { color: colors.neutral }]}>Points:</Text>
+          <Text style={[styles.statValue, { color: colors.text.primary }, isDestroyed && styles.destroyedText]}>
             {battalionLoss.startingPoints} → {battalionLoss.endingPoints}
           </Text>
           {battalionLoss.losses > 0 && (
@@ -62,7 +65,6 @@ export const BattalionLossItem: React.FC<Props> = ({ battalionLoss }) => {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#1a1a1a',
     borderLeftWidth: 4,
     borderRadius: 8,
     padding: 12,
@@ -76,7 +78,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   botType: {
-    color: '#ffffff',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -93,12 +94,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   statLabel: {
-    color: '#888888',
     fontSize: 14,
     minWidth: 50,
   },
   statValue: {
-    color: '#cccccc',
     fontSize: 14,
     fontWeight: '500',
   },

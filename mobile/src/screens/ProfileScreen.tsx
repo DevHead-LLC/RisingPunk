@@ -616,7 +616,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                       </Text>
                     </View>
                     <Text style={styles.themeToggleText}>
-                      {themeMode === 'light' ? 'Go Dark' : 'Go Light'}
+                      {themeMode === 'light' ? 'Go Hacker' : 'Go Business'}
                     </Text>
                   </View>
                 </TouchableOpacity>

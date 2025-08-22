@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 type Props = {
   battleTime: number;
@@ -8,14 +9,16 @@ type Props = {
 };
 
 export const BattleTimerDisplay = React.memo(({ battleTime, maxBattleTime, isVisible }: Props) => {
+  const colors = useThemeColors();
+  
   if (!isVisible) return null;
 
   // battleTime now represents time remaining (45s down to 0s)
   // Calculate progress as (time remaining) / (max time)
   const progressFillStyle = React.useMemo(() => [
     styles.progressFill,
-    { width: `${(battleTime / maxBattleTime) * 100}%` as any },
-  ], [battleTime, maxBattleTime]);
+    { width: `${(battleTime / maxBattleTime) * 100}%` as any, backgroundColor: colors.secondary },
+  ], [battleTime, maxBattleTime, colors.secondary]);
 
   // Display time remaining directly
   const timerText = React.useMemo(() =>
@@ -25,11 +28,11 @@ export const BattleTimerDisplay = React.memo(({ battleTime, maxBattleTime, isVis
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.statusText}>SYSTEM BREACH IN PROGRESS</Text>
-        <Text style={styles.timerText}>{timerText}</Text>
+        <Text style={[styles.statusText, { color: colors.secondary }]}>SYSTEM BREACH IN PROGRESS</Text>
+        <Text style={[styles.timerText, { color: colors.text.primary }]}>{timerText}</Text>
       </View>
 
-      <View style={styles.progressBar}>
+      <View style={[styles.progressBar, { backgroundColor: colors.progressBarBg }]}>
         <View style={progressFillStyle} />
       </View>
     </View>
@@ -49,7 +52,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   statusText: {
-    color: '#4717F6',
     fontSize: 16,
     fontWeight: 'bold',
     letterSpacing: 1,
@@ -58,7 +60,6 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
   },
   timerText: {
-    color: '#FFFFFF',
     fontSize: 24,
     fontWeight: 'bold',
     marginTop: 4,
@@ -68,14 +69,12 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 6,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     borderRadius: 3,
     overflow: 'hidden',
     padding: 2,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#4717F6',
     borderRadius: 3,
   },
 });

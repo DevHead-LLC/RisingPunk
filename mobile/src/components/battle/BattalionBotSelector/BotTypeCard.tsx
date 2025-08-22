@@ -1,6 +1,8 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { SIZING } from '../../../styles/theme';
+import { useThemeColors } from '../../../hooks/useThemeColors';
+import { useTheme } from '../../../context/ThemeContext';
 import { BotType } from '../../../types/bots';
 
 type Props = {
@@ -11,20 +13,45 @@ type Props = {
 };
 
 export const BotTypeCard = React.memo(({ type, count, isSelected, onSelect }: Props) => {
+  const colors = useThemeColors();
+  const { themeMode } = useTheme();
+  
   const cardStyle = React.useMemo(() => [
     styles.card, 
-    isSelected && styles.selectedCard
-  ], [isSelected]);
+    {
+      backgroundColor: themeMode === 'light' ? 'rgba(245, 245, 220, 0.95)' : 'rgba(10, 10, 10, 0.95)',
+      borderColor: themeMode === 'light' ? 'rgba(71, 23, 246, 0.4)' : 'rgba(71, 23, 246, 0.3)',
+    },
+    isSelected && {
+      borderColor: colors.secondary,
+      backgroundColor: themeMode === 'light' ? 'rgba(71, 23, 246, 0.12)' : 'rgba(71, 23, 246, 0.1)',
+      shadowColor: colors.secondary,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.15,
+      shadowRadius: 4,
+      elevation: 2,
+    }
+  ], [isSelected, colors, themeMode]);
 
   const typeTextStyle = React.useMemo(() => [
     styles.typeText, 
-    isSelected && styles.selectedText
-  ], [isSelected]);
+    {
+      color: themeMode === 'light' ? 'rgba(0, 0, 0, 0.7)' : 'rgba(255, 255, 255, 0.7)',
+    },
+    isSelected && {
+      color: colors.secondary,
+    }
+  ], [isSelected, colors, themeMode]);
 
   const countTextStyle = React.useMemo(() => [
     styles.countText, 
-    isSelected && styles.selectedCount
-  ], [isSelected]);
+    {
+      color: themeMode === 'light' ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.5)',
+    },
+    isSelected && {
+      color: themeMode === 'light' ? 'rgba(71, 23, 246, 0.7)' : 'rgba(71, 23, 246, 0.7)',
+    }
+  ], [isSelected, themeMode]);
 
   return (
     <TouchableOpacity
@@ -45,39 +72,17 @@ const styles = StyleSheet.create({
   card: {
     width: 120,
     padding: SIZING.spacing.sm,
-    backgroundColor: 'rgba(10, 10, 10, 0.95)',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(71, 23, 246, 0.3)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  selectedCard: {
-    borderColor: '#4717F6',
-    backgroundColor: 'rgba(71, 23, 246, 0.1)',
-    shadowColor: '#4717F6',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 5,
-  },
   typeText: {
-    color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: SIZING.spacing.xs,
   },
-  selectedText: {
-    color: '#4717F6',
-    textShadowColor: 'rgba(71, 23, 246, 0.4)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
-  },
   countText: {
-    color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 14,
-  },
-  selectedCount: {
-    color: 'rgba(71, 23, 246, 0.7)',
   },
 });

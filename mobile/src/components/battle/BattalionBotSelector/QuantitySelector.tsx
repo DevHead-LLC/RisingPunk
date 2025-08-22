@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { SIZING } from '../../../styles/theme';
+import { useThemeColors } from '../../../hooks/useThemeColors';
+import { useTheme } from '../../../context/ThemeContext';
 import { KeyboardAwareInput } from '../../common/KeyboardAwareInput';
 
 type Props = {
@@ -12,6 +14,8 @@ type Props = {
 const MAX_BATTALION_SIZE = 250;
 
 export const QuantitySelector = React.memo(({ quantity, available, onChangeQuantity }: Props) => {
+  const colors = useThemeColors();
+  const { themeMode } = useTheme();
   const maxQuantity = Math.min(available, MAX_BATTALION_SIZE);
 
   const adjustQuantity = React.useCallback((adjustment: number) => {
@@ -27,50 +31,66 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
   return (
     <View style={styles.container}>
       <View style={styles.row}>
-        <Text style={styles.label}>Quantity:</Text>
+        <Text style={[styles.label, { color: themeMode === 'light' ? 'rgba(0, 0, 0, 0.7)' : 'rgba(255, 255, 255, 0.7)' }]}>Quantity:</Text>
         <View style={styles.controls}>
           <TouchableOpacity
-            style={styles.button}
+            style={[styles.button, { 
+              backgroundColor: themeMode === 'light' ? 'rgba(71, 23, 246, 0.15)' : 'rgba(71, 23, 246, 0.1)',
+              borderColor: colors.secondary 
+            }]}
             onPress={() => adjustQuantity(-25)}
           >
-            <Text style={styles.buttonText}>-25</Text>
+            <Text style={[styles.buttonText, { color: colors.secondary }]}>-25</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.button}
+            style={[styles.button, { 
+              backgroundColor: themeMode === 'light' ? 'rgba(71, 23, 246, 0.15)' : 'rgba(71, 23, 246, 0.1)',
+              borderColor: colors.secondary 
+            }]}
             onPress={() => adjustQuantity(-1)}
           >
-            <Text style={styles.buttonText}>-1</Text>
+            <Text style={[styles.buttonText, { color: colors.secondary }]}>-1</Text>
           </TouchableOpacity>
 
           <KeyboardAwareInput
             value={quantity.toString()}
             onChangeText={handleDirectInput}
             keyboardType="numeric"
-            style={styles.input}
+            style={[styles.input, { 
+              backgroundColor: themeMode === 'light' ? 'rgba(248, 246, 240, 0.8)' : 'rgba(0, 0, 0, 0.3)',
+              borderColor: colors.secondary,
+              color: colors.secondary 
+            }]}
             isLastInput={true}
             maxLength={3}
           />
 
           <TouchableOpacity
-            style={styles.button}
+            style={[styles.button, { 
+              backgroundColor: themeMode === 'light' ? 'rgba(71, 23, 246, 0.15)' : 'rgba(71, 23, 246, 0.1)',
+              borderColor: colors.secondary 
+            }]}
             onPress={() => adjustQuantity(1)}
           >
-            <Text style={styles.buttonText}>+1</Text>
+            <Text style={[styles.buttonText, { color: colors.secondary }]}>+1</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.button}
+            style={[styles.button, { 
+              backgroundColor: themeMode === 'light' ? 'rgba(71, 23, 246, 0.15)' : 'rgba(71, 23, 246, 0.1)',
+              borderColor: colors.secondary 
+            }]}
             onPress={() => adjustQuantity(25)}
           >
-            <Text style={styles.buttonText}>+25</Text>
+            <Text style={[styles.buttonText, { color: colors.secondary }]}>+25</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       <View style={styles.infoRow}>
-        <Text style={styles.infoText}>Available: {available}</Text>
-        <Text style={styles.infoText}>Max: {maxQuantity}</Text>
+        <Text style={[styles.infoText, { color: themeMode === 'light' ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.5)' }]}>Available: {available}</Text>
+        <Text style={[styles.infoText, { color: themeMode === 'light' ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.5)' }]}>Max: {maxQuantity}</Text>
       </View>
     </View>
   );
@@ -87,7 +107,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: SIZING.spacing.lg,
   },
   label: {
-    color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 16,
     marginRight: SIZING.spacing.lg,
   },
@@ -97,24 +116,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   button: {
-    backgroundColor: 'rgba(71, 23, 246, 0.1)',
     borderWidth: 1,
-    borderColor: '#4717F6',
     borderRadius: 4,
     paddingHorizontal: SIZING.spacing.sm,
     paddingVertical: SIZING.spacing.xs,
   },
   buttonText: {
-    color: '#4717F6',
     fontSize: 14,
     fontWeight: 'bold',
   },
   input: {
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     borderWidth: 1,
-    borderColor: '#4717F6',
     borderRadius: 4,
-    color: '#4717F6',
     width: 60,
     height: 32,
     textAlign: 'center',
@@ -127,7 +140,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: SIZING.spacing.sm,
   },
   infoText: {
-    color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 14,
   },
 });
