@@ -656,25 +656,26 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       offsetY.value = clampedY;
       lastComputedPan.value = { x: clampedX, y: clampedY };
       
-      // Force tile loading by triggering a virtual viewport refresh
+      // Force tile loading by properly calculating the new window range
       requestAnimationFrame(() => {
         // First compute the window at the restored position
         computeWindow(clampedX, clampedY, containerSize.width, containerSize.height);
         
-        // Force a virtual viewport refresh to ensure tiles load
-        const forceRefresh = () => {
-          // Trigger virtual viewport calculation
-          calculateVirtualViewport(clampedX, clampedY, containerSize.width, containerSize.height);
-          
-          // Force a re-render by updating the virtual viewport state
-          setVirtualViewport(prev => ({
-            ...prev,
-            renderCount: prev.renderCount + 1
-          }));
-        };
+        // Calculate the correct window range for the restored position
+        const gridLeft = clampedX + MARGIN_SIZE;
+        const gridTop = clampedY + MARGIN_SIZE;
+        const startCol = Math.max(0, Math.floor((-gridLeft) / CELL_SIZE));
+        const endCol = Math.min(gridSize - 1, Math.ceil((containerSize.width - gridLeft) / CELL_SIZE));
+        const startRow = Math.max(0, Math.floor((-gridTop) / CELL_SIZE));
+        const endRow = Math.min(gridSize - 1, Math.ceil((containerSize.height - gridTop) / CELL_SIZE));
         
-        // Execute the force refresh
-        forceRefresh();
+        // Force tile loading by setting the correct window range
+        setWindowRange({
+          rowStart: startRow,
+          rowEnd: endRow,
+          colStart: startCol,
+          colEnd: endCol
+        });
       });
     }
   }, [restorePan, containerSize.width, containerSize.height, computeWindow, offsetX, offsetY, maxX, maxY, grid]);
