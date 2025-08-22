@@ -228,7 +228,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       <CloseButton onPress={onClose} />
 
       <View style={styles.fixedHeader}>
-        <Text style={[styles.title, { color: colors.secondary, textShadowColor: colors.secondary + '66' }]}>BATTLE PREPARATION</Text>
+        <Text style={[styles.title, { color: colors.secondary }]}>BATTLE PREPARATION</Text>
       </View>
 
       <View style={styles.mainContainer}>
@@ -297,11 +297,9 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
           styles.executeText,
           { 
             color: colors.secondary,
-            textShadowColor: colors.secondary + '66'
           },
           !validateDeployment(assignments).isValid && {
             color: colors.neutral,
-            textShadowColor: 'transparent'
           }
         ]}>
           DEPLOY PURGE
@@ -343,8 +341,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
     textAlign: 'center',
   },
   subtitle: {
@@ -399,8 +395,6 @@ const styles = StyleSheet.create({
   executeText: {
     fontSize: 18,
     fontWeight: 'bold',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
   },
   swipeIndicator: {
     alignSelf: 'flex-end',

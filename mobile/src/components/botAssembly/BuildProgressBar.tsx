@@ -13,7 +13,7 @@ export const BuildProgressBar = React.memo(function BuildProgressBar({
   const colors = useThemeColors();
 
   return (
-    <View style={[styles.progressBar, { backgroundColor: colors.text.placeholder + '30' }]}>
+    <View style={[styles.progressBar, { backgroundColor: colors.progressBarBg }]}>
       <View
         style={[
           styles.progressFill,

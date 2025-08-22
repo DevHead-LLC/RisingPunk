@@ -65,6 +65,7 @@ export const DARK_COLORS = {
   buttonBg: '#2E7D32', // Darker green when enabled
   buttonDisabled: 'rgba(102, 102, 102, 0.6)', // Gray with 0.6 opacity when disabled
   matrix: '#00FF41',
+  progressBarBg: '#4A4A4A', // Keep original dark mode progress bar color
   text: {
     primary: '#A239CA',
     secondary: '#4717F6',
@@ -85,6 +86,7 @@ export const LIGHT_COLORS = {
   buttonBg: '#6A4C93', // Slightly dark purple (just under vibrant full purple)
   buttonDisabled: '#9E9E9E', // Gray-ish box for disabled state
   matrix: '#004D00', // Much darker green for better readability
+  progressBarBg: 'rgba(146, 135, 135, 0.67)', // Progress bar background color
   text: {
     primary: '#000000', // Black text for tagline
     secondary: '#4717F6', // Keep same blue as dark mode

@@ -18,7 +18,7 @@ export function LightModeToggle(): React.JSX.Element {
           </Text>
         </View>
         <Text style={[styles.actionText, { color: colors.text.secondary }]}>
-          {isLightMode ? 'Go Dark' : 'Go Light'}
+          {isLightMode ? 'Go Hacker' : 'Go Business'}
         </Text>
       </View>
     </TouchableOpacity>

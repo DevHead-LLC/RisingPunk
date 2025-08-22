@@ -7,6 +7,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { MovementState } from '../../types/battleTypes';
 import { ANIMATION_CONFIG } from '../../config';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 interface Props {
   battalion: {
@@ -45,6 +46,7 @@ export const BattleBattalion = React.memo(({
   size = 30,
   showHealthBar = true,
 }: Props) => {
+  const colors = useThemeColors();
   const animatedPosition = React.useRef(new Animated.ValueXY(position)).current;
   const [currentTime, setCurrentTime] = React.useState(Date.now());
   const [clientStartTime, setClientStartTime] = React.useState<number | null>(null);
@@ -115,8 +117,8 @@ export const BattleBattalion = React.memo(({
   , [battalion.currentHealth, battalion.maxHealth]);
 
   const borderColor = React.useMemo(() => 
-    battalion.isUser ? '#4717F6' : '#FF4141'
-  , [battalion.isUser]);
+    battalion.isUser ? colors.secondary : colors.error
+  , [battalion.isUser, colors]);
 
   const attackRangeRadius = React.useMemo(() => battalion.stats.range * 8, [battalion.stats.range]);
 
@@ -158,10 +160,8 @@ export const BattleBattalion = React.memo(({
   }, [healthPercentage]);
 
   const quantityTextStyle = React.useMemo(() => 
-    battalion.type === 'phreak' 
-      ? [styles.quantityText, { fontSize: 10 }, { transform: [{ rotate: '-45deg' }] }] 
-      : [styles.quantityText, { fontSize: 10 }]
-  , [battalion.type]);
+    [styles.quantityText, { fontSize: 10 }]
+  , []);
 
   const formatQuantity = (quantity: number): string => {
     if (quantity >= 1000) {
@@ -234,14 +234,20 @@ export const BattleBattalion = React.memo(({
       )}
       
       <View style={getShapeStyle}>
-        <View style={styles.quantityBackground}>
-          <Text style={quantityTextStyle}>{formatQuantity(battalion.quantity)}</Text>
+        <View style={[
+          styles.quantityBackground, 
+          { 
+            backgroundColor: '#2A2A2A',
+            transform: battalion.type === 'phreak' ? [{ rotate: '-45deg' }] : []
+          }
+        ]}>
+          <Text style={[quantityTextStyle, { color: '#FFFFFF' }]}>{formatQuantity(battalion.quantity)}</Text>
         </View>
       </View>
       
       {showHealthBar && (
         <View style={healthBarContainerStyle}>
-          <View style={styles.healthBarBackground}>
+          <View style={[styles.healthBarBackground, { backgroundColor: colors.neutral }]}>
             <View
               style={healthBarFillStyle}
             />
@@ -272,7 +278,6 @@ const styles = StyleSheet.create({
   healthBarBackground: {
     width: '100%',
     height: 4,
-    backgroundColor: '#333',
     borderRadius: 3,
     overflow: 'hidden',
   },
@@ -281,7 +286,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   quantityBackground: {
-    backgroundColor: '#000',
     borderRadius: 10,
     width: 28,
     height: 20,
@@ -290,7 +294,6 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   quantityText: {
-    color: '#FFF',
     fontWeight: 'bold',
     textAlign: 'center',
     backgroundColor: 'transparent',
@@ -303,13 +306,13 @@ const styles = StyleSheet.create({
   },
   botTypeText: {
     fontWeight: 'bold',
-    textShadowColor: '#000',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 1,
   },
   markText: {
     fontWeight: 'bold',
-    textShadowColor: '#000',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 1,
   },

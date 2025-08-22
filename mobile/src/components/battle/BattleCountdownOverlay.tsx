@@ -1,5 +1,6 @@
 import React from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 type Props = {
   countdown: number;
@@ -7,6 +8,7 @@ type Props = {
 };
 
 export const BattleCountdownOverlay = React.memo(({ countdown, isVisible }: Props) => {
+  const colors = useThemeColors();
   const opacity = React.useRef(new Animated.Value(0)).current;
   const scale = React.useRef(new Animated.Value(0.5)).current;
 
@@ -43,10 +45,10 @@ export const BattleCountdownOverlay = React.memo(({ countdown, isVisible }: Prop
 
   return (
     <Animated.View style={containerStyle}>
-      <View style={styles.overlay}>
+      <View style={[styles.overlay, { backgroundColor: colors.background + 'CC' }]}>
         <Animated.View style={countdownContainerStyle}>
-          <Text style={styles.countdownText}>{countdown}</Text>
-          <Text style={styles.countdownLabel}>BATTLE STARTING</Text>
+          <Text style={[styles.countdownText, { color: colors.secondary }]}>{countdown}</Text>
+          <Text style={[styles.countdownLabel, { color: colors.text.primary }]}>BATTLE STARTING</Text>
         </Animated.View>
       </View>
     </Animated.View>
@@ -60,7 +62,6 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -70,16 +71,11 @@ const styles = StyleSheet.create({
   countdownText: {
     fontSize: 120,
     fontWeight: 'bold',
-    color: '#4717F6',
-    textShadowColor: 'rgba(71, 23, 246, 0.6)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 20,
     marginBottom: 16,
   },
   countdownLabel: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#FFFFFF',
     letterSpacing: 2,
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
     textShadowOffset: { width: 1, height: 1 },

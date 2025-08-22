@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 interface BattleLoadingErrorProps {
   isLoading: boolean;
@@ -18,11 +19,13 @@ export const BattleLoadingError: React.FC<BattleLoadingErrorProps> = ({
   errorSubtext = 'Please try again',
   children
 }) => {
+  const colors = useThemeColors();
+  
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#4717F6" />
-        <Text style={styles.loadingText}>{loadingText}</Text>
+        <ActivityIndicator size="large" color={colors.secondary} />
+        <Text style={[styles.loadingText, { color: colors.secondary }]}>{loadingText}</Text>
       </View>
     );
   }
@@ -30,8 +33,8 @@ export const BattleLoadingError: React.FC<BattleLoadingErrorProps> = ({
   if (error) {
     return (
       <View style={styles.container}>
-        <Text style={styles.errorText}>{errorText}</Text>
-        <Text style={styles.errorSubtext}>{errorSubtext}</Text>
+        <Text style={[styles.errorText, { color: colors.error }]}>{errorText}</Text>
+        <Text style={[styles.errorSubtext, { color: colors.neutral }]}>{errorSubtext}</Text>
       </View>
     );
   }
@@ -49,18 +52,15 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 10,
-    color: '#4717F6',
     fontSize: 14,
     fontWeight: '600',
   },
   errorText: {
-    color: '#FF4141',
     fontSize: 16,
     fontWeight: 'bold',
     textAlign: 'center',
   },
   errorSubtext: {
-    color: '#666666',
     fontSize: 14,
     textAlign: 'center',
     marginTop: 5,

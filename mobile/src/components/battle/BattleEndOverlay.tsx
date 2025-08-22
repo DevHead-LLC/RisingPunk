@@ -4,6 +4,7 @@ import { NodeOwner } from '../../types/battleTypes';
 import { BattleEndData } from '../../store/api/battleApi';
 import { BattleLossBreakdown } from './BattleLossBreakdown';
 import { LevelUpAnimation } from '../common/LevelUpAnimation';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 interface BattleEndOverlayProps {
   winner: NodeOwner;
@@ -12,6 +13,7 @@ interface BattleEndOverlayProps {
 }
 
 export const BattleEndOverlay: React.FC<BattleEndOverlayProps> = ({ winner, onContinue, battleEndData }) => {
+  const colors = useThemeColors();
   const [showLevelUpAnimation, setShowLevelUpAnimation] = useState(false);
 
   useEffect(() => {
@@ -23,8 +25,6 @@ export const BattleEndOverlay: React.FC<BattleEndOverlayProps> = ({ winner, onCo
   const handleLevelUpAnimationComplete = () => {
     setShowLevelUpAnimation(false);
   };
-
-
 
   const getWinnerText = () => {
     try {
@@ -46,17 +46,17 @@ export const BattleEndOverlay: React.FC<BattleEndOverlayProps> = ({ winner, onCo
 
   if (battleEndData) {
     return (
-      <View style={styles.overlay} testID="battle-end-overlay">
+      <View style={[styles.overlay, { backgroundColor: colors.background + 'E6' }]} testID="battle-end-overlay">
         <LevelUpAnimation
           isVisible={showLevelUpAnimation}
           onAnimationComplete={handleLevelUpAnimationComplete}
         />
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: colors.accent, borderColor: colors.neutral }]}>
           <View style={styles.contentContainer}>
             <BattleLossBreakdown battleEndData={battleEndData} />
           </View>
           <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.continueButton} onPress={handleContinue} testID="continue-button">
+            <TouchableOpacity style={[styles.continueButton, { backgroundColor: colors.buttonBg }]} onPress={handleContinue} testID="continue-button">
               <Text style={styles.continueButtonText}>Continue</Text>
             </TouchableOpacity>
           </View>
@@ -66,17 +66,17 @@ export const BattleEndOverlay: React.FC<BattleEndOverlayProps> = ({ winner, onCo
   }
 
   return (
-    <View style={styles.overlay} testID="battle-end-overlay">
+    <View style={[styles.overlay, { backgroundColor: colors.background + 'E6' }]} testID="battle-end-overlay">
       <LevelUpAnimation
         isVisible={showLevelUpAnimation}
         onAnimationComplete={handleLevelUpAnimationComplete}
       />
-      <View style={styles.container}>
-        <Text style={styles.title}>BATTLE COMPLETE</Text>
-        <Text style={styles.winnerText} testID="winner-display">
+      <View style={[styles.container, { backgroundColor: colors.accent, borderColor: colors.neutral }]}>
+        <Text style={[styles.title, { color: colors.text.primary }]}>BATTLE COMPLETE</Text>
+        <Text style={[styles.winnerText, { color: colors.matrix }]} testID="winner-display">
           {getWinnerText()}
         </Text>
-        <TouchableOpacity style={styles.continueButton} onPress={handleContinue} testID="continue-button">
+        <TouchableOpacity style={[styles.continueButton, { backgroundColor: colors.buttonBg }]} onPress={handleContinue} testID="continue-button">
           <Text style={styles.continueButtonText}>Continue</Text>
         </TouchableOpacity>
       </View>
@@ -91,18 +91,15 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
   },
   container: {
-    backgroundColor: '#1a1a1a',
     borderRadius: 16,
     padding: 0,
     margin: 16,
     borderWidth: 2,
-    borderColor: '#333333',
     flex: 1,
     maxHeight: '95%',
     minHeight: '80%',
@@ -119,19 +116,16 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#ffffff',
     marginBottom: 20,
     textAlign: 'center',
   },
   winnerText: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#4CAF50',
     marginBottom: 30,
     textAlign: 'center',
   },
   continueButton: {
-    backgroundColor: '#4CAF50',
     paddingHorizontal: 40,
     paddingVertical: 18,
     borderRadius: 12,
