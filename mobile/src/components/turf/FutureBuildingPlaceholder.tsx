@@ -1,7 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SIZING } from '../../styles/theme';
-import { DevelopmentIcon } from './index';
+import { DevelopmentIcon, LockedFeatureModal } from './index';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -12,6 +12,7 @@ interface FutureBuildingPlaceholderProps {
 export const FutureBuildingPlaceholder: React.FC<FutureBuildingPlaceholderProps> = ({ propertyNumber }) => {
   const colors = useThemeColors();
   const { themeMode } = useTheme();
+  const [showLockedModal, setShowLockedModal] = useState(false);
 
   const containerStyle = [
     styles.placeholderContainer
@@ -38,11 +39,7 @@ export const FutureBuildingPlaceholder: React.FC<FutureBuildingPlaceholderProps>
   };
 
   const handlePress = () => {
-    Alert.alert(
-      'Property Locked',
-      getUnlockMessage(),
-      [{ text: 'OK' }]
-    );
+    setShowLockedModal(true);
   };
 
   return (
@@ -64,6 +61,14 @@ export const FutureBuildingPlaceholder: React.FC<FutureBuildingPlaceholderProps>
         />
         <Text style={propertyNumberStyle}>{propertyNumber}</Text>
       </View>
+      
+              <LockedFeatureModal
+          visible={showLockedModal}
+          title="PROPERTY LOCKED"
+          message={getUnlockMessage()}
+          onClose={() => setShowLockedModal(false)}
+          closeButtonText="OK"
+        />
     </View>
   );
 };

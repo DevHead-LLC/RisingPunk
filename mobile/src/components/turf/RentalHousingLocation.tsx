@@ -6,11 +6,12 @@ import { useTheme } from '../../context/ThemeContext';
 import { useFetchBalanceQuery } from '../../store/api/balanceApi';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { updateBalance } from '../../store/slices/balanceSlice';
-import { 
-  DevelopmentIcon, 
-  DevelopmentLabel, 
-  DevelopmentTimer, 
-  BuildModal 
+import {
+  DevelopmentIcon,
+  DevelopmentLabel,
+  DevelopmentTimer,
+  BuildModal,
+  LockedFeatureModal
 } from './index';
 
 type RentalHousingLocationProps = {
@@ -25,6 +26,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
   const colors = useThemeColors();
   const { themeMode } = useTheme();
   const [showPopup, setShowPopup] = useState(false);
+  const [showLoadingModal, setShowLoadingModal] = useState(false);
   const { data: balanceData, isLoading: balanceLoading } = useFetchBalanceQuery();
   const dispatch = useAppDispatch();
   
@@ -51,11 +53,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
     } else {
       // Only show modal if we have valid balance data
       if (balanceLoading || currentBalance === null || currentBalance === undefined) {
-        Alert.alert(
-          'Loading Balance',
-          'Please wait while we load your current balance.',
-          [{ text: 'OK' }]
-        );
+        setShowLoadingModal(true);
         return;
       }
       setShowPopup(true);
@@ -117,19 +115,27 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
         width={120}
       />
 
-      <BuildModal
-        visible={showPopup}
-        title="Build Rental Housing"
-        cost={RENTAL_HOUSING_COST}
-        buildTime="2 hours"
-        hasSufficientFunds={hasSufficientFunds}
-        onBuild={handleBuild}
-        onClose={handleClose}
-        buildButtonText="Build Rental Housing"
-      />
-    </View>
-  );
-});
+              <BuildModal
+          visible={showPopup}
+          title="Build Rental Housing"
+          cost={RENTAL_HOUSING_COST}
+          buildTime="2 hours"
+          hasSufficientFunds={hasSufficientFunds}
+          onBuild={handleBuild}
+          onClose={handleClose}
+          buildButtonText="Build Rental Housing"
+        />
+        
+        <LockedFeatureModal
+          visible={showLoadingModal}
+          title="LOADING BALANCE"
+          message="Please wait while we load your current balance."
+          onClose={() => setShowLoadingModal(false)}
+          closeButtonText="OK"
+        />
+      </View>
+    );
+  });
 
 const styles = StyleSheet.create({
   rentalHousingContainer: {
