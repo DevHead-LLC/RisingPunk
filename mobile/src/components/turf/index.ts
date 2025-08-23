@@ -3,6 +3,7 @@ export { DevelopmentIcon } from './DevelopmentIcon';
 export { DevelopmentLabel } from './DevelopmentLabel';
 export { DevelopmentTimer } from './DevelopmentTimer';
 export { BuildModal } from './BuildModal';
+export { LockedFeatureModal } from './LockedFeatureModal';
 export { BuildCountdownTimer } from './BuildCountdownTimer';
 export { DevelopmentZone } from './DevelopmentZone';
 export { RentalHousingLocation } from './RentalHousingLocation';

@@ -56,6 +56,35 @@ We need to implement a new Rental Housing development feature in the TurfScreen 
     - [x] **✅ Zone Label Updated**:
       - [x] Changed "RENTAL HOUSING" to "INVESTMENT PROPERTIES"
       - [x] Maintains same styling and positioning
+    - [x] **✅ Custom Locked Feature Modal System**:
+      - [x] Created reusable `LockedFeatureModal` component with cyberpunk aesthetic
+      - [x] Handles both light and dark modes automatically
+      - [x] Replaced Alert.alert calls in:
+        - FutureBuildingPlaceholder (properties 2-4 unlock requirements)
+        - RentalHousingLocation (loading balance, insufficient funds)
+        - ResearchCenterLocation (loading balance, insufficient funds, build errors)
+      - [x] Features lock icon, themed styling, and consistent button text
+      - [x] **Modal Spacing Improvements**:
+        - [x] Increased overall padding from `xl` to `xl * 2`
+        - [x] Added minimum height (400px) for better proportions
+        - [x] Enlarged lock icon container (70x70) and icon (32px)
+        - [x] Improved spacing between elements for better visual balance
+        - [x] Enhanced button sizing and padding for better touch targets
+      - [x] **Modal Size and Layout Refinements**:
+        - [x] Reduced modal size to 80% of viewport height for better proportions
+        - [x] Adjusted padding from `xl * 2` back to `lg` for balanced spacing
+        - [x] Added `justifyContent: 'center'` for vertical content centering
+        - [x] Changed button text from "UNDERSTOOD" to "OK" for clarity
+        - [x] Optimized lock icon size (60x60) and spacing for new proportions
+    - [x] **✅ Hack Rig Modal System Updated**:
+      - [x] Created specialized `SystemBreachModal` for Hack Rig alerts
+      - [x] Replaced Alert.alert with custom cyberpunk-styled modal
+      - [x] Features warning icon (⚠️), error-colored title, and dual buttons
+      - [x] Maintains same functionality: Cancel and EXECUTE EXPLOIT
+      - [x] Consistent with game's aesthetic and modal system
+      - [x] **Modal Spacing Refinement**:
+        - [x] Fixed spacing issue by using correct `SIZING.spacing.lg` instead of non-existent `xl` value
+        - [x] Balanced spacing to provide separation without pushing content to edges
 - [x] **PHASE 1 COMPLETE**: All visual components implemented and positioned with proper layout
 
 ### **Phase 2: Modal Popup Implementation**

@@ -1,9 +1,10 @@
 import React, {useRef, useState, useEffect} from 'react';
-import {View, StyleSheet, TouchableOpacity, Image, Text, Animated, Alert} from 'react-native';
+import {View, StyleSheet, TouchableOpacity, Image, Text, Animated} from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useAppSelector } from '../../store/hooks';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { API_URL } from '../../config';
+import { SystemBreachModal } from './SystemBreachModal';
 
 type Props = {
   onPress: () => void;
@@ -17,6 +18,7 @@ export const HackRigDisplay = ({ onPress, onNavigateToBattle }: Props) => {
   const [isLocked, setIsLocked] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const [showSystemBreachModal, setShowSystemBreachModal] = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // Fetch hack rig status from database on component mount
@@ -79,28 +81,7 @@ export const HackRigDisplay = ({ onPress, onNavigateToBattle }: Props) => {
   const handlePress = () => {
     setIsAlertOpen(true);
     startPulseAnimation();
-
-    // TODO: system alert is scary, redesign for in-game alert look for cyberpunk style
-    Alert.alert(
-      'System Breach Detected',
-      'TESLA_GRID has root access to your system. Shell injection detected in Hack Rig kernel.\n\nInitiate countermeasures to regain control.',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-          onPress: () => {
-            setIsAlertOpen(false);
-            pulseAnim.stopAnimation();
-            pulseAnim.setValue(1);
-          },
-        },
-        {
-          text: 'EXECUTE EXPLOIT',
-          onPress: handleExploit,
-          style: 'destructive',
-        },
-      ]
-    );
+    setShowSystemBreachModal(true);
   };
 
   // Show loading state while fetching
@@ -168,6 +149,20 @@ export const HackRigDisplay = ({ onPress, onNavigateToBattle }: Props) => {
           <Text style={[styles.moduleDescription, { color: colors.text.secondary }]}>Access the network</Text>
         </View>
       </TouchableOpacity>
+      
+      <SystemBreachModal
+        visible={showSystemBreachModal}
+        onCancel={() => {
+          setShowSystemBreachModal(false);
+          setIsAlertOpen(false);
+          pulseAnim.stopAnimation();
+          pulseAnim.setValue(1);
+        }}
+        onExecuteExploit={() => {
+          setShowSystemBreachModal(false);
+          handleExploit();
+        }}
+      />
     </Animated.View>
   );
 };

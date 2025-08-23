@@ -1,5 +1,5 @@
 import React, {memo, useState, useEffect} from 'react';
-import {TouchableOpacity, View, Text, Image, StyleSheet, Modal, Alert} from 'react-native';
+import {TouchableOpacity, View, Text, Image, StyleSheet, Modal} from 'react-native';
 import {SIZING} from '../../styles/theme';
 import {useThemeColors} from '../../hooks/useThemeColors';
 import { useUnlockResearchCenterMutation, useGetProfileQuery, useGetResearchCenterStatusQuery } from '../../store/api/authApi';
@@ -7,6 +7,7 @@ import { useFetchBalanceQuery } from '../../store/api/balanceApi';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { updateBalance } from '../../store/slices/balanceSlice';
 import { BuildCountdownTimer } from './BuildCountdownTimer';
+import { LockedFeatureModal } from './index';
 
 type ResearchCenterLocationProps = {
   onPress?: () => void;
@@ -16,6 +17,10 @@ type ResearchCenterLocationProps = {
 export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onPress, onNavigateToResearch }: ResearchCenterLocationProps) {
   const colors = useThemeColors();
   const [showPopup, setShowPopup] = useState(false);
+  const [showLoadingModal, setShowLoadingModal] = useState(false);
+  const [showInsufficientFundsModal, setShowInsufficientFundsModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [unlockResearchCenter] = useUnlockResearchCenterMutation();
   const { data: profile, isLoading } = useGetProfileQuery();
   const { data: buildStatus, isLoading: buildStatusLoading, refetch: refetchBuildStatus } = useGetResearchCenterStatusQuery();
@@ -43,11 +48,7 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
     } else {
       // Only show modal if we have valid balance data
       if (balanceLoading || currentBalance === null || currentBalance === undefined) {
-        Alert.alert(
-          'Loading Balance',
-          'Please wait while we load your current balance.',
-          [{ text: 'OK' }]
-        );
+        setShowLoadingModal(true);
         return;
       }
       setShowPopup(true);
@@ -56,11 +57,7 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
 
   const handleBuild = async () => {
     if (!hasSufficientFunds) {
-      Alert.alert(
-        'Insufficient Funds',
-        'You need $50,000 to build the Research Center.',
-        [{ text: 'OK' }]
-      );
+      setShowInsufficientFundsModal(true);
       return;
     }
 
@@ -81,8 +78,9 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
       // Don't call onPress here since we're now building, not navigating
     } catch (error: any) {
       console.error('Failed to start research center build:', error);
-      const errorMessage = error?.data?.message || 'Failed to start research center build';
-      Alert.alert('Error', errorMessage, [{ text: 'OK' }]);
+      const errorMsg = error?.data?.message || 'Failed to start research center build';
+      setErrorMessage(errorMsg);
+      setShowErrorModal(true);
     }
   };
 
@@ -173,6 +171,30 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+      
+      <LockedFeatureModal
+        visible={showLoadingModal}
+        title="LOADING BALANCE"
+        message="Please wait while we load your current balance."
+        onClose={() => setShowLoadingModal(false)}
+        closeButtonText="OK"
+      />
+      
+      <LockedFeatureModal
+        visible={showInsufficientFundsModal}
+        title="INSUFFICIENT FUNDS"
+        message="You need $50,000 to build the Research Center."
+        onClose={() => setShowInsufficientFundsModal(false)}
+        closeButtonText="UNDERSTOOD"
+      />
+      
+      <LockedFeatureModal
+        visible={showErrorModal}
+        title="BUILD ERROR"
+        message={errorMessage}
+        onClose={() => setShowErrorModal(false)}
+        closeButtonText="CLOSE"
+      />
     </View>
   );
 });
