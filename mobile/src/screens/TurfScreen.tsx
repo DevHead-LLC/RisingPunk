@@ -13,6 +13,7 @@ import {ProfileLocation} from '../components/turf/ProfileLocation';
 import {HomeLocation} from '../components/turf/HomeLocation';
 import {DigitalBarracksLocation} from '../components/turf/DigitalBarracksLocation';
 import {ResearchCenterLocation} from '../components/turf/ResearchCenterLocation';
+import {DevelopmentZone, RentalHousingLocation, FutureBuildingPlaceholder} from '../components/turf';
 import {BattlePreparationScreen} from './BattlePreparationScreen';
 import {BattleGridScreen} from './BattleGridScreen';
 import {ErrorBoundary} from '../components/common/ErrorBoundary';
@@ -199,6 +200,12 @@ export function TurfScreen(): React.JSX.Element {
                     <DigitalBarracksLocation onPress={() => navigateToScreen('barracks')} />
                   </View>
                   <ResearchCenterLocation onNavigateToResearch={() => navigateToScreen('research')} />
+                  <DevelopmentZone>
+                    <FutureBuildingPlaceholder propertyNumber={2} />
+                    <FutureBuildingPlaceholder propertyNumber={3} />
+                    <RentalHousingLocation onNavigateToRentalHousing={() => navigateToScreen('turf')} />
+                    <FutureBuildingPlaceholder propertyNumber={4} />
+                  </DevelopmentZone>
                 </View>
               </ScrollViewMemo>
             </View>

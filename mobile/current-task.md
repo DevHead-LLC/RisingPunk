@@ -1,187 +1,232 @@
-# Current Task: Implement Light Mode for Battle Screen
+# Current Task: Implement Rental Housing Development Feature
 
 ## Problem
-The battle screen currently only supports dark mode, but we need to implement light mode support including overlays and battalions.
+We need to implement a new Rental Housing development feature in the TurfScreen that follows the same pattern as the Research Center development. This will include an empty lot, construction phase, and completed housing with a 2-hour build timer.
 
 ## Requirements
-1. **Battle Screen Light Mode**: Convert all battle screen components to support light mode
-2. **Phreak Battalion Diamond**: Maintain the 45-degree rotated diamond shape with straight text
-3. **Overlays**: Ensure all battle overlays (countdown, timer, end screen) support light mode
-4. **Battalions**: Convert battalion shapes, health bars, and labels to light mode
-5. **Network Grid**: Convert network nodes and connections to light mode
+1. **Rental Housing Development**: Implement a new development location similar to Research Center
+2. **Build Process**: Empty lot → Under construction → Completed housing
+3. **Cost**: $100,000 for development
+4. **Build Time**: 2 hours (120 minutes)
+5. **Single Build Limit**: Only allow 1 build at a time
+6. **Database Integration**: Ensure new users get correct initial data
+7. **Persistence**: Handle screen refreshes and app restarts
 
-## Current Status
-✅ **MISSION ACCOMPLISHED**: Battle Screen Light Mode Implementation Complete!
+## Implementation Plan
 
-## COMPLETED: Battle Screen Light Mode Implementation + Visual Improvements
+### **Phase 1: Build Empty Space and Image** 
+- [ ] Add `rentalHousing` to User model `unlockedFeatures` and `rentalHousingBuild` fields
+- [ ] **✅ Create Reusable Components** (for future buildings):
+  - [x] `DevelopmentLocation.tsx` - Base container with positioning, icon, label, timer
+  - [x] `BuildModal.tsx` - Reusable modal for build confirmation
+  - [x] `DevelopmentIcon.tsx` - Icon container with image switching logic
+  - [x] `DevelopmentLabel.tsx` - Reusable label component
+  - [x] `DevelopmentTimer.tsx` - Reusable timer container
+  - [x] `index.ts` - Export all reusable components
+- [x] **✅ Create `DevelopmentZone.tsx`** component for left-side 4-building layout
+- [x] **✅ Create `RentalHousingLocation.tsx`** component using reusable components
+- [x] **✅ Add placeholder components** for 3 future buildings
+- [x] **✅ Position DevelopmentZone** on left side of TurfScreen
+- [x] **✅ Add component to TurfScreen** render
+- [x] **✅ Layout Fixes Applied**: 
+  - [x] Reduced distance underneath (moved to top: 35%)
+  - [x] Fixed "4 on dice" 2x2 grid layout (2 on top, 2 on bottom)
+  - [x] Made all building slots identical (using DevelopmentIcon)
+  - [x] Removed "BUILDING X COMING SOON" text and dashed borders
+  - [x] Moved "Rental Housing" text beneath all buildings (centered)
+  - [x] **✅ Additional Improvements Applied**:
+    - [x] Increased spacing between buildings (larger gap for better separation)
+    - [x] Removed all dashed/dotted borders
+    - [x] Added property numbers (1, 2, 3, 4) inside each location card
+    - [x] Positioned "RENTAL HOUSING" text beneath houses, inside digital grounds
+    - [x] **✅ Final Layout Adjustments**:
+      - [x] Increased digital grounds height from 300 to 350 for better text spacing
+      - [x] Adjusted property number positioning (top: 8, right: 8) to be fully inside green squares
+    - [x] **✅ Property Locking System Implemented**:
+      - [x] Added dark overlay (60% opacity) over properties 2-4
+      - [x] Added lock icon (🔒) in center of locked properties
+      - [x] Implemented unlock requirement messaging:
+        - Property 2: "Unlock Property 1 to Enable"
+        - Property 3: "Unlock Properties 1 and 2 to Enable"  
+        - Property 4: "Unlock Properties 1-3 to Enable"
+- [x] **PHASE 1 COMPLETE**: All visual components implemented and positioned with proper layout
 
-### **What We Accomplished**
-1. **✅ BattleBattalion component** - Added theme support while preserving Phreak diamond rotation
-2. **✅ BattleNetworkGrid component** - Added theme support for nodes and connections
-3. **✅ BattleOverlayManager** - All overlays now support light mode
-4. **✅ BattleGridScreen** - Updated to use theme-aware styles
-5. **✅ BattleTimerDisplay** - Added theme support for timer and progress bar
-6. **✅ BattleCountdownOverlay** - Added theme support for countdown display
-7. **✅ BattleEndOverlay** - Added theme support for end screen
-8. **✅ BattleLossBreakdown** - Added theme support for results display
-9. **✅ BattalionLossItem** - Added theme support for individual battalion items
-10. **✅ NodeHealthBar** - Added theme support for node health indicators
-11. **✅ BattleLoadingError** - Added theme support for loading/error states
-12. **✅ battleGridStyles** - Created theme-aware style system
+### **Phase 2: Modal Popup Implementation**
+- [ ] Add modal popup to `RentalHousingLocation.tsx` component
+- [ ] Implement build confirmation dialog with $100,000 cost display
+- [ ] Add "Build Rental Housing" button (initially disabled)
+- [ ] Style modal to match Research Center pattern
 
-### **Visual Improvements Made**
-- **✅ Neutral Nodes Readability** - Changed neutral nodes from black to light gray (accent color) with better text contrast
-- **✅ Deploy Purge Button** - Removed blur shadow effects for cleaner appearance
-- **✅ Countdown Numbers** - Removed blur shadow effects for cleaner appearance
-- **✅ Battle Preparation Title** - Removed text shadow for consistency
-- **✅ Battalion Quantity Backgrounds** - Changed to dark gray (#2A2A2A) with white text for better readability
-- **✅ Phreak Battalion Text Container** - Fixed rotation to ensure text container is properly counter-rotated -45° for straight text display
-- **✅ Neutral Node Health Bars** - Changed background to darker gray (#4A4A4A) for better contrast with red/blue progress segments
-- **✅ Progress Bar Standardization** - Added reusable `progressBarBg` color to theme system: dark mode keeps original `#4A4A4A`, light mode uses `rgba(146, 135, 135, 0.67)` for better contrast. Updated NodeHealthBar, BuildProgressBar, and BattleTimerDisplay components
-- **✅ Theme Toggle Text** - Updated "Go Dark" to "Go Hacker" and "Go Light" to "Go Business" in profile settings and login screen
+### **Phase 3: Funds Validation**
+- [ ] Integrate balance checking from `useFetchBalanceQuery`
+- [ ] Disable build button if insufficient funds (< $100,000)
+- [ ] Show appropriate error messages for insufficient balance
+- [ ] Enable build button only when user has sufficient funds
 
-### **Key Technical Achievements**
-- **Phreak Battalion**: Diamond shape with 45° rotation preserved, text counter-rotated -45° to stay straight ✅
-- **Theme Integration**: All components now use `useThemeColors` hook for consistent theming ✅
-- **Color Schemes**: Maintained contrast and readability in both light and dark modes ✅
-- **Preserved Functionality**: All existing battle mechanics continue working exactly as before ✅
-- **Comprehensive Coverage**: Every battle screen component now supports both themes ✅
-- **Clean Visual Design**: Removed unnecessary blur shadows for professional appearance ✅
+### **Phase 4: Database Integration & Initial Testing**
+- [ ] Add server-side API endpoints:
+  - `GET /api/users/rental-housing-status` - Check build status
+  - `POST /api/users/unlock-rental-housing` - Start build process
+- [ ] Update User model with `rentalHousingBuild` schema
+- [ ] Implement balance deduction and build timer logic
+- [ ] Add client-side API hooks in `authApi.ts`
+- [ ] Integrate API calls in component
+- [ ] **PROGRESSION CHECK**: Test with 1-minute timer to verify database unlock works before extending to 2 hours
 
-### **Theme-Aware Components Implemented**
-- **Battle Visualization**: Battalions, network grid, nodes, connections
-- **Battle Overlays**: Timer, countdown, end screen, loading states
-- **Battle Results**: Loss breakdown, rewards display, battalion details
-- **UI Elements**: Buttons, text, backgrounds, borders, shadows
+### **Phase 5: 1-Minute Countdown Timer**
+- [ ] Implement countdown timer using `BuildCountdownTimer` component
+- [ ] Test timer functionality with 1-minute build time
+- [ ] Verify timer completion triggers status update
+- [ ] Ensure image transitions from under construction to completed
+- [ ] **VERIFICATION**: Confirm database unlock process works correctly with short timer
 
-## 🎯 **TASK COMPLETE**: Battle Screen now fully supports both light and dark modes with clean visual design!
+### **Phase 6: Extend to 2-Hour Build**
+- [ ] Update build time from 1 minute to 2 hours (120 minutes)
+- [ ] Test extended timer functionality
+- [ ] Verify proper time formatting (hours:minutes:seconds)
+- [ ] Ensure timer persists across app restarts
+- [ ] **FINAL IMPLEMENTATION**: Full 2-hour build process now active
 
----
+### **Phase 7: Persistence Testing**
+- [ ] Test screen refreshes during build process
+- [ ] Verify timer continues counting when app is backgrounded
+- [ ] Test app restart during build process
+- [ ] Ensure build status persists in database
 
-# PREVIOUS ISSUES (RESOLVED)
+### **Phase 8: Single Build Enforcement**
+- [ ] Implement server-side validation to prevent multiple builds
+- [ ] Add client-side checks to disable build button during construction
+- [ ] Test concurrent build attempts are properly blocked
+- [ ] Verify only one rental housing build can be active at a time
 
-## 🚨 **REAL ROOT CAUSE DISCOVERED: Grid Effect Resetting Coordinates!**
+## Technical Implementation Details
 
-**What I Found**: There's a `useEffect` that runs whenever the `grid` changes (line 756 dependency array includes `grid`). When the map data is refetched after battle, the grid changes, which triggers this effect, which resets the `offsetX` and `offsetY` values to 0,0 BEFORE the restore effect can run.
-
-**The Sequence**:
-1. **Battle ends** → `refetch()` called → **Grid changes**
-2. **Grid effect runs** → `offsetX.value = clamped.x` (which is 0,0) 
-3. **Restore effect runs** → Tries to set coordinates but they're already reset to 0,0
-
-**The Culprit Code**:
+### **Database Schema Updates**
 ```typescript
-useEffect(() => {
-  // ... bounds setup ...
-  const clamped = {
-    x: Math.min(bounds.maxX, Math.max(bounds.minX, lastComputedPan.value.x)),
-    y: Math.min(bounds.maxY, Math.max(bounds.minY, lastComputedPan.value.y)),
-  };
-  offsetX.value = clamped.x;  // ❌ This resets coordinates to 0,0
-  offsetY.value = clamped.y;  // ❌ This resets coordinates to 0,0
-}, [grid, ...]);  // ❌ Runs when grid changes after battle
-```
-
-**The Fix Applied**: Prevent this effect from resetting pan position when returning from battle:
-```typescript
-// Don't reset pan position if we're returning from battle with a specific restore position
-if (!restorePan) {
-  const clamped = {
-    x: Math.min(bounds.maxX, Math.max(bounds.minX, lastComputedPan.value.x)),
-    y: Math.min(bounds.maxY, Math.max(bounds.minY, lastComputedPan.value.y)),
-  };
-  offsetX.value = clamped.x;
-  offsetY.value = clamped.y;
-  lastComputedPan.value = clamped;
-  computeWindow(clamped.x, clamped.y, containerSize.width, containerSize.height);
+// User model additions
+unlockedFeatures: {
+  hackRig: boolean;
+  researchCenter: boolean;
+  rentalHousing1: boolean; // NEW - Property 1
+  rentalHousing2: boolean; // NEW - Property 2
+  rentalHousing3: boolean; // NEW - Property 3
+  rentalHousing4: boolean; // NEW - Property 4
+},
+rentalHousingBuilds: { // NEW - Individual property builds
+  property1: { startedAt: Date | null; completesAt: Date | null };
+  property2: { startedAt: Date | null; completesAt: Date | null };
+  property3: { startedAt: Date | null; completesAt: Date | null };
+  property4: { startedAt: Date | null; completesAt: Date | null };
 }
 ```
 
-**Expected Result**: After this fix:
-- **Grid effect won't reset coordinates when returning from battle** ✅
-- **Restore effect can properly set the battle location** ✅ 
-- **Map loads at correct battle location** ✅
-- **No more blank map at 0,0** ✅
-
-## 🚨 **NEW ISSUE: Tiles Not Loading After Battle**
-
-**What's Happening**: The map now loads at the correct location after battle, but the tiles aren't rendering until you pan. This suggests the `computeWindow` call isn't triggering the tile loading properly.
-
-**The Problem**: After restoring the pan position, the tiles don't load because there's no actual pan movement to trigger the tile loading system.
-
-**The Fix Applied**: Added a forced pan trigger after the restore to ensure tiles load:
+### **New User Data Initialization**
 ```typescript
-// Force a small pan movement to trigger tile loading
-requestAnimationFrame(() => {
-  // First compute the window at the restored position
-  computeWindow(clampedX, clampedY, containerSize.width, containerSize.height);
-  
-  // Then trigger a tiny pan movement to force tile loading
-  const tinyPanX = clampedX + 1;
-  const tinyPanY = clampedY + 1;
-  offsetX.value = tinyPanX;
-  offsetY.value = tinyPanY;
-  lastComputedPan.value = { x: tinyPanX, y: tinyPanY };
-  
-  // Compute window again with the tiny pan
-  computeWindow(tinyPanX, tinyPanY, containerSize.width, containerSize.height);
-  
-  // Finally, restore to the exact position
-  requestAnimationFrame(() => {
-    offsetX.value = clampedX;
-    offsetY.value = clampedY;
-    lastComputedPan.value = { x: clampedX, y: clampedY };
-    computeWindow(clampedX, clampedY, containerSize.width, containerSize.height);
-  });
-});
+// Ensure new users have all rental housing fields initialized
+unlockedFeatures: {
+  hackRig: false,
+  researchCenter: false,
+  rentalHousing1: false, // NEW - Property 1
+  rentalHousing2: false, // NEW - Property 2
+  rentalHousing3: false, // NEW - Property 3
+  rentalHousing4: false, // NEW - Property 4
+},
+rentalHousingBuilds: { // NEW - Individual property builds
+  property1: { startedAt: null, completesAt: null },
+  property2: { startedAt: null, completesAt: null },
+  property3: { startedAt: null, completesAt: null },
+  property4: { startedAt: null, completesAt: null }
+}
 ```
 
-**Expected Result**: After this fix:
-- **Map loads at correct battle location** ✅ (already working)
-- **Tiles load immediately** ✅ (forced pan triggers loading)
-- **No more blank screen** ✅ (tiles render without manual panning)
-- **Smooth user experience** ✅ (everything loads automatically)
+### **API Endpoints**
+- `GET /api/users/rental-housing-status/:propertyId` - Returns build status and unlock state for specific property (1-4)
+- `POST /api/users/unlock-rental-housing/:propertyId` - Starts build process for specific property, deducts balance
 
-## 🚨 **FORCED PAN APPROACH FAILED - Trying Virtual Viewport Refresh**
+### **MongoDB Commands for Existing Users**
+```javascript
+// Update existing user to add rental housing fields
+db.users.updateOne(
+  { "_id": ObjectId('68a0a15fd6d999828c46b26c') },
+  {
+    $set: {
+      "unlockedFeatures.rentalHousing1": false,
+      "unlockedFeatures.rentalHousing2": false,
+      "unlockedFeatures.rentalHousing3": false,
+      "unlockedFeatures.rentalHousing4": false,
+      "rentalHousingBuilds.property1": { "startedAt": null, "completesAt": null },
+      "rentalHousingBuilds.property2": { "startedAt": null, "completesAt": null },
+      "rentalHousingBuilds.property3": { "startedAt": null, "completesAt": null },
+      "rentalHousingBuilds.property4": { "startedAt": null, "completesAt": null }
+    }
+  }
+)
 
-**What Happened**: The forced pan sequence didn't work. The logs show:
-```
-[Map] Restoring pan to grid coordinates: 29 19 pan coordinates: -1224.5 -932.5
-[Map] Phase 7A: Virtual viewport calculated - 190 tiles visible out of 190 total
-```
-
-The map is restoring to the correct coordinates and calculating 190 visible tiles, but the tiles still aren't rendering.
-
-**New Theory**: The issue might be that `computeWindow` isn't triggering the tile loading system properly. Instead, we need to force a direct refresh of the virtual viewport and tile rendering.
-
-**New Fix Applied**: Force tile loading by triggering a virtual viewport refresh:
-```typescript
-// Force tile loading by triggering a virtual viewport refresh
-requestAnimationFrame(() => {
-  // First compute the window at the restored position
-  computeWindow(clampedX, clampedY, containerSize.width, containerSize.height);
-  
-  // Force a virtual viewport refresh to ensure tiles load
-  const forceRefresh = () => {
-    // Trigger virtual viewport calculation
-    calculateVirtualViewport(clampedX, clampedY, containerSize.width, containerSize.height);
-    
-    // Force a re-render by updating the virtual viewport state
-    setVirtualViewport(prev => ({
-      ...prev,
-      renderCount: prev.renderCount + 1
-    }));
-  };
-  
-  // Execute the force refresh
-  forceRefresh();
-});
+// Individual property unlock commands
+db.users.updateOne(
+  { "_id": ObjectId('68a0a15fd6d999828c46b26c') },
+  { $set: { "unlockedFeatures.rentalHousing1": true } }
+)
 ```
 
-**Expected Result**: After this fix:
-- **Map loads at correct battle location** ✅ (already working)
-- **Virtual viewport refreshes** ✅ (forced calculation)
-- **Tiles render immediately** ✅ (forced re-render)
-- **No more blank screen** ✅ (direct tile loading trigger)
+### **Component Structure**
+- `RentalHousingLocation.tsx` - Main component with modal and build logic
+- Uses existing `BuildCountdownTimer` component
+- Follows same pattern as `ResearchCenterLocation.tsx`
 
-Now run the battle again - this approach should force the virtual viewport to refresh and the tiles to render immediately!
+### **New User Registration Requirement**
+- **Auth System Update**: Must modify user registration to initialize all 4 rental housing properties
+- **Default State**: All properties start as `false` with no active builds
+- **Individual Control**: Each property can be unlocked independently without affecting others
+
+### **Image Assets**
+- **Empty Lot**: `emptyResidential.png` ✅ (provided by user)
+- **Under Construction**: `residentialUnderConstruction.png` ✅ (provided by user)  
+- **Completed Housing**: `residentialLvl1.png` ✅ (provided by user)
+
+### **Positioning & Layout**
+- **Left Side Development Zone**: 4 buildings in "4 on dice" 2x2 grid pattern on the left side of TurfScreen
+- **Container Style**: Green opaque container similar to Research Center, but more like Home/Digital Barracks "digital turf" style
+- **Positioning**: Beneath Research Center (similar distance as Research Center is beneath Home/Digital Barracks)
+- **Building Layout (2x2 Grid)**: 
+  - Top Left: Building 2 (placeholder)
+  - Top Right: Building 3 (placeholder)
+  - Bottom Left: Building 1 - Rental Housing (bottom center of the 4)
+  - Bottom Right: Building 4 (placeholder)
+- **Spacing**: Generous margins between buildings like Home/Digital Barracks separation
+- **Right Side**: Reserved for different building types later
+- Use responsive positioning with proper z-index layering
+
+## Current Status
+✅ **PHASE 1 COMPLETE**: All visual components implemented and positioned!
+
+## Dependencies
+- ✅ **User Requirements**: Clear and complete
+- ✅ **Technical Plan**: Comprehensive 8-phase implementation
+- ✅ **House Images**: All three states provided (empty, under construction, completed)
+- ✅ **Reusable Components**: All development components created
+- ✅ **Phase 1**: DevelopmentZone, RentalHousingLocation, and placeholders implemented
+- 🔄 **Ready for Phase 2**: Modal popup implementation
+
+## Next Steps
+1. ✅ **House images received** - ready to proceed
+2. Update User model with rental housing fields
+3. Create RentalHousingLocation component using reusable components
+4. Position on TurfScreen (suggested: bottom center area)
+5. Begin Phase 1 implementation
+
+---
+
+## PREVIOUS TASKS (COMPLETED)
+
+### **Battle Screen Light Mode Implementation** ✅
+- All battle components now support both light and dark themes
+- Phreak battalion diamond rotation preserved with straight text
+- Comprehensive theme integration across all battle overlays
+- Clean visual design with improved contrast and readability
+
+### **Map Pan Position Restoration** ✅
+- Fixed grid effect resetting coordinates after battle
+- Implemented proper pan position restoration
+- Added virtual viewport refresh for tile loading
+- Map now loads at correct battle location with tiles visible
