@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { DevelopmentIcon } from './index';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { useTheme } from '../../context/ThemeContext';
 
 interface FutureBuildingPlaceholderProps {
   propertyNumber: number;
@@ -10,6 +11,7 @@ interface FutureBuildingPlaceholderProps {
 
 export const FutureBuildingPlaceholder: React.FC<FutureBuildingPlaceholderProps> = ({ propertyNumber }) => {
   const colors = useThemeColors();
+  const { themeMode } = useTheme();
 
   const containerStyle = [
     styles.placeholderContainer
@@ -18,7 +20,7 @@ export const FutureBuildingPlaceholder: React.FC<FutureBuildingPlaceholderProps>
   const propertyNumberStyle = [
     styles.propertyNumber,
     {
-      color: colors.matrix
+      color: themeMode === 'light' ? '#FFFFFF' : colors.matrix
     }
   ];
 

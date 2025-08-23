@@ -28,9 +28,9 @@ export const DevelopmentZone: React.FC<DevelopmentZoneProps> = ({ children }) =>
           {React.Children.toArray(children).slice(2, 4)}
         </View>
       </View>
-      <Text style={[styles.zoneLabel, { color: colors.secondary }]}>
-        RENTAL HOUSING
-      </Text>
+                   <Text style={[styles.zoneLabel, { color: colors.secondary }]}>
+               INVESTMENT PROPERTIES
+             </Text>
     </View>
   );
 };

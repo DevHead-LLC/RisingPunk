@@ -2,6 +2,7 @@ import React, { memo, useState } from 'react';
 import { View, Text, StyleSheet, Alert } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { useTheme } from '../../context/ThemeContext';
 import { useFetchBalanceQuery } from '../../store/api/balanceApi';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { updateBalance } from '../../store/slices/balanceSlice';
@@ -22,6 +23,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
   onNavigateToRentalHousing 
 }: RentalHousingLocationProps) {
   const colors = useThemeColors();
+  const { themeMode } = useTheme();
   const [showPopup, setShowPopup] = useState(false);
   const { data: balanceData, isLoading: balanceLoading } = useFetchBalanceQuery();
   const dispatch = useAppDispatch();
@@ -101,7 +103,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
           size={100}
           iconSize={85}
         />
-        <Text style={styles.propertyNumber}>1</Text>
+        <Text style={[styles.propertyNumber, { color: themeMode === 'light' ? '#FFFFFF' : colors.matrix }]}>1</Text>
       </View>
       
 

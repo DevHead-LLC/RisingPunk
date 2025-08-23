@@ -49,6 +49,13 @@ We need to implement a new Rental Housing development feature in the TurfScreen 
         - Property 2: "Unlock Property 1 to Enable"
         - Property 3: "Unlock Properties 1 and 2 to Enable"  
         - Property 4: "Unlock Properties 1-3 to Enable"
+    - [x] **✅ Light Mode Property Number Styling**:
+      - [x] Property numbers now use white text (#FFFFFF) in light mode
+      - [x] Dark mode preserves original green matrix color
+      - [x] Applied to both RentalHousingLocation and FutureBuildingPlaceholder
+    - [x] **✅ Zone Label Updated**:
+      - [x] Changed "RENTAL HOUSING" to "INVESTMENT PROPERTIES"
+      - [x] Maintains same styling and positioning
 - [x] **PHASE 1 COMPLETE**: All visual components implemented and positioned with proper layout
 
 ### **Phase 2: Modal Popup Implementation**
