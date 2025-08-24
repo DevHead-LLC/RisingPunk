@@ -2,12 +2,18 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { BuildCountdownTimer } from './BuildCountdownTimer';
 
 interface DevelopmentZoneProps {
   children: React.ReactNode;
+  buildingProperties?: Array<{
+    propertyId: number;
+    buildStatus: any;
+    onComplete: () => void;
+  }>;
 }
 
-export const DevelopmentZone: React.FC<DevelopmentZoneProps> = ({ children }) => {
+export const DevelopmentZone: React.FC<DevelopmentZoneProps> = ({ children, buildingProperties = [] }) => {
   const colors = useThemeColors();
 
   const containerStyle = [
@@ -17,6 +23,8 @@ export const DevelopmentZone: React.FC<DevelopmentZoneProps> = ({ children }) =>
       borderColor: colors.matrix + '33'
     }
   ];
+
+  const activeBuilds = buildingProperties.filter(prop => prop.buildStatus && prop.buildStatus.completesAt);
 
   return (
     <View style={containerStyle}>
@@ -28,9 +36,19 @@ export const DevelopmentZone: React.FC<DevelopmentZoneProps> = ({ children }) =>
           {React.Children.toArray(children).slice(2, 4)}
         </View>
       </View>
-                   <Text style={[styles.zoneLabel, { color: colors.secondary }]}>
-               INVESTMENT PROPERTIES
-             </Text>
+      
+      <Text style={[styles.zoneLabel, { color: colors.secondary }]}>
+        INVESTMENT PROPERTIES
+      </Text>
+
+      {activeBuilds.length > 0 && (
+        <View style={styles.timerContainer}>
+          <BuildCountdownTimer
+            completesAt={activeBuilds[0].buildStatus.completesAt}
+            onComplete={activeBuilds[0].onComplete}
+          />
+        </View>
+      )}
     </View>
   );
 };
@@ -76,5 +94,13 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     marginTop: SIZING.spacing.lg,
     width: '100%',
+  },
+  timerContainer: {
+    position: 'absolute',
+    top: '105%',
+    left: '50%',
+    transform: [{ translateX: -75 }],
+    alignItems: 'center',
+    width: '35%',
   },
 });

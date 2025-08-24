@@ -1,4 +1,4 @@
-import React, {useState, useRef, useEffect, useCallback, memo} from 'react';
+import React, {useState, useRef, useEffect, useCallback, memo, forwardRef, useImperativeHandle, useMemo} from 'react';
 import {View, StyleSheet, ScrollView, Dimensions} from 'react-native';
 import {Balance} from '../components/common/Balance';
 import {HomeScreen} from './HomeScreen';
@@ -16,10 +16,12 @@ import {ResearchCenterLocation} from '../components/turf/ResearchCenterLocation'
 import {DevelopmentZone, RentalHousingLocation, FutureBuildingPlaceholder} from '../components/turf';
 import {BattlePreparationScreen} from './BattlePreparationScreen';
 import {BattleGridScreen} from './BattleGridScreen';
+import {InvestmentPropertyScreen} from './InvestmentPropertyScreen';
 import {ErrorBoundary} from '../components/common/ErrorBoundary';
 import {useAppDispatch} from '../store/hooks';
 import {fetchInitialData} from '../store/slices/authSlice';
 import {mapApi} from '../store/api/mapApi';
+import {useGetRentalHousingStatusQuery, useCompleteRentalHousingMutation} from '../store/api/authApi';
 
 const DiagonalLines = memo(({ colors }: { colors: any }) => (
   <>
@@ -34,9 +36,11 @@ const DiagonalLines = memo(({ colors }: { colors: any }) => (
 const ScrollViewMemo = memo(function ScrollViewMemo({
   children,
   horizontalScrollRef,
+  onScroll,
 }: {
   children: React.ReactNode;
   horizontalScrollRef: React.RefObject<ScrollView>;
+  onScroll?: (event: any) => void;
 }) {
   const SCREEN_WIDTH = Dimensions.get('window').width;
   const CONTENT_WIDTH = 2000;
@@ -53,6 +57,7 @@ const ScrollViewMemo = memo(function ScrollViewMemo({
       maximumZoomScale={1}
       minimumZoomScale={1}
       bounces={false}
+      onScroll={onScroll}
       contentContainerStyle={{
         width: 2000,
         height: 2000,
@@ -63,21 +68,200 @@ const ScrollViewMemo = memo(function ScrollViewMemo({
   );
 });
 
-export function TurfScreen(): React.JSX.Element {
+export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element => {
   const colors = useThemeColors();
-  const [currentScreen, setCurrentScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research'>('turf');
+  const [currentScreen, setCurrentScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research' | 'investmentProperty'>('turf');
   const [battleId, setBattleId] = useState<string | null>(null);
   const [pendingNpcSlug, setPendingNpcSlug] = useState<string | null>(null);
   const [returnContext, setReturnContext] = useState<{ origin: 'hackRig' | 'map'; mapPan?: { x: number; y: number } } | null>(null);
   const [pendingNpcInstanceId, setPendingNpcInstanceId] = useState<string | null>(null);
-  const [previousScreen, setPreviousScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research'>('turf');
+  const [previousScreen, setPreviousScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research' | 'investmentProperty'>('turf');
+  const [currentPropertyId, setCurrentPropertyId] = useState<number>(1);
+  const [turfViewPosition, setTurfViewPosition] = useState<{ x: number; y: number } | null>(null);
   const horizontalScrollRef = useRef<ScrollView>(null);
+  const currentScrollPositionRef = useRef<{ x: number; y: number } | null>(null);
   const dispatch = useAppDispatch();
 
-  const navigateToScreen = useCallback((screen: 'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research') => {
+  // Expose horizontalScrollRef to parent component
+  useImperativeHandle(ref, () => ({
+    horizontalScrollRef: horizontalScrollRef
+  }));
+
+  // Track turf view position using ref to avoid re-renders
+  const handleTurfScroll = useCallback((event: any) => {
+    const { contentOffset } = event.nativeEvent;
+    currentScrollPositionRef.current = { x: contentOffset.x, y: contentOffset.y };
+  }, []);
+
+  // Fetch Property 1's status to determine Property 2's rendering
+  const { data: property1Status } = useGetRentalHousingStatusQuery(1);
+  const property1Unlocked = property1Status?.isUnlocked || false;
+
+  // Fetch Property 2's status to determine Property 3's rendering
+  const { data: property2Status } = useGetRentalHousingStatusQuery(2);
+  const property2Unlocked = property2Status?.isUnlocked || false;
+
+  // Fetch Property 3's status to determine Property 4's rendering
+  const { data: property3Status } = useGetRentalHousingStatusQuery(3);
+  const property3Unlocked = property3Status?.isUnlocked || false;
+
+  // Fetch Property 4's status
+  const { data: property4Status } = useGetRentalHousingStatusQuery(4);
+
+  // Get the completeRentalHousing mutation
+  const [completeRentalHousing] = useCompleteRentalHousingMutation();
+
+  // Memoize completion functions to prevent infinite re-renders
+  const handleProperty1Complete = useCallback(async () => {
+    try {
+      // Only complete if there's an active build
+      if (property1Status?.buildStatus?.completesAt) {
+        const result = await completeRentalHousing(1).unwrap();
+        if (result.success) {
+          console.log('Property 1 build completed successfully:', result);
+        }
+      }
+    } catch (error) {
+      console.error('Error completing property 1 build:', error);
+    }
+  }, [completeRentalHousing, property1Status?.buildStatus?.completesAt]);
+
+  const handleProperty2Complete = useCallback(async () => {
+    try {
+      // Only complete if there's an active build
+      if (property2Status?.buildStatus?.completesAt) {
+        const result = await completeRentalHousing(2).unwrap();
+        if (result.success) {
+          console.log('Property 2 build completed successfully:', result);
+        }
+      }
+    } catch (error) {
+      console.error('Error completing property 2 build:', error);
+    }
+  }, [completeRentalHousing, property2Status?.buildStatus?.completesAt]);
+
+  const handleProperty3Complete = useCallback(async () => {
+    try {
+      // Only complete if there's an active build
+      if (property3Status?.buildStatus?.completesAt) {
+        const result = await completeRentalHousing(3).unwrap();
+        if (result.success) {
+          console.log('Property 3 build completed successfully:', result);
+        }
+      }
+    } catch (error) {
+      console.error('Error completing property 3 build:', error);
+    }
+  }, [completeRentalHousing, property3Status?.buildStatus?.completesAt]);
+
+  const handleProperty4Complete = useCallback(async () => {
+    try {
+      // Only complete if there's an active build
+      if (property4Status?.buildStatus?.completesAt) {
+        const result = await completeRentalHousing(4).unwrap();
+        if (result.success) {
+          console.log('Property 4 build completed successfully:', result);
+        }
+      }
+    } catch (error) {
+      console.error('Error completing property 4 build:', error);
+    }
+  }, [completeRentalHousing, property4Status?.buildStatus?.completesAt]);
+
+  // Memoize building properties array to prevent infinite re-renders
+  const buildingProperties = useMemo(() => {
+    const properties = [];
+    
+    // Only include properties that are actively building
+    if (property1Status?.buildStatus?.completesAt) {
+      properties.push({
+        propertyId: 1,
+        buildStatus: property1Status.buildStatus,
+        onComplete: handleProperty1Complete
+      });
+    }
+    
+    if (property2Status?.buildStatus?.completesAt) {
+      properties.push({
+        propertyId: 2,
+        buildStatus: property2Status.buildStatus,
+        onComplete: handleProperty2Complete
+      });
+    }
+    
+    if (property3Status?.buildStatus?.completesAt) {
+      properties.push({
+        propertyId: 3,
+        buildStatus: property3Status.buildStatus,
+        onComplete: handleProperty3Complete
+      });
+    }
+    
+    if (property1Unlocked && property2Unlocked && property3Unlocked && property4Status?.buildStatus?.completesAt) {
+      properties.push({
+        propertyId: 4,
+        buildStatus: property4Status.buildStatus,
+        onComplete: handleProperty4Complete
+      });
+    }
+    
+    return properties;
+  }, [
+    property1Status?.buildStatus?.completesAt,
+    property2Status?.buildStatus?.completesAt,
+    property3Status?.buildStatus?.completesAt,
+    property4Status?.buildStatus?.completesAt,
+    property1Unlocked,
+    property2Unlocked,
+    property3Unlocked,
+    handleProperty1Complete,
+    handleProperty2Complete,
+    handleProperty3Complete,
+    handleProperty4Complete
+  ]);
+
+  const navigateToScreen = useCallback((screen: 'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research' | 'investmentProperty') => {
+    const previousScreenBeforeUpdate = currentScreen;
     setPreviousScreen(currentScreen);
     setCurrentScreen(screen);
-  }, [currentScreen]);
+    
+    // If returning to turf, handle different behaviors based on previous screen
+    if (screen === 'turf') {
+      // Home, Digital Barracks, and Profile should always center on home/digital barracks
+      if (['hackRig', 'barracks', 'profile'].includes(previousScreenBeforeUpdate)) {
+        // Clear any saved position and center the view
+        setTurfViewPosition(null);
+        setTimeout(() => {
+          const SCREEN_WIDTH = Dimensions.get('window').width;
+          const CONTENT_WIDTH = 2000;
+          const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+          horizontalScrollRef.current?.scrollTo({
+            x: CENTER_X,
+            y: 0,
+            animated: false,
+          });
+        }, 0);
+      } else if (turfViewPosition) {
+        // Research and Investment Properties should restore their last position
+        setTimeout(() => {
+          horizontalScrollRef.current?.scrollTo({
+            x: turfViewPosition.x,
+            y: turfViewPosition.y,
+            animated: false,
+          });
+        }, 0);
+      }
+    }
+  }, [currentScreen, turfViewPosition]);
+
+  const navigateToFloorPlan = useCallback((propertyId: number) => {
+    // Capture current turf view position from the ref
+    if (currentScrollPositionRef.current) {
+      setTurfViewPosition(currentScrollPositionRef.current);
+    }
+    setCurrentPropertyId(propertyId);
+    navigateToScreen('investmentProperty');
+  }, [navigateToScreen]);
 
   const handleBattleEnd = useCallback(() => {
     navigateToScreen('hackRig');
@@ -88,13 +272,22 @@ export function TurfScreen(): React.JSX.Element {
     const CONTENT_WIDTH = 2000;
     const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
 
-    // Set initial scroll position without animation
-    horizontalScrollRef.current?.scrollTo({
-      x: CENTER_X,
-      y: 0,
-      animated: false,
-    });
-  }, []);
+    // If we have a saved turf view position, restore it; otherwise center the view
+    if (turfViewPosition && currentScreen === 'turf') {
+      horizontalScrollRef.current?.scrollTo({
+        x: turfViewPosition.x,
+        y: turfViewPosition.y,
+        animated: false,
+      });
+    } else {
+      // Set initial scroll position without animation
+      horizontalScrollRef.current?.scrollTo({
+        x: CENTER_X,
+        y: 0,
+        animated: false,
+      });
+    }
+  }, [turfViewPosition, currentScreen]);
 
   useEffect(() => {
     // Center the view immediately when the screen mounts
@@ -171,7 +364,7 @@ export function TurfScreen(): React.JSX.Element {
         return <BattleGridScreen
           battleId={battleId}
           _onClose={() => {
-            // Invalidate map cache to ensure fresh data after battle
+            // Invalidate map cache to ensure fresh data after battle end
             // This prevents the "ghost NPC" issue where defeated NPCs still appear on the map
             console.log('[Battle] Invalidating map cache after battle end');
             dispatch(mapApi.util.invalidateTags(['Map']));
@@ -185,6 +378,23 @@ export function TurfScreen(): React.JSX.Element {
             setBattleId(null);
           }}
         />;
+      case 'investmentProperty':
+        return <InvestmentPropertyScreen
+          propertyId={currentPropertyId}
+          onBack={() => {
+            navigateToScreen(previousScreen);
+            // Restore turf view position when returning
+            if (turfViewPosition) {
+              setTimeout(() => {
+                horizontalScrollRef.current?.scrollTo({
+                  x: turfViewPosition.x,
+                  y: turfViewPosition.y,
+                  animated: false,
+                });
+              }, 100); // Small delay to ensure screen transition completes
+            }
+          }}
+        />;
       default:
         return (
           <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -192,19 +402,69 @@ export function TurfScreen(): React.JSX.Element {
               <Balance />
             </ErrorBoundary>
             <View style={styles.scrollWrapper}>
-              <ScrollViewMemo horizontalScrollRef={horizontalScrollRef}>
+              <ScrollViewMemo horizontalScrollRef={horizontalScrollRef} onScroll={handleTurfScroll}>
                 <View style={[styles.scrollContent, { backgroundColor: colors.background, borderColor: colors.secondary + '99' }]}>
                   <DiagonalLines colors={colors} />
                   <View style={[styles.digitalGround, { backgroundColor: colors.matrix + '0D', borderColor: colors.matrix + '33' }]}>
                     <HomeLocation onPress={() => navigateToScreen('hackRig')} />
                     <DigitalBarracksLocation onPress={() => navigateToScreen('barracks')} />
                   </View>
-                  <ResearchCenterLocation onNavigateToResearch={() => navigateToScreen('research')} />
-                  <DevelopmentZone>
-                    <FutureBuildingPlaceholder propertyNumber={2} />
-                    <FutureBuildingPlaceholder propertyNumber={3} />
-                    <RentalHousingLocation onNavigateToRentalHousing={() => navigateToScreen('turf')} />
-                    <FutureBuildingPlaceholder propertyNumber={4} />
+                  <ResearchCenterLocation onNavigateToResearch={() => {
+                    // Capture current turf view position before navigating
+                    if (currentScrollPositionRef.current) {
+                      setTurfViewPosition(currentScrollPositionRef.current);
+                    }
+                    navigateToScreen('research');
+                  }} />
+                  <DevelopmentZone buildingProperties={buildingProperties}>
+                    {/* Property 2: Conditionally render based on Property 1's unlock status */}
+                    {(() => {
+                      return property1Unlocked ? (
+                        <RentalHousingLocation 
+                          propertyId={2}
+                          onNavigateToRentalHousing={() => navigateToScreen('turf')}
+                          onNavigateToFloorPlan={navigateToFloorPlan}
+                          showTimer={false}
+                        />
+                      ) : (
+                        <FutureBuildingPlaceholder propertyNumber={2} />
+                      );
+                    })()}
+
+                    {/* Property 3: Conditionally render based on Properties 1 & 2 being unlocked */}
+                    {(() => {
+                      return (property1Unlocked && property2Unlocked) ? (
+                        <RentalHousingLocation 
+                          propertyId={3}
+                          onNavigateToRentalHousing={() => navigateToScreen('turf')}
+                          onNavigateToFloorPlan={navigateToFloorPlan}
+                          showTimer={false}
+                        />
+                      ) : (
+                        <FutureBuildingPlaceholder propertyNumber={3} />
+                      );
+                    })()}
+
+                    <RentalHousingLocation 
+                      propertyId={1}
+                      onNavigateToRentalHousing={() => navigateToScreen('turf')}
+                      onNavigateToFloorPlan={navigateToFloorPlan}
+                      showTimer={false}
+                    />
+
+                    {/* Property 4: Conditionally render based on Properties 1, 2 & 3 being unlocked */}
+                    {(() => {
+                      return (property1Unlocked && property2Unlocked && property3Unlocked) ? (
+                        <RentalHousingLocation 
+                          propertyId={4}
+                          onNavigateToRentalHousing={() => navigateToScreen('turf')}
+                          onNavigateToFloorPlan={navigateToFloorPlan}
+                          showTimer={false}
+                        />
+                      ) : (
+                        <FutureBuildingPlaceholder propertyNumber={4} />
+                      );
+                    })()}
                   </DevelopmentZone>
                 </View>
               </ScrollViewMemo>
@@ -213,10 +473,10 @@ export function TurfScreen(): React.JSX.Element {
           </View>
         );
     }
-  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors]);
+  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties]);
 
   return renderScreen();
-}
+});
 
 const styles = StyleSheet.create({
   container: {

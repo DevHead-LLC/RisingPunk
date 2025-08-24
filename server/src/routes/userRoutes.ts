@@ -226,3 +226,177 @@ router.get('/finance/templates', auth, async (_req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to load finance templates' });
   }
 });
+
+// Rental Housing endpoints
+router.get('/rental-housing-status/:propertyId', auth, async (req, res): Promise<void> => {
+  try {
+    const userId = req.user?._id;
+    const propertyId = parseInt(req.params.propertyId);
+    
+    if (!userId || propertyId < 1 || propertyId > 4) {
+      res.status(400).json({ error: 'Invalid property ID' });
+      return;
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    const propertyKey = `property${propertyId}` as keyof typeof user.rentalHousingBuilds;
+    const rentalHousingKey = `rentalHousing${propertyId}` as keyof typeof user.unlockedFeatures;
+    
+    const isUnlocked = user.unlockedFeatures[rentalHousingKey] || false;
+    const buildStatus = user.rentalHousingBuilds?.[propertyKey] || { startedAt: null, completesAt: null };
+    
+    const isBuilding = buildStatus.startedAt && buildStatus.completesAt && new Date() < new Date(buildStatus.completesAt);
+    
+    res.json({
+      propertyId,
+      isUnlocked,
+      isBuilding,
+      buildStatus,
+      canBuild: !isUnlocked && !isBuilding
+    });
+  } catch (error) {
+    console.error('Error fetching rental housing status:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/unlock-rental-housing/:propertyId', auth, async (req, res): Promise<void> => {
+  try {
+    const userId = req.user?._id;
+    const propertyId = parseInt(req.params.propertyId);
+    
+    if (!userId || propertyId < 1 || propertyId > 4) {
+      res.status(400).json({ error: 'Invalid property ID' });
+      return;
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    const propertyKey = `property${propertyId}` as keyof typeof user.rentalHousingBuilds;
+    const rentalHousingKey = `rentalHousing${propertyId}` as keyof typeof user.unlockedFeatures;
+    
+    const isUnlocked = user.unlockedFeatures[rentalHousingKey] || false;
+    const buildStatus = user.rentalHousingBuilds?.[propertyKey] || { startedAt: null, completesAt: null };
+    
+    if (isUnlocked) {
+      res.status(400).json({ error: 'Property already unlocked' });
+      return;
+    }
+    
+    if (buildStatus.startedAt && buildStatus.completesAt && new Date() < new Date(buildStatus.completesAt)) {
+      res.status(400).json({ error: 'Property already under construction' });
+      return;
+    }
+
+    const RENTAL_HOUSING_COST = 100000;
+    if (user.balance.total < RENTAL_HOUSING_COST) {
+      res.status(400).json({ error: 'Insufficient funds' });
+      return;
+    }
+
+    // Check if any other property is currently building
+    const hasActiveBuild = Object.values(user.rentalHousingBuilds || {}).some(
+      build => build.startedAt && build.completesAt && new Date() < new Date(build.completesAt)
+    );
+    
+    if (hasActiveBuild) {
+      res.status(400).json({ error: 'Only one property can be built at a time' });
+      return;
+    }
+
+    // Start build process
+    const now = new Date();
+    const buildTimeMinutes = 0.167; // 10 seconds for Phase 5 testing (was 120 minutes)
+    const completesAt = new Date(now.getTime() + buildTimeMinutes * 60 * 1000);
+
+    // Update user
+    const updateData: any = {
+      [`unlockedFeatures.${rentalHousingKey}`]: false, // Will be true when build completes
+      [`rentalHousingBuilds.${propertyKey}`]: {
+        startedAt: now,
+        completesAt: completesAt
+      },
+      'balance.total': user.balance.total - RENTAL_HOUSING_COST
+    };
+
+    await User.findByIdAndUpdate(userId, { $set: updateData });
+
+    res.json({
+      success: true,
+      message: 'Rental housing build started',
+      buildStatus: {
+        startedAt: now,
+        completesAt: completesAt
+      },
+      newBalance: user.balance.total - RENTAL_HOUSING_COST
+    });
+  } catch (error) {
+    console.error('Error starting rental housing build:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/complete-rental-housing/:propertyId', auth, async (req, res): Promise<void> => {
+  try {
+    const userId = req.user?._id;
+    const propertyId = parseInt(req.params.propertyId);
+    
+    if (!userId || propertyId < 1 || propertyId > 4) {
+      res.status(400).json({ error: 'Invalid property ID' });
+      return;
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    const propertyKey = `property${propertyId}` as keyof typeof user.rentalHousingBuilds;
+    const rentalHousingKey = `rentalHousing${propertyId}` as keyof typeof user.unlockedFeatures;
+    
+    const buildStatus = user.rentalHousingBuilds?.[propertyKey] as { startedAt: Date | null; completesAt: Date | null } | undefined;
+    
+    if (!buildStatus?.startedAt || !buildStatus?.completesAt) {
+      res.status(400).json({ error: 'No active build found for this property' });
+      return;
+    }
+
+    // Check if build time has actually completed
+    const now = new Date();
+    if (now < new Date(buildStatus.completesAt)) {
+      res.status(400).json({ error: 'Build time has not completed yet' });
+      return;
+    }
+
+    // Mark property as unlocked and clear build status
+    const updateData: any = {
+      [`unlockedFeatures.${rentalHousingKey}`]: true,
+      [`rentalHousingBuilds.${propertyKey}`]: {
+        startedAt: null,
+        completesAt: null
+      }
+    };
+
+    await User.findByIdAndUpdate(userId, { $set: updateData });
+
+    res.json({
+      success: true,
+      message: 'Rental housing build completed',
+      propertyId,
+      isUnlocked: true
+    });
+  } catch (error) {
+    console.error('Error completing rental housing build:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});

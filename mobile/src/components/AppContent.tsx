@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useRef } from 'react';
+import React, { memo, useEffect, useRef, useCallback } from 'react';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { loadStoredAuth } from '../store/slices/authSlice';
 import { updateBalance, triggerUpdate } from '../store/slices/balanceSlice';
@@ -9,13 +9,29 @@ import { LoginScreen } from '../screens/LoginScreen';
 import { TurfScreen } from '../screens/TurfScreen';
 import { FinancialStatementsScreen } from '../screens/FinancialStatementsScreen';
 import { setFinancialStatements } from '../store/slices/uiSlice';
-
+import { Dimensions } from 'react-native';
 
 const AppContent = memo(() => {
   const dispatch = useAppDispatch();
   const showFinancials = useAppSelector((state) => state.ui.modals.financialStatements);
   const { token, isLoading } = useAppSelector((state) => state.auth);
   const balanceDisplayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const turfScreenRef = useRef<any>(null);
+
+  // Function to center the turf view to home/digital barracks position
+  const centerTurfView = useCallback(() => {
+    const SCREEN_WIDTH = Dimensions.get('window').width;
+    const CONTENT_WIDTH = 2000;
+    const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+    
+    if (turfScreenRef.current?.horizontalScrollRef?.current) {
+      turfScreenRef.current.horizontalScrollRef.current.scrollTo({
+        x: CENTER_X,
+        y: 0,
+        animated: false,
+      });
+    }
+  }, []);
 
   // Fetch data when authenticated
   const { data: balanceData, isLoading: balanceLoading } = useFetchBalanceQuery(undefined, {
@@ -98,9 +114,12 @@ const AppContent = memo(() => {
 
   return (
     <>
-      <TurfScreen />
+      <TurfScreen ref={turfScreenRef} />
       {showFinancials && (
-        <FinancialStatementsScreen onClose={() => dispatch(setFinancialStatements(false))} />
+        <FinancialStatementsScreen onClose={() => {
+          dispatch(setFinancialStatements(false));
+          centerTurfView();
+        }} />
       )}
     </>
   );
