@@ -17,6 +17,7 @@ import mapRoutes from './src/routes/map';
 import userRoutes from './src/routes/userRoutes';
 import battleRoutes from './src/routes/battle';
 import healthRoute from './src/routes/health';
+import researchRoutes from './src/routes/research';
 
 declare global {
   namespace Express {
@@ -149,7 +150,6 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
       user.balance.total += accumulatedAmount;
       user.balance.lastUpdated = now;
       await user.save();
-      console.log(`💰 BALANCE UPDATE: User ${user.handle} gained $${accumulatedAmount} (${secondsElapsed.toFixed(1)}s elapsed)`);
     }
 
     // Return updated balance
@@ -412,6 +412,7 @@ app.use('/api/map', mapRoutes);
 
 app.use('/api/users', userRoutes);
 app.use('/api/battle', battleRoutes);
+app.use('/api/research', researchRoutes);
 app.use('/', healthRoute);
 
 app.post('/api/battalions/assign', auth, async (req: Request, res: Response) => {

@@ -1,5 +1,7 @@
 import express, { Request, Response, Router, NextFunction } from 'express';
 import { User } from '../models/User';
+import { Research } from '../models/Research';
+import { ResearchUser } from '../models/ResearchUser';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 
@@ -71,6 +73,29 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
+// Helper function to create research data for new users
+async function createUserResearchData(userId: mongoose.Types.ObjectId): Promise<void> {
+  try {
+    const researchCategories = await Research.find().select('_id');
+    
+    const researchUserEntries = researchCategories.map(research => ({
+      userId,
+      researchId: research._id,
+      isUnlocked: false,
+      unlockedAt: null,
+      unlockCost: 0,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }));
+
+    await ResearchUser.insertMany(researchUserEntries);
+    console.log(`Created research data for new user ${userId}`);
+  } catch (error) {
+    console.error('Error creating research data for new user:', error);
+    throw error;
+  }
+}
+
 // Register new user
 router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
   '/register', 
@@ -98,6 +123,9 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
       });
 
       await user.save();
+
+      // Create research data for new user
+      await createUserResearchData(user._id as mongoose.Types.ObjectId);
 
       // Generate token
       const token = jwt.sign(

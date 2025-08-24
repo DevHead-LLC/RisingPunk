@@ -61,6 +61,7 @@ export const DARK_COLORS = {
   primary: '#A239CA',
   secondary: '#4717F6',
   accent: '#1A1625',
+  surface: '#1A1625',
   inputBg: '#201C2B',
   buttonBg: '#2E7D32', // Darker green when enabled
   buttonDisabled: 'rgba(102, 102, 102, 0.6)', // Gray with 0.6 opacity when disabled
@@ -73,7 +74,11 @@ export const DARK_COLORS = {
     placeholder: 'rgba(0, 255, 65, 0.4)',
   },
   error: '#ff4444',
+  success: '#00FF41',
+  successDark: '#006400',
   neutral: '#666666',
+  border: '#4717F6',
+  modalBorder: '#666666',
 };
 
 // Light Theme Colors (Optimized for Daylight Viewing)
@@ -82,6 +87,7 @@ export const LIGHT_COLORS = {
   primary: '#A239CA', // Keep same pinkish purple as dark mode for "Rising"
   secondary: '#4717F6', // Keep same blue as dark mode for "Punk"
   accent: '#E8E4D9', // Light tan accent
+  surface: '#E8E4D9', // Light tan surface for cards/containers
   inputBg: '#F8F6F0', // Off-white with slight beige tint
   buttonBg: '#6A4C93', // Slightly dark purple (just under vibrant full purple)
   buttonDisabled: '#9E9E9E', // Gray-ish box for disabled state
@@ -89,12 +95,14 @@ export const LIGHT_COLORS = {
   progressBarBg: 'rgba(146, 135, 135, 0.67)', // Progress bar background color
   text: {
     primary: '#000000', // Black text for tagline
-    secondary: '#4717F6', // Keep same blue as dark mode
+    secondary: '#2E2E2E', // Dark gray for better contrast on light backgrounds
     accent: '#004D00', // Darker green for "Punk?!" and signup
     placeholder: 'rgba(26, 11, 61, 0.7)', // Darker placeholder with higher opacity
   },
   error: '#B71C1C', // Darker red for better contrast
+  success: '#2E7D32', // Dark green for success states
   neutral: '#2E2E2E', // Darker neutral for better readability
+  border: '#4717F6', // Blue border for consistency
 };
 
 export const COLORS = DARK_COLORS; // Default to dark theme for backward compatibility

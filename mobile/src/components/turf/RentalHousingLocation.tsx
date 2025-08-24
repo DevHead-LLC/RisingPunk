@@ -59,17 +59,6 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
   const buildStatus = rentalHousingStatus?.buildStatus ?? null;
   const canBuild = rentalHousingStatus?.canBuild ?? false;
   
-  // Debug logging
-  useEffect(() => {
-    console.log(`RentalHousingLocation ${propertyId}:`, {
-      isUnlocked,
-      isBuilding,
-      canBuild,
-      buildStatus,
-      rentalHousingStatus
-    });
-  }, [propertyId, isUnlocked, isBuilding, canBuild, buildStatus, rentalHousingStatus]);
-  
   const RENTAL_HOUSING_COST = 100000;
   
   const hasSufficientFunds = numericBalance !== null && !isNaN(numericBalance as number) && numericBalance >= RENTAL_HOUSING_COST;
