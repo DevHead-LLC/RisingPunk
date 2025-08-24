@@ -1,5 +1,5 @@
 import React, { memo, useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useTheme } from '../../context/ThemeContext';
@@ -36,6 +36,8 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
   const [showLoadingModal, setShowLoadingModal] = useState(false);
   const [showInsufficientFundsModal, setShowInsufficientFundsModal] = useState(false);
   const [showBuildStartedModal, setShowBuildStartedModal] = useState(false);
+  const [showBuildErrorModal, setShowBuildErrorModal] = useState(false);
+  const [showCompletionErrorModal, setShowCompletionErrorModal] = useState(false);
   const [forceUpdate, setForceUpdate] = useState(0);
   
   const { data: balanceData, isLoading: balanceLoading } = useFetchBalanceQuery();
@@ -133,9 +135,9 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
       if (error?.data?.error === 'Insufficient funds') {
         setShowInsufficientFundsModal(true);
       } else if (error?.data?.error === 'Only one property can be built at a time') {
-        Alert.alert('Build Error', 'Only one property can be built at a time.');
+        setShowBuildErrorModal(true);
       } else {
-        Alert.alert('Build Error', 'Failed to start build. Please try again.');
+        setShowBuildErrorModal(true);
       }
     }
   };
@@ -164,7 +166,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
       }
     } catch (error: any) {
       console.error('Error completing rental housing build:', error);
-      Alert.alert('Completion Error', 'Failed to complete build. Please try again.');
+      setShowCompletionErrorModal(true);
     }
   }, [propertyId, completeRentalHousing, refetch]);
 
@@ -249,6 +251,22 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
         message="Your rental housing build has begun! Check back in 2 hours to see your completed property."
         onClose={() => setShowBuildStartedModal(false)}
         closeButtonText="OK"
+      />
+
+      <LockedFeatureModal
+        visible={showBuildErrorModal}
+        title="BUILD ERROR"
+        message="Failed to start build. Please try again."
+        onClose={() => setShowBuildErrorModal(false)}
+        closeButtonText="CLOSE"
+      />
+
+      <LockedFeatureModal
+        visible={showCompletionErrorModal}
+        title="COMPLETION ERROR"
+        message="Failed to complete build. Please try again."
+        onClose={() => setShowCompletionErrorModal(false)}
+        closeButtonText="CLOSE"
       />
     </View>
   );
