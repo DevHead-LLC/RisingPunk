@@ -1,4 +1,4 @@
-import React, { memo, useState } from 'react';
+import React, { memo, useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, Alert } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -6,6 +6,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useFetchBalanceQuery } from '../../store/api/balanceApi';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { updateBalance } from '../../store/slices/balanceSlice';
+import { useGetRentalHousingStatusQuery, useUnlockRentalHousingMutation, useCompleteRentalHousingMutation } from '../../store/api/authApi';
 import {
   DevelopmentIcon,
   DevelopmentLabel,
@@ -15,19 +16,33 @@ import {
 } from './index';
 
 type RentalHousingLocationProps = {
+  propertyId: number;
   onPress?: () => void;
   onNavigateToRentalHousing?: () => void;
+  onNavigateToFloorPlan?: (propertyId: number) => void;
+  showTimer?: boolean;
 };
 
 export const RentalHousingLocation = memo(function RentalHousingLocation({ 
   onPress, 
-  onNavigateToRentalHousing 
+  onNavigateToRentalHousing,
+  propertyId = 1,
+  onNavigateToFloorPlan,
+  showTimer = true
 }: RentalHousingLocationProps) {
   const colors = useThemeColors();
   const { themeMode } = useTheme();
   const [showPopup, setShowPopup] = useState(false);
   const [showLoadingModal, setShowLoadingModal] = useState(false);
+  const [showInsufficientFundsModal, setShowInsufficientFundsModal] = useState(false);
+  const [showBuildStartedModal, setShowBuildStartedModal] = useState(false);
+  const [forceUpdate, setForceUpdate] = useState(0);
+  
   const { data: balanceData, isLoading: balanceLoading } = useFetchBalanceQuery();
+  const { data: rentalHousingStatus, isLoading: statusLoading, refetch } = useGetRentalHousingStatusQuery(propertyId);
+  const [unlockRentalHousing, { isLoading: isUnlocking }] = useUnlockRentalHousingMutation();
+  const [completeRentalHousing, { isLoading: isCompleting }] = useCompleteRentalHousingMutation();
+  
   const dispatch = useAppDispatch();
   
   // Use both sources to ensure we have the most up-to-date balance
@@ -36,57 +51,143 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
   // Ensure balance is a number
   const numericBalance = typeof currentBalance === 'string' ? parseFloat(currentBalance) : currentBalance;
 
-  // TODO: Replace with actual API calls when implemented
-  const isUnlocked = false; // Will come from API
-  const isBuilding = false; // Will come from API
-  const buildStatus = null; // Will come from API
+  // Get real data from API
+  const isUnlocked = rentalHousingStatus?.isUnlocked ?? false;
+  const isBuilding = rentalHousingStatus?.isBuilding ?? false;
+  const buildStatus = rentalHousingStatus?.buildStatus ?? null;
+  const canBuild = rentalHousingStatus?.canBuild ?? false;
+  
+  // Debug logging
+  useEffect(() => {
+    console.log(`RentalHousingLocation ${propertyId}:`, {
+      isUnlocked,
+      isBuilding,
+      canBuild,
+      buildStatus,
+      rentalHousingStatus
+    });
+  }, [propertyId, isUnlocked, isBuilding, canBuild, buildStatus, rentalHousingStatus]);
+  
   const RENTAL_HOUSING_COST = 100000;
   
   const hasSufficientFunds = numericBalance !== null && !isNaN(numericBalance as number) && numericBalance >= RENTAL_HOUSING_COST;
+
+  // Update balance when build starts
+  useEffect(() => {
+    if (rentalHousingStatus?.buildStatus?.startedAt && !rentalHousingStatus?.buildStatus?.completesAt) {
+      // Build just started, update local balance
+      // Note: Balance will be updated when the unlockRentalHousing mutation completes
+    }
+  }, [rentalHousingStatus, dispatch]);
 
   const handlePress = () => {
     if (isBuilding) {
       // Do nothing during build - disabled
       return;
     } else if (isUnlocked) {
-      if (onNavigateToRentalHousing) onNavigateToRentalHousing();
+      if (onNavigateToFloorPlan) {
+        onNavigateToFloorPlan(propertyId);
+      } else if (onNavigateToRentalHousing) {
+        onNavigateToRentalHousing();
+      }
     } else {
-      // Only show modal if we have valid balance data
-      if (balanceLoading || currentBalance === null || currentBalance === undefined) {
+      // Only show modal if we have valid balance data and can build
+      if (balanceLoading || statusLoading || currentBalance === null || currentBalance === undefined) {
         setShowLoadingModal(true);
         return;
       }
+      
+      if (!canBuild) {
+        // Property cannot be built (e.g., previous property not unlocked)
+        return;
+      }
+      
       setShowPopup(true);
     }
   };
 
   const handleBuild = async () => {
     if (!hasSufficientFunds) {
-      Alert.alert(
-        'Insufficient Funds',
-        'You need $100,000 to build the Rental Housing.',
-        [{ text: 'OK' }]
-      );
+      setShowInsufficientFundsModal(true);
       return;
     }
 
-    // TODO: Implement actual build logic when API is ready
-    Alert.alert(
-      'Build Started',
-      'Rental Housing build will be implemented in Phase 4.',
-      [{ text: 'OK' }]
-    );
-    setShowPopup(false);
+    try {
+      const result = await unlockRentalHousing(propertyId).unwrap();
+      
+      if (result.success) {
+        // Update local balance
+        dispatch(updateBalance({ 
+          total: result.newBalance, 
+          ratePerSecond: 1, 
+          lastUpdated: new Date() 
+        }));
+        
+        // Show success modal
+        setShowBuildStartedModal(true);
+        setShowPopup(false);
+      }
+    } catch (error: any) {
+      console.error('Error starting rental housing build:', error);
+      
+      if (error?.data?.error === 'Insufficient funds') {
+        setShowInsufficientFundsModal(true);
+      } else if (error?.data?.error === 'Only one property can be built at a time') {
+        Alert.alert('Build Error', 'Only one property can be built at a time.');
+      } else {
+        Alert.alert('Build Error', 'Failed to start build. Please try again.');
+      }
+    }
   };
 
   const handleClose = () => {
     setShowPopup(false);
   };
 
-  const handleTimerComplete = () => {
-    // TODO: Implement timer completion logic when API is ready
-    console.log('Rental Housing build completed');
-  };
+  const handleTimerComplete = useCallback(async () => {
+    try {
+      console.log(`Timer completed for property ${propertyId}, calling completeRentalHousing...`);
+      
+      // Mark the build as complete in the database
+      const result = await completeRentalHousing(propertyId).unwrap();
+      
+      if (result.success) {
+        console.log(`Build completed successfully for property ${propertyId}:`, result);
+        
+        // Force a re-render to update the UI
+        setForceUpdate(prev => prev + 1);
+        
+        // Also try to refetch the status
+        console.log(`Attempting to refetch status for property ${propertyId}...`);
+        const refetchResult = await refetch();
+        console.log(`Refetch result:`, refetchResult);
+      }
+    } catch (error: any) {
+      console.error('Error completing rental housing build:', error);
+      Alert.alert('Completion Error', 'Failed to complete build. Please try again.');
+    }
+  }, [propertyId, completeRentalHousing, refetch]);
+
+  // Show loading state while fetching status
+  if (statusLoading) {
+    return (
+      <View style={styles.rentalHousingContainer}>
+        <View style={styles.iconWrapper}>
+          <DevelopmentIcon
+            isBuilding={false}
+            isUnlocked={false}
+            emptyImage={require('../../assets/images/emptyResidential.png')}
+            completedImage={require('../../assets/images/residentialLvl1.png')}
+            underConstructionImage={require('../../assets/images/residentialUnderConstruction.png')}
+            onPress={() => {}}
+            size={100}
+            iconSize={85}
+          />
+          <Text style={[styles.propertyNumber, { color: themeMode === 'light' ? '#FFFFFF' : colors.matrix }]}>{propertyId}</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.rentalHousingContainer}>
@@ -101,41 +202,57 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
           size={100}
           iconSize={85}
         />
-        <Text style={[styles.propertyNumber, { color: themeMode === 'light' ? '#FFFFFF' : colors.matrix }]}>1</Text>
+        <Text style={[styles.propertyNumber, { color: themeMode === 'light' ? '#FFFFFF' : colors.matrix }]}>{propertyId}</Text>
       </View>
       
+      {showTimer && (
+        <DevelopmentTimer
+          isBuilding={isBuilding}
+          buildStatus={buildStatus}
+          onComplete={handleTimerComplete}
+          topOffset="120%"
+          leftOffset={-50}
+          width={120}
+        />
+      )}
 
+      <BuildModal
+        visible={showPopup}
+        title="Build Rental Housing"
+        cost={RENTAL_HOUSING_COST}
+        buildTime="2 hours"
+        hasSufficientFunds={hasSufficientFunds}
+        onBuild={handleBuild}
+        onClose={handleClose}
+        buildButtonText="Build Rental Housing"
+      />
       
-      <DevelopmentTimer
-        isBuilding={isBuilding}
-        buildStatus={buildStatus}
-        onComplete={handleTimerComplete}
-        topOffset="120%"
-        leftOffset={-50}
-        width={120}
+      <LockedFeatureModal
+        visible={showLoadingModal}
+        title="LOADING BALANCE"
+        message="Please wait while we load your current balance."
+        onClose={() => setShowLoadingModal(false)}
+        closeButtonText="OK"
+      />
+      
+      <LockedFeatureModal
+        visible={showInsufficientFundsModal}
+        title="INSUFFICIENT FUNDS"
+        message="You need $100,000 to build the Rental Housing."
+        onClose={() => setShowInsufficientFundsModal(false)}
+        closeButtonText="OK"
       />
 
-              <BuildModal
-          visible={showPopup}
-          title="Build Rental Housing"
-          cost={RENTAL_HOUSING_COST}
-          buildTime="2 hours"
-          hasSufficientFunds={hasSufficientFunds}
-          onBuild={handleBuild}
-          onClose={handleClose}
-          buildButtonText="Build Rental Housing"
-        />
-        
-        <LockedFeatureModal
-          visible={showLoadingModal}
-          title="LOADING BALANCE"
-          message="Please wait while we load your current balance."
-          onClose={() => setShowLoadingModal(false)}
-          closeButtonText="OK"
-        />
-      </View>
-    );
-  });
+      <LockedFeatureModal
+        visible={showBuildStartedModal}
+        title="BUILD STARTED"
+        message="Your rental housing build has begun! Check back in 2 hours to see your completed property."
+        onClose={() => setShowBuildStartedModal(false)}
+        closeButtonText="OK"
+      />
+    </View>
+  );
+});
 
 const styles = StyleSheet.create({
   rentalHousingContainer: {

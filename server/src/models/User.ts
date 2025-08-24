@@ -20,10 +20,20 @@ export interface IUser extends Document {
   unlockedFeatures: {
     hackRig: boolean;
     researchCenter: boolean;
+    rentalHousing1: boolean;
+    rentalHousing2: boolean;
+    rentalHousing3: boolean;
+    rentalHousing4: boolean;
   };
   researchCenterBuild?: {
     startedAt: Date | null;
     completesAt: Date | null;
+  };
+  rentalHousingBuilds?: {
+    property1: { startedAt: Date | null; completesAt: Date | null };
+    property2: { startedAt: Date | null; completesAt: Date | null };
+    property3: { startedAt: Date | null; completesAt: Date | null };
+    property4: { startedAt: Date | null; completesAt: Date | null };
   };
   verifyAccessKey(accessKey: string): Promise<boolean>;
 }
@@ -101,6 +111,22 @@ const userSchema = new Schema({
     researchCenter: {
       type: Boolean,
       default: false
+    },
+    rentalHousing1: {
+      type: Boolean,
+      default: false
+    },
+    rentalHousing2: {
+      type: Boolean,
+      default: false
+    },
+    rentalHousing3: {
+      type: Boolean,
+      default: false
+    },
+    rentalHousing4: {
+      type: Boolean,
+      default: false
     }
   },
   researchCenterBuild: {
@@ -111,6 +137,48 @@ const userSchema = new Schema({
     completesAt: {
       type: Date,
       default: null
+    }
+  },
+  rentalHousingBuilds: {
+    property1: {
+      startedAt: {
+        type: Date,
+        default: null
+      },
+      completesAt: {
+        type: Date,
+        default: null
+      }
+    },
+    property2: {
+      startedAt: {
+        type: Date,
+        default: null
+      },
+      completesAt: {
+        type: Date,
+        default: null
+      }
+    },
+    property3: {
+      startedAt: {
+        type: Date,
+        default: null
+      },
+      completesAt: {
+        type: Date,
+        default: null
+      }
+    },
+    property4: {
+      startedAt: {
+        type: Date,
+        default: null
+      },
+      completesAt: {
+        type: Date,
+        default: null
+      }
     }
   }
 }, { 

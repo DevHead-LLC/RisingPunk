@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, SIZING } from '../../styles/theme';
+import { SIZING } from '../../styles/theme';
+import { useTheme } from '../../context/ThemeContext';
 
 interface BuildCountdownTimerProps {
   completesAt: string;
@@ -10,6 +11,7 @@ interface BuildCountdownTimerProps {
 export const BuildCountdownTimer: React.FC<BuildCountdownTimerProps> = ({ completesAt, onComplete }) => {
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const intervalRef = useRef<number | null>(null);
+  const { themeMode } = useTheme();
  
   useEffect(() => {
     const updateTimer = () => {
@@ -60,9 +62,14 @@ export const BuildCountdownTimer: React.FC<BuildCountdownTimerProps> = ({ comple
     return null;
   }
 
+  const timerTextStyle = [
+    styles.timer,
+    { color: themeMode === 'light' ? '#000000' : '#00FF00' }
+  ];
+
   return (
     <View style={styles.container}>
-      <Text style={styles.timer}>Time Remaining: {formatTime(timeRemaining)}</Text>
+      <Text style={timerTextStyle}>Time Remaining: {formatTime(timeRemaining)}</Text>
     </View>
   );
 };
@@ -74,11 +81,10 @@ const styles = StyleSheet.create({
     padding: SIZING.spacing.sm,
   },
   timer: {
-    color: COLORS.matrix, // Green color as requested
     fontSize: SIZING.font.body,
     fontWeight: 'bold',
     textAlign: 'center',
-    minWidth: 140, // Increased width to accommodate longer time formats
-    fontFamily: 'monospace', // Monospace font for consistent character width
+    minWidth: 140,
+    fontFamily: 'monospace',
   },
 });

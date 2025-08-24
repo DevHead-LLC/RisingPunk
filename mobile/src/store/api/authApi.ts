@@ -73,6 +73,34 @@ export interface ResearchCenterStatusResponse {
   } | null;
 }
 
+export interface RentalHousingStatusResponse {
+  propertyId: number;
+  isUnlocked: boolean;
+  isBuilding: boolean;
+  buildStatus: {
+    startedAt: string;
+    completesAt: string;
+  } | null;
+  canBuild: boolean;
+}
+
+export interface UnlockRentalHousingResponse {
+  success: boolean;
+  message: string;
+  buildStatus: {
+    startedAt: string;
+    completesAt: string;
+  };
+  newBalance: number;
+}
+
+export interface CompleteRentalHousingResponse {
+  success: boolean;
+  message: string;
+  propertyId: number;
+  isUnlocked: boolean;
+}
+
 export const authApi = createApi({
   reducerPath: 'authApi',
   baseQuery: fetchBaseQuery({
@@ -134,6 +162,31 @@ export const authApi = createApi({
       query: () => '/api/users/research-center-status',
       providesTags: ['User'],
     }),
+
+    getRentalHousingStatus: builder.query<RentalHousingStatusResponse, number>({
+      query: (propertyId) => `/api/users/rental-housing-status/${propertyId}`,
+      providesTags: (result, error, propertyId) => [
+        { type: 'User', id: `rentalHousingStatus-${propertyId}` }
+      ],
+    }),
+
+    unlockRentalHousing: builder.mutation<UnlockRentalHousingResponse, number>({
+      query: (propertyId) => ({
+        url: `/api/users/unlock-rental-housing/${propertyId}`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['User'],
+    }),
+
+    completeRentalHousing: builder.mutation<CompleteRentalHousingResponse, number>({
+      query: (propertyId) => ({
+        url: `/api/users/complete-rental-housing/${propertyId}`,
+        method: 'POST',
+      }),
+      invalidatesTags: (result, error, propertyId) => [
+        { type: 'User', id: `rentalHousingStatus-${propertyId}` }
+      ],
+    }),
   }),
 });
 
@@ -144,4 +197,7 @@ export const {
   useUnlockHackRigMutation,
   useUnlockResearchCenterMutation,
   useGetResearchCenterStatusQuery,
+  useGetRentalHousingStatusQuery,
+  useUnlockRentalHousingMutation,
+  useCompleteRentalHousingMutation,
 } = authApi;
