@@ -12,6 +12,16 @@ We need to implement a new Rental Housing development feature in the TurfScreen 
 6. **Database Integration**: Ensure new users get correct initial data
 7. **Persistence**: Handle screen refreshes and app restarts
 
+## Recent Updates
+
+### **Rental Property Build Time Fix** ✅
+- [x] **Changed build time from 10 seconds to 2 hours** for all 4 rental properties
+- [x] **Updated server code** in `server/src/routes/userRoutes.ts`:
+  - Changed `buildTimeMinutes = 0.167` (10 seconds) to `buildTimeMinutes = 120` (2 hours)
+  - This affects all rental properties (1-4) since they use the same variable
+- [x] **Mobile UI already correct** - displays "2 hours" in BuildModal and success messages
+- [x] **No other changes needed** - the system was already properly configured for 2-hour builds
+
 ## Implementation Plan
 
 ### **Phase 1: Build Empty Space and Image** ✅

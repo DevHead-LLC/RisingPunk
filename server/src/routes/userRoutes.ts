@@ -315,7 +315,7 @@ router.post('/unlock-rental-housing/:propertyId', auth, async (req, res): Promis
 
     // Start build process
     const now = new Date();
-    const buildTimeMinutes = 0.167; // 10 seconds for Phase 5 testing (was 120 minutes)
+    const buildTimeMinutes = 120; // 2 hours build time
     const completesAt = new Date(now.getTime() + buildTimeMinutes * 60 * 1000);
 
     // Update user
