@@ -82,10 +82,20 @@ router.get('/features/:categoryId', auth, async (req: Request, res: Response) =>
     // Get the base features for this category
     const baseFeatures = getResearchFeatures(categoryId);
     
-    // Get user's unlock status for these features
+    // Get the research document to get the correct ObjectId
+    const research = await Research.findOne({ categoryId });
+    if (!research) {
+      res.status(404).json({
+        success: false,
+        message: 'Research category not found'
+      });
+      return;
+    }
+    
+    // Get user's unlock status for these features using the correct researchId
     const userResearch = await ResearchUser.findOne({ 
       userId, 
-      researchId: categoryId 
+      researchId: research._id 
     });
     
     // Merge base features with user's unlock status
@@ -128,6 +138,16 @@ router.post('/unlock-feature', auth, async (req: Request, res: Response): Promis
       return;
     }
     
+    // Get the research document to get the correct ObjectId
+    const research = await Research.findOne({ categoryId });
+    if (!research) {
+      res.status(404).json({
+        success: false,
+        message: 'Research category not found'
+      });
+      return;
+    }
+    
     // Check if user can unlock this feature
     const user = await User.findById(userId);
     if (!user) {
@@ -163,9 +183,9 @@ router.post('/unlock-feature', auth, async (req: Request, res: Response): Promis
       'balance.lastUpdated': new Date()
     });
     
-    // Update research feature unlock status
+    // Update research feature unlock status using the correct researchId
     await ResearchUser.findOneAndUpdate(
-      { userId, researchId: categoryId },
+      { userId, researchId: research._id },
       {
         $set: {
           [`features.${featureId}.isUnlocked`]: true,

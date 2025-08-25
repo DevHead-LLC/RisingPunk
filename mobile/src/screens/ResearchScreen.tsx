@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { SIZING } from '../styles/theme';
-import { CloseButton } from '../components/common/CloseButton';
+import { Balance } from '../components/common/Balance';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { ResearchDetailScreen } from '../components/research';
 import { useResearchStatus } from '../hooks/useResearchStatus';
@@ -91,8 +91,19 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
   const renderMainScreen = () => (
     <>
       <View style={styles.header}>
+        <View style={styles.leftSection}>
+          <Balance />
+        </View>
         <Text style={styles.title}>Research</Text>
-        <CloseButton onPress={onClose} />
+        <View style={styles.rightSection}>
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={onClose}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.closeButtonText}>×</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       
       <ScrollView 
@@ -183,24 +194,26 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: SIZING.spacing.md,
     paddingVertical: SIZING.spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.accent,
+    position: 'relative',
   },
   title: {
     color: colors.text.primary,
     fontSize: SIZING.font.h2,
     fontWeight: '600',
-    flex: 1,
+    textAlign: 'center',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     padding: SIZING.spacing.md,
+    paddingTop: SIZING.spacing.lg,
   },
   cardsGrid: {
     flexDirection: 'row',
@@ -258,5 +271,30 @@ const createStyles = (colors: any) => StyleSheet.create({
   lockIcon: {
     fontSize: 32,
     color: '#FFD700',
+  },
+  leftSection: {
+    position: 'absolute',
+    left: SIZING.spacing.md,
+    top: SIZING.spacing.sm,
+  },
+  rightSection: {
+    position: 'absolute',
+    right: SIZING.spacing.md,
+    top: SIZING.spacing.sm,
+  },
+  closeButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderColor: colors.secondary,
+    borderWidth: 2,
+    borderRadius: 22,
+  },
+  closeButtonText: {
+    color: colors.background,
+    fontSize: 28,
+    marginTop: -2,
   },
 });

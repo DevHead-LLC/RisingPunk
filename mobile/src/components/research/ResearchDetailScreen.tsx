@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity } fr
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { CustomButton } from '../common/CustomButton';
+import { Balance } from '../common/Balance';
 import { ResearchFeaturesList, ResearchFeature } from './ResearchFeaturesList';
 
 type ResearchDetailScreenProps = {
@@ -63,26 +64,33 @@ export function ResearchDetailScreen({
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={[
-            styles.backButton, 
-            { 
-              backgroundColor: colors.primary,
-              borderColor: colors.primary
-            }
-          ]} 
-          onPress={onBack}
-        >
-          <Text style={[styles.backButtonText, { color: '#FFFFFF' }]}>← Back</Text>
-        </TouchableOpacity>
+        <View style={styles.leftSection}>
+          <View style={styles.balanceWrapper}>
+            <Balance />
+          </View>
+        </View>
         <Text style={styles.title}>{title}</Text>
-        <TouchableOpacity
-          style={styles.closeButton}
-          onPress={onClose}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.closeButtonText}>×</Text>
-        </TouchableOpacity>
+        <View style={styles.rightSection}>
+          <TouchableOpacity 
+            style={[
+              styles.backButton, 
+              { 
+                backgroundColor: colors.primary,
+                borderColor: colors.primary
+              }
+            ]} 
+            onPress={onBack}
+          >
+            <Text style={[styles.backButtonText, { color: '#FFFFFF' }]}>← Back</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={onClose}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.closeButtonText}>×</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       
       {renderContent()}
@@ -104,12 +112,21 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.accent,
   },
+  leftSection: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+  rightSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZING.spacing.sm,
+  },
   backButton: {
-    paddingHorizontal: SIZING.spacing.md,
+    paddingHorizontal: SIZING.spacing.sm,
     paddingVertical: SIZING.spacing.sm,
     borderRadius: 8,
     borderWidth: 1,
-    minWidth: 80,
+    minWidth: 70,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -155,5 +172,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.text.secondary,
     fontSize: SIZING.font.body,
     textAlign: 'center',
+  },
+  balanceWrapper: {
+    position: 'absolute',
+    top: -SIZING.spacing.lg,
+    zIndex: 9999,
   },
 });
