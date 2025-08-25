@@ -3,27 +3,78 @@ import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity } fr
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { CustomButton } from '../common/CustomButton';
+import { ResearchFeaturesList, ResearchFeature } from './ResearchFeaturesList';
 
 type ResearchDetailScreenProps = {
   title: string;
   onBack: () => void;
   onClose: () => void;
+  features?: ResearchFeature[];
+  currentLevel?: number;
+  currentBalance?: number;
+  onFeatureUnlock?: (featureId: string, cost: number) => Promise<boolean>;
   children?: React.ReactNode;
 };
 
-export function ResearchDetailScreen({ title, onBack, onClose, children }: ResearchDetailScreenProps): React.JSX.Element {
+export function ResearchDetailScreen({ 
+  title, 
+  onBack, 
+  onClose, 
+  features,
+  currentLevel = 1,
+  currentBalance = 0,
+  onFeatureUnlock,
+  children 
+}: ResearchDetailScreenProps): React.JSX.Element {
   const colors = useThemeColors();
   
   const styles = createStyles(colors);
   
+  const handleFeatureUnlock = async (featureId: string, cost: number): Promise<boolean> => {
+    if (onFeatureUnlock) {
+      return await onFeatureUnlock(featureId, cost);
+    }
+    return false;
+  };
+
+  const renderContent = () => {
+    if (children) {
+      return children;
+    }
+    
+    if (features && features.length > 0) {
+      return (
+        <ResearchFeaturesList
+          features={features}
+          currentLevel={currentLevel}
+          currentBalance={currentBalance}
+          onFeatureUnlock={handleFeatureUnlock}
+        />
+      );
+    }
+    
+    return (
+      <View style={styles.content}>
+        <Text style={styles.placeholderText}>Research content for {title} will be implemented here.</Text>
+      </View>
+    );
+  };
+  
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <CustomButton
-          title="← Back"
+        <TouchableOpacity 
+          style={[
+            styles.backButton, 
+            { 
+              backgroundColor: colors.primary,
+              borderColor: colors.primary
+            }
+          ]} 
           onPress={onBack}
-          style={styles.backButton}
-        />
+        >
+          <Text style={[styles.backButtonText, { color: '#FFFFFF' }]}>← Back</Text>
+        </TouchableOpacity>
         <Text style={styles.title}>{title}</Text>
         <TouchableOpacity
           style={styles.closeButton}
@@ -34,17 +85,7 @@ export function ResearchDetailScreen({ title, onBack, onClose, children }: Resea
         </TouchableOpacity>
       </View>
       
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {children || (
-          <View style={styles.content}>
-            <Text style={styles.placeholderText}>Research content for {title} will be implemented here.</Text>
-          </View>
-        )}
-      </ScrollView>
+      {renderContent()}
     </SafeAreaView>
   );
 }
@@ -64,13 +105,17 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderBottomColor: colors.accent,
   },
   backButton: {
-    backgroundColor: colors.accent,
-    borderColor: colors.primary,
+    paddingHorizontal: SIZING.spacing.md,
+    paddingVertical: SIZING.spacing.sm,
+    borderRadius: 8,
     borderWidth: 1,
-    paddingHorizontal: SIZING.spacing.sm,
-    paddingVertical: SIZING.spacing.xs,
     minWidth: 80,
-    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backButtonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
   },
   title: {
     color: colors.text.primary,

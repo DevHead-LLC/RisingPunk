@@ -3,6 +3,8 @@ import auth from '../middleware/auth';
 import { ResearchUnlockService } from '../services/ResearchUnlockService';
 import { Research } from '../models/Research';
 import { ResearchUser } from '../models/ResearchUser';
+import { getResearchFeatures } from '../config/researchFeatures';
+import { User } from '../models/User';
 
 const router = express.Router();
 
@@ -68,6 +70,121 @@ router.get('/unlock-requirements/:categoryId', auth, async (req: Request, res: R
     res.status(500).json({
       success: false,
       message: 'Error validating unlock requirements'
+    });
+  }
+});
+
+router.get('/features/:categoryId', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user._id;
+    const { categoryId } = req.params;
+    
+    // Get the base features for this category
+    const baseFeatures = getResearchFeatures(categoryId);
+    
+    // Get user's unlock status for these features
+    const userResearch = await ResearchUser.findOne({ 
+      userId, 
+      researchId: categoryId 
+    });
+    
+    // Merge base features with user's unlock status
+    const featuresWithStatus = baseFeatures.map(feature => {
+      const userFeature = userResearch?.features?.find((f: any) => f.id === feature.id);
+      return {
+        ...feature,
+        isUnlocked: userFeature?.isUnlocked || false,
+        unlockedAt: userFeature?.unlockedAt || null
+      };
+    });
+    
+    res.json({
+      success: true,
+      data: featuresWithStatus
+    });
+  } catch (error) {
+    console.error('Error fetching research features:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching research features'
+    });
+  }
+});
+
+router.post('/unlock-feature', auth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user._id;
+    const { categoryId, featureId, cost } = req.body;
+    
+    // Validate the feature exists
+    const baseFeatures = getResearchFeatures(categoryId);
+    const feature = baseFeatures.find(f => f.id === featureId);
+    
+    if (!feature) {
+      res.status(400).json({
+        success: false,
+        message: 'Feature not found'
+      });
+      return;
+    }
+    
+    // Check if user can unlock this feature
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+      return;
+    }
+    
+    if (user.balance.total < cost) {
+      res.status(400).json({
+        success: false,
+        message: 'Insufficient funds'
+      });
+      return;
+    }
+    
+    if (user.level < feature.levelRequirement) {
+      res.status(400).json({
+        success: false,
+        message: 'Level requirement not met'
+      });
+      return;
+    }
+    
+    // Deduct cost and unlock feature
+    const newBalance = user.balance.total - cost;
+    
+    // Update user balance
+    await User.findByIdAndUpdate(userId, {
+      'balance.total': newBalance,
+      'balance.lastUpdated': new Date()
+    });
+    
+    // Update research feature unlock status
+    await ResearchUser.findOneAndUpdate(
+      { userId, researchId: categoryId },
+      {
+        $set: {
+          [`features.${featureId}.isUnlocked`]: true,
+          [`features.${featureId}.unlockedAt`]: new Date()
+        }
+      },
+      { upsert: true }
+    );
+    
+    res.json({
+      success: true,
+      message: 'Feature unlocked successfully',
+      newBalance
+    });
+  } catch (error) {
+    console.error('Error unlocking research feature:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error unlocking research feature'
     });
   }
 });

@@ -36,18 +36,7 @@ export class ResearchUnlockService {
     userId: string,
     categoryId: string
   ): Promise<UnlockValidationResult> {
-    const session = await mongoose.startSession();
-    
     try {
-      await session.withTransaction(async () => {
-        const user = await User.findById(userId).session(session);
-        const research = await Research.findOne({ categoryId }).session(session);
-        
-        if (!user || !research) {
-          throw new Error('User or research category not found');
-        }
-      });
-
       const user = await User.findById(userId);
       const research = await Research.findOne({ categoryId });
       
@@ -115,7 +104,8 @@ export class ResearchUnlockService {
 
     const userResearch = await ResearchUser.find({
       userId,
-      researchId: { $in: await this.getResearchIdsByCategoryIds(dependencies) }
+      researchId: { $in: await this.getResearchIdsByCategoryIds(dependencies) },
+      isUnlocked: true
     });
 
     const unlockedCategories = await Promise.all(
@@ -152,20 +142,47 @@ export class ResearchUnlockService {
     
     try {
       return await session.withTransaction(async () => {
-        // Validate requirements again before unlock
-        const validation = await this.validateUnlockRequirements(userId, categoryId);
-        if (!validation.canUnlock) {
-          return {
-            success: false,
-            message: `Cannot unlock: ${validation.reasons.join(', ')}`
-          };
-        }
-
         const user = await User.findById(userId).session(session);
         const research = await Research.findOne({ categoryId }).session(session);
         
         if (!user || !research) {
           throw new Error('User or research category not found');
+        }
+
+        // Check level requirement
+        if (user.level < research.levelRequirement) {
+          return {
+            success: false,
+            message: `Level ${research.levelRequirement} required (current: ${user.level})`
+          };
+        }
+
+        // Check balance requirement
+        if (user.balance.total < research.balanceRequirement) {
+          return {
+            success: false,
+            message: `$${research.balanceRequirement.toLocaleString()} required (current: $${user.balance.total.toLocaleString()})`
+          };
+        }
+
+        // Check dependencies
+        const missingDependencies = await this.checkDependencies(userId, research.dependencies);
+        if (missingDependencies.length > 0) {
+          return {
+            success: false,
+            message: `Missing dependencies: ${missingDependencies.join(', ')}`
+          };
+        }
+
+        // Special check for Investments (requires rental properties)
+        if (categoryId === 'investments') {
+          const hasAllRentalProperties = this.checkRentalProperties(user);
+          if (!hasAllRentalProperties) {
+            return {
+              success: false,
+              message: 'All rental properties (1-4) must be unlocked'
+            };
+          }
         }
 
         const unlockCost = this.getUnlockCost(categoryId);

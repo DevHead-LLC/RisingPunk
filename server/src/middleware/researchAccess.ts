@@ -3,7 +3,7 @@ import { ResearchUnlockService } from '../services/ResearchUnlockService';
 
 export const researchAccessControl = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = req.user._id;
     const categoryId = req.params.categoryId || req.body.categoryId;
     
     if (!categoryId) {

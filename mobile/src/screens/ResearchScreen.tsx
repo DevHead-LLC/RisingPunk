@@ -8,6 +8,9 @@ import { useResearchStatus } from '../hooks/useResearchStatus';
 import { ResearchLockedModal } from '../components/research/ResearchLockedModal';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { getCurrentBalance, updateBalance } from '../store/slices/balanceSlice';
+import { useResearchFeatures } from '../hooks/useResearchFeatures';
+import { useFetchBalanceQuery } from '../store/api/balanceApi';
+import { getMockResearchFeatures } from '../config/mockResearchFeatures';
 
 type ResearchScreenProps = {
   onClose: () => void;
@@ -108,11 +111,24 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
     const selectedCard = RESEARCH_CARDS.find(card => card.id === currentScreen);
     if (!selectedCard) return renderMainScreen();
     
+    // Use mock data for now
+    const features = getMockResearchFeatures(selectedCard.id);
+    
+    const handleFeatureUnlock = async (featureId: string, cost: number): Promise<boolean> => {
+      // Mock implementation - just return success for now
+      console.log(`Mock unlock: ${featureId} for $${cost}`);
+      return true;
+    };
+    
     return (
       <ResearchDetailScreen
         title={selectedCard.name}
         onBack={handleBack}
         onClose={onClose}
+        features={features}
+        currentLevel={userLevel}
+        currentBalance={userBalance}
+        onFeatureUnlock={handleFeatureUnlock}
       />
     );
   };
