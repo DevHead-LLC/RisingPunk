@@ -5,6 +5,7 @@ import { Research } from '../models/Research';
 import { ResearchUser } from '../models/ResearchUser';
 import { getResearchFeatures } from '../config/researchFeatures';
 import { User } from '../models/User';
+import mongoose from 'mongoose';
 
 const router = express.Router();
 
@@ -122,6 +123,8 @@ router.get('/features/:categoryId', auth, async (req: Request, res: Response) =>
 });
 
 router.post('/unlock-feature', auth, async (req: Request, res: Response): Promise<void> => {
+  const session = await mongoose.startSession();
+  
   try {
     const userId = (req as any).user._id;
     const { categoryId, featureId, cost } = req.body;
@@ -174,31 +177,45 @@ router.post('/unlock-feature', auth, async (req: Request, res: Response): Promis
       return;
     }
     
-    // Deduct cost and unlock feature
-    const newBalance = user.balance.total - cost;
-    
-    // Update user balance
-    await User.findByIdAndUpdate(userId, {
-      'balance.total': newBalance,
-      'balance.lastUpdated': new Date()
-    });
-    
-    // Update research feature unlock status using the correct researchId
-    await ResearchUser.findOneAndUpdate(
-      { userId, researchId: research._id },
-      {
-        $set: {
-          [`features.${featureId}.isUnlocked`]: true,
-          [`features.${featureId}.unlockedAt`]: new Date()
+    // Use transaction to ensure both operations succeed or fail together
+    await session.withTransaction(async () => {
+      // Deduct cost from user balance
+      await User.findByIdAndUpdate(
+        userId,
+        {
+          'balance.total': user.balance.total - cost,
+          'balance.lastUpdated': new Date()
+        },
+        { session }
+      );
+      
+      // Update research feature unlock status using proper array update operators
+      await ResearchUser.findOneAndUpdate(
+        { userId, researchId: research._id },
+        {
+          $set: {
+            'updatedAt': new Date()
+          },
+          $addToSet: {
+            features: {
+              id: featureId,
+              isUnlocked: true,
+              unlockedAt: new Date()
+            }
+          }
+        },
+        { 
+          session, 
+          upsert: true,
+          new: true 
         }
-      },
-      { upsert: true }
-    );
+      );
+    });
     
     res.json({
       success: true,
       message: 'Feature unlocked successfully',
-      newBalance
+      newBalance: user.balance.total - cost
     });
   } catch (error) {
     console.error('Error unlocking research feature:', error);
@@ -206,6 +223,8 @@ router.post('/unlock-feature', auth, async (req: Request, res: Response): Promis
       success: false,
       message: 'Error unlocking research feature'
     });
+  } finally {
+    await session.endSession();
   }
 });
 
