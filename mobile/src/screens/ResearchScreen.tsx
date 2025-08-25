@@ -1,9 +1,16 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { SIZING } from '../styles/theme';
-import { CloseButton } from '../components/common/CloseButton';
+import { Balance } from '../components/common/Balance';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { ResearchDetailScreen } from '../components/research';
+import { useResearchStatus } from '../hooks/useResearchStatus';
+import { ResearchLockedModal } from '../components/research/ResearchLockedModal';
+import { useAppSelector, useAppDispatch } from '../store/hooks';
+import { getCurrentBalance, updateBalance } from '../store/slices/balanceSlice';
+import { useResearchFeatures } from '../hooks/useResearchFeatures';
+import { useFetchBalanceQuery } from '../store/api/balanceApi';
+import { getMockResearchFeatures } from '../config/mockResearchFeatures';
 
 type ResearchScreenProps = {
   onClose: () => void;
@@ -35,39 +42,68 @@ const cardSpacing = SIZING.spacing.md;
 export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Element {
   const colors = useThemeColors();
   const [currentScreen, setCurrentScreen] = useState<'main' | string>('main');
+  const [showLockedModal, setShowLockedModal] = useState(false);
+  const [selectedResearch, setSelectedResearch] = useState<string | null>(null);
+  
+  const dispatch = useAppDispatch();
+  const { researchStatus, loading, error, canAccessResearch, getResearchRequirements, refreshAfterUnlock } = useResearchStatus();
+  const userLevel = useAppSelector(state => state.auth.user?.level || 1);
+  const userBalance = useAppSelector(state => getCurrentBalance(state));
   
   const styles = createStyles(colors);
   
   const handleCardPress = (cardId: string) => {
-    setCurrentScreen(cardId);
+    if (canAccessResearch(cardId)) {
+      setCurrentScreen(cardId);
+    } else {
+      setSelectedResearch(cardId);
+      setShowLockedModal(true);
+    }
   };
   
   const handleBack = () => {
     setCurrentScreen('main');
   };
   
-  const renderResearchCard = (card: ResearchCard) => (
-    <TouchableOpacity
-      key={card.id}
-      style={styles.card}
-      onPress={() => handleCardPress(card.id)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.imageContainer}>
-        <Image source={card.image} style={styles.cardImage} />
-        <View style={styles.lockOverlay}>
-          <Text style={styles.lockIcon}>🔒</Text>
+  const renderResearchCard = (card: ResearchCard) => {
+    const isUnlocked = canAccessResearch(card.id);
+    
+    return (
+      <TouchableOpacity
+        key={card.id}
+        style={styles.card}
+        onPress={() => handleCardPress(card.id)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.imageContainer}>
+          <Image source={card.image} style={styles.cardImage} />
+          {!isUnlocked && (
+            <View style={styles.lockOverlay}>
+              <Text style={styles.lockIcon}>🔒</Text>
+            </View>
+          )}
         </View>
-      </View>
-      <Text style={styles.cardName}>{card.name}</Text>
-    </TouchableOpacity>
-  );
+        <Text style={styles.cardName}>{card.name}</Text>
+      </TouchableOpacity>
+    );
+  };
   
   const renderMainScreen = () => (
     <>
       <View style={styles.header}>
+        <View style={styles.leftSection}>
+          <Balance />
+        </View>
         <Text style={styles.title}>Research</Text>
-        <CloseButton onPress={onClose} />
+        <View style={styles.rightSection}>
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={onClose}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.closeButtonText}>×</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       
       <ScrollView 
@@ -86,18 +122,67 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
     const selectedCard = RESEARCH_CARDS.find(card => card.id === currentScreen);
     if (!selectedCard) return renderMainScreen();
     
+    // Use mock data for now
+    const features = getMockResearchFeatures(selectedCard.id);
+    
+    const handleFeatureUnlock = async (featureId: string, cost: number): Promise<boolean> => {
+      // Mock implementation - just return success for now
+      console.log(`Mock unlock: ${featureId} for $${cost}`);
+      return true;
+    };
+    
     return (
       <ResearchDetailScreen
         title={selectedCard.name}
         onBack={handleBack}
         onClose={onClose}
+        features={features}
+        currentLevel={userLevel}
+        currentBalance={userBalance}
+        onFeatureUnlock={handleFeatureUnlock}
       />
     );
   };
   
+  const handleCloseLockedModal = () => {
+    setShowLockedModal(false);
+    setSelectedResearch(null);
+  };
+
+
+
+  const handleUnlockSuccess = (newBalance: number) => {
+    setShowLockedModal(false);
+    setSelectedResearch(null);
+    
+    // Update balance in Redux store
+    dispatch(updateBalance({
+      total: newBalance,
+      ratePerSecond: 1, // Keep existing rate
+      lastUpdated: new Date().toISOString(),
+    }));
+    
+    // Refresh research status
+    refreshAfterUnlock();
+  };
+
+  const requirements = selectedResearch ? getResearchRequirements(selectedResearch) : null;
+  
   return (
     <SafeAreaView style={styles.container}>
       {currentScreen === 'main' ? renderMainScreen() : renderDetailScreen()}
+      
+      <ResearchLockedModal
+        visible={showLockedModal}
+        onClose={handleCloseLockedModal}
+        onUnlockSuccess={handleUnlockSuccess}
+        requirements={requirements}
+        currentLevel={userLevel}
+        currentBalance={userBalance}
+        researchStatus={researchStatus}
+      />
+      
+      {/* ResearchUnlockModal is removed */}
     </SafeAreaView>
   );
 }
@@ -109,23 +194,26 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: SIZING.spacing.md,
     paddingVertical: SIZING.spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.accent,
+    position: 'relative',
   },
   title: {
     color: colors.text.primary,
     fontSize: SIZING.font.h2,
     fontWeight: '600',
+    textAlign: 'center',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     padding: SIZING.spacing.md,
+    paddingTop: SIZING.spacing.lg,
   },
   cardsGrid: {
     flexDirection: 'row',
@@ -183,5 +271,30 @@ const createStyles = (colors: any) => StyleSheet.create({
   lockIcon: {
     fontSize: 32,
     color: '#FFD700',
+  },
+  leftSection: {
+    position: 'absolute',
+    left: SIZING.spacing.md,
+    top: SIZING.spacing.sm,
+  },
+  rightSection: {
+    position: 'absolute',
+    right: SIZING.spacing.md,
+    top: SIZING.spacing.sm,
+  },
+  closeButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderColor: colors.secondary,
+    borderWidth: 2,
+    borderRadius: 22,
+  },
+  closeButtonText: {
+    color: colors.background,
+    fontSize: 28,
+    marginTop: -2,
   },
 });
