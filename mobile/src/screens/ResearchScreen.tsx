@@ -10,7 +10,6 @@ import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { getCurrentBalance, updateBalance } from '../store/slices/balanceSlice';
 import { useResearchFeatures } from '../hooks/useResearchFeatures';
 import { useFetchBalanceQuery } from '../store/api/balanceApi';
-import { getMockResearchFeatures } from '../config/mockResearchFeatures';
 
 type ResearchScreenProps = {
   onClose: () => void;
@@ -49,6 +48,12 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
   const { researchStatus, loading, error, canAccessResearch, getResearchRequirements, refreshAfterUnlock } = useResearchStatus();
   const userLevel = useAppSelector(state => state.auth.user?.level || 1);
   const userBalance = useAppSelector(state => getCurrentBalance(state));
+  
+  // Get the selected research card
+  const selectedCard = RESEARCH_CARDS.find(card => card.id === currentScreen);
+  
+  // Use real API data - only call hook when a research category is actually selected
+  const { features, loading: featuresLoading, error: featuresError } = useResearchFeatures(selectedCard?.id || null);
   
   const styles = createStyles(colors);
   
@@ -119,15 +124,35 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
   );
   
   const renderDetailScreen = () => {
-    const selectedCard = RESEARCH_CARDS.find(card => card.id === currentScreen);
     if (!selectedCard) return renderMainScreen();
     
-    // Use mock data for now
-    const features = getMockResearchFeatures(selectedCard.id);
+    if (featuresLoading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading features...</Text>
+        </View>
+      );
+    }
+    
+    if (featuresError) {
+      return (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Error loading features: {featuresError}</Text>
+        </View>
+      );
+    }
+    
+    if (!features || features.length === 0) {
+      return (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>No features available for this research category</Text>
+        </View>
+      );
+    }
     
     const handleFeatureUnlock = async (featureId: string, cost: number): Promise<boolean> => {
-      // Mock implementation - just return success for now
-      console.log(`Mock unlock: ${featureId} for $${cost}`);
+      // TODO: Implement real feature unlock logic
+      console.log(`Unlock feature: ${featureId} for $${cost}`);
       return true;
     };
     
@@ -296,5 +321,25 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.background,
     fontSize: 28,
     marginTop: -2,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: SIZING.font.body,
+    color: colors.text.secondary,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SIZING.spacing.lg,
+  },
+  errorText: {
+    fontSize: SIZING.font.body,
+    color: colors.error,
+    textAlign: 'center',
   },
 });

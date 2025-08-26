@@ -104,7 +104,9 @@ router.get('/features/:categoryId', auth, async (req: Request, res: Response) =>
       const userFeature = userResearch?.features?.find((f: any) => f.id === feature.id);
       return {
         ...feature,
-        isUnlocked: userFeature?.isUnlocked || false,
+        // If user has explicitly unlocked it, use that status
+        // Otherwise, use the server config's isUnlocked value
+        isUnlocked: userFeature?.isUnlocked !== undefined ? userFeature.isUnlocked : feature.isUnlocked,
         unlockedAt: userFeature?.unlockedAt || null
       };
     });
