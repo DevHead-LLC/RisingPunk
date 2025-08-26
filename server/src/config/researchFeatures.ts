@@ -4,11 +4,11 @@ export const RESEARCH_FEATURES: Record<string, IResearchFeature[]> = {
   'home-defense': [
     {
       id: 'antivirus',
-      name: 'Unlock Antivirus',
-      description: 'Gain access to antivirus software to protect your systems',
-      unlockCost: 5000,
+      name: 'Antivirus',
+      description: 'Deploy a protective shield that prevents other players from attacking you for a limited time. Once activated, the shield runs automatically and provides complete attack immunity until it expires.',
+      unlockCost: 25000,
       levelRequirement: 2,
-      isUnlocked: false,
+      isUnlocked: true,
       effect: {
         type: 'unlock',
         value: 'antivirus',
@@ -17,9 +17,9 @@ export const RESEARCH_FEATURES: Record<string, IResearchFeature[]> = {
     },
     {
       id: 'bot-trap',
-      name: 'Bot Trap',
+      name: 'Bot Trap 1',
       description: 'Instantly destroy 100 enemy bots in battle',
-      unlockCost: 15000,
+      unlockCost: 250000,
       levelRequirement: 5,
       isUnlocked: false,
       effect: {

@@ -139,7 +139,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: SIZING.font.h2,
     fontWeight: '600',
     flex: 1,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   closeButton: {
     width: 44,
