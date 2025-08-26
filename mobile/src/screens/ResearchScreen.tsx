@@ -52,8 +52,8 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
   // Get the selected research card
   const selectedCard = RESEARCH_CARDS.find(card => card.id === currentScreen);
   
-  // Use real API data - moved to top level to follow Rules of Hooks
-  const { features, loading: featuresLoading, error: featuresError } = useResearchFeatures(selectedCard?.id || '');
+  // Use real API data - only call hook when a research category is actually selected
+  const { features, loading: featuresLoading, error: featuresError } = useResearchFeatures(selectedCard?.id || null);
   
   const styles = createStyles(colors);
   
@@ -138,6 +138,14 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
       return (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Error loading features: {featuresError}</Text>
+        </View>
+      );
+    }
+    
+    if (!features || features.length === 0) {
+      return (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>No features available for this research category</Text>
         </View>
       );
     }

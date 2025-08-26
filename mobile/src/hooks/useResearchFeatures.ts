@@ -3,14 +3,14 @@ import { useAppSelector } from '../store/hooks';
 import { API_URL } from '../config';
 import { ResearchFeature } from '../components/research/ResearchFeaturesList';
 
-export function useResearchFeatures(categoryId: string) {
+export function useResearchFeatures(categoryId: string | null) {
   const [features, setFeatures] = useState<ResearchFeature[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const token = useAppSelector(state => state.auth.token);
 
   const fetchFeatures = useCallback(async () => {
-    if (!token || !categoryId) return;
+    if (!token || !categoryId || categoryId === '') return;
 
     try {
       setLoading(true);
@@ -41,7 +41,7 @@ export function useResearchFeatures(categoryId: string) {
   }, [token, categoryId]);
 
   const unlockFeature = useCallback(async (featureId: string, cost: number): Promise<boolean> => {
-    if (!token || !categoryId) return false;
+    if (!token || !categoryId || categoryId === '') return false;
 
     try {
       const response = await fetch(`${API_URL}/api/research/unlock-feature`, {
@@ -80,8 +80,13 @@ export function useResearchFeatures(categoryId: string) {
   }, [token, categoryId]);
 
   useEffect(() => {
-    if (token && categoryId) {
+    if (token && categoryId && categoryId !== '') {
       fetchFeatures();
+    } else {
+      // Reset state when no category is selected
+      setFeatures([]);
+      setLoading(false);
+      setError(null);
     }
   }, [token, categoryId, fetchFeatures]);
 

@@ -66,7 +66,8 @@ The research feature system currently uses mock data and doesn't properly distin
    - Dark Mode: Green text (#00FF00)
    - Price colors: Blue/Green for affordable, Red for unaffordable
 7. ✅ **Create Reusable Pattern**: Helper functions for consistent styling across all features
-8. 🔄 **Feature State Logic**: Implement proper unlock/locked/enabled state handling
+8. ✅ **Fix Unconditional Hook Bug**: Fixed useResearchFeatures hook to prevent unnecessary API calls when no research category is selected
+9. 🔄 **Feature State Logic**: Implement proper unlock/locked/enabled state handling
 
 ## Technical Requirements
 - **No Mock Data**: All features must come from server API
@@ -79,6 +80,28 @@ The research feature system currently uses mock data and doesn't properly distin
 2. Remove mock data usage from ResearchScreen
 3. Implement real API integration
 4. Set up proper feature state management
+
+## Bug Fix: Unconditional Hook Invocation
+**Status**: ✅ FIXED
+
+### Problem
+The `useResearchFeatures` hook was being called unconditionally in `ResearchScreen.tsx` with `selectedCard?.id || ''`. When `currentScreen` was 'main', `selectedCard` was undefined, causing the hook to receive an empty string and trigger unnecessary API calls.
+
+### Solution
+1. **Conditional Hook Call**: Changed hook invocation from `useResearchFeatures(selectedCard?.id || '')` to `useResearchFeatures(selectedCard?.id || null)`
+2. **Updated Hook Type**: Modified `useResearchFeatures` to accept `string | null` instead of just `string`
+3. **Enhanced Guard Clauses**: Added proper null/empty string checks in the hook to prevent API calls when no category is selected
+4. **State Reset**: Added logic to reset features state when no category is selected
+5. **UI Handling**: Added proper error handling for when no features are available
+
+### Files Modified
+- `mobile/src/screens/ResearchScreen.tsx` - Fixed hook invocation and added empty features handling
+- `mobile/src/hooks/useResearchFeatures.ts` - Updated type signature and added proper null handling
+
+### Result
+- No more unnecessary API calls when viewing the main research screen
+- Proper state management when switching between research categories
+- Cleaner user experience with appropriate error messages
 
 ---
 
