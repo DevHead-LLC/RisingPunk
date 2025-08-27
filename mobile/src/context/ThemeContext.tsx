@@ -29,7 +29,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
         setThemeModeState(savedTheme);
       }
     } catch (error) {
-      console.log('Error loading theme preference:', error);
+      console.error('Error loading theme preference:', error);
     }
   };
 
@@ -48,7 +48,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     try {
       await AsyncStorage.setItem('themeMode', mode);
     } catch (error) {
-      console.log('Error saving theme preference:', error);
+      console.error('Error saving theme preference:', error);
     }
   };
 

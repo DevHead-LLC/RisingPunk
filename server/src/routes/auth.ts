@@ -90,7 +90,6 @@ async function createUserResearchData(userId: mongoose.Types.ObjectId): Promise<
     }));
 
     await ResearchUser.insertMany(researchUserEntries);
-    console.log(`Created research data for new user ${userId}`);
   } catch (error) {
     console.error('Error creating research data for new user:', error);
     throw error;

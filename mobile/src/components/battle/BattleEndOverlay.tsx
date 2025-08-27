@@ -37,7 +37,6 @@ export const BattleEndOverlay: React.FC<BattleEndOverlayProps> = ({ winner, onCo
 
   const handleContinue = () => {
     try {
-      console.log('🔍 Continue button pressed, calling onContinue');
       onContinue();
     } catch (error) {
       console.error('❌ Error in handleContinue:', error);

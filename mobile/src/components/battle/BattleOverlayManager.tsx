@@ -90,13 +90,6 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
 
     // Debug logging for battle end - only log once
     if (clientPhase === BattlePhase.COMPLETE && !battleEndLogged.current) {
-      console.log('🔍 BATTLE END DETECTED:', {
-        phase: phase,
-        clientPhase: clientPhase,
-        winner: battleState.winner,
-        onClose: !!onClose,
-        timeRemaining: timeRemaining
-      });
       battleEndLogged.current = true;
     }
 

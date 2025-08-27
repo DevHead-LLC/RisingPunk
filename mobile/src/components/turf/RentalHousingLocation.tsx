@@ -137,21 +137,13 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
 
   const handleTimerComplete = useCallback(async () => {
     try {
-      console.log(`Timer completed for property ${propertyId}, calling completeRentalHousing...`);
-      
       // Mark the build as complete in the database
       const result = await completeRentalHousing(propertyId).unwrap();
       
       if (result.success) {
-        console.log(`Build completed successfully for property ${propertyId}:`, result);
-        
         // Force a re-render to update the UI
         setForceUpdate(prev => prev + 1);
-        
-        // Also try to refetch the status
-        console.log(`Attempting to refetch status for property ${propertyId}...`);
         const refetchResult = await refetch();
-        console.log(`Refetch result:`, refetchResult);
       }
     } catch (error: any) {
       console.error('Error completing rental housing build:', error);

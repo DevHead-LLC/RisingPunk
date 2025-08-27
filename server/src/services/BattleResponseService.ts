@@ -25,11 +25,6 @@ export class BattleResponseService {
     movementStates?: Map<string, MovementState>,
     timerState?: {countdown: number, battleTime: number, timeRemaining: number, phase: any}
   ): Promise<BattleStateResponse> {
-    if (retargetingStatus) {
-      console.log(`📡 CLIENT SYNC: Including retargeting status in response`);
-      console.log(`📡 CLIENT SYNC: Node ${retargetingStatus.nodeIndex} captured, ${retargetingStatus.affectedBattalionIds.length} battalions affected`);
-    }
-
     // Use timer state if provided, otherwise use battle data
     const currentPhase = timerState ? timerState.phase : battle.phase;
     const currentCountdown = timerState ? timerState.countdown : battle.countdown;
@@ -158,18 +153,12 @@ export class BattleResponseService {
     
     if (battleLosses.winner === NodeOwner.USER && (battle as any).defenderNpcSlug) {
       try {
-        console.log(`🔍 BATTLE RESPONSE: Checking for processed rewards in battle:`, battle.battleId);
-        console.log(`🔍 BATTLE RESPONSE: Battle processedRewards field:`, (battle as any).processedRewards);
-        
         // Check if rewards were already processed by looking for a rewards field
         // If not, fall back to NPC data (for backward compatibility)
         if ((battle as any).processedRewards) {
           experienceGained = (battle as any).processedRewards.experienceGained;
           hackerRewards = (battle as any).processedRewards.moneyGained;
           levelUp = (battle as any).processedRewards.levelUp;
-          
-          console.log(`🔍 BATTLE RESPONSE: Found processed rewards:`, (battle as any).processedRewards);
-          console.log(`🔍 BATTLE RESPONSE: Level up data:`, levelUp);
         } else {
           const { NPCService } = require('./NPCService');
           const npc = await NPCService.getNPCBySlug((battle as any).defenderNpcSlug);
@@ -207,8 +196,6 @@ export class BattleResponseService {
       hackerRewards,
       levelUp
     };
-    
-    console.log(`🔍 BATTLE RESPONSE: Returning battle end data:`, battleEndData);
     
     return battleEndData;
   }

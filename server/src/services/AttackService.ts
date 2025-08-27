@@ -281,7 +281,7 @@ export class AttackService {
           default:
         }
       } catch (error) {
-        console.log(`❌ RETARGETING ERROR: Failed to process ${task.triggerType}:`, error);
+        console.error(`❌ RETARGETING ERROR: Failed to process ${task.triggerType}:`, error);
       }
       
       await new Promise(resolve => setTimeout(resolve, 50));

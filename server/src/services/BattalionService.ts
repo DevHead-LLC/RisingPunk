@@ -136,7 +136,7 @@ export class BattalionService {
 
     // Validate bot type
     if (!this.validBotTypes.includes(botType as any)) {
-      console.log(`⚠️ INVALID BOT TYPE: "${botType}" is not a valid bot type. Using 'guardian' as fallback.`);
+      console.error(`⚠️ INVALID BOT TYPE: "${botType}" is not a valid bot type. Using 'guardian' as fallback.`);
       this.userBotTypeCache.set(botType, 'guardian' as BotType);
       return 'guardian' as BotType;
     }
@@ -157,7 +157,7 @@ export class BattalionService {
 
     // Validate bot type
     if (!this.validBotTypes.includes(botType as any)) {
-      console.log(`⚠️ INVALID BOT TYPE: "${botType}" is not a valid bot type. Using 'guardian' as fallback.`);
+      console.error(`⚠️ INVALID BOT TYPE: "${botType}" is not a valid bot type. Using 'guardian' as fallback.`);
       this.enemyBotTypeCache.set(botType, 'guardian' as BotType);
       return 'guardian' as BotType;
     }

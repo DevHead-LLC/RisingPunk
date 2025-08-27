@@ -151,8 +151,6 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
     }
     
     const handleFeatureUnlock = async (featureId: string, cost: number): Promise<boolean> => {
-      // TODO: Implement real feature unlock logic
-      console.log(`Unlock feature: ${featureId} for $${cost}`);
       return true;
     };
     

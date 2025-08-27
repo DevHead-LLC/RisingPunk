@@ -1,103 +1,73 @@
-# Current Task: Implement Onboarding Slides for TurfScreen
+# Current Task: Fix Battle Outcome Logic - Attacker Loss on Equal/Greater Losses
 
-## Priority: Feature Implementation - First-Time User Onboarding Experience
+## Priority: Bug Fix - Battle Outcome Determination
 
-**STATUS**: IN PROGRESS - Phase 3 completed, beginning Phase 4
+**STATUS**: COMPLETED - All phases completed successfully
 
 ## Problem
-New users need an onboarding experience when they first visit the TurfScreen. Existing users should not see this again. We need a slide presentation system that plays once per user and can be skipped.
+Current battle outcome logic doesn't properly handle the case where an attacker loses more troops than the defender. According to the new rules:
+- If attacker loses more troops than defender → **Attacker loses** (attack fails)
+- If defender loses more troops than attacker → **Attacker wins**
+- **Exception**: If one side has 0 remaining troops, they automatically lose regardless of losses
+
+## Implementation Analysis
+✅ **Already Correct**:
+- Complete elimination check (0 troops = automatic loss)
+- Priority given to elimination over loss comparison
+- Battle end detection logic structure
+
+✅ **Fixed in Phase 1**:
+- `determineWinner` method updated to favor attacker only when they have fewer losses
+- Attacker now loses on equal or greater losses
+
+✅ **Verified in Phase 2**:
+- Elimination logic works correctly
+- Edge cases handled properly (both sides eliminated simultaneously)
+- Timer expiration logic validated
+- All battle end methods are consistent
 
 ## Implementation Plan
 
-### **Phase 1: Convert PowerPoint to Images** ✅ COMPLETED
-- Export PowerPoint slides as PNG/JPG images
-- Place images in `mobile/src/assets/images/onboarding/`
-- Label as `one.png`, `two.png`, `three.png`, etc. for order
-- **Status**: ✅ COMPLETED - 23 slides ready (one.png through twentythree.png)
-- **File Naming Convention**: All lowercase, no hyphens, spelled out numbers (one.png, two.png, three.png, etc.)
+### **Phase 1: Fix Winner Determination Logic** ✅ COMPLETED
+- Update `PointTrackingService.determineWinner()` method
+- Change logic to favor attacker only when they have fewer losses
+- Ensure attacker loses on equal or greater losses
+- **Status**: ✅ COMPLETED - Winner determination logic updated
 
-### **Phase 2: Create Slide Presentation Component** ✅ COMPLETED
-- Build reusable `OnboardingSlides` component
-- Handle tap-to-advance navigation between slides
-- Track current slide index and total count
-- Show progress indicators (current slide / total slides)
-- Include skip button for immediate dismissal
-- **Status**: ✅ COMPLETED - All components created and ready
-
-### **Phase 3: Integrate with TurfScreen** ✅ COMPLETED
-- Add completion tracking in user state
-- Show slides only on first visit to TurfScreen
-- Handle completion and dismissal logic
-- Integrate with existing TurfScreen navigation
-- **Status**: ✅ COMPLETED - TurfScreen integration complete
-
-### **Phase 4: User State Management** 🔄 IN PROGRESS
-- Store completion status in database
-- Prevent slides from showing again on subsequent visits
-- Handle both new users and existing users appropriately
-- **Status**: 🔄 IN PROGRESS - Database integration in progress
+### **Phase 2: Verify Battle End Logic** ✅ COMPLETED
+- Confirm elimination logic works correctly
+- Test edge cases (both sides eliminated simultaneously)
+- Validate timer expiration logic
+- **Status**: ✅ COMPLETED - All battle end logic verified and consistent
 
 ## Technical Requirements
-- **Slide Navigation**: Tap anywhere to advance to next slide
-- **Skip Functionality**: Skip button allows immediate dismissal
-- **Progress Tracking**: Visual indicator of current position (e.g., "2 of 22")
-- **One-Time Display**: Slides only show once per user
-- **Responsive Design**: Works on all screen sizes
-- **Theme Integration**: Follows existing light/dark theme system
-- **Total Slides**: 22 slides (one.png through twentythree.png, excluding twentytwo.png)
+- **Attacker loses** when losses are equal to or greater than defender losses
+- **Attacker wins** only when losses are strictly less than defender losses
+- **Complete elimination** takes priority over loss comparison
+- **No hard-coded advantages** for either side
 
-## Component Structure ✅ COMPLETED
-```
-OnboardingSlides/
-├── OnboardingSlides.tsx (main component) ✅
-├── SlideContent.tsx (individual slide display) ✅
-├── ProgressIndicator.tsx (slide counter) ✅
-└── SkipButton.tsx (skip functionality) ✅
-```
-
-## User Experience Flow
-1. **New User**: Sees slides on first TurfScreen visit
-2. **Existing User**: No slides shown (already completed)
-3. **Skip Option**: User can skip at any time
-4. **Completion**: After last slide or skip, slides never show again
+## Files Modified
+- `server/src/services/PointTrackingService.ts` - ✅ Winner determination logic updated
 
 ## Next Steps
-1. ✅ **Phase 1**: Convert PowerPoint to PNG images - COMPLETED
-2. ✅ **Phase 2**: Build slide presentation component - COMPLETED
-3. ✅ **Phase 3**: TurfScreen integration - COMPLETED
-4. 🔄 **Phase 4**: User state management - IN PROGRESS
+1. ✅ **Phase 1**: Fix winner determination logic - COMPLETED
+2. ✅ **Phase 2**: Verify battle end logic - COMPLETED
 
-## Files Created ✅
-- `mobile/src/components/onboarding/OnboardingSlides.tsx` ✅
-- `mobile/src/components/onboarding/SlideContent.tsx` ✅
-- `mobile/src/components/onboarding/ProgressIndicator.tsx` ✅
-- `mobile/src/components/onboarding/SkipButton.tsx` ✅
-- `mobile/src/components/onboarding/index.ts` (exports) ✅
+## Battle Outcome Logic Summary
+The updated logic now works as follows:
 
-## Files Modified ✅
-- `mobile/src/screens/TurfScreen.tsx` (add onboarding logic) ✅
-- `mobile/src/store/slices/authSlice.ts` (add onboarding completion state) ✅
-- `mobile/src/store/api/authApi.ts` (add onboarding completion API) ✅
-- `server/src/models/User.ts` (add onboardingCompleted field) ✅
-- `server/src/routes/auth.ts` (add onboarding completion endpoint) ✅
+1. **Complete Elimination Check** (Priority 1):
+   - If one side has 0 troops → that side automatically loses
+   - If both sides have 0 troops → fall back to loss comparison
 
-## Current Focus: Phase 4 - Database Integration
-- ✅ **User Model Updated**: Added onboardingCompleted field to MongoDB schema
-- ✅ **API Endpoint Created**: POST /api/auth/onboarding-complete endpoint
-- ✅ **Mobile API Integration**: useCompleteOnboardingMutation hook created
-- ✅ **State Management**: Redux state updated with onboarding completion logic
-- ✅ **Image Size Optimization**: Increased slide images by 25% for better visibility
-- ✅ **Content Tab Added**: New Profile tab with intro replay functionality
-- 🔄 **Testing & Validation**: Ready for user testing and validation
+2. **Loss Comparison** (Priority 2):
+   - If `enemyLosses < userLosses` → **Attacker wins** (enemy wins)
+   - If `enemyLosses >= userLosses` → **Attacker loses** (user wins)
 
-## Recent Task Completed ✅
-### **"Coming Soon" Overlay for Research Features**
-- **Problem**: When clicking "Perform Research" in feature modals, the modal was closing immediately
-- **Solution**: Added a "Coming Soon" overlay that appears for 2 seconds instead of closing the modal
-- **Implementation**: 
-  - Modified `FeatureModal.tsx` to show overlay instead of closing modal
-  - Added state management for overlay visibility
-  - Implemented 2-second auto-hide timer
-  - Styled overlay with theme-aware colors and matrix border
-- **Files Modified**: `mobile/src/components/research/FeatureModal.tsx`
-- **Status**: ✅ COMPLETED - Ready for testing
+This ensures that attackers must achieve a decisive victory (fewer losses) to succeed, while complete annihilation always results in victory regardless of the cost.
+
+## Task Status: ✅ COMPLETED
+The battle outcome logic has been successfully updated and verified. The system now correctly:
+- Prioritizes complete elimination (0 troops = automatic loss)
+- Requires attackers to have fewer losses to win
+- Handles all edge cases consistently across all battle end methods

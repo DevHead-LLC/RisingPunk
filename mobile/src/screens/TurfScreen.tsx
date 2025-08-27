@@ -124,9 +124,6 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       // Only complete if there's an active build
       if (property1Status?.buildStatus?.completesAt) {
         const result = await completeRentalHousing(1).unwrap();
-        if (result.success) {
-          console.log('Property 1 build completed successfully:', result);
-        }
       }
     } catch (error) {
       console.error('Error completing property 1 build:', error);
@@ -138,9 +135,6 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       // Only complete if there's an active build
       if (property2Status?.buildStatus?.completesAt) {
         const result = await completeRentalHousing(2).unwrap();
-        if (result.success) {
-          console.log('Property 2 build completed successfully:', result);
-        }
       }
     } catch (error) {
       console.error('Error completing property 2 build:', error);
@@ -152,9 +146,6 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       // Only complete if there's an active build
       if (property3Status?.buildStatus?.completesAt) {
         const result = await completeRentalHousing(3).unwrap();
-        if (result.success) {
-          console.log('Property 3 build completed successfully:', result);
-        }
       }
     } catch (error) {
       console.error('Error completing property 3 build:', error);
@@ -166,9 +157,6 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       // Only complete if there's an active build
       if (property4Status?.buildStatus?.completesAt) {
         const result = await completeRentalHousing(4).unwrap();
-        if (result.success) {
-          console.log('Property 4 build completed successfully:', result);
-        }
       }
     } catch (error) {
       console.error('Error completing property 4 build:', error);
@@ -396,7 +384,6 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           _onClose={() => {
             // Invalidate map cache to ensure fresh data after battle end
             // This prevents the "ghost NPC" issue where defeated NPCs still appear on the map
-            console.log('[Battle] Invalidating map cache after battle end');
             dispatch(mapApi.util.invalidateTags(['Map']));
             
             // Return to origin without resetting app

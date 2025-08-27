@@ -63,7 +63,6 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
 
     try {
       const result = await unlockResearchCenter().unwrap();
-      console.log('Research center build started successfully');
       
       // Update balance in Redux store
       if (result.balance) {
