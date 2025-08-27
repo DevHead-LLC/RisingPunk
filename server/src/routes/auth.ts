@@ -29,6 +29,7 @@ interface UserResponse {
     unlockedFeatures: {
       hackRig: boolean;
     };
+    onboardingCompleted: boolean;
   }
 }
 
@@ -142,7 +143,8 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
           level: user.level,
           unlockedFeatures: {
             hackRig: user.unlockedFeatures?.hackRig || false
-          }
+          },
+          onboardingCompleted: user.onboardingCompleted || false
         }
       });
 
@@ -186,7 +188,8 @@ router.post<{}, UserResponse | { error: string }, LoginRequest['body']>(
           level: user.level,
           unlockedFeatures: {
             hackRig: user.unlockedFeatures?.hackRig || false
-          }
+          },
+          onboardingCompleted: user.onboardingCompleted || false
         }
       });
 
@@ -195,5 +198,33 @@ router.post<{}, UserResponse | { error: string }, LoginRequest['body']>(
       res.status(500).json({ error: 'Server error' });
     }
   });
+
+// Mark onboarding as completed
+router.post('/onboarding-complete', async (req, res): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    const token = authHeader.substring(7);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'defaultsecret') as { userId: string };
+    
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    user.onboardingCompleted = true;
+    await user.save();
+
+    res.json({ success: true, message: 'Onboarding marked as completed' });
+  } catch (error) {
+    console.error('Onboarding completion error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
 export default router; 

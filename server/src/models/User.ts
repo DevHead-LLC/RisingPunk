@@ -25,6 +25,7 @@ export interface IUser extends Document {
     rentalHousing3: boolean;
     rentalHousing4: boolean;
   };
+  onboardingCompleted: boolean;
   researchCenterBuild?: {
     startedAt: Date | null;
     completesAt: Date | null;
@@ -128,6 +129,10 @@ const userSchema = new Schema({
       type: Boolean,
       default: false
     }
+  },
+  onboardingCompleted: {
+    type: Boolean,
+    default: false
   },
   researchCenterBuild: {
     startedAt: {

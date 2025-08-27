@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -29,6 +29,7 @@ export function FeatureModal({
   onPerformResearch,
 }: FeatureModalProps) {
   const colors = useThemeColors();
+  const [showComingSoon, setShowComingSoon] = useState(false);
   const isLightMode = colors.background === '#FAFAFA' || colors.background === '#F5F5DC';
   
   const canAfford = currentBalance >= feature.unlockCost;
@@ -36,10 +37,11 @@ export function FeatureModal({
   
   const handlePerformResearch = async () => {
     if (canAfford && meetsLevelRequirement) {
-      const success = await onPerformResearch(feature.id, feature.unlockCost);
-      if (success) {
-        onClose();
-      }
+      setShowComingSoon(true);
+      
+      setTimeout(() => {
+        setShowComingSoon(false);
+      }, 2000);
     }
   };
 
@@ -151,6 +153,23 @@ export function FeatureModal({
     </View>
   );
 
+  const renderComingSoonOverlay = () => (
+    <View style={styles.comingSoonOverlay}>
+      <View style={[
+        styles.comingSoonContent,
+        {
+          backgroundColor: colors.background,
+          borderColor: colors.matrix,
+        }
+      ]}>
+        <Text style={[
+          styles.comingSoonText,
+          { color: colors.matrix }
+        ]}>Coming Soon</Text>
+      </View>
+    </View>
+  );
+
   return (
     <Modal
       visible={visible}
@@ -169,6 +188,7 @@ export function FeatureModal({
           }
         ]}>
           {feature.isUnlocked ? renderUnlockedModal() : renderLockedModal()}
+          {showComingSoon && renderComingSoonOverlay()}
         </View>
       </View>
     </Modal>
@@ -267,5 +287,26 @@ const styles = StyleSheet.create({
   closeButtonText: {
     fontSize: SIZING.font.body,
     fontWeight: '600',
+  },
+  comingSoonOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  comingSoonContent: {
+    padding: SIZING.spacing.lg,
+    borderRadius: 10,
+    alignItems: 'center',
+    borderWidth: 2,
+  },
+  comingSoonText: {
+    fontSize: SIZING.font.h2,
+    fontWeight: 'bold',
   },
 });

@@ -1,165 +1,103 @@
-# Current Task: Implement Research Feature System - Eliminate Mock Data
+# Current Task: Implement Onboarding Slides for TurfScreen
 
-## Priority: Feature Implementation - Research Feature States & Purchase Flow
+## Priority: Feature Implementation - First-Time User Onboarding Experience
 
-**STATUS**: IN PROGRESS - Understanding feature states and eliminating mock data
+**STATUS**: IN PROGRESS - Phase 3 completed, beginning Phase 4
 
 ## Problem
-The research feature system currently uses mock data and doesn't properly distinguish between "unlocked" (can be purchased) and "enabled" (actually functional). We need to implement the proper flow and eliminate all mock data.
+New users need an onboarding experience when they first visit the TurfScreen. Existing users should not see this again. We need a slide presentation system that plays once per user and can be skipped.
 
-## Feature State Understanding
-**UNLOCKED** = "Can Purchase Feature" (feature is available for purchase)
-**LOCKED** = "Cannot Purchase Feature" (feature is not available)
-**ENABLED** = "Feature is Active" (requires purchase + timer countdown)
+## Implementation Plan
 
-## Feature State Implementation
-### **State 1: Locked & Disabled**
-- **Appearance**: Lock icon (🔒) + disabled overlay covering entire card
-- **Meaning**: Has not met requirements, so locked. Has not been purchased, so disabled.
-- **Price Visibility**: Price is covered by overlay (`zIndex: 0`)
-- **Styling**: Gray background, muted colors, reduced opacity
+### **Phase 1: Convert PowerPoint to Images** ✅ COMPLETED
+- Export PowerPoint slides as PNG/JPG images
+- Place images in `mobile/src/assets/images/onboarding/`
+- Label as `one.png`, `two.png`, `three.png`, etc. for order
+- **Status**: ✅ COMPLETED - 23 slides ready (one.png through twentythree.png)
+- **File Naming Convention**: All lowercase, no hyphens, spelled out numbers (one.png, two.png, three.png, etc.)
 
-### **State 2: Unlocked & Disabled** 
-- **Appearance**: No lock icon + disabled overlay covering entire card
-- **Meaning**: Has met requirements, so unlocked. Has not been purchased, so disabled.
-- **Price Visibility**: Price shows clearly above overlay (`zIndex: 2`)
-- **Styling**: Normal background, price shown in blue/red based on affordability
+### **Phase 2: Create Slide Presentation Component** ✅ COMPLETED
+- Build reusable `OnboardingSlides` component
+- Handle tap-to-advance navigation between slides
+- Track current slide index and total count
+- Show progress indicators (current slide / total slides)
+- Include skip button for immediate dismissal
+- **Status**: ✅ COMPLETED - All components created and ready
 
-### **State 3: Unlocked & Enabled**
-- **Appearance**: No lock icon + no overlay (clean appearance)
-- **Meaning**: Has met requirements, so unlocked. Has been purchased, so enabled.
-- **Price Visibility**: No price shown (feature is active)
-- **Styling**: Green background, full opacity, success colors
+### **Phase 3: Integrate with TurfScreen** ✅ COMPLETED
+- Add completion tracking in user state
+- Show slides only on first visit to TurfScreen
+- Handle completion and dismissal logic
+- Integrate with existing TurfScreen navigation
+- **Status**: ✅ COMPLETED - TurfScreen integration complete
 
-## Overlay System Implementation
-- **Disabled Overlay**: Always present for disabled states (States 1 & 2)
-- **Z-Index Logic**: 
-  - `zIndex: 0` for locked features (price under overlay)
-  - `zIndex: 2` for unlocked features (price above overlay)
-- **Overlay Styling**: 
-  - Light Mode: `rgba(0, 0, 0, 0.15)` - subtle darkening
-  - Dark Mode: `rgba(0, 0, 0, 0.4)` - appropriate darkening
-
-## Background Image System
-- **Antivirus Feature**: Uses antivirusResearch.png as background
-- **Text Colors**: 
-  - Light Mode: White text (#FFFFFF) for visibility on dark backgrounds
-  - Dark Mode: Green text (#00FF00) for visibility on dark backgrounds
-- **Reusable Pattern**: Helper functions `renderFeatureContent()` and `renderDisabledOverlay()` ensure consistency
-- **Future Features**: Easy to add background images by following the documented pattern in ResearchFeaturesList.tsx
-
-## Current Focus: Home Defense - Antivirus Feature
-- **Feature**: Antivirus
-- **Current State**: Should be UNLOCKED (can be purchased) when Home Defense category is unlocked
-- **Price**: $25,000 (unchanged)
-- **Requirements**: Level 2 (unchanged)
-- **Purchase Flow**: When clicked, should show purchase modal, then timer countdown
-
-## Implementation Steps
-1. ✅ **Update Server Config**: Changed "Unlock Antivirus" → "Antivirus" in server/src/config/researchFeatures.ts
-2. ✅ **Eliminate Mock Data**: Completely removed mockResearchFeatures.ts and all mock data usage
-3. ✅ **Fix Server Logic**: Updated server to respect config's isUnlocked value when no user record exists
-4. ✅ **Implement Real API**: ResearchScreen now uses useResearchFeatures hook for real database data
-5. ✅ **Add Background Image**: Antivirus feature now uses antivirusResearch.png as background
-6. ✅ **Update Text Colors**: 
-   - Light Mode: White text (#FFFFFF)
-   - Dark Mode: Green text (#00FF00)
-   - Price colors: Blue/Green for affordable, Red for unaffordable
-7. ✅ **Create Reusable Pattern**: Helper functions for consistent styling across all features
-8. ✅ **Fix Unconditional Hook Bug**: Fixed useResearchFeatures hook to prevent unnecessary API calls when no research category is selected
-9. 🔄 **Feature State Logic**: Implement proper unlock/locked/enabled state handling
+### **Phase 4: User State Management** 🔄 IN PROGRESS
+- Store completion status in database
+- Prevent slides from showing again on subsequent visits
+- Handle both new users and existing users appropriately
+- **Status**: 🔄 IN PROGRESS - Database integration in progress
 
 ## Technical Requirements
-- **No Mock Data**: All features must come from server API
-- **State Management**: Proper handling of unlocked vs locked vs enabled states
-- **Purchase Flow**: Click → Purchase Modal → Timer Countdown → Feature Enabled
-- **Real-time Updates**: Features should update immediately when states change
+- **Slide Navigation**: Tap anywhere to advance to next slide
+- **Skip Functionality**: Skip button allows immediate dismissal
+- **Progress Tracking**: Visual indicator of current position (e.g., "2 of 22")
+- **One-Time Display**: Slides only show once per user
+- **Responsive Design**: Works on all screen sizes
+- **Theme Integration**: Follows existing light/dark theme system
+- **Total Slides**: 22 slides (one.png through twentythree.png, excluding twentytwo.png)
+
+## Component Structure ✅ COMPLETED
+```
+OnboardingSlides/
+├── OnboardingSlides.tsx (main component) ✅
+├── SlideContent.tsx (individual slide display) ✅
+├── ProgressIndicator.tsx (slide counter) ✅
+└── SkipButton.tsx (skip functionality) ✅
+```
+
+## User Experience Flow
+1. **New User**: Sees slides on first TurfScreen visit
+2. **Existing User**: No slides shown (already completed)
+3. **Skip Option**: User can skip at any time
+4. **Completion**: After last slide or skip, slides never show again
 
 ## Next Steps
-1. Make Antivirus automatically unlocked in Home Defense category
-2. Remove mock data usage from ResearchScreen
-3. Implement real API integration
-4. Set up proper feature state management
+1. ✅ **Phase 1**: Convert PowerPoint to PNG images - COMPLETED
+2. ✅ **Phase 2**: Build slide presentation component - COMPLETED
+3. ✅ **Phase 3**: TurfScreen integration - COMPLETED
+4. 🔄 **Phase 4**: User state management - IN PROGRESS
 
-## Bug Fix: Unconditional Hook Invocation
-**Status**: ✅ FIXED
+## Files Created ✅
+- `mobile/src/components/onboarding/OnboardingSlides.tsx` ✅
+- `mobile/src/components/onboarding/SlideContent.tsx` ✅
+- `mobile/src/components/onboarding/ProgressIndicator.tsx` ✅
+- `mobile/src/components/onboarding/SkipButton.tsx` ✅
+- `mobile/src/components/onboarding/index.ts` (exports) ✅
 
-### Problem
-The `useResearchFeatures` hook was being called unconditionally in `ResearchScreen.tsx` with `selectedCard?.id || ''`. When `currentScreen` was 'main', `selectedCard` was undefined, causing the hook to receive an empty string and trigger unnecessary API calls.
+## Files Modified ✅
+- `mobile/src/screens/TurfScreen.tsx` (add onboarding logic) ✅
+- `mobile/src/store/slices/authSlice.ts` (add onboarding completion state) ✅
+- `mobile/src/store/api/authApi.ts` (add onboarding completion API) ✅
+- `server/src/models/User.ts` (add onboardingCompleted field) ✅
+- `server/src/routes/auth.ts` (add onboarding completion endpoint) ✅
 
-### Solution
-1. **Conditional Hook Call**: Changed hook invocation from `useResearchFeatures(selectedCard?.id || '')` to `useResearchFeatures(selectedCard?.id || null)`
-2. **Updated Hook Type**: Modified `useResearchFeatures` to accept `string | null` instead of just `string`
-3. **Enhanced Guard Clauses**: Added proper null/empty string checks in the hook to prevent API calls when no category is selected
-4. **State Reset**: Added logic to reset features state when no category is selected
-5. **UI Handling**: Added proper error handling for when no features are available
+## Current Focus: Phase 4 - Database Integration
+- ✅ **User Model Updated**: Added onboardingCompleted field to MongoDB schema
+- ✅ **API Endpoint Created**: POST /api/auth/onboarding-complete endpoint
+- ✅ **Mobile API Integration**: useCompleteOnboardingMutation hook created
+- ✅ **State Management**: Redux state updated with onboarding completion logic
+- ✅ **Image Size Optimization**: Increased slide images by 25% for better visibility
+- ✅ **Content Tab Added**: New Profile tab with intro replay functionality
+- 🔄 **Testing & Validation**: Ready for user testing and validation
 
-### Files Modified
-- `mobile/src/screens/ResearchScreen.tsx` - Fixed hook invocation and added empty features handling
-- `mobile/src/hooks/useResearchFeatures.ts` - Updated type signature and added proper null handling
-
-### Result
-- No more unnecessary API calls when viewing the main research screen
-- Proper state management when switching between research categories
-- Cleaner user experience with appropriate error messages
-
----
-
-# Previous Tasks (Archived)
-
-## ✅ COMPLETED: Investment Property Floor Plans
-**Date**: Current Session
-**Status**: COMPLETED
-
-### What Was Accomplished
-- Created reusable `FloorPlan` component in `mobile/src/components/common/FloorPlan.tsx`
-- Updated `InvestmentPropertyScreen` to use the new floor plan component
-- Implemented consistent apartment floor plan design for all 4 investment properties
-- Floor plan includes: Bathroom, Entrance, Kitchen, Bedroom, and Living Room
-- Each room displays dimensions and proper labeling
-- Property ID is prominently displayed at the top center
-- Theme-aware styling that works with both light and dark modes
-- **IMPROVED**: Added wall lines to separate rooms (vertical and horizontal walls)
-- **IMPROVED**: Different colored sections for entryways and rooms for better visual separation
-- **MAJOR UPGRADE**: Removed title text for cleaner appearance
-- **MAJOR UPGRADE**: Enlarged floor plan to 800x600 for better visibility and panning
-- **MAJOR UPGRADE**: Added panning scroll functionality for navigation
-- **MAJOR UPGRADE**: Auto-centers view on Property text at top center on each visit
-- **FINAL IMPROVEMENT**: Increased room sizes for better clarity and improved Property text positioning
-- **CRITICAL FIX**: Significantly enlarged floor plan to 1200x900 with much more room space
-- **CRITICAL FIX**: Fixed centering calculation and container dimensions for proper panning
-- **FINAL CRITICAL FIX**: Implemented nested scrolling for both horizontal AND vertical panning
-- **FINAL FIXES**: 
-  - Moved Property text card down to fit within floor plan area
-  - Implemented free panning in both directions simultaneously (not locked to one axis)
-  - Fixed vertical scrolling range to allow panning to top and bottom edges
-  - Properly implemented both horizontal AND vertical scrolling using ScrollView with content sizing
-  - Fixed initial view centering to position at top-middle (Property text) instead of middle-middle
-
-### Technical Details
-- **Component**: `FloorPlan` - reusable across all property screens
-- **Layout**: 2D floor plan with rooms positioned absolutely for precise control
-- **Walls**: Thick black lines (3px) to separate rooms, matching the image design
-- **Styling**: Uses theme colors for borders, backgrounds, and text
-- **Size**: Very large dimensions (1200x900) for excellent visibility and smooth panning
-- **Scroll**: Single ScrollView with free panning in both directions simultaneously
-- **Panning**: `directionalLockEnabled={false}` allows diagonal and free movement
-- **Centering**: Automatically centers view on Property text with correct X and Y calculations
-- **Container**: Updated to 1250x950 to accommodate the larger floor plan
-- **Property Text**: Positioned at top center within the floor plan area (not above it)
-- **Integration**: Seamlessly integrated into existing `InvestmentPropertyScreen`
-
-### Floor Plan Layout (Majorly Improved)
-- **Property Text**: Fixed position at top center of screen (top: 15px margin) - smaller pill with reduced padding, stays visible during panning
-- **Left Side - Stacked Colored Boxes**: 
-  - **Bathroom**: +$0.01 (top-left, purple tinted, 380x280)
-  - **Entrance**: No value text (middle-left, blue tinted, 380x280)
-  - **Kitchen**: +$0.01 (bottom-left, purple tinted, 380x260)
-- **Right Side - Stacked Colored Boxes**:
-  - **Bedroom**: +$0.02 (top-right, light purple tinted, 780x430)
-  - **Living Room**: +$0.02 (bottom-right, light blue tinted, 780x430)
-- **Design**: Simplified with colored boxes stacked on top of each other, no extra wall lines, green dollar values instead of dimensions
-
-### Files Modified
-- `mobile/src/components/common/FloorPlan.tsx` - Enhanced component with wall lines, larger layout (1200x900), and Property text positioned within floor plan
-- `mobile/src/screens/InvestmentPropertyScreen.tsx` - Added free panning functionality, removed title, updated container size to 1250x950
+## Recent Task Completed ✅
+### **"Coming Soon" Overlay for Research Features**
+- **Problem**: When clicking "Perform Research" in feature modals, the modal was closing immediately
+- **Solution**: Added a "Coming Soon" overlay that appears for 2 seconds instead of closing the modal
+- **Implementation**: 
+  - Modified `FeatureModal.tsx` to show overlay instead of closing modal
+  - Added state management for overlay visibility
+  - Implemented 2-second auto-hide timer
+  - Styled overlay with theme-aware colors and matrix border
+- **Files Modified**: `mobile/src/components/research/FeatureModal.tsx`
+- **Status**: ✅ COMPLETED - Ready for testing

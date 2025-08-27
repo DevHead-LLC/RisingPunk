@@ -18,10 +18,11 @@ import {BattlePreparationScreen} from './BattlePreparationScreen';
 import {BattleGridScreen} from './BattleGridScreen';
 import {InvestmentPropertyScreen} from './InvestmentPropertyScreen';
 import {ErrorBoundary} from '../components/common/ErrorBoundary';
-import {useAppDispatch} from '../store/hooks';
-import {fetchInitialData} from '../store/slices/authSlice';
+import {useAppDispatch, useAppSelector} from '../store/hooks';
+import {fetchInitialData, setOnboardingCompleted, setShowOnboarding} from '../store/slices/authSlice';
 import {mapApi} from '../store/api/mapApi';
-import {useGetRentalHousingStatusQuery, useCompleteRentalHousingMutation} from '../store/api/authApi';
+import {useGetRentalHousingStatusQuery, useCompleteRentalHousingMutation, useCompleteOnboardingMutation} from '../store/api/authApi';
+import {OnboardingSlides} from '../components/onboarding';
 
 const DiagonalLines = memo(({ colors }: { colors: any }) => (
   <>
@@ -82,6 +83,9 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const currentScrollPositionRef = useRef<{ x: number; y: number } | null>(null);
   const dispatch = useAppDispatch();
 
+  // Onboarding state
+  const showOnboarding = useAppSelector((state) => state.auth.showOnboarding);
+
   // Expose horizontalScrollRef to parent component
   useImperativeHandle(ref, () => ({
     horizontalScrollRef: horizontalScrollRef
@@ -110,6 +114,9 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
 
   // Get the completeRentalHousing mutation
   const [completeRentalHousing] = useCompleteRentalHousingMutation();
+  
+  // Get the completeOnboarding mutation
+  const [completeOnboarding] = useCompleteOnboardingMutation();
 
   // Memoize completion functions to prevent infinite re-renders
   const handleProperty1Complete = useCallback(async () => {
@@ -219,6 +226,29 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     handleProperty3Complete,
     handleProperty4Complete
   ]);
+
+  // Onboarding handlers
+  const handleOnboardingComplete = useCallback(async () => {
+    try {
+      await completeOnboarding().unwrap();
+      dispatch(setOnboardingCompleted());
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+      // Still update local state even if API call fails
+      dispatch(setOnboardingCompleted());
+    }
+  }, [dispatch, completeOnboarding]);
+
+  const handleOnboardingSkip = useCallback(async () => {
+    try {
+      await completeOnboarding().unwrap();
+      dispatch(setOnboardingCompleted());
+    } catch (error) {
+      console.error('Error skipping onboarding:', error);
+      // Still update local state even if API call fails
+      dispatch(setOnboardingCompleted());
+    }
+  }, [dispatch, completeOnboarding]);
 
   const navigateToScreen = useCallback((screen: 'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research' | 'investmentProperty') => {
     const previousScreenBeforeUpdate = currentScreen;
@@ -473,9 +503,19 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           </View>
         );
     }
-  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties]);
+  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip]);
 
-  return renderScreen();
+  return (
+    <>
+      {renderScreen()}
+      {showOnboarding && (
+        <OnboardingSlides
+          onComplete={handleOnboardingComplete}
+          onSkip={handleOnboardingSkip}
+        />
+      )}
+    </>
+  );
 });
 
 const styles = StyleSheet.create({
