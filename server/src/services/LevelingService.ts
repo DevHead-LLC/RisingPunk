@@ -41,7 +41,6 @@ export class LevelingService {
       };
 
       this.configLoaded = true;
-      console.log('✅ LevelingService: Config loaded successfully');
     } catch (error) {
       console.error('❌ LevelingService: Failed to load config:', error);
       throw error;

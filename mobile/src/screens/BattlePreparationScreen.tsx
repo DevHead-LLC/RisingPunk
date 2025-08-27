@@ -278,7 +278,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
           const validation = validateDeployment(assignments);
           
           if (!validation.isValid) {
-            console.log('Deployment validation failed:', validation.message);
+            console.error('Deployment validation failed:', validation.message);
             return;
           }
 

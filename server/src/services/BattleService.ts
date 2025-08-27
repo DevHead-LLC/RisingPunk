@@ -155,11 +155,9 @@ export class BattleService {
       winner = battleLosses.winner;
       endCondition = 'elimination';
     } else if (eliminationResult.userEliminated) {
-      // User eliminated - enemy wins
       winner = NodeOwner.ENEMY;
       endCondition = 'elimination';
     } else if (eliminationResult.enemyEliminated) {
-      // Enemy eliminated - user wins
       winner = NodeOwner.USER;
       endCondition = 'elimination';
     } else {
@@ -182,7 +180,6 @@ export class BattleService {
       try {
         const user = await User.findById(battle.attackerId);
         if (!user) {
-          console.log(`⚠️ BATTLE VICTORY: User ${battle.attackerId} not found for hack rig unlock`);
           return;
         }
 
@@ -190,9 +187,6 @@ export class BattleService {
           user.unlockedFeatures = user.unlockedFeatures || {};
           user.unlockedFeatures.hackRig = true;
           await user.save();
-          console.log(`🎉 BATTLE VICTORY: Hack rig unlocked for user ${battle.attackerId}`);
-        } else {
-          console.log(`ℹ️ BATTLE VICTORY: Hack rig already unlocked for user ${battle.attackerId}`);
         }
       } catch (error) {
         console.error('Failed to unlock hack rig for user', battle.attackerId, error);
@@ -225,7 +219,6 @@ export class BattleService {
         const result = await BattleRewardService.processBattleRewards(battle, battle.attackerId);
       } catch (e) {
         console.error('Battle reward processing failed for', battleId, e);
-        console.log('Battle will complete but reward handling failed. Manual intervention may be required.');
       }
     }
 
@@ -239,7 +232,6 @@ export class BattleService {
       const user = await User.findById(objectId);
       
       if (!user) {
-        console.log(`⚠️ BATTLE VICTORY: User ${userId} not found for hack rig unlock`);
         return;
       }
 
@@ -248,9 +240,6 @@ export class BattleService {
         user.unlockedFeatures = user.unlockedFeatures || {};
         user.unlockedFeatures.hackRig = true;
         await user.save();
-        console.log(`🎉 BATTLE VICTORY: Hack rig unlocked for user ${userId}`);
-      } else {
-        console.log(`ℹ️ BATTLE VICTORY: Hack rig already unlocked for user ${userId}`);
       }
     } catch (error) {
       console.error('❌ BATTLE VICTORY: Failed to unlock hack rig for user', userId, error);

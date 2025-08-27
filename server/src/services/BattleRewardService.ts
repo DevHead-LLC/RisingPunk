@@ -94,23 +94,16 @@ export class BattleRewardService {
         // Update user experience using LevelingService to trigger level ups
         experienceGained = npc.battleExperienceReward;
         
-        console.log(`🔍 BATTLE REWARDS: Processing experience gain of ${experienceGained} for user ${userId}`);
-        
         if (experienceGained) {
           const { LevelingService } = require('./LevelingService');
           const levelingResult = await LevelingService.applyExperience(userId, experienceGained);
           
-          console.log(`🔍 BATTLE REWARDS: LevelingService result:`, levelingResult);
-          
           // Check if user leveled up
           if (levelingResult.levelsGained > 0) {
-            console.log(`🎉 LEVEL UP: User ${userId} gained ${levelingResult.levelsGained} level(s)! New level: ${levelingResult.level}`);
             levelUp = {
               levelsGained: levelingResult.levelsGained,
               newLevel: levelingResult.level
             };
-          } else {
-            console.log(`🔍 BATTLE REWARDS: No level up - levelsGained: ${levelingResult.levelsGained}`);
           }
         }
 
@@ -133,9 +126,7 @@ export class BattleRewardService {
         botLosses,
         levelUp
       };
-      
-      console.log(`🔍 BATTLE REWARDS: Storing processed rewards in battle:`, (battle as any).processedRewards);
-      
+            
       await battle.save();
 
       return {

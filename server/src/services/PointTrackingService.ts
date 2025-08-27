@@ -45,17 +45,16 @@ export class PointTrackingService {
 
   /**
    * Determine winner based on losses
-   * Side with fewer losses wins
-   * In case of tie, defender (user) wins
+   * Party A (user) wins only when they have fewer losses than Party B (opponent)
+   * Party B (opponent) wins when losses are equal or when they have fewer losses
    */
   static determineWinner(userLosses: number, enemyLosses: number): NodeOwner {
     if (userLosses < enemyLosses) {
+      // Party A (user) has fewer losses - Party A wins
       return NodeOwner.USER;
-    } else if (enemyLosses < userLosses) {
-      return NodeOwner.ENEMY;
     } else {
-      // Tie - defender (user) wins
-      return NodeOwner.USER;
+      // Party B (opponent) has fewer or equal losses - Party B wins
+      return NodeOwner.ENEMY;
     }
   }
 

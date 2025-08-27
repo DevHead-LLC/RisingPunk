@@ -51,7 +51,7 @@ export class CombatService {
     
     if (defender.currentHealth > 0) {
       if (!defender.baseHealthPerUnit || defender.baseHealthPerUnit <= 0) {
-        console.log(`⚠️ COMBAT WARNING: ${defender.owner} ${defender.type} has invalid baseHealthPerUnit (${defender.baseHealthPerUnit}), using fallback calculation`);
+        console.error(`⚠️ COMBAT WARNING: ${defender.owner} ${defender.type} has invalid baseHealthPerUnit (${defender.baseHealthPerUnit}), using fallback calculation`);
         defender.baseHealthPerUnit = 10;
       }
       

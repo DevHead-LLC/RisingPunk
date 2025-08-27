@@ -244,11 +244,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
            Math.abs(lastVelocity.value.vx) < velocityThreshold && 
            Math.abs(lastVelocity.value.vy) < velocityThreshold;
     
-    // Debug log for pan completion status
-    if (complete && timeSincePanEnd > 200) { // Only log occasionally
-      console.log('[Map] Panning complete - ready for immediate interaction');
-    }
-    
     return complete;
   }, []);
 
@@ -550,8 +545,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   useEffect(() => {
     dispatch(setLoading(isLoading));
     if (mapData && mapData.grid) {
-      console.log('[Map] Updating grid with fresh data from server');
-      
       // Separate static and dynamic data
       const { terrain, entities } = separateStaticAndDynamicData(mapData.grid);
       setStaticTerrainData(terrain);
@@ -573,7 +566,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   // Force refresh map data when returning from battle to ensure NPCs are updated
   useEffect(() => {
     if (restorePan) {
-      console.log('[Map] Returning from battle, forcing map data refresh');
       refetch();
     }
   }, [restorePan, refetch]);
@@ -630,16 +622,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       // Validate grid coordinates are within bounds
       const gridSize = grid.length || 50;
       if (restorePan.x < 0 || restorePan.x >= gridSize || restorePan.y < 0 || restorePan.y >= gridSize) {
-        console.log('[Map] Invalid grid coordinates for restore:', restorePan.x, restorePan.y, 'grid size:', gridSize);
         return;
-      }
-      
-      // Check if there's still an entity at the restore coordinates
-      const cell = grid[restorePan.y]?.[restorePan.x];
-      if (cell) {
-        console.log('[Map] Cell at restore coordinates:', restorePan.x, restorePan.y, 'entity:', cell.entity, 'name:', cell.name);
-      } else {
-        console.log('[Map] No cell found at restore coordinates:', restorePan.x, restorePan.y);
       }
       
       // Convert grid coordinates to pan coordinates (center the cell on screen)
@@ -649,8 +632,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       // Clamp to valid pan bounds
       const clampedX = Math.min(maxX.value, Math.max(minX.value, targetX));
       const clampedY = Math.min(maxY.value, Math.max(minY.value, targetY));
-      
-      console.log('[Map] Restoring pan to grid coordinates:', restorePan.x, restorePan.y, 'pan coordinates:', clampedX, clampedY);
       
       offsetX.value = clampedX;
       offsetY.value = clampedY;

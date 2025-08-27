@@ -78,8 +78,6 @@ function generateNPCInstanceId(npcSlug, x, y) {
  */
 async function seedMap() {
   try {
-    console.log('🌱 Starting map seeding...');
-    
     // Get the main map - use mongoose directly to avoid TypeScript import issues
     const map = await mongoose.connection.collection('maps').findOne({ name: 'main' });
     
@@ -87,10 +85,7 @@ async function seedMap() {
       throw new Error('Main map not found');
     }
     
-    console.log(`📍 Found map with ${map.cells.length} cells`);
-    
     // Clear existing NPCs from map
-    console.log('🧹 Clearing existing NPCs from map...');
     map.cells.forEach(cell => {
       if (cell.occupiedBy === 'npc') {
         cell.isOccupied = false;
@@ -106,8 +101,6 @@ async function seedMap() {
     let totalPlaced = 0;
     
     for (const [level, config] of Object.entries(NPC_LEVELS)) {
-      console.log(`🎯 Placing ${config.count} Level ${level} NPCs...`);
-      
       const validCells = getValidCells(map.cells, config.count);
       
       for (let i = 0; i < config.count; i++) {
@@ -125,14 +118,9 @@ async function seedMap() {
         cell.npcInstanceId = npcInstanceId;
         
         totalPlaced++;
-        console.log(`  ✅ Placed ${cell.entityName} at (${cell.x}, ${cell.y})`);
       }
     }
-    
-    // Save the updated map using native MongoDB update - only update NPC-related fields
-    console.log('💾 Saving updated map...');
-    
-    // Create update operations for only the cells that have NPCs
+
     const updateOperations = [];
     map.cells.forEach((cell, index) => {
       if (cell.occupiedBy === 'npc') {
@@ -182,12 +170,6 @@ async function seedMap() {
     }
     if (clearOperations.length > 0) {
       await mongoose.connection.collection('maps').bulkWrite(clearOperations);
-    }
-    
-    console.log(`🎉 Successfully seeded map with ${totalPlaced} NPCs!`);
-    console.log('\n📊 NPC Distribution:');
-    for (const [level, config] of Object.entries(NPC_LEVELS)) {
-      console.log(`  Level ${level}: ${config.count} NPCs`);
     }
     
   } catch (error) {

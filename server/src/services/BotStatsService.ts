@@ -80,7 +80,6 @@ export class BotStatsService {
       this.typeAdvantages = advantageDoc;
 
       this.configsLoaded = true;
-      console.log('✅ BotStatsService: Configs loaded successfully');
     } catch (error) {
       console.error('❌ BotStatsService: Failed to load configs:', error);
       throw error;
