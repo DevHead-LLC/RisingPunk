@@ -7,10 +7,11 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { CloseButton } from '../components/common/CloseButton';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { logout } from '../store/slices/authSlice';
+import { logout, setShowOnboarding } from '../store/slices/authSlice';
 import { useGetProfileQuery, useGetResearchCenterStatusQuery } from '../store/api/authApi';
 import { useFetchBotStatsQuery } from '../store/api/botsApi';
 import { SIZING } from '../styles/theme';
@@ -43,7 +44,7 @@ interface UserProfile {
   };
 }
 
-type TabType = 'profile' | 'settings';
+type TabType = 'profile' | 'settings' | 'content';
 
 const createProfileStyles = (colors: any) => StyleSheet.create({
   container: {
@@ -384,6 +385,43 @@ const createProfileStyles = (colors: any) => StyleSheet.create({
     fontSize: SIZING.font.body,
     fontWeight: 'bold',
   },
+  contentContainer: {
+    flex: 1,
+    padding: SIZING.spacing.md,
+  },
+  contentTitle: {
+    color: colors.secondary,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: SIZING.spacing.md,
+  },
+  introReplaySection: {
+    alignItems: 'center',
+    gap: SIZING.spacing.sm,
+    padding: SIZING.spacing.sm,
+  },
+  introImage: {
+    width: 200,
+    height: 150,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: colors.matrix,
+  },
+  replayButton: {
+    backgroundColor: colors.matrix,
+    paddingVertical: SIZING.spacing.sm,
+    paddingHorizontal: SIZING.spacing.md,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.matrix,
+  },
+  replayButtonText: {
+    color: colors.background,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
 });
 
 export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
@@ -484,6 +522,15 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
           >
             <Text style={[styles.leftTabText, activeTab === 'settings' && styles.activeLeftTabText]}>
               SETTINGS
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.leftTab, activeTab === 'content' && styles.activeLeftTab]}
+            onPress={() => setActiveTab('content')}
+          >
+            <Text style={[styles.leftTabText, activeTab === 'content' && styles.activeLeftTabText]}>
+              CONTENT
             </Text>
           </TouchableOpacity>
         </View>
@@ -595,7 +642,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                 <Text style={styles.disconnectText}>DISCONNECT</Text>
               </TouchableOpacity>
             </ScrollView>
-          ) : (
+          ) : activeTab === 'settings' ? (
             <View style={styles.settingsContainer}>
               <Text style={styles.settingsTitle}>SETTINGS</Text>
               
@@ -622,7 +669,33 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                 </TouchableOpacity>
               </View>
             </View>
-          )}
+          ) : activeTab === 'content' ? (
+            <View style={styles.contentContainer}>
+              <Text style={styles.contentTitle}>CONTENT</Text>
+              
+              {/* Intro Replay Section */}
+              <View style={styles.settingCard}>
+                <Text style={styles.settingLabel}>ONBOARDING</Text>
+                <View style={styles.introReplaySection}>
+                  <Image 
+                    source={require('../assets/images/onboarding/twentythree.png')}
+                    style={styles.introImage}
+                    resizeMode="contain"
+                  />
+                  <TouchableOpacity
+                    style={styles.replayButton}
+                    onPress={() => {
+                      onClose();
+                      // Trigger onboarding replay by setting showOnboarding to true
+                      dispatch(setShowOnboarding(true));
+                    }}
+                  >
+                    <Text style={styles.replayButtonText}>Replay Intro</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          ) : null}
         </View>
       </View>
     </SafeAreaView>

@@ -16,6 +16,7 @@ export interface User {
   unlockedFeatures: {
     hackRig: boolean;
   };
+  onboardingCompleted: boolean;
 }
 
 export interface AuthState {
@@ -23,6 +24,7 @@ export interface AuthState {
   user: User | null;
   isLoading: boolean;
   error: string | null;
+  showOnboarding: boolean;
 }
 
 // Async thunks
@@ -277,6 +279,7 @@ const initialState: AuthState = {
   user: null,
   isLoading: true,
   error: null,
+  showOnboarding: false,
 };
 
 // Slice
@@ -292,6 +295,15 @@ export const authSlice = createSlice({
       state.user = action.payload.user;
       state.error = null;
     },
+    setOnboardingCompleted: (state) => {
+      state.showOnboarding = false;
+      if (state.user) {
+        state.user.onboardingCompleted = true;
+      }
+    },
+    setShowOnboarding: (state, action: PayloadAction<boolean>) => {
+      state.showOnboarding = action.payload;
+    },
   },
   extraReducers: (builder) => {
     // Login
@@ -300,12 +312,13 @@ export const authSlice = createSlice({
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(loginUser.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.token = action.payload.token;
-        state.user = action.payload.user;
-        state.error = null;
-      })
+          .addCase(loginUser.fulfilled, (state, action) => {
+      state.isLoading = false;
+      state.token = action.payload.token;
+      state.user = action.payload.user;
+      state.error = null;
+      state.showOnboarding = !action.payload.user.onboardingCompleted;
+    })
       .addCase(loginUser.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
@@ -317,12 +330,13 @@ export const authSlice = createSlice({
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(registerUser.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.token = action.payload.token;
-        state.user = action.payload.user;
-        state.error = null;
-      })
+          .addCase(registerUser.fulfilled, (state, action) => {
+      state.isLoading = false;
+      state.token = action.payload.token;
+      state.user = action.payload.user;
+      state.error = null;
+      state.showOnboarding = !action.payload.user.onboardingCompleted;
+    })
       .addCase(registerUser.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
@@ -354,13 +368,14 @@ export const authSlice = createSlice({
       .addCase(loadStoredAuth.pending, (state) => {
         state.isLoading = true;
       })
-      .addCase(loadStoredAuth.fulfilled, (state, action) => {
-        state.isLoading = false;
-        if (action.payload) {
-          state.token = action.payload.token;
-          state.user = action.payload.user;
-        }
-      })
+          .addCase(loadStoredAuth.fulfilled, (state, action) => {
+      state.isLoading = false;
+      if (action.payload) {
+        state.token = action.payload.token;
+        state.user = action.payload.user;
+        state.showOnboarding = !action.payload.user.onboardingCompleted;
+      }
+    })
       .addCase(loadStoredAuth.rejected, (state) => {
         state.isLoading = false;
       });
@@ -382,6 +397,6 @@ export const authSlice = createSlice({
   },
 });
 
-export const { clearError, setCredentials } = authSlice.actions;
+export const { clearError, setCredentials, setOnboardingCompleted, setShowOnboarding } = authSlice.actions;
 export const logout = logoutUser;
 export default authSlice.reducer;

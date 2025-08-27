@@ -187,6 +187,14 @@ export const authApi = createApi({
         { type: 'User', id: `rentalHousingStatus-${propertyId}` }
       ],
     }),
+
+    completeOnboarding: builder.mutation<{ success: boolean; message: string }, void>({
+      query: () => ({
+        url: '/api/auth/onboarding-complete',
+        method: 'POST',
+      }),
+      invalidatesTags: ['User'],
+    }),
   }),
 });
 
@@ -200,4 +208,5 @@ export const {
   useGetRentalHousingStatusQuery,
   useUnlockRentalHousingMutation,
   useCompleteRentalHousingMutation,
+  useCompleteOnboardingMutation,
 } = authApi;
