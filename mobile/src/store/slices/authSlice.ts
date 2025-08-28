@@ -25,6 +25,7 @@ export interface AuthState {
   isLoading: boolean;
   error: string | null;
   showOnboarding: boolean;
+  showTurfIntro: boolean;
 }
 
 // Async thunks
@@ -280,6 +281,7 @@ const initialState: AuthState = {
   isLoading: true,
   error: null,
   showOnboarding: false,
+  showTurfIntro: false,
 };
 
 // Slice
@@ -297,12 +299,16 @@ export const authSlice = createSlice({
     },
     setOnboardingCompleted: (state) => {
       state.showOnboarding = false;
+      state.showTurfIntro = true;
       if (state.user) {
         state.user.onboardingCompleted = true;
       }
     },
     setShowOnboarding: (state, action: PayloadAction<boolean>) => {
       state.showOnboarding = action.payload;
+    },
+    setShowTurfIntro: (state, action: PayloadAction<boolean>) => {
+      state.showTurfIntro = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -397,6 +403,6 @@ export const authSlice = createSlice({
   },
 });
 
-export const { clearError, setCredentials, setOnboardingCompleted, setShowOnboarding } = authSlice.actions;
+export const { clearError, setCredentials, setOnboardingCompleted, setShowOnboarding, setShowTurfIntro } = authSlice.actions;
 export const logout = logoutUser;
 export default authSlice.reducer;

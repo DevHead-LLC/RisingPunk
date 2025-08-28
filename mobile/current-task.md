@@ -1,77 +1,89 @@
-# Current Task: Update HomeScreen to Floor Plan Layout with Tabs
+# Current Task: Security Fix - Database Credentials Hardcoded in Backup Scripts
 
-## Priority: UI Enhancement - HomeScreen Floor Plan Implementation
+## Priority: Security - Critical Vulnerability Fixed
 
-**STATUS**: IN PROGRESS - Phase 1 & 2 completed, Phase 3 in progress
+**STATUS**: ✅ COMPLETED - Database credentials removed from scripts
 
 ## Problem
-The current HomeScreen has a simple side-by-side layout with HackRig and BotAssembly components. We want to:
-1. Convert to a floor plan layout similar to investment properties
-2. Place HackRig in the bedroom section
-3. Add a new garage tab for bot building
-4. Implement the same panning behavior as investment properties
-5. Maintain the locking/unlocking behavior for HackRig
+The `autoBackup.sh` script contained hardcoded MongoDB database credentials, creating a security vulnerability where sensitive database access information was exposed in the repository.
 
-## Implementation Analysis
-✅ **Existing Components**:
-- `HackRigDisplay` - Has locking/unlocking logic and navigation to hack map
-- `BotAssembly` - Simple component for bot building
-- `FloorPlan` component exists for investment properties with panning
-
-✅ **Existing Patterns**:
-- Investment properties use ScrollView with panning
-- Tab navigation exists in ProfileScreen and FinancialStatementsScreen
-- Floor plan layout with rooms already implemented
-
-## Implementation Plan
-
-### **Phase 1: Create Home Floor Plan Component** ✅ COMPLETED
-- Create new `HomeFloorPlan` component similar to `FloorPlan`
-- Design layout with bedroom (HackRig) and garage (BotAssembly) sections
-- Implement tab navigation between floor plan and garage
-- **Status**: ✅ COMPLETED - HomeFloorPlan component created
-
-### **Phase 2: Update HomeScreen Layout** ✅ COMPLETED
-- Replace current side-by-side layout with floor plan + tabs
-- Implement ScrollView with panning behavior
-- Add tab navigation between floor plan and garage
-- **Status**: ✅ COMPLETED - HomeScreen updated with floor plan layout and tabs
-
-### **Phase 3: Integrate Existing Components** 🔄 IN PROGRESS
-- Move HackRigDisplay to bedroom section of floor plan
-- Move BotAssembly to garage tab
-- Maintain all existing functionality and navigation
-- **Status**: 🔄 IN PROGRESS - Components integrated, testing needed
-
-## Technical Requirements
-- **Floor plan layout** similar to investment properties ✅
-- **Panning behavior** using ScrollView with horizontal/vertical scrolling ✅
-- **Tab navigation** between floor plan and garage ✅
-- **HackRig locking/unlocking** behavior preserved ✅
-- **Responsive design** with proper sizing and positioning ✅
+## Solution Implemented
+1. ✅ **Removed hardcoded credentials** from `autoBackup.sh`
+2. ✅ **Updated `backupRestore.js`** to generate secure scripts
+3. ✅ **Added environment variable validation** with clear error messages
+4. ✅ **Updated scripts to use existing `env.staging`** configuration
+5. ✅ **Updated documentation** with security best practices
 
 ## Files Modified
-- `mobile/src/screens/HomeScreen.tsx` - ✅ Main layout changes completed
-- `mobile/src/components/home/HomeFloorPlan.tsx` - ✅ New floor plan component created
-- `mobile/src/components/home/BotAssembly.tsx` - ✅ Moved to garage tab
+- `server/scripts/autoBackup.sh` - Removed hardcoded MONGODB_URI, updated to use env.staging
+- `server/scripts/backupRestore.js` - Updated to generate secure backup scripts using env.staging
+- `server/scripts/README.md` - Added security documentation and usage instructions for env.staging
 
-## Next Steps
-1. ✅ **Phase 1**: Create HomeFloorPlan component - COMPLETED
-2. ✅ **Phase 2**: Update HomeScreen layout with tabs and panning - COMPLETED
-3. 🔄 **Phase 3**: Integrate existing components into new layout - IN PROGRESS
+## Security Features Now in Place
+- ✅ No hardcoded credentials in any scripts
+- ✅ Environment variable validation with clear error messages
+- ✅ Automatic .env file loading
+- ✅ Gitignore protection for sensitive files
+- ✅ Clear setup instructions for users
 
-## Design Notes
-- Bedroom section will contain HackRig with existing locking logic ✅
-- Garage tab will contain BotAssembly for bot building ✅
-- Floor plan will use same panning behavior as investment properties ✅
-- Maintain all existing navigation and functionality ✅
+---
+
+# Current Task: Turf Intro System Implementation - Fresh Start
+
+## Priority: User Experience - Onboarding Enhancement
+
+**STATUS**: 🔄 IN PROGRESS - Fresh start with simplified approach
+
+## Problem
+Need to create a Turf Intro system that highlights specific locations in sequence after the initial slideshow completes, providing guided tour of the Turf.
+
+## Requirements
+1. **Trigger**: After current slideshow completes (first Turf visit)
+2. **First Intro**: Dark overlay with Home Location highlighted + explanatory text
+3. **Second Intro**: Walk through Turf (future implementation)
+4. **Features**: 
+   - Dark opaque overlay except on highlighted areas
+   - Skip button at top right
+   - Pan view moves to appropriate locations
+   - One-time events, skippable
+   - Text: "This is your Home on your Turf. It's where you can build a digital bot army and access your hack rig to see other players and new enemies on a map."
+
+## Implementation Plan - Fresh Start
+1. ✅ **Phase 1**: Add turf intro state to auth slice
+2. ✅ **Phase 2**: Create simple TurfIntroText component (keeping what user liked)
+3. ✅ **Phase 3**: Create main TurfIntro component with centering logic
+4. ✅ **Phase 4**: Integrate into TurfScreen
+5. 🔄 **Phase 5**: Fix overlay to not cover Home Location
+6. ⏳ **Phase 6**: Set up second intro event structure
+
+## Files Created/Modified
+
+### **New Components**:
+- `mobile/src/components/turf-intro/TurfIntro.tsx` - Main intro component
+- `mobile/src/components/turf-intro/TurfIntroText.tsx` - Text component (keeping user's preferred design)
+- `mobile/src/components/turf-intro/index.ts` - Export file
+
+### **Updated Files**:
+- `mobile/src/store/slices/authSlice.ts` - Added turfIntroCompleted state
+- `mobile/src/screens/TurfScreen.tsx` - Integrated Turf Intro system
 
 ## Current Status
-The HomeScreen has been successfully converted to a floor plan layout with:
-- Floor Plan tab showing the home layout with HackRig positioned in the bedroom
-- Garage tab containing the BotAssembly component
-- Panning behavior matching investment properties
-- Tab navigation between the two views
-- All existing functionality preserved
+🔄 **IN PROGRESS** - Basic system implemented, need to fix overlay:
+- Component architecture created with simplified approach
+- Text component positioned on right side as user preferred
+- Turf centering using exact same logic as profile closing
+- Dark overlay covering screen
+- **NEXT**: Fix overlay to not cover Home Location using z-index
 
-Ready for testing and any final adjustments needed.
+## Next Steps
+1. Fix overlay to not cover Home Location (using z-index)
+2. Test the complete system
+3. Set up second intro event structure
+
+## Technical Notes
+- Uses existing onboarding state management
+- Integrates with current auth slice structure
+- Follows existing component patterns
+- Maintains single source of truth for intro state
+- **NEW**: Uses exact same centering logic as profile closing (`CENTER_X = (2000 - SCREEN_WIDTH) / 2`)
+- **NEW**: Simplified overlay approach - need to fix z-index layering

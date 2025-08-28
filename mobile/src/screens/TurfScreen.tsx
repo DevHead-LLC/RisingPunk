@@ -23,6 +23,7 @@ import {fetchInitialData, setOnboardingCompleted, setShowOnboarding} from '../st
 import {mapApi} from '../store/api/mapApi';
 import {useGetRentalHousingStatusQuery, useCompleteRentalHousingMutation, useCompleteOnboardingMutation} from '../store/api/authApi';
 import {OnboardingSlides} from '../components/onboarding';
+import {TurfIntro} from '../components/turf-intro';
 
 const DiagonalLines = memo(({ colors }: { colors: any }) => (
   <>
@@ -85,6 +86,9 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
 
   // Onboarding state
   const showOnboarding = useAppSelector((state) => state.auth.showOnboarding);
+  
+  // Turf Intro state
+  const showTurfIntro = useAppSelector((state) => state.auth.showTurfIntro);
 
   // Expose horizontalScrollRef to parent component
   useImperativeHandle(ref, () => ({
@@ -237,6 +241,15 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       dispatch(setOnboardingCompleted());
     }
   }, [dispatch, completeOnboarding]);
+
+  // Turf Intro handlers
+  const handleTurfIntroComplete = useCallback(() => {
+    console.log('Turf Intro completed');
+  }, []);
+
+  const handleTurfIntroSkip = useCallback(() => {
+    console.log('Turf Intro skipped');
+  }, []);
 
   const navigateToScreen = useCallback((screen: 'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research' | 'investmentProperty') => {
     const previousScreenBeforeUpdate = currentScreen;
@@ -490,7 +503,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           </View>
         );
     }
-  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip]);
+  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip]);
 
   return (
     <>
@@ -499,6 +512,13 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         <OnboardingSlides
           onComplete={handleOnboardingComplete}
           onSkip={handleOnboardingSkip}
+        />
+      )}
+      {showTurfIntro && (
+        <TurfIntro
+          onComplete={handleTurfIntroComplete}
+          onSkip={handleTurfIntroSkip}
+          horizontalScrollRef={horizontalScrollRef}
         />
       )}
     </>
