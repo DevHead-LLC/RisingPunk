@@ -21,7 +21,6 @@ export const ProfileLocation = memo(function ProfileLocation({ onPress }: Profil
           style={styles.locationIcon}
         />
       </View>
-      <Text style={[styles.profileLabel, { color: colors.primary }]}>PROFILE</Text>
     </TouchableOpacity>
   );
 });
@@ -50,13 +49,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderRadius: 4,
-  },
-  profileLabel: {
-    fontSize: SIZING.font.small,
-    letterSpacing: 1,
-    position: 'absolute',
-    bottom: -30,
-    width: 80,
-    textAlign: 'center',
   },
 });

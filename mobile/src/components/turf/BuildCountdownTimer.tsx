@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
     fontSize: SIZING.font.body,
     fontWeight: 'bold',
     textAlign: 'center',
-    minWidth: 140,
+    minWidth: 200,
     fontFamily: 'monospace',
   },
 });
