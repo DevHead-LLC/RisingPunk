@@ -1,77 +1,100 @@
-# Current Task: Update HomeScreen to Floor Plan Layout with Tabs
+# Current Task: Database Management & Reseeding System
 
-## Priority: UI Enhancement - HomeScreen Floor Plan Implementation
+## Priority: Infrastructure - Database Backup & Recovery
 
-**STATUS**: IN PROGRESS - Phase 1 & 2 completed, Phase 3 in progress
+**STATUS**: ✅ COMPLETED - Comprehensive database management system implemented
 
 ## Problem
-The current HomeScreen has a simple side-by-side layout with HackRig and BotAssembly components. We want to:
-1. Convert to a floor plan layout similar to investment properties
-2. Place HackRig in the bedroom section
-3. Add a new garage tab for bot building
-4. Implement the same panning behavior as investment properties
-5. Maintain the locking/unlocking behavior for HackRig
+Need to ensure the RisingPunk database can be fully reseeded if it gets deleted, and create a robust backup system for MongoDB Atlas.
 
-## Implementation Analysis
-✅ **Existing Components**:
-- `HackRigDisplay` - Has locking/unlocking logic and navigation to hack map
-- `BotAssembly` - Simple component for bot building
-- `FloorPlan` component exists for investment properties with panning
+## Solution Implemented
+✅ **Complete Database Reseeding System**:
+- Full database reseeding script that recreates all game configuration data
+- Comprehensive backup and restore procedures for MongoDB Atlas
+- Automated backup script with cron job support
+- Detailed documentation and troubleshooting guides
 
-✅ **Existing Patterns**:
-- Investment properties use ScrollView with panning
-- Tab navigation exists in ProfileScreen and FinancialStatementsScreen
-- Floor plan layout with rooms already implemented
+## What Gets Reseeded vs. What Doesn't
 
-## Implementation Plan
+### ✅ **Game Configuration Data (Reseeded)**:
+- `game_config` - User leveling rules and experience scaling
+- `bot_types` - Bot type definitions and base stats  
+- `bot_growth_config` - Bot growth and scaling configurations
+- `combat_type_advantages` - Rock-paper-scissors combat system
+- `finance_tier_templates` - Financial tier definitions
+- `research` - Research category definitions
+- `maps` - Main game world with terrain and NPCs
 
-### **Phase 1: Create Home Floor Plan Component** ✅ COMPLETED
-- Create new `HomeFloorPlan` component similar to `FloorPlan`
-- Design layout with bedroom (HackRig) and garage (BotAssembly) sections
-- Implement tab navigation between floor plan and garage
-- **Status**: ✅ COMPLETED - HomeFloorPlan component created
+### ❌ **User Data (NOT Reseeded)**:
+- `users` - User accounts and authentication
+- `bots` - User bot inventories and progress
+- `battles` - Battle history and results
+- `researchUsers` - Research progress and unlocks
+- `financial_tiers` - User financial tier assignments
 
-### **Phase 2: Update HomeScreen Layout** ✅ COMPLETED
-- Replace current side-by-side layout with floor plan + tabs
-- Implement ScrollView with panning behavior
-- Add tab navigation between floor plan and garage
-- **Status**: ✅ COMPLETED - HomeScreen updated with floor plan layout and tabs
+## Files Created/Modified
 
-### **Phase 3: Integrate Existing Components** 🔄 IN PROGRESS
-- Move HackRigDisplay to bedroom section of floor plan
-- Move BotAssembly to garage tab
-- Maintain all existing functionality and navigation
-- **Status**: 🔄 IN PROGRESS - Components integrated, testing needed
+### **New Scripts**:
+- `server/scripts/seedDatabase.js` - Complete database reseeding
+- `server/scripts/backupRestore.js` - Backup/restore command generator
+- `server/scripts/autoBackup.sh` - Automated backup script
 
-## Technical Requirements
-- **Floor plan layout** similar to investment properties ✅
-- **Panning behavior** using ScrollView with horizontal/vertical scrolling ✅
-- **Tab navigation** between floor plan and garage ✅
-- **HackRig locking/unlocking** behavior preserved ✅
-- **Responsive design** with proper sizing and positioning ✅
+### **Updated Files**:
+- `server/package.json` - Added new npm scripts
+- `server/scripts/DATABASE_MANAGEMENT.md` - Comprehensive guide
 
-## Files Modified
-- `mobile/src/screens/HomeScreen.tsx` - ✅ Main layout changes completed
-- `mobile/src/components/home/HomeFloorPlan.tsx` - ✅ New floor plan component created
-- `mobile/src/components/home/BotAssembly.tsx` - ✅ Moved to garage tab
+## Available Commands
 
-## Next Steps
-1. ✅ **Phase 1**: Create HomeFloorPlan component - COMPLETED
-2. ✅ **Phase 2**: Update HomeScreen layout with tabs and panning - COMPLETED
-3. 🔄 **Phase 3**: Integrate existing components into new layout - IN PROGRESS
+```bash
+# Database operations
+npm run seed:database          # Reseed entire database
+npm run seed:map              # Reseed NPCs only (existing)
+npm run backup:guide          # Show backup commands
 
-## Design Notes
-- Bedroom section will contain HackRig with existing locking logic ✅
-- Garage tab will contain BotAssembly for bot building ✅
-- Floor plan will use same panning behavior as investment properties ✅
-- Maintain all existing navigation and functionality ✅
+# Automated backup
+./scripts/autoBackup.sh       # Run automated backup
+```
+
+## Backup & Restore Procedures
+
+### **Backup Commands**:
+```bash
+# Full database backup
+mongodump --uri="your-uri" --out=./backups/$(date +%Y%m%d_%H%M%S)
+
+# Configuration-only backup
+mongodump --uri="your-uri" --collection=game_config --collection=bot_types --collection=bot_growth_config --collection=combat_type_advantages --collection=finance_tier_templates --collection=research --collection=maps --out=./backups/config-only
+```
+
+### **Restore Commands**:
+```bash
+# Full restore
+mongorestore --uri="your-uri" --drop backup-directory/
+
+# Configuration-only restore
+mongorestore --uri="your-uri" --collection=game_config --collection=bot_types --collection=bot_growth_config --collection=combat_type_advantages --collection=finance_tier_templates --collection=research --collection=maps backup-directory/RisingPunk/
+```
+
+## Emergency Recovery
+
+If database gets completely deleted:
+
+1. **Restore from backup** (if available):
+   ```bash
+   mongorestore --uri="your-uri" --drop backup-directory/
+   ```
+
+2. **Reseed from scratch** (if no backup):
+   ```bash
+   npm run seed:database
+   ```
 
 ## Current Status
-The HomeScreen has been successfully converted to a floor plan layout with:
-- Floor Plan tab showing the home layout with HackRig positioned in the bedroom
-- Garage tab containing the BotAssembly component
-- Panning behavior matching investment properties
-- Tab navigation between the two views
-- All existing functionality preserved
+✅ **COMPLETED** - Full database management system implemented:
+- Database can be completely reseeded with game configuration data
+- Comprehensive backup procedures for MongoDB Atlas
+- Automated backup script with retention management
+- Detailed documentation and troubleshooting guides
+- Emergency recovery procedures documented
 
-Ready for testing and any final adjustments needed.
+The system is now fully prepared for database disasters and can automatically restore all game functionality while preserving user data through backups.

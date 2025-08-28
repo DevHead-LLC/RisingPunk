@@ -9,7 +9,9 @@
     "start:staging": "NODE_ENV=staging node dist/server.js",
     "start:prod": "NODE_ENV=production node dist/server.js",
     "test": "jest",
-    "seed:map": "node scripts/seedMap.js"
+    "seed:map": "node scripts/seedMap.js",
+    "seed:database": "node scripts/seedDatabase.js",
+    "backup:guide": "node scripts/backupRestore.js"
   },
   "keywords": [],
   "author": "",
