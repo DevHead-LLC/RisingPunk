@@ -1,100 +1,89 @@
-# Current Task: Database Management & Reseeding System
+# Current Task: Security Fix - Database Credentials Hardcoded in Backup Scripts
 
-## Priority: Infrastructure - Database Backup & Recovery
+## Priority: Security - Critical Vulnerability Fixed
 
-**STATUS**: ✅ COMPLETED - Comprehensive database management system implemented
+**STATUS**: ✅ COMPLETED - Database credentials removed from scripts
 
 ## Problem
-Need to ensure the RisingPunk database can be fully reseeded if it gets deleted, and create a robust backup system for MongoDB Atlas.
+The `autoBackup.sh` script contained hardcoded MongoDB database credentials, creating a security vulnerability where sensitive database access information was exposed in the repository.
 
 ## Solution Implemented
-✅ **Complete Database Reseeding System**:
-- Full database reseeding script that recreates all game configuration data
-- Comprehensive backup and restore procedures for MongoDB Atlas
-- Automated backup script with cron job support
-- Detailed documentation and troubleshooting guides
+1. ✅ **Removed hardcoded credentials** from `autoBackup.sh`
+2. ✅ **Updated `backupRestore.js`** to generate secure scripts
+3. ✅ **Added environment variable validation** with clear error messages
+4. ✅ **Updated scripts to use existing `env.staging`** configuration
+5. ✅ **Updated documentation** with security best practices
 
-## What Gets Reseeded vs. What Doesn't
+## Files Modified
+- `server/scripts/autoBackup.sh` - Removed hardcoded MONGODB_URI, updated to use env.staging
+- `server/scripts/backupRestore.js` - Updated to generate secure backup scripts using env.staging
+- `server/scripts/README.md` - Added security documentation and usage instructions for env.staging
 
-### ✅ **Game Configuration Data (Reseeded)**:
-- `game_config` - User leveling rules and experience scaling
-- `bot_types` - Bot type definitions and base stats  
-- `bot_growth_config` - Bot growth and scaling configurations
-- `combat_type_advantages` - Rock-paper-scissors combat system
-- `finance_tier_templates` - Financial tier definitions
-- `research` - Research category definitions
-- `maps` - Main game world with terrain and NPCs
+## Security Features Now in Place
+- ✅ No hardcoded credentials in any scripts
+- ✅ Environment variable validation with clear error messages
+- ✅ Automatic .env file loading
+- ✅ Gitignore protection for sensitive files
+- ✅ Clear setup instructions for users
 
-### ❌ **User Data (NOT Reseeded)**:
-- `users` - User accounts and authentication
-- `bots` - User bot inventories and progress
-- `battles` - Battle history and results
-- `researchUsers` - Research progress and unlocks
-- `financial_tiers` - User financial tier assignments
+---
+
+# Current Task: Turf Intro System Implementation - Fresh Start
+
+## Priority: User Experience - Onboarding Enhancement
+
+**STATUS**: 🔄 IN PROGRESS - Fresh start with simplified approach
+
+## Problem
+Need to create a Turf Intro system that highlights specific locations in sequence after the initial slideshow completes, providing guided tour of the Turf.
+
+## Requirements
+1. **Trigger**: After current slideshow completes (first Turf visit)
+2. **First Intro**: Dark overlay with Home Location highlighted + explanatory text
+3. **Second Intro**: Walk through Turf (future implementation)
+4. **Features**: 
+   - Dark opaque overlay except on highlighted areas
+   - Skip button at top right
+   - Pan view moves to appropriate locations
+   - One-time events, skippable
+   - Text: "This is your Home on your Turf. It's where you can build a digital bot army and access your hack rig to see other players and new enemies on a map."
+
+## Implementation Plan - Fresh Start
+1. ✅ **Phase 1**: Add turf intro state to auth slice
+2. ✅ **Phase 2**: Create simple TurfIntroText component (keeping what user liked)
+3. ✅ **Phase 3**: Create main TurfIntro component with centering logic
+4. ✅ **Phase 4**: Integrate into TurfScreen
+5. 🔄 **Phase 5**: Fix overlay to not cover Home Location
+6. ⏳ **Phase 6**: Set up second intro event structure
 
 ## Files Created/Modified
 
-### **New Scripts**:
-- `server/scripts/seedDatabase.js` - Complete database reseeding
-- `server/scripts/backupRestore.js` - Backup/restore command generator
-- `server/scripts/autoBackup.sh` - Automated backup script
+### **New Components**:
+- `mobile/src/components/turf-intro/TurfIntro.tsx` - Main intro component
+- `mobile/src/components/turf-intro/TurfIntroText.tsx` - Text component (keeping user's preferred design)
+- `mobile/src/components/turf-intro/index.ts` - Export file
 
 ### **Updated Files**:
-- `server/package.json` - Added new npm scripts
-- `server/scripts/DATABASE_MANAGEMENT.md` - Comprehensive guide
-
-## Available Commands
-
-```bash
-# Database operations
-npm run seed:database          # Reseed entire database
-npm run seed:map              # Reseed NPCs only (existing)
-npm run backup:guide          # Show backup commands
-
-# Automated backup
-./scripts/autoBackup.sh       # Run automated backup
-```
-
-## Backup & Restore Procedures
-
-### **Backup Commands**:
-```bash
-# Full database backup
-mongodump --uri="your-uri" --out=./backups/$(date +%Y%m%d_%H%M%S)
-
-# Configuration-only backup
-mongodump --uri="your-uri" --collection=game_config --collection=bot_types --collection=bot_growth_config --collection=combat_type_advantages --collection=finance_tier_templates --collection=research --collection=maps --out=./backups/config-only
-```
-
-### **Restore Commands**:
-```bash
-# Full restore
-mongorestore --uri="your-uri" --drop backup-directory/
-
-# Configuration-only restore
-mongorestore --uri="your-uri" --collection=game_config --collection=bot_types --collection=bot_growth_config --collection=combat_type_advantages --collection=finance_tier_templates --collection=research --collection=maps backup-directory/RisingPunk/
-```
-
-## Emergency Recovery
-
-If database gets completely deleted:
-
-1. **Restore from backup** (if available):
-   ```bash
-   mongorestore --uri="your-uri" --drop backup-directory/
-   ```
-
-2. **Reseed from scratch** (if no backup):
-   ```bash
-   npm run seed:database
-   ```
+- `mobile/src/store/slices/authSlice.ts` - Added turfIntroCompleted state
+- `mobile/src/screens/TurfScreen.tsx` - Integrated Turf Intro system
 
 ## Current Status
-✅ **COMPLETED** - Full database management system implemented:
-- Database can be completely reseeded with game configuration data
-- Comprehensive backup procedures for MongoDB Atlas
-- Automated backup script with retention management
-- Detailed documentation and troubleshooting guides
-- Emergency recovery procedures documented
+🔄 **IN PROGRESS** - Basic system implemented, need to fix overlay:
+- Component architecture created with simplified approach
+- Text component positioned on right side as user preferred
+- Turf centering using exact same logic as profile closing
+- Dark overlay covering screen
+- **NEXT**: Fix overlay to not cover Home Location using z-index
 
-The system is now fully prepared for database disasters and can automatically restore all game functionality while preserving user data through backups.
+## Next Steps
+1. Fix overlay to not cover Home Location (using z-index)
+2. Test the complete system
+3. Set up second intro event structure
+
+## Technical Notes
+- Uses existing onboarding state management
+- Integrates with current auth slice structure
+- Follows existing component patterns
+- Maintains single source of truth for intro state
+- **NEW**: Uses exact same centering logic as profile closing (`CENTER_X = (2000 - SCREEN_WIDTH) / 2`)
+- **NEW**: Simplified overlay approach - need to fix z-index layering

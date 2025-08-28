@@ -121,7 +121,19 @@ set -e
 # Configuration
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BACKUP_DIR="./backups/\${TIMESTAMP}"
-MONGODB_URI="${process.env.MONGODB_URI || 'your-mongodb-uri-here'}"
+
+# Load environment variables from env.staging file
+if [ -f env.staging ]; then
+    export $(cat env.staging | grep -v '^#' | xargs)
+fi
+
+# Check if MONGODB_URI is set
+if [ -z "$MONGODB_URI" ]; then
+    echo "❌ Error: MONGODB_URI environment variable is not set"
+    echo "   Please ensure env.staging contains MONGODB_URI"
+    echo "   Example: MONGODB_URI='mongodb+srv://username:password@cluster.mongodb.net/database'"
+    exit 1
+fi
 
 echo "🚀 Starting automated backup at \${TIMESTAMP}"
 
