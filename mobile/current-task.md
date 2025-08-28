@@ -1,73 +1,77 @@
-# Current Task: Fix Battle Outcome Logic - Attacker Loss on Equal/Greater Losses
+# Current Task: Update HomeScreen to Floor Plan Layout with Tabs
 
-## Priority: Bug Fix - Battle Outcome Determination
+## Priority: UI Enhancement - HomeScreen Floor Plan Implementation
 
-**STATUS**: COMPLETED - All phases completed successfully
+**STATUS**: IN PROGRESS - Phase 1 & 2 completed, Phase 3 in progress
 
 ## Problem
-Current battle outcome logic doesn't properly handle the case where an attacker loses more troops than the defender. According to the new rules:
-- If attacker loses more troops than defender → **Attacker loses** (attack fails)
-- If defender loses more troops than attacker → **Attacker wins**
-- **Exception**: If one side has 0 remaining troops, they automatically lose regardless of losses
+The current HomeScreen has a simple side-by-side layout with HackRig and BotAssembly components. We want to:
+1. Convert to a floor plan layout similar to investment properties
+2. Place HackRig in the bedroom section
+3. Add a new garage tab for bot building
+4. Implement the same panning behavior as investment properties
+5. Maintain the locking/unlocking behavior for HackRig
 
 ## Implementation Analysis
-✅ **Already Correct**:
-- Complete elimination check (0 troops = automatic loss)
-- Priority given to elimination over loss comparison
-- Battle end detection logic structure
+✅ **Existing Components**:
+- `HackRigDisplay` - Has locking/unlocking logic and navigation to hack map
+- `BotAssembly` - Simple component for bot building
+- `FloorPlan` component exists for investment properties with panning
 
-✅ **Fixed in Phase 1**:
-- `determineWinner` method updated to favor attacker only when they have fewer losses
-- Attacker now loses on equal or greater losses
-
-✅ **Verified in Phase 2**:
-- Elimination logic works correctly
-- Edge cases handled properly (both sides eliminated simultaneously)
-- Timer expiration logic validated
-- All battle end methods are consistent
+✅ **Existing Patterns**:
+- Investment properties use ScrollView with panning
+- Tab navigation exists in ProfileScreen and FinancialStatementsScreen
+- Floor plan layout with rooms already implemented
 
 ## Implementation Plan
 
-### **Phase 1: Fix Winner Determination Logic** ✅ COMPLETED
-- Update `PointTrackingService.determineWinner()` method
-- Change logic to favor attacker only when they have fewer losses
-- Ensure attacker loses on equal or greater losses
-- **Status**: ✅ COMPLETED - Winner determination logic updated
+### **Phase 1: Create Home Floor Plan Component** ✅ COMPLETED
+- Create new `HomeFloorPlan` component similar to `FloorPlan`
+- Design layout with bedroom (HackRig) and garage (BotAssembly) sections
+- Implement tab navigation between floor plan and garage
+- **Status**: ✅ COMPLETED - HomeFloorPlan component created
 
-### **Phase 2: Verify Battle End Logic** ✅ COMPLETED
-- Confirm elimination logic works correctly
-- Test edge cases (both sides eliminated simultaneously)
-- Validate timer expiration logic
-- **Status**: ✅ COMPLETED - All battle end logic verified and consistent
+### **Phase 2: Update HomeScreen Layout** ✅ COMPLETED
+- Replace current side-by-side layout with floor plan + tabs
+- Implement ScrollView with panning behavior
+- Add tab navigation between floor plan and garage
+- **Status**: ✅ COMPLETED - HomeScreen updated with floor plan layout and tabs
+
+### **Phase 3: Integrate Existing Components** 🔄 IN PROGRESS
+- Move HackRigDisplay to bedroom section of floor plan
+- Move BotAssembly to garage tab
+- Maintain all existing functionality and navigation
+- **Status**: 🔄 IN PROGRESS - Components integrated, testing needed
 
 ## Technical Requirements
-- **Attacker loses** when losses are equal to or greater than defender losses
-- **Attacker wins** only when losses are strictly less than defender losses
-- **Complete elimination** takes priority over loss comparison
-- **No hard-coded advantages** for either side
+- **Floor plan layout** similar to investment properties ✅
+- **Panning behavior** using ScrollView with horizontal/vertical scrolling ✅
+- **Tab navigation** between floor plan and garage ✅
+- **HackRig locking/unlocking** behavior preserved ✅
+- **Responsive design** with proper sizing and positioning ✅
 
 ## Files Modified
-- `server/src/services/PointTrackingService.ts` - ✅ Winner determination logic updated
+- `mobile/src/screens/HomeScreen.tsx` - ✅ Main layout changes completed
+- `mobile/src/components/home/HomeFloorPlan.tsx` - ✅ New floor plan component created
+- `mobile/src/components/home/BotAssembly.tsx` - ✅ Moved to garage tab
 
 ## Next Steps
-1. ✅ **Phase 1**: Fix winner determination logic - COMPLETED
-2. ✅ **Phase 2**: Verify battle end logic - COMPLETED
+1. ✅ **Phase 1**: Create HomeFloorPlan component - COMPLETED
+2. ✅ **Phase 2**: Update HomeScreen layout with tabs and panning - COMPLETED
+3. 🔄 **Phase 3**: Integrate existing components into new layout - IN PROGRESS
 
-## Battle Outcome Logic Summary
-The updated logic now works as follows:
+## Design Notes
+- Bedroom section will contain HackRig with existing locking logic ✅
+- Garage tab will contain BotAssembly for bot building ✅
+- Floor plan will use same panning behavior as investment properties ✅
+- Maintain all existing navigation and functionality ✅
 
-1. **Complete Elimination Check** (Priority 1):
-   - If one side has 0 troops → that side automatically loses
-   - If both sides have 0 troops → fall back to loss comparison
+## Current Status
+The HomeScreen has been successfully converted to a floor plan layout with:
+- Floor Plan tab showing the home layout with HackRig positioned in the bedroom
+- Garage tab containing the BotAssembly component
+- Panning behavior matching investment properties
+- Tab navigation between the two views
+- All existing functionality preserved
 
-2. **Loss Comparison** (Priority 2):
-   - If `enemyLosses < userLosses` → **Attacker wins** (enemy wins)
-   - If `enemyLosses >= userLosses` → **Attacker loses** (user wins)
-
-This ensures that attackers must achieve a decisive victory (fewer losses) to succeed, while complete annihilation always results in victory regardless of the cost.
-
-## Task Status: ✅ COMPLETED
-The battle outcome logic has been successfully updated and verified. The system now correctly:
-- Prioritizes complete elimination (0 troops = automatic loss)
-- Requires attackers to have fewer losses to win
-- Handles all edge cases consistently across all battle end methods
+Ready for testing and any final adjustments needed.
