@@ -12,8 +12,6 @@ export const ProfileLocation = memo(function ProfileLocation({ onPress }: Profil
   const colors = useThemeColors();
   const profileGender = useAppSelector((state) => state.preferences.profileGender);
 
-  console.log('ProfileLocation render - profileGender:', profileGender);
-
   const profileImageSource = profileGender === 'female' 
     ? require('../../assets/images/profile-female.png')
     : require('../../assets/images/profile.png');

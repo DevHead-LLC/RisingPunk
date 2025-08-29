@@ -680,12 +680,10 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                   style={styles.themeToggle}
                   onPress={async () => {
                     const newGender = profileGender === 'male' ? 'female' : 'male';
-                    console.log('ProfileScreen: Switching gender to:', newGender);
+                    
                     try {
                       const result = await updatePreferences({ profileGender: newGender }).unwrap();
-                      console.log('ProfileScreen: Database update result:', result);
                       dispatch(updateProfileGender(newGender));
-                      console.log('ProfileScreen: Local state updated to:', newGender);
                     } catch (error) {
                       console.error('ProfileScreen: Failed to update preferences:', error);
                     }
