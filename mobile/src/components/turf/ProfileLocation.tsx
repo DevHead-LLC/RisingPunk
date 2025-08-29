@@ -2,6 +2,7 @@ import React, {memo} from 'react';
 import {TouchableOpacity, View, Text, Image, StyleSheet} from 'react-native';
 import {SIZING} from '../../styles/theme';
 import {useThemeColors} from '../../hooks/useThemeColors';
+import {useAppSelector} from '../../store/hooks';
 
 type ProfileLocationProps = {
   onPress: () => void;
@@ -9,6 +10,11 @@ type ProfileLocationProps = {
 
 export const ProfileLocation = memo(function ProfileLocation({ onPress }: ProfileLocationProps) {
   const colors = useThemeColors();
+  const profileGender = useAppSelector((state) => state.preferences.profileGender);
+
+  const profileImageSource = profileGender === 'female' 
+    ? require('../../assets/images/profile-female.png')
+    : require('../../assets/images/profile.png');
 
   return (
     <TouchableOpacity
@@ -17,7 +23,7 @@ export const ProfileLocation = memo(function ProfileLocation({ onPress }: Profil
     >
       <View style={styles.profileContainer}>
         <Image
-          source={require('../../assets/images/profile.png')}
+          source={profileImageSource}
           style={styles.locationIcon}
         />
       </View>

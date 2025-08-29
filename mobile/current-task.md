@@ -28,11 +28,121 @@ The `autoBackup.sh` script contained hardcoded MongoDB database credentials, cre
 
 ---
 
-# Current Task: Turf Intro System Implementation - Digital Barracks Step
+# Current Task: Hacker Map Navigation Icon Implementation
+
+## Priority: User Experience - Map Navigation Enhancement
+
+**STATUS**: ✅ COMPLETED - Navigation icon added to center map on user's home
+
+## Problem
+Users need a quick way to navigate back to their position on the hacker map, especially when they've panned away from their home location.
+
+## Solution Implemented
+1. ✅ **Added navigation function** `centerOnUserHome` that finds user's house and centers map
+2. ✅ **Added navigation button** with home icon (⌂) positioned at top-left of screen
+3. ✅ **Implemented proper clamping** to respect map boundaries when centering
+4. ✅ **Used free text-based icon** to avoid copyright/licensing issues
+5. ✅ **Upgraded to MaterialIcons** for professional appearance
+
+## Features
+- **Icon**: Professional MaterialIcons home icon - no copyright concerns
+- **Position**: Top-left corner, above other UI elements
+- **Functionality**: Centers map on user's home location with boundary clamping
+- **Styling**: Consistent with existing UI (primary color background, white icon)
+- **Accessibility**: High z-index to ensure it's always clickable
+
+## Files Modified
+- `mobile/src/screens/HackMapScreen.tsx` - Added navigation button and centering function
+
+## Technical Implementation
+- **Function**: `centerOnUserHome` callback that searches grid for user's house
+- **Positioning**: Calculates target coordinates and applies boundary clamping
+- **Animation**: Uses existing `offsetX` and `offsetY` shared values for smooth movement
+- **Window Update**: Calls `computeWindow` to update visible cells after centering
+
+## Next Steps
+1. Test the navigation icon functionality
+2. Verify it works correctly from all map positions
+3. Consider adding visual feedback (e.g., brief highlight) when centering
+
+---
+
+# Current Task: Profile Gender Selection Implementation - Database Persistence
+
+## Priority: User Experience - Profile Customization with Persistence
+
+**STATUS**: ✅ COMPLETED - Gender selection with database persistence implemented
+
+## Problem
+Users need the ability to choose between male and female profile avatars that persist through application refreshes and restarts.
+
+## Solution Implemented
+1. ✅ **Created preferences slice** to store user preferences including profile gender
+2. ✅ **Added gender toggle** in ProfileScreen settings section
+3. ✅ **Updated ProfileLocation component** to dynamically use selected gender image
+4. ✅ **Integrated with existing store** structure
+5. ✅ **Added database persistence** to User model and API endpoints
+6. ✅ **Implemented automatic sync** between local state and database
+
+## Features
+- **Gender Selection**: Toggle between male (👨) and female (👩) profile avatars
+- **Settings Integration**: Added to existing ProfileScreen settings tab
+- **Dynamic Images**: ProfileLocation automatically updates based on selection
+- **Database Persistence**: Gender preference stored in MongoDB User document
+- **Automatic Sync**: Preferences loaded from database on login/app restart
+- **Visual Feedback**: Clear icons and text indicating current selection
+
+## Files Created/Modified
+
+### **New Files**:
+- `mobile/src/store/slices/preferencesSlice.ts` - New slice for user preferences
+- `mobile/src/store/api/preferencesApi.ts` - API for updating user preferences
+
+### **Updated Files**:
+- `mobile/src/store/index.ts` - Added preferences slice and API to store
+- `mobile/src/components/turf/ProfileLocation.tsx` - Dynamic profile image selection
+- `mobile/src/screens/ProfileScreen.tsx` - Added gender toggle with API integration
+- `mobile/src/store/slices/authSlice.ts` - Added preferences sync on login/load
+- `server/src/models/User.ts` - Added profileGender field to User model
+- `server/src/routes/userRoutes.ts` - Added preferences update endpoint and profile endpoint update
+
+## Technical Implementation
+- **Database Schema**: Added profileGender field to User model with enum validation
+- **API Endpoints**: 
+  - PUT `/api/users/preferences` for updating preferences
+  - Updated GET `/api/users/profile` to include profileGender
+- **State Management**: Redux preferences slice with automatic database sync
+- **Authentication Flow**: Preferences loaded from database on login and app restart
+- **Error Handling**: Graceful fallback to default 'male' if database field missing
+
+## Database Changes
+- **New Field**: `profileGender: { type: String, enum: ['male', 'female'], default: 'male' }`
+- **Backward Compatibility**: Existing users without profileGender will default to 'male'
+- **Validation**: Server-side validation ensures only valid values are stored
+
+## Next Steps
+1. ✅ **FIXED**: Resolved circular dependency issue in auth slice
+2. ✅ **FIXED**: Added robust preferences syncing from AppContent
+3. Test the complete gender selection with database persistence
+4. Verify preferences survive app restarts and refreshes
+5. Consider adding more profile customization options
+6. Test with existing users to ensure backward compatibility
+
+## Technical Fixes Applied
+- **Circular Dependency**: Removed preferences import from auth slice
+- **Robust Syncing**: Added preferences sync in AppContent with proper timing
+- **Dual Sync Strategy**: 
+  - Sync from AsyncStorage after auth loads
+  - Sync from user data when profile changes
+- **Timing Fix**: Added small delay to ensure store initialization
+
+---
+
+# Previous Task: Turf Intro System Implementation - Digital Barracks Step
 
 ## Priority: User Experience - Onboarding Enhancement
 
-**STATUS**: 🔄 IN PROGRESS - Digital Barracks step implemented
+**STATUS**: ✅ COMPLETED - Digital Barracks step implemented
 
 ## Problem
 Need to create a Turf Intro system that highlights specific locations in sequence after the initial slideshow completes, providing guided tour of the Turf.
@@ -69,7 +179,7 @@ Need to create a Turf Intro system that highlights specific locations in sequenc
 - `mobile/src/screens/TurfScreen.tsx` - Integrated Turf Intro system
 
 ## Current Status
-🔄 **IN PROGRESS** - Digital Barracks step implemented:
+✅ **COMPLETED** - Digital Barracks step implemented:
 - ✅ Component architecture created with simplified approach
 - ✅ Text component positioned on right side as user preferred
 - ✅ Turf centering using exact same logic as profile closing
@@ -78,11 +188,6 @@ Need to create a Turf Intro system that highlights specific locations in sequenc
 - ✅ **NEW**: Pan position adjusts to show Digital Barracks in overlay window
 - ✅ **NEW**: Dynamic button text (Continue → Complete)
 - ✅ **NEW**: Step-based text content for each location
-
-## Next Steps
-1. Test the complete two-step intro system
-2. Fine-tune pan positioning if needed
-3. Consider adding more intro steps for other locations
 
 ## Technical Notes
 - Uses existing onboarding state management

@@ -12,6 +12,8 @@ import {
 import { CloseButton } from '../components/common/CloseButton';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { logout, setShowOnboarding } from '../store/slices/authSlice';
+import { updateProfileGender } from '../store/slices/preferencesSlice';
+import { useUpdatePreferencesMutation } from '../store/api/preferencesApi';
 import { useGetProfileQuery, useGetResearchCenterStatusQuery } from '../store/api/authApi';
 import { useFetchBotStatsQuery } from '../store/api/botsApi';
 import { SIZING } from '../styles/theme';
@@ -430,6 +432,8 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const [activeTab, setActiveTab] = useState<TabType>('profile');
   const { themeMode, toggleTheme } = useTheme();
   const colors = useThemeColors();
+  const profileGender = useAppSelector((state) => state.preferences.profileGender);
+  const [updatePreferences] = useUpdatePreferencesMutation();
   
   const styles = useMemo(() => createProfileStyles(colors), [colors]);
   
@@ -664,6 +668,38 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                     </View>
                     <Text style={styles.themeToggleText}>
                       {themeMode === 'light' ? 'Go Hacker' : 'Go Business'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              {/* Gender Toggle Section */}
+              <View style={styles.settingCard}>
+                <Text style={styles.settingLabel}>PROFILE AVATAR</Text>
+                <TouchableOpacity
+                  style={styles.themeToggle}
+                  onPress={async () => {
+                    const newGender = profileGender === 'male' ? 'female' : 'male';
+                    
+                    try {
+                      const result = await updatePreferences({ profileGender: newGender }).unwrap();
+                      dispatch(updateProfileGender(newGender));
+                    } catch (error) {
+                      console.error('ProfileScreen: Failed to update preferences:', error);
+                    }
+                  }}
+                >
+                  <View style={styles.themeToggleContent}>
+                    <View style={[
+                      styles.themeIconContainer,
+                      profileGender === 'female' && styles.themeIconContainerDark
+                    ]}>
+                      <Text style={styles.themeIcon}>
+                        {profileGender === 'male' ? '👨' : '👩'}
+                      </Text>
+                    </View>
+                    <Text style={styles.themeToggleText}>
+                      {profileGender === 'male' ? 'Switch to Female' : 'Switch to Male'}
                     </Text>
                   </View>
                 </TouchableOpacity>

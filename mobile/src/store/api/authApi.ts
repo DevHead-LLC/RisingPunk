@@ -45,6 +45,7 @@ export interface ProfileResponse {
     hackRig: boolean;
     researchCenter: boolean;
   };
+  profileGender: 'male' | 'female';
 }
 
 export interface UnlockResearchCenterResponse {

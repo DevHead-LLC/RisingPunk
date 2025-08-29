@@ -25,6 +25,7 @@ export interface IUser extends Document {
     rentalHousing3: boolean;
     rentalHousing4: boolean;
   };
+  profileGender: 'male' | 'female';
   onboardingCompleted: boolean;
   researchCenterBuild?: {
     startedAt: Date | null;
@@ -129,6 +130,11 @@ const userSchema = new Schema({
       type: Boolean,
       default: false
     }
+  },
+  profileGender: {
+    type: String,
+    enum: ['male', 'female'],
+    default: 'male'
   },
   onboardingCompleted: {
     type: Boolean,
