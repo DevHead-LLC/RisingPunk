@@ -12,7 +12,7 @@ import {
 import { CloseButton } from '../components/common/CloseButton';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { logout, setShowOnboarding } from '../store/slices/authSlice';
-import { setProfileGender } from '../store/slices/preferencesSlice';
+import { updateProfileGender } from '../store/slices/preferencesSlice';
 import { useUpdatePreferencesMutation } from '../store/api/preferencesApi';
 import { useGetProfileQuery, useGetResearchCenterStatusQuery } from '../store/api/authApi';
 import { useFetchBotStatsQuery } from '../store/api/botsApi';
@@ -684,7 +684,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                     try {
                       const result = await updatePreferences({ profileGender: newGender }).unwrap();
                       console.log('ProfileScreen: Database update result:', result);
-                      dispatch(setProfileGender(newGender));
+                      dispatch(updateProfileGender(newGender));
                       console.log('ProfileScreen: Local state updated to:', newGender);
                     } catch (error) {
                       console.error('ProfileScreen: Failed to update preferences:', error);
