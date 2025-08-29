@@ -793,7 +793,38 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     setSelectedCell({x, y, info: cellData});
   }, []);
 
-
+  const centerOnUserHome = useCallback(() => {
+    if (!currentUserHandle || !grid.length) return;
+    
+    let homeX: number | null = null;
+    let homeY: number | null = null;
+    
+    for (let y = 0; y < grid.length; y++) {
+      const row = grid[y];
+      if (!row) continue;
+      for (let x = 0; x < row.length; x++) {
+        const cell = row[x] as any;
+        if (cell && cell.entity === 'house' && cell.name === currentUserHandle) {
+          homeX = x; 
+          homeY = y; 
+          break;
+        }
+      }
+      if (homeX != null) break;
+    }
+    
+    if (homeX != null && homeY != null) {
+      const targetX = (containerSize.width / 2) - MARGIN_SIZE - ((homeX + 0.5) * CELL_SIZE);
+      const targetY = (containerSize.height / 2) - MARGIN_SIZE - ((homeY + 0.5) * CELL_SIZE);
+      const cx = Math.min(maxX.value, Math.max(minX.value, targetX));
+      const cy = Math.min(maxY.value, Math.max(minY.value, targetY));
+      
+      offsetX.value = cx;
+      offsetY.value = cy;
+      lastComputedPan.value = { x: cx, y: cy };
+      computeWindow(cx, cy, containerSize.width, containerSize.height);
+    }
+  }, [currentUserHandle, grid, containerSize.width, containerSize.height, maxX, maxY, minX, minY, offsetX, offsetY, computeWindow]);
 
   const renderInfoPanel = useCallback(() => {
     if (!selectedCell) {return null;}
@@ -858,6 +889,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   return (
     <View style={styles.container} onLayout={onContainerLayout}>
       <CloseButton onPress={onClose} />
+
+      <Pressable style={styles.navigationButton} onPress={centerOnUserHome}>
+        <Image source={require('../assets/images/navigationIcon.png')} style={styles.navigationIcon} resizeMode="contain" />
+      </Pressable>
 
       {renderInfoPanel()}
 
@@ -1212,5 +1247,21 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   },
   scrollContainer: {
     // width/height are set dynamically on container View
+  },
+  navigationButton: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'black',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  navigationIcon: {
+    width: 24,
+    height: 24,
   },
 });

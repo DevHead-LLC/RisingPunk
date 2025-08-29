@@ -16,6 +16,7 @@ export interface User {
   unlockedFeatures: {
     hackRig: boolean;
   };
+  profileGender: 'male' | 'female';
   onboardingCompleted: boolean;
 }
 
@@ -57,6 +58,8 @@ export const loginUser = createAsyncThunk(
       dispatch(balanceApi.util.resetApiState());
       dispatch(botsApi.util.resetApiState());
       dispatch(mapApi.util.resetApiState());
+
+      // Note: Preferences will be synced by AppContent useEffect after login completes
 
       // Fetch initial data after successful login
       try {
@@ -206,9 +209,11 @@ export const loadStoredAuth = createAsyncThunk(
     ]);
 
     if (storedToken && storedUser) {
+      const user = JSON.parse(storedUser) as User;
+      
       return {
         token: storedToken,
-        user: JSON.parse(storedUser) as User,
+        user: user,
       };
     }
 

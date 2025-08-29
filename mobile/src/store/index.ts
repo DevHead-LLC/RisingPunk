@@ -8,16 +8,19 @@ import balanceSlice from './slices/balanceSlice';
 import { balanceApi } from './api/balanceApi';
 import botsSlice from './slices/botsSlice';
 import { botsApi } from './api/botsApi';
+import preferencesSlice from './slices/preferencesSlice';
 
 import mapSlice from './slices/mapSlice';
 import { mapApi } from './api/mapApi';
 import { battleApi } from './api/battleApi';
+import { preferencesApi } from './api/preferencesApi';
 
 export const store = configureStore({
   reducer: {
     auth: authSlice,
     balance: balanceSlice,
     bots: botsSlice,
+    preferences: preferencesSlice,
 
     map: mapSlice,
     ui: uiSlice,
@@ -28,6 +31,7 @@ export const store = configureStore({
     [botsApi.reducerPath]: botsApi.reducer,
     [mapApi.reducerPath]: mapApi.reducer,
     [battleApi.reducerPath]: battleApi.reducer,
+    [preferencesApi.reducerPath]: preferencesApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
@@ -40,7 +44,8 @@ export const store = configureStore({
     .concat(balanceApi.middleware)
     .concat(botsApi.middleware)
     .concat(mapApi.middleware)
-    .concat(battleApi.middleware),
+    .concat(battleApi.middleware)
+    .concat(preferencesApi.middleware),
   devTools: __DEV__,
 });
 

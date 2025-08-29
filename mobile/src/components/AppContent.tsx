@@ -3,8 +3,10 @@ import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { loadStoredAuth } from '../store/slices/authSlice';
 import { updateBalance, triggerUpdate } from '../store/slices/balanceSlice';
 import { setBots, setBuildState } from '../store/slices/botsSlice';
+import { syncPreferencesFromStorage, syncPreferencesFromUser } from '../store/slices/preferencesSlice';
 import { useFetchBalanceQuery } from '../store/api/balanceApi';
 import { useFetchBotsQuery, useFetchBuildStateQuery } from '../store/api/botsApi';
+import { useGetProfileQuery } from '../store/api/authApi';
 import { LoginScreen } from '../screens/LoginScreen';
 import { TurfScreen } from '../screens/TurfScreen';
 import { FinancialStatementsScreen } from '../screens/FinancialStatementsScreen';
@@ -49,9 +51,41 @@ const AppContent = memo(() => {
     pollingInterval: 10000, // Poll every 10 seconds
   });
 
+  // Fetch fresh user profile data to get latest preferences
+  const { data: profileData } = useGetProfileQuery(undefined, {
+    skip: !token,
+  });
+
+  // Debug: Log current preferences state
+  const currentPreferences = useAppSelector((state) => state.preferences);
+  console.log('AppContent: Current preferences state:', currentPreferences);
+
   useEffect(() => {
     dispatch(loadStoredAuth());
   }, [dispatch]);
+
+  // Sync preferences after auth is loaded
+  useEffect(() => {
+    if (token) {
+      console.log('AppContent: Token loaded, syncing preferences from storage...');
+      // Small delay to ensure store is fully initialized
+      const timer = setTimeout(() => {
+        console.log('AppContent: Dispatching syncPreferencesFromStorage');
+        dispatch(syncPreferencesFromStorage());
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [token, dispatch]);
+
+  // Sync preferences from fresh profile data from database
+  useEffect(() => {
+    if (profileData?.profileGender) {
+      console.log('AppContent: Syncing preferences from fresh profile data:', profileData.profileGender);
+      dispatch(syncPreferencesFromUser({ profileGender: profileData.profileGender }));
+    } else {
+      console.log('AppContent: No profile data available for preferences sync');
+    }
+  }, [profileData?.profileGender, dispatch]);
 
   // Update balance slice when data is fetched
   useEffect(() => {

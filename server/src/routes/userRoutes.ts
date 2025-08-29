@@ -5,11 +5,17 @@ import { Request, Response } from 'express';
 import { FinanceTier } from '../models/Finance';
 import { FinanceTemplate } from '../models/FinanceTemplate';
 
+interface UpdatePreferencesRequest extends Request {
+  body: {
+    profileGender?: 'male' | 'female';
+  }
+}
+
 const router = express.Router();
 
 router.get('/profile', auth, async (req: Request, res: Response) => {
   try {
-    const user = await User.findById(req.user._id).select('handle email level experience unlockedFeatures');
+    const user = await User.findById(req.user._id).select('handle email level experience unlockedFeatures profileGender');
     
     if (!user) {
       res.status(404).json({ message: 'User not found' });
@@ -28,7 +34,8 @@ router.get('/profile', auth, async (req: Request, res: Response) => {
       unlockedFeatures: {
         hackRig: user.unlockedFeatures?.hackRig || false,
         researchCenter: user.unlockedFeatures?.researchCenter || false
-      }
+      },
+      profileGender: user.profileGender || 'male'
     });
   } catch (error) {
     console.error('Server error:', error);
@@ -400,3 +407,55 @@ router.post('/complete-rental-housing/:propertyId', auth, async (req, res): Prom
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// Update user preferences
+router.put<{}, { success: boolean; message: string; profileGender: 'male' | 'female' } | { error: string }, UpdatePreferencesRequest['body']>(
+  '/preferences',
+  auth,
+  async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?._id;
+      const { profileGender } = req.body;
+      
+      if (!userId) {
+        res.status(401).json({ error: 'User not authenticated' });
+        return;
+      }
+
+      if (profileGender && !['male', 'female'].includes(profileGender)) {
+        res.status(400).json({ error: 'Invalid profile gender value' });
+        return;
+      }
+
+      const updateData: any = {};
+      if (profileGender) {
+        updateData.profileGender = profileGender;
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        res.status(400).json({ error: 'No valid preferences to update' });
+        return;
+      }
+
+      const user = await User.findByIdAndUpdate(
+        userId,
+        { $set: updateData },
+        { new: true, select: 'profileGender' }
+      );
+
+      if (!user) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      res.json({
+        success: true,
+        message: 'Preferences updated successfully',
+        profileGender: user.profileGender
+      });
+    } catch (error) {
+      console.error('Error updating user preferences:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+);
