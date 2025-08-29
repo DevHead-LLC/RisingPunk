@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
           left: 0,
           right: 0,
           height: '25%',
-          backgroundColor: 'rgba(0, 0, 0, 0.85)',
+          backgroundColor: '#000000',
           zIndex: 1001,
         },
         overlayLeft: {
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
           left: 0,
           height: '100%',
           width: '25%',
-          backgroundColor: 'rgba(0, 0, 0, 0.85)',
+          backgroundColor: '#000000',
           zIndex: 1001,
         },
         overlayRight: {
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
           right: 0,
           height: '100%',
           width: '54%',
-          backgroundColor: 'rgba(0, 0, 0, 0.85)',
+          backgroundColor: '#000000',
           zIndex: 1001,
         },
         overlayBottom: {
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
           left: 0,
           right: 0,
           height: '30%',
-          backgroundColor: 'rgba(0, 0, 0, 0.85)',
+          backgroundColor: '#000000',
           zIndex: 1001,
         },
 });
