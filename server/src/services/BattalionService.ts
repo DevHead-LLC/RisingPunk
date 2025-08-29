@@ -5,6 +5,7 @@
 
 import { IBattalion, INode, NodeOwner, BotType, BattalionTargetingResult } from '../types/battle';
 import { BotService } from './BotService';
+import { BattalionFactory } from './BattalionFactory';
 import { MovementService } from './MovementService';
 import { MovementState } from '../types/battle';
 import { Battle } from '../models/Battle';
@@ -93,40 +94,7 @@ export class BattalionService {
     return battalions.reduce((total, battalion) => total + (battalion.stats.health * battalion.quantity), 0);
   }
 
-  private static createBattalion(
-    id: string,
-    type: BotType,
-    quantity: number,
-    nodeIndex: number,
-    owner: NodeOwner,
-    stats: any,
-    nodes: INode[]
-  ): IBattalion {
-    const maxHealth = stats.health * quantity;
-    const node = nodes[nodeIndex];
-    
-    if (!node) {
-      throw new Error(`Node index ${nodeIndex} not found in nodes array`);
-    }
-        
-    return {
-      id,
-      type,
-      quantity,
-      currentHealth: maxHealth,
-      maxHealth,
-      baseHealthPerUnit: stats.health,
-      isDestroyed: false,
-      position: {
-        x: node.position.x,
-        y: node.position.y,
-        nodeIndex,
-      },
-      owner,
-      stats,
-      mark: 1,
-    };
-  }
+
 
   private static validateBotType(botType: string): BotType {
     // Check cache first
@@ -195,7 +163,7 @@ export class BattalionService {
       const randomNodeIndex = Math.floor(Math.random() * availableUserNodes.length);
       const nodeIndex = availableUserNodes[randomNodeIndex];
       
-      battalions.push(this.createBattalion(
+      battalions.push(BattalionFactory.createBattalion(
         `user-battalion-${battalions.length}`,
         validatedBotType,
         battalion.quantity,
@@ -232,7 +200,7 @@ export class BattalionService {
       const randomNodeIndex = Math.floor(Math.random() * availableEnemyNodes.length);
       const nodeIndex = availableEnemyNodes[randomNodeIndex];
       
-      battalions.push(this.createBattalion(
+      battalions.push(BattalionFactory.createBattalion(
         `enemy-battalion-${battalions.length}`,
         validatedBotType,
         battalion.quantity,
@@ -278,7 +246,7 @@ export class BattalionService {
       const randomNodeIndex = Math.floor(Math.random() * availableEnemyNodes.length);
       const nodeIndex = availableEnemyNodes[randomNodeIndex];
 
-      battalions.push(this.createBattalion(
+      battalions.push(BattalionFactory.createBattalion(
         `enemy-battalion-${battalions.length}`,
         validatedBotType,
         battalion.quantity,
