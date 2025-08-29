@@ -14,7 +14,7 @@ const initialState: PreferencesState = {
 export const syncPreferencesFromUser = createAsyncThunk(
   'preferences/syncFromUser',
   async (userData: { profileGender?: 'male' | 'female' }) => {
-    console.log('Preferences sync from user:', userData.profileGender || 'male');
+    
     return userData.profileGender || 'male';
   }
 );
@@ -27,10 +27,10 @@ export const syncPreferencesFromStorage = createAsyncThunk(
     const storedUser = await AsyncStorage.getItem('user');
     if (storedUser) {
       const user = JSON.parse(storedUser);
-      console.log('Preferences sync from storage:', user.profileGender || 'male');
+
       return user.profileGender || 'male';
     }
-    console.log('Preferences sync from storage: no stored user, defaulting to male');
+    
     return 'male';
   }
 );
@@ -45,7 +45,6 @@ export const updateProfileGender = createAsyncThunk(
       const user = JSON.parse(storedUser);
       user.profileGender = gender;
       await AsyncStorage.setItem('user', JSON.stringify(user));
-      console.log('Preferences: Updated AsyncStorage with new gender:', gender);
     }
     return gender;
   }

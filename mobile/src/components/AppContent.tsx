@@ -56,9 +56,7 @@ const AppContent = memo(() => {
     skip: !token,
   });
 
-  // Debug: Log current preferences state
-  const currentPreferences = useAppSelector((state) => state.preferences);
-  console.log('AppContent: Current preferences state:', currentPreferences);
+
 
   useEffect(() => {
     dispatch(loadStoredAuth());
@@ -67,10 +65,8 @@ const AppContent = memo(() => {
   // Sync preferences after auth is loaded
   useEffect(() => {
     if (token) {
-      console.log('AppContent: Token loaded, syncing preferences from storage...');
       // Small delay to ensure store is fully initialized
       const timer = setTimeout(() => {
-        console.log('AppContent: Dispatching syncPreferencesFromStorage');
         dispatch(syncPreferencesFromStorage());
       }, 100);
       return () => clearTimeout(timer);
@@ -80,10 +76,7 @@ const AppContent = memo(() => {
   // Sync preferences from fresh profile data from database
   useEffect(() => {
     if (profileData?.profileGender) {
-      console.log('AppContent: Syncing preferences from fresh profile data:', profileData.profileGender);
       dispatch(syncPreferencesFromUser({ profileGender: profileData.profileGender }));
-    } else {
-      console.log('AppContent: No profile data available for preferences sync');
     }
   }, [profileData?.profileGender, dispatch]);
 
