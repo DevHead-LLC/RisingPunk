@@ -1,5 +1,12 @@
 # Current Task: User-vs-User Hacking with Defender Wave Deployment
 
+## Recently Completed: Case-Insensitive Username Authentication
+- ✅ Modified registration endpoint to check existing handles case-insensitively using regex
+- ✅ Modified login endpoint to find users by handle case-insensitively using regex  
+- ✅ Usernames preserve original formatting but accept case-insensitive login
+- ✅ Passwords remain case-sensitive as requested
+- ✅ Fixed: Reverted forced lowercase input - users can type handles in any case
+
 ## Priority: Core Gameplay – Enable attacking other users and large-scale defense
 
 Goal: When attacking a user on the map, attacker keeps current limits; defender can auto-deploy entire inventory in waves: up to 6 battalions per second, 250,000 units per battalion, random bot types until inventory is exhausted. Inventory must decrement on deploy and return survivors at battle end for both sides.

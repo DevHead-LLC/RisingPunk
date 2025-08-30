@@ -103,9 +103,9 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
     try {
       const { email, handle, accessKey } = req.body;
       
-      // Check for existing user
+      // Check for existing user (case-insensitive handle check)
       const existingUser = await User.findOne({ 
-        $or: [{ email }, { handle }] 
+        $or: [{ email }, { handle: { $regex: new RegExp(`^${handle}$`, 'i') } }] 
       });
       
       if (existingUser) {
@@ -161,7 +161,7 @@ router.post<{}, UserResponse | { error: string }, LoginRequest['body']>(
     try {
       const { handle, accessKey } = req.body;
       
-      const user = await User.findOne({ handle });
+      const user = await User.findOne({ handle: { $regex: new RegExp(`^${handle}$`, 'i') } });
       if (!user) {
         res.status(401).json({ error: 'Authentication failed' });
         return;
