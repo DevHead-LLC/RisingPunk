@@ -60,6 +60,26 @@ Phased Plan (minimal, additive, no duplication):
 8) Manual verification (user-run)
    - Attack another user; observe defender waves ramp to 6 battalions/sec until inventory spent; after battle, verify both users’ inventories reflect destroyed vs returned survivors.
 
+## Recently Added: Global Internet Connectivity Checking
+- ✅ Added @react-native-community/netinfo package for network detection
+- ✅ Created NetworkConnectivityProvider to monitor connection status globally
+- ✅ Created ConnectivityOverlay component with black overlay and centered error message
+- ✅ Integrated connectivity checking into AppProviders wrapper
+- ✅ Added connectivity overlay to both LoginScreen and authenticated screens
+- ✅ Installed iOS pods and added Android ACCESS_NETWORK_STATE permission
+- ✅ Fixed NetInfo native module linking issues with dynamic import approach
+- ✅ Added graceful fallback when NetInfo is unavailable (defaults to connected state)
+- Shows "It looks like you're not connected to the internet. Please check your connection and try again." when offline
+- Overlay appears on any screen when network is unavailable, as requested
+- Fixed native module errors by using dynamic imports and error handling
+- Implementation is complete and ready for testing
+
+## Security Fix: Regex Injection Vulnerability
+- ✅ Fixed regex injection vulnerability in auth routes (registration and login)
+- ✅ Added `escapeRegexString()` helper function to safely escape special characters
+- ✅ Preserved case-insensitive username/handle functionality
+- ✅ Prevents crafted handles from bypassing authentication or uniqueness checks
+
 Notes
 - Respect attacker limits; only defender uses wave logic.
 - Keep edits small in files near 300 lines; add new services for new behavior.

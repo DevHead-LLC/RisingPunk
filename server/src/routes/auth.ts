@@ -5,6 +5,11 @@ import { ResearchUser } from '../models/ResearchUser';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 
+// Helper function to safely escape regex special characters
+function escapeRegexString(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 interface RegisterRequest extends Request {
   body: {
     email: string;
@@ -103,9 +108,9 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
     try {
       const { email, handle, accessKey } = req.body;
       
-      // Check for existing user (case-insensitive handle check)
+      // Check for existing user (case-insensitive handle check with regex escaping)
       const existingUser = await User.findOne({ 
-        $or: [{ email }, { handle: { $regex: new RegExp(`^${handle}$`, 'i') } }] 
+        $or: [{ email }, { handle: { $regex: new RegExp(`^${escapeRegexString(handle)}$`, 'i') } }] 
       });
       
       if (existingUser) {
@@ -161,7 +166,7 @@ router.post<{}, UserResponse | { error: string }, LoginRequest['body']>(
     try {
       const { handle, accessKey } = req.body;
       
-      const user = await User.findOne({ handle: { $regex: new RegExp(`^${handle}$`, 'i') } });
+      const user = await User.findOne({ handle: { $regex: new RegExp(`^${escapeRegexString(handle)}$`, 'i') } });
       if (!user) {
         res.status(401).json({ error: 'Authentication failed' });
         return;
