@@ -20,7 +20,6 @@ export class BattleInventorySettlementService {
         return;
       }
 
-      console.log(`BattleInventorySettlementService: Processing settlement for battle ${battle.battleId}`);
 
       // Process attacker inventory settlement
       await this.processAttackerSettlement(battle);
@@ -28,7 +27,6 @@ export class BattleInventorySettlementService {
       // Process defender inventory settlement
       await this.processDefenderSettlement(battle);
       
-      console.log(`BattleInventorySettlementService: Settlement complete for battle ${battle.battleId}`);
       
     } catch (error) {
       console.error(`BattleInventorySettlementService processBattleEndSettlement error:`, error);
@@ -76,7 +74,6 @@ export class BattleInventorySettlementService {
           attackerBots.bots[botType as keyof typeof attackerBots.bots] = currentCount + survivorCount;
           inventoryUpdated = true;
           
-          console.log(`BattleInventorySettlementService: Added ${survivorCount} ${botType} survivors to attacker ${attackerId}`);
         }
       }
 
@@ -92,7 +89,6 @@ export class BattleInventorySettlementService {
         );
         
         await attackerBots.save();
-        console.log(`BattleInventorySettlementService: Cleared ${usedBattalionIds.length} battalion assignments for attacker ${attackerId}`);
       }
       
     } catch (error) {
@@ -141,13 +137,11 @@ export class BattleInventorySettlementService {
           defenderBots.bots[botType as keyof typeof defenderBots.bots] = currentCount + survivorCount;
           inventoryUpdated = true;
           
-          console.log(`BattleInventorySettlementService: Added ${survivorCount} ${botType} survivors to defender ${defenderId}`);
         }
       }
 
       if (inventoryUpdated) {
         await defenderBots.save();
-        console.log(`BattleInventorySettlementService: Updated defender ${defenderId} inventory with survivors`);
       }
       
     } catch (error) {

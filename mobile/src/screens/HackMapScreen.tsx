@@ -856,9 +856,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             )}
             <Text style={[
               styles.statusText,
+              selectedCell.info.owner === 'player' && selectedCell.info.name !== currentUserHandle ? styles.hostileText : 
               selectedCell.info.owner === 'player' ? styles.friendlyText : styles.hostileText,
             ]}>
-              STATUS: {selectedCell.info.owner === 'player' ? 'FRIENDLY' : 'HOSTILE'}
+              STATUS: {selectedCell.info.owner === 'player' && selectedCell.info.name !== currentUserHandle ? 'HOSTILE' : 
+              selectedCell.info.owner === 'player' ? 'FRIENDLY' : 'HOSTILE'}
             </Text>
               {selectedCell.info.owner !== 'player' && selectedCell.info.npcSlug && (
               <Pressable
@@ -879,7 +881,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             )}
             {selectedCell.info.owner === 'player' && 
              selectedCell.info.userId && 
-             selectedCell.info.userId !== currentUserId && 
              selectedCell.info.name !== currentUserHandle && (
               <Pressable
                 style={[styles.hackButton]}

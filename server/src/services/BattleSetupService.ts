@@ -51,7 +51,6 @@ export class BattleSetupService {
                           !defenderId.startsWith('npc-') && 
                           !defenderId.startsWith('computer');
     
-    console.log(`BattleSetupService: Battle setup - defenderId: ${defenderId}, defenderNpcSlug: ${defenderNpcSlug}, isUserDefender: ${isUserDefender}`);
     
     // Validate defender inventory for user-vs-user battles
     if (isUserDefender) {
@@ -59,7 +58,6 @@ export class BattleSetupService {
       if (!inventoryValidation.valid) {
         throw new Error(`Cannot start battle: ${inventoryValidation.error}`);
       }
-      console.log(`BattleSetupService: Defender ${defenderId} has ${inventoryValidation.totalBots} bots available for defense`);
     }
     
     // Optionally load NPC for enemy side (only for NPC battles)

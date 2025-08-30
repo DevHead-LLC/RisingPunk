@@ -84,8 +84,6 @@ export class BattalionFactory {
       defense: botConfig.stats.defense
     };
 
-    console.log(`BattalionFactory: Created ${type} battalion at node ${spawnNode.index} for level ${defenderLevel} defender`);
-    console.log(`BattalionFactory: ${type} effective stats:`, stats);
 
     return this.createBattalion(
       id,

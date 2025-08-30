@@ -23,18 +23,14 @@ export class DefenderDeploymentService {
    * Called once per second during active battle phase
    */
   static async onTick(battleId: string): Promise<void> {
-    console.log(`DefenderDeploymentService: onTick called for battle ${battleId}`);
     try {
       const battle = await Battle.findOne({ battleId });
       if (!battle) {
-        console.warn(`DefenderDeploymentService: Battle ${battleId} not found`);
         return;
       }
 
       // Only process user defender battles
-      console.log(`DefenderDeploymentService: Battle ${battleId} - isUserDefender: ${battle.isUserDefender}, phase: ${battle.phase}`);
       if (!battle.isUserDefender) {
-        console.log(`DefenderDeploymentService: Skipping - not a user defender battle`);
         return;
       }
 
@@ -51,11 +47,9 @@ export class DefenderDeploymentService {
 
       if (isFirstWave) {
         // First wave - deploy immediately regardless of phase
-        console.log(`DefenderDeploymentService: Deploying first wave during ${battle.phase} phase`);
       } else {
         // Subsequent waves - only during active phase and respect tick timing
         if (battle.phase !== 'active') {
-          console.log(`DefenderDeploymentService: Skipping deployment - phase ${battle.phase}, not first wave`);
           return;
         }
 
@@ -85,7 +79,6 @@ export class DefenderDeploymentService {
       );
       
     } catch (error) {
-      console.error(`DefenderDeploymentService onTick error for battle ${battleId}:`, error);
     }
   }
 
@@ -93,17 +86,14 @@ export class DefenderDeploymentService {
    * Deploy a wave of up to 6 battalions
    */
   private static async deployWave(battle: IBattleDocument): Promise<void> {
-    console.log(`DefenderDeploymentService: deployWave called for battle ${battle.battleId}, defender: ${battle.defenderId}`);
     try {
       // Get defender's current bot inventory using proper model reference
       const BotModel = mongoose.model('Bot');
       const defenderBots = await BotModel.findOne({ userId: battle.defenderId });
       if (!defenderBots || !defenderBots.bots) {
-        console.warn(`DefenderDeploymentService: No bot inventory found for defender ${battle.defenderId}`);
         return;
       }
       
-      console.log(`DefenderDeploymentService: Found defender bots:`, defenderBots.bots);
 
       // Get defender's level for bot stat scaling
       const UserModel = mongoose.model('User');
@@ -122,7 +112,6 @@ export class DefenderDeploymentService {
       // We want to deploy ALL available bots, up to 6 battalions per second
       const maxBattalionsThisTick = Math.min(MAX_DEFENDER_BATTALIONS_PER_SECOND, totalAvailable);
       
-      console.log(`DefenderDeploymentService: Total available: ${totalAvailable}, maxBattalionsThisTick: ${maxBattalionsThisTick}`);
 
       // Prepare all deployments first without updating inventory
       const deployments: Array<{ battalion: IBattalion; botType: string; quantity: number }> = [];
@@ -189,7 +178,6 @@ export class DefenderDeploymentService {
         }
       );
       
-      console.log(`DefenderDeploymentService: Deployed ${deployments.length} battalions simultaneously for battle ${battle.battleId}`);
       
     } catch (error) {
       console.error(`DefenderDeploymentService deployWave error:`, error);

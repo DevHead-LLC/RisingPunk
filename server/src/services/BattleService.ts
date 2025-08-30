@@ -134,7 +134,6 @@ export class BattleService {
       // For user defender battles, deploy the first wave immediately
       const battle = await this.getBattle(battleId);
       if (battle?.isUserDefender) {
-        console.log(`BattleService: Phase ACTIVE - deploying first wave immediately for battle ${battleId}`);
         await DefenderDeploymentService.onTick(battleId);
       }
     }
@@ -143,20 +142,15 @@ export class BattleService {
   }
 
   private async handleBattleTimeUpdate(battleId: string, data: any): Promise<void> {
-    console.log(`BattleService: battleTimeUpdate received for battle ${battleId}, time: ${data.battleTime}`);
     
     // Update battle time
     await this.updateBattle(battleId, { battleTime: data.battleTime });
     
     // Check if this is a user defender battle and deploy waves if needed
     const battle = await this.getBattle(battleId);
-    console.log(`BattleService: Battle ${battleId} - isUserDefender: ${battle?.isUserDefender}, phase: ${battle?.phase}`);
     
     if (battle?.isUserDefender && battle.phase === BattlePhase.ACTIVE) {
-      console.log(`BattleService: Calling DefenderDeploymentService.onTick for battle ${battleId}`);
       await DefenderDeploymentService.onTick(battleId);
-    } else {
-      console.log(`BattleService: Skipping defender deployment - isUserDefender: ${battle?.isUserDefender}, phase: ${battle?.phase}`);
     }
   }
 
