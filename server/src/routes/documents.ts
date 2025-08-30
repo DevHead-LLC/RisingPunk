@@ -3,67 +3,6 @@ import { Router, Request, Response } from 'express';
 const router = Router();
 
 router.get('/privacy-policy', (_req: Request, res: Response) => {
-  const privacyPolicy = `
-# Privacy Policy
-
-**Effective Date:** August 30, 2025
-
-## 1. Information We Collect
-
-**Email address & username/handle:** Provided during account registration.
-
-**Password:** Stored as a bcrypt hash; we never keep raw passwords.
-
-**Usage data:** Basic log data (e.g., IP address, device type) for security and analytics.
-
-We do not request real names, location data, contacts, camera, or microphone access.
-
-## 2. How We Use the Information
-
-- Create and manage accounts, authenticate users, and operate core app features.
-- Communicate with users regarding updates or support requests.
-- Protect against fraud and misuse.
-
-## 3. Data Sharing
-
-We do not sell personal data.
-
-Data may be shared with trusted service providers (hosting, analytics) solely to operate the service, under agreements requiring confidentiality and security.
-
-## 4. Data Retention
-
-Personal data is kept while the account remains active.
-
-Users can delete their data by deleting their account within the app or contacting us (support@risingpunk.com).
-
-Deleted accounts are permanently removed from our active databases within a reasonable time frame.
-
-## 5. Security
-
-Passwords are hashed with bcrypt.
-
-We employ industry-standard measures (such as HTTPS) to protect data in transit and at rest.
-
-No method of transmission or storage is 100% secure, so we cannot guarantee absolute security.
-
-## 6. Children's Privacy
-
-RisingPunk is not directed to children under 13, and we do not knowingly collect data from them.
-
-If we learn that we have collected such data, we will delete it promptly.
-
-## 7. User Rights
-
-Users may request access, correction, or deletion of their data via in‑app settings or by contacting support@risingpunk.com.
-
-## 8. Changes to This Policy
-
-We may update this policy periodically. Material changes will be posted on this page with a new effective date.
-
-## 9. Contact Us
-
-Questions or requests can be sent to support@risingpunk.com.
-  `.trim();
 
   res.setHeader('Content-Type', 'text/html');
   res.send(`
