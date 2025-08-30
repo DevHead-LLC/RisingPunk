@@ -18,6 +18,7 @@ import userRoutes from './src/routes/userRoutes';
 import battleRoutes from './src/routes/battle';
 import healthRoute from './src/routes/health';
 import researchRoutes from './src/routes/research';
+import documentsRoutes from './src/routes/documents';
 
 declare global {
   namespace Express {
@@ -413,6 +414,7 @@ app.use('/api/map', mapRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/battle', battleRoutes);
 app.use('/api/research', researchRoutes);
+app.use('/documents', documentsRoutes);
 app.use('/', healthRoute);
 
 app.post('/api/battalions/assign', auth, async (req: Request, res: Response) => {
