@@ -60,6 +60,16 @@ Phased Plan (minimal, additive, no duplication):
 8) Manual verification (user-run)
    - Attack another user; observe defender waves ramp to 6 battalions/sec until inventory spent; after battle, verify both users’ inventories reflect destroyed vs returned survivors.
 
+## Recently Added: Privacy Policy Integration
+- ✅ Created server endpoint `/documents/privacy-policy` serving formatted HTML privacy policy
+- ✅ Added documents route to server with proper styling and content
+- ✅ Created PrivacyPolicyModal component for mobile app display
+- ✅ Integrated privacy policy into ProfileScreen content tab under "LEGAL" section
+- ✅ Privacy policy displays in scrollable overlay with close button
+- ✅ Content matches user's specified privacy policy text with August 30, 2025 effective date
+- ✅ Modal uses theme-aware styling and responsive design
+- ✅ Accessible via Profile → CONTENT → LEGAL → Privacy Policy
+
 ## Recently Added: Global Internet Connectivity Checking
 - ✅ Added @react-native-community/netinfo package for network detection
 - ✅ Created NetworkConnectivityProvider to monitor connection status globally
