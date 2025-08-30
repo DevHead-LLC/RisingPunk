@@ -90,6 +90,7 @@ export interface StartBattleRequest {
   }>;
   screenWidth: number;
   screenHeight: number;
+  defenderId?: string;
   defenderNpcSlug?: string;
   unlockHackRigOnWin?: boolean;
   defenderNpcInstanceId?: string;

@@ -28,6 +28,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const grid = useAppSelector((state) => state.map.grid);
   const loading = useAppSelector((state) => state.map.loading);
   const currentUserHandle = useAppSelector((state) => state.auth.user?.handle);
+  const currentUserId = useAppSelector((state) => state.auth.user?._id);
   const colors = useThemeColors();
   const { themeMode } = useTheme();
 
@@ -855,9 +856,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             )}
             <Text style={[
               styles.statusText,
+              selectedCell.info.owner === 'player' && selectedCell.info.name !== currentUserHandle ? styles.hostileText : 
               selectedCell.info.owner === 'player' ? styles.friendlyText : styles.hostileText,
             ]}>
-              STATUS: {selectedCell.info.owner === 'player' ? 'FRIENDLY' : 'HOSTILE'}
+              STATUS: {selectedCell.info.owner === 'player' && selectedCell.info.name !== currentUserHandle ? 'HOSTILE' : 
+              selectedCell.info.owner === 'player' ? 'FRIENDLY' : 'HOSTILE'}
             </Text>
               {selectedCell.info.owner !== 'player' && selectedCell.info.npcSlug && (
               <Pressable
@@ -874,6 +877,24 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                 }}
               >
                 <Text style={styles.hackButtonText}>Hack Entity</Text>
+              </Pressable>
+            )}
+            {selectedCell.info.owner === 'player' && 
+             selectedCell.info.userId && 
+             selectedCell.info.name !== currentUserHandle && (
+              <Pressable
+                style={[styles.hackButton]}
+                onPress={() => {
+                  (globalThis as any).pendingDefenderUserId = selectedCell.info.userId;
+                  // Store the grid coordinates of the selected cell, not the pan coordinates
+                  (globalThis as any).pendingMapPan = {
+                    x: selectedCell.x,
+                    y: selectedCell.y,
+                  };
+                  onClose();
+                }}
+              >
+                <Text style={styles.hackButtonText}>Hack User</Text>
               </Pressable>
             )}
           </>

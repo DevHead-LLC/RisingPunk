@@ -107,6 +107,18 @@ export interface IBattle extends Document {
   startingBattalions?: IBattalion[];
   battalions: IBattalion[];
   nodes: INode[];
+  unlockHackRigOnWin?: boolean;
+  defenderNpcSlug?: string;
+  defenderNpcInstanceId?: string;
+  isUserDefender?: boolean;
+  defenderDeployedTotals?: {
+    guardian: number;
+    breacher: number;
+    phreak: number;
+  };
+  defenderDeploymentExhausted?: boolean;
+  lastTickProcessed?: number;
+  processedRewards?: any;
   createdAt: Date;
   updatedAt: Date;
 }

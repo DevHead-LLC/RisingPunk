@@ -199,6 +199,14 @@ const battleSchema = new Schema({
   unlockHackRigOnWin: { type: Boolean, default: false },
   defenderNpcSlug: { type: String, default: '' },
   defenderNpcInstanceId: { type: String, default: '' },
+  isUserDefender: { type: Boolean, default: false },
+  defenderDeployedTotals: {
+    guardian: { type: Number, default: 0 },
+    breacher: { type: Number, default: 0 },
+    phreak: { type: Number, default: 0 }
+  },
+  defenderDeploymentExhausted: { type: Boolean, default: false },
+  lastTickProcessed: { type: Number, default: 0 },
   processedRewards: {
     type: Schema.Types.Mixed,
     default: undefined

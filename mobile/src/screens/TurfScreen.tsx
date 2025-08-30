@@ -77,6 +77,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const [pendingNpcSlug, setPendingNpcSlug] = useState<string | null>(null);
   const [returnContext, setReturnContext] = useState<{ origin: 'hackRig' | 'map'; mapPan?: { x: number; y: number } } | null>(null);
   const [pendingNpcInstanceId, setPendingNpcInstanceId] = useState<string | null>(null);
+  const [pendingDefenderUserId, setPendingDefenderUserId] = useState<string | null>(null);
   const [previousScreen, setPreviousScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research' | 'investmentProperty'>('turf');
   const [currentPropertyId, setCurrentPropertyId] = useState<number>(1);
   const [turfViewPosition, setTurfViewPosition] = useState<{ x: number; y: number } | null>(null);
@@ -325,6 +326,15 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     centerView();
   }, [centerView]); // Include centerView in dependencies
 
+  useEffect(() => {
+    // Clean up pending data when navigating away from battlePrep
+    if (currentScreen !== 'battlePrep') {
+      setPendingDefenderUserId(null);
+      setPendingNpcSlug(null);
+      setPendingNpcInstanceId(null);
+    }
+  }, [currentScreen]);
+
   const renderScreen = useCallback(() => {
     switch (currentScreen) {
       case 'hackRig':
@@ -343,6 +353,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           restorePan={returnContext?.mapPan}
           onClose={() => {
             const slug = (globalThis as any).pendingNpcSlug as string | undefined;
+            const defenderUserId = (globalThis as any).pendingDefenderUserId as string | undefined;
+            
             if (slug) {
               setPendingNpcSlug(slug);
               const instanceId = (globalThis as any).pendingNpcInstanceId as string | undefined;
@@ -355,6 +367,17 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
               navigateToScreen('battlePrep');
               return;
             }
+            
+            if (defenderUserId) {
+              setPendingDefenderUserId(defenderUserId);
+              const mapPan = (globalThis as any).pendingMapPan as { x: number; y: number } | undefined;
+              (globalThis as any).pendingDefenderUserId = undefined;
+              (globalThis as any).pendingMapPan = undefined;
+              setReturnContext({ origin: 'map', mapPan });
+              navigateToScreen('battlePrep');
+              return;
+            }
+            
             navigateToScreen('hackRig');
           }}
         />;
@@ -377,9 +400,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
             setBattleId(newBattleId || null);
             navigateToScreen('battle');
           }}
-          // @ts-ignore pass via global or extend props
+          defenderId={pendingDefenderUserId || undefined}
           defenderNpcSlug={pendingNpcSlug || undefined}
-          // @ts-ignore
           defenderNpcInstanceId={pendingNpcInstanceId || undefined}
         />;
       case 'battle':

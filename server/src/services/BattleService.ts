@@ -12,6 +12,8 @@ import mongoose from 'mongoose';
 import { NPCRespawnService } from './NPCRespawnService';
 import { NPCService } from './NPCService';
 import { BattleRewardService } from './BattleRewardService';
+import { DefenderDeploymentService } from './DefenderDeploymentService';
+import { BattleInventorySettlementService } from './BattleInventorySettlementService';
 
 export class BattleService {
   private timerService: BattleTimerService;
@@ -80,6 +82,7 @@ export class BattleService {
     const events = [
       { name: 'countdownUpdate', handler: (data: any) => this.updateBattle(battleId, { countdown: data.countdown, phase: data.phase }) },
       { name: 'phaseChange', handler: (data: any) => this.handlePhaseChange(battleId, data.phase) },
+      { name: 'battleTimeUpdate', handler: (data: any) => this.handleBattleTimeUpdate(battleId, data) },
       { name: 'battleEnd', handler: () => this.handleBattleEnd(battleId) }
     ];
 
@@ -112,7 +115,7 @@ export class BattleService {
     this.battleListeners.delete(battleId);
   }
 
-  private async updateBattle(battleId: string, updates: { countdown?: number; phase?: BattlePhase }): Promise<void> {
+  private async updateBattle(battleId: string, updates: { countdown?: number; phase?: BattlePhase; battleTime?: number }): Promise<void> {
     const battle = await Battle.findOne({ battleId });
     if (!battle) return;
 
@@ -127,9 +130,28 @@ export class BattleService {
       updates.countdown = 0;
       updates.battleTime = 0;
       BattalionService.startMovementUpdates(battleId);
+      
+      // For user defender battles, deploy the first wave immediately
+      const battle = await this.getBattle(battleId);
+      if (battle?.isUserDefender) {
+        await DefenderDeploymentService.onTick(battleId);
+      }
     }
     
     await this.updateBattle(battleId, updates);
+  }
+
+  private async handleBattleTimeUpdate(battleId: string, data: any): Promise<void> {
+    
+    // Update battle time
+    await this.updateBattle(battleId, { battleTime: data.battleTime });
+    
+    // Check if this is a user defender battle and deploy waves if needed
+    const battle = await this.getBattle(battleId);
+    
+    if (battle?.isUserDefender && battle.phase === BattlePhase.ACTIVE) {
+      await DefenderDeploymentService.onTick(battleId);
+    }
   }
 
   private async handleBattleEnd(battleId: string): Promise<void> {
@@ -210,6 +232,16 @@ export class BattleService {
         }
       } catch (error) {
         // NPC handling failed, but battle will complete
+      }
+    }
+
+    // Process inventory settlement for user-vs-user battles
+    if (battle.isUserDefender) {
+      try {
+        await BattleInventorySettlementService.processBattleEndSettlement(battle);
+      } catch (e) {
+        console.error('Battle inventory settlement failed for', battleId, e);
+        // Continue with battle end even if settlement fails
       }
     }
 

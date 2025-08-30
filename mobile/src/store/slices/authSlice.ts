@@ -10,6 +10,7 @@ import { mapApi } from '../api/mapApi';
 
 // Types
 export interface User {
+  _id: string;
   handle: string;
   email: string;
   level: number;

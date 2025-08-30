@@ -12,6 +12,8 @@ import { BotService } from './BotService';
 import { NPCService } from './NPCService';
 import { Map as MapModel } from '../models/Map';
 import { User } from '../models/User';
+import mongoose from 'mongoose';
+import { BattleInventorySettlementService } from './BattleInventorySettlementService';
 
 export class BattleSetupService {
 
@@ -43,11 +45,26 @@ export class BattleSetupService {
     
     const battalionConfigs = userBattalions || defaultUserBattalions;
     
-    // Optionally load NPC for enemy side
-    const npc = defenderNpcSlug ? await NPCService.getNPCBySlug(defenderNpcSlug) : null;
+    // Check if defender is a user (not NPC)
+    // A user defender is when we have a defenderId that's not 'computer-opponent' and doesn't look like an NPC ID
+    const isUserDefender = defenderId !== 'computer-opponent' && 
+                          !defenderId.startsWith('npc-') && 
+                          !defenderId.startsWith('computer');
     
-    // Validate that NPC instance exists on map if instance ID is provided
-    if (defenderNpcInstanceId && defenderNpcSlug) {
+    
+    // Validate defender inventory for user-vs-user battles
+    if (isUserDefender) {
+      const inventoryValidation = await BattleInventorySettlementService.validateDefenderInventory(defenderId);
+      if (!inventoryValidation.valid) {
+        throw new Error(`Cannot start battle: ${inventoryValidation.error}`);
+      }
+    }
+    
+    // Optionally load NPC for enemy side (only for NPC battles)
+    const npc = !isUserDefender && defenderNpcSlug ? await NPCService.getNPCBySlug(defenderNpcSlug) : null;
+    
+    // Validate that NPC instance exists on map if instance ID is provided (only for NPC battles)
+    if (!isUserDefender && defenderNpcInstanceId && defenderNpcSlug) {
       const mapDoc = await MapModel.findOne({ name: 'main' });
       if (!mapDoc) {
         throw new Error('Map not found');
@@ -74,7 +91,37 @@ export class BattleSetupService {
     }
     
     let enemyTotal = 0;
-    if (npc) {
+    if (isUserDefender) {
+      // For user defenders, calculate total health based on their inventory and level
+      try {
+        const defender = await User.findById(defenderId);
+        if (!defender) {
+          throw new Error(`Defender user ${defenderId} not found`);
+        }
+        
+        const defenderLevel = defender.level || 1;
+        const BotModel = mongoose.model('Bot');
+        const defenderBots = await BotModel.findOne({ userId: defenderId });
+        
+        // Calculate total health for all available bots in defender's inventory
+        if (defenderBots && defenderBots.bots) {
+          for (const [botType, quantity] of Object.entries(defenderBots.bots)) {
+            if (typeof quantity === 'number' && quantity > 0) {
+              const botConfig = await BotService.getUserBotStats(botType as BotType, defenderLevel);
+              enemyTotal += botConfig.stats.health * quantity;
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Could not fetch defender inventory, using default enemy total:', error);
+        // Fallback to default enemy total if defender data can't be fetched
+        for (const battalion of defaultEnemyBattalions) {
+          const botType = battalion.type as BotType;
+          const botConfig = await BotService.getEnemyBotStats(botType, userLevel);
+          enemyTotal += botConfig.stats.health * battalion.quantity;
+        }
+      }
+    } else if (npc) {
       // Use NPC's userLevelAssociation for bot stat scaling instead of statMultipliers
       const npcLevel = npc.userLevelAssociation || 1;
       for (const battalion of npc.battalions) {
@@ -98,7 +145,10 @@ export class BattleSetupService {
     const userBattalionsList = await BattalionService.createUserBattalions(nodes, userLevel, userBattalions);
 
     let enemyBattalions: IBattalion[];
-    if (npc) {
+    if (isUserDefender) {
+      // For user defenders, don't create enemy battalions upfront - they'll be spawned in waves
+      enemyBattalions = [];
+    } else if (npc) {
       // Pass NPC level for proper bot stat scaling
       const npcLevel = npc.userLevelAssociation || 1;
       enemyBattalions = await BattalionService.createEnemyBattalionsFromNPC(nodes, npcLevel, {
@@ -111,6 +161,7 @@ export class BattleSetupService {
     const battalions = [...userBattalionsList, ...enemyBattalions];
     
     // Store starting battalion states for loss tracking
+    // For user defenders, only track attacker battalions initially since defender battalions spawn in waves
     const startingBattalions = battalions.map(battalion => ({
       ...battalion,
       id: battalion.id,
@@ -135,6 +186,12 @@ export class BattleSetupService {
       ...(unlockHackRigOnWin ? { unlockHackRigOnWin: true } as any : {}),
       ...(defenderNpcSlug ? { defenderNpcSlug } as any : {}),
       ...(defenderNpcInstanceId ? { defenderNpcInstanceId } as any : {}),
+      ...(isUserDefender ? { 
+        isUserDefender: true,
+        defenderDeployedTotals: { guardian: 0, breacher: 0, phreak: 0 },
+        defenderDeploymentExhausted: false,
+        lastTickProcessed: 0
+      } as any : {}),
     });
 
     return await battle.save();
