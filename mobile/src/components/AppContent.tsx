@@ -12,6 +12,8 @@ import { TurfScreen } from '../screens/TurfScreen';
 import { FinancialStatementsScreen } from '../screens/FinancialStatementsScreen';
 import { setFinancialStatements } from '../store/slices/uiSlice';
 import { Dimensions } from 'react-native';
+import { useNetworkConnectivity } from '../providers/NetworkConnectivityProvider';
+import { ConnectivityOverlay } from './common/ConnectivityOverlay';
 
 const AppContent = memo(() => {
   const dispatch = useAppDispatch();
@@ -19,6 +21,7 @@ const AppContent = memo(() => {
   const { token, isLoading } = useAppSelector((state) => state.auth);
   const balanceDisplayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const turfScreenRef = useRef<any>(null);
+  const { isConnected, isInternetReachable } = useNetworkConnectivity();
 
   // Function to center the turf view to home/digital barracks position
   const centerTurfView = useCallback(() => {
@@ -130,13 +133,22 @@ const AppContent = memo(() => {
     };
   }, [token, dispatch]);
 
+  // Determine if we should show the connectivity overlay
+  // Only show when we're definitely disconnected (both flags are false)
+  const shouldShowConnectivityOverlay = isConnected === false && isInternetReachable === false;
+
   // Show loading state while checking stored auth or fetching data
   if (isLoading || (token && (balanceLoading || botsLoading || buildStateLoading))) {
     return null; // or a loading component
   }
 
   if (!token) {
-    return <LoginScreen />;
+    return (
+      <>
+        <LoginScreen />
+        <ConnectivityOverlay visible={shouldShowConnectivityOverlay} />
+      </>
+    );
   }
 
   return (
@@ -148,6 +160,7 @@ const AppContent = memo(() => {
           centerTurfView();
         }} />
       )}
+      <ConnectivityOverlay visible={shouldShowConnectivityOverlay} />
     </>
   );
 });
