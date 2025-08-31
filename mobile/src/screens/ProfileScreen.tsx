@@ -19,6 +19,7 @@ import { useFetchBotStatsQuery } from '../store/api/botsApi';
 import { SIZING } from '../styles/theme';
 import { useTheme } from '../context/ThemeContext';
 import { useThemeColors } from '../hooks/useThemeColors';
+import { PrivacyPolicyModal } from '../components/profile/PrivacyPolicyModal';
 
 interface BotStats {
   role: string;
@@ -347,14 +348,14 @@ const createProfileStyles = (colors: any) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.matrix,
     borderRadius: 8,
-    padding: SIZING.spacing.lg,
-    marginBottom: SIZING.spacing.md,
+    padding: SIZING.spacing.md,
+    marginBottom: SIZING.spacing.sm,
   },
   settingLabel: {
     color: colors.text.primary,
     fontSize: SIZING.font.body,
     fontWeight: 'bold',
-    marginBottom: SIZING.spacing.md,
+    marginBottom: SIZING.spacing.sm,
     textAlign: 'center',
   },
   themeToggle: {
@@ -400,20 +401,20 @@ const createProfileStyles = (colors: any) => StyleSheet.create({
   },
   introReplaySection: {
     alignItems: 'center',
-    gap: SIZING.spacing.sm,
-    padding: SIZING.spacing.sm,
+    gap: SIZING.spacing.xs,
+    padding: SIZING.spacing.xs,
   },
   introImage: {
     width: 200,
-    height: 150,
+    height: 120,
     borderRadius: 8,
     borderWidth: 2,
     borderColor: colors.matrix,
   },
   replayButton: {
     backgroundColor: colors.matrix,
-    paddingVertical: SIZING.spacing.sm,
-    paddingHorizontal: SIZING.spacing.md,
+    paddingVertical: SIZING.spacing.xs,
+    paddingHorizontal: SIZING.spacing.sm,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.matrix,
@@ -424,12 +425,27 @@ const createProfileStyles = (colors: any) => StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
   },
+  privacyPolicyButton: {
+    backgroundColor: colors.matrix + '1A',
+    borderWidth: 1,
+    borderColor: colors.matrix,
+    borderRadius: 8,
+    padding: SIZING.spacing.md,
+    alignItems: 'center',
+    marginTop: SIZING.spacing.sm,
+  },
+  privacyPolicyButtonText: {
+    color: colors.matrix,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
 });
 
 export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
   const dispatch = useAppDispatch();
   const { token } = useAppSelector((state) => state.auth);
   const [activeTab, setActiveTab] = useState<TabType>('profile');
+  const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const { themeMode, toggleTheme } = useTheme();
   const colors = useThemeColors();
   const profileGender = useAppSelector((state) => state.preferences.profileGender);
@@ -706,7 +722,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
               </View>
             </View>
           ) : activeTab === 'content' ? (
-            <View style={styles.contentContainer}>
+            <ScrollView style={styles.contentContainer} showsVerticalScrollIndicator={false}>
               <Text style={styles.contentTitle}>CONTENT</Text>
               
               {/* Intro Replay Section */}
@@ -730,10 +746,26 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
+
+              {/* Privacy Policy Section */}
+              <View style={styles.settingCard}>
+                <Text style={styles.settingLabel}>LEGAL</Text>
+                <TouchableOpacity
+                  style={styles.privacyPolicyButton}
+                  onPress={() => setShowPrivacyPolicy(true)}
+                >
+                  <Text style={styles.privacyPolicyButtonText}>Privacy Policy</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           ) : null}
         </View>
       </View>
+
+      <PrivacyPolicyModal
+        visible={showPrivacyPolicy}
+        onClose={() => setShowPrivacyPolicy(false)}
+      />
     </SafeAreaView>
   );
 }

@@ -1,11 +1,43 @@
 # Current Task: User-vs-User Hacking with Defender Wave Deployment
 
-## Recently Completed: Case-Insensitive Username Authentication
-- ✅ Modified registration endpoint to check existing handles case-insensitively using regex
-- ✅ Modified login endpoint to find users by handle case-insensitively using regex  
-- ✅ Usernames preserve original formatting but accept case-insensitive login
-- ✅ Passwords remain case-sensitive as requested
-- ✅ Fixed: Reverted forced lowercase input - users can type handles in any case
+## Recently Completed: Email Encryption Bug Fix & Performance Optimization
+- ✅ Fixed critical bug where new user registration stored emails as plain text
+- ✅ Added pre-save hook in User model to automatically encrypt emails before saving
+- ✅ Updated getDecryptedEmail() method to handle both encrypted and unencrypted emails (backward compatibility)
+- ✅ Fixed existing user email duplicate checking to work with encrypted emails
+- ✅ Added static emailExists() method to User model for efficient duplicate checking
+- ✅ **NEW**: Added emailHash field for efficient duplicate checking without decrypting all emails
+- ✅ **NEW**: Created migration script `npm run migrate:add-email-hash` to add hash field to existing users
+- ✅ **FIXED**: Made emailHash field optional to prevent validation errors with existing users
+- ✅ All new user registrations now properly encrypt emails before database storage
+- ✅ Existing users with unencrypted emails can still authenticate and use the system
+- ✅ Email encryption now works consistently across registration, login, and profile endpoints
+- ✅ **PERFORMANCE**: Email duplicate checking now uses indexed hash field instead of scanning all users
+
+## Previously Completed: Email Encryption at Rest for GDPR Compliance
+- ✅ Installed crypto-js library for AES-256-CBC encryption
+- ✅ Created EncryptionService with encrypt/decrypt methods and key validation
+- ✅ Updated User model with email encryption/decryption methods
+- ✅ Modified auth routes to handle encrypted email storage and retrieval
+- ✅ Updated user routes to return decrypted emails in responses
+- ✅ Created migration script for existing user emails
+- ✅ Added environment variable configuration for encryption keys
+- ✅ Emails are now encrypted at rest using AES-256-CBC with random IVs
+- ✅ All email operations (create, read, update) now use encryption
+- ✅ Migration script available: `npm run migrate:encrypt-emails`
+
+**Security Features:**
+- AES-256-CBC encryption with PKCS7 padding
+- Random initialization vector (IV) for each encryption
+- Environment-based encryption keys (minimum 32 characters)
+- Automatic encryption on save, decryption on retrieval
+- GDPR compliant data protection
+
+**Next Steps for Email Encryption:**
+1. Set ENCRYPTION_KEY in environment variables (32+ characters)
+2. Run migration: `npm run migrate:encrypt-emails`
+3. Test registration/login with new encrypted emails
+4. Verify existing users can still authenticate
 
 ## Priority: Core Gameplay – Enable attacking other users and large-scale defense
 
@@ -59,6 +91,16 @@ Phased Plan (minimal, additive, no duplication):
 
 8) Manual verification (user-run)
    - Attack another user; observe defender waves ramp to 6 battalions/sec until inventory spent; after battle, verify both users’ inventories reflect destroyed vs returned survivors.
+
+## Recently Added: Privacy Policy Integration
+- ✅ Created server endpoint `/documents/privacy-policy` serving formatted HTML privacy policy
+- ✅ Added documents route to server with proper styling and content
+- ✅ Created PrivacyPolicyModal component for mobile app display
+- ✅ Integrated privacy policy into ProfileScreen content tab under "LEGAL" section
+- ✅ Privacy policy displays in scrollable overlay with close button
+- ✅ Content matches user's specified privacy policy text with August 30, 2025 effective date
+- ✅ Modal uses theme-aware styling and responsive design
+- ✅ Accessible via Profile → CONTENT → LEGAL → Privacy Policy
 
 ## Recently Added: Global Internet Connectivity Checking
 - ✅ Added @react-native-community/netinfo package for network detection

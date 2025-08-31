@@ -58,7 +58,7 @@ router.post('/unlock-hack-rig', auth, async (req: Request, res: Response) => {
 
     res.json({
       handle: user.handle,
-      email: user.email,
+      email: user.getDecryptedEmail(),
       level: user.level,
       unlockedFeatures: {
         hackRig: user.unlockedFeatures?.hackRig || false,
