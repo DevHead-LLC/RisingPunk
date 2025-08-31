@@ -48,8 +48,7 @@ const userActivitySummarySchema = new Schema<IUserActivitySummary>({
   },
   expiresAt: {
     type: Date,
-    required: true,
-    index: true
+    required: true
   }
 }, {
   collection: 'user_activity_summaries',

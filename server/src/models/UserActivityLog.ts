@@ -68,8 +68,7 @@ const userActivityLogSchema = new Schema<IUserActivityLog>({
   },
   expiresAt: {
     type: Date,
-    required: true,
-    index: true
+    required: true
   }
 }, {
   collection: 'user_activity_logs',

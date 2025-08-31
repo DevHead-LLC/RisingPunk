@@ -14,13 +14,14 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { logout, setShowOnboarding } from '../store/slices/authSlice';
 import { updateProfileGender } from '../store/slices/preferencesSlice';
 import { useUpdatePreferencesMutation } from '../store/api/preferencesApi';
-import { useGetProfileQuery, useGetResearchCenterStatusQuery } from '../store/api/authApi';
+import { useGetProfileQuery, useGetResearchCenterStatusQuery, useDeleteAccountMutation } from '../store/api/authApi';
 import { useFetchBotStatsQuery } from '../store/api/botsApi';
 import { SIZING } from '../styles/theme';
 import { useTheme } from '../context/ThemeContext';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { PrivacyPolicyModal } from '../components/profile/PrivacyPolicyModal';
 import { TermsOfServiceModal } from '../components/profile/TermsOfServiceModal';
+import { DeleteAccountModal } from '../components/profile/DeleteAccountModal';
 
 interface BotStats {
   role: string;
@@ -48,7 +49,7 @@ interface UserProfile {
   };
 }
 
-type TabType = 'profile' | 'settings' | 'content';
+type TabType = 'profile' | 'settings' | 'account' | 'content';
 
 const createProfileStyles = (colors: any) => StyleSheet.create({
   container: {
@@ -448,10 +449,12 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const [activeTab, setActiveTab] = useState<TabType>('profile');
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [showTermsOfService, setShowTermsOfService] = useState(false);
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
   const { themeMode, toggleTheme } = useTheme();
   const colors = useThemeColors();
   const profileGender = useAppSelector((state) => state.preferences.profileGender);
   const [updatePreferences] = useUpdatePreferencesMutation();
+  const [deleteAccount] = useDeleteAccountMutation();
   
   const styles = useMemo(() => createProfileStyles(colors), [colors]);
   
@@ -468,6 +471,16 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
 
   const handleLogout = () => {
     dispatch(logout());
+  };
+
+  const handleDeleteAccount = async (handle: string) => {
+    try {
+      await deleteAccount({ handle }).unwrap();
+      dispatch(logout());
+    } catch (error) {
+      console.error('ProfileScreen: Failed to delete account:', error);
+      throw error;
+    }
   };
 
   // Transform API data to match our interface
@@ -544,6 +557,15 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
           >
             <Text style={[styles.leftTabText, activeTab === 'settings' && styles.activeLeftTabText]}>
               SETTINGS
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.leftTab, activeTab === 'account' && styles.activeLeftTab]}
+            onPress={() => setActiveTab('account')}
+          >
+            <Text style={[styles.leftTabText, activeTab === 'account' && styles.activeLeftTabText]}>
+              ACCOUNT
             </Text>
           </TouchableOpacity>
           
@@ -723,6 +745,20 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                 </TouchableOpacity>
               </View>
             </View>
+          ) : activeTab === 'account' ? (
+            <View style={styles.settingsContainer}>
+              <Text style={styles.settingsTitle}>ACCOUNT SETTINGS</Text>
+              
+              <View style={styles.settingCard}>
+                <Text style={styles.settingLabel}>DANGER ZONE</Text>
+                <TouchableOpacity
+                  style={[styles.disconnectButton, { marginTop: SIZING.spacing.md }]}
+                  onPress={() => setShowDeleteAccount(true)}
+                >
+                  <Text style={styles.disconnectText}>DELETE ACCOUNT</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           ) : activeTab === 'content' ? (
             <ScrollView style={styles.contentContainer} showsVerticalScrollIndicator={false}>
               <Text style={styles.contentTitle}>CONTENT</Text>
@@ -777,6 +813,12 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
       <TermsOfServiceModal
         visible={showTermsOfService}
         onClose={() => setShowTermsOfService(false)}
+      />
+      <DeleteAccountModal
+        visible={showDeleteAccount}
+        onClose={() => setShowDeleteAccount(false)}
+        onDelete={handleDeleteAccount}
+        userHandle={profile.handle}
       />
     </SafeAreaView>
   );
