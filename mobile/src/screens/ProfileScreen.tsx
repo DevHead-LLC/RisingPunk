@@ -20,6 +20,7 @@ import { SIZING } from '../styles/theme';
 import { useTheme } from '../context/ThemeContext';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { PrivacyPolicyModal } from '../components/profile/PrivacyPolicyModal';
+import { TermsOfServiceModal } from '../components/profile/TermsOfServiceModal';
 
 interface BotStats {
   role: string;
@@ -446,6 +447,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const { token } = useAppSelector((state) => state.auth);
   const [activeTab, setActiveTab] = useState<TabType>('profile');
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
+  const [showTermsOfService, setShowTermsOfService] = useState(false);
   const { themeMode, toggleTheme } = useTheme();
   const colors = useThemeColors();
   const profileGender = useAppSelector((state) => state.preferences.profileGender);
@@ -749,12 +751,18 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
 
               {/* Privacy Policy Section */}
               <View style={styles.settingCard}>
-                <Text style={styles.settingLabel}>LEGAL</Text>
+                <Text style={styles.settingLabel}>APPLICATION DETAILS</Text>
                 <TouchableOpacity
                   style={styles.privacyPolicyButton}
                   onPress={() => setShowPrivacyPolicy(true)}
                 >
                   <Text style={styles.privacyPolicyButtonText}>Privacy Policy</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.privacyPolicyButton}
+                  onPress={() => setShowTermsOfService(true)}
+                >
+                  <Text style={styles.privacyPolicyButtonText}>Terms of Service</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -765,6 +773,10 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
       <PrivacyPolicyModal
         visible={showPrivacyPolicy}
         onClose={() => setShowPrivacyPolicy(false)}
+      />
+      <TermsOfServiceModal
+        visible={showTermsOfService}
+        onClose={() => setShowTermsOfService(false)}
       />
     </SafeAreaView>
   );

@@ -55,154 +55,207 @@ export function PrivacyPolicyModal({
 
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
-              1. Information We Collect
+              Data Controller
             </Text>
-            
-            <View style={[styles.infoItem, { backgroundColor: colors.background + '33' }]}>
-              <Text style={[styles.infoLabel, { color: colors.text.primary }]}>
-                Email address & username/handle:
-              </Text>
-              <Text style={[styles.infoText, { color: colors.text.secondary }]}>
-                Provided during account registration.
-              </Text>
-            </View>
-            
-            <View style={[styles.infoItem, { backgroundColor: colors.background + '33' }]}>
-              <Text style={[styles.infoLabel, { color: colors.text.primary }]}>
-                Password:
-              </Text>
-              <Text style={[styles.infoText, { color: colors.text.secondary }]}>
-                Stored as a bcrypt hash; we never keep raw passwords.
-              </Text>
-            </View>
-            
-            <View style={[styles.infoItem, { backgroundColor: colors.background + '33' }]}>
-              <Text style={[styles.infoLabel, { color: colors.text.primary }]}>
-                Usage data:
-              </Text>
-              <Text style={[styles.infoText, { color: colors.text.secondary }]}>
-                Basic log data (e.g., IP address, device type) for security and analytics.
-              </Text>
-            </View>
-            
             <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
-              We do not request real names, location data, contacts, camera, or microphone access.
+              DevHead LLC{'\n'}
+              3801 E. Windsong Dr., Phoenix, AZ 85048, USA{'\n'}
+              support@risingpunk.com (forwarded and hosted through Google Workspace)
             </Text>
           </View>
 
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
-              2. How We Use the Information
+              Information We Collect
+            </Text>
+            
+            <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
+              <Text style={styles.boldText}>Email address</Text> – required to create and manage the account.
+            </Text>
+            
+            <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
+              <Text style={styles.boldText}>Handle/username</Text> – chosen by you for in‑game display.
+            </Text>
+            
+            <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
+              <Text style={styles.boldText}>Password</Text> – stored only as a bcrypt hash.
+            </Text>
+            
+            <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
+              <Text style={styles.boldText}>Server logs</Text> – IP address, device ID, and usage data retained for 30 days to detect fraud and maintain security.
+            </Text>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
+              Legal Bases
+            </Text>
+            
+            <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
+              <Text style={styles.boldText}>Performance of a contract</Text> – operating and maintaining your game account.
+            </Text>
+            
+            <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
+              <Text style={styles.boldText}>Legitimate interests</Text> – securing the service and preventing fraud.
+            </Text>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
+              How We Use Information
             </Text>
             
             <View style={styles.bulletList}>
               <Text style={[styles.bulletItem, { color: colors.text.secondary }]}>
-                • Create and manage accounts, authenticate users, and operate core app features.
+                • Authenticate and manage accounts.
               </Text>
               <Text style={[styles.bulletItem, { color: colors.text.secondary }]}>
-                • Communicate with users regarding updates or support requests.
+                • Send essential service messages or support replies.
               </Text>
               <Text style={[styles.bulletItem, { color: colors.text.secondary }]}>
-                • Protect against fraud and misuse.
+                • Protect the service against fraud or abuse.
               </Text>
             </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
-              3. Data Sharing
-            </Text>
             
             <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
               We do not sell personal data.
             </Text>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
+              Third‑Party Processors
+            </Text>
             
             <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
-              Data may be shared with trusted service providers (hosting, analytics) solely to operate the service, under agreements requiring confidentiality and security.
+              <Text style={styles.boldText}>Amazon Web Services (Elastic Beanstalk/EC2)</Text> – application hosting (USA).
+            </Text>
+            
+            <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
+              <Text style={styles.boldText}>MongoDB Atlas</Text> – database hosting (USA clusters).
+            </Text>
+            
+            <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
+              <Text style={styles.boldText}>Apple</Text> – app distribution and optional diagnostic data under Apple's own policy.
+            </Text>
+            
+            <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
+              <Text style={styles.boldText}>Google Workspace</Text> – handles support@risingpunk.com email forwarding.
+            </Text>
+            
+            <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
+              Each processor operates under a written data‑processing agreement.
             </Text>
           </View>
 
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
-              4. Data Retention
+              International Data Transfers
             </Text>
             
             <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
-              Personal data is kept while the account remains active.
-            </Text>
-            
-            <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
-              Users can delete their data by deleting their account within the app or contacting us (support@risingpunk.com).
-            </Text>
-            
-            <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
-              Deleted accounts are permanently removed from our active databases within a reasonable time frame.
+              Data is stored on servers in the United States. For EU/UK users, transfers rely on Standard Contractual Clauses or equivalent lawful mechanisms.
             </Text>
           </View>
 
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
-              5. Security
+              Data Retention
             </Text>
             
             <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
-              Passwords are hashed with bcrypt.
+              <Text style={styles.boldText}>Active accounts:</Text> retained until you delete or remain inactive for 12 months, after which they are scheduled for deletion.
             </Text>
             
             <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
-              We employ industry-standard measures (such as HTTPS) to protect data in transit and at rest.
+              <Text style={styles.boldText}>User‑initiated deletion:</Text> removed immediately from active systems and purged from backups within 30 days.
             </Text>
             
             <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
-              No method of transmission or storage is 100% secure, so we cannot guarantee absolute security.
+              <Text style={styles.boldText}>Server logs:</Text> automatically deleted after 30 days.
             </Text>
           </View>
 
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
-              6. Children's Privacy
+              Your Rights
             </Text>
             
             <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
-              RisingPunk is not directed to children under 13, and we do not knowingly collect data from them.
+              Contact support@risingpunk.com to:
             </Text>
             
+            <View style={styles.bulletList}>
+              <Text style={[styles.bulletItem, { color: colors.text.secondary }]}>
+                • Access a copy of your email and handle.
+              </Text>
+              <Text style={[styles.bulletItem, { color: colors.text.secondary }]}>
+                • Rectify or update them.
+              </Text>
+              <Text style={[styles.bulletItem, { color: colors.text.secondary }]}>
+                • Delete your account (or request restriction/objection).
+              </Text>
+              <Text style={[styles.bulletItem, { color: colors.text.secondary }]}>
+                • Receive data in a portable format (JSON/CSV).
+              </Text>
+            </View>
+            
             <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
-              If we learn that we have collected such data, we will delete it promptly.
+              We respond within one month. EU/UK users may lodge a complaint with a supervisory authority (e.g., the ICO).
             </Text>
           </View>
 
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
-              7. User Rights
+              Security
             </Text>
             
             <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
-              Users may request access, correction, or deletion of their data via in‑app settings or by contacting support@risingpunk.com.
+              Passwords are hashed; email addresses are encrypted at rest. We use HTTPS/TLS and role‑based access controls, but no method is 100% secure.
             </Text>
           </View>
 
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
-              8. Changes to This Policy
+              Data Breach Response
             </Text>
             
             <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
-              We may update this policy periodically. Material changes will be posted on this page with a new effective date.
+              On discovering a personal‑data breach, we will notify affected users and regulators within 72 hours, outlining the incident and remedial steps.
             </Text>
           </View>
 
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
-              9. Contact Us
+              Children's Privacy
+            </Text>
+            
+            <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
+              RisingPunk is intended for users 16+. We do not knowingly collect data from younger children; any such data will be deleted.
+            </Text>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
+              Changes to This Policy
+            </Text>
+            
+            <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
+              Material updates will be posted in‑app and/or via email with a revised effective date.
+            </Text>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
+              Contact
             </Text>
             
             <View style={[styles.contactInfo, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '33' }]}>
               <Text style={[styles.contactText, { color: colors.text.primary }]}>
-                Questions or requests can be sent to:
+                support@risingpunk.com
               </Text>
               <Text style={[styles.contactEmail, { color: colors.primary }]}>
-                support@risingpunk.com
+                DevHead LLC, 3801 E. Windsong Dr., Phoenix, AZ 85048, USA
               </Text>
             </View>
           </View>
@@ -297,5 +350,8 @@ const styles = StyleSheet.create({
   contactEmail: {
     fontSize: SIZING.font.body,
     fontWeight: '600',
+  },
+  boldText: {
+    fontWeight: 'bold',
   },
 });
