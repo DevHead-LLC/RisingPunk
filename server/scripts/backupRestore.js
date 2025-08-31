@@ -38,6 +38,12 @@ function generateBackupCommands() {
   console.log('   # Backup only game configuration collections:');
   console.log(`   mongodump --uri="${process.env.MONGODB_URI}" --collection=game_config --collection=bot_types --collection=bot_growth_config --collection=combat_type_advantages --collection=finance_tier_templates --collection=research --collection=maps --out=${backupDir}/config-only\n`);
   
+  console.log('   # Backup user data collections (for privacy compliance):');
+  console.log(`   mongodump --uri="${process.env.MONGODB_URI}" --collection=users --collection=user_activity_logs --collection=bots --collection=battles --out=${backupDir}/user-data\n`);
+  
+  console.log('   # Backup everything (recommended for full restore):');
+  console.log(`   mongodump --uri="${process.env.MONGODB_URI}" --out=${backupDir}/full-backup\n`);
+  
   console.log('4. Compress backup:');
   console.log(`   tar -czf ${backupDir}.tar.gz ${backupDir}\n`);
   
@@ -65,6 +71,12 @@ function generateRestoreCommands() {
   console.log('2. Restore specific collections:');
   console.log('   # Restore only configuration data:');
   console.log('   mongorestore --uri="${process.env.MONGODB_URI}" --collection=game_config --collection=bot_types --collection=bot_growth_config --collection=combat_type_advantages --collection=finance_tier_templates --collection=research --collection=maps backup-directory/RisingPunk/\n');
+  
+  console.log('   # Restore user data (respects privacy retention policies):');
+  console.log('   mongorestore --uri="${process.env.MONGODB_URI}" --collection=users --collection=user_activity_logs --collection=bots --collection=battles backup-directory/RisingPunk/\n');
+  
+  console.log('   # ⚠️  WARNING: Restoring user_activity_logs will reset 30-day deletion timers');
+  console.log('   #    Consider if you really need to restore privacy-sensitive data\n');
   
   console.log('3. Restore with custom database name:');
   console.log('   mongorestore --uri="${process.env.MONGODB_URI}" --nsFrom="RisingPunk.*" --nsTo="RisingPunk.*" backup-directory/\n');
@@ -216,6 +228,14 @@ function main() {
   console.log('• Consider using Atlas Backup service for production databases');
   console.log('• User data (users, bots, battles, etc.) will NOT be restored by seeding');
   console.log('• Only game configuration and map data will be restored\n');
+  
+  console.log('🔒 Privacy Compliance Notes:');
+  console.log('============================\n');
+  console.log('• user_activity_logs collection contains IP addresses and device IDs');
+  console.log('• This data automatically expires after 30 days (TTL index)');
+  console.log('• Restoring this collection will reset deletion timers');
+  console.log('• Consider if restoring privacy-sensitive data is necessary');
+  console.log('• For disaster recovery, restore only essential game data\n');
 }
 
 // Run if called directly

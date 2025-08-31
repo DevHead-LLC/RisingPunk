@@ -1,0 +1,14 @@
+---
+description: Watch for these on everything you do every time. These are rules you should always follow.
+globs:
+alwaysApply: true
+---
+
+1. Check for existing files and logic first thoroughly every time
+2. DO NOT create new files without checking for existing files and logic
+3. ONLY create new files if 100% sure no existing logic exists OR when existing files are >250 lines of code
+4. If existing file size is >250 lines of code, create a new file and import where necessary
+5. Make sure you're not duplicating existing code
+6. Use a "Source of Truth" (AKA "Authority") for similar code pieces.  Be careful not to create competing or duplicate code.
+7. Use existing mobile/src/current-task.md file as your personal extra context.  Read it, update it, perform a phase of tasks as needed, then update it again and repeat this process.  This ensures you accurately track what you're doing with extra contextual pieces.
+8. Keep current-task.md to a maximum of 300 lines.  Replace irrelevant content by deleting older content and keeping the main current task as the priority.  (Keep associated items, delete unrelated items)
