@@ -52,5 +52,7 @@
 	<array>
 		<string>AntDesign.ttf</string>
 	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
