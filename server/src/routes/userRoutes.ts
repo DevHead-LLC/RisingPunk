@@ -459,3 +459,42 @@ router.put<{}, { success: boolean; message: string; profileGender: 'male' | 'fem
     }
   }
 );
+
+// Delete user account
+router.delete('/account', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    const { handle } = req.body;
+    
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    if (!handle) {
+      res.status(400).json({ error: 'Handle is required for account deletion' });
+      return;
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    if (user.handle !== handle) {
+      res.status(400).json({ error: 'Handle verification failed' });
+      return;
+    }
+
+    await User.findByIdAndDelete(userId);
+    
+    res.json({
+      success: true,
+      message: 'Account deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting user account:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});

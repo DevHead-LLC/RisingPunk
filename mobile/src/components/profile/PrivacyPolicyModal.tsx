@@ -28,6 +28,7 @@ export function PrivacyPolicyModal({
       animationType="slide"
       presentationStyle="pageSheet"
       onRequestClose={onClose}
+      supportedOrientations={['landscape']}
     >
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.header}>

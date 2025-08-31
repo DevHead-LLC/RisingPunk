@@ -196,6 +196,15 @@ export const authApi = createApi({
       }),
       invalidatesTags: ['User'],
     }),
+
+    deleteAccount: builder.mutation<{ success: boolean; message: string }, { handle: string }>({
+      query: (data) => ({
+        url: '/api/users/account',
+        method: 'DELETE',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
   }),
 });
 
@@ -210,4 +219,5 @@ export const {
   useUnlockRentalHousingMutation,
   useCompleteRentalHousingMutation,
   useCompleteOnboardingMutation,
+  useDeleteAccountMutation,
 } = authApi;
