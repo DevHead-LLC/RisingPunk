@@ -6,7 +6,8 @@ const auth = async (req: Request, res: Response, next: NextFunction): Promise<vo
     const token = req.header('Authorization')?.replace('Bearer ', '');
     
     if (!token) {
-      throw new Error();
+      res.status(401).json({ error: 'Please authenticate' });
+      return;
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'defaultsecret');
@@ -14,6 +15,7 @@ const auth = async (req: Request, res: Response, next: NextFunction): Promise<vo
     next();
   } catch (error) {
     res.status(401).json({ error: 'Please authenticate' });
+    return;
   }
 };
 

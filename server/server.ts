@@ -2,11 +2,11 @@ import helmet from 'helmet';
 import { CORS_ORIGINS, PORT } from './src/config/env';
 console.log('Environment loaded via dotenv-flow. Connecting to MongoDB...');
 
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const path = require('path');
-const fs = require('fs');
+import express from 'express';
+import mongoose from 'mongoose';
+import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
 import { User } from './src/models/User';
 import authRoutes from './src/routes/auth';
 import auth from './src/middleware/auth';
@@ -19,6 +19,7 @@ import battleRoutes from './src/routes/battle';
 import healthRoute from './src/routes/health';
 import researchRoutes from './src/routes/research';
 import documentsRoutes from './src/routes/documents';
+import testRoutes from './src/routes/test';
 
 declare global {
   namespace Express {
@@ -40,25 +41,43 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Activity logging middleware for privacy policy compliance
+import { activityLogging } from './src/middleware/activityLogging';
+
 // MongoDB connection - simplified to match mongosh
+if (!process.env.MONGODB_URI) {
+  console.error('❌ MONGODB_URI environment variable is not set');
+  process.exit(1);
+}
+
 mongoose.connect(process.env.MONGODB_URI, {
   dbName: 'RisingPunk',
   appName: 'mongosh+2.2.12'  // matching the working mongosh connection
 })
 .then(async () => {
   console.log('✅ MongoDB connected successfully');
-  console.log('📦 Database:', mongoose.connection.db.databaseName);
+  console.log('📦 Database:', mongoose.connection.db?.databaseName || 'Unknown');
   console.log('🔗 Connected to:', mongoose.connection.host);
   
   // Initialize leveling and bot stats services
   try {
-    const { LevelingService } = require('./src/services/LevelingService');
-    const { BotStatsService } = require('./src/services/BotStatsService');
-    
-    await LevelingService.loadConfig();
+          const { LevelingService } = require('./src/services/LevelingService');
+      const { BotStatsService } = require('./src/services/BotStatsService');
+      const { DataCleanupService } = require('./src/services/DataCleanupService');
+      
+      await LevelingService.loadConfig();
     await BotStatsService.loadConfigs();
     
+    // Start data cleanup service for privacy policy compliance
+    DataCleanupService.startScheduledCleanup();
+    
+    // Start activity aggregation service for privacy compliance
+    const { ActivityAggregationService } = require('./src/services/ActivityAggregationService');
+    ActivityAggregationService.startAggregationService();
+    
     console.log('✅ Game services initialized successfully');
+    console.log('✅ Data cleanup service started for privacy compliance');
+    console.log('✅ Activity aggregation service started for privacy compliance');
   } catch (error) {
     console.error('❌ Failed to initialize game services:', error);
     process.exit(1);
@@ -114,12 +133,16 @@ app.get('/api/profile', async (req: Request, res: Response) => {
 
 app.use('/api/auth', authRoutes);
 
+// Activity logging middleware for privacy policy compliance
+// This runs AFTER auth routes so req.user is available
+app.use(activityLogging);
+
 // Add this route to verify database connection
 app.get('/api/dbcheck', async (req: Request, res: Response) => {
   try {
-    const dbName = mongoose.connection.db.databaseName;
-    const collections = await mongoose.connection.db.listCollections().toArray();
-    const users = await mongoose.connection.db.collection('users').countDocuments();
+    const dbName = mongoose.connection.db?.databaseName || 'Unknown';
+    const collections = await mongoose.connection.db?.listCollections().toArray() || [];
+    const users = await mongoose.connection.db?.collection('users').countDocuments() || 0;
     
     res.json({
       database: dbName,
@@ -211,10 +234,11 @@ app.get('/api/bots', auth, async (req: Request, res: Response) => {
   try {
     const bot = await Bot.findOne({ userId: req.user._id });
     if (!bot) {
-      return res.json({ 
+      res.json({ 
         bots: { breacher: 0, guardian: 0, phreak: 0 },
         battalionAssignments: []
       });
+      return;
     }
     res.json({ 
       bots: bot.bots,
@@ -250,16 +274,19 @@ app.post('/api/bots/build', auth, async (req: Request, res: Response) => {
     const { type, quantity, totalCost } = req.body;
     
     if (!type || quantity <= 0) {
-      return res.status(400).json({ error: 'Invalid build parameters' });
+      res.status(400).json({ error: 'Invalid build parameters' });
+      return;
     }
 
     const user = await User.findById(req.user._id);
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      res.status(404).json({ error: 'User not found' });
+      return;
     }
 
     if (user.balance.total < totalCost) {
-      return res.status(400).json({ error: 'Insufficient balance' });
+      res.status(400).json({ error: 'Insufficient balance' });
+      return;
     }
 
     // Deduct balance FIRST to ensure we have sufficient funds
@@ -306,11 +333,13 @@ app.post('/api/balance/deduct', auth, async (req: Request, res: Response) => {
     const user = await User.findById(req.user._id);
     
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      res.status(404).json({ error: 'User not found' });
+      return;
     }
 
     if (user.balance.total < amount) {
-      return res.status(400).json({ error: 'Insufficient balance' });
+      res.status(400).json({ error: 'Insufficient balance' });
+      return;
     }
 
     user.balance.total -= amount;
@@ -354,10 +383,11 @@ app.get('/api/bots/build-state', auth, async (req: Request, res: Response) => {
     const bot = await Bot.findOne({ userId: req.user._id });
     
     if (!bot?.buildQueue) {
-      return res.json({ 
+      res.json({ 
         buildQueue: null,
         bots: bot?.bots || { breacher: 0, guardian: 0, phreak: 0 }
       });
+      return;
     }
 
     const now = new Date();
@@ -387,10 +417,11 @@ app.get('/api/bots/build-state', auth, async (req: Request, res: Response) => {
       bot.buildQueue = null;
       await bot.save();
 
-      return res.json({
+      res.json({
         buildQueue: null,
         bots: bot.bots
       });
+      return;
     }
 
     // Return current state with all buildQueue properties
@@ -415,6 +446,14 @@ app.use('/api/users', userRoutes);
 app.use('/api/battle', battleRoutes);
 app.use('/api/research', researchRoutes);
 app.use('/documents', documentsRoutes);
+
+// Test routes for privacy policy compliance verification
+app.use('/api/test', testRoutes);
+
+// Admin routes for privacy policy compliance and data management
+import adminRoutes from './src/routes/admin';
+app.use('/api/admin', adminRoutes);
+
 app.use('/', healthRoute);
 
 app.post('/api/battalions/assign', auth, async (req: Request, res: Response) => {
@@ -443,7 +482,8 @@ app.post('/api/battalions/assign', auth, async (req: Request, res: Response) => 
 
     // Now verify sufficient bots available
     if (bot.bots[botType] < quantity) {
-      return res.status(400).json({ error: 'Insufficient bots available' });
+      res.status(400).json({ error: 'Insufficient bots available' });
+      return;
     }
 
     // Make the new assignment
