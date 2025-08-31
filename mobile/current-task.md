@@ -1,5 +1,15 @@
 # Current Task: User-vs-User Hacking with Defender Wave Deployment
 
+## Recently Completed: Terms of Service Integration
+- ✅ Created server endpoint `/documents/terms-of-service` serving formatted HTML Terms of Service
+- ✅ Added Terms of Service route to server with proper styling and content matching user's specified TOS
+- ✅ Created TermsOfServiceModal component for mobile app display with theme-aware styling
+- ✅ Integrated Terms of Service into ProfileScreen content tab under "APPLICATION DETAILS" section (changed from "LEGAL")
+- ✅ Terms of Service displays in scrollable overlay with close button alongside Privacy Policy
+- ✅ Content includes all specified sections: Acceptance of Terms, Eligibility, Account Registration, User Conduct, IP, Purchases, Suspension, Dispute Resolution, Warranties, Liability, Changes, Contact
+- ✅ Both server endpoint (/documents/terms-of-service) and in-app modal now display comprehensive TOS content
+- ✅ Effective date set to August 30, 2025 as specified
+
 ## Recently Completed: Email Encryption Bug Fix & Performance Optimization
 - ✅ Fixed critical bug where new user registration stored emails as plain text
 - ✅ Added pre-save hook in User model to automatically encrypt emails before saving
@@ -59,12 +69,12 @@ Phased Plan (minimal, additive, no duplication):
    - **REQUIRED**: Update `BattlePreparationScreen` Props to accept `defenderId` and pass it through to battle start
 
 2) Battle Setup (no pre-spawn for defender in U-vs-U)
-   - In `BattleSetupService.createBattle`: when `defenderId` is a user (not NPC), only create attacker battalions; do not pre-create enemy battalions. Compute `totalArmyHealth` using attacker battalions plus defender inventory (by type) at defender’s level to size tug-of-war nodes correctly. Persist flags/fields on `Battle`:
+   - In `BattleSetupService.createBattle`: when `defenderId` is a user (not NPC), only create attacker battalions; do not pre-create enemy battalions. Compute `totalArmyHealth` using attacker battalions plus defender inventory (by type) at defender's level to size tug-of-war nodes correctly. Persist flags/fields on `Battle`:
      - `isUserDefender: true`, `defenderDeployedTotals: {guardian, breacher, phreak}`, `defenderDeploymentExhausted: false`.
 
 3) Defender Wave Spawning (6 battalions/sec, 250k cap per battalion)
    - Create `server/src/services/DefenderDeploymentService.ts` (new):
-     - Build a dynamic deployment plan from defender’s `Bot` inventory at battle start; randomize bot type per battalion respecting remaining counts and 250k cap.
+     - Build a dynamic deployment plan from defender's `Bot` inventory at battle start; randomize bot type per battalion respecting remaining counts and 250k cap.
      - On each battle tick, spawn up to 6 battalions until inventory exhausted.
      - For each spawn: decrement defender `Bot` inventory immediately; append battalions to `battle.battalions`; also append to `startingBattalions` as they appear.
      - Track per-type totals in `battle.defenderDeployedTotals` and mark `defenderDeploymentExhausted` when done.
@@ -90,7 +100,7 @@ Phased Plan (minimal, additive, no duplication):
    - No new screens. Keep existing preparation and battle screens. Enable U-vs-U map hack and pass `defenderId` from `HackMapScreen` (treat non-self `owner==='player'` as hackable enemy; set `pendingDefenderUserId`).
 
 8) Manual verification (user-run)
-   - Attack another user; observe defender waves ramp to 6 battalions/sec until inventory spent; after battle, verify both users’ inventories reflect destroyed vs returned survivors.
+   - Attack another user; observe defender waves ramp to 6 battalions/sec until inventory spent; after battle, verify both users' inventories reflect destroyed vs returned survivors.
 
 ## Recently Added: Privacy Policy Integration
 - ✅ Created server endpoint `/documents/privacy-policy` serving formatted HTML privacy policy
@@ -101,6 +111,11 @@ Phased Plan (minimal, additive, no duplication):
 - ✅ Content matches user's specified privacy policy text with August 30, 2025 effective date
 - ✅ Modal uses theme-aware styling and responsive design
 - ✅ Accessible via Profile → CONTENT → LEGAL → Privacy Policy
+- ✅ **UPDATED**: Privacy policy content updated to match new comprehensive policy text
+- ✅ **UPDATED**: Both server endpoint (/documents/privacy-policy) and in-app modal now display updated content
+- ✅ **UPDATED**: New sections added: Data Controller, Legal Bases, Third-Party Processors, International Data Transfers, Your Rights, Data Breach Response
+- ✅ **UPDATED**: Children's privacy age updated from 13+ to 16+ to match new policy
+- ✅ **UPDATED**: Contact information updated with full company address and email details
 
 ## Recently Added: Global Internet Connectivity Checking
 - ✅ Added @react-native-community/netinfo package for network detection
