@@ -11,23 +11,26 @@
     "test": "jest",
     "seed:map": "node scripts/seedMap.js",
     "seed:database": "node scripts/seedDatabase.js",
-    "backup:guide": "node scripts/backupRestore.js"
+    "backup:guide": "node scripts/backupRestore.js",
+    "migrate:encrypt-emails": "node scripts/encryptExistingEmails.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@types/crypto-js": "^4.2.2",
     "@types/jsonwebtoken": "^9.0.7",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
+    "crypto-js": "^4.2.0",
     "dotenv-flow": "^4.0.2",
     "express": "^4.21.2",
+    "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.12.0",
     "mongoose": "^8.9.5",
     "nodemon": "^3.1.9",
-    "helmet": "^7.1.0",
     "seedrandom": "^3.0.5",
     "ts-node": "^10.9.2"
   },
@@ -43,9 +46,10 @@
     "react-test-renderer": "^18.3.1",
     "supertest": "^7.1.3",
     "ts-jest": "^29.1.2",
-    "typescript": "^5.7.3",
-    "tsx": "^4.13.0"
+    "tsx": "^4.13.0",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=18 <23"
   }
-  ,
-  "engines": {"node": ">=18 <23"}
 }

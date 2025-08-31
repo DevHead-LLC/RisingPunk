@@ -114,8 +114,9 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
       });
       
       if (existingUser) {
+        const existingEmail = existingUser.getDecryptedEmail();
         res.status(400).json({ 
-          error: existingUser.email === email ? 'Email already exists' : 'Handle already exists'
+          error: existingEmail === email ? 'Email already exists' : 'Handle already exists'
         });
         return;
       }
@@ -143,7 +144,7 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
         token,
         user: {
           handle: user.handle,
-          email: user.email,
+          email: user.getDecryptedEmail(),
           level: user.level,
           unlockedFeatures: {
             hackRig: user.unlockedFeatures?.hackRig || false
@@ -188,7 +189,7 @@ router.post<{}, UserResponse | { error: string }, LoginRequest['body']>(
         token,
         user: {
           handle: user.handle,
-          email: user.email,
+          email: user.getDecryptedEmail(),
           level: user.level,
           unlockedFeatures: {
             hackRig: user.unlockedFeatures?.hackRig || false

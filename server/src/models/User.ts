@@ -1,5 +1,6 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import bcrypt from 'bcryptjs';
+import { EncryptionService } from '../services/EncryptionService';
 
 export interface IUser extends Document {
   email: string;
@@ -38,6 +39,8 @@ export interface IUser extends Document {
     property4: { startedAt: Date | null; completesAt: Date | null };
   };
   verifyAccessKey(accessKey: string): Promise<boolean>;
+  getDecryptedEmail(): string;
+  setEncryptedEmail(email: string): void;
 }
 
 const userSchema = new Schema({
@@ -209,6 +212,20 @@ userSchema.pre('save', async function(this: IUser, next: Function) {
 // Add method to verify password
 userSchema.methods.verifyAccessKey = async function(accessKey: string): Promise<boolean> {
   return bcrypt.compare(accessKey, this.hashedAccessKey);
+};
+
+// Add email encryption/decryption methods
+userSchema.methods.getDecryptedEmail = function(): string {
+  try {
+    return EncryptionService.decryptEmail(this.email);
+  } catch (error) {
+    console.error('Failed to decrypt email:', error);
+    return '';
+  }
+};
+
+userSchema.methods.setEncryptedEmail = function(email: string): void {
+  this.email = EncryptionService.encryptEmail(email);
 };
 
 export const User = mongoose.model<IUser>('User', userSchema); 
