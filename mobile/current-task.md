@@ -1,6 +1,20 @@
 # Current Task: User-vs-User Hacking with Defender Wave Deployment
 
-## Recently Completed: Email Encryption at Rest for GDPR Compliance
+## Recently Completed: Email Encryption Bug Fix & Performance Optimization
+- ✅ Fixed critical bug where new user registration stored emails as plain text
+- ✅ Added pre-save hook in User model to automatically encrypt emails before saving
+- ✅ Updated getDecryptedEmail() method to handle both encrypted and unencrypted emails (backward compatibility)
+- ✅ Fixed existing user email duplicate checking to work with encrypted emails
+- ✅ Added static emailExists() method to User model for efficient duplicate checking
+- ✅ **NEW**: Added emailHash field for efficient duplicate checking without decrypting all emails
+- ✅ **NEW**: Created migration script `npm run migrate:add-email-hash` to add hash field to existing users
+- ✅ **FIXED**: Made emailHash field optional to prevent validation errors with existing users
+- ✅ All new user registrations now properly encrypt emails before database storage
+- ✅ Existing users with unencrypted emails can still authenticate and use the system
+- ✅ Email encryption now works consistently across registration, login, and profile endpoints
+- ✅ **PERFORMANCE**: Email duplicate checking now uses indexed hash field instead of scanning all users
+
+## Previously Completed: Email Encryption at Rest for GDPR Compliance
 - ✅ Installed crypto-js library for AES-256-CBC encryption
 - ✅ Created EncryptionService with encrypt/decrypt methods and key validation
 - ✅ Updated User model with email encryption/decryption methods

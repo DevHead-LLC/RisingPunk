@@ -63,4 +63,14 @@ export class EncryptionService {
       return false;
     }
   }
+
+  static hashEmail(email: string): string {
+    try {
+      const key = this.getEncryptionKey();
+      return CryptoJS.SHA256(email + key).toString();
+    } catch (error) {
+      console.error('Email hashing failed:', error);
+      throw new Error('Failed to hash email');
+    }
+  }
 }

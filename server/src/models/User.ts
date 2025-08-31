@@ -4,6 +4,7 @@ import { EncryptionService } from '../services/EncryptionService';
 
 export interface IUser extends Document {
   email: string;
+  emailHash?: string;
   handle: string;
   hashedAccessKey: string;
   level: number;
@@ -43,11 +44,22 @@ export interface IUser extends Document {
   setEncryptedEmail(email: string): void;
 }
 
+export interface IUserModel extends mongoose.Model<IUser> {
+  emailExists(email: string): Promise<boolean>;
+}
+
 const userSchema = new Schema({
   email: {
     type: String,
     required: true,
     unique: true
+  },
+  emailHash: {
+    type: String,
+    required: false,
+    unique: true,
+    sparse: true,
+    index: true
   },
   handle: {
     type: String,
@@ -206,6 +218,28 @@ userSchema.pre('save', async function(this: IUser, next: Function) {
     const salt = await bcrypt.genSalt(12);
     this.hashedAccessKey = await bcrypt.hash(this.hashedAccessKey, salt);
   }
+  
+  // Encrypt email if it's modified and not already encrypted
+  if (this.isModified('email') && !EncryptionService.isEncrypted(this.email)) {
+    this.email = EncryptionService.encryptEmail(this.email);
+  }
+  
+  // Generate email hash for efficient duplicate checking
+  if (this.isModified('email')) {
+    const originalEmail = this.isModified('email') && !EncryptionService.isEncrypted(this.email) 
+      ? this.email 
+      : this.getDecryptedEmail();
+    this.emailHash = EncryptionService.hashEmail(originalEmail);
+  }
+  
+  // Ensure emailHash exists for new users or when updating email
+  if (!this.emailHash && this.email) {
+    const originalEmail = EncryptionService.isEncrypted(this.email) 
+      ? this.getDecryptedEmail() 
+      : this.email;
+    this.emailHash = EncryptionService.hashEmail(originalEmail);
+  }
+  
   next();
 });
 
@@ -217,6 +251,10 @@ userSchema.methods.verifyAccessKey = async function(accessKey: string): Promise<
 // Add email encryption/decryption methods
 userSchema.methods.getDecryptedEmail = function(): string {
   try {
+    // If email is not encrypted, return as-is
+    if (!EncryptionService.isEncrypted(this.email)) {
+      return this.email;
+    }
     return EncryptionService.decryptEmail(this.email);
   } catch (error) {
     console.error('Failed to decrypt email:', error);
@@ -228,4 +266,25 @@ userSchema.methods.setEncryptedEmail = function(email: string): void {
   this.email = EncryptionService.encryptEmail(email);
 };
 
-export const User = mongoose.model<IUser>('User', userSchema); 
+// Static method to check if email exists (for registration validation)
+userSchema.statics.emailExists = async function(email: string): Promise<boolean> {
+  // Use the email hash for efficient duplicate checking
+  const emailHash = EncryptionService.hashEmail(email);
+  const existingUser = await this.findOne({ emailHash });
+  
+  if (existingUser) {
+    return true;
+  }
+  
+  // Fall back to checking decrypted emails for users without emailHash (backward compatibility)
+  const usersWithoutHash = await this.find({ 
+    $or: [
+      { emailHash: { $exists: false } },
+      { emailHash: null }
+    ]
+  });
+  
+  return usersWithoutHash.some((user: IUser) => user.getDecryptedEmail() === email);
+};
+
+export const User = mongoose.model<IUser, IUserModel>('User', userSchema); 

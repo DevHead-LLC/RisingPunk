@@ -110,14 +110,19 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
       
       // Check for existing user (case-insensitive handle check with regex escaping)
       const existingUser = await User.findOne({ 
-        $or: [{ email }, { handle: { $regex: new RegExp(`^${escapeRegexString(handle)}$`, 'i') } }] 
+        handle: { $regex: new RegExp(`^${escapeRegexString(handle)}$`, 'i') } 
       });
       
       if (existingUser) {
-        const existingEmail = existingUser.getDecryptedEmail();
-        res.status(400).json({ 
-          error: existingEmail === email ? 'Email already exists' : 'Handle already exists'
-        });
+        res.status(400).json({ error: 'Handle already exists' });
+        return;
+      }
+
+      // Check for existing email using the static method
+      const emailExists = await User.emailExists(email);
+      
+      if (emailExists) {
+        res.status(400).json({ error: 'Email already exists' });
         return;
       }
 
