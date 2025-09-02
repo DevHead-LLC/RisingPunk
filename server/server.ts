@@ -59,6 +59,15 @@ mongoose.connect(process.env.MONGODB_URI, {
   console.log('📦 Database:', mongoose.connection.db?.databaseName || 'Unknown');
   console.log('🔗 Connected to:', mongoose.connection.host);
   
+  // Initialize Google Auth Service
+  try {
+    const { GoogleAuthService } = require('./src/services/GoogleAuthService');
+    GoogleAuthService.initialize();
+    console.log('✅ Google Auth Service initialized');
+  } catch (error) {
+    console.warn('⚠️  Google Auth Service not available:', error);
+  }
+  
   // Initialize leveling and bot stats services
   try {
           const { LevelingService } = require('./src/services/LevelingService');

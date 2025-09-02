@@ -7,9 +7,12 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { GoogleSignin, GoogleSigninButton } from '@react-native-google-signin/google-signin';
+
 import {SIZING, styleGuide} from '../styles/theme';
+import { GOOGLE_AUTH_CONFIG } from '../config/googleAuth';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { loginUser, registerUser, clearError } from '../store/slices/authSlice';
+import { loginUser, registerUser, clearError, googleSignIn, googleSignUp } from '../store/slices/authSlice';
 import { TitleSection } from '../components/auth/TitleSection';
 import { AuthInputs } from '../components/auth/AuthInputs';
 import { useFormState } from '../hooks/useFormState';
@@ -50,6 +53,156 @@ const ErrorMessage = memo(function ErrorMessage({ error }: { error: string | nul
   return <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>;
 });
 
+const GoogleSignInButton = memo(function GoogleSignInButton() {
+  const dispatch = useAppDispatch();
+  const colors = useThemeColors();
+  
+  const handleGoogleSignIn = useCallback(async () => {
+    console.log('🔵 GSI LOGIN: Starting Google Sign-In process');
+    
+    try {
+      console.log('🔵 GSI LOGIN: Configuring Google Sign-In');
+      const config = {
+        webClientId: GOOGLE_AUTH_CONFIG.webClientId,
+        iosClientId: GOOGLE_AUTH_CONFIG.iosClientId,
+        offlineAccess: false,
+        forceCodeForRefreshToken: false,
+        openIdConnect: true,
+      };
+      
+      GoogleSignin.configure(config);
+      await GoogleSignin.hasPlayServices();
+      
+      console.log('🔵 GSI LOGIN: Initiating Google Sign-In UI');
+      const userInfo = await GoogleSignin.signIn();
+      
+      if (userInfo.type === 'cancelled' || userInfo.data === null) {
+        console.log('🔵 GSI LOGIN: User cancelled Google Sign-In');
+        return;
+      }
+      
+      const idToken = userInfo.data?.idToken;
+      if (idToken) {
+        console.log('🔵 GSI LOGIN: ID token received, dispatching to Redux');
+        await dispatch(googleSignIn(idToken)).unwrap();
+        console.log('🔵 GSI LOGIN: Redux dispatch completed successfully');
+      } else {
+        throw new Error('No ID token received from Google');
+      }
+    } catch (error: any) {
+      console.log('🔴 GSI LOGIN: Error caught:', error);
+      
+      if (error.code === 'SIGN_IN_CANCELLED' || error.code === 'IN_PROGRESS') {
+        return; // Handle silently
+      }
+      
+      // Let Redux handle the error display
+      throw error;
+    }
+  }, [dispatch]);
+
+  return (
+    <View style={styles.googleButtonContainer}>
+      <TouchableOpacity 
+        style={[styles.googleButton, { 
+          backgroundColor: colors.surface,
+          borderColor: colors.matrix 
+        }]} 
+        onPress={handleGoogleSignIn}
+      >
+        <View style={styles.googleButtonContent}>
+          <View style={styles.googleLogoContainer}>
+            <GoogleSigninButton
+              size={GoogleSigninButton.Size.Icon}
+              color={GoogleSigninButton.Color.Dark}
+              onPress={() => {}} // Empty handler since we're using TouchableOpacity
+            />
+          </View>
+          <Text style={[styles.googleButtonText, { color: colors.matrix }]}>
+            SIGN_IN_WITH_GOOGLE
+          </Text>
+        </View>
+        <View style={[styles.buttonCorner, { borderColor: colors.matrix }]} />
+      </TouchableOpacity>
+    </View>
+  );
+});
+
+const GoogleSignUpButton = memo(function GoogleSignUpButton() {
+  const dispatch = useAppDispatch();
+  const colors = useThemeColors();
+  
+  const handleGoogleSignUp = useCallback(async () => {
+    console.log('🔵 GSU: Starting Google Sign-Up process');
+    
+    try {
+      console.log('🔵 GSU: Configuring Google Sign-In');
+      const config = {
+        webClientId: GOOGLE_AUTH_CONFIG.webClientId,
+        iosClientId: GOOGLE_AUTH_CONFIG.iosClientId,
+        offlineAccess: false,
+        forceCodeForRefreshToken: false,
+        openIdConnect: true,
+      };
+      
+      GoogleSignin.configure(config);
+      await GoogleSignin.hasPlayServices();
+      
+      console.log('🔵 GSU: Initiating Google Sign-In UI');
+      const userInfo = await GoogleSignin.signIn();
+      
+      if (userInfo.type === 'cancelled' || userInfo.data === null) {
+        console.log('🔵 GSU: User cancelled Google Sign-In');
+        return;
+      }
+      
+      const idToken = userInfo.data?.idToken;
+      if (idToken) {
+        console.log('🔵 GSU: ID token received, dispatching to Redux');
+        await dispatch(googleSignUp(idToken)).unwrap();
+        console.log('🔵 GSU: Redux dispatch completed successfully');
+      } else {
+        throw new Error('No ID token received from Google');
+      }
+    } catch (error: any) {
+      console.log('🔴 GSU: Error caught:', error);
+      
+      if (error.code === 'SIGN_IN_CANCELLED' || error.code === 'IN_PROGRESS') {
+        return; // Handle silently
+      }
+      
+      // Let Redux handle the error display
+      throw error;
+    }
+  }, [dispatch]);
+
+  return (
+    <View style={styles.googleButtonContainer}>
+      <TouchableOpacity 
+        style={[styles.googleButton, { 
+          backgroundColor: colors.surface,
+          borderColor: colors.matrix 
+        }]} 
+        onPress={handleGoogleSignUp}
+      >
+        <View style={styles.googleButtonContent}>
+          <View style={styles.googleLogoContainer}>
+            <GoogleSigninButton
+              size={GoogleSigninButton.Size.Icon}
+              color={GoogleSigninButton.Color.Dark}
+              onPress={() => {}} // Empty handler since we're using TouchableOpacity
+            />
+          </View>
+          <Text style={[styles.googleButtonText, { color: colors.matrix }]}>
+            SIGN_UP_WITH_GOOGLE
+          </Text>
+        </View>
+        <View style={[styles.buttonCorner, { borderColor: colors.matrix }]} />
+      </TouchableOpacity>
+    </View>
+  );
+});
+
 export const LoginScreen = () => {
   const dispatch = useAppDispatch();
   const { isLoading: authLoading, error: authError } = useAppSelector((state) => state.auth);
@@ -67,12 +220,7 @@ export const LoginScreen = () => {
   const isLoading = authLoading || formLoading;
   const error = authError || formError;
 
-  // Clear auth error when form type changes
-  useEffect(() => {
-    if (authError) {
-      dispatch(clearError());
-    }
-  }, [formType, authError, dispatch]);
+  // Don't auto-clear auth errors - let them persist until user action
 
   const handleInputChange = useCallback((field: string) => (value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -166,8 +314,9 @@ export const LoginScreen = () => {
   const toggleFormType = useCallback(() => {
     setFormType(prev => prev === 'login' ? 'register' : 'login');
     clearFormError();
+    dispatch(clearError()); // Clear auth errors when switching forms
     setFormData({ email: '', handle: '', accessKey: '', verifyAccessKey: '' });
-  }, [clearFormError]);
+  }, [clearFormError, dispatch]);
 
   const renderLoginForm = () => {
     return (
@@ -250,6 +399,7 @@ export const LoginScreen = () => {
               <ErrorMessage error={error} />
               {formType === 'login' ? renderLoginForm() : renderRegisterForm()}
               <ToggleFormButton formType={formType} onPress={toggleFormType} />
+              {formType === 'login' ? <GoogleSignInButton /> : <GoogleSignUpButton />}
             </View>
           </View>
         </View>
@@ -336,6 +486,35 @@ const styles = StyleSheet.create({
   },
   toggleText: {
     fontSize: SIZING.font.small,
+    letterSpacing: 1,
+  },
+  googleButtonContainer: {
+    marginTop: SIZING.spacing.md,
+    width: '100%',
+    maxWidth: 320,
+    alignItems: 'center',
+  },
+  googleButton: {
+    height: 48,
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    borderWidth: 2,
+    borderRadius: 4,
+  },
+  googleButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleLogoContainer: {
+    marginRight: SIZING.spacing.sm,
+  },
+  googleButtonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '500',
     letterSpacing: 1,
   },
   inputSpacing: {

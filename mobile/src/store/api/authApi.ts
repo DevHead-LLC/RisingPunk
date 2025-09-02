@@ -3,32 +3,31 @@ import type { RootState } from '../index';
 import { API_URL } from '../../config';
 
 export interface LoginRequest {
-  email: string;
-  password: string;
+  handle: string;
+  accessKey: string;
 }
 
 export interface RegisterRequest {
   email: string;
-  password: string;
-  username: string;
+  handle: string;
+  accessKey: string;
+}
+
+export interface GoogleSignInRequest {
+  idToken: string;
 }
 
 export interface AuthResponse {
   token: string;
   user: {
-    id: string;
-    email: string;
     handle: string;
+    email: string;
     level: number;
-    experience: {
-      current: number;
-      nextLevel: number;
-      total: number;
-    };
     unlockedFeatures: {
       hackRig: boolean;
-      researchCenter: boolean;
     };
+    onboardingCompleted: boolean;
+    needsHandleSelection: boolean;
   };
 }
 
@@ -138,6 +137,15 @@ export const authApi = createApi({
       invalidatesTags: ['User'],
     }),
 
+    googleSignIn: builder.mutation<AuthResponse, GoogleSignInRequest>({
+      query: (data) => ({
+        url: '/api/auth/google-signin',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
+
     getProfile: builder.query<ProfileResponse, void>({
       query: () => '/api/users/profile',
       providesTags: ['User'],
@@ -211,6 +219,7 @@ export const authApi = createApi({
 export const {
   useLoginMutation,
   useRegisterMutation,
+  useGoogleSignInMutation,
   useGetProfileQuery,
   useUnlockHackRigMutation,
   useUnlockResearchCenterMutation,

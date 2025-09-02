@@ -19,6 +19,7 @@ export interface User {
   };
   profileGender: 'male' | 'female';
   onboardingCompleted: boolean;
+  needsHandleSelection: boolean;
 }
 
 export interface AuthState {
@@ -27,7 +28,9 @@ export interface AuthState {
   isLoading: boolean;
   error: string | null;
   showOnboarding: boolean;
+  showUsernameSelection: boolean;
   showTurfIntro: boolean;
+  showHandleSelection: boolean;
 }
 
 // Async thunks
@@ -146,6 +149,274 @@ export const registerUser = createAsyncThunk(
       if (error instanceof TypeError && error.message.includes('Network request failed')) {
         return rejectWithValue('Network error: Cannot connect to server');
       }
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+);
+
+export const googleSignInUser = createAsyncThunk(
+  'auth/googleSignIn',
+  async (idToken: string, { rejectWithValue, dispatch }) => {
+    console.log('🔵 GSI Redux: Starting Google Sign-In thunk');
+    console.log('🔵 GSI Redux: API URL:', API_URL);
+    console.log('🔵 GSI Redux: ID Token length:', idToken?.length);
+    
+    try {
+      console.log('🔵 GSI Redux: Making fetch request to server');
+      const response = await fetch(`${API_URL}/api/auth/google-signin`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ idToken }),
+      });
+      
+      console.log('🔵 GSI Redux: Server response received');
+      console.log('🔵 GSI Redux: Response status:', response.status);
+      console.log('🔵 GSI Redux: Response ok:', response.ok);
+
+      if (!response.ok) {
+        console.log('🔴 GSI Redux: Server response not ok, parsing error');
+        const error = await response.json().catch(() => ({ error: 'Google Sign-In failed' }));
+        console.log('🔴 GSI Redux: Server error:', error);
+        
+        // Handle specific error cases with user-friendly messages
+        if (error.error && error.error.includes('No account found')) {
+          return rejectWithValue('No account found with this Google account. Please use the "NEW_IDENTITY (SIGN_UP)" option to create an account.');
+        } else if (error.error && error.error.includes('account already exists with this Google account')) {
+          return rejectWithValue('An account already exists with this Google account. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.');
+        } else if (error.error && error.error.includes('account already exists with this email address')) {
+          return rejectWithValue('An account already exists with this email address. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.');
+        }
+        
+        return rejectWithValue(error.error || 'Google Sign-In failed');
+      }
+
+      console.log('🔵 GSI Redux: Parsing successful response');
+      const data = await response.json();
+      console.log('🔵 GSI Redux: Response data parsed successfully');
+
+      // Store in AsyncStorage
+      await AsyncStorage.setItem('token', data.token);
+      await AsyncStorage.setItem('user', JSON.stringify(data.user));
+
+      // Clear any existing RTK Query cache to ensure fresh data for new user
+      dispatch(authApi.util.resetApiState());
+      dispatch(balanceApi.util.resetApiState());
+      dispatch(botsApi.util.resetApiState());
+      dispatch(mapApi.util.resetApiState());
+
+      // Fetch initial data after successful login
+      try {
+        // Fetch balance
+        const balanceResponse = await fetch(`${API_URL}/api/balance`, {
+          headers: {
+            'Authorization': `Bearer ${data.token}`,
+          },
+        });
+
+        if (balanceResponse.ok) {
+          const balanceData = await balanceResponse.json();
+          dispatch(updateBalance({
+            total: balanceData.total,
+            ratePerSecond: balanceData.ratePerSecond,
+            lastUpdated: new Date().toISOString(),
+          }));
+        }
+
+        // Fetch bots
+        const botsResponse = await fetch(`${API_URL}/api/bots`, {
+          headers: {
+            'Authorization': `Bearer ${data.token}`,
+          },
+        });
+
+        if (botsResponse.ok) {
+          const botsData = await botsResponse.json();
+          dispatch(setBots(botsData.bots));
+        }
+
+        // Fetch build state
+        const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
+          headers: {
+            'Authorization': `Bearer ${data.token}`,
+          },
+        });
+
+        if (buildStateResponse.ok) {
+          const buildStateData = await buildStateResponse.json();
+          dispatch(setBuildState(buildStateData));
+        }
+      } catch (fetchError) {
+        // Don't fail login if data fetching fails
+        console.warn('Failed to fetch initial data:', fetchError);
+      }
+
+      console.log('🔵 GSI Redux: Returning successful data');
+      return data;
+    } catch (error) {
+      console.log('🔴 GSI Redux: Error caught in thunk');
+      console.log('🔴 GSI Redux: Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        type: typeof error,
+        isTypeError: error instanceof TypeError,
+        isNetworkError: error instanceof TypeError && error.message.includes('Network request failed'),
+      });
+      
+      if (error instanceof TypeError && error.message.includes('Network request failed')) {
+        console.log('🔴 GSI Redux: Network request failed error detected');
+        return rejectWithValue('Network error: Cannot connect to server');
+      }
+      console.log('🔴 GSI Redux: Other error, rejecting with message');
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+);
+
+export const googleSignUpUser = createAsyncThunk(
+  'auth/googleSignUp',
+  async (idToken: string, { rejectWithValue, dispatch }) => {
+    console.log('🔵 GSU Redux: Starting Google Sign-Up thunk');
+    console.log('🔵 GSU Redux: API URL:', API_URL);
+    console.log('🔵 GSU Redux: ID Token length:', idToken?.length);
+    
+    try {
+      console.log('🔵 GSU Redux: Making fetch request to server');
+      const response = await fetch(`${API_URL}/api/auth/google-signup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ idToken }),
+      });
+      
+      console.log('🔵 GSU Redux: Server response received');
+      console.log('🔵 GSU Redux: Response status:', response.status);
+      console.log('🔵 GSU Redux: Response ok:', response.ok);
+
+      if (!response.ok) {
+        console.log('🔴 GSU Redux: Server response not ok, parsing error');
+        const error = await response.json().catch(() => ({ error: 'Google Sign-Up failed' }));
+        console.log('🔴 GSU Redux: Server error:', error);
+        
+        // Handle specific error cases with user-friendly messages
+        if (error.error && error.error.includes('account already exists with this Google account')) {
+          return rejectWithValue('An account already exists with this Google account. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.');
+        } else if (error.error && error.error.includes('account already exists with this email address')) {
+          return rejectWithValue('An account already exists with this email address. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.');
+        }
+        
+        return rejectWithValue(error.error || 'Google Sign-Up failed');
+      }
+
+      console.log('🔵 GSU Redux: Parsing successful response');
+      const data = await response.json();
+      console.log('🔵 GSU Redux: Response data parsed successfully');
+
+      // Store in AsyncStorage
+      await AsyncStorage.setItem('token', data.token);
+      await AsyncStorage.setItem('user', JSON.stringify(data.user));
+
+      // Clear any existing RTK Query cache to ensure fresh data for new user
+      dispatch(authApi.util.resetApiState());
+      dispatch(balanceApi.util.resetApiState());
+      dispatch(botsApi.util.resetApiState());
+      dispatch(mapApi.util.resetApiState());
+
+      // Fetch initial data after successful signup
+      try {
+        // Fetch balance
+        const balanceResponse = await fetch(`${API_URL}/api/balance`, {
+          headers: {
+            'Authorization': `Bearer ${data.token}`,
+          },
+        });
+
+        if (balanceResponse.ok) {
+          const balanceData = await balanceResponse.json();
+          dispatch(updateBalance({
+            total: balanceData.total,
+            ratePerSecond: balanceData.ratePerSecond,
+            lastUpdated: new Date().toISOString(),
+          }));
+        }
+
+        // Fetch bots
+        const botsResponse = await fetch(`${API_URL}/api/bots`, {
+          headers: {
+            'Authorization': `Bearer ${data.token}`,
+          },
+        });
+
+        if (botsResponse.ok) {
+          const botsData = await botsResponse.json();
+          dispatch(setBots(botsData.bots));
+        }
+
+        // Fetch build state
+        const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
+          headers: {
+            'Authorization': `Bearer ${data.token}`,
+          },
+        });
+
+        if (buildStateResponse.ok) {
+          const buildStateData = await buildStateResponse.json();
+          dispatch(setBuildState(buildStateData));
+        }
+      } catch (fetchError) {
+        console.log('🔴 GSU Redux: Error fetching initial data:', fetchError);
+      }
+
+      console.log('🔵 GSU Redux: Google Sign-Up completed successfully');
+      return data;
+    } catch (error) {
+      console.log('🔴 GSU Redux: Google Sign-Up failed:', error);
+      console.log('🔴 GSU Redux: Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        type: typeof error,
+        isTypeError: error instanceof TypeError,
+        isNetworkError: error instanceof TypeError && error.message.includes('Network request failed'),
+      });
+      
+      if (error instanceof TypeError && error.message.includes('Network request failed')) {
+        console.log('🔴 GSU Redux: Network request failed error detected');
+        return rejectWithValue('Network error: Cannot connect to server');
+      }
+      console.log('🔴 GSU Redux: Other error, rejecting with message');
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+);
+
+export const updateUserHandle = createAsyncThunk(
+  'auth/updateHandle',
+  async (handle: string, { rejectWithValue, getState }) => {
+    try {
+      const state = getState() as { auth: AuthState };
+      const token = state.auth.token;
+      
+      if (!token) {
+        return rejectWithValue('No authentication token');
+      }
+
+      const response = await fetch(`${API_URL}/api/auth/update-handle`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ handle }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Handle update failed' }));
+        throw new Error(error.error || 'Handle update failed');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error: any) {
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -287,7 +558,9 @@ const initialState: AuthState = {
   isLoading: true,
   error: null,
   showOnboarding: false,
+  showUsernameSelection: false,
   showTurfIntro: false,
+  showHandleSelection: false,
 };
 
 // Slice
@@ -316,6 +589,16 @@ export const authSlice = createSlice({
     setShowTurfIntro: (state, action: PayloadAction<boolean>) => {
       state.showTurfIntro = action.payload;
     },
+    setShowHandleSelection: (state, action: PayloadAction<boolean>) => {
+      state.showHandleSelection = action.payload;
+    },
+    setShowUsernameSelection: (state, action: PayloadAction<boolean>) => {
+      state.showUsernameSelection = action.payload;
+    },
+    setUsernameSelectionCompleted: (state) => {
+      state.showUsernameSelection = false;
+      state.showTurfIntro = true;
+    },
   },
   extraReducers: (builder) => {
     // Login
@@ -330,6 +613,7 @@ export const authSlice = createSlice({
       state.user = action.payload.user;
       state.error = null;
       state.showOnboarding = !action.payload.user.onboardingCompleted;
+      state.showHandleSelection = action.payload.user.needsHandleSelection;
     })
       .addCase(loginUser.rejected, (state, action) => {
         state.isLoading = false;
@@ -350,6 +634,64 @@ export const authSlice = createSlice({
       state.showOnboarding = !action.payload.user.onboardingCompleted;
     })
       .addCase(registerUser.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      });
+
+    // Google Sign-In
+    builder
+      .addCase(googleSignInUser.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(googleSignInUser.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.token = action.payload.token;
+        state.user = action.payload.user;
+        state.error = null;
+        state.showOnboarding = !action.payload.user.onboardingCompleted;
+        state.showHandleSelection = action.payload.user.needsHandleSelection;
+      })
+      .addCase(googleSignInUser.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      });
+
+    // Google Sign-Up
+    builder
+      .addCase(googleSignUpUser.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(googleSignUpUser.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.token = action.payload.token;
+        state.user = action.payload.user;
+        state.error = null;
+        state.showOnboarding = !action.payload.user.onboardingCompleted;
+        state.showHandleSelection = action.payload.user.needsHandleSelection;
+      })
+      .addCase(googleSignUpUser.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      });
+
+    // Update Handle
+    builder
+      .addCase(updateUserHandle.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(updateUserHandle.fulfilled, (state, action) => {
+        state.isLoading = false;
+        if (state.user) {
+          state.user.handle = action.payload.user.handle;
+          state.user.needsHandleSelection = false;
+        }
+        state.showHandleSelection = false;
+        state.error = null;
+      })
+      .addCase(updateUserHandle.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       });
@@ -409,6 +751,9 @@ export const authSlice = createSlice({
   },
 });
 
-export const { clearError, setCredentials, setOnboardingCompleted, setShowOnboarding, setShowTurfIntro } = authSlice.actions;
+export const { clearError, setCredentials, setOnboardingCompleted, setShowOnboarding, setShowUsernameSelection, setUsernameSelectionCompleted, setShowTurfIntro, setShowHandleSelection } = authSlice.actions;
 export const logout = logoutUser;
+export const googleSignIn = googleSignInUser;
+export const googleSignUp = googleSignUpUser;
+export const updateHandle = updateUserHandle;
 export default authSlice.reducer;

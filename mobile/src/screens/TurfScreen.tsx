@@ -225,10 +225,34 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     try {
       await completeOnboarding().unwrap();
       dispatch(setOnboardingCompleted());
+      
+      // Center the view on home/digital barracks after onboarding completion
+      setTimeout(() => {
+        const SCREEN_WIDTH = Dimensions.get('window').width;
+        const CONTENT_WIDTH = 2000;
+        const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+        horizontalScrollRef.current?.scrollTo({
+          x: CENTER_X,
+          y: 0,
+          animated: false,
+        });
+      }, 0);
     } catch (error) {
       console.error('Error completing onboarding:', error);
       // Still update local state even if API call fails
       dispatch(setOnboardingCompleted());
+      
+      // Center the view even if API call fails
+      setTimeout(() => {
+        const SCREEN_WIDTH = Dimensions.get('window').width;
+        const CONTENT_WIDTH = 2000;
+        const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+        horizontalScrollRef.current?.scrollTo({
+          x: CENTER_X,
+          y: 0,
+          animated: false,
+        });
+      }, 0);
     }
   }, [dispatch, completeOnboarding]);
 
@@ -236,20 +260,68 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     try {
       await completeOnboarding().unwrap();
       dispatch(setOnboardingCompleted());
+      
+      // Center the view on home/digital barracks after skipping onboarding
+      setTimeout(() => {
+        const SCREEN_WIDTH = Dimensions.get('window').width;
+        const CONTENT_WIDTH = 2000;
+        const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+        horizontalScrollRef.current?.scrollTo({
+          x: CENTER_X,
+          y: 0,
+          animated: false,
+        });
+      }, 0);
     } catch (error) {
       console.error('Error skipping onboarding:', error);
       // Still update local state even if API call fails
       dispatch(setOnboardingCompleted());
+      
+      // Center the view even if API call fails
+      setTimeout(() => {
+        const SCREEN_WIDTH = Dimensions.get('window').width;
+        const CONTENT_WIDTH = 2000;
+        const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+        horizontalScrollRef.current?.scrollTo({
+          x: CENTER_X,
+          y: 0,
+          animated: false,
+        });
+      }, 0);
     }
   }, [dispatch, completeOnboarding]);
 
   // Turf Intro handlers
   const handleTurfIntroComplete = useCallback(() => {
     console.log('Turf Intro completed');
+    
+    // Center the view on home/digital barracks after turf intro completion
+    setTimeout(() => {
+      const SCREEN_WIDTH = Dimensions.get('window').width;
+      const CONTENT_WIDTH = 2000;
+      const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+      horizontalScrollRef.current?.scrollTo({
+        x: CENTER_X,
+        y: 0,
+        animated: false,
+      });
+    }, 0);
   }, []);
 
   const handleTurfIntroSkip = useCallback(() => {
     console.log('Turf Intro skipped');
+    
+    // Center the view on home/digital barracks after skipping turf intro
+    setTimeout(() => {
+      const SCREEN_WIDTH = Dimensions.get('window').width;
+      const CONTENT_WIDTH = 2000;
+      const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+      horizontalScrollRef.current?.scrollTo({
+        x: CENTER_X,
+        y: 0,
+        animated: false,
+      });
+    }, 0);
   }, []);
 
   const navigateToScreen = useCallback((screen: 'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research' | 'investmentProperty') => {

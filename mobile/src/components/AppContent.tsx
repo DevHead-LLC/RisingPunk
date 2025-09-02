@@ -1,6 +1,6 @@
 import React, { memo, useEffect, useRef, useCallback } from 'react';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
-import { loadStoredAuth } from '../store/slices/authSlice';
+import { loadStoredAuth, updateHandle } from '../store/slices/authSlice';
 import { updateBalance, triggerUpdate } from '../store/slices/balanceSlice';
 import { setBots, setBuildState } from '../store/slices/botsSlice';
 import { syncPreferencesFromStorage, syncPreferencesFromUser } from '../store/slices/preferencesSlice';
@@ -14,11 +14,12 @@ import { setFinancialStatements } from '../store/slices/uiSlice';
 import { Dimensions } from 'react-native';
 import { useNetworkConnectivity } from '../providers/NetworkConnectivityProvider';
 import { ConnectivityOverlay } from './common/ConnectivityOverlay';
+import { HandleSelectionModal } from './modals/HandleSelectionModal';
 
 const AppContent = memo(() => {
   const dispatch = useAppDispatch();
   const showFinancials = useAppSelector((state) => state.ui.modals.financialStatements);
-  const { token, isLoading } = useAppSelector((state) => state.auth);
+  const { token, isLoading, showHandleSelection } = useAppSelector((state) => state.auth);
   const balanceDisplayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const turfScreenRef = useRef<any>(null);
   const { isConnected, isInternetReachable } = useNetworkConnectivity();
@@ -133,6 +134,15 @@ const AppContent = memo(() => {
     };
   }, [token, dispatch]);
 
+  // Handle handle selection submission
+  const handleHandleSubmit = useCallback(async (handle: string) => {
+    try {
+      await dispatch(updateHandle(handle)).unwrap();
+    } catch (error) {
+      throw error; // Re-throw to let the modal handle the error
+    }
+  }, [dispatch]);
+
   // Determine if we should show the connectivity overlay
   // Only show when we're definitely disconnected (both flags are false)
   const shouldShowConnectivityOverlay = isConnected === false && isInternetReachable === false;
@@ -160,6 +170,11 @@ const AppContent = memo(() => {
           centerTurfView();
         }} />
       )}
+      <HandleSelectionModal
+        visible={showHandleSelection}
+        onSubmit={handleHandleSubmit}
+        isLoading={isLoading}
+      />
       <ConnectivityOverlay visible={shouldShowConnectivityOverlay} />
     </>
   );
