@@ -7,6 +7,7 @@ export interface IUser extends Document {
   emailHash?: string;
   handle: string;
   hashedAccessKey: string;
+  googleId?: string;
   level: number;
   experience: {
     current: number;
@@ -29,6 +30,7 @@ export interface IUser extends Document {
   };
   profileGender: 'male' | 'female';
   onboardingCompleted: boolean;
+  needsHandleSelection: boolean;
   researchCenterBuild?: {
     startedAt: Date | null;
     completesAt: Date | null;
@@ -46,6 +48,7 @@ export interface IUser extends Document {
 
 export interface IUserModel extends mongoose.Model<IUser> {
   emailExists(email: string): Promise<boolean>;
+  findByGoogleId(googleId: string): Promise<IUser | null>;
 }
 
 const userSchema = new Schema({
@@ -68,7 +71,14 @@ const userSchema = new Schema({
   },
   hashedAccessKey: {
     type: String,
-    required: true
+    required: false
+  },
+  googleId: {
+    type: String,
+    required: false,
+    unique: true,
+    sparse: true,
+    index: true
   },
   level: {
     type: Number,
@@ -155,6 +165,10 @@ const userSchema = new Schema({
     type: Boolean,
     default: false
   },
+  needsHandleSelection: {
+    type: Boolean,
+    default: false
+  },
   researchCenterBuild: {
     startedAt: {
       type: Date,
@@ -214,7 +228,8 @@ const userSchema = new Schema({
 
 // Add password hashing middleware
 userSchema.pre('save', async function(this: IUser, next: Function) {
-  if (this.isModified('hashedAccessKey')) {
+  // Only hash password if it's provided and modified
+  if (this.isModified('hashedAccessKey') && this.hashedAccessKey) {
     const salt = await bcrypt.genSalt(12);
     this.hashedAccessKey = await bcrypt.hash(this.hashedAccessKey, salt);
   }
@@ -285,6 +300,11 @@ userSchema.statics.emailExists = async function(email: string): Promise<boolean>
   });
   
   return usersWithoutHash.some((user: IUser) => user.getDecryptedEmail() === email);
+};
+
+// Static method to find user by Google ID
+userSchema.statics.findByGoogleId = async function(googleId: string): Promise<IUser | null> {
+  return this.findOne({ googleId });
 };
 
 export const User = mongoose.model<IUser, IUserModel>('User', userSchema); 
