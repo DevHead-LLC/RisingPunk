@@ -26,9 +26,10 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
   const { data: buildStatus, isLoading: buildStatusLoading, refetch: refetchBuildStatus } = useGetResearchCenterStatusQuery();
   const { data: balanceData, isLoading: balanceLoading } = useFetchBalanceQuery();
   const dispatch = useAppDispatch();
+  const reduxBalance = useAppSelector((state) => state.balance.total);
   
   // Use both sources to ensure we have the most up-to-date balance
-  const currentBalance = balanceData?.total ?? useAppSelector((state) => state.balance.total);
+  const currentBalance = balanceData?.total ?? reduxBalance;
   
   // Ensure balance is a number
   const numericBalance = typeof currentBalance === 'string' ? parseFloat(currentBalance) : currentBalance;

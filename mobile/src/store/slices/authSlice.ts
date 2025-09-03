@@ -28,9 +28,9 @@ export interface AuthState {
   isLoading: boolean;
   error: string | null;
   showOnboarding: boolean;
-  showUsernameSelection: boolean;
   showTurfIntro: boolean;
   showHandleSelection: boolean;
+  isInitialized: boolean; // Track if initial database verification is complete
 }
 
 // Async thunks
@@ -123,7 +123,7 @@ export const loginUser = createAsyncThunk(
 
 export const registerUser = createAsyncThunk(
   'auth/register',
-  async (credentials: { email: string; handle: string; accessKey: string }, { rejectWithValue }) => {
+  async (credentials: { email: string; accessKey: string }, { rejectWithValue }) => {
     try {
       const response = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
@@ -139,6 +139,8 @@ export const registerUser = createAsyncThunk(
       }
 
       const data = await response.json();
+      console.log('🔵 CLIENT: Received registration response:', data);
+      console.log('🔵 CLIENT: User needsHandleSelection:', data.user.needsHandleSelection);
 
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
@@ -391,7 +393,7 @@ export const googleSignUpUser = createAsyncThunk(
 
 export const updateUserHandle = createAsyncThunk(
   'auth/updateHandle',
-  async (handle: string, { rejectWithValue, getState }) => {
+  async (handle: string, { rejectWithValue, getState, dispatch }) => {
     try {
       const state = getState() as { auth: AuthState };
       const token = state.auth.token;
@@ -415,6 +417,27 @@ export const updateUserHandle = createAsyncThunk(
       }
 
       const data = await response.json();
+      
+      console.log('🔵 HANDLE UPDATE: Handle updated successfully, invalidating User cache');
+      
+      // Update AsyncStorage with new user data
+      try {
+        const currentUserData = await AsyncStorage.getItem('user');
+        if (currentUserData) {
+          const userData = JSON.parse(currentUserData);
+          userData.handle = data.user.handle;
+          userData.needsHandleSelection = false;
+          await AsyncStorage.setItem('user', JSON.stringify(userData));
+          console.log('🔵 HANDLE UPDATE: AsyncStorage updated with new handle:', data.user.handle);
+        }
+      } catch (storageError) {
+        console.warn('🔵 HANDLE UPDATE: Failed to update AsyncStorage:', storageError);
+      }
+      
+      // Invalidate RTK Query cache to ensure profile data is refreshed
+      dispatch(authApi.util.invalidateTags(['User']));
+      console.log('🔵 HANDLE UPDATE: User cache invalidated, profile should refresh');
+      
       return data;
     } catch (error: any) {
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
@@ -474,22 +497,43 @@ export const logoutUser = createAsyncThunk(
 
 export const loadStoredAuth = createAsyncThunk(
   'auth/loadStored',
-  async () => {
-    const [storedToken, storedUser] = await Promise.all([
-      AsyncStorage.getItem('token'),
-      AsyncStorage.getItem('user'),
-    ]);
+  async (_, { rejectWithValue }) => {
+    try {
+      const storedToken = await AsyncStorage.getItem('token');
+      
+      if (!storedToken) {
+        return null;
+      }
 
-    if (storedToken && storedUser) {
-      const user = JSON.parse(storedUser) as User;
+      // Verify token and get fresh user data from database
+      const response = await fetch(`${API_URL}/api/auth/verify-token`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${storedToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        // Token is invalid, clear stored data
+        await AsyncStorage.multiRemove(['token', 'user']);
+        return null;
+      }
+
+      const userData = await response.json();
+      
+      // Update stored user data with fresh database data
+      await AsyncStorage.setItem('user', JSON.stringify(userData.user));
       
       return {
         token: storedToken,
-        user: user,
+        user: userData.user,
       };
+    } catch (error) {
+      console.error('🔴 LOAD STORED AUTH: Error verifying token:', error);
+      // On error, clear stored data to force re-authentication
+      await AsyncStorage.multiRemove(['token', 'user']);
+      return null;
     }
-
-    return null;
   }
 );
 
@@ -558,9 +602,9 @@ const initialState: AuthState = {
   isLoading: true,
   error: null,
   showOnboarding: false,
-  showUsernameSelection: false,
   showTurfIntro: false,
   showHandleSelection: false,
+  isInitialized: false,
 };
 
 // Slice
@@ -577,27 +621,54 @@ export const authSlice = createSlice({
       state.error = null;
     },
     setOnboardingCompleted: (state) => {
+      // Only allow onboarding completion if app is initialized
+      if (!state.isInitialized) {
+        console.log('🔵 ONB: Skipping onboarding completion - app not yet initialized');
+        return;
+      }
+      
+      console.log('🔵 ONB: Onboarding completed, current showHandleSelection:', state.showHandleSelection);
+      // Store the current handle selection state before making changes
+      const shouldShowHandleSelection = state.showHandleSelection;
+      
       state.showOnboarding = false;
       state.showTurfIntro = true;
+      // Explicitly preserve handle selection state
+      state.showHandleSelection = shouldShowHandleSelection;
+      
       if (state.user) {
         state.user.onboardingCompleted = true;
       }
+      console.log('🔵 ONB: After update - showOnboarding:', state.showOnboarding, 'showTurfIntro:', state.showTurfIntro, 'showHandleSelection:', state.showHandleSelection);
     },
     setShowOnboarding: (state, action: PayloadAction<boolean>) => {
       state.showOnboarding = action.payload;
     },
     setShowTurfIntro: (state, action: PayloadAction<boolean>) => {
+      // Only allow turf intro changes if app is initialized
+      if (!state.isInitialized) {
+        console.log('🔵 TURF: Skipping turf intro change - app not yet initialized');
+        return;
+      }
+      
+      console.log('🔵 TURF: Setting showTurfIntro to:', action.payload, 'current showHandleSelection:', state.showHandleSelection);
+      
+      // If we're hiding turf intro (setting to false), check if user needs handle selection
+      if (action.payload === false) {
+        // Check if user needs handle selection and set it to true
+        if (state.user && state.user.needsHandleSelection) {
+          state.showHandleSelection = true;
+          console.log('🔵 TURF: Hiding turf intro, user needs handle selection, setting showHandleSelection: true');
+        } else {
+          console.log('🔵 TURF: Hiding turf intro, user does not need handle selection');
+        }
+      }
+      
       state.showTurfIntro = action.payload;
+      console.log('🔵 TURF: After update - showTurfIntro:', state.showTurfIntro, 'showHandleSelection:', state.showHandleSelection);
     },
     setShowHandleSelection: (state, action: PayloadAction<boolean>) => {
       state.showHandleSelection = action.payload;
-    },
-    setShowUsernameSelection: (state, action: PayloadAction<boolean>) => {
-      state.showUsernameSelection = action.payload;
-    },
-    setUsernameSelectionCompleted: (state) => {
-      state.showUsernameSelection = false;
-      state.showTurfIntro = true;
     },
   },
   extraReducers: (builder) => {
@@ -608,13 +679,14 @@ export const authSlice = createSlice({
         state.error = null;
       })
           .addCase(loginUser.fulfilled, (state, action) => {
-      state.isLoading = false;
-      state.token = action.payload.token;
-      state.user = action.payload.user;
-      state.error = null;
-      state.showOnboarding = !action.payload.user.onboardingCompleted;
-      state.showHandleSelection = action.payload.user.needsHandleSelection;
-    })
+        state.isLoading = false;
+        state.token = action.payload.token;
+        state.user = action.payload.user;
+        state.error = null;
+        state.showOnboarding = !action.payload.user.onboardingCompleted;
+        state.showHandleSelection = action.payload.user.needsHandleSelection;
+        state.isInitialized = true; // Mark as initialized after successful login
+      })
       .addCase(loginUser.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
@@ -627,11 +699,19 @@ export const authSlice = createSlice({
         state.error = null;
       })
           .addCase(registerUser.fulfilled, (state, action) => {
+      console.log('🔵 REG: Registration fulfilled, payload:', action.payload);
+      console.log('🔵 REG: User needsHandleSelection:', action.payload.user.needsHandleSelection);
+      console.log('🔵 REG: User onboardingCompleted:', action.payload.user.onboardingCompleted);
+      
       state.isLoading = false;
       state.token = action.payload.token;
       state.user = action.payload.user;
       state.error = null;
       state.showOnboarding = !action.payload.user.onboardingCompleted;
+      state.showHandleSelection = action.payload.user.needsHandleSelection;
+      state.isInitialized = true; // Mark as initialized after successful registration
+      
+      console.log('🔵 REG: State after update - showOnboarding:', state.showOnboarding, 'showHandleSelection:', state.showHandleSelection, 'isInitialized:', state.isInitialized);
     })
       .addCase(registerUser.rejected, (state, action) => {
         state.isLoading = false;
@@ -651,26 +731,33 @@ export const authSlice = createSlice({
         state.error = null;
         state.showOnboarding = !action.payload.user.onboardingCompleted;
         state.showHandleSelection = action.payload.user.needsHandleSelection;
+        state.isInitialized = true; // Mark as initialized after successful Google Sign-In
       })
       .addCase(googleSignInUser.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       });
 
-    // Google Sign-Up
+        // Google Sign-Up
     builder
       .addCase(googleSignUpUser.pending, (state) => {
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(googleSignUpUser.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.token = action.payload.token;
-        state.user = action.payload.user;
-        state.error = null;
-        state.showOnboarding = !action.payload.user.onboardingCompleted;
-        state.showHandleSelection = action.payload.user.needsHandleSelection;
-      })
+          .addCase(googleSignUpUser.fulfilled, (state, action) => {
+      console.log('🔵 GSU: Google Sign-Up fulfilled, needsHandleSelection:', action.payload.user.needsHandleSelection);
+      
+      state.isLoading = false;
+      state.token = action.payload.token;
+      state.user = action.payload.user;
+      state.error = null;
+      state.showOnboarding = !action.payload.user.onboardingCompleted;
+      // Store needsHandleSelection but don't show modal yet - wait for onboarding + turf intro to complete
+      state.showHandleSelection = false; // Will be set to true after turf intro completes
+      state.isInitialized = true; // Mark as initialized after successful Google Sign-Up
+      
+      console.log('🔵 GSU: State after update - showOnboarding:', state.showOnboarding, 'showHandleSelection:', state.showHandleSelection, 'isInitialized:', state.isInitialized);
+    })
       .addCase(googleSignUpUser.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
@@ -685,11 +772,13 @@ export const authSlice = createSlice({
       .addCase(updateUserHandle.fulfilled, (state, action) => {
         state.isLoading = false;
         if (state.user) {
+          console.log('🔵 AUTH SLICE: Updating local user handle from', state.user.handle, 'to', action.payload.user.handle);
           state.user.handle = action.payload.user.handle;
           state.user.needsHandleSelection = false;
         }
         state.showHandleSelection = false;
         state.error = null;
+        console.log('🔵 AUTH SLICE: Handle update completed, showHandleSelection set to false');
       })
       .addCase(updateUserHandle.rejected, (state, action) => {
         state.isLoading = false;
@@ -715,6 +804,10 @@ export const authSlice = createSlice({
         state.token = null;
         state.user = null;
         state.error = null;
+        state.showOnboarding = false;
+        state.showTurfIntro = false;
+        state.showHandleSelection = false;
+        state.isInitialized = false;
       });
 
     // Load Stored Auth
@@ -722,16 +815,51 @@ export const authSlice = createSlice({
       .addCase(loadStoredAuth.pending, (state) => {
         state.isLoading = true;
       })
-          .addCase(loadStoredAuth.fulfilled, (state, action) => {
-      state.isLoading = false;
-      if (action.payload) {
-        state.token = action.payload.token;
-        state.user = action.payload.user;
-        state.showOnboarding = !action.payload.user.onboardingCompleted;
-      }
-    })
+      .addCase(loadStoredAuth.fulfilled, (state, action) => {
+        state.isLoading = false;
+        if (action.payload) {
+          const { token, user } = action.payload;
+          
+          console.log('🔵 LOAD STORED AUTH: Loading fresh user data from database:', {
+            handle: user.handle,
+            onboardingCompleted: user.onboardingCompleted,
+            needsHandleSelection: user.needsHandleSelection
+          });
+          
+          state.token = token;
+          state.user = user;
+          
+          // Set UI states based on fresh database data
+          state.showOnboarding = !user.onboardingCompleted;
+          state.showTurfIntro = false; // Always start with false, will be set by onboarding flow if needed
+          state.showHandleSelection = user.needsHandleSelection && user.onboardingCompleted;
+          state.isInitialized = true; // Mark that initial database verification is complete
+          
+          console.log('🔵 LOAD STORED AUTH: UI states set:', {
+            showOnboarding: state.showOnboarding,
+            showTurfIntro: state.showTurfIntro,
+            showHandleSelection: state.showHandleSelection,
+            isInitialized: state.isInitialized
+          });
+        } else {
+          // No stored auth, reset all states
+          state.token = null;
+          state.user = null;
+          state.showOnboarding = false;
+          state.showTurfIntro = false;
+          state.showHandleSelection = false;
+          state.isInitialized = false;
+        }
+      })
       .addCase(loadStoredAuth.rejected, (state) => {
         state.isLoading = false;
+        // On error, reset all states
+        state.token = null;
+        state.user = null;
+        state.showOnboarding = false;
+        state.showTurfIntro = false;
+        state.showHandleSelection = false;
+        state.isInitialized = false;
       });
 
     // Fetch Initial Data
@@ -751,7 +879,7 @@ export const authSlice = createSlice({
   },
 });
 
-export const { clearError, setCredentials, setOnboardingCompleted, setShowOnboarding, setShowUsernameSelection, setUsernameSelectionCompleted, setShowTurfIntro, setShowHandleSelection } = authSlice.actions;
+export const { clearError, setCredentials, setOnboardingCompleted, setShowOnboarding, setShowTurfIntro, setShowHandleSelection } = authSlice.actions;
 export const logout = logoutUser;
 export const googleSignIn = googleSignInUser;
 export const googleSignUp = googleSignUpUser;

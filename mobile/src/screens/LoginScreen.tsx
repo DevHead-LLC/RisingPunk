@@ -228,6 +228,7 @@ export const LoginScreen = () => {
 
   const handleSubmit = useCallback(async () => {
     clearFormError();
+    console.log('🔵 LOGIN: Form submission started, formType:', formType);
 
     const validateForm = () => {
       setError('');
@@ -238,7 +239,7 @@ export const LoginScreen = () => {
           return false;
         }
       } else {
-        if (!formData.email || !formData.handle || !formData.accessKey || !formData.verifyAccessKey) {
+        if (!formData.email || !formData.accessKey || !formData.verifyAccessKey) {
           setError('ACCESS_DENIED: ALL_FIELDS_REQUIRED');
           return false;
         }
@@ -261,19 +262,23 @@ export const LoginScreen = () => {
     if (validateForm()) {
       try {
         setLoading(true);
+        console.log('🔵 LOGIN: Form validation passed, dispatching:', formType);
+        
         if (formType === 'login') {
           await dispatch(loginUser({
             handle: formData.handle,
             accessKey: formData.accessKey,
           })).unwrap();
         } else {
+          console.log('🔵 LOGIN: Registering user with email:', formData.email);
           await dispatch(registerUser({
             email: formData.email,
-            handle: formData.handle,
             accessKey: formData.accessKey,
           })).unwrap();
+          console.log('🔵 LOGIN: Registration completed successfully');
         }
       } catch (err) {
+        console.error('🔴 LOGIN: Form submission error:', err);
         // Convert technical errors to user-friendly messages
         let userMessage = 'ACCESS_DENIED: ';
 
@@ -303,7 +308,6 @@ export const LoginScreen = () => {
       return formData.handle.trim().length > 0 && formData.accessKey.trim().length > 0;
     }
     return formData.email.trim().length > 0 &&
-           formData.handle.trim().length > 0 &&
            formData.accessKey.trim().length > 0 &&
            formData.verifyAccessKey.trim().length > 0;
   }, [formType, formData]);

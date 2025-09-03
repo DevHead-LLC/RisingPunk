@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   Modal,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 import { SIZING, styleGuide } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -23,23 +27,111 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
 }) => {
   const [handle, setHandle] = useState('');
   const [error, setError] = useState('');
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
+  const [isHandleAvailable, setIsHandleAvailable] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const colors = useThemeColors();
+  
+  // Ref to track the current handle being checked
+  const currentHandleRef = useRef('');
+  
+  // Track individual requirements
+  const [requirements, setRequirements] = useState({
+    minLength: false,
+    validChars: false,
+    unique: false
+  });
 
   const validateHandle = useCallback((value: string): string => {
     if (!value.trim()) {
       return 'HANDLE_REQUIRED';
     }
-    if (value.length < 3) {
+    if (value.length < 5) {
       return 'HANDLE_TOO_SHORT';
     }
-    if (value.length > 20) {
+    if (value.length > 15) {
       return 'HANDLE_TOO_LONG';
     }
-    if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
+    if (!/^[a-zA-Z0-9!&%^*]+$/.test(value)) {
       return 'HANDLE_INVALID_CHARS';
     }
     return '';
   }, []);
+
+  // Check individual requirements
+  const checkRequirements = useCallback((value: string) => {
+    const newRequirements = {
+      minLength: value.length >= 5,
+      validChars: /^[a-zA-Z0-9!&%^*]+$/.test(value),
+      unique: false // Will be set by availability check
+    };
+    setRequirements(newRequirements);
+  }, []);
+
+  // Check handle availability in database
+  const checkHandleAvailability = useCallback(async (handleToCheck: string) => {
+    if (!handleToCheck.trim() || validateHandle(handleToCheck)) {
+      setIsHandleAvailable(false);
+      return;
+    }
+
+    try {
+      setIsCheckingAvailability(true);
+      const response = await fetch('http://localhost:5001/api/auth/check-handle', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ handle: handleToCheck }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setIsHandleAvailable(data.available);
+        // Update unique requirement
+        setRequirements(prev => ({ ...prev, unique: data.available }));
+      } else {
+        setIsHandleAvailable(false);
+        setRequirements(prev => ({ ...prev, unique: false }));
+      }
+    } catch (error) {
+      setIsHandleAvailable(false);
+    } finally {
+      setIsCheckingAvailability(false);
+      setIsTyping(false);
+    }
+  }, [validateHandle]);
+
+  // Real-time requirements checking and availability checking with debouncing
+  useEffect(() => {
+    // Check requirements on every keystroke
+    checkRequirements(handle);
+    
+    if (!handle.trim()) {
+      setIsHandleAvailable(false);
+      setRequirements(prev => ({ ...prev, unique: false }));
+      return;
+    }
+
+    const validationError = validateHandle(handle);
+    if (validationError) {
+      setIsHandleAvailable(false);
+      setRequirements(prev => ({ ...prev, unique: false }));
+      return;
+    }
+
+    // Update ref to track current handle
+    currentHandleRef.current = handle;
+
+    // Debounce the check to avoid excessive API calls
+    const timer = setTimeout(() => {
+      if (currentHandleRef.current === handle) {
+        checkHandleAvailability(handle);
+      }
+    }, 1000); // Check after 1 second of no typing
+
+    return () => clearTimeout(timer);
+  }, [handle, validateHandle, checkHandleAvailability, checkRequirements]);
 
   const handleSubmit = useCallback(async () => {
     const validationError = validateHandle(handle);
@@ -58,6 +150,7 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
 
   const handleTextChange = useCallback((text: string) => {
     setHandle(text);
+    setIsTyping(true);
     if (error) {
       setError('');
     }
@@ -68,11 +161,11 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
       case 'HANDLE_REQUIRED':
         return 'Please enter a handle';
       case 'HANDLE_TOO_SHORT':
-        return 'Handle must be at least 3 characters';
+        return 'Handle must be at least 5 characters';
       case 'HANDLE_TOO_LONG':
-        return 'Handle must be 20 characters or less';
+        return 'Handle must be 15 characters or less';
       case 'HANDLE_INVALID_CHARS':
-        return 'Handle can only contain letters, numbers, _ and -';
+        return 'Handle can only contain letters, numbers, and !&%^*';
       case 'HANDLE_ALREADY_EXISTS':
         return 'This handle is already taken';
       default:
@@ -86,10 +179,18 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
       transparent={true}
       animationType="fade"
       statusBarTranslucent={true}
+      supportedOrientations={['landscape']}
     >
-      <View style={styles.overlay}>
-        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-          <View style={[styles.modalContent, { borderColor: colors.matrix }]}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.overlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1, justifyContent: 'center' }}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+          >
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+                <View style={[styles.modalContent, { borderColor: colors.matrix }]}>
             <Text style={[styles.title, { color: colors.primary }]}>
               CHOOSE_YOUR_HANDLE
             </Text>
@@ -114,7 +215,7 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
                 placeholderTextColor={colors.secondary}
                 autoCapitalize="none"
                 autoCorrect={false}
-                maxLength={20}
+                maxLength={15}
                 editable={!isLoading}
               />
               {error ? (
@@ -122,18 +223,49 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
                   {getErrorMessage(error)}
                 </Text>
               ) : null}
+              
+              {/* Requirements Checklist */}
+              <View style={styles.requirementsContainer}>
+                <Text style={[styles.requirementsTitle, { color: colors.secondary }]}>
+                  Requirements:
+                </Text>
+                <View style={styles.requirementItem}>
+                  <Text style={[styles.requirementText, { 
+                    color: requirements.minLength ? colors.success || '#4CAF50' : colors.error 
+                  }]}>
+                    {requirements.minLength ? '✓' : '✗'} At least 5 characters
+                  </Text>
+                </View>
+
+                <View style={styles.requirementItem}>
+                  <Text style={[styles.requirementText, { 
+                    color: requirements.validChars ? colors.success || '#4CAF50' : colors.error 
+                  }]}>
+                    {requirements.validChars ? '✓' : '✗'} Only letters, numbers, and !&%^*
+                  </Text>
+                </View>
+                <View style={styles.requirementItem}>
+                  <Text style={[styles.requirementText, { 
+                    color: isCheckingAvailability ? colors.secondary : 
+                           requirements.unique ? colors.success || '#4CAF50' : colors.error 
+                  }]}>
+                    {isCheckingAvailability ? 'Checking uniqueness...' :
+                     requirements.unique ? '✓ Unique' : '✗ Unique'}
+                  </Text>
+                </View>
+              </View>
             </View>
 
-            <TouchableOpacity
+                                  <TouchableOpacity
               style={[
                 styles.submitButton,
                 { 
-                  backgroundColor: isLoading || !handle.trim() ? colors.buttonDisabled : colors.buttonBg,
+                  backgroundColor: isLoading || validateHandle(handle) || !isHandleAvailable || isCheckingAvailability || isTyping ? colors.buttonDisabled : colors.buttonBg,
                   borderColor: colors.matrix,
                 }
               ]}
               onPress={handleSubmit}
-              disabled={isLoading || !handle.trim()}
+              disabled={isLoading || !!validateHandle(handle) || !isHandleAvailable || isCheckingAvailability || isTyping}
             >
               <Text style={[styles.submitText, { color: '#FFFFFF' }]}>
                 {isLoading ? 'SETTING_HANDLE...' : 'CONFIRM_HANDLE'}
@@ -142,7 +274,10 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+              </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
+        </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 };
@@ -191,6 +326,30 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: SIZING.font.small,
     marginTop: SIZING.spacing.sm,
+    textAlign: 'center',
+  },
+  statusText: {
+    fontSize: SIZING.font.small,
+    marginTop: SIZING.spacing.sm,
+    textAlign: 'center',
+  },
+  requirementsContainer: {
+    marginTop: SIZING.spacing.md,
+    padding: SIZING.spacing.sm,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: 4,
+  },
+  requirementsTitle: {
+    fontSize: SIZING.font.small,
+    fontWeight: '600',
+    marginBottom: SIZING.spacing.xs,
+    textAlign: 'center',
+  },
+  requirementItem: {
+    marginVertical: 2,
+  },
+  requirementText: {
+    fontSize: SIZING.font.small,
     textAlign: 'center',
   },
   submitButton: {

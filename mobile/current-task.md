@@ -1,34 +1,25 @@
-# Current Task: Fix Onboarding Completion Centering ✅ COMPLETED
+**Expected Result**: Profile screen will now immediately show updated handle after successful username change
 
-## Issue
-After completing the slideshow and TurfScreen walkthrough onboarding, the panning/scrolling position is not properly centered on the home location and digital barracks. The position is "just off" from center, unlike when entering profile/financial statement screens and then closing them, which properly centers the view.
+## App Refresh Fix ✅
+**Problem**: On app refresh, onboarding and handle selection modal appear even when database shows they shouldn't
 
-## Root Cause
-The centering logic exists in `navigateToScreen` function for returning from profile screens, but onboarding completion handlers don't trigger this centering logic.
+**Root Cause**: App relying on stale local storage data instead of fresh database verification
+- **Location**: `mobile/src/store/slices/authSlice.ts` - `loadStoredAuth` thunk
+- **Issue**: On refresh, app loads stored user data without verifying current database state
+- **Result**: UI shows incorrect states based on outdated local data
 
-## Solution ✅ IMPLEMENTED
-Added centering logic to both `handleOnboardingComplete` and `handleTurfIntroComplete` functions to ensure proper centering after onboarding completion.
+**Solution**: Implemented database-first verification system with additional safety measures
+- **Before**: Load stored token + user data, set UI states based on stored data
+- **After**: Load stored token, verify with database, get fresh user data, set UI states based on current database state
+- **New Endpoint**: Added `/api/auth/verify-token` to verify token and return current user data
+- **Safety Flag**: Added `isInitialized` flag to prevent onboarding reducers from running before database verification is complete
+- **How It Works**: 
+  1. App loads stored token on refresh
+  2. Immediately calls `/api/auth/verify-token` to verify token validity
+  3. Gets fresh user data from database (including current `onboardingCompleted` and `needsHandleSelection`)
+  4. Sets all UI states based on fresh database data, not stored data
+  5. Updates local storage with fresh data
+  6. Sets `isInitialized = true` to allow onboarding flow to proceed
+  7. Onboarding reducers check `isInitialized` before making state changes
 
-## Changes Made
-- **`mobile/src/screens/TurfScreen.tsx`** - Added centering logic to all onboarding completion handlers:
-  - `handleOnboardingComplete` - Centers view after completing onboarding
-  - `handleOnboardingSkip` - Centers view after skipping onboarding  
-  - `handleTurfIntroComplete` - Centers view after completing turf intro
-  - `handleTurfIntroSkip` - Centers view after skipping turf intro
-
-## Centering Logic
-Uses the exact same centering calculation as profile screen closing:
-```typescript
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const CONTENT_WIDTH = 2000;
-const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
-
-horizontalScrollRef.current?.scrollTo({
-  x: CENTER_X,
-  y: 0,
-  animated: false,
-});
-```
-
-## Result
-Now when onboarding (slideshow + turf walkthrough) is completed, the view will be properly centered on the home location and digital barracks, matching the behavior when closing profile/financial statement screens.
+**Expected Result**: On app refresh, UI states will always match current database state - no more incorrect onboarding or handle selection modals
