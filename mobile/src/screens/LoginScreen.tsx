@@ -147,15 +147,12 @@ const GoogleSignUpButton = memo(function GoogleSignUpButton() {
   const handleGoogleSignUp = useCallback(async () => {
     // Prevent double execution
     if (isProcessing) {
-      console.log('🔵 GSU: Already processing, ignoring duplicate call');
       return;
     }
     
-    console.log('🔵 GSU: Starting Google Sign-Up process');
     setIsProcessing(true);
     
     try {
-      console.log('🔵 GSU: Configuring Google Sign-In');
       const config = {
         webClientId: GOOGLE_AUTH_CONFIG.webClientId,
         iosClientId: GOOGLE_AUTH_CONFIG.iosClientId,
@@ -167,25 +164,19 @@ const GoogleSignUpButton = memo(function GoogleSignUpButton() {
       GoogleSignin.configure(config);
       await GoogleSignin.hasPlayServices();
       
-      console.log('🔵 GSU: Initiating Google Sign-In UI');
       const userInfo = await GoogleSignin.signIn();
       
       if (userInfo.type === 'cancelled' || userInfo.data === null) {
-        console.log('🔵 GSU: User cancelled Google Sign-In');
         return;
       }
         
       const idToken = userInfo.data?.idToken;
       if (idToken) {
-        console.log('🔵 GSU: ID token received, dispatching to Redux');
         await dispatch(googleSignUp(idToken)).unwrap();
-        console.log('🔵 GSU: Redux dispatch completed successfully');
       } else {
         throw new Error('No ID token received from Google');
       }
     } catch (error: any) {
-      console.log('🔴 GSU: Error caught:', error);
-      
       if (error.code === 'SIGN_IN_CANCELLED' || error.code === 'IN_PROGRESS') {
         return; // Handle silently
       }

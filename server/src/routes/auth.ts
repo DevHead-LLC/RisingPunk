@@ -181,6 +181,18 @@ router.post<{}, UserResponse | { error: string }, LoginRequest['body']>(
         return;
       }
 
+      // Check if this is a Google Sign-In account (no password set)
+      if (user.googleId && !user.hashedAccessKey) {
+        res.status(400).json({ error: 'This account was created with Google Sign-In. Please use the "SIGN_IN_WITH_GOOGLE" option to sign in.' });
+        return;
+      }
+
+      // Check if password is provided for verification
+      if (!user.hashedAccessKey) {
+        res.status(400).json({ error: 'No password set for this account. Please use the "SIGN_IN_WITH_GOOGLE" option to sign in.' });
+        return;
+      }
+
       const isValid = await user.verifyAccessKey(accessKey);
       if (!isValid) {
         res.status(401).json({ error: 'Authentication failed' });
