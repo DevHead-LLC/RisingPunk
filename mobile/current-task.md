@@ -62,3 +62,75 @@
   5. Added logging to track duplicate call attempts
 
 **Expected Result**: Google Sign-In process will only execute once per button press, eliminating duplicate logs and potential errors
+
+## Google Sign-Up Debug Logs Cleanup ✅
+**Problem**: Excessive debug logs cluttering console when attempting Google Sign-Up with existing account
+
+**Root Cause**: Multiple console.log statements throughout Google Sign-Up flow
+- **Location**: `mobile/src/store/slices/authSlice.ts` - `googleSignUpUser` thunk
+- **Location**: `mobile/src/screens/LoginScreen.tsx` - `GoogleSignUpButton` component
+- **Issue**: Debug logs showing every step of the process, even for expected error cases
+- **Result**: Console cluttered with unnecessary logs when user tries to sign up with existing account
+
+**Solution**: Removed all debug console.log statements from Google Sign-Up flow
+- **Before**: 15+ console.log statements showing every step of the process
+- **After**: Clean, silent operation with only essential error handling
+- **Changes Made**:
+  1. Removed all `🔵 GSU Redux:` and `🔴 GSU Redux:` logs from authSlice.ts
+  2. Removed all `🔵 GSU:` and `🔴 GSU:` logs from LoginScreen.tsx
+  3. Kept essential error handling logic intact
+  4. Maintained user-friendly error messages in Redux state
+
+**Expected Result**: Clean console output when attempting Google Sign-Up with existing account - only the red error text at top of screen will show, no console spam
+
+## React Native Warning Banner Disable ✅
+**Problem**: Development warning banner appearing at bottom of screen during Google Sign-Up attempts
+
+**Root Cause**: React Native's default LogBox showing development warnings
+- **Location**: `mobile/App.tsx` - Main app entry point
+- **Issue**: Warning banner with "Open debugger to view warnings" appearing at bottom
+- **Result**: Visual clutter during sign-up process
+
+**Solution**: Disabled all LogBox warnings using React Native's LogBox API
+- **Before**: Warning banner visible at bottom of screen
+- **After**: All warning banners disabled
+- **Implementation**: Added `LogBox.ignoreAllLogs(true)` to App.tsx
+
+**Expected Result**: No warning banner at bottom of screen during Google Sign-Up attempts
+
+## Google Sign-In Account Password Login Error Fix ✅
+**Problem**: Users trying to log in with password to accounts created via Google Sign-In get generic "Server error" message
+
+**Root Cause**: No specific error handling for password login attempts to Google Sign-In accounts
+- **Location**: `mobile/src/store/slices/authSlice.ts` - `loginUser` thunk
+- **Issue**: Server returns error about no password set, but client shows generic "Server error"
+- **Result**: Users don't understand why login failed or how to proceed
+
+**Solution**: Added specific error handling for Google Sign-In account password attempts
+- **Before**: Generic "Server error" message for all login failures
+- **After**: Specific message "Please Sign In with Google account used to create this account." for Google accounts
+- **Implementation**: 
+  1. Added error parsing in `loginUser` thunk
+  2. Check for "No password set" or "Google account" in error message
+  3. Return user-friendly message directing them to use Google Sign-In
+
+**Expected Result**: When users try to log in with password to a Google Sign-In account, they'll see the helpful message "Please Sign In with Google account used to create this account." instead of generic "Server error"
+
+## Server-Side Google Sign-In Password Login Crash Fix ✅
+**Problem**: Server crashes with "Illegal arguments: string, undefined" when users try password login to Google Sign-In accounts
+
+**Root Cause**: Server attempts bcrypt.compare() with undefined hashedAccessKey for Google accounts
+- **Location**: `server/src/routes/auth.ts` - `/login` route
+- **Issue**: Google Sign-In accounts don't have hashedAccessKey, causing bcrypt.compare() to fail
+- **Result**: Server crashes with bcrypt error instead of returning helpful error message
+
+**Solution**: Added server-side validation to prevent bcrypt crash and return proper error
+- **Before**: Server crashes when trying to verify password for Google accounts
+- **After**: Server checks account type and returns helpful error message without crashing
+- **Implementation**: 
+  1. Check if user has googleId but no hashedAccessKey (Google Sign-In account)
+  2. Check if user has no hashedAccessKey at all (no password set)
+  3. Return appropriate error message before attempting bcrypt verification
+  4. Only proceed with password verification if hashedAccessKey exists
+
+**Expected Result**: Server will no longer crash when users attempt password login to Google Sign-In accounts, and will return the helpful message "Please Sign In with Google account used to create this account."

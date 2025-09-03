@@ -48,6 +48,12 @@ export const loginUser = createAsyncThunk(
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: 'Login failed' }));
+        
+        // Handle specific error cases with user-friendly messages
+        if (error.error && (error.error.includes('Google Sign-In') || error.error.includes('No password set') || error.error.includes('This account was created with Google Sign-In'))) {
+          return rejectWithValue('Please Sign In with the Google account used to create this user.');
+        }
+        
         return rejectWithValue(error.error || 'Login failed');
       }
 
@@ -278,12 +284,7 @@ export const googleSignInUser = createAsyncThunk(
 export const googleSignUpUser = createAsyncThunk(
   'auth/googleSignUp',
   async (idToken: string, { rejectWithValue, dispatch }) => {
-    console.log('🔵 GSU Redux: Starting Google Sign-Up thunk');
-    console.log('🔵 GSU Redux: API URL:', API_URL);
-    console.log('🔵 GSU Redux: ID Token length:', idToken?.length);
-    
     try {
-      console.log('🔵 GSU Redux: Making fetch request to server');
       const response = await fetch(`${API_URL}/api/auth/google-signup`, {
         method: 'POST',
         headers: {
@@ -292,14 +293,8 @@ export const googleSignUpUser = createAsyncThunk(
         body: JSON.stringify({ idToken }),
       });
       
-      console.log('🔵 GSU Redux: Server response received');
-      console.log('🔵 GSU Redux: Response status:', response.status);
-      console.log('🔵 GSU Redux: Response ok:', response.ok);
-
       if (!response.ok) {
-        console.log('🔴 GSU Redux: Server response not ok, parsing error');
         const error = await response.json().catch(() => ({ error: 'Google Sign-Up failed' }));
-        console.log('🔴 GSU Redux: Server error:', error);
         
         // Handle specific error cases with user-friendly messages
         if (error.error && error.error.includes('account already exists with this Google account')) {
@@ -311,9 +306,7 @@ export const googleSignUpUser = createAsyncThunk(
         return rejectWithValue(error.error || 'Google Sign-Up failed');
       }
 
-      console.log('🔵 GSU Redux: Parsing successful response');
       const data = await response.json();
-      console.log('🔵 GSU Redux: Response data parsed successfully');
 
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
@@ -367,25 +360,14 @@ export const googleSignUpUser = createAsyncThunk(
           dispatch(setBuildState(buildStateData));
         }
       } catch (fetchError) {
-        console.log('🔴 GSU Redux: Error fetching initial data:', fetchError);
+        // Silently handle fetch errors
       }
 
-      console.log('🔵 GSU Redux: Google Sign-Up completed successfully');
       return data;
     } catch (error) {
-      console.log('🔴 GSU Redux: Google Sign-Up failed:', error);
-      console.log('🔴 GSU Redux: Error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        type: typeof error,
-        isTypeError: error instanceof TypeError,
-        isNetworkError: error instanceof TypeError && error.message.includes('Network request failed'),
-      });
-      
       if (error instanceof TypeError && error.message.includes('Network request failed')) {
-        console.log('🔴 GSU Redux: Network request failed error detected');
         return rejectWithValue('Network error: Cannot connect to server');
       }
-      console.log('🔴 GSU Redux: Other error, rejecting with message');
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -745,8 +727,6 @@ export const authSlice = createSlice({
         state.error = null;
       })
           .addCase(googleSignUpUser.fulfilled, (state, action) => {
-      console.log('🔵 GSU: Google Sign-Up fulfilled, needsHandleSelection:', action.payload.user.needsHandleSelection);
-      
       state.isLoading = false;
       state.token = action.payload.token;
       state.user = action.payload.user;
@@ -755,8 +735,6 @@ export const authSlice = createSlice({
       // Store needsHandleSelection but don't show modal yet - wait for onboarding + turf intro to complete
       state.showHandleSelection = false; // Will be set to true after turf intro completes
       state.isInitialized = true; // Mark as initialized after successful Google Sign-Up
-      
-      console.log('🔵 GSU: State after update - showOnboarding:', state.showOnboarding, 'showHandleSelection:', state.showHandleSelection, 'isInitialized:', state.isInitialized);
     })
       .addCase(googleSignUpUser.rejected, (state, action) => {
         state.isLoading = false;
