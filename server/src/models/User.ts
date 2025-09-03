@@ -31,6 +31,10 @@ export interface IUser extends Document {
   profileGender: 'male' | 'female';
   onboardingCompleted: boolean;
   needsHandleSelection: boolean;
+  debugFeatures?: {
+    enableDataRefresh: boolean;
+    enableDebugLogs: boolean;
+  };
   researchCenterBuild?: {
     startedAt: Date | null;
     completesAt: Date | null;
@@ -168,6 +172,16 @@ const userSchema = new Schema({
   needsHandleSelection: {
     type: Boolean,
     default: false
+  },
+  debugFeatures: {
+    enableDataRefresh: {
+      type: Boolean,
+      default: false
+    },
+    enableDebugLogs: {
+      type: Boolean,
+      default: false
+    }
   },
   researchCenterBuild: {
     startedAt: {

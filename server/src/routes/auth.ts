@@ -42,6 +42,10 @@ interface UserResponse {
     };
     onboardingCompleted: boolean;
     needsHandleSelection: boolean;
+    debugFeatures?: {
+      enableDataRefresh: boolean;
+      enableDebugLogs: boolean;
+    };
   }
 }
 
@@ -157,7 +161,11 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
             hackRig: user.unlockedFeatures?.hackRig || false
           },
           onboardingCompleted: user.onboardingCompleted || false,
-          needsHandleSelection: user.needsHandleSelection || false
+          needsHandleSelection: user.needsHandleSelection || false,
+          debugFeatures: {
+            enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
+            enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
+          }
         }
       });
 
@@ -215,7 +223,11 @@ router.post<{}, UserResponse | { error: string }, LoginRequest['body']>(
             hackRig: user.unlockedFeatures?.hackRig || false
           },
           onboardingCompleted: user.onboardingCompleted || false,
-          needsHandleSelection: user.needsHandleSelection || false
+          needsHandleSelection: user.needsHandleSelection || false,
+          debugFeatures: {
+            enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
+            enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
+          }
         }
       });
 
@@ -276,7 +288,11 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
               hackRig: user.unlockedFeatures?.hackRig || false
             },
             onboardingCompleted: user.onboardingCompleted || false,
-            needsHandleSelection: user.needsHandleSelection || false
+            needsHandleSelection: user.needsHandleSelection || false,
+            debugFeatures: {
+              enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
+              enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
+            }
           }
         });
         return;
@@ -308,7 +324,11 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
                 hackRig: user.unlockedFeatures?.hackRig || false
               },
               onboardingCompleted: user.onboardingCompleted || false,
-              needsHandleSelection: user.needsHandleSelection || false
+              needsHandleSelection: user.needsHandleSelection || false,
+              debugFeatures: {
+                enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
+                enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
+              }
             }
           });
           return;
@@ -412,7 +432,11 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
             hackRig: user.unlockedFeatures?.hackRig || false
           },
           onboardingCompleted: user.onboardingCompleted || false,
-          needsHandleSelection: user.needsHandleSelection || false
+          needsHandleSelection: user.needsHandleSelection || false,
+          debugFeatures: {
+            enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
+            enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
+          }
         }
       });
 
@@ -517,7 +541,11 @@ router.post('/update-handle', async (req, res): Promise<void> => {
           hackRig: user.unlockedFeatures?.hackRig || false
         },
         onboardingCompleted: user.onboardingCompleted || false,
-        needsHandleSelection: user.needsHandleSelection || false
+        needsHandleSelection: user.needsHandleSelection || false,
+        debugFeatures: {
+          enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
+          enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
+        }
       }
     });
   } catch (error) {
@@ -590,7 +618,11 @@ router.get('/verify-token', async (req, res): Promise<void> => {
         },
         profileGender: user.profileGender || 'male',
         onboardingCompleted: user.onboardingCompleted || false,
-        needsHandleSelection: user.needsHandleSelection || false
+        needsHandleSelection: user.needsHandleSelection || false,
+        debugFeatures: {
+          enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
+          enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
+        }
       }
     });
   } catch (error) {

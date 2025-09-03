@@ -19,12 +19,16 @@ interface HandleSelectionModalProps {
   visible: boolean;
   onSubmit: (handle: string) => Promise<void>;
   isLoading?: boolean;
+  isRequired?: boolean;
+  onClose?: () => void;
 }
 
 export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
   visible,
   onSubmit,
   isLoading = false,
+  isRequired = false,
+  onClose,
 }) => {
   const [handle, setHandle] = useState('');
   const [error, setError] = useState('');
@@ -257,22 +261,42 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
               </View>
             </View>
 
-                                  <TouchableOpacity
-              style={[
-                styles.submitButton,
-                { 
-                  backgroundColor: isLoading || validateHandle(handle) || !isHandleAvailable || isCheckingAvailability || isTyping ? colors.buttonDisabled : colors.buttonBg,
-                  borderColor: colors.matrix,
-                }
-              ]}
-              onPress={handleSubmit}
-              disabled={isLoading || !!validateHandle(handle) || !isHandleAvailable || isCheckingAvailability || isTyping}
-            >
-              <Text style={[styles.submitText, { color: '#FFFFFF' }]}>
-                {isLoading ? 'SETTING_HANDLE...' : 'CONFIRM_HANDLE'}
-              </Text>
-              <View style={[styles.buttonCorner, { borderColor: colors.matrix }]} />
-            </TouchableOpacity>
+            <View style={styles.buttonContainer}>
+              {!isRequired && onClose && (
+                <TouchableOpacity
+                  style={[
+                    styles.cancelButton,
+                    { 
+                      backgroundColor: colors.background + 'CC',
+                      borderColor: colors.text.secondary,
+                    }
+                  ]}
+                  onPress={onClose}
+                >
+                  <Text style={[styles.cancelText, { color: colors.text.secondary }]}>
+                    CANCEL
+                  </Text>
+                </TouchableOpacity>
+              )}
+              
+              <TouchableOpacity
+                style={[
+                  styles.submitButton,
+                  { 
+                    backgroundColor: isLoading || validateHandle(handle) || !isHandleAvailable || isCheckingAvailability || isTyping ? colors.buttonDisabled : colors.buttonBg,
+                    borderColor: colors.matrix,
+                    flex: isRequired ? 1 : 0.6,
+                  }
+                ]}
+                onPress={handleSubmit}
+                disabled={isLoading || !!validateHandle(handle) || !isHandleAvailable || isCheckingAvailability || isTyping}
+              >
+                <Text style={[styles.submitText, { color: '#FFFFFF' }]}>
+                  {isLoading ? 'SETTING_HANDLE...' : 'CONFIRM_HANDLE'}
+                </Text>
+                <View style={[styles.buttonCorner, { borderColor: colors.matrix }]} />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
               </TouchableWithoutFeedback>
@@ -353,6 +377,11 @@ const styles = StyleSheet.create({
     fontSize: SIZING.font.small,
     textAlign: 'center',
   },
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: SIZING.spacing.sm,
+    marginTop: SIZING.spacing.md,
+  },
   submitButton: {
     height: 48,
     justifyContent: 'center',
@@ -362,6 +391,19 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   submitText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
+    letterSpacing: 1,
+  },
+  cancelButton: {
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderRadius: 4,
+    flex: 0.4,
+  },
+  cancelText: {
     fontSize: SIZING.font.body,
     fontWeight: '600',
     letterSpacing: 1,
