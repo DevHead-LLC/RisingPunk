@@ -459,9 +459,16 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const styles = useMemo(() => createProfileStyles(colors), [colors]);
   
   // Use existing working APIs - only when authenticated
-  const { data: profileData, isLoading: profileLoading, error: profileError } = useGetProfileQuery(undefined, {
+  const { data: profileData, isLoading: profileLoading, error: profileError, refetch } = useGetProfileQuery(undefined, {
     skip: !token,
   });
+
+  // Log when profile data changes
+  useEffect(() => {
+    if (profileData) {
+      console.log('🔵 PROFILE: Profile data updated, handle:', profileData.handle);
+    }
+  }, [profileData]);
   const { data: botStatsData, isLoading: botStatsLoading, error: botStatsError } = useFetchBotStatsQuery(undefined, {
     skip: !token,
   });

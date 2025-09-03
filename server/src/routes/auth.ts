@@ -14,7 +14,6 @@ function escapeRegexString(str: string): string {
 interface RegisterRequest extends Request {
   body: {
     email: string;
-    handle: string;
     accessKey: string;
   }
 }
@@ -114,18 +113,8 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
   '/register', 
   async (req, res): Promise<void> => {
     try {
-      const { email, handle, accessKey } = req.body;
+      const { email, accessKey } = req.body;
       
-      // Check for existing user (case-insensitive handle check with regex escaping)
-      const existingUser = await User.findOne({ 
-        handle: { $regex: new RegExp(`^${escapeRegexString(handle)}$`, 'i') } 
-      });
-      
-      if (existingUser) {
-        res.status(400).json({ error: 'Handle already exists' });
-        return;
-      }
-
       // Check for existing email using the static method
       const emailExists = await User.emailExists(email);
       
@@ -134,14 +123,17 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
         return;
       }
 
-      // Create user
+      // Create user with temporary handle and needsHandleSelection flag
+      console.log('🔵 SERVER: Creating user with needsHandleSelection: true');
       const user = new User({
         email,
-        handle,
-        hashedAccessKey: accessKey
+        handle: `user_${Date.now()}`,
+        hashedAccessKey: accessKey,
+        needsHandleSelection: true
       });
 
       await user.save();
+      console.log('🔵 SERVER: User saved, needsHandleSelection:', user.needsHandleSelection);
 
       // Create research data for new user
       await createUserResearchData(user._id as mongoose.Types.ObjectId);
@@ -153,6 +145,8 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
         { expiresIn: '7d' }
       );
 
+      console.log('🔵 SERVER: About to send response, user.needsHandleSelection:', user.needsHandleSelection);
+      
       res.status(201).json({
         token,
         user: {
@@ -376,11 +370,13 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
       user = new User({
         email: googleUser.email,
         handle,
-        googleId: googleUser.googleId
+        googleId: googleUser.googleId,
+        needsHandleSelection: true
         // Note: hashedAccessKey is optional for Google Sign-In users
       });
 
       await user.save();
+      console.log('🔵 GSU SERVER: User saved, needsHandleSelection:', user.needsHandleSelection);
 
       // Create research data for new user
       await createUserResearchData(user._id as mongoose.Types.ObjectId);
@@ -392,6 +388,8 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
       );
 
       console.log('🔵 GSU Server Route: New user created successfully');
+      console.log('🔵 GSU SERVER: About to send response, user.needsHandleSelection:', user.needsHandleSelection);
+      
       res.status(201).json({
         token,
         user: {
@@ -437,6 +435,155 @@ router.post('/onboarding-complete', async (req, res): Promise<void> => {
   } catch (error) {
     console.error('Onboarding completion error:', error);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update user handle
+router.post('/update-handle', async (req, res): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    const token = authHeader.substring(7);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'defaultsecret') as { userId: string };
+    
+    const { handle } = req.body;
+    
+    if (!handle || typeof handle !== 'string') {
+      res.status(400).json({ error: 'Handle is required' });
+      return;
+    }
+
+    if (handle.length < 5 || handle.length > 15) {
+      res.status(400).json({ error: 'Handle must be between 5 and 15 characters' });
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9!&%^*]+$/.test(handle)) {
+      res.status(400).json({ error: 'Handle can only contain letters, numbers, and !&%^*' });
+      return;
+    }
+
+    // Check for existing user with same handle (case-insensitive)
+    const existingUser = await User.findOne({ 
+      handle: { $regex: new RegExp(`^${escapeRegexString(handle)}$`, 'i') },
+      _id: { $ne: decoded.userId } // Exclude current user
+    });
+    
+    if (existingUser) {
+      res.status(400).json({ error: 'Handle already exists' });
+      return;
+    }
+
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    user.handle = handle;
+    user.needsHandleSelection = false;
+    await user.save();
+
+    console.log('🔵 SERVER: Handle updated successfully:', {
+      userId: user._id,
+      oldHandle: user.handle,
+      newHandle: handle,
+      needsHandleSelection: user.needsHandleSelection
+    });
+
+    res.json({
+      success: true,
+      user: {
+        handle: user.handle,
+        email: user.getDecryptedEmail(),
+        level: user.level,
+        unlockedFeatures: {
+          hackRig: user.unlockedFeatures?.hackRig || false
+        },
+        onboardingCompleted: user.onboardingCompleted || false,
+        needsHandleSelection: user.needsHandleSelection || false
+      }
+    });
+  } catch (error) {
+    console.error('Handle update error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Check handle availability (no auth required for real-time checking)
+router.post('/check-handle', async (req, res): Promise<void> => {
+  try {
+    const { handle } = req.body;
+    
+    if (!handle || typeof handle !== 'string') {
+      res.status(400).json({ error: 'Handle is required' });
+      return;
+    }
+
+    // Check for existing user with same handle (case-insensitive)
+    const existingUser = await User.findOne({ 
+      handle: { $regex: new RegExp(`^${escapeRegexString(handle)}$`, 'i') }
+    });
+    
+    const available = !existingUser;
+    
+    res.json({ 
+      available,
+      message: available ? 'Handle is available' : 'Handle is already taken'
+    });
+  } catch (error) {
+    console.error('Handle availability check error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Verify token and get current user data
+router.get('/verify-token', async (req, res): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    const token = authHeader.substring(7);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'defaultsecret') as { userId: string };
+    
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    console.log('🔵 SERVER: Token verified, returning current user data:', {
+      userId: user._id,
+      handle: user.handle,
+      onboardingCompleted: user.onboardingCompleted,
+      needsHandleSelection: user.needsHandleSelection
+    });
+
+    res.json({
+      success: true,
+      user: {
+        _id: user._id,
+        handle: user.handle,
+        email: user.getDecryptedEmail(),
+        level: user.level,
+        unlockedFeatures: {
+          hackRig: user.unlockedFeatures?.hackRig || false
+        },
+        profileGender: user.profileGender || 'male',
+        onboardingCompleted: user.onboardingCompleted || false,
+        needsHandleSelection: user.needsHandleSelection || false
+      }
+    });
+  } catch (error) {
+    console.error('Token verification error:', error);
+    res.status(401).json({ error: 'Invalid token' });
   }
 });
 

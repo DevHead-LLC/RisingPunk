@@ -19,7 +19,6 @@ export const AuthInputs = memo(function AuthInputs({
   formData,
   handleInputChange,
 }: AuthInputsProps) {
-  const handleRef = useRef<TextInput>(null);
   const accessKeyRef = useRef<TextInput>(null);
   const verifyAccessKeyRef = useRef<TextInput>(null);
 
@@ -60,13 +59,6 @@ export const AuthInputs = memo(function AuthInputs({
           value={formData.email}
           onChangeText={handleInputChange('email')}
           keyboardType="email-address"
-          onSubmitEditing={() => focusNext(handleRef)}
-        />
-        <KeyboardAwareInput
-          ref={handleRef}
-          placeholder="SELECT_HANDLE (USERNAME)"
-          value={formData.handle}
-          onChangeText={handleInputChange('handle')}
           onSubmitEditing={() => focusNext(accessKeyRef)}
         />
         <KeyboardAwareInput

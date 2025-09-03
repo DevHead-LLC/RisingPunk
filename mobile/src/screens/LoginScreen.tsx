@@ -56,9 +56,17 @@ const ErrorMessage = memo(function ErrorMessage({ error }: { error: string | nul
 const GoogleSignInButton = memo(function GoogleSignInButton() {
   const dispatch = useAppDispatch();
   const colors = useThemeColors();
+  const [isProcessing, setIsProcessing] = useState(false);
   
   const handleGoogleSignIn = useCallback(async () => {
+    // Prevent double execution
+    if (isProcessing) {
+      console.log('🔵 GSI LOGIN: Already processing, ignoring duplicate call');
+      return;
+    }
+    
     console.log('🔵 GSI LOGIN: Starting Google Sign-In process');
+    setIsProcessing(true);
     
     try {
       console.log('🔵 GSI LOGIN: Configuring Google Sign-In');
@@ -98,8 +106,10 @@ const GoogleSignInButton = memo(function GoogleSignInButton() {
       
       // Let Redux handle the error display
       throw error;
+    } finally {
+      setIsProcessing(false);
     }
-  }, [dispatch]);
+  }, [dispatch, isProcessing]);
 
   return (
     <View style={styles.googleButtonContainer}>
@@ -109,6 +119,7 @@ const GoogleSignInButton = memo(function GoogleSignInButton() {
           borderColor: colors.matrix 
         }]} 
         onPress={handleGoogleSignIn}
+        disabled={isProcessing}
       >
         <View style={styles.googleButtonContent}>
           <View style={styles.googleLogoContainer}>
@@ -131,9 +142,17 @@ const GoogleSignInButton = memo(function GoogleSignInButton() {
 const GoogleSignUpButton = memo(function GoogleSignUpButton() {
   const dispatch = useAppDispatch();
   const colors = useThemeColors();
+  const [isProcessing, setIsProcessing] = useState(false);
   
   const handleGoogleSignUp = useCallback(async () => {
+    // Prevent double execution
+    if (isProcessing) {
+      console.log('🔵 GSU: Already processing, ignoring duplicate call');
+      return;
+    }
+    
     console.log('🔵 GSU: Starting Google Sign-Up process');
+    setIsProcessing(true);
     
     try {
       console.log('🔵 GSU: Configuring Google Sign-In');
@@ -155,7 +174,7 @@ const GoogleSignUpButton = memo(function GoogleSignUpButton() {
         console.log('🔵 GSU: User cancelled Google Sign-In');
         return;
       }
-      
+        
       const idToken = userInfo.data?.idToken;
       if (idToken) {
         console.log('🔵 GSU: ID token received, dispatching to Redux');
@@ -173,8 +192,10 @@ const GoogleSignUpButton = memo(function GoogleSignUpButton() {
       
       // Let Redux handle the error display
       throw error;
+    } finally {
+      setIsProcessing(false);
     }
-  }, [dispatch]);
+  }, [dispatch, isProcessing]);
 
   return (
     <View style={styles.googleButtonContainer}>
@@ -184,6 +205,7 @@ const GoogleSignUpButton = memo(function GoogleSignUpButton() {
           borderColor: colors.matrix 
         }]} 
         onPress={handleGoogleSignUp}
+        disabled={isProcessing}
       >
         <View style={styles.googleButtonContent}>
           <View style={styles.googleLogoContainer}>
@@ -228,6 +250,7 @@ export const LoginScreen = () => {
 
   const handleSubmit = useCallback(async () => {
     clearFormError();
+    console.log('🔵 LOGIN: Form submission started, formType:', formType);
 
     const validateForm = () => {
       setError('');
@@ -238,7 +261,7 @@ export const LoginScreen = () => {
           return false;
         }
       } else {
-        if (!formData.email || !formData.handle || !formData.accessKey || !formData.verifyAccessKey) {
+        if (!formData.email || !formData.accessKey || !formData.verifyAccessKey) {
           setError('ACCESS_DENIED: ALL_FIELDS_REQUIRED');
           return false;
         }
@@ -261,19 +284,23 @@ export const LoginScreen = () => {
     if (validateForm()) {
       try {
         setLoading(true);
+        console.log('🔵 LOGIN: Form validation passed, dispatching:', formType);
+        
         if (formType === 'login') {
           await dispatch(loginUser({
             handle: formData.handle,
             accessKey: formData.accessKey,
           })).unwrap();
         } else {
+          console.log('🔵 LOGIN: Registering user with email:', formData.email);
           await dispatch(registerUser({
             email: formData.email,
-            handle: formData.handle,
             accessKey: formData.accessKey,
           })).unwrap();
+          console.log('🔵 LOGIN: Registration completed successfully');
         }
       } catch (err) {
+        console.error('🔴 LOGIN: Form submission error:', err);
         // Convert technical errors to user-friendly messages
         let userMessage = 'ACCESS_DENIED: ';
 
@@ -303,7 +330,6 @@ export const LoginScreen = () => {
       return formData.handle.trim().length > 0 && formData.accessKey.trim().length > 0;
     }
     return formData.email.trim().length > 0 &&
-           formData.handle.trim().length > 0 &&
            formData.accessKey.trim().length > 0 &&
            formData.verifyAccessKey.trim().length > 0;
   }, [formType, formData]);
