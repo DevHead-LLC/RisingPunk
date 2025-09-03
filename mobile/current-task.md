@@ -134,3 +134,115 @@
   4. Only proceed with password verification if hashedAccessKey exists
 
 **Expected Result**: Server will no longer crash when users attempt password login to Google Sign-In accounts, and will return the helpful message "Please Sign In with Google account used to create this account."
+
+## Profile Settings Handle Change Feature ✅
+**Problem**: Users need ability to change their username/handle after account creation
+
+**Solution**: Added "Change User Handle" functionality to Profile settings using existing HandleSelectionModal
+- **Location**: `mobile/src/screens/ProfileScreen.tsx`
+- **Implementation**: 
+  1. Added "UPDATE ACCOUNT SETTINGS" section above "DANGER ZONE" in account tab
+  2. Added "CHANGE USER HANDLE" button that opens HandleSelectionModal
+  3. Imported HandleSelectionModal component and updateUserHandle Redux action
+  4. Added state management for showing/hiding the handle change modal
+  5. Implemented handleUpdateUserHandle function using existing updateUserHandle Redux action
+  6. Modal includes all existing validation and availability checking
+- **Features**:
+  - Real-time handle availability checking
+  - Validation for length (5-15 characters) and allowed characters (letters, numbers, !&%^*)
+  - Visual requirements checklist with checkmarks
+  - Database update with proper error handling
+  - Automatic profile refresh after successful update
+- **User Experience**: 
+  - Same modal and validation as account creation flow
+  - Consistent UI/UX with existing handle selection process
+  - Immediate profile update after successful handle change
+
+**Expected Result**: Users can now change their handle from Profile settings with the same validation and user experience as the initial handle selection during account creation
+
+## Handle Selection Modal Conditional Behavior ✅
+**Problem**: HandleSelectionModal needs different behavior based on context - optional for profile settings, required for signup
+
+**Solution**: Added conditional behavior to HandleSelectionModal with isRequired prop
+- **Location**: `mobile/src/components/modals/HandleSelectionModal.tsx`
+- **Implementation**: 
+  1. Added `isRequired?: boolean` and `onClose?: () => void` props to interface
+  2. Added conditional CANCEL button that only shows when `isRequired={false}`
+  3. Updated button layout to show CANCEL and CONFIRM buttons side-by-side for optional mode
+  4. Submit button takes full width when required, 60% width when optional
+  5. Added new styles for button container and cancel button
+- **Profile Settings Usage**: 
+  - `isRequired={false}` - shows CANCEL button, allows user to close modal
+  - `onClose={() => setShowChangeHandle(false)}` - closes modal when cancelled
+- **Signup Flow Usage**: 
+  - `isRequired={true}` - no CANCEL button, user must complete handle selection
+  - No onClose prop - modal cannot be dismissed until handle is submitted
+- **User Experience**:
+  - Profile settings: Optional handle change with cancel option
+  - Signup flow: Mandatory handle selection, no escape until completed
+  - Consistent validation and UI for both contexts
+
+**Expected Result**: HandleSelectionModal now behaves appropriately for both contexts - optional in profile settings with cancel button, required during signup with no escape option
+
+## Database Sync Issue Debugging & Fixes ✅
+**Problem**: User account showing $0 balance and running onboarding despite database having correct data (balance: 1,284,611, bots built, etc.)
+
+**Root Cause**: App's local state out of sync with database - likely stale AsyncStorage data or failed data synchronization
+
+**Solution**: Implemented comprehensive debugging and force refresh mechanisms
+- **Location**: `mobile/src/store/slices/authSlice.ts` and `mobile/src/screens/ProfileScreen.tsx`
+- **Debugging Added**:
+  1. Enhanced logging in `loadStoredAuth` to track data flow from `/api/auth/verify-token`
+  2. Added logging in `fetchInitialData` to monitor balance, bots, and build state fetching
+  3. Added logging in UI state setting to track onboarding/showHandleSelection logic
+- **Force Refresh Mechanism**:
+  1. Added `forceRefreshAllData` async thunk that clears all RTK Query caches
+  2. Fetches fresh data from database for balance, bots, and build state
+  3. Added "REFRESH DATA" button to Profile settings for manual sync
+  4. Added `forceRefreshData` action for triggering refreshes
+- **Data Flow Improvements**:
+  1. Enhanced error handling in data fetching with detailed logging
+  2. Added cache invalidation to ensure fresh data retrieval
+  3. Improved logging throughout the authentication and data loading process
+
+**Immediate Actions for User**:
+1. **Check Console Logs**: Look for "🔵 LOAD STORED AUTH" and "🔵 FETCH INITIAL DATA" messages
+2. **Use Refresh Button**: Click "REFRESH DATA" in Profile → Account → Update Account Settings
+3. **Monitor Logs**: Watch for any error messages or failed API calls
+
+**Expected Result**: 
+- Console will show detailed data flow from database to app state
+- "REFRESH DATA" button will force complete data sync from database
+- User should see correct balance and skip onboarding if database shows `onboardingCompleted: true`
+- App state will match database state after refresh
+
+## Server-Controlled Debug Features ✅
+**Problem**: Need ability to control debug features (like REFRESH DATA button) per user without code changes
+
+**Solution**: Implemented server-controlled debug features using database flags
+- **Location**: `server/src/models/User.ts`, `server/src/routes/auth.ts`, `mobile/src/store/slices/authSlice.ts`, `mobile/src/screens/ProfileScreen.tsx`
+- **Database Schema**: Added `debugFeatures` field to User model:
+  ```javascript
+  debugFeatures: {
+    enableDataRefresh: { type: Boolean, default: false },
+    enableDebugLogs: { type: Boolean, default: false }
+  }
+  ```
+- **Server Implementation**:
+  1. Added debug features to User interface and schema
+  2. Updated all auth endpoints (login, google-signin, verify-token) to include debug features in response
+  3. Features default to `false` for all users
+- **Mobile Implementation**:
+  1. Added `debugFeatures` to User interface in auth slice
+  2. Updated ProfileScreen to conditionally show "REFRESH DATA" button based on `user.debugFeatures.enableDataRefresh`
+  3. Button only appears when server sets `enableDataRefresh: true` for that user
+- **Usage**:
+  - **Enable for specific user**: Update user document in database: `debugFeatures.enableDataRefresh: true`
+  - **Disable for user**: Set `debugFeatures.enableDataRefresh: false` or remove the field
+  - **No code changes needed** - controlled entirely from database
+
+**Expected Result**: 
+- "REFRESH DATA" button only appears for users with `debugFeatures.enableDataRefresh: true` in database
+- Can enable/disable debug features per user by updating database
+- No app updates needed to control debug features
+- Safe and controlled access to debugging tools

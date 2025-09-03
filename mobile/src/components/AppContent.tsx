@@ -174,6 +174,7 @@ const AppContent = memo(() => {
         visible={showHandleSelection}
         onSubmit={handleHandleSubmit}
         isLoading={isLoading}
+        isRequired={true}
       />
       <ConnectivityOverlay visible={shouldShowConnectivityOverlay} />
     </>

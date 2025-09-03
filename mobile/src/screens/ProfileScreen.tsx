@@ -8,10 +8,11 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
+  Alert,
 } from 'react-native';
 import { CloseButton } from '../components/common/CloseButton';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { logout, setShowOnboarding } from '../store/slices/authSlice';
+import { logout, setShowOnboarding, updateUserHandle, forceRefresh } from '../store/slices/authSlice';
 import { updateProfileGender } from '../store/slices/preferencesSlice';
 import { useUpdatePreferencesMutation } from '../store/api/preferencesApi';
 import { useGetProfileQuery, useGetResearchCenterStatusQuery, useDeleteAccountMutation } from '../store/api/authApi';
@@ -22,6 +23,7 @@ import { useThemeColors } from '../hooks/useThemeColors';
 import { PrivacyPolicyModal } from '../components/profile/PrivacyPolicyModal';
 import { TermsOfServiceModal } from '../components/profile/TermsOfServiceModal';
 import { DeleteAccountModal } from '../components/profile/DeleteAccountModal';
+import { HandleSelectionModal } from '../components/modals/HandleSelectionModal';
 
 interface BotStats {
   role: string;
@@ -334,6 +336,22 @@ const createProfileStyles = (colors: any) => StyleSheet.create({
     fontSize: SIZING.font.body,
     fontWeight: 'bold',
   },
+  primaryButton: {
+    backgroundColor: colors.background + 'CC',
+    borderWidth: 2,
+    borderColor: colors.secondary,
+    borderRadius: 8,
+    paddingVertical: SIZING.spacing.md,
+    paddingHorizontal: SIZING.spacing.lg,
+    alignItems: 'center',
+    marginTop: SIZING.spacing.lg,
+    marginHorizontal: SIZING.spacing.md,
+  },
+  primaryButtonText: {
+    color: colors.secondary,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
   settingsContainer: {
     flex: 1,
     padding: SIZING.spacing.md,
@@ -445,11 +463,12 @@ const createProfileStyles = (colors: any) => StyleSheet.create({
 
 export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
   const dispatch = useAppDispatch();
-  const { token } = useAppSelector((state) => state.auth);
+  const { token, user } = useAppSelector((state) => state.auth);
   const [activeTab, setActiveTab] = useState<TabType>('profile');
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [showTermsOfService, setShowTermsOfService] = useState(false);
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [showChangeHandle, setShowChangeHandle] = useState(false);
   const { themeMode, toggleTheme } = useTheme();
   const colors = useThemeColors();
   const profileGender = useAppSelector((state) => state.preferences.profileGender);
@@ -486,6 +505,16 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
       dispatch(logout());
     } catch (error) {
       console.error('ProfileScreen: Failed to delete account:', error);
+      throw error;
+    }
+  };
+
+  const handleUpdateUserHandle = async (newHandle: string) => {
+    try {
+      await dispatch(updateUserHandle(newHandle)).unwrap();
+      setShowChangeHandle(false);
+    } catch (error) {
+      console.error('ProfileScreen: Failed to update handle:', error);
       throw error;
     }
   };
@@ -757,6 +786,35 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
               <Text style={styles.settingsTitle}>ACCOUNT SETTINGS</Text>
               
               <View style={styles.settingCard}>
+                <Text style={styles.settingLabel}>UPDATE ACCOUNT SETTINGS</Text>
+                <TouchableOpacity
+                  style={[styles.primaryButton, { marginTop: SIZING.spacing.md }]}
+                  onPress={() => setShowChangeHandle(true)}
+                >
+                  <Text style={styles.primaryButtonText}>CHANGE USER HANDLE</Text>
+                </TouchableOpacity>
+                
+                {user?.debugFeatures?.enableDataRefresh && (
+                  <TouchableOpacity
+                    style={[styles.primaryButton, { marginTop: SIZING.spacing.md }]}
+                    onPress={() => {
+                      // Show confirmation dialog for safety
+                      Alert.alert(
+                        'Data Refresh',
+                        'This will refresh all your data from the server. Only use this if you\'re experiencing sync issues.',
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Refresh', onPress: () => dispatch(forceRefresh()) }
+                        ]
+                      );
+                    }}
+                  >
+                    <Text style={styles.primaryButtonText}>REFRESH DATA</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              
+              <View style={styles.settingCard}>
                 <Text style={styles.settingLabel}>DANGER ZONE</Text>
                 <TouchableOpacity
                   style={[styles.disconnectButton, { marginTop: SIZING.spacing.md }]}
@@ -826,6 +884,13 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
         onClose={() => setShowDeleteAccount(false)}
         onDelete={handleDeleteAccount}
         userHandle={profile.handle}
+      />
+      <HandleSelectionModal
+        visible={showChangeHandle}
+        onSubmit={handleUpdateUserHandle}
+        isLoading={false}
+        isRequired={false}
+        onClose={() => setShowChangeHandle(false)}
       />
     </SafeAreaView>
   );

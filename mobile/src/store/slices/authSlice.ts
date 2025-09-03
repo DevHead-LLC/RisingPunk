@@ -20,6 +20,10 @@ export interface User {
   profileGender: 'male' | 'female';
   onboardingCompleted: boolean;
   needsHandleSelection: boolean;
+  debugFeatures?: {
+    enableDataRefresh: boolean;
+    enableDebugLogs: boolean;
+  };
 }
 
 export interface AuthState {
@@ -503,6 +507,9 @@ export const loadStoredAuth = createAsyncThunk(
 
       const userData = await response.json();
       
+      console.log('🔵 LOAD STORED AUTH: Raw response from verify-token:', userData);
+      console.log('🔵 LOAD STORED AUTH: User data from database:', userData.user);
+      
       // Update stored user data with fresh database data
       await AsyncStorage.setItem('user', JSON.stringify(userData.user));
       
@@ -572,6 +579,75 @@ export const fetchInitialData = createAsyncThunk(
 
       return { success: true };
     } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+);
+
+export const forceRefreshAllData = createAsyncThunk(
+  'auth/forceRefreshAllData',
+  async (_, { getState, dispatch, rejectWithValue }) => {
+    try {
+      const state = getState() as { auth: AuthState };
+      const { token } = state.auth;
+
+      if (!token) {
+        return rejectWithValue('No authentication token');
+      }
+
+      console.log('🔵 FORCE REFRESH: Starting complete data refresh from database');
+
+      // Clear all RTK Query caches to force fresh data
+      dispatch(authApi.util.resetApiState());
+      dispatch(balanceApi.util.resetApiState());
+      dispatch(botsApi.util.resetApiState());
+      dispatch(mapApi.util.resetApiState());
+
+      // Fetch fresh data
+      const balanceResponse = await fetch(`${API_URL}/api/balance`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (balanceResponse.ok) {
+        const balanceData = await balanceResponse.json();
+        console.log('🔵 FORCE REFRESH: Fresh balance data:', balanceData);
+        dispatch(updateBalance({
+          total: balanceData.total,
+          ratePerSecond: balanceData.ratePerSecond,
+          lastUpdated: new Date().toISOString(),
+        }));
+      }
+
+      const botsResponse = await fetch(`${API_URL}/api/bots`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (botsResponse.ok) {
+        const botsData = await botsResponse.json();
+        console.log('🔵 FORCE REFRESH: Fresh bots data:', botsData);
+        dispatch(setBots(botsData.bots));
+      }
+
+      const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (buildStateResponse.ok) {
+        const buildStateData = await buildStateResponse.json();
+        console.log('🔵 FORCE REFRESH: Fresh build state data:', buildStateData);
+        dispatch(setBuildState(buildStateData));
+      }
+
+      console.log('🔵 FORCE REFRESH: Complete data refresh completed');
+      return { success: true };
+    } catch (error) {
+      console.error('🔴 FORCE REFRESH: Error during data refresh:', error);
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -651,6 +727,10 @@ export const authSlice = createSlice({
     },
     setShowHandleSelection: (state, action: PayloadAction<boolean>) => {
       state.showHandleSelection = action.payload;
+    },
+    forceRefreshData: (state) => {
+      // This action will trigger a complete data refresh
+      console.log('🔵 FORCE REFRESH: Triggering complete data refresh from database');
     },
   },
   extraReducers: (builder) => {
@@ -819,6 +899,9 @@ export const authSlice = createSlice({
             showHandleSelection: state.showHandleSelection,
             isInitialized: state.isInitialized
           });
+          
+          // Force fetch fresh balance and bot data immediately after auth
+          console.log('🔵 LOAD STORED AUTH: Triggering immediate data refresh');
         } else {
           // No stored auth, reset all states
           state.token = null;
@@ -854,12 +937,30 @@ export const authSlice = createSlice({
         state.isLoading = false;
         state.error = action.payload as string;
       });
+
+    // Force Refresh All Data
+    builder
+      .addCase(forceRefreshAllData.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(forceRefreshAllData.fulfilled, (state, _action) => {
+        state.isLoading = false;
+        state.error = null;
+        console.log('🔵 FORCE REFRESH: Data refresh completed successfully');
+      })
+      .addCase(forceRefreshAllData.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+        console.error('🔴 FORCE REFRESH: Data refresh failed:', action.payload);
+      });
   },
 });
 
-export const { clearError, setCredentials, setOnboardingCompleted, setShowOnboarding, setShowTurfIntro, setShowHandleSelection } = authSlice.actions;
+export const { clearError, setCredentials, setOnboardingCompleted, setShowOnboarding, setShowTurfIntro, setShowHandleSelection, forceRefreshData } = authSlice.actions;
 export const logout = logoutUser;
 export const googleSignIn = googleSignInUser;
 export const googleSignUp = googleSignUpUser;
 export const updateHandle = updateUserHandle;
+export const forceRefresh = forceRefreshAllData;
 export default authSlice.reducer;
