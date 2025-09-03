@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SIZING, styleGuide } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { API_URL } from '../../config';
 
 interface HandleSelectionModalProps {
   visible: boolean;
@@ -77,7 +78,7 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
 
     try {
       setIsCheckingAvailability(true);
-      const response = await fetch('http://localhost:5001/api/auth/check-handle', {
+      const response = await fetch(`${API_URL}/api/auth/check-handle`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
