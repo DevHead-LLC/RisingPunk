@@ -180,7 +180,8 @@ router.get('/privacy-policy', (_req: Request, res: Response) => {
             support@risingpunk.com (forwarded and hosted through Google Workspace)</p>
             
             <h2>Information We Collect</h2>
-            <p><strong>Email address</strong> – required to create and manage the account.</p>
+            <p><strong>Email address</strong> – required to create and manage the account. Email addresses are verified through a secure verification process to ensure account security and enable password recovery.</p>
+            <p><strong>Email verification status</strong> – we track whether your email has been verified to provide appropriate account security features.</p>
             <p><strong>Handle/username</strong> – chosen by you for in‑game display.</p>
             <p><strong>Password</strong> – stored only as a bcrypt hash.</p>
             <p><strong>Server logs</strong> – IP address, device ID, and usage data retained for 30 days to detect fraud and maintain security.</p>
@@ -193,9 +194,19 @@ router.get('/privacy-policy', (_req: Request, res: Response) => {
             <ul class="bullet-list">
                 <li>Authenticate and manage accounts.</li>
                 <li>Send essential service messages or support replies.</li>
+                <li>Send email verification links and password recovery emails.</li>
                 <li>Protect the service against fraud or abuse.</li>
             </ul>
             <p>We do not sell personal data.</p>
+            
+            <h2>Email Verification and Account Security</h2>
+            <p><strong>Email verification is required</strong> for account security and password recovery. Unverified accounts may be subject to the following limitations:</p>
+            <ul class="bullet-list">
+                <li>Password recovery may not be available for unverified accounts.</li>
+                <li>Unverified accounts that become locked may be unrecoverable and subject to deletion.</li>
+                <li>We will attempt to notify users of verification requirements through in-app notifications.</li>
+            </ul>
+            <p><strong>Verification emails</strong> contain secure tokens that expire within 72 hours. You can request new verification emails as needed from your account settings.</p>
             
             <h2>Third‑Party Processors</h2>
             <p><strong>Amazon Web Services (Elastic Beanstalk/EC2)</strong> – application hosting (USA).</p>
@@ -426,7 +437,9 @@ router.get('/terms-of-service', (_req: Request, res: Response) => {
             <h2>Account Registration and Security</h2>
             <ul class="bullet-list">
                 <li>Provide a valid email and choose a handle.</li>
+                <li>Verify your email address to ensure account security and enable password recovery.</li>
                 <li>You are responsible for safeguarding your password.</li>
+                <li>Unverified accounts may have limited functionality and may be unrecoverable if locked.</li>
                 <li>We may suspend or terminate accounts for violations or security concerns.</li>
             </ul>
             

@@ -78,7 +78,9 @@ export function TermsOfServiceModal({
             </Text>
             <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
               • Provide a valid email and choose a handle.{'\n'}
+              • Verify your email address to ensure account security and enable password recovery.{'\n'}
               • You are responsible for safeguarding your password.{'\n'}
+              • Unverified accounts may have limited functionality and may be unrecoverable if locked.{'\n'}
               • We may suspend or terminate accounts for violations or security concerns.
             </Text>
           </View>
@@ -218,7 +220,7 @@ const styles = StyleSheet.create({
     marginBottom: SIZING.spacing.lg,
   },
   sectionTitle: {
-    fontSize: SIZING.font.h3,
+    fontSize: SIZING.font.h2,
     fontWeight: 'bold',
     marginBottom: SIZING.spacing.sm,
   },

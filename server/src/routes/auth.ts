@@ -5,6 +5,8 @@ import { ResearchUser } from '../models/ResearchUser';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import { GoogleAuthService } from '../services/GoogleAuthService';
+import { EmailService } from '../services/EmailService';
+import { EncryptionService } from '../services/EncryptionService';
 
 // Helper function to safely escape regex special characters
 function escapeRegexString(str: string): string {
@@ -42,6 +44,9 @@ interface UserResponse {
     };
     onboardingCompleted: boolean;
     needsHandleSelection: boolean;
+    emailVerified: boolean;
+    emailVerificationToken?: string | null;
+    emailVerificationPrompted?: boolean;
     debugFeatures?: {
       enableDataRefresh: boolean;
       enableDebugLogs: boolean;
@@ -162,6 +167,9 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
           },
           onboardingCompleted: user.onboardingCompleted || false,
           needsHandleSelection: user.needsHandleSelection || false,
+          emailVerified: user.emailVerified || false,
+          emailVerificationToken: user.emailVerificationToken || null,
+          emailVerificationPrompted: user.emailVerificationPrompted || false,
           debugFeatures: {
             enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
             enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
@@ -224,6 +232,9 @@ router.post<{}, UserResponse | { error: string }, LoginRequest['body']>(
           },
           onboardingCompleted: user.onboardingCompleted || false,
           needsHandleSelection: user.needsHandleSelection || false,
+          emailVerified: user.emailVerified || false,
+          emailVerificationToken: user.emailVerificationToken || null,
+          emailVerificationPrompted: user.emailVerificationPrompted || false,
           debugFeatures: {
             enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
             enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
@@ -289,6 +300,9 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
             },
             onboardingCompleted: user.onboardingCompleted || false,
             needsHandleSelection: user.needsHandleSelection || false,
+            emailVerified: user.emailVerified || false,
+          emailVerificationToken: user.emailVerificationToken || null,
+          emailVerificationPrompted: user.emailVerificationPrompted || false,
             debugFeatures: {
               enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
               enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
@@ -325,6 +339,9 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
               },
               onboardingCompleted: user.onboardingCompleted || false,
               needsHandleSelection: user.needsHandleSelection || false,
+              emailVerified: user.emailVerified || false,
+          emailVerificationToken: user.emailVerificationToken || null,
+          emailVerificationPrompted: user.emailVerificationPrompted || false,
               debugFeatures: {
                 enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
                 enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
@@ -403,7 +420,8 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
         email: googleUser.email,
         handle,
         googleId: googleUser.googleId,
-        needsHandleSelection: true
+        needsHandleSelection: true,
+        emailVerified: true // Google Sign-In users have verified emails
         // Note: hashedAccessKey is optional for Google Sign-In users
       });
 
@@ -433,6 +451,9 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
           },
           onboardingCompleted: user.onboardingCompleted || false,
           needsHandleSelection: user.needsHandleSelection || false,
+          emailVerified: user.emailVerified || false,
+          emailVerificationToken: user.emailVerificationToken || null,
+          emailVerificationPrompted: user.emailVerificationPrompted || false,
           debugFeatures: {
             enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
             enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
@@ -542,6 +563,7 @@ router.post('/update-handle', async (req, res): Promise<void> => {
         },
         onboardingCompleted: user.onboardingCompleted || false,
         needsHandleSelection: user.needsHandleSelection || false,
+        emailVerified: user.emailVerified || false,
         debugFeatures: {
           enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
           enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
@@ -619,6 +641,9 @@ router.get('/verify-token', async (req, res): Promise<void> => {
         profileGender: user.profileGender || 'male',
         onboardingCompleted: user.onboardingCompleted || false,
         needsHandleSelection: user.needsHandleSelection || false,
+        emailVerified: user.emailVerified || false,
+        emailVerificationToken: user.emailVerificationToken || null,
+        emailVerificationPrompted: user.emailVerificationPrompted || false,
         debugFeatures: {
           enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
           enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
@@ -628,6 +653,392 @@ router.get('/verify-token', async (req, res): Promise<void> => {
   } catch (error) {
     console.error('Token verification error:', error);
     res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+// Email verification endpoints
+router.post('/send-verification', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      res.status(400).json({ error: 'Email is required' });
+      return;
+    }
+
+    // Get the authenticated user from the token
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    const token = authHeader.substring(7);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'defaultsecret') as { userId: string };
+    
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Check if the email is already in use by another user
+    const emailExists = await User.emailExists(email);
+    console.log('🔵 SERVER: Email existence check:', {
+      email: email,
+      emailExists: emailExists,
+      currentUser: user.handle
+    });
+    
+    if (emailExists) {
+      console.log('🔴 SERVER: Email already exists:', email);
+      res.status(400).json({ error: 'Please select a new email address or log into the existing account.' });
+      return;
+    }
+
+    // Check if this is a new email (different from current user's email)
+    const isNewEmail = user.getDecryptedEmail() !== email;
+    
+    if (isNewEmail) {
+      // Store the new email temporarily (will be confirmed after verification)
+      user.emailVerificationNewEmail = email;
+    }
+
+    // Generate verification token
+    const verificationToken = EmailService.generateVerificationToken();
+    const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000); // 72 hours
+
+    // Update user with verification token
+    user.emailVerificationToken = verificationToken;
+    user.emailVerificationExpires = expiresAt;
+    user.emailVerificationSentAt = new Date();
+    
+    await user.save();
+
+    // Send verification email
+    const emailSent = await EmailService.sendVerificationEmail(
+      email, // Use the email from the request (new email if updating)
+      user.handle,
+      verificationToken
+    );
+
+    if (emailSent) {
+      res.status(200).json({ message: 'Verification email sent successfully' });
+    } else {
+      res.status(500).json({ error: 'Failed to send verification email' });
+    }
+  } catch (error) {
+    console.error('Send verification error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.get('/verify-email/:token', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token } = req.params;
+
+    // Find user by verification token
+    const user = await User.findOne({ 
+      emailVerificationToken: token,
+      emailVerificationExpires: { $gt: new Date() }
+    });
+
+    if (!user) {
+      res.setHeader('Content-Type', 'text/html');
+      res.status(400).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Email Verification Failed - RisingPunk</title>
+          <style>
+            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #1a1a1a; color: #fff; }
+            .container { max-width: 500px; margin: 0 auto; }
+            .error { color: #ff6b6b; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>Email Verification Failed</h1>
+            <p class="error">Invalid or expired verification token.</p>
+            <p>Please request a new verification email from the app.</p>
+          </div>
+        </body>
+        </html>
+      `);
+      return;
+    }
+
+    // Mark email as verified and clear token
+    user.emailVerified = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+    user.emailVerificationSentAt = undefined;
+    
+    // If this was an email update, update the user's email
+    if (user.emailVerificationNewEmail) {
+      user.email = user.emailVerificationNewEmail;
+      user.emailHash = EncryptionService.hashEmail(user.emailVerificationNewEmail);
+      user.emailVerificationNewEmail = undefined;
+    }
+    
+    await user.save();
+
+    res.setHeader('Content-Type', 'text/html');
+    res.status(200).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Email Verified - RisingPunk</title>
+        <style>
+          body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #1a1a1a; color: #fff; }
+          .container { max-width: 500px; margin: 0 auto; }
+          .success { color: #51cf66; }
+          .button { 
+            display: inline-block; 
+            padding: 12px 24px; 
+            background: #51cf66; 
+            color: white; 
+            text-decoration: none; 
+            border-radius: 6px; 
+            margin-top: 20px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>Email Verified Successfully!</h1>
+          <p class="success">Your email address has been verified.</p>
+          <p>You can now close this window and return to the app.</p>
+          <p>Your account is now fully secured and you can recover your password if needed.</p>
+        </div>
+      </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error('Email verification error:', error);
+    res.setHeader('Content-Type', 'text/html');
+    res.status(500).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Verification Error - RisingPunk</title>
+        <style>
+          body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #1a1a1a; color: #fff; }
+          .container { max-width: 500px; margin: 0 auto; }
+          .error { color: #ff6b6b; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>Verification Error</h1>
+          <p class="error">An error occurred while verifying your email.</p>
+          <p>Please try again or contact support.</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+});
+
+router.post('/resend-verification', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      res.status(400).json({ error: 'Email is required' });
+      return;
+    }
+
+    // Find user by email
+    const user = await User.findOne({ emailHash: EncryptionService.hashEmail(email) });
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Check if already verified
+    if (user.emailVerified) {
+      res.status(400).json({ error: 'Email already verified' });
+      return;
+    }
+
+    // Check rate limiting (prevent spam)
+    const now = new Date();
+    const lastSent = user.emailVerificationSentAt;
+    if (lastSent && (now.getTime() - lastSent.getTime()) < 60000) { // 1 minute cooldown
+      res.status(429).json({ error: 'Please wait before requesting another verification email' });
+      return;
+    }
+
+    // Generate new verification token
+    const verificationToken = EmailService.generateVerificationToken();
+    const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000); // 72 hours
+
+    // Update user with new verification token
+    user.emailVerificationToken = verificationToken;
+    user.emailVerificationExpires = expiresAt;
+    user.emailVerificationSentAt = new Date();
+    await user.save();
+
+    // Send verification email
+    const emailSent = await EmailService.sendVerificationEmail(
+      user.getDecryptedEmail(),
+      user.handle,
+      verificationToken
+    );
+
+    if (emailSent) {
+      res.status(200).json({ message: 'Verification email resent successfully' });
+    } else {
+      res.status(500).json({ error: 'Failed to send verification email' });
+    }
+  } catch (error) {
+    console.error('Resend verification error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Password reset endpoints
+router.post('/forgot-password', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      res.status(400).json({ error: 'Email is required' });
+      return;
+    }
+
+    // Find user by email
+    const user = await User.findOne({ emailHash: EncryptionService.hashEmail(email) });
+    if (!user) {
+      // Don't reveal if user exists or not for security
+      res.status(200).json({ message: 'If the email exists, a password reset link has been sent' });
+      return;
+    }
+
+    // Check if email is verified
+    if (!user.emailVerified) {
+      res.status(400).json({ error: 'Email must be verified before resetting password' });
+      return;
+    }
+
+    // Generate password reset token
+    const resetToken = EmailService.generatePasswordResetToken();
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    // Update user with reset token
+    user.emailVerificationToken = resetToken; // Reuse the same field for password reset
+    user.emailVerificationExpires = expiresAt;
+    user.emailVerificationSentAt = new Date();
+    await user.save();
+
+    // Send password reset email
+    const emailSent = await EmailService.sendPasswordResetEmail(
+      user.getDecryptedEmail(),
+      user.handle,
+      resetToken
+    );
+
+    if (emailSent) {
+      res.status(200).json({ message: 'If the email exists, a password reset link has been sent' });
+    } else {
+      res.status(500).json({ error: 'Failed to send password reset email' });
+    }
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.post('/reset-password', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      res.status(400).json({ error: 'Token and new password are required' });
+      return;
+    }
+
+    // Find user by reset token
+    const user = await User.findOne({ 
+      emailVerificationToken: token,
+      emailVerificationExpires: { $gt: new Date() }
+    });
+
+    if (!user) {
+      res.status(400).json({ error: 'Invalid or expired reset token' });
+      return;
+    }
+
+    // Update password and clear token
+    user.hashedAccessKey = newPassword; // Will be hashed by pre-save middleware
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+    user.emailVerificationSentAt = undefined;
+    await user.save();
+
+    res.status(200).json({ message: 'Password reset successfully' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Mark user as prompted for email verification
+router.post('/mark-email-verification-prompted', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
+    const user = await User.findById(decoded.userId);
+    
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Mark user as prompted for email verification
+    user.emailVerificationPrompted = true;
+    await user.save();
+
+    res.status(200).json({ 
+      message: 'User marked as prompted for email verification',
+      emailVerificationPrompted: user.emailVerificationPrompted
+    });
+  } catch (error) {
+    console.error('Mark email verification prompted error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Debug endpoint to verify email (for testing only)
+router.get('/debug/email/:userId', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Decrypt and show the current email
+    const decryptedEmail = user.getDecryptedEmail();
+    
+          res.status(200).json({
+        userId: user._id,
+        handle: user.handle,
+        currentEmail: decryptedEmail,
+        emailHash: user.emailHash,
+        emailVerified: user.emailVerified
+      });
+  } catch (error) {
+    console.error('Debug email error:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 

@@ -20,6 +20,9 @@ export interface User {
   profileGender: 'male' | 'female';
   onboardingCompleted: boolean;
   needsHandleSelection: boolean;
+  emailVerified: boolean;
+  emailVerificationToken?: string | null;
+  emailVerificationPrompted?: boolean;
   debugFeatures?: {
     enableDataRefresh: boolean;
     enableDebugLogs: boolean;
@@ -34,6 +37,9 @@ export interface AuthState {
   showOnboarding: boolean;
   showTurfIntro: boolean;
   showHandleSelection: boolean;
+  showEmailVerification: boolean;
+  showEmailVerificationBanner: boolean;
+  emailVerificationPromptedUserId: string | null; // Track which user has been prompted for email verification in this session
   isInitialized: boolean; // Track if initial database verification is complete
 }
 
@@ -584,6 +590,37 @@ export const fetchInitialData = createAsyncThunk(
   }
 );
 
+export const refreshUserData = createAsyncThunk(
+  'auth/refreshUserData',
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      const state = getState() as { auth: AuthState };
+      const { token } = state.auth;
+
+      if (!token) {
+        return rejectWithValue('No authentication token');
+      }
+
+      // Fetch updated user profile
+      const response = await fetch(`${API_URL}/api/users/profile`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch user profile');
+      }
+
+      const userData = await response.json();
+      return userData;
+    } catch (error) {
+      console.error('Error refreshing user data:', error);
+      return rejectWithValue('Failed to refresh user data');
+    }
+  }
+);
+
 export const forceRefreshAllData = createAsyncThunk(
   'auth/forceRefreshAllData',
   async (_, { getState, dispatch, rejectWithValue }) => {
@@ -662,6 +699,9 @@ const initialState: AuthState = {
   showOnboarding: false,
   showTurfIntro: false,
   showHandleSelection: false,
+  showEmailVerification: false,
+  showEmailVerificationBanner: false,
+  emailVerificationPromptedUserId: null,
   isInitialized: false,
 };
 
@@ -728,6 +768,15 @@ export const authSlice = createSlice({
     setShowHandleSelection: (state, action: PayloadAction<boolean>) => {
       state.showHandleSelection = action.payload;
     },
+    setShowEmailVerification: (state, action: PayloadAction<boolean>) => {
+      state.showEmailVerification = action.payload;
+    },
+    setShowEmailVerificationBanner: (state, action: PayloadAction<boolean>) => {
+      state.showEmailVerificationBanner = action.payload;
+    },
+    setEmailVerificationPrompted: (state, action: PayloadAction<string | null>) => {
+      state.emailVerificationPromptedUserId = action.payload;
+    },
     forceRefreshData: (state) => {
       // This action will trigger a complete data refresh
       console.log('🔵 FORCE REFRESH: Triggering complete data refresh from database');
@@ -747,6 +796,8 @@ export const authSlice = createSlice({
         state.error = null;
         state.showOnboarding = !action.payload.user.onboardingCompleted;
         state.showHandleSelection = action.payload.user.needsHandleSelection;
+        state.showEmailVerification = false;
+        state.showEmailVerificationBanner = false;
         state.isInitialized = true; // Mark as initialized after successful login
       })
       .addCase(loginUser.rejected, (state, action) => {
@@ -793,6 +844,8 @@ export const authSlice = createSlice({
         state.error = null;
         state.showOnboarding = !action.payload.user.onboardingCompleted;
         state.showHandleSelection = action.payload.user.needsHandleSelection;
+        state.showEmailVerification = false;
+        state.showEmailVerificationBanner = false;
         state.isInitialized = true; // Mark as initialized after successful Google Sign-In
       })
       .addCase(googleSignInUser.rejected, (state, action) => {
@@ -814,6 +867,8 @@ export const authSlice = createSlice({
       state.showOnboarding = !action.payload.user.onboardingCompleted;
       // Store needsHandleSelection but don't show modal yet - wait for onboarding + turf intro to complete
       state.showHandleSelection = false; // Will be set to true after turf intro completes
+      state.showEmailVerification = false;
+      state.showEmailVerificationBanner = false;
       state.isInitialized = true; // Mark as initialized after successful Google Sign-Up
     })
       .addCase(googleSignUpUser.rejected, (state, action) => {
@@ -835,8 +890,14 @@ export const authSlice = createSlice({
           state.user.needsHandleSelection = false;
         }
         state.showHandleSelection = false;
+        // Show email verification modal after handle selection if email is not verified
+        if (state.user && !state.user.emailVerified) {
+          state.showEmailVerification = true;
+          console.log('🔵 AUTH SLICE: Handle update completed, showing email verification modal');
+        } else {
+          console.log('🔵 AUTH SLICE: Handle update completed, email already verified');
+        }
         state.error = null;
-        console.log('🔵 AUTH SLICE: Handle update completed, showHandleSelection set to false');
       })
       .addCase(updateUserHandle.rejected, (state, action) => {
         state.isLoading = false;
@@ -865,6 +926,9 @@ export const authSlice = createSlice({
         state.showOnboarding = false;
         state.showTurfIntro = false;
         state.showHandleSelection = false;
+        state.showEmailVerification = false;
+        state.showEmailVerificationBanner = false;
+        state.emailVerificationPromptedUserId = null;
         state.isInitialized = false;
       });
 
@@ -938,6 +1002,38 @@ export const authSlice = createSlice({
         state.error = action.payload as string;
       });
 
+    // Refresh User Data
+    builder
+      .addCase(refreshUserData.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(refreshUserData.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.error = null;
+        if (state.user && action.payload) {
+          // Update user data with fresh data from server
+          state.user.emailVerified = action.payload.emailVerified || false;
+          state.user.handle = action.payload.handle;
+          state.user.level = action.payload.level;
+          state.user.unlockedFeatures = action.payload.unlockedFeatures;
+          state.user.profileGender = action.payload.profileGender;
+          state.user.onboardingCompleted = action.payload.onboardingCompleted;
+          state.user.needsHandleSelection = action.payload.needsHandleSelection;
+          
+          // Reset email verification prompted flag if email is now verified
+          if (action.payload.emailVerified) {
+            state.emailVerificationPromptedUserId = null;
+          }
+          
+          console.log('🔵 AUTH SLICE: User data refreshed, emailVerified:', action.payload.emailVerified);
+        }
+      })
+      .addCase(refreshUserData.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      });
+
     // Force Refresh All Data
     builder
       .addCase(forceRefreshAllData.pending, (state) => {
@@ -957,7 +1053,7 @@ export const authSlice = createSlice({
   },
 });
 
-export const { clearError, setCredentials, setOnboardingCompleted, setShowOnboarding, setShowTurfIntro, setShowHandleSelection, forceRefreshData } = authSlice.actions;
+export const { clearError, setCredentials, setOnboardingCompleted, setShowOnboarding, setShowTurfIntro, setShowHandleSelection, setShowEmailVerification, setShowEmailVerificationBanner, setEmailVerificationPrompted, forceRefreshData } = authSlice.actions;
 export const logout = logoutUser;
 export const googleSignIn = googleSignInUser;
 export const googleSignUp = googleSignUpUser;
