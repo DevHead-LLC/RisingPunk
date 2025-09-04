@@ -745,6 +745,28 @@ The `/verify-token` endpoint was **NOT returning the `emailVerificationPrompted`
 - ✅ **If email is unique** → sends verification email
 - ✅ **No more "Current user not found" errors**
 
+## 🔴 **CRITICAL BUG FIXED** - Profile API Missing Email Verification Fields:
+
+### **Problem:**
+- **Codex Review identified critical issue** - `/api/users/profile` endpoint was missing `emailVerified` field
+- This caused the Redux state to be overwritten with `false` on every refresh
+- UI showed account as unverified even after successful verification
+
+### **Root Cause:**
+- The `refreshUserData` thunk updates `state.user.emailVerified` from the profile response
+- But the profile endpoint was only returning `handle`, `email`, `level`, and `unlockedFeatures`
+- Every refresh overwrote the Redux `emailVerified` flag with `false`
+
+### **Solution Implemented:**
+- ✅ **Fixed `/api/users/profile` endpoint** - Now returns `emailVerified`, `emailVerificationToken`, and `emailVerificationPrompted` fields
+- ✅ **Consistent client state** - Redux state now stays consistent with database state
+- ✅ **No more state overwrites** - Email verification status persists across refreshes
+
+### **Expected Behavior Now:**
+- ✅ **Email verification status persists** across app refreshes
+- ✅ **UI shows correct verification status** after successful verification
+- ✅ **No more false "unverified" status** after verification
+
 ## MongoDB Commands for Existing Users:
 
 ### Set all users to unverified (already executed):

@@ -35,7 +35,10 @@ router.get('/profile', auth, async (req: Request, res: Response) => {
         hackRig: user.unlockedFeatures?.hackRig || false,
         researchCenter: user.unlockedFeatures?.researchCenter || false
       },
-      profileGender: user.profileGender || 'male'
+      profileGender: user.profileGender || 'male',
+      emailVerified: user.emailVerified || false,
+      emailVerificationToken: user.emailVerificationToken || null,
+      emailVerificationPrompted: user.emailVerificationPrompted || false
     });
   } catch (error) {
     console.error('Server error:', error);
