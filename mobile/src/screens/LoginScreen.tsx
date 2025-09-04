@@ -18,6 +18,7 @@ import { AuthInputs } from '../components/auth/AuthInputs';
 import { useFormState } from '../hooks/useFormState';
 import { ScreenContainer } from '../components/common/ScreenContainer';
 import { useThemeColors } from '../hooks/useThemeColors';
+import { ForgotPasswordModal } from '../components/modals/ForgotPasswordModal';
 
 type FormType = 'login' | 'register';
 
@@ -226,6 +227,7 @@ export const LoginScreen = () => {
     accessKey: '',
     verifyAccessKey: '',
   });
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
   const { isLoading: formLoading, error: formError, setLoading, setError, clearError: clearFormError } = useFormState();
   const colors = useThemeColors();
 
@@ -364,6 +366,15 @@ export const LoginScreen = () => {
           </Text>
           <View style={[styles.buttonCorner, { borderColor: colors.primary }]} />
         </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={styles.forgotPasswordButton}
+          onPress={() => setShowForgotPasswordModal(true)}
+        >
+          <Text style={[styles.forgotPasswordText, { color: colors.matrix }]}>
+            forgot password
+          </Text>
+        </TouchableOpacity>
       </View>
     );
   };
@@ -415,12 +426,17 @@ export const LoginScreen = () => {
               <WelcomeMessage formType={formType} />
               <ErrorMessage error={error} />
               {formType === 'login' ? renderLoginForm() : renderRegisterForm()}
-              <ToggleFormButton formType={formType} onPress={toggleFormType} />
               {formType === 'login' ? <GoogleSignInButton /> : <GoogleSignUpButton />}
+              <ToggleFormButton formType={formType} onPress={toggleFormType} />
             </View>
           </View>
         </View>
       </KeyboardAvoidingView>
+      
+      <ForgotPasswordModal
+        isVisible={showForgotPasswordModal}
+        onClose={() => setShowForgotPasswordModal(false)}
+      />
     </ScreenContainer>
   );
 };
@@ -506,7 +522,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   googleButtonContainer: {
-    marginTop: SIZING.spacing.md,
+    marginTop: SIZING.spacing.sm,
+    marginBottom: SIZING.spacing.sm,
     width: '100%',
     maxWidth: 320,
     alignItems: 'center',
@@ -543,6 +560,7 @@ const styles = StyleSheet.create({
   welcomeText: {
     fontSize: SIZING.font.h2 - 2,
     fontWeight: '500',
+    marginBottom: SIZING.spacing.sm,
   },
   buttonDisabled: {
     opacity: 0.5,
@@ -555,5 +573,15 @@ const styles = StyleSheet.create({
     fontSize: SIZING.font.small,
     marginBottom: SIZING.spacing.sm,
     textAlign: 'center',
+  },
+  forgotPasswordButton: {
+    marginTop: SIZING.spacing.md,
+    marginBottom: SIZING.spacing.md,
+    alignSelf: 'center',
+  },
+  forgotPasswordText: {
+    fontSize: SIZING.font.small - 2,
+    letterSpacing: 0.5,
+    opacity: 0.7,
   },
 });

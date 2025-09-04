@@ -17,6 +17,10 @@ export interface GoogleSignInRequest {
   idToken: string;
 }
 
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
 export interface AuthResponse {
   token: string;
   user: {
@@ -214,6 +218,14 @@ export const authApi = createApi({
       }),
       invalidatesTags: ['User'],
     }),
+
+    forgotPassword: builder.mutation<{ message: string }, ForgotPasswordRequest>({
+      query: (data) => ({
+        url: '/api/auth/forgot-password',
+        method: 'POST',
+        body: data,
+      }),
+    }),
   }),
 });
 
@@ -230,4 +242,5 @@ export const {
   useCompleteRentalHousingMutation,
   useCompleteOnboardingMutation,
   useDeleteAccountMutation,
+  useForgotPasswordMutation,
 } = authApi;

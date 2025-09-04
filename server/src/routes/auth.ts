@@ -922,6 +922,12 @@ router.post('/forgot-password', async (req: Request, res: Response): Promise<voi
       return;
     }
 
+    // Check if this is a Google account (has googleId but no hashedAccessKey)
+    if (user.googleId && !user.hashedAccessKey) {
+      res.status(400).json({ error: 'This account uses Google Sign-In. Please use the "Sign in with Google" button instead.' });
+      return;
+    }
+
     // Generate password reset token
     const resetToken = EmailService.generatePasswordResetToken();
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
@@ -950,25 +956,299 @@ router.post('/forgot-password', async (req: Request, res: Response): Promise<voi
   }
 });
 
-router.post('/reset-password', async (req: Request, res: Response): Promise<void> => {
+// GET endpoint to show password reset form
+router.get('/reset-password', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { token, newPassword } = req.body;
+    const { token } = req.query;
 
-    if (!token || !newPassword) {
-      res.status(400).json({ error: 'Token and new password are required' });
+    if (!token) {
+      res.setHeader('Content-Type', 'text/html');
+      res.status(400).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Password Reset - RisingPunk</title>
+          <style>
+            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #1a1a1a; color: #fff; }
+            .container { max-width: 500px; margin: 0 auto; }
+            .error { color: #ff6b6b; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>Password Reset</h1>
+            <p class="error">Invalid reset link. Please check your email for the correct link.</p>
+          </div>
+        </body>
+        </html>
+      `);
       return;
     }
 
-    // Find user by reset token
+    // Verify token exists and is valid
     const user = await User.findOne({ 
       emailVerificationToken: token,
       emailVerificationExpires: { $gt: new Date() }
     });
 
     if (!user) {
+      res.setHeader('Content-Type', 'text/html');
+      res.status(400).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Password Reset - RisingPunk</title>
+          <style>
+            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #1a1a1a; color: #fff; }
+            .container { max-width: 500px; margin: 0 auto; }
+            .error { color: #ff6b6b; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>Password Reset</h1>
+            <p class="error">Invalid or expired reset token.</p>
+            <p>Please request a new password reset from the app.</p>
+          </div>
+        </body>
+        </html>
+      `);
+      return;
+    }
+
+    // Show password reset form
+    res.setHeader('Content-Type', 'text/html');
+    
+    // Generate a nonce for CSP
+    const nonce = require('crypto').randomBytes(16).toString('base64');
+    res.setHeader('Content-Security-Policy', `script-src 'self' 'nonce-${nonce}'`);
+    
+    // Create the JavaScript code with proper token substitution using string concatenation
+    const resetScript = `
+      console.log('Password reset script loaded');
+      console.log('Token:', '` + token + `');
+      
+      document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM loaded, attaching event listener');
+        const form = document.getElementById('resetForm');
+        if (form) {
+          form.addEventListener('submit', async function(e) {
+            console.log('Form submit event triggered');
+            e.preventDefault();
+            
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const submitBtn = document.getElementById('submitBtn');
+            const loading = document.getElementById('loading');
+            const message = document.getElementById('message');
+            
+            console.log('New password length:', newPassword.length);
+            console.log('Confirm password length:', confirmPassword.length);
+            
+            if (newPassword !== confirmPassword) {
+              message.innerHTML = '<div class="message error">Passwords do not match.</div>';
+              return;
+            }
+            
+            if (newPassword.length < 6) {
+              message.innerHTML = '<div class="message error">Password must be at least 6 characters long.</div>';
+              return;
+            }
+            
+            submitBtn.disabled = true;
+            loading.style.display = 'block';
+            message.innerHTML = '';
+            
+            try {
+              console.log('Sending POST request to /api/auth/reset-password');
+              const response = await fetch('/api/auth/reset-password', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  token: '` + token + `',
+                  newPassword: newPassword
+                })
+              });
+              
+              console.log('Response status:', response.status);
+              const data = await response.json();
+              console.log('Response data:', data);
+              
+              if (response.ok) {
+                message.innerHTML = '<div class="message success">Password reset successfully! You can now close this window and log in with your new password.</div>';
+                document.getElementById('resetForm').style.display = 'none';
+              } else {
+                message.innerHTML = '<div class="message error">' + (data.error || 'Failed to reset password. Please try again.') + '</div>';
+              }
+            } catch (error) {
+              console.error('Network error:', error);
+              message.innerHTML = '<div class="message error">Network error. Please check your connection and try again.</div>';
+            } finally {
+              submitBtn.disabled = false;
+              loading.style.display = 'none';
+            }
+          });
+        } else {
+          console.error('Form element not found');
+        }
+      });
+    `;
+    
+    res.status(200).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Reset Your Password - RisingPunk</title>
+        <style>
+          body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: #1a1a1a; 
+            color: #fff; 
+            margin: 0; 
+            padding: 20px; 
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .container { 
+            max-width: 400px; 
+            width: 100%;
+            background: #2a2a2a;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+          }
+          .logo {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 30px;
+          }
+          .form-group {
+            margin-bottom: 20px;
+          }
+          label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+          }
+          input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #444;
+            border-radius: 8px;
+            background: #333;
+            color: #fff;
+            font-size: 16px;
+            box-sizing: border-box;
+          }
+          input[type="password"]:focus {
+            outline: none;
+            border-color: #667eea;
+          }
+          .button {
+            width: 100%;
+            padding: 14px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+          }
+          .button:hover {
+            background: #5a6fd8;
+          }
+          .button:disabled {
+            background: #555;
+            cursor: not-allowed;
+          }
+          .message {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+          }
+          .success {
+            background: #2d5a2d;
+            color: #51cf66;
+          }
+          .error {
+            background: #5a2d2d;
+            color: #ff6b6b;
+          }
+          .loading {
+            display: none;
+            text-align: center;
+            margin-top: 10px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="logo">RisingPunk</div>
+          <h2 style="text-align: center; margin-bottom: 30px;">Reset Your Password</h2>
+          <form id="resetForm">
+            <div class="form-group">
+              <label for="newPassword">New Password</label>
+              <input type="password" id="newPassword" required minlength="6">
+            </div>
+            <div class="form-group">
+              <label for="confirmPassword">Confirm Password</label>
+              <input type="password" id="confirmPassword" required minlength="6">
+            </div>
+            <button type="submit" class="button" id="submitBtn">Reset Password</button>
+            <div class="loading" id="loading">Resetting password...</div>
+          </form>
+          <div id="message"></div>
+        </div>
+
+        <script nonce="${nonce}">${resetScript}</script>
+      </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error('Password reset form error:', error);
+    res.status(500).send('Server error');
+  }
+});
+
+// POST endpoint to handle password reset
+router.post('/reset-password', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token, newPassword } = req.body;
+
+    console.log('🔵 PASSWORD RESET: POST request received');
+    console.log('🔵 PASSWORD RESET: Token received:', token ? 'YES' : 'NO');
+    console.log('🔵 PASSWORD RESET: Token length:', token ? token.length : 0);
+    console.log('🔵 PASSWORD RESET: New password received:', newPassword ? 'YES' : 'NO');
+
+    if (!token || !newPassword) {
+      console.log('🔴 PASSWORD RESET: Missing token or password');
+      res.status(400).json({ error: 'Token and new password are required' });
+      return;
+    }
+
+    // Find user by reset token
+    console.log('🔵 PASSWORD RESET: Looking for user with token:', token);
+    const user = await User.findOne({ 
+      emailVerificationToken: token,
+      emailVerificationExpires: { $gt: new Date() }
+    });
+
+    if (!user) {
+      console.log('🔴 PASSWORD RESET: No user found with this token or token expired');
       res.status(400).json({ error: 'Invalid or expired reset token' });
       return;
     }
+
+    console.log('🔵 PASSWORD RESET: User found:', user.handle);
 
     // Update password and clear token
     user.hashedAccessKey = newPassword; // Will be hashed by pre-save middleware
