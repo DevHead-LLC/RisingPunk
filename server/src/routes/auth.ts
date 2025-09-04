@@ -1025,15 +1025,10 @@ router.get('/reset-password', async (req: Request, res: Response): Promise<void>
     
     // Create the JavaScript code with proper token substitution using string concatenation
     const resetScript = `
-      console.log('Password reset script loaded');
-      console.log('Token:', '` + token + `');
-      
       document.addEventListener('DOMContentLoaded', function() {
-        console.log('DOM loaded, attaching event listener');
         const form = document.getElementById('resetForm');
         if (form) {
           form.addEventListener('submit', async function(e) {
-            console.log('Form submit event triggered');
             e.preventDefault();
             
             const newPassword = document.getElementById('newPassword').value;
@@ -1041,9 +1036,6 @@ router.get('/reset-password', async (req: Request, res: Response): Promise<void>
             const submitBtn = document.getElementById('submitBtn');
             const loading = document.getElementById('loading');
             const message = document.getElementById('message');
-            
-            console.log('New password length:', newPassword.length);
-            console.log('Confirm password length:', confirmPassword.length);
             
             if (newPassword !== confirmPassword) {
               message.innerHTML = '<div class="message error">Passwords do not match.</div>';
@@ -1060,7 +1052,6 @@ router.get('/reset-password', async (req: Request, res: Response): Promise<void>
             message.innerHTML = '';
             
             try {
-              console.log('Sending POST request to /api/auth/reset-password');
               const response = await fetch('/api/auth/reset-password', {
                 method: 'POST',
                 headers: {
@@ -1072,9 +1063,7 @@ router.get('/reset-password', async (req: Request, res: Response): Promise<void>
                 })
               });
               
-              console.log('Response status:', response.status);
               const data = await response.json();
-              console.log('Response data:', data);
               
               if (response.ok) {
                 message.innerHTML = '<div class="message success">Password reset successfully! You can now close this window and log in with your new password.</div>';
@@ -1083,15 +1072,12 @@ router.get('/reset-password', async (req: Request, res: Response): Promise<void>
                 message.innerHTML = '<div class="message error">' + (data.error || 'Failed to reset password. Please try again.') + '</div>';
               }
             } catch (error) {
-              console.error('Network error:', error);
               message.innerHTML = '<div class="message error">Network error. Please check your connection and try again.</div>';
             } finally {
               submitBtn.disabled = false;
               loading.style.display = 'none';
             }
           });
-        } else {
-          console.error('Form element not found');
         }
       });
     `;
@@ -1224,31 +1210,21 @@ router.post('/reset-password', async (req: Request, res: Response): Promise<void
   try {
     const { token, newPassword } = req.body;
 
-    console.log('🔵 PASSWORD RESET: POST request received');
-    console.log('🔵 PASSWORD RESET: Token received:', token ? 'YES' : 'NO');
-    console.log('🔵 PASSWORD RESET: Token length:', token ? token.length : 0);
-    console.log('🔵 PASSWORD RESET: New password received:', newPassword ? 'YES' : 'NO');
-
     if (!token || !newPassword) {
-      console.log('🔴 PASSWORD RESET: Missing token or password');
       res.status(400).json({ error: 'Token and new password are required' });
       return;
     }
 
     // Find user by reset token
-    console.log('🔵 PASSWORD RESET: Looking for user with token:', token);
     const user = await User.findOne({ 
       emailVerificationToken: token,
       emailVerificationExpires: { $gt: new Date() }
     });
 
     if (!user) {
-      console.log('🔴 PASSWORD RESET: No user found with this token or token expired');
       res.status(400).json({ error: 'Invalid or expired reset token' });
       return;
     }
-
-    console.log('🔵 PASSWORD RESET: User found:', user.handle);
 
     // Update password and clear token
     user.hashedAccessKey = newPassword; // Will be hashed by pre-save middleware
