@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { CloseButton } from '../components/common/CloseButton';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { logout, setShowOnboarding, updateUserHandle, forceRefresh } from '../store/slices/authSlice';
+import { logout, setShowOnboarding, updateUserHandle, forceRefresh, setShowEmailVerification, refreshUserData } from '../store/slices/authSlice';
 import { updateProfileGender } from '../store/slices/preferencesSlice';
 import { useUpdatePreferencesMutation } from '../store/api/preferencesApi';
 import { useGetProfileQuery, useGetResearchCenterStatusQuery, useDeleteAccountMutation } from '../store/api/authApi';
@@ -39,6 +39,7 @@ interface BotStats {
 interface UserProfile {
   handle: string;
   email: string;
+  emailVerified: boolean;
   level: number;
   experience: {
     current: number;
@@ -459,6 +460,30 @@ const createProfileStyles = (colors: any) => StyleSheet.create({
     fontSize: SIZING.font.body,
     fontWeight: 'bold',
   },
+  emailVerificationContainer: {
+    marginTop: SIZING.spacing.sm,
+  },
+  verificationStatus: {
+    alignItems: 'center',
+    marginBottom: SIZING.spacing.sm,
+  },
+  verificationLabel: {
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
+  warningContainer: {
+    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 193, 7, 0.3)',
+    borderRadius: 4,
+    padding: SIZING.spacing.sm,
+    marginTop: SIZING.spacing.sm,
+  },
+  warningText: {
+    fontSize: SIZING.font.small,
+    lineHeight: 16,
+    textAlign: 'center',
+  },
 });
 
 export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
@@ -472,8 +497,10 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const { themeMode, toggleTheme } = useTheme();
   const colors = useThemeColors();
   const profileGender = useAppSelector((state) => state.preferences.profileGender);
+
   const [updatePreferences] = useUpdatePreferencesMutation();
   const [deleteAccount] = useDeleteAccountMutation();
+
   
   const styles = useMemo(() => createProfileStyles(colors), [colors]);
   
@@ -523,6 +550,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const profile: UserProfile | null = profileData ? {
     handle: profileData.handle,
     email: profileData.email,
+    emailVerified: profileData.emailVerified || false,
     level: profileData.level,
     experience: profileData.experience,
     unlockedFeatures: {
@@ -782,7 +810,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
               </View>
             </View>
           ) : activeTab === 'account' ? (
-            <View style={styles.settingsContainer}>
+            <ScrollView style={styles.settingsContainer} showsVerticalScrollIndicator={false}>
               <Text style={styles.settingsTitle}>ACCOUNT SETTINGS</Text>
               
               <View style={styles.settingCard}>
@@ -793,6 +821,35 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                 >
                   <Text style={styles.primaryButtonText}>CHANGE USER HANDLE</Text>
                 </TouchableOpacity>
+                
+                {/* Email Verification Status */}
+                <View style={[styles.settingCard, { marginTop: SIZING.spacing.md }]}>
+                  <Text style={styles.settingLabel}>EMAIL VERIFICATION</Text>
+                  <View style={styles.emailVerificationContainer}>
+                    <View style={styles.verificationStatus}>
+                      <Text style={[
+                        styles.verificationLabel, 
+                        { color: user?.emailVerified ? colors.matrix : colors.error }
+                      ]}>
+                        {user?.emailVerified ? '✓ VERIFIED' : '⚠ UNVERIFIED'}
+                      </Text>
+                    </View>
+                  </View>
+                  
+                  {!user?.emailVerified && (
+                    <View style={styles.warningContainer}>
+                      <Text style={[styles.warningText, { color: colors.error }]}>
+                        ⚠️ Your email is not verified. Without verification, you may not be able to recover your account if you forget your password.
+                      </Text>
+                      <TouchableOpacity
+                        style={[styles.primaryButton, { marginTop: SIZING.spacing.sm }]}
+                        onPress={() => dispatch(setShowEmailVerification(true))}
+                      >
+                        <Text style={styles.primaryButtonText}>VERIFY EMAIL</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
                 
                 {user?.debugFeatures?.enableDataRefresh && (
                   <TouchableOpacity
@@ -823,7 +880,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                   <Text style={styles.disconnectText}>DELETE ACCOUNT</Text>
                 </TouchableOpacity>
               </View>
-            </View>
+            </ScrollView>
           ) : activeTab === 'content' ? (
             <ScrollView style={styles.contentContainer} showsVerticalScrollIndicator={false}>
               <Text style={styles.contentTitle}>CONTENT</Text>

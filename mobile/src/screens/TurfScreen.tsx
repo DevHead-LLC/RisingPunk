@@ -19,7 +19,7 @@ import {BattleGridScreen} from './BattleGridScreen';
 import {InvestmentPropertyScreen} from './InvestmentPropertyScreen';
 import {ErrorBoundary} from '../components/common/ErrorBoundary';
 import {useAppDispatch, useAppSelector} from '../store/hooks';
-import {fetchInitialData, setOnboardingCompleted, setShowOnboarding} from '../store/slices/authSlice';
+import {fetchInitialData, setOnboardingCompleted, setShowOnboarding, setShowEmailVerification, setEmailVerificationPrompted} from '../store/slices/authSlice';
 import {mapApi} from '../store/api/mapApi';
 import {useGetRentalHousingStatusQuery, useCompleteRentalHousingMutation, useCompleteOnboardingMutation} from '../store/api/authApi';
 import {OnboardingSlides} from '../components/onboarding';
@@ -90,6 +90,18 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   
   // Turf Intro state
   const showTurfIntro = useAppSelector((state) => state.auth.showTurfIntro);
+
+  // Email verification state
+  const { user, showEmailVerification, emailVerificationPromptedUserId } = useAppSelector((state) => state.auth);
+
+  // Check for email verification on component mount for existing users
+  useEffect(() => {
+    if (user && !user.emailVerified && !user.emailVerificationToken && !user.emailVerificationPrompted && !showOnboarding && !showTurfIntro && !showEmailVerification && emailVerificationPromptedUserId !== user._id) {
+      // Show email verification modal for existing users who haven't verified their email AND haven't been sent a verification email yet AND haven't been prompted before (either in session or database)
+      dispatch(setShowEmailVerification(true));
+      dispatch(setEmailVerificationPrompted(user._id));
+    }
+  }, [user, showOnboarding, showTurfIntro, showEmailVerification, emailVerificationPromptedUserId, dispatch]);
 
   // Expose horizontalScrollRef to parent component
   useImperativeHandle(ref, () => ({
@@ -306,7 +318,13 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         animated: false,
       });
     }, 0);
-  }, []);
+
+    // Check if user needs email verification after turf intro
+    if (user && !user.emailVerified && !user.emailVerificationToken && !user.emailVerificationPrompted && emailVerificationPromptedUserId !== user._id) {
+      dispatch(setShowEmailVerification(true));
+      dispatch(setEmailVerificationPrompted(user._id));
+    }
+  }, [user, emailVerificationPromptedUserId, dispatch]);
 
   const handleTurfIntroSkip = useCallback(() => {
     console.log('Turf Intro skipped');
@@ -322,7 +340,13 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         animated: false,
       });
     }, 0);
-  }, []);
+
+    // Check if user needs email verification after turf intro
+    if (user && !user.emailVerified && !user.emailVerificationToken && !user.emailVerificationPrompted && emailVerificationPromptedUserId !== user._id) {
+      dispatch(setShowEmailVerification(true));
+      dispatch(setEmailVerificationPrompted(user._id));
+    }
+  }, [user, emailVerificationPromptedUserId, dispatch]);
 
   const navigateToScreen = useCallback((screen: 'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research' | 'investmentProperty') => {
     const previousScreenBeforeUpdate = currentScreen;

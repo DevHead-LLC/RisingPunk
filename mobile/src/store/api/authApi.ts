@@ -34,6 +34,7 @@ export interface AuthResponse {
 export interface ProfileResponse {
   handle: string;
   email: string;
+  emailVerified: boolean;
   level: number;
   experience: {
     current: number;

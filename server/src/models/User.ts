@@ -31,6 +31,12 @@ export interface IUser extends Document {
   profileGender: 'male' | 'female';
   onboardingCompleted: boolean;
   needsHandleSelection: boolean;
+  emailVerified: boolean;
+  emailVerificationToken?: string;
+  emailVerificationExpires?: Date;
+  emailVerificationSentAt?: Date;
+  emailVerificationNewEmail?: string;
+  emailVerificationPrompted?: boolean;
   debugFeatures?: {
     enableDataRefresh: boolean;
     enableDebugLogs: boolean;
@@ -171,6 +177,32 @@ const userSchema = new Schema({
   },
   needsHandleSelection: {
     type: Boolean,
+    default: false
+  },
+  emailVerified: {
+    type: Boolean,
+    default: false
+  },
+  emailVerificationToken: {
+    type: String,
+    required: false,
+    index: true
+  },
+  emailVerificationExpires: {
+    type: Date,
+    required: false
+  },
+  emailVerificationSentAt: {
+    type: Date,
+    required: false
+  },
+  emailVerificationNewEmail: {
+    type: String,
+    required: false
+  },
+  emailVerificationPrompted: {
+    type: Boolean,
+    required: false,
     default: false
   },
   debugFeatures: {

@@ -71,7 +71,11 @@ export function PrivacyPolicyModal({
             </Text>
             
             <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
-              <Text style={styles.boldText}>Email address</Text> – required to create and manage the account.
+              <Text style={styles.boldText}>Email address</Text> – required to create and manage the account. Email addresses are verified through a secure verification process to ensure account security and enable password recovery.
+            </Text>
+            
+            <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
+              <Text style={styles.boldText}>Email verification status</Text> – we track whether your email has been verified to provide appropriate account security features.
             </Text>
             
             <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
@@ -114,12 +118,41 @@ export function PrivacyPolicyModal({
                 • Send essential service messages or support replies.
               </Text>
               <Text style={[styles.bulletItem, { color: colors.text.secondary }]}>
+                • Send email verification links and password recovery emails.
+              </Text>
+              <Text style={[styles.bulletItem, { color: colors.text.secondary }]}>
                 • Protect the service against fraud or abuse.
               </Text>
             </View>
             
             <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
               We do not sell personal data.
+            </Text>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
+              Email Verification and Account Security
+            </Text>
+            
+            <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
+              <Text style={styles.boldText}>Email verification is required</Text> for account security and password recovery. Unverified accounts may be subject to the following limitations:
+            </Text>
+            
+            <View style={styles.bulletList}>
+              <Text style={[styles.bulletItem, { color: colors.text.secondary }]}>
+                • Password recovery may not be available for unverified accounts.
+              </Text>
+              <Text style={[styles.bulletItem, { color: colors.text.secondary }]}>
+                • Unverified accounts that become locked may be unrecoverable and subject to deletion.
+              </Text>
+              <Text style={[styles.bulletItem, { color: colors.text.secondary }]}>
+                • We will attempt to notify users of verification requirements through in-app notifications.
+              </Text>
+            </View>
+            
+            <Text style={[styles.paragraph, { color: colors.text.secondary }]}>
+              <Text style={styles.boldText}>Verification emails</Text> contain secure tokens that expire within 72 hours. You can request new verification emails as needed from your account settings.
             </Text>
           </View>
 
@@ -305,7 +338,7 @@ const styles = StyleSheet.create({
     marginBottom: SIZING.spacing.lg,
   },
   sectionTitle: {
-    fontSize: SIZING.font.h3,
+    fontSize: SIZING.font.h2,
     fontWeight: 'bold',
     marginBottom: SIZING.spacing.sm,
   },

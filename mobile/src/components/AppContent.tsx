@@ -1,7 +1,7 @@
 import React, { memo, useEffect, useRef, useCallback } from 'react';
-import { View, Text, Dimensions } from 'react-native';
+import { View, Text, Dimensions, AppState } from 'react-native';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
-import { loadStoredAuth, updateHandle } from '../store/slices/authSlice';
+import { loadStoredAuth, updateHandle, setShowEmailVerification, setShowEmailVerificationBanner, refreshUserData } from '../store/slices/authSlice';
 import { updateBalance, triggerUpdate } from '../store/slices/balanceSlice';
 import { setBots, setBuildState } from '../store/slices/botsSlice';
 import { syncPreferencesFromStorage, syncPreferencesFromUser } from '../store/slices/preferencesSlice';
@@ -15,11 +15,13 @@ import { setFinancialStatements } from '../store/slices/uiSlice';
 import { useNetworkConnectivity } from '../providers/NetworkConnectivityProvider';
 import { ConnectivityOverlay } from './common/ConnectivityOverlay';
 import { HandleSelectionModal } from './modals/HandleSelectionModal';
+import { EmailVerificationModal } from './modals/EmailVerificationModal';
+import { NotificationBanner } from './common/NotificationBanner';
 
 const AppContent = memo(() => {
   const dispatch = useAppDispatch();
   const showFinancials = useAppSelector((state) => state.ui.modals.financialStatements);
-  const { token, isLoading, showHandleSelection } = useAppSelector((state) => state.auth);
+  const { token, isLoading, showHandleSelection, showEmailVerification, showEmailVerificationBanner, user } = useAppSelector((state) => state.auth);
   const balanceDisplayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const turfScreenRef = useRef<any>(null);
   const { isConnected, isInternetReachable } = useNetworkConnectivity();
@@ -109,6 +111,19 @@ const AppContent = memo(() => {
     }
   }, [buildStateData, dispatch]);
 
+  // Refresh user data when app comes back to foreground (e.g., after email verification)
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      if (nextAppState === 'active' && token && user) {
+        // Refresh user data when app becomes active
+        dispatch(refreshUserData());
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, [dispatch, token, user]);
+
   // Set up balance display timer to trigger selector recalculation every 10 seconds
   useEffect(() => {
     if (!token) {
@@ -175,6 +190,24 @@ const AppContent = memo(() => {
         onSubmit={handleHandleSubmit}
         isLoading={isLoading}
         isRequired={true}
+      />
+      <EmailVerificationModal
+        visible={showEmailVerification}
+        userEmail={user?.email}
+        userHandle={user?.handle}
+        onClose={() => dispatch(setShowEmailVerification(false))}
+        onVerificationSent={() => {
+          // Show banner notification
+          dispatch(setShowEmailVerificationBanner(true));
+        }}
+        isRequired={false}
+      />
+      <NotificationBanner
+        visible={showEmailVerificationBanner}
+        message="Please check your email for verification link within 72 hours"
+        type="success"
+        duration={5000}
+        onClose={() => dispatch(setShowEmailVerificationBanner(false))}
       />
       <ConnectivityOverlay visible={shouldShowConnectivityOverlay} />
     </>
