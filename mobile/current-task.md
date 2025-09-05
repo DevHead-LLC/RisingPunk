@@ -1,19 +1,44 @@
-# Current Task: Password Reset System - DEBUGGING IN PROGRESS 🔍
+# Current Task: App Store Preparation - Hide Placeholder Content 🏪
 
 ## Task Overview
-Implement and test password reset functionality for verified user accounts. The system should send an email to users with `emailVerified: true` allowing them to set a new password.
+Prepare the application for Apple App Store submission by hiding all placeholder, incomplete, or "coming soon" content. Apple requires that all visible features be fully functional.
 
 ## Current Status
-- ✅ Password reset backend endpoints already implemented
-- ✅ Email service with password reset template exists
-- ✅ Server configured for local testing (port 5001)
-- ✅ Password reset web interface created
-- ✅ ForgotPasswordModal component created
-- ✅ API integration added to authApi
-- ✅ Forgot password button added to login screen
-- ✅ Google account error handling implemented
-- 🔄 **IN PROGRESS: Debugging token substitution and form submission issues**
-- ❌ **ISSUE: Still getting "Invalid reset link" error after initial fix**
+- ✅ Password reset system completed and working
+- ✅ Research Center categories hidden (only Home Defense visible)
+- ✅ Bot Trap feature hidden in Home Defense (only Antivirus visible)
+- ✅ Antivirus functionality implemented in HackMapScreen
+- 🔄 **IN PROGRESS: App Store preparation**
+
+## App Store Preparation Changes
+
+### Research Center Categories Hidden
+- **Hidden Categories**: Hack Ability, Financial, Hack Crew, NPC, Cash Flow, Construction, Battle Mechanics, Gear, Investments
+- **Visible Category**: Home Defense only
+- **Implementation**: Filtered `RESEARCH_CARDS` array to only show `home-defense`
+- **Note**: All hidden categories preserved in `ALL_RESEARCH_CARDS` for future restoration
+
+### Home Defense Features Hidden
+- **Hidden Feature**: Bot Trap 1 ($250,000)
+- **Visible Feature**: Antivirus ($25,000) only
+- **Implementation**: Added filter in `ResearchFeaturesList` to exclude `bot-trap` features
+- **Note**: Bot Trap feature code preserved for future restoration
+
+### Antivirus Functionality Implemented
+- **Location**: HackMapScreen only
+- **Components**: 
+  - `CollapsibleToolbar`: Responsive toolbar positioned at bottom-right
+  - `AntivirusModal`: Full-featured modal with status, features, and activation
+- **Features**:
+  - Collapsible design with proper arrow indicators (› when collapsed, ‹ when expanded)
+  - Smaller, less intrusive design (36px collapsed button, 28px icon)
+  - Antivirus shield icon using provided image
+  - Modal shows status (Active/Inactive), cooldown timer, and feature list
+  - 24-hour activation duration with cooldown timer
+  - Responsive positioning using liquid design principles
+  - Uses standard CloseButton component for consistency
+  - Fixed orientation error with proper modal configuration
+- **Future Integration**: Ready to connect with research unlock system
 
 ## Implementation Details
 

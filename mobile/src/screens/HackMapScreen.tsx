@@ -4,6 +4,8 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withDecay, runOnJS, useAnimatedReaction } from 'react-native-reanimated';
 import { CloseButton } from '../components/common/CloseButton';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import { CollapsibleToolbar } from '../components/hackMap/CollapsibleToolbar';
+import { AntivirusModal } from '../components/hackMap/AntivirusModal';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { setGrid, setLoading } from '../store/slices/mapSlice';
 import { useFetchMapQuery } from '../store/api/mapApi';
@@ -186,6 +188,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   };
 
   const [selectedCell, setSelectedCell] = useState<{x: number, y: number, info: CellData} | null>(null);
+  const [showAntivirusModal, setShowAntivirusModal] = useState(false);
+  const [antivirusActive, setAntivirusActive] = useState(false);
+  const [antivirusCooldown, setAntivirusCooldown] = useState(0);
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
   const startX = useSharedValue(0);
@@ -827,6 +832,30 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
   }, [currentUserHandle, grid, containerSize.width, containerSize.height, maxX, maxY, minX, minY, offsetX, offsetY, computeWindow]);
 
+  const handleAntivirusPress = useCallback(() => {
+    setShowAntivirusModal(true);
+  }, []);
+
+  const handleAntivirusActivate = useCallback((option: any) => {
+    // TODO: Implement actual antivirus activation logic with selected option
+    console.log('Activating shield:', option);
+    setAntivirusActive(true);
+    setAntivirusCooldown(option.hours * 3600); // Convert hours to seconds
+    setShowAntivirusModal(false);
+    
+    // Start cooldown timer
+    const timer = setInterval(() => {
+      setAntivirusCooldown(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setAntivirusActive(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
+
   const renderInfoPanel = useCallback(() => {
     if (!selectedCell) {return null;}
 
@@ -915,9 +944,20 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         <Image source={require('../assets/images/navigationIcon.png')} style={styles.navigationIcon} resizeMode="contain" />
       </Pressable>
 
+      <CollapsibleToolbar
+        onAntivirusPress={handleAntivirusPress}
+        isAntivirusUnlocked={true} // For now, always show as unlocked
+      />
+
+      <AntivirusModal
+        visible={showAntivirusModal}
+        onClose={() => setShowAntivirusModal(false)}
+        onActivate={handleAntivirusActivate}
+        isActive={antivirusActive}
+        cooldownTime={antivirusCooldown}
+      />
+
       {renderInfoPanel()}
-
-
 
       <GestureDetector gesture={panGesture}>
         <Animated.View
