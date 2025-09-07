@@ -449,6 +449,123 @@ app.get('/api/bots/build-state', auth, async (req: Request, res: Response) => {
   }
 });
 
+// Antivirus Shield endpoints
+app.get('/api/antivirus-shield/status', auth, async (req: Request, res: Response) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    const now = new Date();
+    let shieldStatus = null;
+    let isActive = false;
+
+    // Check if shield is active and should be completed
+    if (user.antivirusShield?.active && user.antivirusShield?.startedAt && user.antivirusShield?.completesAt) {
+      if (now >= user.antivirusShield.completesAt) {
+        // Shield has expired, deactivate it
+        user.antivirusShield.active = false;
+        user.antivirusShield.startedAt = null;
+        user.antivirusShield.completesAt = null;
+        await user.save();
+        isActive = false;
+      } else {
+        // Shield is still active
+        isActive = true;
+        shieldStatus = {
+          startedAt: user.antivirusShield.startedAt.toISOString(),
+          completesAt: user.antivirusShield.completesAt.toISOString(),
+          timeRemaining: Math.max(0, user.antivirusShield.completesAt.getTime() - now.getTime())
+        };
+      }
+    }
+
+    res.json({
+      isActive,
+      shieldStatus
+    });
+  } catch (error: any) {
+    console.error('Antivirus shield status error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/antivirus-shield/activate', auth, async (req: Request, res: Response) => {
+  try {
+    const { optionId } = req.body;
+    
+    if (!optionId) {
+      res.status(400).json({ error: 'Shield option ID is required' });
+      return;
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Check if shield is already active
+    if (user.antivirusShield?.active && user.antivirusShield?.completesAt) {
+      const now = new Date();
+      if (now < user.antivirusShield.completesAt) {
+        res.status(400).json({ error: 'Antivirus shield is already active' });
+        return;
+      }
+    }
+
+    // Define shield options (for testing, all are 1 minute)
+    const shieldOptions: Record<string, { price: number; durationMs: number }> = {
+      '4h': { price: 10000, durationMs: 60 * 1000 }, // 1 minute for testing
+      '8h': { price: 20000, durationMs: 60 * 1000 }, // 1 minute for testing
+      '12h': { price: 40000, durationMs: 60 * 1000 }, // 1 minute for testing
+      '24h': { price: 75000, durationMs: 60 * 1000 }, // 1 minute for testing
+      '1w': { price: 500000, durationMs: 60 * 1000 } // 1 minute for testing
+    };
+
+    const option = shieldOptions[optionId];
+    if (!option) {
+      res.status(400).json({ error: 'Invalid shield option' });
+      return;
+    }
+
+    // Check if user has sufficient balance
+    if (user.balance.total < option.price) {
+      res.status(400).json({ error: 'Insufficient balance' });
+      return;
+    }
+
+    // Deduct balance and activate shield
+    user.balance.total -= option.price;
+    const now = new Date();
+    user.antivirusShield = {
+      active: true,
+      startedAt: now,
+      completesAt: new Date(now.getTime() + option.durationMs)
+    };
+    await user.save();
+
+    res.json({
+      success: true,
+      balance: {
+        total: user.balance.total,
+        ratePerSecond: user.balance.ratePerSecond,
+        lastUpdated: user.balance.lastUpdated.toISOString()
+      },
+      antivirusShield: {
+        active: true,
+        startedAt: user.antivirusShield.startedAt!.toISOString(),
+        completesAt: user.antivirusShield.completesAt!.toISOString()
+      }
+    });
+  } catch (error: any) {
+    console.error('Antivirus shield activation error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 app.use('/api/map', mapRoutes);
 
 app.use('/api/users', userRoutes);

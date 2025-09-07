@@ -9,6 +9,7 @@ import { AntivirusModal } from '../components/hackMap/AntivirusModal';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { setGrid, setLoading } from '../store/slices/mapSlice';
 import { useFetchMapQuery } from '../store/api/mapApi';
+import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { computePanBounds } from '../utils/mapPanBounds';
 import { CellData, TerrainType, EntityType } from '../types/map';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -96,7 +97,14 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           {cell.entity === 'house' && (
             <>
               {cell.owner === 'player' ? (
-                <Image source={require('../assets/images/home.png')} style={styles.playerHomeIcon} resizeMode="contain" />
+                <Image 
+                  source={cell.name === currentUserHandle && isShieldActive 
+                    ? require('../assets/images/hackMap/shielded.png')
+                    : require('../assets/images/home.png')
+                  } 
+                  style={styles.playerHomeIcon} 
+                  resizeMode="contain" 
+                />
               ) : (
                 <>
                   {(() => {
@@ -189,8 +197,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
   const [selectedCell, setSelectedCell] = useState<{x: number, y: number, info: CellData} | null>(null);
   const [showAntivirusModal, setShowAntivirusModal] = useState(false);
-  const [antivirusActive, setAntivirusActive] = useState(false);
-  const [antivirusCooldown, setAntivirusCooldown] = useState(0);
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
   const startX = useSharedValue(0);
@@ -420,6 +426,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const gridSize = grid.length || 50;
   const totalSize = gridSize * CELL_SIZE;
   const { data: mapData, isLoading, refetch } = useFetchMapQuery();
+  const { data: shieldData } = useGetShieldStatusQuery(undefined, {
+    pollingInterval: 1000, // Poll every second for real-time updates
+  });
+  
+  const isShieldActive = shieldData?.isActive || false;
 
   // Precompute terrain style map and position style caches
   // Memoized with stable references to prevent unnecessary re-renders
@@ -836,24 +847,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     setShowAntivirusModal(true);
   }, []);
 
-  const handleAntivirusActivate = useCallback((option: any) => {
-    // TODO: Implement actual antivirus activation logic with selected option
-    console.log('Activating shield:', option);
-    setAntivirusActive(true);
-    setAntivirusCooldown(option.hours * 3600); // Convert hours to seconds
+  const handleAntivirusClose = useCallback(() => {
     setShowAntivirusModal(false);
-    
-    // Start cooldown timer
-    const timer = setInterval(() => {
-      setAntivirusCooldown(prev => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setAntivirusActive(false);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
   }, []);
 
   const renderInfoPanel = useCallback(() => {
@@ -951,10 +946,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
       <AntivirusModal
         visible={showAntivirusModal}
-        onClose={() => setShowAntivirusModal(false)}
-        onActivate={handleAntivirusActivate}
-        isActive={antivirusActive}
-        cooldownTime={antivirusCooldown}
+        onClose={handleAntivirusClose}
       />
 
       {renderInfoPanel()}

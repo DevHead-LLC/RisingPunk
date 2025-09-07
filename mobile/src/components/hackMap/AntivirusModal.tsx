@@ -6,6 +6,8 @@ import { CloseButton } from '../common/CloseButton';
 import { useAppSelector } from '../../store/hooks';
 import { getCurrentBalance } from '../../store/slices/balanceSlice';
 import { formatBalance } from '../common/Balance';
+import { useGetShieldStatusQuery, useActivateShieldMutation } from '../../store/api/antivirusApi';
+import { AntivirusShieldTimer } from './AntivirusShieldTimer';
 
 interface ShieldOption {
   id: string;
@@ -18,9 +20,6 @@ interface ShieldOption {
 interface AntivirusModalProps {
   visible: boolean;
   onClose: () => void;
-  onActivate: (option: ShieldOption) => void;
-  isActive?: boolean;
-  cooldownTime?: number;
 }
 
 const SHIELD_OPTIONS: ShieldOption[] = [
@@ -64,18 +63,32 @@ const SHIELD_OPTIONS: ShieldOption[] = [
 export const AntivirusModal: React.FC<AntivirusModalProps> = ({
   visible,
   onClose,
-  onActivate,
-  isActive = false,
-  cooldownTime = 0,
 }) => {
   const colors = useThemeColors();
   const balance = useAppSelector(getCurrentBalance);
   const styles = createStyles(colors);
+  
+  const { data: shieldData, refetch } = useGetShieldStatusQuery(undefined, {
+    pollingInterval: 1000, // Poll every second for real-time updates
+  });
+  const [activateShield, { isLoading: isActivating }] = useActivateShieldMutation();
 
-  const formatTime = (seconds: number): string => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  const isActive = shieldData?.isActive || false;
+  const shieldStatus = shieldData?.shieldStatus;
+
+  const handleActivate = async (option: ShieldOption) => {
+    try {
+      await activateShield({ optionId: option.id }).unwrap();
+      // Refetch to get updated status
+      refetch();
+    } catch (error) {
+      console.error('Failed to activate shield:', error);
+    }
+  };
+
+  const handleShieldComplete = () => {
+    // Refetch to get updated status when shield completes
+    refetch();
   };
 
   return (
@@ -99,7 +112,10 @@ export const AntivirusModal: React.FC<AntivirusModalProps> = ({
           <View style={styles.header}>
             <View style={styles.titleContainer}>
               <Image
-                source={require('../../assets/images/hackMap/antivirusShield.png')}
+                source={isActive 
+                  ? require('../../assets/images/hackMap/activatedShield.png')
+                  : require('../../assets/images/hackMap/antivirusShield.png')
+                }
                 style={styles.headerIcon}
                 resizeMode="contain"
               />
@@ -124,15 +140,13 @@ export const AntivirusModal: React.FC<AntivirusModalProps> = ({
               ]}>
                 {isActive ? 'ACTIVE' : 'INACTIVE'}
               </Text>
+              {isActive && shieldStatus && (
+                <AntivirusShieldTimer
+                  completesAt={shieldStatus.completesAt}
+                  onComplete={handleShieldComplete}
+                />
+              )}
             </View>
-
-            {cooldownTime > 0 && (
-              <View style={styles.cooldownContainer}>
-                <Text style={styles.cooldownLabel}>Cooldown:</Text>
-                <Text style={styles.cooldownValue}>{formatTime(cooldownTime)}</Text>
-              </View>
-            )}
-
 
             <View style={styles.optionsContainer}>
               <Text style={styles.optionsTitle}>Shield Options:</Text>
@@ -141,30 +155,30 @@ export const AntivirusModal: React.FC<AntivirusModalProps> = ({
                   key={option.id}
                   style={[
                     styles.optionButton,
-                    (isActive || cooldownTime > 0) && styles.disabledOptionButton
+                    isActive && styles.disabledOptionButton
                   ]}
-                  onPress={isActive || cooldownTime > 0 ? undefined : () => onActivate(option)}
-                  activeOpacity={isActive || cooldownTime > 0 ? 1 : 0.7}
-                  disabled={isActive || cooldownTime > 0}
+                  onPress={isActive ? undefined : () => handleActivate(option)}
+                  activeOpacity={isActive ? 1 : 0.7}
+                  disabled={isActive || isActivating}
                 >
                   <View style={styles.optionContent}>
                     <View style={styles.optionHeader}>
                       <Text style={[
                         styles.optionDuration,
-                        (isActive || cooldownTime > 0) && styles.disabledOptionText
+                        isActive && styles.disabledOptionText
                       ]}>
                         {option.duration}
                       </Text>
                       <Text style={[
                         styles.optionPrice,
-                        (isActive || cooldownTime > 0) && styles.disabledOptionText
+                        isActive && styles.disabledOptionText
                       ]}>
                         ${option.price.toLocaleString()}
                       </Text>
                     </View>
                     <Text style={[
                       styles.optionDescription,
-                      (isActive || cooldownTime > 0) && styles.disabledOptionText
+                      isActive && styles.disabledOptionText
                     ]}>
                       {option.description}
                     </Text>

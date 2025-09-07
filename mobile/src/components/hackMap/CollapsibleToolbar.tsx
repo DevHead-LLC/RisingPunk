@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from 'rea
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { CloseButton } from '../common/CloseButton';
+import { useGetShieldStatusQuery } from '../../store/api/antivirusApi';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -17,7 +18,11 @@ export const CollapsibleToolbar: React.FC<CollapsibleToolbarProps> = ({
 }) => {
   const colors = useThemeColors();
   const [isExpanded, setIsExpanded] = useState(false);
+  const { data: shieldData } = useGetShieldStatusQuery(undefined, {
+    pollingInterval: 1000, // Poll every second for real-time updates
+  });
 
+  const isShieldActive = shieldData?.isActive || false;
   const styles = createStyles(colors);
 
   const toggleExpanded = () => {
@@ -49,7 +54,10 @@ export const CollapsibleToolbar: React.FC<CollapsibleToolbarProps> = ({
             disabled={!isAntivirusUnlocked}
           >
             <Image
-              source={require('../../assets/images/hackMap/antivirusShield.png')}
+              source={isShieldActive 
+                ? require('../../assets/images/hackMap/activatedShield.png')
+                : require('../../assets/images/hackMap/antivirusShield.png')
+              }
               style={styles.toolIcon}
               resizeMode="contain"
             />
