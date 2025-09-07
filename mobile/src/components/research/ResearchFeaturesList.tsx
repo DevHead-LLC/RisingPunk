@@ -226,6 +226,9 @@ export function ResearchFeaturesList({
     );
   };
 
+  // Filter out bot-trap for App Store submission - only show Antivirus
+  const visibleFeatures = features.filter(feature => feature.id !== 'bot-trap');
+
   return (
     <ScrollView 
       style={styles.container}
@@ -233,7 +236,7 @@ export function ResearchFeaturesList({
       contentContainerStyle={styles.scrollContent}
     >
       <View style={styles.featuresGrid}>
-        {features.map(renderFeatureCard)}
+        {visibleFeatures.map(renderFeatureCard)}
       </View>
       
       {/* Feature Modal */}

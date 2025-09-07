@@ -1,0 +1,52 @@
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { API_URL } from '../../config';
+
+export const antivirusApi = createApi({
+  reducerPath: 'antivirusApi',
+  baseQuery: fetchBaseQuery({
+    baseUrl: API_URL,
+    prepareHeaders: (headers, { getState }) => {
+      const token = (getState() as any).auth?.token;
+      if (token) {
+        headers.set('authorization', `Bearer ${token}`);
+      }
+      return headers;
+    },
+  }),
+  tagTypes: ['AntivirusShield'],
+  endpoints: (builder) => ({
+    getShieldStatus: builder.query<{
+      isActive: boolean;
+      shieldStatus: {
+        startedAt: string;
+        completesAt: string;
+        timeRemaining: number;
+      } | null;
+    }, void>({
+      query: () => '/api/antivirus-shield/status',
+      providesTags: ['AntivirusShield'],
+    }),
+    activateShield: builder.mutation<{
+      success: boolean;
+      balance: {
+        total: number;
+        ratePerSecond: number;
+        lastUpdated: string;
+      };
+      antivirusShield: {
+        active: boolean;
+        startedAt: string;
+        completesAt: string;
+      };
+    }, { optionId: string }>({
+      query: (body) => ({
+        url: '/api/antivirus-shield/activate',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['AntivirusShield'],
+    }),
+  }),
+});
+
+export const { useGetShieldStatusQuery, useActivateShieldMutation } = antivirusApi;

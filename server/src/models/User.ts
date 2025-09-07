@@ -51,6 +51,11 @@ export interface IUser extends Document {
     property3: { startedAt: Date | null; completesAt: Date | null };
     property4: { startedAt: Date | null; completesAt: Date | null };
   };
+  antivirusShield?: {
+    active: boolean;
+    startedAt: Date | null;
+    completesAt: Date | null;
+  };
   verifyAccessKey(accessKey: string): Promise<boolean>;
   getDecryptedEmail(): string;
   setEncryptedEmail(email: string): void;
@@ -265,6 +270,20 @@ const userSchema = new Schema({
         type: Date,
         default: null
       }
+    }
+  },
+  antivirusShield: {
+    active: {
+      type: Boolean,
+      default: false
+    },
+    startedAt: {
+      type: Date,
+      default: null
+    },
+    completesAt: {
+      type: Date,
+      default: null
     }
   }
 }, { 

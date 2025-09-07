@@ -1,19 +1,72 @@
-# Current Task: Password Reset System - DEBUGGING IN PROGRESS 🔍
+# Current Task: Antivirus Shield Activation System 🛡️
 
 ## Task Overview
-Implement and test password reset functionality for verified user accounts. The system should send an email to users with `emailVerified: true` allowing them to set a new password.
+Implement the activated state for the antivirus shielding behavior with real countdown timer, database integration, and visual updates.
 
 ## Current Status
-- ✅ Password reset backend endpoints already implemented
-- ✅ Email service with password reset template exists
-- ✅ Server configured for local testing (port 5001)
-- ✅ Password reset web interface created
-- ✅ ForgotPasswordModal component created
-- ✅ API integration added to authApi
-- ✅ Forgot password button added to login screen
-- ✅ Google account error handling implemented
-- 🔄 **IN PROGRESS: Debugging token substitution and form submission issues**
-- ❌ **ISSUE: Still getting "Invalid reset link" error after initial fix**
+- ✅ Password reset system completed and working
+- ✅ Research Center categories hidden (only Home Defense visible)
+- ✅ Bot Trap feature hidden in Home Defense (only Antivirus visible)
+- ✅ Antivirus functionality implemented in HackMapScreen
+- ✅ **COMPLETED: Antivirus Shield Activation System**
+
+## Antivirus Shield Activation System Implementation
+
+### Database Schema Updates
+- **User Model**: Added `antivirusShield` field with `active`, `startedAt`, and `completesAt` properties
+- **Schema**: Properly configured with default values and null handling
+
+### API Endpoints
+- **GET /api/antivirus-shield/status**: Returns current shield status and countdown timer
+- **POST /api/antivirus-shield/activate**: Activates shield with selected option (1 minute for testing)
+- **Auto-expiry**: Server automatically deactivates shield when timer expires
+
+### Frontend Components
+- **AntivirusShieldTimer**: Real-time countdown component with MM:SS format
+- **AntivirusModal**: Updated to show active state with countdown and disable options when active
+- **CollapsibleToolbar**: Shows activatedShield.png when shield is active
+- **HackMapScreen**: Home image changes to shielded.png when user's shield is active
+
+### Visual Updates
+- **Toolbar Icon**: Changes from antivirusShield.png to activatedShield.png when active
+- **Home Image**: Changes from home.png to shielded.png for current user when shield is active
+- **Status Display**: Shows "ACTIVE" with countdown timer instead of "INACTIVE"
+- **Real-time Updates**: Polls server every second for live countdown updates
+
+### Testing Configuration
+- **Duration**: All shield options set to 1 minute for testing (4h, 8h, 12h, 24h, 1w)
+- **Pricing**: Maintains original pricing structure
+- **Auto-revert**: Images automatically revert when timer expires
+
+## App Store Preparation Changes
+
+### Research Center Categories Hidden
+- **Hidden Categories**: Hack Ability, Financial, Hack Crew, NPC, Cash Flow, Construction, Battle Mechanics, Gear, Investments
+- **Visible Category**: Home Defense only
+- **Implementation**: Filtered `RESEARCH_CARDS` array to only show `home-defense`
+- **Note**: All hidden categories preserved in `ALL_RESEARCH_CARDS` for future restoration
+
+### Home Defense Features Hidden
+- **Hidden Feature**: Bot Trap 1 ($250,000)
+- **Visible Feature**: Antivirus ($25,000) only
+- **Implementation**: Added filter in `ResearchFeaturesList` to exclude `bot-trap` features
+- **Note**: Bot Trap feature code preserved for future restoration
+
+### Antivirus Functionality Implemented
+- **Location**: HackMapScreen only
+- **Components**: 
+  - `CollapsibleToolbar`: Responsive toolbar positioned at bottom-right
+  - `AntivirusModal`: Full-featured modal with status, features, and activation
+- **Features**:
+  - Collapsible design with proper arrow indicators (› when collapsed, ‹ when expanded)
+  - Smaller, less intrusive design (36px collapsed button, 28px icon)
+  - Antivirus shield icon using provided image
+  - Modal shows status (Active/Inactive), cooldown timer, and feature list
+  - 24-hour activation duration with cooldown timer
+  - Responsive positioning using liquid design principles
+  - Uses standard CloseButton component for consistency
+  - Fixed orientation error with proper modal configuration
+- **Future Integration**: Ready to connect with research unlock system
 
 ## Implementation Details
 

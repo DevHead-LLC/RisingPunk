@@ -21,7 +21,8 @@ type ResearchCard = {
   image: any;
 };
 
-const RESEARCH_CARDS: ResearchCard[] = [
+// All research categories - hidden for App Store submission
+const ALL_RESEARCH_CARDS: ResearchCard[] = [
   { id: 'home-defense', name: 'Home Defense', image: require('../assets/images/homeDefenseResearch.png') },
   { id: 'hack-ability', name: 'Hack Ability', image: require('../assets/images/hackerResearch.png') },
   { id: 'financial', name: 'Financial', image: require('../assets/images/financialResearchMale.png') },
@@ -33,6 +34,9 @@ const RESEARCH_CARDS: ResearchCard[] = [
   { id: 'gear', name: 'Gear', image: require('../assets/images/hackerGearResearch.png') },
   { id: 'investments', name: 'Investments', image: require('../assets/images/investmentResearch.png') },
 ];
+
+// Only show Home Defense for App Store submission - other categories hidden
+const RESEARCH_CARDS: ResearchCard[] = ALL_RESEARCH_CARDS.filter(card => card.id === 'home-defense');
 
 const { width: screenWidth } = Dimensions.get('window');
 const cardSize = Math.min((screenWidth - SIZING.spacing.md * 3) / 2, 160);
