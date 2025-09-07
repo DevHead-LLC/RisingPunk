@@ -39,10 +39,18 @@ export const AntivirusShieldTimer: React.FC<AntivirusShieldTimerProps> = ({
 
   const formattedTime = useMemo(() => {
     const totalSeconds = Math.floor(timeLeft / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
+    const days = Math.floor(totalSeconds / (24 * 60 * 60));
+    const hours = Math.floor((totalSeconds % (24 * 60 * 60)) / (60 * 60));
+    const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
     const seconds = totalSeconds % 60;
     
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    const parts = [];
+    if (days > 0) parts.push(`${days}d`);
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0) parts.push(`${minutes}m`);
+    if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
+    
+    return parts.join(' ');
   }, [timeLeft]);
 
   if (timeLeft <= 0) {

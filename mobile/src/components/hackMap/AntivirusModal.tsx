@@ -133,13 +133,15 @@ export const AntivirusModal: React.FC<AntivirusModalProps> = ({
           {/* Content */}
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
             <View style={styles.statusContainer}>
-              <Text style={styles.statusLabel}>Status:</Text>
-              <Text style={[
-                styles.statusValue,
-                isActive ? styles.activeStatus : styles.inactiveStatus
-              ]}>
-                {isActive ? 'ACTIVE' : 'INACTIVE'}
-              </Text>
+              <View style={styles.statusRow}>
+                <Text style={styles.statusLabel}>Status:</Text>
+                <Text style={[
+                  styles.statusValue,
+                  isActive ? styles.activeStatus : styles.inactiveStatus
+                ]}>
+                  {isActive ? 'ACTIVE' : 'INACTIVE'}
+                </Text>
+              </View>
               {isActive && shieldStatus && (
                 <AntivirusShieldTimer
                   completesAt={shieldStatus.completesAt}
@@ -288,9 +290,14 @@ const createStyles = (colors: any) => StyleSheet.create({
     padding: SIZING.spacing.lg,
   },
   statusContainer: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    marginBottom: SIZING.spacing.md,
+  },
+  statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SIZING.spacing.md,
+    marginBottom: SIZING.spacing.xs,
   },
   statusLabel: {
     color: colors.text.secondary,
