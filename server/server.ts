@@ -533,6 +533,13 @@ app.post('/api/antivirus-shield/activate', auth, async (req: Request, res: Respo
       }
     }
 
+    // Check if user is in cooldown period
+    const now = new Date();
+    if (user.antivirusShield?.cooldownUntil && now < user.antivirusShield.cooldownUntil) {
+      res.status(400).json({ error: 'Shield is in cooldown period' });
+      return;
+    }
+
     // Define shield options with actual durations
     const shieldOptions: Record<string, { price: number; durationMs: number }> = {
       '4h': { price: 10000, durationMs: 4 * 60 * 60 * 1000 }, // 4 hours
@@ -556,7 +563,6 @@ app.post('/api/antivirus-shield/activate', auth, async (req: Request, res: Respo
 
     // Deduct balance and activate shield
     user.balance.total -= option.price;
-    const now = new Date();
     user.antivirusShield = {
       active: true,
       startedAt: now,
