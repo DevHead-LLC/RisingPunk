@@ -461,6 +461,7 @@ app.get('/api/antivirus-shield/status', auth, async (req: Request, res: Response
     const now = new Date();
     let shieldStatus = null;
     let isActive = false;
+    let cooldownStatus = null;
 
     // Check if shield is active and should be completed
     if (user.antivirusShield?.active && user.antivirusShield?.startedAt && user.antivirusShield?.completesAt) {
@@ -482,9 +483,25 @@ app.get('/api/antivirus-shield/status', auth, async (req: Request, res: Response
       }
     }
 
+    // Check cooldown status
+    if (user.antivirusShield?.cooldownUntil) {
+      if (now >= user.antivirusShield.cooldownUntil) {
+        // Cooldown has expired, clear it
+        user.antivirusShield.cooldownUntil = null;
+        await user.save();
+      } else {
+        // Still in cooldown
+        cooldownStatus = {
+          cooldownUntil: user.antivirusShield.cooldownUntil.toISOString(),
+          timeRemaining: Math.max(0, user.antivirusShield.cooldownUntil.getTime() - now.getTime())
+        };
+      }
+    }
+
     res.json({
       isActive,
-      shieldStatus
+      shieldStatus,
+      cooldownStatus
     });
   } catch (error: any) {
     console.error('Antivirus shield status error:', error);
@@ -543,7 +560,8 @@ app.post('/api/antivirus-shield/activate', auth, async (req: Request, res: Respo
     user.antivirusShield = {
       active: true,
       startedAt: now,
-      completesAt: new Date(now.getTime() + option.durationMs)
+      completesAt: new Date(now.getTime() + option.durationMs),
+      cooldownUntil: null
     };
     await user.save();
 
@@ -556,12 +574,56 @@ app.post('/api/antivirus-shield/activate', auth, async (req: Request, res: Respo
       },
       antivirusShield: {
         active: true,
-        startedAt: user.antivirusShield.startedAt!.toISOString(),
-        completesAt: user.antivirusShield.completesAt!.toISOString()
+        startedAt: user.antivirusShield!.startedAt!.toISOString(),
+        completesAt: user.antivirusShield!.completesAt!.toISOString()
       }
     });
   } catch (error: any) {
     console.error('Antivirus shield activation error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/antivirus-shield/deactivate', auth, async (req: Request, res: Response) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Check if shield is active
+    if (!user.antivirusShield?.active) {
+      res.status(400).json({ error: 'No active shield to deactivate' });
+      return;
+    }
+
+    // Check if user is in cooldown
+    const now = new Date();
+    if (user.antivirusShield.cooldownUntil && now < user.antivirusShield.cooldownUntil) {
+      res.status(400).json({ error: 'Shield is in cooldown period' });
+      return;
+    }
+
+    // Deactivate shield and set 15-minute cooldown
+    const cooldownUntil = new Date(now.getTime() + 15 * 60 * 1000); // 15 minutes
+    user.antivirusShield = {
+      active: false,
+      startedAt: null,
+      completesAt: null,
+      cooldownUntil: cooldownUntil
+    };
+    await user.save();
+
+    res.json({
+      success: true,
+      antivirusShield: {
+        active: false,
+        cooldownUntil: cooldownUntil.toISOString()
+      }
+    });
+  } catch (error: any) {
+    console.error('Antivirus shield deactivation error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });

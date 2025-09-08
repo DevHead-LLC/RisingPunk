@@ -22,6 +22,10 @@ export const antivirusApi = createApi({
         completesAt: string;
         timeRemaining: number;
       } | null;
+      cooldownStatus: {
+        cooldownUntil: string;
+        timeRemaining: number;
+      } | null;
     }, void>({
       query: () => '/api/antivirus-shield/status',
       providesTags: ['AntivirusShield'],
@@ -46,7 +50,20 @@ export const antivirusApi = createApi({
       }),
       invalidatesTags: ['AntivirusShield'],
     }),
+    deactivateShield: builder.mutation<{
+      success: boolean;
+      antivirusShield: {
+        active: boolean;
+        cooldownUntil: string;
+      };
+    }, void>({
+      query: () => ({
+        url: '/api/antivirus-shield/deactivate',
+        method: 'POST',
+      }),
+      invalidatesTags: ['AntivirusShield'],
+    }),
   }),
 });
 
-export const { useGetShieldStatusQuery, useActivateShieldMutation } = antivirusApi;
+export const { useGetShieldStatusQuery, useActivateShieldMutation, useDeactivateShieldMutation } = antivirusApi;

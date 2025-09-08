@@ -7,10 +7,12 @@ import { BattalionSlot } from '../components/battle/BattalionSlot';
 import { CircleSlot } from '../components/battle/CircleSlot';
 import { BattalionBotSelector } from '../components/battle/BattalionBotSelector';
 import { BattalionAssignment } from '../components/battle/BattalionSlot';
+import { ShieldCheckModal } from '../components/battle/ShieldCheckModal';
 import { BotType } from '../types/bots';
 import { useAppSelector } from '../store/hooks';
 import { useAssignToBattalionMutation } from '../store/api/botsApi';
 import { useStartBattleMutation } from '../store/api/battleApi';
+import { useGetShieldStatusQuery, useDeactivateShieldMutation } from '../store/api/antivirusApi';
 import { API_URL } from '../config';
 
 type Props = {
@@ -29,10 +31,15 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [selectedBattalion, setSelectedBattalion] = useState<string | null>(null);
   const [assignments, setAssignments] = useState<Record<string, BattalionAssignment>>({});
+  const [shieldCheckModalVisible, setShieldCheckModalVisible] = useState(false);
   const token = useAppSelector((state) => state.auth.token);
   const botCounts = useAppSelector((state) => state.bots.botCounts);
   const [assignToBattalion] = useAssignToBattalionMutation();
   const [startBattle] = useStartBattleMutation();
+  const [deactivateShield] = useDeactivateShieldMutation();
+  const { data: shieldData } = useGetShieldStatusQuery(undefined, {
+    pollingInterval: 1000,
+  });
 
   // Calculate available bot counts by subtracting assigned quantities
   const availableBots = useMemo(() => {
@@ -169,6 +176,51 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
     defenderNpcInstanceId,
   }), [userBattalions, defenderId, defenderNpcSlug, defenderNpcInstanceId]);
 
+  // Handle battle start - check for shield warning first
+  const handleBattleStart = React.useCallback(async () => {
+    const validation = validateDeployment(assignments);
+    
+    if (!validation.isValid) {
+      console.error('Deployment validation failed:', validation.message);
+      return;
+    }
+
+    const isShieldActive = shieldData?.isActive || false;
+    const isDefendingUser = !!defenderId && !defenderNpcSlug;
+    
+    // If attacking user has shield activated AND defending entity is another user, show modal
+    if (isShieldActive && isDefendingUser) {
+      setShieldCheckModalVisible(true);
+      return;
+    }
+
+    // Otherwise proceed directly with battle start
+    try {
+      const result = await startBattle(battleStartData).unwrap();
+      onBattleStart(result.battleId);
+    } catch (error) {
+      console.error('Failed to start battle:', error);
+      onBattleStart();
+    }
+  }, [assignments, shieldData?.isActive, defenderId, defenderNpcSlug, battleStartData, startBattle, onBattleStart, validateDeployment]);
+
+  // Handle continue from shield modal - deactivate shield and proceed to battle
+  const handleShieldModalContinue = React.useCallback(async () => {
+    setShieldCheckModalVisible(false);
+    
+    try {
+      // First deactivate the shield
+      await deactivateShield().unwrap();
+      
+      // Then start the battle
+      const result = await startBattle(battleStartData).unwrap();
+      onBattleStart(result.battleId);
+    } catch (error) {
+      console.error('Failed to deactivate shield or start battle:', error);
+      onBattleStart();
+    }
+  }, [battleStartData, startBattle, onBattleStart, deactivateShield]);
+
   useEffect(() => {
     const fetchAssignments = async () => {
       try {
@@ -276,23 +328,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
             borderColor: colors.neutral
           }
         ]}
-        onPress={async () => {
-          const validation = validateDeployment(assignments);
-          
-          if (!validation.isValid) {
-            console.error('Deployment validation failed:', validation.message);
-            return;
-          }
-
-          try {
-            const result = await startBattle(battleStartData).unwrap();
-
-            onBattleStart(result.battleId);
-          } catch (error) {
-            console.error('Failed to start battle:', error);
-            onBattleStart();
-          }
-        }}
+        onPress={handleBattleStart}
         disabled={!validateDeployment(assignments).isValid}
       >
         <Text style={[
@@ -314,6 +350,12 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
         onSubmit={handleBotAssignment}
         battalionName={selectedBattalion || ''}
         availableBots={availableBots}
+      />
+
+      <ShieldCheckModal
+        visible={shieldCheckModalVisible}
+        onClose={() => setShieldCheckModalVisible(false)}
+        onContinue={handleShieldModalContinue}
       />
     </SafeAreaView>
   );

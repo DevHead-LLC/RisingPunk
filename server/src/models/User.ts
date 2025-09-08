@@ -55,6 +55,7 @@ export interface IUser extends Document {
     active: boolean;
     startedAt: Date | null;
     completesAt: Date | null;
+    cooldownUntil: Date | null;
   };
   verifyAccessKey(accessKey: string): Promise<boolean>;
   getDecryptedEmail(): string;
@@ -282,6 +283,10 @@ const userSchema = new Schema({
       default: null
     },
     completesAt: {
+      type: Date,
+      default: null
+    },
+    cooldownUntil: {
       type: Date,
       default: null
     }
