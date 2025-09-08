@@ -516,13 +516,13 @@ app.post('/api/antivirus-shield/activate', auth, async (req: Request, res: Respo
       }
     }
 
-    // Define shield options (for testing, all are 1 minute)
+    // Define shield options with actual durations
     const shieldOptions: Record<string, { price: number; durationMs: number }> = {
-      '4h': { price: 10000, durationMs: 60 * 1000 }, // 1 minute for testing
-      '8h': { price: 20000, durationMs: 60 * 1000 }, // 1 minute for testing
-      '12h': { price: 40000, durationMs: 60 * 1000 }, // 1 minute for testing
-      '24h': { price: 75000, durationMs: 60 * 1000 }, // 1 minute for testing
-      '1w': { price: 500000, durationMs: 60 * 1000 } // 1 minute for testing
+      '4h': { price: 10000, durationMs: 4 * 60 * 60 * 1000 }, // 4 hours
+      '8h': { price: 20000, durationMs: 8 * 60 * 60 * 1000 }, // 8 hours
+      '12h': { price: 40000, durationMs: 12 * 60 * 60 * 1000 }, // 12 hours
+      '24h': { price: 75000, durationMs: 24 * 60 * 60 * 1000 }, // 24 hours
+      '1w': { price: 500000, durationMs: 7 * 24 * 60 * 60 * 1000 } // 1 week (7 days)
     };
 
     const option = shieldOptions[optionId];
