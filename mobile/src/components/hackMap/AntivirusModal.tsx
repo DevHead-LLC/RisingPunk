@@ -8,6 +8,7 @@ import { getCurrentBalance } from '../../store/slices/balanceSlice';
 import { formatBalance } from '../common/Balance';
 import { useGetShieldStatusQuery, useActivateShieldMutation } from '../../store/api/antivirusApi';
 import { AntivirusShieldTimer } from './AntivirusShieldTimer';
+import { AntivirusCooldownTimer } from './AntivirusCooldownTimer';
 
 interface ShieldOption {
   id: string;
@@ -75,6 +76,8 @@ export const AntivirusModal: React.FC<AntivirusModalProps> = ({
 
   const isActive = shieldData?.isActive || false;
   const shieldStatus = shieldData?.shieldStatus;
+  const cooldownStatus = shieldData?.cooldownStatus;
+  const isInCooldown = !!cooldownStatus;
 
   const handleActivate = async (option: ShieldOption) => {
     try {
@@ -137,14 +140,20 @@ export const AntivirusModal: React.FC<AntivirusModalProps> = ({
                 <Text style={styles.statusLabel}>Status:</Text>
                 <Text style={[
                   styles.statusValue,
-                  isActive ? styles.activeStatus : styles.inactiveStatus
+                  isActive ? styles.activeStatus : isInCooldown ? styles.cooldownStatus : styles.inactiveStatus
                 ]}>
-                  {isActive ? 'ACTIVE' : 'INACTIVE'}
+                  {isActive ? 'ACTIVE' : isInCooldown ? 'COOLDOWN' : 'INACTIVE'}
                 </Text>
               </View>
               {isActive && shieldStatus && (
                 <AntivirusShieldTimer
                   completesAt={shieldStatus.completesAt}
+                  onComplete={handleShieldComplete}
+                />
+              )}
+              {isInCooldown && cooldownStatus && (
+                <AntivirusCooldownTimer
+                  cooldownUntil={cooldownStatus.cooldownUntil}
                   onComplete={handleShieldComplete}
                 />
               )}
@@ -157,30 +166,30 @@ export const AntivirusModal: React.FC<AntivirusModalProps> = ({
                   key={option.id}
                   style={[
                     styles.optionButton,
-                    isActive && styles.disabledOptionButton
+                    (isActive || isInCooldown) && styles.disabledOptionButton
                   ]}
-                  onPress={isActive ? undefined : () => handleActivate(option)}
-                  activeOpacity={isActive ? 1 : 0.7}
-                  disabled={isActive || isActivating}
+                  onPress={(isActive || isInCooldown) ? undefined : () => handleActivate(option)}
+                  activeOpacity={(isActive || isInCooldown) ? 1 : 0.7}
+                  disabled={isActive || isInCooldown || isActivating}
                 >
                   <View style={styles.optionContent}>
                     <View style={styles.optionHeader}>
                       <Text style={[
                         styles.optionDuration,
-                        isActive && styles.disabledOptionText
+                        (isActive || isInCooldown) && styles.disabledOptionText
                       ]}>
                         {option.duration}
                       </Text>
                       <Text style={[
                         styles.optionPrice,
-                        isActive && styles.disabledOptionText
+                        (isActive || isInCooldown) && styles.disabledOptionText
                       ]}>
                         ${option.price.toLocaleString()}
                       </Text>
                     </View>
                     <Text style={[
                       styles.optionDescription,
-                      isActive && styles.disabledOptionText
+                      (isActive || isInCooldown) && styles.disabledOptionText
                     ]}>
                       {option.description}
                     </Text>
@@ -314,6 +323,9 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   inactiveStatus: {
     color: colors.text.secondary,
+  },
+  cooldownStatus: {
+    color: colors.error,
   },
   cooldownContainer: {
     flexDirection: 'row',
