@@ -598,12 +598,7 @@ app.post('/api/antivirus-shield/deactivate', auth, async (req: Request, res: Res
       return;
     }
 
-    // Check if user is in cooldown
     const now = new Date();
-    if (user.antivirusShield.cooldownUntil && now < user.antivirusShield.cooldownUntil) {
-      res.status(400).json({ error: 'Shield is in cooldown period' });
-      return;
-    }
 
     // Deactivate shield and set 15-minute cooldown
     const cooldownUntil = new Date(now.getTime() + 15 * 60 * 1000); // 15 minutes
