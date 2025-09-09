@@ -95,13 +95,43 @@ Successfully connected rental housing unlocks with user's balance system using r
 
 ### Debugging Steps
 - **API Integration**: Fixed baseUrl to use API_URL from config (port 5001)
-- **Server Logging**: Added console logs to rental housing income endpoint
-- **Client Logging**: Added debug logs to FinancialStatementsScreen
 - **Error Handling**: Added loading states and error display for API calls
 - **Property Values**: Shows "4 Properties @ $100,000 each" in balance sheet
+- **Debug Cleanup**: Removed all debug console logs for production readiness
 
 ### Balance Sheet Enhancements
 - **Individual Properties**: Shows each unlocked property as "Investment Property 1", "Investment Property 2", etc. with $100,000 value
 - **Net Worth Calculation**: Removed "(Cash)" text and now includes total property values + cash balance
 - **Dynamic Calculation**: Net worth = Cash Balance + (Number of Properties × $100,000)
 - **Example**: With $11,109,669 cash + 4 properties = $11,509,669 total net worth
+
+## Critical Bug Fix: Base Income Loss
+**Issue**: Rental housing sync was wiping out base income by updating `lastUpdated` before calculating elapsed time.
+
+### Problem
+- **Sync Order**: `performSync()` updated `user.balance.lastUpdated` to current time
+- **Immediate Calculation**: Balance endpoints calculated `secondsElapsed` after sync
+- **Result**: `secondsElapsed` was almost always 0, losing all base income for that period
+- **Impact**: Players lost base ratePerSecond earnings every time sync ran (initially + hourly)
+
+### Fix Applied
+- **Reordered Logic**: Calculate and apply base income accumulation FIRST
+- **Then Sync**: Run rental housing sync AFTER base income is preserved
+- **Both Endpoints**: Fixed `/api/balance` GET and `/api/balance/update` POST
+- **Preserved Behavior**: All existing functionality maintained, just fixed timing
+
+## Critical Bug Fix: Rental Income Compounding
+**Issue**: Rental income was compounding exponentially instead of adding fixed amounts.
+
+### Problem
+- **Compounding Calculation**: `rentalIncomePerSecond = properties × $0.06 × user.ratePerSecond`
+- **Exponential Growth**: Each sync multiplied rate by ~1.06 per property instead of adding $0.06
+- **Rate Inflation**: After a few syncs, rates grew exponentially beyond intended values
+- **Display Issues**: Rental values inflated far beyond the intended "$0.06 per property per second"
+
+### Fix Applied
+- **Fixed Amounts**: Changed to `rentalIncomePerSecond = properties × $0.06` (no rate multiplication)
+- **Both Services**: Fixed RentalHousingSyncService and RentalHousingIncomeService
+- **Room Values**: Fixed room values to be constants instead of rate-scaled
+- **Method Signatures**: Updated helper methods to remove ratePerSecond parameters
+- **Consistent Behavior**: Now rental income is truly fixed at $0.06 per property per second

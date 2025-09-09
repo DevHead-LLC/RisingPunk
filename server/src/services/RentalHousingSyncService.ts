@@ -87,8 +87,8 @@ export class RentalHousingSyncService {
     const lastUpdated = user.balance.lastUpdated;
     const secondsElapsed = (now.getTime() - lastUpdated.getTime()) / 1000;
     
-    // Calculate rental housing income that should have been earned
-    const rentalIncomePerSecond = unlockedProperties.length * this.BASE_INCOME_PER_PROPERTY * user.balance.ratePerSecond;
+    // Calculate rental housing income that should have been earned (fixed amount per property)
+    const rentalIncomePerSecond = unlockedProperties.length * this.BASE_INCOME_PER_PROPERTY;
     const historicalIncome = Math.floor(secondsElapsed * rentalIncomePerSecond);
     
     return historicalIncome;
@@ -108,8 +108,8 @@ export class RentalHousingSyncService {
     // Add the synced amount to the user's balance
     const newBalance = user.balance.total + syncResult.syncedAmount;
     
-    // Calculate total effective rate including rental housing income
-    const rentalIncomePerSecond = syncResult.totalUnlockedProperties * this.BASE_INCOME_PER_PROPERTY * user.balance.ratePerSecond;
+    // Calculate total effective rate including rental housing income (fixed amount per property)
+    const rentalIncomePerSecond = syncResult.totalUnlockedProperties * this.BASE_INCOME_PER_PROPERTY;
     const totalEffectiveRate = user.balance.ratePerSecond + rentalIncomePerSecond;
     
     // Update user with new balance, effective rate, and sync timestamp
@@ -119,8 +119,6 @@ export class RentalHousingSyncService {
     user.balance.lastUpdated = syncResult.syncTimestamp;
     
     await user.save();
-
-    console.log(`🔄 RENTAL SYNC: User ${user._id} synced $${syncResult.syncedAmount} from ${syncResult.totalUnlockedProperties} properties`);
 
     return {
       success: true,

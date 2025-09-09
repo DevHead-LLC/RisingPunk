@@ -36,14 +36,14 @@ export class RentalHousingIncomeService {
       
       let incomePerSecond = 0;
       if (isUnlocked) {
-        incomePerSecond = this.BASE_INCOME_PER_PROPERTY * user.balance.ratePerSecond;
+        incomePerSecond = this.BASE_INCOME_PER_PROPERTY; // Fixed amount per property
       }
 
       const roomValues = {
-        bathroom: this.ROOM_VALUES.bathroom * user.balance.ratePerSecond,
-        kitchen: this.ROOM_VALUES.kitchen * user.balance.ratePerSecond,
-        bedroom: this.ROOM_VALUES.bedroom * user.balance.ratePerSecond,
-        livingRoom: this.ROOM_VALUES.livingRoom * user.balance.ratePerSecond
+        bathroom: this.ROOM_VALUES.bathroom, // Fixed room values
+        kitchen: this.ROOM_VALUES.kitchen,
+        bedroom: this.ROOM_VALUES.bedroom,
+        livingRoom: this.ROOM_VALUES.livingRoom
       };
 
       propertyBreakdown.push({
@@ -62,11 +62,11 @@ export class RentalHousingIncomeService {
     };
   }
 
-  static getRoomValue(roomType: 'bathroom' | 'kitchen' | 'bedroom' | 'livingRoom', ratePerSecond: number): number {
-    return this.ROOM_VALUES[roomType] * ratePerSecond;
+  static getRoomValue(roomType: 'bathroom' | 'kitchen' | 'bedroom' | 'livingRoom'): number {
+    return this.ROOM_VALUES[roomType]; // Fixed room values
   }
 
-  static getTotalPropertyIncome(ratePerSecond: number): number {
-    return this.BASE_INCOME_PER_PROPERTY * ratePerSecond;
+  static getTotalPropertyIncome(): number {
+    return this.BASE_INCOME_PER_PROPERTY; // Fixed amount per property
   }
 }

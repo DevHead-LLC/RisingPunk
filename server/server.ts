@@ -173,11 +173,7 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
       return;
     }
 
-    // First, check and sync rental housing income if needed
-    const { RentalHousingSyncService } = await import('./src/services/RentalHousingSyncService');
-    await RentalHousingSyncService.performSync(user);
-
-    // Calculate and update accumulated balance
+    // Calculate and update accumulated balance FIRST (before sync)
     const now = new Date();
     const secondsElapsed = (now.getTime() - user.balance.lastUpdated.getTime()) / 1000;
     
@@ -190,6 +186,10 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
       user.balance.lastUpdated = now;
       await user.save();
     }
+
+    // THEN check and sync rental housing income if needed
+    const { RentalHousingSyncService } = await import('./src/services/RentalHousingSyncService');
+    await RentalHousingSyncService.performSync(user);
 
     // Return updated balance (ratePerSecond already includes rental housing income)
     const currentBalance = {
@@ -215,10 +215,7 @@ app.post('/api/balance/update', auth, async (req: Request, res: Response) => {
       return;
     }
 
-    // First, check and sync rental housing income if needed
-    const { RentalHousingSyncService } = await import('./src/services/RentalHousingSyncService');
-    await RentalHousingSyncService.performSync(user);
-
+    // Calculate and update accumulated balance FIRST (before sync)
     const now = new Date();
     const secondsElapsed = (now.getTime() - user.balance.lastUpdated.getTime()) / 1000;
     
@@ -228,6 +225,10 @@ app.post('/api/balance/update', auth, async (req: Request, res: Response) => {
     user.balance.total += accumulatedAmount;
     user.balance.lastUpdated = now;
     await user.save();
+
+    // THEN check and sync rental housing income if needed
+    const { RentalHousingSyncService } = await import('./src/services/RentalHousingSyncService');
+    await RentalHousingSyncService.performSync(user);
 
     res.json({
       total: user.balance.total,
@@ -380,19 +381,15 @@ app.post('/api/balance/deduct', auth, async (req: Request, res: Response) => {
 // Get rental housing income data
 app.get('/api/rental-housing/income', auth, async (req: Request, res: Response) => {
   try {
-    console.log('🏠 Rental housing income request from user:', req.user._id);
     const user = await User.findById(req.user._id);
     
     if (!user) {
-      console.log('❌ User not found for rental housing income');
       res.status(404).json({ error: 'User not found' });
       return;
     }
 
     const { RentalHousingIncomeService } = await import('./src/services/RentalHousingIncomeService');
     const rentalIncome = RentalHousingIncomeService.calculateRentalHousingIncome(user);
-    
-    console.log('💰 Rental housing income calculated:', rentalIncome);
 
     res.json(rentalIncome);
   } catch (error: any) {

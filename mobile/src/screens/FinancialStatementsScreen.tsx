@@ -20,13 +20,6 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
   const { data: templatesData } = useFetchFinanceTemplatesQuery();
   const { data: userTiersData } = useFetchUserFinanceTiersQuery();
   const { data: rentalHousingData, error: rentalHousingError, isLoading: rentalHousingLoading } = useGetRentalHousingIncomeQuery();
-  
-  // Debug logging
-  console.log('🏠 Financial Statements - Rental Housing Data:', {
-    data: rentalHousingData,
-    error: rentalHousingError,
-    loading: rentalHousingLoading
-  });
   const currentCash = useAppSelector(getCurrentBalance);
   const { themeMode } = useTheme();
   const colors = useThemeColors();
