@@ -14,7 +14,7 @@ interface CollapsibleToolbarProps {
 
 export const CollapsibleToolbar: React.FC<CollapsibleToolbarProps> = ({
   onAntivirusPress,
-  isAntivirusUnlocked = true, // For now, always show as unlocked
+  isAntivirusUnlocked = false,
 }) => {
   const colors = useThemeColors();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -28,6 +28,11 @@ export const CollapsibleToolbar: React.FC<CollapsibleToolbarProps> = ({
   const toggleExpanded = () => {
     setIsExpanded(!isExpanded);
   };
+
+  // Don't render the toolbar at all if antivirus is not unlocked
+  if (!isAntivirusUnlocked) {
+    return null;
+  }
 
   return (
     <View style={styles.container}>

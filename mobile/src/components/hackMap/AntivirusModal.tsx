@@ -7,6 +7,7 @@ import { useAppSelector } from '../../store/hooks';
 import { getCurrentBalance } from '../../store/slices/balanceSlice';
 import { formatBalance } from '../common/Balance';
 import { useGetShieldStatusQuery, useActivateShieldMutation } from '../../store/api/antivirusApi';
+import { useGetFeaturesQuery } from '../../store/api/researchFeaturesApi';
 import { AntivirusShieldTimer } from './AntivirusShieldTimer';
 import { AntivirusCooldownTimer } from './AntivirusCooldownTimer';
 
@@ -73,6 +74,19 @@ export const AntivirusModal: React.FC<AntivirusModalProps> = ({
     pollingInterval: 1000, // Poll every second for real-time updates
   });
   const [activateShield, { isLoading: isActivating }] = useActivateShieldMutation();
+  
+  // Get research features data (same as HackMapScreen and ResearchFeaturesList)
+  const { data: researchFeatures } = useGetFeaturesQuery('home-defense');
+  
+  // Find the antivirus feature from the research features
+  const antivirusFeature = researchFeatures?.find(f => f.id === 'antivirus');
+  
+  // Use local timer logic to determine if actually unlocked (same as ResearchFeaturesList)
+  const now = new Date().getTime();
+  const researchCompletesAt = antivirusFeature?.researchCompletesAt ? new Date(antivirusFeature.researchCompletesAt).getTime() : 0;
+  const remaining = Math.max(0, researchCompletesAt - now);
+  const isActuallyUnlocked = antivirusFeature?.isUnlocked || 
+    (antivirusFeature?.isResearching && remaining === 0);
 
   const isActive = shieldData?.isActive || false;
   const shieldStatus = shieldData?.shieldStatus;
@@ -93,6 +107,9 @@ export const AntivirusModal: React.FC<AntivirusModalProps> = ({
     // Refetch to get updated status when shield completes
     refetch();
   };
+
+  // Modal visibility is controlled by parent component (HackMapScreen)
+  // No need to double-check unlock status here
 
   return (
     <Modal

@@ -4,6 +4,9 @@ export interface IResearchFeature {
   id: string;
   isUnlocked: boolean;
   unlockedAt: Date | null;
+  isResearching?: boolean;
+  researchStartedAt?: Date;
+  researchCompletesAt?: Date;
 }
 
 export interface IResearchUser extends Document {
@@ -27,6 +30,18 @@ const researchFeatureSchema = new Schema({
     default: false
   },
   unlockedAt: {
+    type: Date,
+    default: null
+  },
+  isResearching: {
+    type: Boolean,
+    default: false
+  },
+  researchStartedAt: {
+    type: Date,
+    default: null
+  },
+  researchCompletesAt: {
     type: Date,
     default: null
   }

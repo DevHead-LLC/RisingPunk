@@ -10,6 +10,7 @@ import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { setGrid, setLoading } from '../store/slices/mapSlice';
 import { useFetchMapQuery } from '../store/api/mapApi';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
+import { useGetFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { computePanBounds } from '../utils/mapPanBounds';
 import { CellData, TerrainType, EntityType } from '../types/map';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -430,6 +431,22 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     pollingInterval: 1000, // Poll every second for real-time updates
   });
   
+  // Get research features data (same as ResearchFeaturesList)
+  const { data: researchFeatures } = useGetFeaturesQuery('home-defense');
+  
+  // Find the antivirus feature from the research features
+  const antivirusFeature = researchFeatures?.find(f => f.id === 'antivirus');
+  
+  // Use local timer logic to determine if actually unlocked (same as ResearchFeaturesList)
+  // Calculate remaining time to match ResearchFeaturesList logic
+  const now = new Date().getTime();
+  const researchCompletesAt = antivirusFeature?.researchCompletesAt ? new Date(antivirusFeature.researchCompletesAt).getTime() : 0;
+  const remaining = Math.max(0, researchCompletesAt - now);
+  const isActuallyUnlocked = antivirusFeature?.isUnlocked || 
+    (antivirusFeature?.isResearching && remaining === 0);
+  
+  // Debug logging - REMOVED to fix infinite loop
+  
   const isShieldActive = shieldData?.isActive || false;
 
   // Precompute terrain style map and position style caches
@@ -844,8 +861,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   }, [currentUserHandle, grid, containerSize.width, containerSize.height, maxX, maxY, minX, minY, offsetX, offsetY, computeWindow]);
 
   const handleAntivirusPress = useCallback(() => {
-    setShowAntivirusModal(true);
-  }, []);
+    // Only show modal if antivirus feature is unlocked (including timer-based unlock)
+    if (isActuallyUnlocked) {
+      setShowAntivirusModal(true);
+    }
+  }, [isActuallyUnlocked]);
 
   const handleAntivirusClose = useCallback(() => {
     setShowAntivirusModal(false);
@@ -939,10 +959,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         <Image source={require('../assets/images/navigationIcon.png')} style={styles.navigationIcon} resizeMode="contain" />
       </Pressable>
 
-      <CollapsibleToolbar
-        onAntivirusPress={handleAntivirusPress}
-        isAntivirusUnlocked={true} // For now, always show as unlocked
-      />
+        <CollapsibleToolbar
+          onAntivirusPress={handleAntivirusPress}
+          isAntivirusUnlocked={isActuallyUnlocked}
+        />
 
       <AntivirusModal
         visible={showAntivirusModal}

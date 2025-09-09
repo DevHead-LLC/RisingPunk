@@ -56,7 +56,8 @@ export class BattleSetupService {
     if (isUserDefender) {
       const inventoryValidation = await BattleInventorySettlementService.validateDefenderInventory(defenderId);
       if (!inventoryValidation.valid) {
-        throw new Error(`Cannot start battle: ${inventoryValidation.error}`);
+        console.warn(`Defender ${defenderId} has no bots available for defense: ${inventoryValidation.error}`);
+        // Don't throw error - allow battle to start but defender won't be able to deploy
       }
     }
     

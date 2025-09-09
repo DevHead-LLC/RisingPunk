@@ -57,7 +57,7 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
   const selectedCard = RESEARCH_CARDS.find(card => card.id === currentScreen);
   
   // Use real API data - only call hook when a research category is actually selected
-  const { features, loading: featuresLoading, error: featuresError } = useResearchFeatures(selectedCard?.id || null);
+  const { features, loading: featuresLoading, error: featuresError, refetch: refetchFeatures } = useResearchFeatures(selectedCard?.id || null);
   
   const styles = createStyles(colors);
   
@@ -154,9 +154,10 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
       );
     }
     
-    const handleFeatureUnlock = async (featureId: string, cost: number): Promise<boolean> => {
-      return true;
-    };
+  const handleResearchStarted = () => {
+    // RTK Query will automatically refetch when cache is invalidated
+    // No manual refetch needed
+  };
     
     return (
       <ResearchDetailScreen
@@ -166,7 +167,7 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
         features={features}
         currentLevel={userLevel}
         currentBalance={userBalance}
-        onFeatureUnlock={handleFeatureUnlock}
+        onResearchStarted={handleResearchStarted}
       />
     );
   };

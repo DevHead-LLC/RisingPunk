@@ -10,6 +10,7 @@ import {
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { ResearchFeature } from './ResearchFeaturesList';
+import { useStartResearchMutation, useCompleteResearchMutation } from '../../store/api/researchFeaturesApi';
 
 interface FeatureModalProps {
   visible: boolean;
@@ -17,7 +18,7 @@ interface FeatureModalProps {
   currentBalance: number;
   currentLevel: number;
   onClose: () => void;
-  onPerformResearch: (featureId: string, cost: number) => Promise<boolean>;
+  onResearchStarted?: () => void;
 }
 
 export function FeatureModal({
@@ -26,23 +27,68 @@ export function FeatureModal({
   currentBalance,
   currentLevel,
   onClose,
-  onPerformResearch,
+  onResearchStarted,
 }: FeatureModalProps) {
   const colors = useThemeColors();
-  const [showComingSoon, setShowComingSoon] = useState(false);
+  const [isResearching, setIsResearching] = useState(false);
+  const [researchTimeRemaining, setResearchTimeRemaining] = useState(0);
+  const [startResearch, { isLoading: isStartingResearch }] = useStartResearchMutation();
+  const [completeResearch, { isLoading: isCompletingResearch }] = useCompleteResearchMutation();
   const isLightMode = colors.background === '#FAFAFA' || colors.background === '#F5F5DC';
   
   const canAfford = currentBalance >= feature.unlockCost;
   const meetsLevelRequirement = currentLevel >= feature.levelRequirement;
+  const researchTimeHours = feature.researchTimeHours || 4; // Default to 4 hours if not specified
+  
+  // Check if research is in progress
+  const isCurrentlyResearching = feature.isResearching || false;
+  
+  // Calculate time remaining if research is in progress
+  useEffect(() => {
+    if (isCurrentlyResearching && feature.researchCompletesAt) {
+      const updateTimer = () => {
+        const now = new Date().getTime();
+        const completesAt = new Date(feature.researchCompletesAt!).getTime();
+        const remaining = Math.max(0, completesAt - now);
+        setResearchTimeRemaining(remaining);
+        
+        if (remaining === 0) {
+          console.log('🔬 RESEARCH: Timer reached zero, attempting to complete research for:', feature.id);
+          // Research completed - automatically complete it
+          completeResearch(feature.id).unwrap().then((result) => {
+            console.log('🔬 RESEARCH: Successfully completed research:', result);
+            setIsResearching(false);
+            // RTK Query will automatically invalidate cache and refetch data
+          }).catch((error) => {
+            console.error('🔬 RESEARCH: Failed to complete research:', error);
+          });
+        }
+      };
+      
+      updateTimer();
+      const interval = setInterval(updateTimer, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [isCurrentlyResearching, feature.researchCompletesAt, feature.id, completeResearch, onResearchStarted]);
   
   const handlePerformResearch = async () => {
-    if (canAfford && meetsLevelRequirement) {
-      setShowComingSoon(true);
-      
-      setTimeout(() => {
-        setShowComingSoon(false);
-      }, 2000);
+    if (canAfford && meetsLevelRequirement && !isCurrentlyResearching) {
+      try {
+        const result = await startResearch(feature.id).unwrap();
+        setIsResearching(true);
+        onResearchStarted?.();
+        onClose(); // Close modal after starting research
+      } catch (error) {
+        console.error('Failed to start research:', error);
+      }
     }
+  };
+  
+  const formatTimeRemaining = (milliseconds: number) => {
+    const hours = Math.floor(milliseconds / (1000 * 60 * 60));
+    const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((milliseconds % (1000 * 60)) / 1000);
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
   const renderLockedModal = () => (
@@ -121,26 +167,43 @@ export function FeatureModal({
             Research Time:
           </Text>
           <Text style={[styles.infoValue, { color: isLightMode ? '#374151' : '#F1F5F9' }]}>
-            24 hours
+            {researchTimeHours} hours
           </Text>
         </View>
       </View>
       
-      <TouchableOpacity
-        style={[
-          styles.researchButton,
-          {
-            backgroundColor: canAfford ? '#7C3AED' : '#EF4444',
-            opacity: canAfford ? 1 : 0.6
-          }
-        ]}
-        onPress={handlePerformResearch}
-        disabled={!canAfford}
-      >
-        <Text style={[styles.researchButtonText, { color: '#FFFFFF' }]}>
-          {canAfford ? 'Perform Research' : 'Insufficient Funds'}
-        </Text>
-      </TouchableOpacity>
+      {isCurrentlyResearching ? (
+        <View style={[styles.researchingContainer, { backgroundColor: '#1F2937' }]}>
+          <Text style={[styles.researchingTitle, { color: '#10B981' }]}>
+            Research in Progress
+          </Text>
+          <Text style={[styles.researchingTime, { color: '#F1F5F9' }]}>
+            {formatTimeRemaining(researchTimeRemaining)}
+          </Text>
+          <Text style={[styles.researchingSubtext, { color: '#9CA3AF' }]}>
+            Research will complete automatically
+          </Text>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={[
+            styles.researchButton,
+            {
+              backgroundColor: (canAfford && meetsLevelRequirement) ? '#7C3AED' : '#EF4444',
+              opacity: (canAfford && meetsLevelRequirement) ? 1 : 0.6
+            }
+          ]}
+          onPress={handlePerformResearch}
+          disabled={!canAfford || !meetsLevelRequirement || isStartingResearch}
+        >
+          <Text style={[styles.researchButtonText, { color: '#FFFFFF' }]}>
+            {isStartingResearch ? 'Starting Research...' : 
+             !canAfford ? 'Insufficient Funds' :
+             !meetsLevelRequirement ? 'Level Too Low' :
+             'Perform Research'}
+          </Text>
+        </TouchableOpacity>
+      )}
 
       <TouchableOpacity
         style={[styles.closeButton, { backgroundColor: '#475569' }]}
@@ -188,7 +251,6 @@ export function FeatureModal({
           }
         ]}>
           {feature.isUnlocked ? renderUnlockedModal() : renderLockedModal()}
-          {showComingSoon && renderComingSoonOverlay()}
         </View>
       </View>
     </Modal>
@@ -276,6 +338,28 @@ const styles = StyleSheet.create({
   researchButtonText: {
     fontSize: SIZING.font.body,
     fontWeight: '600',
+  },
+  researchingContainer: {
+    width: '100%',
+    padding: SIZING.spacing.lg,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: SIZING.spacing.lg,
+  },
+  researchingTitle: {
+    fontSize: SIZING.font.h2,
+    fontWeight: '700',
+    marginBottom: SIZING.spacing.sm,
+  },
+  researchingTime: {
+    fontSize: SIZING.font.h2,
+    fontWeight: '600',
+    fontFamily: 'monospace',
+    marginBottom: SIZING.spacing.xs,
+  },
+  researchingSubtext: {
+    fontSize: SIZING.font.small,
+    textAlign: 'center',
   },
   closeButton: {
     paddingHorizontal: SIZING.spacing.md,

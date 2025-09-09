@@ -13,7 +13,7 @@ type ResearchDetailScreenProps = {
   features?: ResearchFeature[];
   currentLevel?: number;
   currentBalance?: number;
-  onFeatureUnlock?: (featureId: string, cost: number) => Promise<boolean>;
+  onResearchStarted?: () => void;
   children?: React.ReactNode;
 };
 
@@ -24,19 +24,13 @@ export function ResearchDetailScreen({
   features,
   currentLevel = 1,
   currentBalance = 0,
-  onFeatureUnlock,
+  onResearchStarted,
   children 
 }: ResearchDetailScreenProps): React.JSX.Element {
   const colors = useThemeColors();
   
   const styles = createStyles(colors);
   
-  const handleFeatureUnlock = async (featureId: string, cost: number): Promise<boolean> => {
-    if (onFeatureUnlock) {
-      return await onFeatureUnlock(featureId, cost);
-    }
-    return false;
-  };
 
   const renderContent = () => {
     if (children) {
@@ -49,7 +43,7 @@ export function ResearchDetailScreen({
           features={features}
           currentLevel={currentLevel}
           currentBalance={currentBalance}
-          onFeatureUnlock={handleFeatureUnlock}
+          onResearchStarted={onResearchStarted}
         />
       );
     }
