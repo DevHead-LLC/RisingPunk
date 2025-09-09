@@ -6,11 +6,13 @@ import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useAppDispatch } from '../../store/hooks';
 import { setFinancialStatements } from '../../store/slices/uiSlice';
+import { roundToFloor } from '../../utils/currencyUtils';
 
 // Utility function for formatting balance
 export function formatBalance(amount: number): string {
   if (amount === undefined || amount === null) {return '0';}
-  return amount.toLocaleString();
+  const roundedAmount = roundToFloor(amount);
+  return roundedAmount.toLocaleString();
 }
 
 export const Balance = memo(() => {

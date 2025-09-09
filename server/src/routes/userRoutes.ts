@@ -399,6 +399,13 @@ router.post('/complete-rental-housing/:propertyId', auth, async (req, res): Prom
 
     await User.findByIdAndUpdate(userId, { $set: updateData });
 
+    // Trigger a sync to ensure rental housing income is properly calculated
+    const updatedUser = await User.findById(userId);
+    if (updatedUser) {
+      const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
+      await RentalHousingSyncService.performSync(updatedUser);
+    }
+
     res.json({
       success: true,
       message: 'Rental housing build completed',

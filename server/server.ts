@@ -173,9 +173,11 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
       return;
     }
 
-    // Calculate and update accumulated balance
+    // Calculate and update accumulated balance FIRST (before sync)
     const now = new Date();
     const secondsElapsed = (now.getTime() - user.balance.lastUpdated.getTime()) / 1000;
+    
+    // Calculate income from total effective rate (includes rental housing income)
     const accumulatedAmount = Math.floor(secondsElapsed * user.balance.ratePerSecond);
     
     // Only update if there's accumulated amount to add
@@ -185,7 +187,11 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
       await user.save();
     }
 
-    // Return updated balance
+    // THEN check and sync rental housing income if needed
+    const { RentalHousingSyncService } = await import('./src/services/RentalHousingSyncService');
+    await RentalHousingSyncService.performSync(user);
+
+    // Return updated balance (ratePerSecond already includes rental housing income)
     const currentBalance = {
       total: user.balance.total,
       ratePerSecond: user.balance.ratePerSecond,
@@ -209,15 +215,26 @@ app.post('/api/balance/update', auth, async (req: Request, res: Response) => {
       return;
     }
 
+    // Calculate and update accumulated balance FIRST (before sync)
     const now = new Date();
     const secondsElapsed = (now.getTime() - user.balance.lastUpdated.getTime()) / 1000;
+    
+    // Calculate income from total effective rate (includes rental housing income)
     const accumulatedAmount = Math.floor(secondsElapsed * user.balance.ratePerSecond);
     
     user.balance.total += accumulatedAmount;
     user.balance.lastUpdated = now;
     await user.save();
 
-    res.json(user.balance);
+    // THEN check and sync rental housing income if needed
+    const { RentalHousingSyncService } = await import('./src/services/RentalHousingSyncService');
+    await RentalHousingSyncService.performSync(user);
+
+    res.json({
+      total: user.balance.total,
+      ratePerSecond: user.balance.ratePerSecond,
+      lastUpdated: user.balance.lastUpdated
+    });
   } catch (error: any) {
     console.error('Balance update error:', error);
     res.status(500).json({ error: 'Server error' });
@@ -358,6 +375,53 @@ app.post('/api/balance/deduct', auth, async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Balance deduction error:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Get rental housing income data
+app.get('/api/rental-housing/income', auth, async (req: Request, res: Response) => {
+  try {
+    const user = await User.findById(req.user._id);
+    
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    const { RentalHousingIncomeService } = await import('./src/services/RentalHousingIncomeService');
+    const rentalIncome = RentalHousingIncomeService.calculateRentalHousingIncome(user);
+
+    res.json(rentalIncome);
+  } catch (error: any) {
+    console.error('Rental housing income fetch error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Manual sync endpoint for rental housing income
+app.post('/api/rental-housing/sync', auth, async (req: Request, res: Response) => {
+  try {
+    const user = await User.findById(req.user._id);
+    
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    const { RentalHousingSyncService } = await import('./src/services/RentalHousingSyncService');
+    const syncResult = await RentalHousingSyncService.performSync(user);
+
+    res.json({
+      success: syncResult.success,
+      syncedAmount: syncResult.syncedAmount,
+      newBalance: syncResult.newBalance,
+      message: syncResult.syncedAmount > 0 
+        ? `Synced $${syncResult.syncedAmount} in rental housing income`
+        : 'No sync needed - rental housing income is up to date'
+    });
+  } catch (error: any) {
+    console.error('Rental housing sync error:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 

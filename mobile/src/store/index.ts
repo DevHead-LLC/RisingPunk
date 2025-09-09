@@ -15,6 +15,7 @@ import { mapApi } from './api/mapApi';
 import { battleApi } from './api/battleApi';
 import { preferencesApi } from './api/preferencesApi';
 import { antivirusApi } from './api/antivirusApi';
+import { rentalHousingApi } from './api/rentalHousingApi';
 
 export const store = configureStore({
   reducer: {
@@ -34,6 +35,7 @@ export const store = configureStore({
     [battleApi.reducerPath]: battleApi.reducer,
     [preferencesApi.reducerPath]: preferencesApi.reducer,
     [antivirusApi.reducerPath]: antivirusApi.reducer,
+    [rentalHousingApi.reducerPath]: rentalHousingApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
@@ -48,7 +50,8 @@ export const store = configureStore({
     .concat(mapApi.middleware)
     .concat(battleApi.middleware)
     .concat(preferencesApi.middleware)
-    .concat(antivirusApi.middleware),
+    .concat(antivirusApi.middleware)
+    .concat(rentalHousingApi.middleware),
   devTools: __DEV__,
 });
 
