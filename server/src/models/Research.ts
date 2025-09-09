@@ -8,6 +8,10 @@ export interface IResearchFeature {
   levelRequirement: number;
   isUnlocked: boolean;
   unlockedAt?: Date;
+  isResearching?: boolean;
+  researchStartedAt?: Date;
+  researchCompletesAt?: Date;
+  researchTimeHours?: number;
   effect: {
     type: 'unlock' | 'improvement' | 'reduction' | 'special';
     value: number | string;
@@ -58,6 +62,22 @@ const researchFeatureSchema = new Schema({
   unlockedAt: {
     type: Date,
     default: null
+  },
+  isResearching: {
+    type: Boolean,
+    default: false
+  },
+  researchStartedAt: {
+    type: Date,
+    default: null
+  },
+  researchCompletesAt: {
+    type: Date,
+    default: null
+  },
+  researchTimeHours: {
+    type: Number,
+    default: 4
   },
   effect: {
     type: {

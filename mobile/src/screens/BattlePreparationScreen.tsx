@@ -13,6 +13,7 @@ import { useAppSelector } from '../store/hooks';
 import { useAssignToBattalionMutation } from '../store/api/botsApi';
 import { useStartBattleMutation } from '../store/api/battleApi';
 import { useGetShieldStatusQuery, useDeactivateShieldMutation } from '../store/api/antivirusApi';
+import { useGetFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { API_URL } from '../config';
 
 type Props = {
@@ -32,6 +33,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
   const [selectedBattalion, setSelectedBattalion] = useState<string | null>(null);
   const [assignments, setAssignments] = useState<Record<string, BattalionAssignment>>({});
   const [shieldCheckModalVisible, setShieldCheckModalVisible] = useState(false);
+  const [isStartingBattle, setIsStartingBattle] = useState(false);
   const token = useAppSelector((state) => state.auth.token);
   const botCounts = useAppSelector((state) => state.bots.botCounts);
   const [assignToBattalion] = useAssignToBattalionMutation();
@@ -40,6 +42,21 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
   const { data: shieldData } = useGetShieldStatusQuery(undefined, {
     pollingInterval: 1000,
   });
+  
+  // Get research features data (same as other components)
+  const { data: researchFeatures } = useGetFeaturesQuery('home-defense');
+  
+  // Find the antivirus feature from the research features
+  const antivirusFeature = researchFeatures?.find(f => f.id === 'antivirus');
+  
+  // Use local timer logic to determine if actually unlocked (same as other components)
+  const isActuallyUnlocked = useMemo(() => {
+    const now = new Date().getTime();
+    const researchCompletesAt = antivirusFeature?.researchCompletesAt ? new Date(antivirusFeature.researchCompletesAt).getTime() : 0;
+    const remaining = Math.max(0, researchCompletesAt - now);
+    return antivirusFeature?.isUnlocked || 
+      (antivirusFeature?.isResearching && remaining === 0);
+  }, [antivirusFeature?.isUnlocked, antivirusFeature?.isResearching, antivirusFeature?.researchCompletesAt]);
 
   // Calculate available bot counts by subtracting assigned quantities
   const availableBots = useMemo(() => {
@@ -178,6 +195,12 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
 
   // Handle battle start - check for shield warning first
   const handleBattleStart = React.useCallback(async () => {
+    // Prevent double-clicks
+    if (isStartingBattle) {
+      console.log('Battle start already in progress, ignoring click');
+      return;
+    }
+
     const validation = validateDeployment(assignments);
     
     if (!validation.isValid) {
@@ -185,24 +208,28 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       return;
     }
 
-    const isShieldActive = shieldData?.isActive || false;
-    const isDefendingUser = !!defenderId && !defenderNpcSlug;
-    
-    // If attacking user has shield activated AND defending entity is another user, show modal
-    if (isShieldActive && isDefendingUser) {
-      setShieldCheckModalVisible(true);
-      return;
-    }
+    setIsStartingBattle(true);
 
-    // Otherwise proceed directly with battle start
     try {
+      const isShieldActive = (isActuallyUnlocked && shieldData?.isActive) || false;
+      const isDefendingUser = !!defenderId && !defenderNpcSlug;
+      
+      // If attacking user has shield activated AND defending entity is another user, show modal
+      if (isShieldActive && isDefendingUser) {
+        setShieldCheckModalVisible(true);
+        return;
+      }
+
+      // Otherwise proceed directly with battle start
       const result = await startBattle(battleStartData).unwrap();
       onBattleStart(result.battleId);
     } catch (error) {
       console.error('Failed to start battle:', error);
       onBattleStart();
+    } finally {
+      setIsStartingBattle(false);
     }
-  }, [assignments, shieldData?.isActive, defenderId, defenderNpcSlug, battleStartData, startBattle, onBattleStart, validateDeployment]);
+  }, [assignments, isActuallyUnlocked, shieldData?.isActive, defenderId, defenderNpcSlug, battleStartData, startBattle, onBattleStart, validateDeployment, isStartingBattle]);
 
   // Handle continue from shield modal - deactivate shield and proceed to battle
   const handleShieldModalContinue = React.useCallback(async () => {
@@ -322,25 +349,25 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
             backgroundColor: colors.secondary + '1A',
             borderColor: colors.secondary 
           },
-          !validateDeployment(assignments).isValid && {
+          (!validateDeployment(assignments).isValid || isStartingBattle) && {
             opacity: 0.5,
             backgroundColor: colors.neutral + '1A',
             borderColor: colors.neutral
           }
         ]}
         onPress={handleBattleStart}
-        disabled={!validateDeployment(assignments).isValid}
+        disabled={!validateDeployment(assignments).isValid || isStartingBattle}
       >
         <Text style={[
           styles.executeText,
           { 
             color: colors.secondary,
           },
-          !validateDeployment(assignments).isValid && {
+          (!validateDeployment(assignments).isValid || isStartingBattle) && {
             color: colors.neutral,
           }
         ]}>
-          DEPLOY PURGE
+          {isStartingBattle ? 'STARTING...' : 'DEPLOY PURGE'}
         </Text>
       </TouchableOpacity>
 

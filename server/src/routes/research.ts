@@ -99,7 +99,7 @@ router.get('/features/:categoryId', auth, async (req: Request, res: Response) =>
       researchId: research._id 
     });
     
-    // Merge base features with user's unlock status
+    // Merge base features with user's unlock status and research state
     const featuresWithStatus = baseFeatures.map(feature => {
       const userFeature = userResearch?.features?.find((f: any) => f.id === feature.id);
       return {
@@ -107,7 +107,12 @@ router.get('/features/:categoryId', auth, async (req: Request, res: Response) =>
         // If user has explicitly unlocked it, use that status
         // Otherwise, use the server config's isUnlocked value
         isUnlocked: userFeature?.isUnlocked !== undefined ? userFeature.isUnlocked : feature.isUnlocked,
-        unlockedAt: userFeature?.unlockedAt || null
+        unlockedAt: userFeature?.unlockedAt || null,
+        // Add research state from database
+        isResearching: userFeature?.isResearching || false,
+        researchStartedAt: userFeature?.researchStartedAt || null,
+        researchCompletesAt: userFeature?.researchCompletesAt || null,
+        researchTimeHours: feature.researchTimeHours || 4 // Default to 4 hours
       };
     });
     
@@ -120,6 +125,302 @@ router.get('/features/:categoryId', auth, async (req: Request, res: Response) =>
     res.status(500).json({
       success: false,
       message: 'Error fetching research features'
+    });
+  }
+});
+
+// Check if a specific research feature is unlocked
+router.get('/feature-status/:featureId', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user._id;
+    const { featureId } = req.params;
+    
+    // Find the research feature in the database
+    if (!mongoose.connection.db) {
+      res.status(500).json({
+        success: false,
+        message: 'Database connection not available'
+      });
+      return;
+    }
+    
+    const researchFeature = await mongoose.connection.db.collection('researchFeatures').findOne({ featureId });
+    
+    if (!researchFeature) {
+      res.status(404).json({
+        success: false,
+        message: 'Research feature not found'
+      });
+      return;
+    }
+    
+    // Check if the user has unlocked this feature
+    const userResearch = await ResearchUser.findOne({ 
+      userId, 
+      researchId: researchFeature.categoryObjectId 
+    });
+    
+    const isUnlocked = userResearch?.features?.some((f: any) => f.id === featureId && f.isUnlocked) || false;
+    
+    res.json({
+      success: true,
+      data: {
+        featureId: researchFeature.featureId,
+        name: researchFeature.name,
+        isUnlocked,
+        unlockCost: researchFeature.unlockCost,
+        levelRequirement: researchFeature.levelRequirement,
+        researchTimeHours: researchFeature.researchTimeHours
+      }
+    });
+  } catch (error) {
+    console.error('Error checking research feature status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error checking research feature status'
+    });
+  }
+});
+
+// Start research for a specific feature
+router.post('/start-research/:featureId', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user._id;
+    const { featureId } = req.params;
+    
+    // Find the research feature in the database
+    if (!mongoose.connection.db) {
+      res.status(500).json({
+        success: false,
+        message: 'Database connection not available'
+      });
+      return;
+    }
+    
+    const researchFeature = await mongoose.connection.db.collection('researchFeatures').findOne({ featureId });
+    
+    if (!researchFeature) {
+      res.status(404).json({
+        success: false,
+        message: 'Research feature not found'
+      });
+      return;
+    }
+    
+    // Get user data
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+      return;
+    }
+    
+    // Check if user meets requirements
+    if (user.level < researchFeature.levelRequirement) {
+      res.status(400).json({
+        success: false,
+        message: 'Level requirement not met'
+      });
+      return;
+    }
+    
+    if (user.balance.total < researchFeature.unlockCost) {
+      res.status(400).json({
+        success: false,
+        message: 'Insufficient funds'
+      });
+      return;
+    }
+    
+    // Check if already researching or unlocked
+    const userResearch = await ResearchUser.findOne({ 
+      userId, 
+      researchId: researchFeature.categoryObjectId 
+    });
+    
+    const existingFeature = userResearch?.features?.find((f: any) => f.id === featureId);
+    if (existingFeature?.isUnlocked) {
+      res.status(400).json({
+        success: false,
+        message: 'Feature already unlocked'
+      });
+      return;
+    }
+    
+    if (existingFeature?.isResearching) {
+      res.status(400).json({
+        success: false,
+        message: 'Research already in progress'
+      });
+      return;
+    }
+    
+    // Calculate research completion time
+    const researchStartedAt = new Date();
+    const researchCompletesAt = new Date(researchStartedAt.getTime() + (researchFeature.researchTimeHours * 60 * 60 * 1000));
+    
+    // Deduct cost from user balance
+    await User.findByIdAndUpdate(
+      userId,
+      {
+        'balance.total': user.balance.total - researchFeature.unlockCost,
+        'balance.lastUpdated': new Date()
+      }
+    );
+    
+    // Update research feature to show as researching
+    await ResearchUser.findOneAndUpdate(
+      { userId, researchId: researchFeature.categoryObjectId },
+      {
+        $set: {
+          'updatedAt': new Date()
+        },
+        $addToSet: {
+          features: {
+            id: featureId,
+            isUnlocked: false,
+            isResearching: true,
+            researchStartedAt: researchStartedAt,
+            researchCompletesAt: researchCompletesAt,
+            unlockedAt: null
+          }
+        }
+      },
+      { 
+        upsert: true,
+        new: true 
+      }
+    );
+    
+    res.json({
+      success: true,
+      message: 'Research started successfully',
+      data: {
+        researchStartedAt,
+        researchCompletesAt,
+        researchTimeHours: researchFeature.researchTimeHours
+      }
+    });
+  } catch (error) {
+    console.error('Error starting research:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error starting research'
+    });
+  }
+});
+
+// Check and complete research for a specific feature
+router.post('/complete-research/:featureId', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user._id;
+    const { featureId } = req.params;
+    
+    // Find the research feature in the database
+    if (!mongoose.connection.db) {
+      res.status(500).json({
+        success: false,
+        message: 'Database connection not available'
+      });
+      return;
+    }
+    
+    const researchFeature = await mongoose.connection.db.collection('researchFeatures').findOne({ featureId });
+    
+    if (!researchFeature) {
+      res.status(404).json({
+        success: false,
+        message: 'Research feature not found'
+      });
+      return;
+    }
+    
+    // Get user research data
+    const userResearch = await ResearchUser.findOne({ 
+      userId, 
+      researchId: researchFeature.categoryObjectId 
+    });
+    
+    if (!userResearch) {
+      res.status(404).json({
+        success: false,
+        message: 'User research data not found'
+      });
+      return;
+    }
+    
+    // Find the specific feature
+    const featureIndex = userResearch.features.findIndex((f: any) => f.id === featureId);
+    
+    if (featureIndex === -1) {
+      res.status(404).json({
+        success: false,
+        message: 'Feature not found in user research'
+      });
+      return;
+    }
+    
+    const feature = userResearch.features[featureIndex];
+    
+    // Check if research is complete
+    if (!feature.isResearching) {
+      res.status(400).json({
+        success: false,
+        message: 'No research in progress for this feature'
+      });
+      return;
+    }
+    
+    const now = new Date();
+    const researchCompletesAt = new Date(feature.researchCompletesAt!);
+    
+    if (now < researchCompletesAt) {
+      res.status(400).json({
+        success: false,
+        message: 'Research not yet complete',
+        data: {
+          researchCompletesAt: feature.researchCompletesAt,
+          timeRemaining: researchCompletesAt.getTime() - now.getTime()
+        }
+      });
+      return;
+    }
+    
+    // Complete the research
+    const updatedFeatures = [...userResearch.features];
+    updatedFeatures[featureIndex] = {
+      ...feature,
+      isResearching: false,
+      isUnlocked: true,
+      unlockedAt: now
+    };
+    
+    await ResearchUser.findByIdAndUpdate(
+      userResearch._id,
+      {
+        $set: {
+          features: updatedFeatures,
+          updatedAt: now
+        }
+      }
+    );
+    
+    res.json({
+      success: true,
+      message: 'Research completed successfully',
+      data: {
+        featureId,
+        isUnlocked: true,
+        unlockedAt: now
+      }
+    });
+  } catch (error) {
+    console.error('Error completing research:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error completing research'
     });
   }
 });
