@@ -5,6 +5,7 @@ import { CloseButton } from '../components/common/CloseButton';
 import { useAppSelector } from '../store/hooks';
 import { getCurrentBalance } from '../store/slices/balanceSlice';
 import { useFetchFinanceTemplatesQuery, useFetchUserFinanceTiersQuery } from '../store/api/userFinanceApi';
+import { useGetRentalHousingIncomeQuery } from '../store/api/rentalHousingApi';
 import { useTheme } from '../context/ThemeContext';
 import { useThemeColors } from '../hooks/useThemeColors';
 
@@ -18,6 +19,14 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
   const [activeTab, setActiveTab] = useState<TabKey>('income');
   const { data: templatesData } = useFetchFinanceTemplatesQuery();
   const { data: userTiersData } = useFetchUserFinanceTiersQuery();
+  const { data: rentalHousingData, error: rentalHousingError, isLoading: rentalHousingLoading } = useGetRentalHousingIncomeQuery();
+  
+  // Debug logging
+  console.log('🏠 Financial Statements - Rental Housing Data:', {
+    data: rentalHousingData,
+    error: rentalHousingError,
+    loading: rentalHousingLoading
+  });
   const currentCash = useAppSelector(getCurrentBalance);
   const { themeMode } = useTheme();
   const colors = useThemeColors();
@@ -184,6 +193,24 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                         <View key={k} style={styles.row}><Text style={styles.keyText}>{k}</Text><Text style={styles.valText}>{num >= 0 ? `+${num.toFixed(2)}` : num.toFixed(2)}</Text></View>
                       );
                     })}
+                    {rentalHousingLoading && (
+                      <View style={styles.row}>
+                        <Text style={styles.keyText}>Loading rental data...</Text>
+                        <Text style={styles.valText}>...</Text>
+                      </View>
+                    )}
+                    {rentalHousingError && (
+                      <View style={styles.row}>
+                        <Text style={styles.keyText}>Rental data error</Text>
+                        <Text style={styles.valText}>Error</Text>
+                      </View>
+                    )}
+                    {rentalHousingData && (
+                      <View style={styles.row}>
+                        <Text style={styles.keyText}>Investment Properties (Passive Income)</Text>
+                        <Text style={styles.valText}>+${rentalHousingData.totalIncomePerSecond.toFixed(2)}</Text>
+                      </View>
+                    )}
                   </View>
                 ) : (
                   <Text style={styles.placeholderSubtitle}>Loading...</Text>
@@ -203,14 +230,36 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                       <Text style={styles.keyText}>Cash Balance</Text>
                       <Text style={styles.valText}>{`$${Number(currentCash).toFixed(2)}`}</Text>
                     </View>
+                    {rentalHousingLoading && (
+                      <View style={styles.row}>
+                        <Text style={styles.keyText}>Loading property data...</Text>
+                        <Text style={styles.valText}>...</Text>
+                      </View>
+                    )}
+                    {rentalHousingError && (
+                      <View style={styles.row}>
+                        <Text style={styles.keyText}>Property data error</Text>
+                        <Text style={styles.valText}>Error</Text>
+                      </View>
+                    )}
+                    {rentalHousingData && rentalHousingData.propertyBreakdown
+                      .filter(p => p.isUnlocked)
+                      .map((property, index) => (
+                        <View key={property.propertyId} style={styles.row}>
+                          <Text style={styles.keyText}>Investment Property {property.propertyId}</Text>
+                          <Text style={styles.valText}>$100,000</Text>
+                        </View>
+                      ))}
                     <Text style={[styles.sectionTitle, { marginTop: SIZING.spacing.md }]}>Liabilities</Text>
                     <View style={styles.row}>
                       <Text style={styles.keyText}>None</Text>
                       <Text style={styles.valText}>$0.00</Text>
                     </View>
                     <View style={[styles.row, { marginTop: SIZING.spacing.sm }]}>
-                      <Text style={styles.keyText}>Net Worth (Cash)</Text>
-                      <Text style={styles.valText}>{`$${Number(currentCash).toFixed(2)}`}</Text>
+                      <Text style={styles.keyText}>Net Worth</Text>
+                      <Text style={styles.valText}>
+                        {`$${(Number(currentCash) + (rentalHousingData ? rentalHousingData.propertyBreakdown.filter(p => p.isUnlocked).length * 100000 : 0)).toFixed(2)}`}
+                      </Text>
                     </View>
                   </View>
                 ) : (
@@ -233,6 +282,30 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                         <View key={k} style={styles.row}><Text style={styles.keyText}>{k}</Text><Text style={styles.valText}>{num >= 0 ? `+${num.toFixed(2)}` : num.toFixed(2)}</Text></View>
                       );
                     })}
+                    {rentalHousingLoading && (
+                      <View style={styles.row}>
+                        <Text style={styles.keyText}>Loading rental data...</Text>
+                        <Text style={styles.valText}>...</Text>
+                      </View>
+                    )}
+                    {rentalHousingError && (
+                      <View style={styles.row}>
+                        <Text style={styles.keyText}>Rental data error</Text>
+                        <Text style={styles.valText}>Error</Text>
+                      </View>
+                    )}
+                    {rentalHousingData && (
+                      <View style={styles.row}>
+                        <Text style={styles.keyText}>Investment Properties (Passive Income)</Text>
+                        <Text style={styles.valText}>+${rentalHousingData.totalIncomePerSecond.toFixed(2)}</Text>
+                      </View>
+                    )}
+                    <View style={[styles.row, { marginTop: SIZING.spacing.md }]}>
+                      <Text style={styles.keyText}>Total Cash Flow Rate</Text>
+                      <Text style={[styles.valText, { color: colors.matrix }]}>
+                        ${(1 + (rentalHousingData?.totalIncomePerSecond || 0)).toFixed(2)}/sec
+                      </Text>
+                    </View>
                     <View style={[styles.row, { marginTop: SIZING.spacing.md }]}>
                       <Text style={styles.keyText}>Investing Activities</Text>
                       <Text style={styles.valText}>{(merged.cashFlows?.investing ?? 0) >= 0 ? `+${(merged.cashFlows?.investing ?? 0).toFixed(2)}` : (merged.cashFlows?.investing ?? 0).toFixed(2)}</Text>

@@ -19,6 +19,7 @@ export interface IUser extends Document {
     total: number;
     ratePerSecond: number;
     lastUpdated: Date;
+    rentalHousingIncomeLastSynced?: Date | null;
   };
   unlockedFeatures: {
     hackRig: boolean;
@@ -144,6 +145,10 @@ const userSchema = new Schema({
     lastUpdated: {
       type: Date,
       default: Date.now
+    },
+    rentalHousingIncomeLastSynced: {
+      type: Date,
+      default: null
     }
   },
   unlockedFeatures: {

@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { useGetRentalHousingIncomeQuery } from '../../store/api/rentalHousingApi';
+import { formatCurrency } from '../../utils/currencyUtils';
 
 interface FloorPlanProps {
   propertyId: number;
@@ -8,6 +10,11 @@ interface FloorPlanProps {
 
 export const FloorPlan: React.FC<FloorPlanProps> = ({ propertyId }) => {
   const colors = useThemeColors();
+  const { data: rentalIncome, isLoading } = useGetRentalHousingIncomeQuery();
+  
+  // Get room values for this property
+  const propertyData = rentalIncome?.propertyBreakdown.find(p => p.propertyId === propertyId);
+  const roomValues = propertyData?.roomValues;
 
   return (
     <View style={styles.floorPlan}>
@@ -19,7 +26,9 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({ propertyId }) => {
       <View style={[styles.room, styles.bathroom, { backgroundColor: colors.primary + '30' }]}>
         <View style={[styles.roomLabel, { backgroundColor: colors.primary }]}>
           <Text style={styles.roomText}>Bathroom</Text>
-          <Text style={styles.roomValue}>+$0.01</Text>
+          <Text style={styles.roomValue}>
+            {isLoading ? '+$0.01' : formatCurrency(roomValues?.bathroom || 0.01)}
+          </Text>
         </View>
       </View>
       
@@ -34,7 +43,9 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({ propertyId }) => {
       <View style={[styles.room, styles.kitchen, { backgroundColor: colors.primary + '30' }]}>
         <View style={[styles.roomLabel, { backgroundColor: colors.primary }]}>
           <Text style={styles.roomText}>Kitchen</Text>
-          <Text style={styles.roomValue}>+$0.01</Text>
+          <Text style={styles.roomValue}>
+            {isLoading ? '+$0.01' : formatCurrency(roomValues?.kitchen || 0.01)}
+          </Text>
         </View>
       </View>
       
@@ -43,7 +54,9 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({ propertyId }) => {
       <View style={[styles.room, styles.bedroom, { backgroundColor: colors.primary + '20' }]}>
         <View style={[styles.roomLabel, { backgroundColor: colors.primary }]}>
           <Text style={styles.roomText}>Bedroom</Text>
-          <Text style={styles.roomValue}>+$0.02</Text>
+          <Text style={styles.roomValue}>
+            {isLoading ? '+$0.02' : formatCurrency(roomValues?.bedroom || 0.02)}
+          </Text>
         </View>
       </View>
       
@@ -51,7 +64,9 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({ propertyId }) => {
       <View style={[styles.room, styles.livingRoom, { backgroundColor: colors.secondary + '20' }]}>
         <View style={[styles.roomLabel, { backgroundColor: colors.secondary }]}>
           <Text style={styles.roomText}>Living Room</Text>
-          <Text style={styles.roomValue}>+$0.02</Text>
+          <Text style={styles.roomValue}>
+            {isLoading ? '+$0.02' : formatCurrency(roomValues?.livingRoom || 0.02)}
+          </Text>
         </View>
       </View>
     </View>
