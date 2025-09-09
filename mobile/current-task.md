@@ -311,3 +311,36 @@ const isActuallyUnlocked = antivirusFeatureStatus?.isUnlocked ||
 ✅ **BattlePreparationScreen fixed** - Shield check uses timer-based unlock logic
 ✅ **Double-click issue fixed** - Added loading state and memoization
 ✅ **Enemy battalions fixed** - Default battalions created when defender has no bots
+
+---
+
+**NEW ISSUE FIXED: Wallet Balance Rate Calculation Bug**
+
+## Problem Identified:
+The `RentalHousingSyncService.performSync()` method was **adding** rental income to the existing `ratePerSecond` instead of calculating the total as `baseRate + passiveIncome`. This caused the rate to grow exponentially each time the sync ran.
+
+## Root Cause:
+```typescript
+// WRONG - This adds rental income to existing rate repeatedly
+const totalEffectiveRate = user.balance.ratePerSecond + rentalIncomePerSecond;
+```
+
+## Fix Applied:
+```typescript
+// CORRECT - This calculates total as baseRate + passiveIncome
+const baseRate = 1.0; // $1.00 base rate per second
+const rentalIncomePerSecond = syncResult.totalUnlockedProperties * this.BASE_INCOME_PER_PROPERTY;
+const totalEffectiveRate = baseRate + rentalIncomePerSecond;
+```
+
+## Expected Result:
+- **Before**: User with 4 rental properties had `ratePerSecond: 4.60` (incorrect)
+- **After**: User with 4 rental properties will have `ratePerSecond: 1.24` (correct)
+  - Base rate: $1.00
+  - Rental income: 4 properties × $0.06 = $0.24
+  - **Total: $1.00 + $0.24 = $1.24**
+
+## Verification:
+- Only one place in codebase modifies `ratePerSecond` (RentalHousingSyncService)
+- Base rate confirmed as $1.00 from User model default and client-side code
+- Fix ensures rate calculation is consistent and doesn't accumulate over time
