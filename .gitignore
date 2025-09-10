@@ -35,3 +35,5 @@ jest.setup.js
 .env.production.local
 .env.staging
 .env.production
+.env.dev
+.env.prod
