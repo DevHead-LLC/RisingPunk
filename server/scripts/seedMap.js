@@ -63,17 +63,31 @@ function generateMap() {
  * Add terrain features to the map
  */
 function addTerrainFeatures(cells, gridSize) {
+  // Create 2D lookup array for O(1) cell access
+  const cellGrid = Array(gridSize).fill(null).map(() => Array(gridSize).fill(null));
+  cells.forEach(cell => {
+    cellGrid[cell.y][cell.x] = cell;
+  });
+  
+  // Helper function to get cell at coordinates
+  const getCell = (x, y) => {
+    if (x >= 0 && x < gridSize && y >= 0 && y < gridSize) {
+      return cellGrid[y][x];
+    }
+    return null;
+  };
+  
   // Add forests
   for (let i = 0; i < 5; i++) {
     const centerX = Math.floor(Math.random() * gridSize);
     const centerY = Math.floor(Math.random() * gridSize);
     const radius = Math.floor(Math.random() * 8) + 3;
     
-    for (let x = Math.max(0, centerX - radius); x < Math.min(gridSize, centerX + radius); x++) {
-      for (let y = Math.max(0, centerY - radius); y < Math.min(gridSize, centerY + radius); y++) {
+    for (let x = Math.max(0, centerX - radius); x <= Math.min(gridSize - 1, centerX + radius); x++) {
+      for (let y = Math.max(0, centerY - radius); y <= Math.min(gridSize - 1, centerY + radius); y++) {
         const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
         if (distance <= radius && Math.random() < 0.7) {
-          const cell = cells.find(c => c.x === x && c.y === y);
+          const cell = getCell(x, y);
           if (cell) cell.terrain = 'forest';
         }
       }
@@ -92,7 +106,7 @@ function addTerrainFeatures(cells, gridSize) {
       const y = direction === 'vertical' ? startY + j : startY;
       
       if (x < gridSize && y < gridSize) {
-        const cell = cells.find(c => c.x === x && c.y === y);
+        const cell = getCell(x, y);
         if (cell) cell.terrain = 'water';
       }
     }
@@ -110,7 +124,7 @@ function addTerrainFeatures(cells, gridSize) {
       const y = direction === 'vertical' ? startY + j : startY;
       
       if (x < gridSize && y < gridSize) {
-        const cell = cells.find(c => c.x === x && c.y === y);
+        const cell = getCell(x, y);
         if (cell) cell.terrain = 'road';
       }
     }
@@ -122,11 +136,11 @@ function addTerrainFeatures(cells, gridSize) {
     const centerY = Math.floor(Math.random() * gridSize);
     const radius = Math.floor(Math.random() * 6) + 2;
     
-    for (let x = Math.max(0, centerX - radius); x < Math.min(gridSize, centerX + radius); x++) {
-      for (let y = Math.max(0, centerY - radius); y < Math.min(gridSize, centerY + radius); y++) {
+    for (let x = Math.max(0, centerX - radius); x <= Math.min(gridSize - 1, centerX + radius); x++) {
+      for (let y = Math.max(0, centerY - radius); y <= Math.min(gridSize - 1, centerY + radius); y++) {
         const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
         if (distance <= radius && Math.random() < 0.8) {
-          const cell = cells.find(c => c.x === x && c.y === y);
+          const cell = getCell(x, y);
           if (cell) cell.terrain = 'mountain';
         }
       }
