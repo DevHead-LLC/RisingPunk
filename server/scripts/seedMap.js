@@ -1,11 +1,14 @@
 const mongoose = require('mongoose');
 require('dotenv').config();
 
-// Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/RisingPunk', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+// Use existing mongoose connection (established by orchestrator)
+// If not connected, establish connection for standalone execution
+if (mongoose.connection.readyState === 0) {
+  mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/RisingPunk', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  });
+}
 
 const db = mongoose.connection;
 
