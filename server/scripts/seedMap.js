@@ -110,7 +110,10 @@ function addTerrainFeatures(cells, gridSize) {
       
       if (x < gridSize && y < gridSize) {
         const cell = getCell(x, y);
-        if (cell) cell.terrain = 'water';
+        if (cell) {
+          cell.terrain = 'water';
+          cell.canBeOccupied = false;
+        }
       }
     }
   }
@@ -128,7 +131,10 @@ function addTerrainFeatures(cells, gridSize) {
       
       if (x < gridSize && y < gridSize) {
         const cell = getCell(x, y);
-        if (cell) cell.terrain = 'road';
+        if (cell) {
+          cell.terrain = 'road';
+          cell.canBeOccupied = false;
+        }
       }
     }
   }
@@ -144,7 +150,10 @@ function addTerrainFeatures(cells, gridSize) {
         const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
         if (distance <= radius && Math.random() < 0.8) {
           const cell = getCell(x, y);
-          if (cell) cell.terrain = 'mountain';
+          if (cell) {
+            cell.terrain = 'mountain';
+            cell.canBeOccupied = false;
+          }
         }
       }
     }
