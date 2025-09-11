@@ -735,7 +735,7 @@ app.post('/api/battalions/assign', auth, async (req: Request, res: Response) => 
 
     // Now verify sufficient bots available
     if (bot.bots[botType] < quantity) {
-      res.status(400).json({ error: 'Insufficient bots available' });
+      res.status(400).json({ error: 'Insufficient Bots Available!' });
       return;
     }
 

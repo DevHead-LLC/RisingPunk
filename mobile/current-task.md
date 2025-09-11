@@ -48,15 +48,126 @@
 
 ### 2. AWS Elastic Beanstalk Environment Setup
 **Current State**: rp-staging-api (Node.js 22) → staging-api.risingpunk.com, rp-env (Docker) → to be replaced
-**Goal**: Duplicate rp-staging-api for staging, use original for production
+**Goal**: Create green environment for staging, promote current staging to production
 **Environment Strategy**: Staging → api.risingpunk.dev, Production → api.risingpunk.com
-**Current AWS EB Setup**: rp-env (Docker) → TO BE REPLACED, rp-staging-api (Node.js 22) → TO BE DUPLICATED for dev, then used for prod
+**Port Strategy**: Staging (8080), Production (8081) for security isolation
+**SSL Strategy**: Standard domain certificates with Cloudflare, port-specific ATS configuration
 
-- [ ] Duplicate rp-staging-api environment for api.risingpunk.dev (staging)
-- [ ] Keep original rp-staging-api environment for api.risingpunk.com (production)
-- [ ] Delete legacy rp-env (Docker) after verifying backups
-- [ ] Configure staging environment with .env.staging variables
-- [ ] Configure production environment with .env.production variables
+#### 2.1. Pre-Migration Inventory
+**Status**: ✅ **COMPLETED** - Current configuration documented and ready for migration
+**Goal**: Document current configuration and dependencies before migration
+
+**Summary**: Complete inventory of rp-staging-api environment including Beanstalk configuration, environment variables, load balancer settings, security groups, and external dependencies. Health check verified working, no RDS managed by EB, Cloudflare domains active.
+
+**Key Findings**:
+- ✅ **Environment Variables**: All 9 variables documented (CLIENT_URL, CORS_ORIGINS, etc.)
+- ✅ **Instance Configuration**: t3.micro/small, 1 min/max instances, NetworkOut scaling
+- ✅ **Load Balancer**: Application Load Balancer (public, IPv4) with nginx proxy
+- ✅ **Health Check**: `/health` endpoint confirmed working (`{"status":"ok","uptime":19025}`)
+- ✅ **RDS Check**: No RDS managed by EB (safe to proceed with migration)
+- ✅ **Cloudflare**: Both domains active with security insights enabled
+
+**Detailed Documentation**: [See complete inventory in `completed-tasks.md` - Pre-Migration Inventory - Step 2.1](#completed-tasks)
+
+#### 2.2. Create Green Staging Environment
+**Status**: ✅ **COMPLETED** - Green staging environment created and verified
+**Goal**: Create isolated staging environment for api.risingpunk.dev
+
+**Environment Cloning Process**:
+- [x] **Clone rp-staging-api**: Actions → Clone environment in EB console
+- [x] **Name**: `rp-api-staging` (green environment)
+- [x] **Platform**: Node.js 22 running on 64bit Amazon Linux 2023/6.6.4
+- [x] **VPC/Subnets**: Same VPC/subnets as current staging
+- [x] **Environment Variables**: All variables imported from rp-staging-api
+- [x] **Health Check**: Green = Healthy status confirmed
+- [x] **Test**: ✅ **VERIFIED** - `https://rp-api-staging.eba-zmq38tta.us-west-2.elasticbeanstalk.com/health` returns `{"status":"ok","uptime":8058}`
+
+**Environment Details**:
+- **Environment ID**: `e-zxgvmm2z4i`
+- **Domain**: `rp-api-staging.eba-zmq38tta.us-west-2.elasticbeanstalk.com`
+- **Platform State**: Supported
+- **Health Status**: Ok
+- **Environment Variables**: Identical to source environment
+
+#### 2.3. Rename and Configure Staging Environment
+**Status**: ⏳ **IN PROGRESS** - Configuring green environment as staging
+**Goal**: Configure staging environment for api.risingpunk.dev with proper settings
+
+**Staging Environment Configuration**:
+- [x] **Environment Name**: Keep as `rp-api-staging` ✅
+- [x] **Description**: "staging environment for the RisingPunk application" ✅
+- [x] **Load Balancer**: Ports 80 and 443 confirmed ✅
+- [x] **Health Check**: Working correctly ✅
+- [x] **Environment Variables**: Update in AWS EB console:
+  - [x] PORT=8080
+  - [x] NODE_ENV=staging
+  - [x] CLIENT_URL=https://api.risingpunk.dev
+  - [x] CORS_ORIGINS=https://api.risingpunk.dev,http://localhost:5001
+- [ ] **GitHub Actions Secrets**: Update repository secrets for new environment
+
+**GitHub Actions Configuration Update**:
+**Status**: ⚠️ **REQUIRED** - Current secrets point to old environment names
+**Current Secrets**: AWS_ACCESS_KEY_ID, AWS_REGION, AWS_SECRET_ACCESS_KEY, EB_APP_NAME, EB_ENV_NAME, EB_S3_BUCKET
+**Required Updates**:
+- [ ] **EB_ENV_NAME**: Update from `rp-staging-api` to `rp-api-staging`
+- [ ] **EB_APP_NAME**: Verify it's still `risingpunk-api` (should be correct)
+- [ ] **Other Secrets**: AWS credentials and S3 bucket should remain the same
+- [ ] **Test Deployment**: Verify GitHub Actions can deploy to new environment
+
+#### 2.4. SSL and DNS Configuration for Staging
+**Status**: ⏳ **PENDING** - Configure SSL and DNS for api.risingpunk.dev
+**Goal**: Set up SSL certificates and DNS routing for staging environment
+
+**SSL Certificate Setup**:
+- [ ] **ACM Certificate**: Request certificate for `api.risingpunk.dev` in us-west-2
+- [ ] **Validation**: Add ACM CNAME validation records in Cloudflare (DNS-only/gray cloud)
+- [ ] **Attach Certificate**: Attach to staging environment's load balancer :443 listener
+- [ ] **Cloudflare DNS**: Create CNAME `api.risingpunk.dev` → staging EB CNAME
+- [ ] **SSL Mode**: Set Cloudflare SSL mode to Full (strict)
+- [ ] **HTTPS Redirect**: Configure HTTP → HTTPS redirect
+- [ ] **CORS/Host Header**: Add `api.risingpunk.dev` to allowed hosts
+
+**Health Gate**: Visit `https://api.risingpunk.dev:8080/healthz` - verify TLS, CORS, secure cookies
+
+#### 2.5. Promote Current Staging to Production
+**Status**: ⏳ **PENDING** - Configure current staging as production
+**Goal**: Use current rp-staging-api as production environment for api.risingpunk.com
+
+**Production Environment Configuration**:
+- [ ] **Rename Environment**: Change rp-staging-api to `rp-production` (or keep current name)
+- [ ] **Description**: Update to "Production Environment"
+- [ ] **Environment Variables**: Configure for production behavior:
+  - [ ] PORT=8081
+  - [ ] NODE_ENV=production
+  - [ ] CLIENT_URL=https://api.risingpunk.com:8081
+  - [ ] CORS_ORIGINS=https://api.risingpunk.com:8081
+  - [ ] JWT_SECRET=(regenerate for production)
+  - [ ] ENCRYPTION_KEY=(regenerate for production)
+  - [ ] MONGODB_URI=(production-specific)
+- [ ] **Load Balancer**: Ensure listeners are :80 and :443
+
+**SSL Certificate Setup**:
+- [ ] **ACM Certificate**: Request certificate for `api.risingpunk.com` in us-west-2
+- [ ] **Validation**: Add ACM CNAME validation records in Cloudflare
+- [ ] **Attach Certificate**: Attach to production environment's load balancer :443 listener
+- [ ] **Cloudflare DNS**: Point `api.risingpunk.com` to production EB CNAME
+- [ ] **SSL Mode**: Set Cloudflare SSL mode to Full (strict)
+- [ ] **HTTPS Redirect**: Configure HTTP → HTTPS redirect
+
+**Health Gate**: Visit `https://api.risingpunk.com:8081/healthz` - verify TLS, production DB, secure cookies
+
+#### 2.6. Clean Up Legacy Environment
+**Status**: ⏳ **PENDING** - Remove legacy Docker environment
+**Goal**: Delete rp-env (Docker) after confirming no traffic
+
+**Legacy Environment Cleanup**:
+- [ ] **Traffic Check**: Verify no traffic to rp-env (Docker) environment
+- [ ] **Shared Resources**: Confirm no shared RDS/S3 marked for termination with environment
+- [ ] **Backup Verification**: Ensure all data is backed up before deletion
+- [ ] **Delete Environment**: Remove rp-env (Docker) environment
+- [ ] **Delete Application**: Remove associated application if no other environments
+- [ ] **DNS Cleanup**: Remove any Cloudflare DNS pointing to legacy environment
+- [ ] **Certificate Cleanup**: Revoke ACM certificates used only by legacy environment
 
 ### 3. Environment Configuration Files
 **Current State**: Using .env.local for local development, AWS EB environment variables for staging
