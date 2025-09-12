@@ -1,7 +1,7 @@
 name: Deploy API (production)
 
 on:
-  push:
+  pull_request:
     branches: [ prod ]
     paths:
       - 'server/**'
@@ -91,4 +91,4 @@ jobs:
       - name: Verify production deployment
         run: |
           echo "✅ Production deployment completed successfully!"
-          echo "🌐 Production API should be available at: https://api.risingpunk.com:8081"
+          echo "🌐 Production API should be available at: https://api.risingpunk.com"
