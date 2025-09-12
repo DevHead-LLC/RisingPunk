@@ -1,0 +1,94 @@
+name: Deploy API (production)
+
+on:
+  pull_request:
+    branches: [ prod ]
+    paths:
+      - 'server/**'
+      - '.github/workflows/deploy-production.yml'
+  workflow_dispatch:
+
+env:
+  EB_BUCKET: ${{ secrets.EB_S3_BUCKET }}
+  EB_APP:    ${{ secrets.EB_APP_NAME }}
+  EB_ENV:    ${{ secrets.EB_ENV_NAME_PRODUCTION }}
+  REGION:    ${{ secrets.AWS_REGION }}
+  EB_VERSION: ${{ github.sha }}
+  ARTIFACT: rp-api-prod-${{ github.sha }}.zip
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: 'server/package-lock.json'
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build (ts -> dist)
+        run: npm run build
+
+      - name: Create Procfile for production
+        run: |
+          echo 'web: node dist/server.js' > Procfile
+
+      - name: Zip artifact (dist + runtime files)
+        run: |
+          zip -qr "${ARTIFACT}" package.json package-lock.json Procfile dist \
+            -x "dist/mobile/*" "**/__tests__/**"
+
+      - name: Configure AWS creds
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.REGION }}
+
+      - name: Sanity check identity & bucket
+        run: |
+          aws sts get-caller-identity
+          aws s3 ls "s3://${EB_BUCKET}/" || true
+
+      - name: Upload artifact to S3 (EB service bucket)
+        run: aws s3 cp "${{ env.ARTIFACT }}" "s3://${{ env.EB_BUCKET }}/${{ env.ARTIFACT }}" --acl bucket-owner-full-control
+
+      - name: Ensure EB application version exists (idempotent)
+        run: |
+          set -e
+          EXISTS=$(aws elasticbeanstalk describe-application-versions \
+            --application-name "${EB_APP}" \
+            --version-labels "${EB_VERSION}" \
+            --query 'length(ApplicationVersions)' --output text)
+          if [ "$EXISTS" = "0" ]; then
+            echo "Creating EB application version for ${EB_VERSION} ..."
+            aws elasticbeanstalk create-application-version \
+              --application-name "${EB_APP}" \
+              --version-label "${EB_VERSION}" \
+              --source-bundle S3Bucket="${EB_BUCKET}",S3Key="${ARTIFACT}"
+          else
+            echo "EB application version already exists; continuing."
+          fi
+
+      - name: Deploy to production environment
+        run: |
+          aws elasticbeanstalk update-environment \
+            --environment-name "${EB_ENV}" \
+            --version-label "${EB_VERSION}"
+
+      - name: Wait for environment to finish updating
+        run: aws elasticbeanstalk wait environment-updated --environment-names "${EB_ENV}"
+
+      - name: Verify production deployment
+        run: |
+          echo "✅ Production deployment completed successfully!"
+          echo "🌐 Production API should be available at: https://api.risingpunk.com"
