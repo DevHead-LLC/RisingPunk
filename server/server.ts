@@ -51,7 +51,6 @@ if (!process.env.MONGODB_URI) {
 }
 
 mongoose.connect(process.env.MONGODB_URI, {
-  dbName: 'RisingPunk',
   appName: 'mongosh+2.2.12'  // matching the working mongosh connection
 })
 .then(async () => {

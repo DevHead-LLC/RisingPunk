@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
 
 env:
-  EB_BUCKET: ${{ secrets.EB_S3_BUCKET_PROD }}
-  EB_APP:    ${{ secrets.EB_APP_NAME_PROD }}
-  EB_ENV:    ${{ secrets.EB_ENV_NAME_PROD }}
+  EB_BUCKET: ${{ secrets.EB_S3_BUCKET }}
+  EB_APP:    ${{ secrets.EB_APP_NAME }}
+  EB_ENV:    ${{ secrets.EB_ENV_NAME_PRODUCTION }}
   REGION:    ${{ secrets.AWS_REGION }}
   EB_VERSION: ${{ github.sha }}
   ARTIFACT: rp-api-prod-${{ github.sha }}.zip

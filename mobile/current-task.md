@@ -90,7 +90,7 @@
 - **Environment Variables**: Identical to source environment
 
 #### 2.3. Rename and Configure Staging Environment
-**Status**: ⏳ **IN PROGRESS** - Configuring green environment as staging
+**Status**: ✅ **COMPLETED** - Green environment configured as staging
 **Goal**: Configure staging environment for api.risingpunk.dev with proper settings
 
 **Staging Environment Configuration**:
@@ -103,48 +103,57 @@
   - [x] NODE_ENV=staging
   - [x] CLIENT_URL=https://api.risingpunk.dev
   - [x] CORS_ORIGINS=https://api.risingpunk.dev,http://localhost:5001
-- [ ] **GitHub Actions Secrets**: Update repository secrets for new environment
+- [x] **GitHub Actions Secrets**: Update repository secrets for new environment ✅
 
 **GitHub Actions Configuration Update**:
-**Status**: ⚠️ **REQUIRED** - Current secrets point to old environment names
+**Status**: ✅ **COMPLETED** - IAM permissions updated and deployment successful
 **Current Secrets**: AWS_ACCESS_KEY_ID, AWS_REGION, AWS_SECRET_ACCESS_KEY, EB_APP_NAME, EB_ENV_NAME, EB_S3_BUCKET
-**Required Updates**:
-- [ ] **EB_ENV_NAME**: Update from `rp-staging-api` to `rp-api-staging`
-- [ ] **EB_APP_NAME**: Verify it's still `risingpunk-api` (should be correct)
-- [ ] **Other Secrets**: AWS credentials and S3 bucket should remain the same
-- [ ] **Test Deployment**: Verify GitHub Actions can deploy to new environment
+**Completed Updates**:
+- [x] **EB_ENV_NAME**: Updated from `rp-staging-api` to `rp-api-staging` ✅
+- [x] **EB_APP_NAME**: Verified as `risingpunk-api` ✅
+- [x] **IAM Permissions**: Updated CloudFormation permissions for new environment ✅
+- [x] **Test Deployment**: ✅ **SUCCESSFUL** - GitHub Actions deployed to new environment
+- [x] **Health Endpoint**: ✅ **VERIFIED** - `https://rp-api-staging.eba-zmq38tta.us-west-2.elasticbeanstalk.com/health` returns `{"status":"ok","uptime":48}`
 
-#### 2.4. SSL and DNS Configuration for Staging
-**Status**: ⏳ **PENDING** - Configure SSL and DNS for api.risingpunk.dev
+#### 2.4. SSL and DNS Configuration for Staging ✅
+**Status**: ✅ **COMPLETED** - SSL and DNS configured for api.risingpunk.dev
 **Goal**: Set up SSL certificates and DNS routing for staging environment
 
 **SSL Certificate Setup**:
-- [ ] **ACM Certificate**: Request certificate for `api.risingpunk.dev` in us-west-2
-- [ ] **Validation**: Add ACM CNAME validation records in Cloudflare (DNS-only/gray cloud)
-- [ ] **Attach Certificate**: Attach to staging environment's load balancer :443 listener
-- [ ] **Cloudflare DNS**: Create CNAME `api.risingpunk.dev` → staging EB CNAME
-- [ ] **SSL Mode**: Set Cloudflare SSL mode to Full (strict)
-- [ ] **HTTPS Redirect**: Configure HTTP → HTTPS redirect
-- [ ] **CORS/Host Header**: Add `api.risingpunk.dev` to allowed hosts
+- [x] **ACM Certificate**: Request certificate for `api.risingpunk.dev` in us-west-2 ✅
+- [x] **Validation**: Add ACM CNAME validation records in Cloudflare (DNS-only/gray cloud) ✅
+- [x] **Attach Certificate**: Attach to staging environment's load balancer :443 listener ✅
+- [x] **Cloudflare DNS**: Create CNAME `api.risingpunk.dev` → staging EB CNAME ✅
+- [x] **SSL Mode**: Set Cloudflare SSL mode to Full (strict) ✅
+- [x] **HTTPS Redirect**: Configure HTTP → HTTPS redirect ✅
+- [x] **CORS/Host Header**: Add `api.risingpunk.dev` to allowed hosts ✅
 
 **Health Gate**: Visit `https://api.risingpunk.dev:8080/healthz` - verify TLS, CORS, secure cookies
 
 #### 2.5. Promote Current Staging to Production
-**Status**: ⏳ **PENDING** - Configure current staging as production
-**Goal**: Use current rp-staging-api as production environment for api.risingpunk.com
+**Status**: 🔄 **IN PROGRESS** - Configure production environment for api.risingpunk.com
+**Goal**: Set up production environment for api.risingpunk.com
 
 **Production Environment Configuration**:
-- [ ] **Rename Environment**: Change rp-staging-api to `rp-production` (or keep current name)
-- [ ] **Description**: Update to "Production Environment"
-- [ ] **Environment Variables**: Configure for production behavior:
-  - [ ] PORT=8081
-  - [ ] NODE_ENV=production
-  - [ ] CLIENT_URL=https://api.risingpunk.com:8081
-  - [ ] CORS_ORIGINS=https://api.risingpunk.com:8081
-  - [ ] JWT_SECRET=(regenerate for production)
-  - [ ] ENCRYPTION_KEY=(regenerate for production)
-  - [ ] MONGODB_URI=(production-specific)
-- [ ] **Load Balancer**: Ensure listeners are :80 and :443
+- [x] **Clone Environment**: Created `rp-api-prod` from `rp-staging-api` ✅
+- [x] **Environment Variables**: Updated in AWS EB console:
+  - [x] NODE_ENV=production ✅
+  - [x] CLIENT_URL=https://api.risingpunk.com ✅
+  - [x] CORS_ORIGINS=https://api.risingpunk.com ✅
+  - [x] JWT_SECRET=(production-specific from .env.prod) ✅
+  - [x] MONGODB_URI=(production database) ✅
+  - [x] ENCRYPTION_KEY=(regenerated for production) ✅
+  - [x] EMAIL_PASSWORD=(new production Gmail password) ✅
+- [x] **Load Balancer**: Ensure listeners are :80 and :443 ✅
+
+**GitHub Actions Configuration for Production**:
+- [x] **Environment Created**: `rp-api-prod` environment ready ✅
+- [x] **Add Production GitHub Secret**: Created `EB_ENV_NAME_PRODUCTION` secret ✅
+- [x] **Set Secret Value**: Update `EB_ENV_NAME_PRODUCTION` to `rp-api-prod` ✅
+- [x] **Verify IAM Permissions**: Ensure `rp-github-deployer` has CloudFormation permissions for production environment ✅
+- [x] **Create deploy-production.yml**: Workflow for prod branch → production environment ✅
+- [ ] **Test Production Deployment**: Verify GitHub Actions can deploy to production environment
+- [ ] **Health Check**: Test production health endpoint after deployment
 
 **SSL Certificate Setup**:
 - [ ] **ACM Certificate**: Request certificate for `api.risingpunk.com` in us-west-2
@@ -168,6 +177,11 @@
 - [ ] **Delete Application**: Remove associated application if no other environments
 - [ ] **DNS Cleanup**: Remove any Cloudflare DNS pointing to legacy environment
 - [ ] **Certificate Cleanup**: Revoke ACM certificates used only by legacy environment
+
+**Production Environment Final Configuration**:
+- [ ] **EMAIL_PASSWORD**: Create new Gmail app password for production environment
+- [ ] **Update Production Environment**: Set EMAIL_PASSWORD in rp-api-prod environment variables
+- [ ] **Test Email Functionality**: Verify production email sending works correctly
 
 ### 3. Environment Configuration Files
 **Current State**: Using .env.local for local development, AWS EB environment variables for staging
@@ -359,29 +373,32 @@
 ### 7.1. GitHub Secrets Management
 **Current State**: Single set of secrets (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, EB_APP_NAME, EB_ENV_NAME, EB_S3_BUCKET)
 **Goal**: Environment-specific secrets for staging vs production EB environments
-**Strategy**: Keep current secrets for production, add staging-specific secrets
+**Strategy**: Use same IAM user with updated permissions, separate environment-specific secrets
 **Current GitHub Secrets**: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, EB_APP_NAME, EB_ENV_NAME, EB_S3_BUCKET
 
-**Production Secrets (Keep Current)**:
-- [ ] Keep existing `AWS_ACCESS_KEY_ID` (for production EB)
-- [ ] Keep existing `AWS_SECRET_ACCESS_KEY` (for production EB)
-- [ ] Keep existing `AWS_REGION` (shared)
-- [ ] Keep existing `EB_APP_NAME` (for production EB)
-- [ ] Keep existing `EB_ENV_NAME` (for production EB)
-- [ ] Keep existing `EB_S3_BUCKET` (for production EB)
+**IAM User Configuration**:
+- [x] **rp-github-deployer**: Updated with CloudFormation permissions for both environments ✅
+- [x] **AWS Credentials**: Same credentials work for both environments ✅
+- [x] **S3 Bucket**: Same bucket works for both environments ✅
 
-**Staging Secrets (Add New)**:
-- [ ] Add `AWS_ACCESS_KEY_ID_STAGING` (for staging EB)
-- [ ] Add `AWS_SECRET_ACCESS_KEY_STAGING` (for staging EB)
-- [ ] Add `EB_APP_NAME_STAGING` (for staging EB)
-- [ ] Add `EB_ENV_NAME_STAGING` (for staging EB)
-- [ ] Add `EB_S3_BUCKET_STAGING` (for staging EB)
-- [ ] Keep `AWS_REGION` shared (same region for both environments)
+**Environment-Specific Secrets Strategy**:
+- [x] **Staging Environment**: `EB_ENV_NAME_STAGING=rp-api-staging` ✅
+- [ ] **Production Environment**: `EB_ENV_NAME_PRODUCTION=rp-api-prod`
+- [ ] **Shared Secrets**: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, EB_APP_NAME, EB_S3_BUCKET (same for both)
 
-**Workflow Updates**:
-- [ ] Update deploy-staging.yml to use staging-specific secrets
-- [ ] Update deploy-production.yml to use production-specific secrets
-- [ ] Ensure both workflows use correct secret names for their respective environments
+**Workflow Configuration**:
+- [ ] **deploy-staging.yml**: Uses `EB_ENV_NAME_STAGING` secret, triggers on staging branch
+- [ ] **deploy-production.yml**: Uses `EB_ENV_NAME_PRODUCTION` secret, triggers on prod branch
+- [ ] **Branch Strategy**: 
+  - dev branch → local development only
+  - staging branch → rp-api-staging environment → api.risingpunk.dev
+  - prod branch → rp-api-prod environment → api.risingpunk.com
+
+**Required Updates**:
+- [ ] **Add EB_ENV_NAME_PRODUCTION**: Create production environment secret
+- [ ] **Create deploy-staging.yml**: Trigger on staging branch → rp-api-staging environment
+- [ ] **Create deploy-production.yml**: Trigger on prod branch → rp-api-prod environment  
+- [ ] **Test Both Workflows**: Verify deployments work for both environments
 
 ### 8. AWS Elastic Beanstalk Environment Management
 **Current State**: rp-staging-api (Node.js 22) → staging-api.risingpunk.com, rp-env (Docker) → to be replaced
