@@ -55,17 +55,34 @@ mongoose.connect(process.env.MONGODB_URI, {
 })
 .then(async () => {
   console.log('✅ MongoDB connected successfully');
+  
+  // Wait for connection to be fully ready before proceeding
+  await new Promise<void>((resolve, reject) => {
+    if (mongoose.connection.readyState === 1) {
+      // Connection is already ready
+      resolve();
+    } else if (mongoose.connection.readyState === 2) {
+      // Connection is in progress, wait for it to complete
+      mongoose.connection.once('open', () => {
+        resolve();
+      });
+      mongoose.connection.once('error', (err) => {
+        reject(err);
+      });
+    } else {
+      // Connection is in an unexpected state (0: disconnected, 3: disconnecting)
+      reject(new Error(`Unexpected connection state: ${mongoose.connection.readyState}`));
+    }
+  });
+  
   console.log('📦 Database:', mongoose.connection.db?.databaseName || 'Unknown');
   console.log('🔗 Connected to:', mongoose.connection.host);
   
-  // Wait for the connection to be fully ready
-  await new Promise(resolve => {
-    if (mongoose.connection.readyState === 1) {
-      resolve(undefined);
-    } else {
-      mongoose.connection.once('open', resolve);
-    }
-  });
+  // Verify database object is available after full connection
+  if (!mongoose.connection.db) {
+    console.error('❌ Database object not available after connection');
+    process.exit(1);
+  }
   
   // Initialize Google Auth Service
   try {
