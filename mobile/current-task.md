@@ -4,6 +4,13 @@
 - **Completed Tasks**: See [`completed-tasks.md`](./completed-tasks.md) for all completed work
 - **Current Focus**: Remaining seeding implementations and production setup
 
+## 🚨 CRITICAL FIX APPLIED - September 13, 2025
+**Issue**: AWS EB deployment failing with "Connection refused" errors - nginx couldn't connect to Node.js app
+**Root Cause**: GitHub Actions workflows were overwriting Procfile with wrong path (`dist/server.js` instead of `dist/server/server.js`)
+**Fix Applied**: Updated both staging and production workflows to use correct Procfile path
+**Status**: Procfile fixed, but deployment still failing with "Cannot find module" error
+**Next Step**: Need to investigate file structure in deployed package - files may not be in expected location
+
 ## Required Steps
 
 ### 0. Pre-Migration Validation (COMPLETED)
