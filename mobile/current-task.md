@@ -4,6 +4,12 @@
 - **Completed Tasks**: See [`completed-tasks.md`](./completed-tasks.md) for all completed work
 - **Current Focus**: Remaining seeding implementations and production setup
 
+## 🚨 CRITICAL FIX APPLIED - September 13, 2025
+**Issue**: AWS EB deployment failing with "Connection refused" errors - nginx couldn't connect to Node.js app
+**Root Cause**: GitHub Actions workflows were overwriting Procfile with wrong path (`dist/server.js` instead of `dist/server/server.js`)
+**Fix Applied**: Updated both staging and production workflows to use correct Procfile path
+**Status**: Ready for redeployment - both workflows now use `web: node dist/server/server.js`
+
 ## Required Steps
 
 ### 0. Pre-Migration Validation (COMPLETED)
