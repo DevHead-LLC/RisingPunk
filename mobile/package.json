@@ -7,7 +7,7 @@
     "android:dev": "API_ENV=dev react-native run-android",
     "android:staging": "API_ENV=staging react-native run-android",
     "android:prod": "API_ENV=prod react-native run-android",
-    "ios": "react-native run-ios",
+    "ios": "cd ios && pod install && cd .. && react-native run-ios --simulator='iPhone 16 Pro Max'",
     "ios:dev": "API_ENV=dev react-native run-ios",
     "ios:staging": "API_ENV=staging react-native run-ios",
     "ios:prod": "API_ENV=prod react-native run-ios",
