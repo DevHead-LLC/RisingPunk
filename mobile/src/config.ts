@@ -9,9 +9,9 @@ const getApiUrl = () => {
       case 'dev':
         return 'http://localhost:5001';
       case 'staging':
-        return 'https://api.risingpunk.dev:8080';
+        return 'https://api.risingpunk.dev';
       case 'prod':
-        return 'https://api.risingpunk.com:8081';
+        return 'https://api.risingpunk.com';
       default:
         return 'http://localhost:5001';
     }
@@ -20,7 +20,7 @@ const getApiUrl = () => {
   // Fallback to __DEV__ for backward compatibility
   return __DEV__
     ? 'http://localhost:5001'  // or 'http://10.0.2.2:5001' for Android emulator
-    : 'https://staging-api.risingpunk.com';
+    : 'https://api.risingpunk.dev';
 };
 
 export const API_URL = getApiUrl();
