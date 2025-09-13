@@ -6,10 +6,9 @@
 
 ## 🚨 CRITICAL FIX APPLIED - September 13, 2025
 **Issue**: AWS EB deployment failing with "Connection refused" errors - nginx couldn't connect to Node.js app
-**Root Cause**: GitHub Actions workflows were overwriting Procfile with wrong path (`dist/server.js` instead of `dist/server/server.js`)
-**Fix Applied**: Updated both staging and production workflows to use correct Procfile path
-**Status**: Procfile fixed, but deployment still failing with "Cannot find module" error
-**Next Step**: Need to investigate file structure in deployed package - files may not be in expected location
+**Root Cause**: Procfile was pointing to wrong path - TypeScript compiles `server.ts` to `dist/server.js`, not `dist/server/server.js`
+**Fix Applied**: Updated both staging and production workflows to use correct Procfile path `web: node dist/server.js`
+**Status**: Ready for redeployment - Procfile now matches actual compiled file location
 
 ## Required Steps
 
