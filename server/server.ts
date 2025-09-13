@@ -50,7 +50,21 @@ if (!process.env.MONGODB_URI) {
   process.exit(1);
 }
 
+// Determine database name based on environment
+const getDatabaseName = () => {
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  switch (nodeEnv) {
+    case 'production':
+      return 'RisingPunkProd';
+    case 'staging':
+    case 'development':
+    default:
+      return 'RisingPunk';
+  }
+};
+
 mongoose.connect(process.env.MONGODB_URI, {
+  dbName: getDatabaseName(),
   appName: 'mongosh+2.2.12'  // matching the working mongosh connection
 })
 .then(async () => {
