@@ -58,14 +58,11 @@ mongoose.connect(process.env.MONGODB_URI, {
   console.log('📦 Database:', mongoose.connection.db?.databaseName || 'Unknown');
   console.log('🔗 Connected to:', mongoose.connection.host);
   
-  // Wait for the connection to be fully ready
-  await new Promise(resolve => {
-    if (mongoose.connection.readyState === 1) {
-      resolve(undefined);
-    } else {
-      mongoose.connection.once('open', resolve);
-    }
-  });
+  // Ensure the database object is available before proceeding
+  if (!mongoose.connection.db) {
+    console.error('❌ Database object not available after connection');
+    process.exit(1);
+  }
   
   // Initialize Google Auth Service
   try {

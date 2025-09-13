@@ -115,58 +115,14 @@
 **Detailed Implementation**: [See complete details in `completed-tasks.md` - Mobile Configuration Updates - Step 5](#completed-tasks)
 
 ### 6. iOS App Transport Security
-**Current State**: Basic ATS with NSAllowsLocalNetworking for localhost, need domain-specific config
-**Goal**: Configure ATS for staging and production domains
-**Environment Strategy**: Staging (api.risingpunk.dev), Production (api.risingpunk.com)
-**Port Strategy**: Both staging and production use default port 8080 (separated by domain .dev vs .com)
-**GitHub Branch Strategy**: staging branch (TestFlight testing), prod branch (App Store submission)
-**API Environment Mapping**: dev (http://localhost:5001), staging (https://api.risingpunk.dev), prod (https://api.risingpunk.com)
-
-- [ ] Update mobile/ios/mobile/Info.plist with NSExceptionDomains for both domains
-- [ ] Configure NSExceptionDomains for api.risingpunk.dev (staging)
-- [ ] Configure NSExceptionDomains for api.risingpunk.com (production)
-- [ ] Set NSExceptionMinimumTLSVersion to TLSv1.2 for both domains
-- [ ] Set NSExceptionAllowsInsecureHTTPLoads to false (HTTPS only)
-- [ ] Test on actual device to confirm HTTPS requests succeed without ATS warnings
-- [ ] Build and test on device/emulator against both domains before App Store submission
-- [ ] Ensure all API endpoints use HTTPS with valid certificates
+**Status**: ✅ **COMPLETED** - ATS configuration implemented for staging and production domains
+**Summary**: Successfully configured NSExceptionDomains for api.risingpunk.dev and api.risingpunk.com with TLS 1.2+ and HTTPS-only enforcement. Localhost development access maintained.
+**Detailed Implementation**: [See complete details in `completed-tasks.md` - iOS App Transport Security - Step 6](#completed-tasks)
 
 ### 6.1. iOS Info.plist ATS Configuration Details
-**Current State**: Basic ATS with NSAllowsLocalNetworking for localhost development
-**Goal**: Add domain-specific NSExceptionDomains for staging and production
-**Bundle ID**: com.devheadllc.risingpunk (from Xcode project)
-**Required Domains**: api.risingpunk.dev (staging), api.risingpunk.com (production)
-**Port Strategy**: Both domains use default port 8080 (separated by domain .dev vs .com)
-
-**Info.plist Updates Required**:
-- [ ] Add NSExceptionDomains dictionary under NSAppTransportSecurity
-- [ ] Configure api.risingpunk.dev exception (staging)
-- [ ] Configure api.risingpunk.com exception (production)
-- [ ] Set NSExceptionMinimumTLSVersion to TLSv1.2 for both domains
-- [ ] Set NSExceptionAllowsInsecureHTTPLoads to false (HTTPS only)
-- [ ] Keep NSAllowsLocalNetworking for localhost development
-- [ ] Test configuration on actual iOS device
-
-**Example NSExceptionDomains Structure**:
-```xml
-<key>NSExceptionDomains</key>
-<dict>
-    <key>api.risingpunk.dev</key>
-    <dict>
-        <key>NSExceptionMinimumTLSVersion</key>
-        <string>TLSv1.2</string>
-        <key>NSExceptionAllowsInsecureHTTPLoads</key>
-        <false/>
-    </dict>
-    <key>api.risingpunk.com</key>
-    <dict>
-        <key>NSExceptionMinimumTLSVersion</key>
-        <string>TLSv1.2</string>
-        <key>NSExceptionAllowsInsecureHTTPLoads</key>
-        <false/>
-    </dict>
-</dict>
-```
+**Status**: ✅ **COMPLETED** - Domain-specific NSExceptionDomains implemented for staging and production
+**Summary**: Successfully added NSExceptionDomains dictionary to Info.plist with proper security configuration for both staging and production domains.
+**Detailed Implementation**: [See complete details in `completed-tasks.md` - iOS Info.plist ATS Configuration Details - Step 6.1](#completed-tasks)
 
 ### 7. GitHub Actions Workflows
 **Current State**: ✅ **COMPLETED** - Workflows corrected for secure CI/CD practices
@@ -408,6 +364,13 @@
 **Goal**: Configure production-grade monitoring, backups, and search capabilities
 **Environment Strategy**: Production cluster gets full enterprise features, dev/staging keeps basic M0 features
 **Cluster Status**: RisingPunk-Production (M10/M30 tier) - **PAID FEATURES AVAILABLE**
+
+**iOS ATS Testing and Validation**:
+- [ ] **Test iOS ATS configuration on actual device** - Deploy to TestFlight and test on physical device
+- [ ] **Verify HTTPS requests succeed without ATS warnings** - Confirm staging and production API calls work
+- [ ] **Build and test on device/emulator against both domains** - Validate before App Store submission
+- [ ] **Test staging environment (api.risingpunk.dev)** - Verify TestFlight builds work with staging
+- [ ] **Test production environment (api.risingpunk.com)** - Verify App Store builds work with production
 
 **MongoDB Atlas Alerts Setup**:
 - [ ] Configure cluster health monitoring alerts
