@@ -1,7 +1,7 @@
 name: Deploy API (production)
 
 on:
-  pull_request:
+  push:
     branches: [ prod ]
     paths:
       - 'server/**'
@@ -40,7 +40,7 @@ jobs:
 
       - name: Create Procfile for production
         run: |
-          echo 'web: node dist/server.js' > Procfile
+          echo 'web: node dist/server/server.js' > Procfile
 
       - name: Zip artifact (dist + runtime files)
         run: |
