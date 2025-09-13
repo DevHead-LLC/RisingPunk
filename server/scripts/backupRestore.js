@@ -217,7 +217,7 @@ function main() {
   console.log('==================\n');
   console.log('🔸 Backup: mongodump --uri="<your-uri>" --out=./backups/$(date +%Y%m%d_%H%M%S)');
   console.log('🔸 Restore: mongorestore --uri="<your-uri>" --drop backup-directory/');
-  console.log('🔸 Reseed: node scripts/seedDatabase.js');
+  console.log('🔸 Reseed: node scripts/seedDatabaseComplete.js');
   console.log('🔸 Auto-backup: ./scripts/autoBackup.sh\n');
   
   console.log('⚠️  Important Notes:');
