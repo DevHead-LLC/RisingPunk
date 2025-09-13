@@ -97,6 +97,7 @@ mongoose.connect(process.env.MONGODB_URI, {
     console.error('❌ Database object not available after connection');
     process.exit(1);
   }
+
   
   // Initialize Google Auth Service
   try {
