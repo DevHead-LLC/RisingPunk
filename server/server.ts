@@ -58,6 +58,15 @@ mongoose.connect(process.env.MONGODB_URI, {
   console.log('📦 Database:', mongoose.connection.db?.databaseName || 'Unknown');
   console.log('🔗 Connected to:', mongoose.connection.host);
   
+  // Wait for the connection to be fully ready
+  await new Promise(resolve => {
+    if (mongoose.connection.readyState === 1) {
+      resolve(undefined);
+    } else {
+      mongoose.connection.once('open', resolve);
+    }
+  });
+  
   // Initialize Google Auth Service
   try {
     const { GoogleAuthService } = require('./src/services/GoogleAuthService');
