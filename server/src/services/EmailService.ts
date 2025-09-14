@@ -384,7 +384,6 @@ export class EmailService {
     resetToken: string
   ): Promise<boolean> {
     console.log('🔍 [DEBUG] sendPasswordResetEmail called with:', { email, userHandle, resetToken: resetToken.substring(0, 10) + '...' });
-    
     const baseUrl = this.getBaseUrl();
     const resetUrl = `${baseUrl}/api/auth/reset-password?token=${resetToken}`;
     console.log('🔍 [DEBUG] Generated reset URL:', resetUrl);
