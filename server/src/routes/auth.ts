@@ -901,53 +901,73 @@ router.post('/resend-verification', async (req: Request, res: Response): Promise
 // Password reset endpoints
 router.post('/forgot-password', async (req: Request, res: Response): Promise<void> => {
   try {
+    console.log('🔍 [DEBUG] Forgot password request received');
     const { email } = req.body;
+    console.log('🔍 [DEBUG] Email provided:', email);
     
     if (!email) {
+      console.log('❌ [DEBUG] No email provided');
       res.status(400).json({ error: 'Email is required' });
       return;
     }
 
     // Find user by email
+    console.log('🔍 [DEBUG] Looking up user by email hash');
     const user = await User.findOne({ emailHash: EncryptionService.hashEmail(email) });
     if (!user) {
+      console.log('❌ [DEBUG] User not found for email');
       // Don't reveal if user exists or not for security
       res.status(200).json({ message: 'If the email exists, a password reset link has been sent' });
       return;
     }
+    console.log('✅ [DEBUG] User found:', user.handle);
 
     // Check if email is verified
+    console.log('🔍 [DEBUG] Checking if email is verified:', user.emailVerified);
     if (!user.emailVerified) {
+      console.log('❌ [DEBUG] Email not verified');
       res.status(400).json({ error: 'Email must be verified before resetting password' });
       return;
     }
+    console.log('✅ [DEBUG] Email is verified');
 
     // Check if this is a Google account (has googleId but no hashedAccessKey)
+    console.log('🔍 [DEBUG] Checking if Google account:', { googleId: !!user.googleId, hashedAccessKey: !!user.hashedAccessKey });
     if (user.googleId && !user.hashedAccessKey) {
+      console.log('❌ [DEBUG] Google account - cannot reset password');
       res.status(400).json({ error: 'This account uses Google Sign-In. Please use the "Sign in with Google" button instead.' });
       return;
     }
+    console.log('✅ [DEBUG] Not a Google account - proceeding with password reset');
 
     // Generate password reset token
+    console.log('🔍 [DEBUG] Generating password reset token');
     const resetToken = EmailService.generatePasswordResetToken();
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    console.log('✅ [DEBUG] Reset token generated, expires at:', expiresAt);
 
     // Update user with reset token
+    console.log('🔍 [DEBUG] Saving reset token to user');
     user.emailVerificationToken = resetToken; // Reuse the same field for password reset
     user.emailVerificationExpires = expiresAt;
     user.emailVerificationSentAt = new Date();
     await user.save();
+    console.log('✅ [DEBUG] Reset token saved to database');
 
     // Send password reset email
+    console.log('📧 [DEBUG] Attempting to send password reset email to:', user.getDecryptedEmail());
     const emailSent = await EmailService.sendPasswordResetEmail(
       user.getDecryptedEmail(),
       user.handle,
       resetToken
     );
+    console.log('📧 [DEBUG] Email send result:', emailSent);
 
     if (emailSent) {
+      console.log('✅ [DEBUG] Password reset email sent successfully');
       res.status(200).json({ message: 'If the email exists, a password reset link has been sent' });
     } else {
+      console.log('❌ [DEBUG] Failed to send password reset email');
       res.status(500).json({ error: 'Failed to send password reset email' });
     }
   } catch (error) {
