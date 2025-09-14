@@ -22,14 +22,11 @@ export class EmailService {
     
     switch (nodeEnv) {
       case 'staging':
-        console.log('✅ [DEBUG] Using staging URL: https://api.risingpunk.dev');
         return 'https://api.risingpunk.dev';
       case 'production':
-        console.log('✅ [DEBUG] Using production URL: https://api.risingpunk.com');
         return 'https://api.risingpunk.com';
       case 'development':
       default:
-        console.log('✅ [DEBUG] Using development URL: http://localhost:5001');
         return 'http://localhost:5001';
     }
   };
@@ -41,7 +38,6 @@ export class EmailService {
       const emailPassword = process.env.EMAIL_PASSWORD;
 
       if (!emailUser || !emailPassword) {
-        console.log('❌ [DEBUG] Missing email credentials');
         throw new Error('EMAIL_USER and EMAIL_PASSWORD environment variables are required');
       }
 
@@ -53,12 +49,10 @@ export class EmailService {
           pass: emailPassword
         }
       });
-      console.log('✅ [DEBUG] Nodemailer transporter created successfully');
 
       // Verify connection configuration
       try {
         await this.transporter.verify();
-        console.log('✅ Email service configured successfully');
       } catch (error) {
         console.error('❌ Email service configuration failed:', error);
         throw new Error('Failed to configure email service');
@@ -334,11 +328,8 @@ export class EmailService {
     to: string,
     template: EmailTemplate
   ): Promise<boolean> {
-    console.log('🔍 [DEBUG] sendEmail called with to:', to);
     try {
-      console.log('🔍 [DEBUG] Getting transporter...');
       const transporter = await this.getTransporter();
-      console.log('✅ [DEBUG] Transporter obtained');
       
       const mailOptions = {
         from: `"RisingPunk" <support@risingpunk.com>`,
@@ -347,7 +338,6 @@ export class EmailService {
         text: template.text,
         html: template.html
       };
-      console.log('🔍 [DEBUG] Mail options prepared, sending email...');
 
       const result = await transporter.sendMail(mailOptions);
       return true;
@@ -373,10 +363,8 @@ export class EmailService {
     userHandle: string,
     resetToken: string
   ): Promise<boolean> {
-    console.log('🔍 [DEBUG] sendPasswordResetEmail called with:', { email, userHandle, resetToken: resetToken.substring(0, 10) + '...' });
     const baseUrl = this.getBaseUrl();
     const resetUrl = `${baseUrl}/api/auth/reset-password?token=${resetToken}`;
-    console.log('🔍 [DEBUG] Generated reset URL:', resetUrl);
     
     const template = this.createPasswordResetTemplate(resetUrl, userHandle);
     const result = await this.sendEmail(email, template);
