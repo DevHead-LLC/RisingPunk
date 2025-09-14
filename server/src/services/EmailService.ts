@@ -11,6 +11,7 @@ export class EmailService {
   private static transporter: nodemailer.Transporter | null = null
 
   private static getBaseUrl(): string {
+
     console.log('🔍 [DEBUG] EmailService.getBaseUrl() called');
     console.log('🔍 [DEBUG] CLIENT_URL:', process.env.CLIENT_URL);
     console.log('🔍 [DEBUG] NODE_ENV:', process.env.NODE_ENV);
