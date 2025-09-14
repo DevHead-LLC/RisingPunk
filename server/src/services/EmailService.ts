@@ -8,7 +8,29 @@ export interface EmailTemplate {
 }
 
 export class EmailService {
-  private static transporter: nodemailer.Transporter | null = null;
+  private static transporter: nodemailer.Transporter | null = null
+
+  private static getBaseUrl(): string {
+    // Check for CLIENT_URL environment variable first
+    if (process.env.CLIENT_URL) {
+      console.log('📧 Using CLIENT_URL from environment:', process.env.CLIENT_URL);
+      return process.env.CLIENT_URL;
+    }
+    
+    // Fallback based on NODE_ENV
+    const nodeEnv = process.env.NODE_ENV;
+    console.log('📧 CLIENT_URL not set, using NODE_ENV fallback:', nodeEnv);
+    
+    switch (nodeEnv) {
+      case 'staging':
+        return 'https://api.risingpunk.dev';
+      case 'production':
+        return 'https://api.risingpunk.com';
+      case 'development':
+      default:
+        return 'http://localhost:5001';
+    }
+  };
 
   private static async getTransporter(): Promise<nodemailer.Transporter> {
     if (!this.transporter) {
@@ -331,7 +353,7 @@ export class EmailService {
     userHandle: string,
     verificationToken: string
   ): Promise<boolean> {
-    const baseUrl = process.env.CLIENT_URL || 'http://localhost:5001';
+    const baseUrl = this.getBaseUrl();
     const verificationUrl = `${baseUrl}/api/auth/verify-email/${verificationToken}`;
     
     const template = this.createEmailVerificationTemplate(verificationUrl, userHandle);
@@ -343,7 +365,7 @@ export class EmailService {
     userHandle: string,
     resetToken: string
   ): Promise<boolean> {
-    const baseUrl = process.env.CLIENT_URL || 'http://localhost:5001';
+    const baseUrl = this.getBaseUrl();
     const resetUrl = `${baseUrl}/api/auth/reset-password?token=${resetToken}`;
     
     const template = this.createPasswordResetTemplate(resetUrl, userHandle);
