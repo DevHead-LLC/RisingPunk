@@ -21,7 +21,7 @@ import {ErrorBoundary} from '../components/common/ErrorBoundary';
 import {useAppDispatch, useAppSelector} from '../store/hooks';
 import {fetchInitialData, setOnboardingCompleted, setShowOnboarding, setShowEmailVerification, setEmailVerificationPrompted} from '../store/slices/authSlice';
 import {mapApi} from '../store/api/mapApi';
-import {useGetRentalHousingStatusQuery, useCompleteRentalHousingMutation, useCompleteOnboardingMutation} from '../store/api/authApi';
+import {useGetRentalHousingStatusQuery, useCompleteRentalHousingMutation, useCompleteOnboardingMutation, authApi} from '../store/api/authApi';
 import {OnboardingSlides} from '../components/onboarding';
 import {TurfIntro} from '../components/turf-intro';
 
@@ -516,6 +516,9 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
             // Invalidate map cache to ensure fresh data after battle end
             // This prevents the "ghost NPC" issue where defeated NPCs still appear on the map
             dispatch(mapApi.util.invalidateTags(['Map']));
+            
+            // Invalidate user profile cache to ensure fresh experience/level data
+            dispatch(authApi.util.invalidateTags(['User']));
             
             // Return to origin without resetting app
             if (returnContext?.origin === 'map') {
