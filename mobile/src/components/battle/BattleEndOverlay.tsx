@@ -5,6 +5,8 @@ import { BattleEndData } from '../../store/api/battleApi';
 import { BattleLossBreakdown } from './BattleLossBreakdown';
 import { LevelUpAnimation } from '../common/LevelUpAnimation';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { useAppDispatch } from '../../store/hooks';
+import { authApi } from '../../store/api/authApi';
 
 interface BattleEndOverlayProps {
   winner: NodeOwner;
@@ -14,6 +16,7 @@ interface BattleEndOverlayProps {
 
 export const BattleEndOverlay: React.FC<BattleEndOverlayProps> = ({ winner, onContinue, battleEndData }) => {
   const colors = useThemeColors();
+  const dispatch = useAppDispatch();
   const [showLevelUpAnimation, setShowLevelUpAnimation] = useState(false);
 
   useEffect(() => {
@@ -21,6 +24,14 @@ export const BattleEndOverlay: React.FC<BattleEndOverlayProps> = ({ winner, onCo
       setShowLevelUpAnimation(true);
     }
   }, [battleEndData]);
+
+  // Invalidate user profile cache when battle ends to ensure fresh data
+  useEffect(() => {
+    if (battleEndData) {
+      // Invalidate the User cache tag to force profile data refresh
+      dispatch(authApi.util.invalidateTags(['User']));
+    }
+  }, [battleEndData, dispatch]);
 
   const handleLevelUpAnimationComplete = () => {
     setShowLevelUpAnimation(false);
