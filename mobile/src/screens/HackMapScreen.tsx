@@ -589,6 +589,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           if (currentData) {
             Object.values(currentData).forEach((entity: any) => {
               if (entity && entity.owner === 'player' && entity.userId) {
+                // Call updateTileShieldStatus directly without dependency issues
                 updateTileShieldStatus(entity.userId, entity.isShielded || false);
               }
             });
@@ -599,7 +600,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }, 3000); // Check every 3 seconds to reduce re-renders while maintaining responsiveness
 
     return () => clearInterval(interval);
-  }, [isRefreshing, updateTileShieldStatus]);
+  }, [isRefreshing]); // Removed updateTileShieldStatus from dependencies to prevent circular issues
 
   // Precompute terrain style map and position style caches
   // Memoized with stable references to prevent unnecessary re-renders

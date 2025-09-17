@@ -136,6 +136,12 @@ interface CellData {
 - **State Optimization**: Only updates state when shield status actually changes
 - **Result**: Panning should be smoother with less visual interference
 
+## Circular Dependency Fix
+**Issue**: useEffect had circular dependency causing infinite loops
+- **Problem**: `updateTileShieldStatus` in dependency array caused function recreation
+- **Solution**: Removed `updateTileShieldStatus` from useEffect dependencies
+- **Result**: Eliminated circular dependency and excessive API calls
+
 ## Next Steps
 - Test shield icon display on map tiles
 - Verify real-time updates work for all users
