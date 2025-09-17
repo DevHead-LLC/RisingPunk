@@ -10,6 +10,7 @@ export interface CellData {
   npcInstanceId?: string;
   userId?: string;
   npcLevel?: number;
+  isShielded?: boolean;
 }
 
 export interface MapResponse {

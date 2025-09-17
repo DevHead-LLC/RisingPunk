@@ -46,6 +46,38 @@ router.get('/profile', auth, async (req: Request, res: Response) => {
   }
 });
 
+router.get('/shield-status/:userId', auth, async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    
+    if (!userId) {
+      res.status(400).json({ message: 'User ID is required' });
+      return;
+    }
+
+    const user = await User.findById(userId).select('handle antivirusShield');
+    
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    res.json({
+      userId: user._id,
+      handle: user.handle,
+      antivirusShield: {
+        active: user.antivirusShield?.active || false,
+        startedAt: user.antivirusShield?.startedAt || null,
+        completesAt: user.antivirusShield?.completesAt || null,
+        cooldownUntil: user.antivirusShield?.cooldownUntil || null
+      }
+    });
+  } catch (error) {
+    console.error('Server error:', error);
+    res.status(500).json({ message: 'Error fetching user shield status' });
+  }
+});
+
 router.post('/unlock-hack-rig', auth, async (req: Request, res: Response) => {
   try {
     const user = await User.findByIdAndUpdate(

@@ -11,6 +11,7 @@ import { setGrid, setLoading } from '../store/slices/mapSlice';
 import { useFetchMapQuery } from '../store/api/mapApi';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
+import { API_URL } from '../config';
 import { computePanBounds } from '../utils/mapPanBounds';
 import { CellData, TerrainType, EntityType } from '../types/map';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -33,6 +34,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const loading = useAppSelector((state) => state.map.loading);
   const currentUserHandle = useAppSelector((state) => state.auth.user?.handle);
   const currentUserId = useAppSelector((state) => state.auth.user?._id);
+  const token = useAppSelector((state) => state.auth.token);
   const colors = useThemeColors();
   const { themeMode } = useTheme();
 
@@ -78,12 +80,17 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
   };
 
-  const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles }) => {
+  const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive }) => {
     const houseBgStyle = cell.entity === 'house'
       ? (cell.owner === 'player'
           ? (cell.name === currentUserHandle ? styles.userHouseBg : styles.otherUserHouseBg)
           : styles.enemyHouseBg)
       : null;
+    
+    // Check for shield status in both grid data and dynamic entity data
+    const key = `${x},${y}`;
+    const dynamicEntity = dynamicEntityData[key];
+    const isShielded = dynamicEntity?.isShielded || (cell as any).isShielded;
     return (
       <Pressable
         style={[
@@ -99,7 +106,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             <>
               {cell.owner === 'player' ? (
                 <Image 
-                  source={cell.name === currentUserHandle && isShieldActive 
+                  source={(cell.name === currentUserHandle && isShieldActive) || isShielded
                     ? require('../assets/images/hackMap/shielded.png')
                     : require('../assets/images/home.png')
                   } 
@@ -143,10 +150,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     );
   });
 
-  const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles }) => {
+  const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive }) => {
     return (
       <View style={[yStyle]}>
-        <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} />
+        <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} />
       </View>
     );
   });
@@ -167,9 +174,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     colors: ReturnType<typeof useThemeColors>;
     themeMode: 'light' | 'dark';
     styles: any;
+    dynamicEntityData: Record<string, any>;
+    isShieldActive: boolean;
   };
 
-  const Row: React.FC<RowProps> = ({ y, row, colStart, colEnd, rowVisible, selectedCell, onPress, rowStyle, xPosStyles, terrainStyleMap, disableTiles, currentUserHandle, colors, themeMode, styles }) => {
+  const Row: React.FC<RowProps> = ({ y, row, colStart, colEnd, rowVisible, selectedCell, onPress, rowStyle, xPosStyles, terrainStyleMap, disableTiles, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive }) => {
     // Always render the row container (grid shell), but only mount tiles when visible
     if (!row) {
       return <View style={[styles.row, rowStyle]} />;
@@ -185,7 +194,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           const cell = row[x];
           if (!cell) return null;
           const isSelected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
-          return <Tile key={`${x}-${y}`} x={x} y={y} cell={cell} selected={isSelected} onPress={onPress} xStyle={xPosStyles[x]} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} />;
+          return <Tile key={`${x}-${y}`} x={x} y={y} cell={cell} selected={isSelected} onPress={onPress} xStyle={xPosStyles[x]} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} />;
         })
       : null;
 
@@ -217,6 +226,45 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [dynamicEntityData, setDynamicEntityData] = useState<Record<string, any>>({});
   const [terrainDataLoaded, setTerrainDataLoaded] = useState<boolean>(false);
   
+  // Shield status change tracking
+  const [lastShieldStatus, setLastShieldStatus] = useState<boolean | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+
+  // Update specific tile shield status without full map refresh
+  const updateTileShieldStatus = useCallback(async (userId: string, isShielded: boolean) => {
+    try {
+      const response = await fetch(`${API_URL}/api/users/shield-status/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (response.ok) {
+        const userData = await response.json();
+        const actualShieldStatus = userData.antivirusShield?.active || false;
+        
+        // Update the specific tile in the dynamic entity data
+        setDynamicEntityData(prev => {
+          const updated = { ...prev };
+          // Find and update the tile for this user
+          Object.keys(updated).forEach(key => {
+            const entity = updated[key];
+            if (entity && entity.userId === userId && entity.owner === 'player') {
+              updated[key] = {
+                ...entity,
+                isShielded: actualShieldStatus
+              };
+            }
+          });
+          
+          return updated;
+        });
+      }
+    } catch (error) {
+      console.error('Failed to update tile shield status:', error);
+    }
+  }, [token]);
+
   // Phase 7A: Virtual Scrolling - Only render visible tiles
   const [virtualViewport, setVirtualViewport] = useState<{ 
     visibleTiles: Set<string>; 
@@ -449,6 +497,63 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   
   const isShieldActive = shieldData?.isActive || false;
 
+  // Trigger immediate updates for ALL users when current user's shield status changes
+  useEffect(() => {
+    if (lastShieldStatus !== null && lastShieldStatus !== isShieldActive && currentUserId) {
+      console.log('🛡️ Current user shield status changed, immediately updating ALL visible tiles...', {
+        previous: lastShieldStatus, 
+        current: isShieldActive,
+        userId: currentUserId
+      });
+      
+      // First, immediately update ALL visible player tiles with fresh shield status
+      if (dynamicEntityData) {
+        Object.keys(dynamicEntityData).forEach(key => {
+          const entity = dynamicEntityData[key];
+          if (entity && entity.owner === 'player' && entity.userId) {
+            // Update other users' tiles immediately
+            updateTileShieldStatus(entity.userId, entity.isShielded || false);
+          }
+        });
+      }
+      
+      // Then update the current user's tile
+      setDynamicEntityData(prev => {
+        const updated = { ...prev };
+        let found = false;
+        Object.keys(updated).forEach(key => {
+          const entity = updated[key];
+          if (entity && entity.userId === currentUserId && entity.owner === 'player') {
+            updated[key] = {
+              ...entity,
+              isShielded: isShieldActive
+            };
+            found = true;
+          }
+        });
+        
+        return updated;
+      });
+    }
+    setLastShieldStatus(isShieldActive);
+  }, [isShieldActive, lastShieldStatus, currentUserId, dynamicEntityData, updateTileShieldStatus]);
+
+  // Add frequent check for shield status changes on visible tiles
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!isRefreshing && dynamicEntityData) {
+        // Check shield status for all visible player entities
+        Object.values(dynamicEntityData).forEach((entity: any) => {
+          if (entity && entity.owner === 'player' && entity.userId) {
+            updateTileShieldStatus(entity.userId, entity.isShielded || false);
+          }
+        });
+      }
+    }, 1000); // Check every 1 second for maximum responsiveness
+
+    return () => clearInterval(interval);
+  }, [isRefreshing, dynamicEntityData, updateTileShieldStatus]);
+
   // Precompute terrain style map and position style caches
   // Memoized with stable references to prevent unnecessary re-renders
   const terrainStyleMap = useMemo(() => {
@@ -568,6 +673,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             npcSlug: cell.npcSlug,
             npcInstanceId: cell.npcInstanceId,
             npcLevel: cell.npcLevel,
+            isShielded: cell.isShielded,
           };
         }
       }
@@ -821,11 +927,34 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     hasCenteredOnHome.value = true;
   }, [grid, currentUserHandle, restorePan, containerSize.width, containerSize.height, minX, maxX, boundsReady, computeWindow, offsetX, offsetY]);
 
-  const handleCellPress = useCallback((x: number, y: number, cellData: CellData) => {
+  const handleCellPress = useCallback(async (x: number, y: number, cellData: CellData) => {
     // Allow clicking even while panning - this provides immediate feedback
     // The modal will still work, and the pan will continue if user keeps dragging
+    
+    // If clicking on another player, fetch their current shield status
+    if (cellData.owner === 'player' && cellData.userId && cellData.name !== currentUserHandle) {
+      try {
+        const response = await fetch(`${API_URL}/api/users/shield-status/${cellData.userId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        if (response.ok) {
+          const userData = await response.json();
+          const updatedCellData = {
+            ...cellData,
+            isShielded: userData.antivirusShield?.active || false
+          };
+          setSelectedCell({x, y, info: updatedCellData});
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to fetch shield status:', error);
+      }
+    }
+    
     setSelectedCell({x, y, info: cellData});
-  }, []);
+  }, [currentUserHandle, token]);
 
   const centerOnUserHome = useCallback(() => {
     if (!currentUserHandle || !grid.length) return;
@@ -906,6 +1035,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
               STATUS: {selectedCell.info.owner === 'player' && selectedCell.info.name !== currentUserHandle ? 'HOSTILE' : 
               selectedCell.info.owner === 'player' ? 'FRIENDLY' : 'HOSTILE'}
             </Text>
+            {selectedCell.info.owner === 'player' && selectedCell.info.isShielded && (
+              <Text style={[styles.statusText, styles.shieldedText]}>
+                SHIELD: ACTIVE
+              </Text>
+            )}
               {selectedCell.info.owner !== 'player' && selectedCell.info.npcSlug && (
               <Pressable
                 style={[styles.hackButton]}
@@ -927,8 +1061,14 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
              selectedCell.info.userId && 
              selectedCell.info.name !== currentUserHandle && (
               <Pressable
-                style={[styles.hackButton]}
+                style={[
+                  styles.hackButton,
+                  selectedCell.info.isShielded && styles.hackButtonDisabled
+                ]}
                 onPress={() => {
+                  if (selectedCell.info.isShielded) {
+                    return; // Don't allow hacking shielded users
+                  }
                   (globalThis as any).pendingDefenderUserId = selectedCell.info.userId;
                   // Store the grid coordinates of the selected cell, not the pan coordinates
                   (globalThis as any).pendingMapPan = {
@@ -937,8 +1077,14 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                   };
                   onClose();
                 }}
+                disabled={selectedCell.info.isShielded}
               >
-                <Text style={styles.hackButtonText}>Hack User</Text>
+                <Text style={[
+                  styles.hackButtonText,
+                  selectedCell.info.isShielded && styles.hackButtonTextDisabled
+                ]}>
+                  {selectedCell.info.isShielded ? 'Shielded User' : 'Hack User'}
+                </Text>
               </Pressable>
             )}
           </>
@@ -998,6 +1144,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                   colors={colors}
                   themeMode={themeMode}
                   styles={styles}
+                  dynamicEntityData={dynamicEntityData}
+                  isShieldActive={isShieldActive}
                 />
               );
             })}
@@ -1006,7 +1154,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       </GestureDetector>
     </View>
   );
-};type TileProps = {
+};
+
+type TileProps = {
   x: number;
   y: number;
   cell: CellData;
@@ -1018,7 +1168,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   colors: ReturnType<typeof useThemeColors>;
   themeMode: 'light' | 'dark';
   styles: any;
-};type PoolTileProps = {
+  dynamicEntityData: Record<string, any>;
+  isShieldActive: boolean;
+};
+
+type PoolTileProps = {
   x: number;
   y: number;
   cell: CellData;
@@ -1031,6 +1185,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   colors: ReturnType<typeof useThemeColors>;
   themeMode: 'light' | 'dark';
   styles: any;
+  dynamicEntityData: Record<string, any>;
+  isShieldActive: boolean;
 };const getStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light' | 'dark') => StyleSheet.create({
   container: {
     flex: 1,
@@ -1336,5 +1492,16 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   navigationIcon: {
     width: 24,
     height: 24,
+  },
+  hackButtonDisabled: {
+    opacity: 0.5,
+    borderColor: themeMode === 'light' ? 'rgba(128, 128, 128, 0.5)' : 'rgba(128, 128, 128, 0.3)',
+  },
+  hackButtonTextDisabled: {
+    color: themeMode === 'light' ? 'rgba(128, 128, 128, 0.8)' : 'rgba(128, 128, 128, 0.6)',
+  },
+  shieldedText: {
+    color: themeMode === 'light' ? '#4CAF50' : '#66BB6A',
+    fontWeight: 'bold',
   },
 });

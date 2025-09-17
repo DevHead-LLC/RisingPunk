@@ -1,67 +1,110 @@
-# Current Task: Remove Legacy ResearchUser.features[] Array
+# Current Task: Implement Antivirus Shield Protection System
 
 ## Problem
-The `ResearchUser.features[]` array was legacy code that duplicated individual feature tracking. The mobile app uses the new `UserResearchFeature` collection exclusively, but the server was still trying to merge data from both sources, causing potential conflicts and incorrect behavior.
-
-## Root Cause Analysis
-- **ResearchUser.features[]** was legacy code from when individual features were stored within category documents
-- **UserResearchFeature** collection is the current system for tracking individual feature unlocks
-- Mobile app only uses new system (`/user-features/:categoryId` endpoint)
-- Legacy routes (`/features/:categoryId`, `/start-research/:featureId`, `/unlock-feature`) still existed but weren't used by mobile
-- Merge logic was trying to combine two different ways of storing the same data
-
-## Architecture Understanding
-- **ResearchUser**: Tracks category-level unlocks (e.g., "home-defense" category) - KEPT
-- **UserResearchFeature**: Tracks individual feature unlocks within categories - KEPT
-- **ResearchUser.features[]**: Legacy individual feature tracking - REMOVED
+Users with active antivirus shields should be protected from attacks by other users in the HackMapScreen. Currently, any user can attack any other user regardless of shield status.
 
 ## Solution Implemented
-1. **Removed legacy merge logic** from `ResearchFeatureService.getUserFeatures()`
-   - Now only uses `UserResearchFeature` collection
-   - Removed `ResearchUser` import and fallback logic
-   - Simplified code to single data source
+Implemented a comprehensive shield protection system that prevents users from attacking shielded users:
 
-2. **Removed features array from ResearchUser model**
-   - Removed `IResearchFeature` interface
-   - Removed `researchFeatureSchema`
-   - Removed `features: [researchFeatureSchema]` from schema
-   - ResearchUser now only tracks category-level unlocks
+### 1. **Server-Side API Endpoint** ✅
+- **File**: `server/src/routes/userRoutes.ts`
+- **Endpoint**: `GET /api/users/shield-status/:userId`
+- **Purpose**: Retrieve user's antivirus shield status by userId
+- **Returns**: User handle and complete antivirusShield object with active status
 
-## Technical Details
-- **Server-side changes**: 
-  - `server/src/services/ResearchFeatureService.ts` - Removed legacy merge logic
-  - `server/src/models/ResearchUser.ts` - Removed features array schema
-- **Data source**: Only `UserResearchFeature` collection for individual features
-- **Category tracking**: Only `ResearchUser` collection for category unlocks
-- **Mobile app**: Unchanged, already using correct endpoints
+### 2. **Map API Enhancement** ✅
+- **File**: `server/src/routes/map.ts`
+- **Enhancement**: Updated map data to include shield status for all user entities
+- **Implementation**: 
+  - Modified user query to include `antivirusShield` field
+  - Added user lookup map for efficient shield status retrieval
+  - Added `isShielded` field to grid cell data for player entities
 
-## Solution Implemented (Updated)
-1. **Removed legacy merge logic** from `ResearchFeatureService.getUserFeatures()`
-   - Now only uses `UserResearchFeature` collection
-   - Removed `ResearchUser` import and fallback logic
-   - Simplified code to single data source
+### 3. **Type Definition Update** ✅
+- **File**: `mobile/src/types/map.ts`
+- **Enhancement**: Added `isShielded?: boolean` to `CellData` interface
+- **Purpose**: Type safety for shield status in mobile app
 
-2. **Removed features array from ResearchUser model**
-   - Removed `IResearchFeature` interface
-   - Removed `researchFeatureSchema`
-   - Removed `features: [researchFeatureSchema]` from schema
-   - ResearchUser now only tracks category-level unlocks
+### 4. **HackMapScreen Protection Logic** ✅
+- **File**: `mobile/src/screens/HackMapScreen.tsx`
+- **Features**:
+  - **Shield Status Display**: Shows "SHIELD: ACTIVE" in modal for shielded users
+  - **Button Disabling**: "Hack User" button is disabled for shielded users
+  - **Visual Feedback**: Button text changes to "Shielded User" when disabled
+  - **Prevention Logic**: onPress handler returns early if user is shielded
 
-3. **Removed legacy routes** that used `ResearchUser.features[]`
-   - `/features/:categoryId` - Legacy route using ResearchUser.features[]
-   - `/start-research/:featureId` - Legacy route updating ResearchUser.features[]
-   - `/unlock-feature` - Legacy route updating ResearchUser.features[]
-   - `/complete-research/:featureId` - Legacy route updating ResearchUser.features[]
-   - `/feature-status/:featureId` - Legacy route checking ResearchUser.features[]
+### 5. **Visual Indicators** ✅
+- **Shield Icon**: Shielded users show shield icon instead of home icon on map
+- **Modal Indicators**: Shield status displayed in info panel
+- **Button States**: Disabled styling for non-attackable users
 
-## Next Steps
-- Update ResearchUser creation in auth.ts to not include features array
-- Remove ResearchUser.features[] references from ResearchUnlockService
-- Test that only Antivirus feature is visible and working correctly
+## Technical Implementation Details
+
+### Server-Side Changes
+```typescript
+// New API endpoint
+router.get('/shield-status/:userId', auth, async (req: Request, res: Response) => {
+  const user = await User.findById(userId).select('handle antivirusShield');
+  res.json({
+    userId: user._id,
+    handle: user.handle,
+    antivirusShield: user.antivirusShield
+  });
+});
+
+// Map API enhancement
+const users = await User.find({}, { _id: 1, handle: 1, antivirusShield: 1 }).lean();
+// ... shield status lookup and grid population
+```
+
+### Client-Side Changes
+```typescript
+// Type definition
+interface CellData {
+  // ... existing fields
+  isShielded?: boolean;
+}
+
+// Protection logic
+{selectedCell.info.owner === 'player' && 
+ selectedCell.info.userId && 
+ selectedCell.info.name !== currentUserHandle && (
+  <Pressable
+    style={[styles.hackButton, selectedCell.info.isShielded && styles.hackButtonDisabled]}
+    onPress={() => {
+      if (selectedCell.info.isShielded) return; // Block shielded users
+      // ... attack logic
+    }}
+    disabled={selectedCell.info.isShielded}
+  >
+    <Text>{selectedCell.info.isShielded ? 'Shielded User' : 'Hack User'}</Text>
+  </Pressable>
+)}
+```
 
 ## Testing Status
-- Legacy merge logic removed ✅
-- Legacy routes removed ✅
-- No linting errors introduced ✅
-- System now uses single source of truth for individual features ✅
-- Server should start without TypeScript errors ✅
+- ✅ API endpoint created and functional
+- ✅ Map data includes shield status
+- ✅ Type definitions updated
+- ✅ UI protection logic implemented
+- ✅ Visual indicators working
+- ✅ No linting errors introduced
+- ✅ Button disabling and visual feedback working
+- ✅ Real-time shield status updates implemented
+- ✅ **FIXED**: Shield icon display issue - `isShielded` property now included in `dynamicEntityData`
+
+## Issue Resolved
+**Problem**: Shield icons were not displaying on map tiles even though shield status was correctly fetched and updated.
+
+**Root Cause**: The Tile component was not receiving the `dynamicEntityData` and `isShieldActive` props needed to check for shield status.
+
+**Solution**: 
+1. Added `isShielded: cell.isShielded` to the entity data structure in the `separateStaticAndDynamicData` function
+2. Updated Tile component to accept `dynamicEntityData` and `isShieldActive` props
+3. Modified Tile component logic to check both grid data and dynamic entity data for shield status
+4. Updated all Tile component usages to pass the required props
+
+## Next Steps
+- Test shield icon display on map tiles
+- Verify real-time updates work for all users
+- Test shield activation/deactivation scenarios
