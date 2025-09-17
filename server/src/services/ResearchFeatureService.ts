@@ -1,5 +1,6 @@
 import { User } from '../models/User';
 import { Research } from '../models/Research';
+import { ResearchUser } from '../models/ResearchUser';
 import { UserResearchFeature } from '../models/UserResearchFeature';
 import { getResearchFeatures, getFeatureById } from '../config/researchFeatures';
 import mongoose from 'mongoose';
@@ -291,24 +292,35 @@ export class ResearchFeatureService {
     try {
       // Get base features from config
       const baseFeatures = getResearchFeatures(categoryId);
-      
-      // Get user's research progress for this category
+
+      // Get user's research progress for this category from new collection
       const userFeatures = await UserResearchFeature.find({
         userId,
         categoryId
       });
 
-      // Merge base features with user progress
+      // Get legacy research data from old collection
+      const research = await Research.findOne({ categoryId });
+      const legacyUserResearch = research ? await ResearchUser.findOne({
+        userId,
+        researchId: research._id
+      }) : null;
+
+      // Merge base features with user progress (prioritize new collection over legacy)
       const featuresWithStatus = baseFeatures.map(feature => {
+        // Check new collection first
         const userFeature = userFeatures.find(uf => uf.featureId === feature.id);
         
+        // Fall back to legacy collection if no new data exists
+        const legacyFeature = legacyUserResearch?.features?.find((f: any) => f.id === feature.id);
+
         return {
           ...feature,
-          isUnlocked: userFeature?.isUnlocked || false,
-          unlockedAt: userFeature?.unlockedAt || null,
-          isResearching: userFeature?.isResearching || false,
-          researchStartedAt: userFeature?.researchStartedAt || null,
-          researchCompletesAt: userFeature?.researchCompletesAt || null,
+          isUnlocked: userFeature?.isUnlocked || legacyFeature?.isUnlocked || false,
+          unlockedAt: userFeature?.unlockedAt || legacyFeature?.unlockedAt || null,
+          isResearching: userFeature?.isResearching || legacyFeature?.isResearching || false,
+          researchStartedAt: userFeature?.researchStartedAt || legacyFeature?.researchStartedAt || null,
+          researchCompletesAt: userFeature?.researchCompletesAt || legacyFeature?.researchCompletesAt || null,
           researchTimeHours: userFeature?.researchTimeHours || feature.researchTimeHours || 4
         };
       });

@@ -208,12 +208,12 @@ export function FeatureModal({
             Research will complete automatically
           </Text>
         </View>
-      ) : (
+      ) : !feature.isUnlocked ? (
         <TouchableOpacity
           style={[
             styles.researchButton,
             {
-              backgroundColor: (canAfford && meetsLevelRequirement) ? '#7C3AED' : '#EF4444',
+              backgroundColor: (canAfford && meetsLevelRequirement) ? colors.secondary : '#EF4444',
               opacity: (canAfford && meetsLevelRequirement) ? 1 : 0.6
             }
           ]}
@@ -227,6 +227,12 @@ export function FeatureModal({
              'Perform Research'}
           </Text>
         </TouchableOpacity>
+      ) : (
+        <View style={styles.unlockedStatus}>
+          <Text style={[styles.unlockedText, { color: '#10B981' }]}>
+            ✓ Feature Unlocked
+          </Text>
+        </View>
       )}
 
       <TouchableOpacity
@@ -384,6 +390,14 @@ const styles = StyleSheet.create({
   researchingSubtext: {
     fontSize: SIZING.font.small,
     textAlign: 'center',
+  },
+  unlockedStatus: {
+    alignItems: 'center',
+    marginBottom: SIZING.spacing.md,
+  },
+  unlockedText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
   },
   closeButton: {
     paddingHorizontal: SIZING.spacing.md,
