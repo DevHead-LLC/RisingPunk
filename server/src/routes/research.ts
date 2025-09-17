@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import auth from '../middleware/auth';
 import { ResearchUnlockService } from '../services/ResearchUnlockService';
+import { ResearchFeatureService } from '../services/ResearchFeatureService';
 import { Research } from '../models/Research';
 import { ResearchUser } from '../models/ResearchUser';
 import { getResearchFeatures } from '../config/researchFeatures';
@@ -571,6 +572,142 @@ router.post('/fix-user-research', auth, async (req: Request, res: Response): Pro
     res.status(500).json({
       success: false,
       message: 'Error fixing user research'
+    });
+  }
+});
+
+// NEW ENDPOINTS FOR INDIVIDUAL FEATURE MANAGEMENT
+// These use the new UserResearchFeature collection and don't interfere with category unlocking
+
+// Get user's individual feature status for a category
+router.get('/user-features/:categoryId', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user._id;
+    const { categoryId } = req.params;
+    
+    const featuresWithStatus = await ResearchFeatureService.getUserFeatures(userId, categoryId);
+    
+    res.json({
+      success: true,
+      data: featuresWithStatus
+    });
+  } catch (error) {
+    console.error('Error fetching user research features:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching user research features'
+    });
+  }
+});
+
+// Start research for an individual feature
+router.post('/start-feature-research', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user._id;
+    const { categoryId, featureId } = req.body;
+    
+    if (!categoryId || !featureId) {
+      res.status(400).json({
+        success: false,
+        message: 'Category ID and Feature ID are required'
+      });
+      return;
+    }
+    
+    const result = await ResearchFeatureService.startResearch(userId, categoryId, featureId);
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: result.message,
+        data: {
+          researchStartedAt: result.researchStartedAt?.toISOString(),
+          researchCompletesAt: result.researchCompletesAt?.toISOString(),
+          researchTimeHours: 4 // Default research time
+        },
+        newBalance: result.newBalance
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error starting feature research:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error starting feature research'
+    });
+  }
+});
+
+// Complete research for an individual feature
+router.post('/complete-feature-research', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user._id;
+    const { categoryId, featureId } = req.body;
+    
+    if (!categoryId || !featureId) {
+      res.status(400).json({
+        success: false,
+        message: 'Category ID and Feature ID are required'
+      });
+      return;
+    }
+    
+    const result = await ResearchFeatureService.completeResearch(userId, categoryId, featureId);
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: result.message,
+        data: {
+          featureId,
+          isUnlocked: result.isUnlocked,
+          unlockedAt: result.unlockedAt?.toISOString()
+        }
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message
+      });
+    }
+  } catch (error) {
+    console.error('Error completing feature research:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error completing feature research'
+    });
+  }
+});
+
+// Get individual feature status
+router.get('/user-feature-status/:categoryId/:featureId', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user._id;
+    const { categoryId, featureId } = req.params;
+    
+    const featureStatus = await ResearchFeatureService.getUserFeatureStatus(userId, categoryId, featureId);
+    
+    if (!featureStatus) {
+      res.status(404).json({
+        success: false,
+        message: 'Feature not found'
+      });
+      return;
+    }
+    
+    res.json({
+      success: true,
+      data: featureStatus
+    });
+  } catch (error) {
+    console.error('Error fetching feature status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching feature status'
     });
   }
 });

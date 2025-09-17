@@ -17,6 +17,7 @@ interface FeatureModalProps {
   feature: ResearchFeature;
   currentBalance: number;
   currentLevel: number;
+  categoryId?: string; // Add categoryId prop
   onClose: () => void;
   onResearchStarted?: () => void;
 }
@@ -26,6 +27,7 @@ export function FeatureModal({
   feature,
   currentBalance,
   currentLevel,
+  categoryId = 'home-defense', // Default to home-defense
   onClose,
   onResearchStarted,
 }: FeatureModalProps) {
@@ -55,7 +57,7 @@ export function FeatureModal({
         if (remaining === 0) {
           console.log('🔬 RESEARCH: Timer reached zero, attempting to complete research for:', feature.id);
           // Research completed - automatically complete it
-          completeResearch(feature.id).unwrap().then((result) => {
+          completeResearch({ categoryId, featureId: feature.id }).unwrap().then((result) => {
             console.log('🔬 RESEARCH: Successfully completed research:', result);
             setIsResearching(false);
             // RTK Query will automatically invalidate cache and refetch data
@@ -74,7 +76,7 @@ export function FeatureModal({
   const handlePerformResearch = async () => {
     if (canAfford && meetsLevelRequirement && !isCurrentlyResearching) {
       try {
-        const result = await startResearch(feature.id).unwrap();
+        const result = await startResearch({ categoryId, featureId: feature.id }).unwrap();
         setIsResearching(true);
         onResearchStarted?.();
         onClose(); // Close modal after starting research
@@ -130,6 +132,28 @@ export function FeatureModal({
           </Text>
         </View>
       </View>
+      
+      {/* Show research button if conditions are met, or disabled button if conditions not met */}
+      {!isCurrentlyResearching && (
+        <TouchableOpacity
+          style={[
+            styles.researchButton,
+            { 
+              backgroundColor: (canAfford && meetsLevelRequirement) ? colors.secondary : '#6B7280',
+              opacity: isStartingResearch ? 0.6 : 1
+            }
+          ]}
+          onPress={handlePerformResearch}
+          disabled={isStartingResearch || !canAfford || !meetsLevelRequirement}
+        >
+          <Text style={[styles.researchButtonText, { color: '#FFFFFF' }]}>
+            {isStartingResearch ? 'Starting Research...' : 
+             !canAfford ? 'Insufficient Funds' :
+             !meetsLevelRequirement ? 'Level Too Low' :
+             'Perform Research'}
+          </Text>
+        </TouchableOpacity>
+      )}
       
       <TouchableOpacity
         style={[styles.closeButton, { backgroundColor: colors.primary }]}

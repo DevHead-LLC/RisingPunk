@@ -10,7 +10,7 @@ import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { setGrid, setLoading } from '../store/slices/mapSlice';
 import { useFetchMapQuery } from '../store/api/mapApi';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
-import { useGetFeaturesQuery } from '../store/api/researchFeaturesApi';
+import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { computePanBounds } from '../utils/mapPanBounds';
 import { CellData, TerrainType, EntityType } from '../types/map';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -432,7 +432,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   });
   
   // Get research features data (same as ResearchFeaturesList)
-  const { data: researchFeatures } = useGetFeaturesQuery('home-defense');
+  const { data: researchFeatures } = useGetUserFeaturesQuery('home-defense');
   
   // Find the antivirus feature from the research features
   const antivirusFeature = researchFeatures?.find(f => f.id === 'antivirus');

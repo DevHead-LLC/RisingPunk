@@ -13,7 +13,7 @@ import { useAppSelector } from '../store/hooks';
 import { useAssignToBattalionMutation } from '../store/api/botsApi';
 import { useStartBattleMutation } from '../store/api/battleApi';
 import { useGetShieldStatusQuery, useDeactivateShieldMutation } from '../store/api/antivirusApi';
-import { useGetFeaturesQuery } from '../store/api/researchFeaturesApi';
+import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { API_URL } from '../config';
 
 type Props = {
@@ -44,7 +44,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
   });
   
   // Get research features data (same as other components)
-  const { data: researchFeatures } = useGetFeaturesQuery('home-defense');
+  const { data: researchFeatures } = useGetUserFeaturesQuery('home-defense');
   
   // Find the antivirus feature from the research features
   const antivirusFeature = researchFeatures?.find(f => f.id === 'antivirus');

@@ -167,6 +167,7 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
         features={features}
         currentLevel={userLevel}
         currentBalance={userBalance}
+        categoryId={selectedCard.id}
         onResearchStarted={handleResearchStarted}
       />
     );

@@ -1,4 +1,4 @@
-import { useGetFeaturesQuery } from '../store/api/researchFeaturesApi';
+import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { ResearchFeature } from '../components/research/ResearchFeaturesList';
 
 export function useResearchFeatures(categoryId: string | null) {
@@ -7,7 +7,7 @@ export function useResearchFeatures(categoryId: string | null) {
     isLoading: loading, 
     error: queryError,
     refetch
-  } = useGetFeaturesQuery(categoryId || '', {
+  } = useGetUserFeaturesQuery(categoryId || '', {
     skip: !categoryId || categoryId === ''
   });
 

@@ -57,6 +57,7 @@ interface ResearchFeaturesListProps {
   features: ResearchFeature[];
   currentLevel: number;
   currentBalance: number;
+  categoryId: string; // Add categoryId prop
   onResearchStarted?: () => void;
 }
 
@@ -64,6 +65,7 @@ export function ResearchFeaturesList({
   features,
   currentLevel,
   currentBalance,
+  categoryId,
   onResearchStarted,
 }: ResearchFeaturesListProps) {
   const colors = useThemeColors();
@@ -110,7 +112,7 @@ export function ResearchFeaturesList({
           if (remaining === 0) {
             console.log('🔬 RESEARCH: ⚡ TIMER REACHED ZERO! Completing research for:', feature.id);
             completedFeaturesRef.current.add(feature.id);
-            completeResearch(feature.id).unwrap().then((result) => {
+            completeResearch({ categoryId, featureId: feature.id }).unwrap().then((result) => {
               console.log('🔬 RESEARCH: ✅ Successfully completed research:', result);
               onResearchStarted?.();
             }).catch((error) => {
@@ -352,6 +354,7 @@ export function ResearchFeaturesList({
           feature={selectedFeature}
           currentBalance={currentBalance}
           currentLevel={currentLevel}
+          categoryId={categoryId}
           onClose={() => {
             setShowFeatureModal(false);
             // Delay clearing the selected feature to prevent content flash
