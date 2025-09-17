@@ -148,6 +148,20 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         </View>
       </Pressable>
     );
+  }, (prevProps, nextProps) => {
+    // Custom comparison to prevent unnecessary re-renders
+    // Only re-render if essential props change
+    return (
+      prevProps.x === nextProps.x &&
+      prevProps.y === nextProps.y &&
+      prevProps.selected === nextProps.selected &&
+      prevProps.cell === nextProps.cell &&
+      prevProps.currentUserHandle === nextProps.currentUserHandle &&
+      prevProps.isShieldActive === nextProps.isShieldActive &&
+      // Only check dynamicEntityData for this specific tile
+      prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
+      nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
+    );
   });
 
   const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive }) => {
@@ -155,6 +169,19 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       <View style={[yStyle]}>
         <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} />
       </View>
+    );
+  }, (prevProps, nextProps) => {
+    // Custom comparison for PoolTile - only re-render if essential props change
+    return (
+      prevProps.x === nextProps.x &&
+      prevProps.y === nextProps.y &&
+      prevProps.selected === nextProps.selected &&
+      prevProps.cell === nextProps.cell &&
+      prevProps.currentUserHandle === nextProps.currentUserHandle &&
+      prevProps.isShieldActive === nextProps.isShieldActive &&
+      // Only check dynamicEntityData for this specific tile
+      prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
+      nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
     );
   });
 
@@ -229,9 +256,17 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   // Shield status change tracking
   const [lastShieldStatus, setLastShieldStatus] = useState<boolean | null>(null);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [lastUpdateTime, setLastUpdateTime] = useState<number>(0);
 
   // Update specific tile shield status without full map refresh
-  const updateTileShieldStatus = useCallback(async (userId: string, isShielded: boolean) => {
+  const updateTileShieldStatus = useCallback(async (userId: string, currentShieldStatus: boolean) => {
+    const now = Date.now();
+    
+    // Debounce updates to prevent excessive re-renders
+    if (now - lastUpdateTime < 500) {
+      return;
+    }
+    
     try {
       const response = await fetch(`${API_URL}/api/users/shield-status/${userId}`, {
         headers: {
@@ -243,27 +278,34 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         const userData = await response.json();
         const actualShieldStatus = userData.antivirusShield?.active || false;
         
-        // Update the specific tile in the dynamic entity data
-        setDynamicEntityData(prev => {
-          const updated = { ...prev };
-          // Find and update the tile for this user
-          Object.keys(updated).forEach(key => {
-            const entity = updated[key];
-            if (entity && entity.userId === userId && entity.owner === 'player') {
-              updated[key] = {
-                ...entity,
-                isShielded: actualShieldStatus
-              };
-            }
+        // Only update if the shield status actually changed
+        if (actualShieldStatus !== currentShieldStatus) {
+          setLastUpdateTime(now);
+          setDynamicEntityData(prev => {
+            const updated = { ...prev };
+            let hasChanges = false;
+            
+            // Find and update the tile for this user
+            Object.keys(updated).forEach(key => {
+              const entity = updated[key];
+              if (entity && entity.userId === userId && entity.owner === 'player' && entity.isShielded !== actualShieldStatus) {
+                updated[key] = {
+                  ...entity,
+                  isShielded: actualShieldStatus
+                };
+                hasChanges = true;
+              }
+            });
+            
+            // Only return new object if there were actual changes
+            return hasChanges ? updated : prev;
           });
-          
-          return updated;
-        });
+        }
       }
     } catch (error) {
       console.error('Failed to update tile shield status:', error);
     }
-  }, [token]);
+  }, [token, lastUpdateTime]);
 
   // Phase 7A: Virtual Scrolling - Only render visible tiles
   const [virtualViewport, setVirtualViewport] = useState<{ 
@@ -554,7 +596,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           return currentData; // Return unchanged data
         });
       }
-    }, 1000); // Check every 1 second for maximum responsiveness
+    }, 3000); // Check every 3 seconds to reduce re-renders while maintaining responsiveness
 
     return () => clearInterval(interval);
   }, [isRefreshing, updateTileShieldStatus]);

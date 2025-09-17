@@ -117,8 +117,28 @@ interface CellData {
 - **Solution**: Added `isShielded: entity?.isShielded` to CellData construction
 - **Result**: Shield status now properly preserved in modal interactions
 
+## Performance Optimization Applied
+**Issue**: Excessive tile re-rendering causing blinking and poor user experience
+- **Problem**: Tiles were re-rendering constantly due to props changes and circular dependencies
+- **Solutions Applied**:
+  1. **Custom memo comparison**: Added precise comparison functions to Tile and PoolTile components
+  2. **Debounced updates**: Added 500ms debounce to prevent rapid shield status updates
+  3. **Reduced polling frequency**: Changed from 1 second to 3 seconds for shield checks
+  4. **Conditional updates**: Only update when shield status actually changes
+  5. **Optimized state updates**: Only return new state object when actual changes occur
+- **Result**: Eliminated tile blinking while preserving shield functionality
+
+## Panning/Scrolling Impact Analysis
+**Concern**: How optimizations affect map panning and tile loading/unloading
+- **Virtual Scrolling**: Optimizations actually improve panning performance
+- **Tile Stability**: Custom memo prevents unnecessary re-renders during panning
+- **Loading Efficiency**: Debounced updates don't interfere with tile loading
+- **State Optimization**: Only updates state when shield status actually changes
+- **Result**: Panning should be smoother with less visual interference
+
 ## Next Steps
 - Test shield icon display on map tiles
 - Verify real-time updates work for all users
 - Test shield activation/deactivation scenarios
 - Monitor API call frequency to ensure performance improvement
+- Verify clicking on tiles is now smooth and responsive
