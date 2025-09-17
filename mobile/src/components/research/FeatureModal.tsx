@@ -71,7 +71,7 @@ export function FeatureModal({
       const interval = setInterval(updateTimer, 1000);
       return () => clearInterval(interval);
     }
-  }, [isCurrentlyResearching, feature.researchCompletesAt, feature.id, completeResearch, onResearchStarted]);
+  }, [isCurrentlyResearching, feature.researchCompletesAt, feature.id, completeResearch, categoryId, onResearchStarted]);
   
   const handlePerformResearch = async () => {
     if (canAfford && meetsLevelRequirement && !isCurrentlyResearching) {

@@ -130,7 +130,7 @@ export function ResearchFeaturesList({
     const interval = setInterval(updateTimers, 1000);
     
     return () => clearInterval(interval);
-  }, [features, completeResearch, onResearchStarted]);
+  }, [features, completeResearch, categoryId, onResearchStarted]);
 
   const renderFeatureCard = (feature: ResearchFeature) => {
     const isLightMode = colors.background === '#FAFAFA' || colors.background === '#F5F5DC';
