@@ -168,7 +168,7 @@ export function FeatureModal({
 
   const renderUnlockedModal = () => (
     <View style={styles.modalContent}>
-            <Text style={[styles.modalTitle, { color: '#8B5CF6' }]}>
+      <Text style={[styles.modalTitle, { color: '#8B5CF6' }]}>
         {feature.name}
       </Text>
 
@@ -197,7 +197,7 @@ export function FeatureModal({
       </View>
       
       {isCurrentlyResearching ? (
-        <View style={[styles.researchingContainer, { backgroundColor: '#1F2937' }]}>
+        <View style={styles.researchingStatus}>
           <Text style={[styles.researchingTitle, { color: '#10B981' }]}>
             Research in Progress
           </Text>
@@ -208,12 +208,12 @@ export function FeatureModal({
             Research will complete automatically
           </Text>
         </View>
-      ) : (
+      ) : !feature.isUnlocked ? (
         <TouchableOpacity
           style={[
             styles.researchButton,
             {
-              backgroundColor: (canAfford && meetsLevelRequirement) ? '#7C3AED' : '#EF4444',
+              backgroundColor: (canAfford && meetsLevelRequirement) ? colors.secondary : '#EF4444',
               opacity: (canAfford && meetsLevelRequirement) ? 1 : 0.6
             }
           ]}
@@ -227,6 +227,12 @@ export function FeatureModal({
              'Perform Research'}
           </Text>
         </TouchableOpacity>
+      ) : (
+        <View style={styles.unlockedStatus}>
+          <Text style={[styles.unlockedText, { color: '#10B981' }]}>
+            ✓ Feature Unlocked
+          </Text>
+        </View>
       )}
 
       <TouchableOpacity
@@ -363,20 +369,17 @@ const styles = StyleSheet.create({
     fontSize: SIZING.font.body,
     fontWeight: '600',
   },
-  researchingContainer: {
-    width: '100%',
-    padding: SIZING.spacing.lg,
-    borderRadius: 8,
+  researchingStatus: {
     alignItems: 'center',
-    marginBottom: SIZING.spacing.lg,
+    marginBottom: SIZING.spacing.md,
   },
   researchingTitle: {
-    fontSize: SIZING.font.h2,
-    fontWeight: '700',
-    marginBottom: SIZING.spacing.sm,
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
+    marginBottom: SIZING.spacing.xs,
   },
   researchingTime: {
-    fontSize: SIZING.font.h2,
+    fontSize: SIZING.font.large,
     fontWeight: '600',
     fontFamily: 'monospace',
     marginBottom: SIZING.spacing.xs,
@@ -384,6 +387,14 @@ const styles = StyleSheet.create({
   researchingSubtext: {
     fontSize: SIZING.font.small,
     textAlign: 'center',
+  },
+  unlockedStatus: {
+    alignItems: 'center',
+    marginBottom: SIZING.spacing.md,
+  },
+  unlockedText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
   },
   closeButton: {
     paddingHorizontal: SIZING.spacing.md,

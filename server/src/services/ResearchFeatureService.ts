@@ -291,25 +291,25 @@ export class ResearchFeatureService {
     try {
       // Get base features from config
       const baseFeatures = getResearchFeatures(categoryId);
-      
-      // Get user's research progress for this category
+
+      // Get user's research progress for this category from UserResearchFeature collection
       const userFeatures = await UserResearchFeature.find({
         userId,
         categoryId
       });
 
-      // Merge base features with user progress
+      // Merge base features with user progress from UserResearchFeature collection
       const featuresWithStatus = baseFeatures.map(feature => {
         const userFeature = userFeatures.find(uf => uf.featureId === feature.id);
-        
+
         return {
           ...feature,
-          isUnlocked: userFeature?.isUnlocked || false,
-          unlockedAt: userFeature?.unlockedAt || null,
-          isResearching: userFeature?.isResearching || false,
-          researchStartedAt: userFeature?.researchStartedAt || null,
-          researchCompletesAt: userFeature?.researchCompletesAt || null,
-          researchTimeHours: userFeature?.researchTimeHours || feature.researchTimeHours || 4
+          isUnlocked: userFeature?.isUnlocked ?? false,
+          unlockedAt: userFeature?.unlockedAt ?? null,
+          isResearching: userFeature?.isResearching ?? false,
+          researchStartedAt: userFeature?.researchStartedAt ?? null,
+          researchCompletesAt: userFeature?.researchCompletesAt ?? null,
+          researchTimeHours: userFeature?.researchTimeHours ?? feature.researchTimeHours ?? 4
         };
       });
 
