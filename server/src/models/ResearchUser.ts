@@ -1,51 +1,14 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-export interface IResearchFeature {
-  id: string;
-  isUnlocked: boolean;
-  unlockedAt: Date | null;
-  isResearching?: boolean;
-  researchStartedAt?: Date;
-  researchCompletesAt?: Date;
-}
-
 export interface IResearchUser extends Document {
   userId: mongoose.Types.ObjectId;
   researchId: mongoose.Types.ObjectId;
   isUnlocked: boolean;
   unlockedAt: Date | null;
   unlockCost: number;
-  features: IResearchFeature[];
   createdAt: Date;
   updatedAt: Date;
 }
-
-const researchFeatureSchema = new Schema({
-  id: {
-    type: String,
-    required: true
-  },
-  isUnlocked: {
-    type: Boolean,
-    default: false
-  },
-  unlockedAt: {
-    type: Date,
-    default: null
-  },
-  isResearching: {
-    type: Boolean,
-    default: false
-  },
-  researchStartedAt: {
-    type: Date,
-    default: null
-  },
-  researchCompletesAt: {
-    type: Date,
-    default: null
-  }
-}, { _id: false });
 
 const researchUserSchema = new Schema({
   userId: {
@@ -70,8 +33,7 @@ const researchUserSchema = new Schema({
     type: Number,
     default: 0,
     min: 0
-  },
-  features: [researchFeatureSchema]
+  }
 }, {
   collection: 'researchUsers',
   timestamps: true

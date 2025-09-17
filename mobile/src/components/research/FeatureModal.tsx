@@ -168,7 +168,7 @@ export function FeatureModal({
 
   const renderUnlockedModal = () => (
     <View style={styles.modalContent}>
-            <Text style={[styles.modalTitle, { color: '#8B5CF6' }]}>
+      <Text style={[styles.modalTitle, { color: '#8B5CF6' }]}>
         {feature.name}
       </Text>
 
@@ -197,7 +197,7 @@ export function FeatureModal({
       </View>
       
       {isCurrentlyResearching ? (
-        <View style={[styles.researchingContainer, { backgroundColor: '#1F2937' }]}>
+        <View style={styles.researchingStatus}>
           <Text style={[styles.researchingTitle, { color: '#10B981' }]}>
             Research in Progress
           </Text>
@@ -369,20 +369,17 @@ const styles = StyleSheet.create({
     fontSize: SIZING.font.body,
     fontWeight: '600',
   },
-  researchingContainer: {
-    width: '100%',
-    padding: SIZING.spacing.lg,
-    borderRadius: 8,
+  researchingStatus: {
     alignItems: 'center',
-    marginBottom: SIZING.spacing.lg,
+    marginBottom: SIZING.spacing.md,
   },
   researchingTitle: {
-    fontSize: SIZING.font.h2,
-    fontWeight: '700',
-    marginBottom: SIZING.spacing.sm,
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
+    marginBottom: SIZING.spacing.xs,
   },
   researchingTime: {
-    fontSize: SIZING.font.h2,
+    fontSize: SIZING.font.large,
     fontWeight: '600',
     fontFamily: 'monospace',
     marginBottom: SIZING.spacing.xs,
