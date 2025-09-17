@@ -104,7 +104,21 @@ interface CellData {
 3. Modified Tile component logic to check both grid data and dynamic entity data for shield status
 4. Updated all Tile component usages to pass the required props
 
+## Performance Fix Applied
+**Issue**: Circular dependency in useEffect causing excessive API calls
+- **Problem**: useEffect depended on `dynamicEntityData` but also updated it via `updateTileShieldStatus`
+- **Solution**: Used `setDynamicEntityData` with callback to access current data without dependency
+- **Result**: Eliminated circular dependency, reduced API calls from continuous to every 1 second
+
+## Critical Bug Fix Applied
+**Issue**: Shield status not preserved in CellData when materializing visible cells
+- **Problem**: `isShielded` property was dropped when creating `CellData` objects, causing UI inconsistencies
+- **Impact**: Shielded users could be attacked even when shield icon was visible on map
+- **Solution**: Added `isShielded: entity?.isShielded` to CellData construction
+- **Result**: Shield status now properly preserved in modal interactions
+
 ## Next Steps
 - Test shield icon display on map tiles
 - Verify real-time updates work for all users
 - Test shield activation/deactivation scenarios
+- Monitor API call frequency to ensure performance improvement

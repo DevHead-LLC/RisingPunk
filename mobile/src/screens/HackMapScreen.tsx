@@ -541,18 +541,23 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   // Add frequent check for shield status changes on visible tiles
   useEffect(() => {
     const interval = setInterval(() => {
-      if (!isRefreshing && dynamicEntityData) {
-        // Check shield status for all visible player entities
-        Object.values(dynamicEntityData).forEach((entity: any) => {
-          if (entity && entity.owner === 'player' && entity.userId) {
-            updateTileShieldStatus(entity.userId, entity.isShielded || false);
+      if (!isRefreshing) {
+        // Get current dynamicEntityData without depending on it in the dependency array
+        setDynamicEntityData(currentData => {
+          if (currentData) {
+            Object.values(currentData).forEach((entity: any) => {
+              if (entity && entity.owner === 'player' && entity.userId) {
+                updateTileShieldStatus(entity.userId, entity.isShielded || false);
+              }
+            });
           }
+          return currentData; // Return unchanged data
         });
       }
     }, 1000); // Check every 1 second for maximum responsiveness
 
     return () => clearInterval(interval);
-  }, [isRefreshing, dynamicEntityData, updateTileShieldStatus]);
+  }, [isRefreshing, updateTileShieldStatus]);
 
   // Precompute terrain style map and position style caches
   // Memoized with stable references to prevent unnecessary re-renders
@@ -610,6 +615,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           npcSlug: entity?.npcSlug,
           npcInstanceId: entity?.npcInstanceId,
           npcLevel: entity?.npcLevel,
+          isShielded: entity?.isShielded,
         } as any;
         
         cells.push({ x, y, cell });
