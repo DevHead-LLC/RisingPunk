@@ -19,6 +19,7 @@ export interface StartResearchResult {
   message: string;
   researchStartedAt?: Date;
   researchCompletesAt?: Date;
+  researchTimeHours?: number;
   newBalance?: number;
 }
 
@@ -162,6 +163,7 @@ export class ResearchFeatureService {
           message: 'Research started successfully',
           researchStartedAt,
           researchCompletesAt,
+          researchTimeHours: feature.researchTimeHours || 4,
           newBalance: user.balance.total - feature.unlockCost
         };
       });

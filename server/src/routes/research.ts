@@ -617,16 +617,16 @@ router.post('/start-feature-research', auth, async (req: Request, res: Response)
     const result = await ResearchFeatureService.startResearch(userId, categoryId, featureId);
     
     if (result.success) {
-      res.json({
-        success: true,
-        message: result.message,
-        data: {
-          researchStartedAt: result.researchStartedAt?.toISOString(),
-          researchCompletesAt: result.researchCompletesAt?.toISOString(),
-          researchTimeHours: 4 // Default research time
-        },
-        newBalance: result.newBalance
-      });
+              res.json({
+                success: true,
+                message: result.message,
+                data: {
+                  researchStartedAt: result.researchStartedAt?.toISOString(),
+                  researchCompletesAt: result.researchCompletesAt?.toISOString(),
+                  researchTimeHours: result.researchTimeHours
+                },
+                newBalance: result.newBalance
+              });
     } else {
       res.status(400).json({
         success: false,
