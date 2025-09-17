@@ -57,6 +57,9 @@ router.get('/:name', async (req: Request, res: Response) => {
       return;
     }
 
+    // Get users data for shield status lookup
+    const users = await User.find({}, { _id: 1, handle: 1, antivirusShield: 1 }).lean();
+
     // Migrate old maps: enforce version >=2 and gridSize 50, friendly cleanup, and placement rules
     const docAny = mapDoc as any;
     if (!docAny.version || docAny.version < 2 || docAny.gridSize !== 50) {
@@ -103,7 +106,6 @@ router.get('/:name', async (req: Request, res: Response) => {
         await (mapDoc as any).save();
       }
 
-      const users = await User.find({}, { _id: 1, handle: 1 }).lean();
       const terrainIsValid = (cc: any) => !cc.isOccupied && cc.canBeOccupied && cc.terrain !== 'water' && cc.terrain !== 'mountain';
       const pickValidCell = (): { x: number; y: number } | null => {
         let tries = 0;
@@ -166,6 +168,13 @@ router.get('/:name', async (req: Request, res: Response) => {
       Array.from({ length: gridSize }, () => ({ terrain: 'plain', entity: 'empty' }))
     );
     let mutated = false;
+    
+    // Create a map of userId to user data for quick lookup
+    const userMap = new Map();
+    users.forEach((user: any) => {
+      userMap.set(String(user._id), user);
+    });
+    
     for (const c of (mapDoc as any).cells as any[]) {
       const y = c.y;
       const x = c.x;
@@ -179,6 +188,14 @@ router.get('/:name', async (req: Request, res: Response) => {
       }
       const npcInstanceId = c.occupiedBy === 'npc' ? (c.npcInstanceId || undefined) : undefined;
       const npcLevel = c.occupiedBy === 'npc' && npcSlug ? getNPCLevelFromSlug(npcSlug) : undefined;
+      
+      // Get shield status for player entities
+      let isShielded = false;
+      if (c.occupiedBy === 'player' && c.userId) {
+        const user = userMap.get(String(c.userId));
+        isShielded = user?.antivirusShield?.active || false;
+      }
+      
       emptyGrid[y][x] = {
         terrain: c.terrain,
         entity,
@@ -188,6 +205,7 @@ router.get('/:name', async (req: Request, res: Response) => {
         npcSlug,
         npcInstanceId,
         npcLevel,
+        isShielded,
       } as any;
     }
 
