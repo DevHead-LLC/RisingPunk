@@ -149,6 +149,13 @@ interface CellData {
 - **Implementation**: `updateTileShieldStatusRef.current` provides latest function
 - **Result**: Eliminated stale closures while avoiding circular dependencies
 
+## Circular Dependency in useCallback Fix
+**Issue**: `updateTileShieldStatus` had circular dependency with `lastUpdateTime`
+- **Problem**: Function depended on `lastUpdateTime` but also updated it, causing recreation
+- **Solution**: Used `useRef` for `lastUpdateTime` instead of state
+- **Implementation**: `lastUpdateTimeRef.current` for debouncing without circular dependency
+- **Result**: Function is now stable and only recreates when `token` changes
+
 ## Next Steps
 - Test shield icon display on map tiles
 - Verify real-time updates work for all users

@@ -256,14 +256,16 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   // Shield status change tracking
   const [lastShieldStatus, setLastShieldStatus] = useState<boolean | null>(null);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
-  const [lastUpdateTime, setLastUpdateTime] = useState<number>(0);
 
+  // Use ref for lastUpdateTime to avoid circular dependency
+  const lastUpdateTimeRef = useRef(0);
+  
   // Update specific tile shield status without full map refresh
   const updateTileShieldStatus = useCallback(async (userId: string, currentShieldStatus: boolean) => {
     const now = Date.now();
     
     // Debounce updates to prevent excessive re-renders
-    if (now - lastUpdateTime < 500) {
+    if (now - lastUpdateTimeRef.current < 500) {
       return;
     }
     
@@ -280,7 +282,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         
         // Only update if the shield status actually changed
         if (actualShieldStatus !== currentShieldStatus) {
-          setLastUpdateTime(now);
+          lastUpdateTimeRef.current = now; // Update ref instead of state
           setDynamicEntityData(prev => {
             const updated = { ...prev };
             let hasChanges = false;
@@ -305,7 +307,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     } catch (error) {
       console.error('Failed to update tile shield status:', error);
     }
-  }, [token, lastUpdateTime]);
+  }, [token]); // Removed lastUpdateTime from dependencies
 
   // Phase 7A: Virtual Scrolling - Only render visible tiles
   const [virtualViewport, setVirtualViewport] = useState<{ 
