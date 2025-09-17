@@ -274,7 +274,7 @@ export function FeatureModal({
             borderColor: colors.primary
           }
         ]}>
-          {feature.isUnlocked ? renderUnlockedModal() : renderLockedModal()}
+          {(feature.isUnlocked || isCurrentlyResearching) ? renderUnlockedModal() : renderLockedModal()}
         </View>
       </View>
     </Modal>
