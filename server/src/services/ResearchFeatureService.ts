@@ -114,12 +114,41 @@ export class ResearchFeatureService {
           };
         }
 
-        // Validate requirements
-        const validation = await this.validateFeatureRequirements(userId, categoryId, featureId);
-        if (!validation.canResearch) {
+        // Validate requirements within the transaction using the same session
+        const reasons: string[] = [];
+        const missingRequirements: any = {};
+
+        // Check level requirement
+        if (user.level < feature.levelRequirement) {
+          reasons.push(`Level ${feature.levelRequirement} required (current: ${user.level})`);
+          missingRequirements.level = true;
+        }
+
+        // Check balance requirement
+        if (user.balance.total < feature.unlockCost) {
+          reasons.push(`$${feature.unlockCost.toLocaleString()} required (current: $${user.balance.total.toLocaleString()})`);
+          missingRequirements.balance = true;
+        }
+
+        // Check if already unlocked or researching (using transaction session)
+        const existingFeature = await UserResearchFeature.findOne({
+          userId,
+          categoryId,
+          featureId
+        }).session(session);
+
+        if (existingFeature?.isUnlocked) {
+          reasons.push('Feature already unlocked');
+        }
+
+        if (existingFeature?.isResearching) {
+          reasons.push('Research already in progress');
+        }
+
+        if (reasons.length > 0) {
           return {
             success: false,
-            message: validation.reasons.join(', ')
+            message: reasons.join(', ')
           };
         }
 
