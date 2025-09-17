@@ -8,7 +8,7 @@ export const RESEARCH_FEATURES: Record<string, IResearchFeature[]> = {
       description: 'Deploy a protective shield that prevents other players from attacking you for a limited time. Once activated, the shield runs automatically and provides complete attack immunity until it expires.',
       unlockCost: 25000,
       levelRequirement: 2,
-      isUnlocked: true,
+      isUnlocked: false,
       effect: {
         type: 'unlock',
         value: 'antivirus',

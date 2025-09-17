@@ -47,26 +47,31 @@ export const researchFeaturesApi = createApi({
       transformResponse: (response: { success: boolean; data: any[] }) => response.data,
       providesTags: (result, error, categoryId) => [{ type: 'ResearchFeatures', id: categoryId }],
     }),
-    startResearch: builder.mutation<StartResearchResponse, string>({
-      query: (featureId) => ({
-        url: `/start-research/${featureId}`,
+    getUserFeatures: builder.query<any[], string>({
+      query: (categoryId) => `/user-features/${categoryId}`,
+      transformResponse: (response: { success: boolean; data: any[] }) => response.data,
+      providesTags: (result, error, categoryId) => [{ type: 'ResearchFeatures', id: categoryId }],
+    }),
+    startResearch: builder.mutation<StartResearchResponse, { categoryId: string; featureId: string }>({
+      query: ({ categoryId, featureId }) => ({
+        url: `/start-feature-research`,
         method: 'POST',
+        body: { categoryId, featureId },
       }),
       transformResponse: (response: { success: boolean; data: StartResearchResponse }) => response.data,
-      invalidatesTags: (result, error, featureId) => [
-        { type: 'ResearchFeature', id: featureId },
-        { type: 'ResearchFeatures', id: 'home-defense' } // Invalidate the specific category
+      invalidatesTags: (result, error, { categoryId }) => [
+        { type: 'ResearchFeatures', id: categoryId }
       ],
     }),
-    completeResearch: builder.mutation<CompleteResearchResponse, string>({
-      query: (featureId) => ({
-        url: `/complete-research/${featureId}`,
+    completeResearch: builder.mutation<CompleteResearchResponse, { categoryId: string; featureId: string }>({
+      query: ({ categoryId, featureId }) => ({
+        url: `/complete-feature-research`,
         method: 'POST',
+        body: { categoryId, featureId },
       }),
       transformResponse: (response: { success: boolean; data: CompleteResearchResponse }) => response.data,
-      invalidatesTags: (result, error, featureId) => [
-        { type: 'ResearchFeature', id: featureId },
-        { type: 'ResearchFeatures', id: 'home-defense' } // Invalidate the specific category
+      invalidatesTags: (result, error, { categoryId }) => [
+        { type: 'ResearchFeatures', id: categoryId }
       ],
     }),
   }),
@@ -75,6 +80,7 @@ export const researchFeaturesApi = createApi({
 export const { 
   useGetFeatureStatusQuery, 
   useGetFeaturesQuery,
+  useGetUserFeaturesQuery,
   useStartResearchMutation, 
   useCompleteResearchMutation 
 } = researchFeaturesApi;

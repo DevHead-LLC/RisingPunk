@@ -13,6 +13,7 @@ type ResearchDetailScreenProps = {
   features?: ResearchFeature[];
   currentLevel?: number;
   currentBalance?: number;
+  categoryId?: string; // Add categoryId prop
   onResearchStarted?: () => void;
   children?: React.ReactNode;
 };
@@ -24,6 +25,7 @@ export function ResearchDetailScreen({
   features,
   currentLevel = 1,
   currentBalance = 0,
+  categoryId = 'home-defense', // Default to home-defense
   onResearchStarted,
   children 
 }: ResearchDetailScreenProps): React.JSX.Element {
@@ -43,6 +45,7 @@ export function ResearchDetailScreen({
           features={features}
           currentLevel={currentLevel}
           currentBalance={currentBalance}
+          categoryId={categoryId}
           onResearchStarted={onResearchStarted}
         />
       );

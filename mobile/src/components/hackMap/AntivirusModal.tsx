@@ -7,7 +7,7 @@ import { useAppSelector } from '../../store/hooks';
 import { getCurrentBalance } from '../../store/slices/balanceSlice';
 import { formatBalance } from '../common/Balance';
 import { useGetShieldStatusQuery, useActivateShieldMutation } from '../../store/api/antivirusApi';
-import { useGetFeaturesQuery } from '../../store/api/researchFeaturesApi';
+import { useGetUserFeaturesQuery } from '../../store/api/researchFeaturesApi';
 import { AntivirusShieldTimer } from './AntivirusShieldTimer';
 import { AntivirusCooldownTimer } from './AntivirusCooldownTimer';
 
@@ -76,7 +76,7 @@ export const AntivirusModal: React.FC<AntivirusModalProps> = ({
   const [activateShield, { isLoading: isActivating }] = useActivateShieldMutation();
   
   // Get research features data (same as HackMapScreen and ResearchFeaturesList)
-  const { data: researchFeatures } = useGetFeaturesQuery('home-defense');
+  const { data: researchFeatures } = useGetUserFeaturesQuery('home-defense');
   
   // Find the antivirus feature from the research features
   const antivirusFeature = researchFeatures?.find(f => f.id === 'antivirus');
