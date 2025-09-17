@@ -578,7 +578,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       });
     }
     setLastShieldStatus(isShieldActive);
-  }, [isShieldActive, lastShieldStatus, currentUserId, dynamicEntityData, updateTileShieldStatus]);
+  }, [isShieldActive, lastShieldStatus, currentUserId]);
+
+  // Store the latest updateTileShieldStatus function in a ref to avoid stale closures
+  const updateTileShieldStatusRef = useRef(updateTileShieldStatus);
+  updateTileShieldStatusRef.current = updateTileShieldStatus;
 
   // Add frequent check for shield status changes on visible tiles
   useEffect(() => {
@@ -589,8 +593,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           if (currentData) {
             Object.values(currentData).forEach((entity: any) => {
               if (entity && entity.owner === 'player' && entity.userId) {
-                // Call updateTileShieldStatus directly without dependency issues
-                updateTileShieldStatus(entity.userId, entity.isShielded || false);
+                // Use the ref to get the latest updateTileShieldStatus function
+                updateTileShieldStatusRef.current(entity.userId, entity.isShielded || false);
               }
             });
           }
@@ -600,7 +604,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }, 3000); // Check every 3 seconds to reduce re-renders while maintaining responsiveness
 
     return () => clearInterval(interval);
-  }, [isRefreshing]); // Removed updateTileShieldStatus from dependencies to prevent circular issues
+  }, [isRefreshing]); // Only depend on isRefreshing, use ref for latest function
 
   // Precompute terrain style map and position style caches
   // Memoized with stable references to prevent unnecessary re-renders

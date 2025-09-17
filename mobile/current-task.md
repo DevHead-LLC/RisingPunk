@@ -142,6 +142,13 @@ interface CellData {
 - **Solution**: Removed `updateTileShieldStatus` from useEffect dependencies
 - **Result**: Eliminated circular dependency and excessive API calls
 
+## Stale Closure Fix
+**Issue**: useEffect used stale `updateTileShieldStatus` function
+- **Problem**: Missing dependency caused outdated token/lastUpdateTime values
+- **Solution**: Used useRef to store latest function reference
+- **Implementation**: `updateTileShieldStatusRef.current` provides latest function
+- **Result**: Eliminated stale closures while avoiding circular dependencies
+
 ## Next Steps
 - Test shield icon display on map tiles
 - Verify real-time updates work for all users
