@@ -1,7 +1,7 @@
 import React, { memo, useEffect, useRef, useCallback } from 'react';
 import { View, Text, Dimensions, AppState } from 'react-native';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
-import { loadStoredAuth, updateHandle, setShowEmailVerification, setShowEmailVerificationBanner, refreshUserData } from '../store/slices/authSlice';
+import { loadStoredAuth, updateHandle, setShowEmailVerification, setShowEmailVerificationBanner, refreshUserData, logoutUser } from '../store/slices/authSlice';
 import { updateBalance, triggerUpdate } from '../store/slices/balanceSlice';
 import { setBots, setBuildState } from '../store/slices/botsSlice';
 import { syncPreferencesFromStorage, syncPreferencesFromUser } from '../store/slices/preferencesSlice';
@@ -11,16 +11,18 @@ import { useGetProfileQuery } from '../store/api/authApi';
 import { LoginScreen } from '../screens/LoginScreen';
 import { TurfScreen } from '../screens/TurfScreen';
 import { FinancialStatementsScreen } from '../screens/FinancialStatementsScreen';
-import { setFinancialStatements } from '../store/slices/uiSlice';
+import { setFinancialStatements, setGlobalErrorModal } from '../store/slices/uiSlice';
 import { useNetworkConnectivity } from '../providers/NetworkConnectivityProvider';
 import { ConnectivityOverlay } from './common/ConnectivityOverlay';
 import { HandleSelectionModal } from './modals/HandleSelectionModal';
 import { EmailVerificationModal } from './modals/EmailVerificationModal';
+import { GlobalErrorModal } from './modals/GlobalErrorModal';
 import { NotificationBanner } from './common/NotificationBanner';
 
 const AppContent = memo(() => {
   const dispatch = useAppDispatch();
   const showFinancials = useAppSelector((state) => state.ui.modals.financialStatements);
+  const showGlobalError = useAppSelector((state) => state.ui.modals.globalError);
   const { token, isLoading, showHandleSelection, showEmailVerification, showEmailVerificationBanner, user } = useAppSelector((state) => state.auth);
   const balanceDisplayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const turfScreenRef = useRef<any>(null);
@@ -158,6 +160,12 @@ const AppContent = memo(() => {
     }
   }, [dispatch]);
 
+  // Handle global error modal log out
+  const handleGlobalErrorLogOut = useCallback(() => {
+    dispatch(setGlobalErrorModal(false));
+    dispatch(logoutUser());
+  }, [dispatch]);
+
   // Determine if we should show the connectivity overlay
   // Only show when we're definitely disconnected (both flags are false)
   const shouldShowConnectivityOverlay = isConnected === false && isInternetReachable === false;
@@ -208,6 +216,10 @@ const AppContent = memo(() => {
         type="success"
         duration={5000}
         onClose={() => dispatch(setShowEmailVerificationBanner(false))}
+      />
+      <GlobalErrorModal
+        visible={showGlobalError}
+        onLogOut={handleGlobalErrorLogOut}
       />
       <ConnectivityOverlay visible={shouldShowConnectivityOverlay} />
     </>

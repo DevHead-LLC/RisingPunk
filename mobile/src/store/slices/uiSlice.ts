@@ -11,6 +11,7 @@ interface UIState {
     battleResults: boolean;
     botSelector: boolean;
     financialStatements: boolean;
+    globalError: boolean;
   };
   // Screen navigation state (for future use)
   screens: {
@@ -27,6 +28,7 @@ const initialState: UIState = {
     battleResults: false,
     botSelector: false,
     financialStatements: false,
+    globalError: false,
   },
   screens: {
     currentTurfScreen: 'home',
@@ -60,6 +62,10 @@ export const uiSlice = createSlice({
       state.modals.financialStatements = action.payload;
     },
 
+    setGlobalErrorModal: (state, action: PayloadAction<boolean>) => {
+      state.modals.globalError = action.payload;
+    },
+
     // Screen navigation actions (for future use)
     setCurrentTurfScreen: (state, action: PayloadAction<string>) => {
       state.screens.currentTurfScreen = action.payload;
@@ -74,6 +80,7 @@ export const {
   setBattleResults,
   setBotSelector,
   setFinancialStatements,
+  setGlobalErrorModal,
   setCurrentTurfScreen,
 } = uiSlice.actions;
 
