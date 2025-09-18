@@ -156,6 +156,14 @@ interface CellData {
 - **Implementation**: `lastUpdateTimeRef.current` for debouncing without circular dependency
 - **Result**: Function is now stable and only recreates when `token` changes
 
+## Critical Shield Display Bug Fix
+**Issue**: Dynamic shield updates couldn't override stale map data
+- **Problem**: `||` operator treats `false` as falsy, so `dynamicEntity.isShielded = false` falls back to stale `cell.isShielded = true`
+- **Impact**: Shields never visually deactivate, hack button stays disabled after shield expires
+- **Solution**: Changed `||` to `??` (nullish coalescing) operator
+- **Implementation**: `dynamicEntity?.isShielded ?? (cell as any).isShielded`
+- **Result**: Dynamic updates now properly override stale data, shields deactivate correctly
+
 ## Next Steps
 - Test shield icon display on map tiles
 - Verify real-time updates work for all users

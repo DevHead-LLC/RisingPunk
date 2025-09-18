@@ -90,7 +90,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     // Check for shield status in both grid data and dynamic entity data
     const key = `${x},${y}`;
     const dynamicEntity = dynamicEntityData[key];
-    const isShielded = dynamicEntity?.isShielded || (cell as any).isShielded;
+    const isShielded = dynamicEntity?.isShielded ?? (cell as any).isShielded;
     return (
       <Pressable
         style={[
