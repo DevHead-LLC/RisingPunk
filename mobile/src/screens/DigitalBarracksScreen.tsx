@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,11 @@ import { Balance } from '../components/common/Balance';
 import { CloseButton } from '../components/common/CloseButton';
 import { useAppSelector } from '../store/hooks';
 import { SIZING } from '../styles/theme';
-import { COLORS } from '../styles/theme';
+import { useThemeColors } from '../hooks/useThemeColors';
+import { useTheme } from '../context/ThemeContext';
 import { BotType } from '../types/bots';
 import { useFetchBotStatsQuery } from '../store/api/botsApi';
+import { formatNumber } from '../utils/formatUtils';
 
 type MarkLevel = 1 | 2 | 3 | 4;
 
@@ -21,6 +23,10 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
   const botCounts = useAppSelector((state) => state.bots.botCounts);
   const [selectedMark, setSelectedMark] = useState<MarkLevel>(1);
   const { data: botStatsData, isLoading: botStatsLoading } = useFetchBotStatsQuery();
+  const colors = useThemeColors();
+  const { themeMode } = useTheme();
+
+  const styles = useMemo(() => createStyles(colors, themeMode), [colors, themeMode]);
 
   const BotCard = ({ type }: { type: BotType }) => {
     const hackerLore = {
@@ -67,7 +73,7 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
         <View style={styles.botContent}>
           <View style={styles.countRow}>
             <Text style={styles.countLabel}>Available:</Text>
-            <Text style={styles.countValue}>{botCounts?.[type] || 0}</Text>
+            <Text style={styles.countValue}>{formatNumber(botCounts?.[type] || 0)}</Text>
             <View style={styles.deployedContainer}>
               <Text style={styles.countLabel}>Deployed: 0</Text>
             </View>
@@ -181,7 +187,7 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total Army Size:</Text>
             <Text style={styles.totalCount}>
-              {botCounts ? Object.values(botCounts).reduce((a, b) => a + b, 0) : 0}
+              {formatNumber(botCounts ? Object.values(botCounts).reduce((a, b) => a + b, 0) : 0)}
             </Text>
           </View>
           <ArmyComposition />
@@ -207,10 +213,10 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light' | 'dark') => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -221,7 +227,7 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   title: {
-    color: '#fff',
+    color: colors.text.primary,
     fontSize: 24,
     fontWeight: 'bold',
     textAlign: 'center',
@@ -231,13 +237,13 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   totalContainer: {
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: themeMode === 'light' ? 'rgba(0, 0, 0, 0.05)' : 'rgba(0, 0, 0, 0.3)',
     borderRadius: 8,
     padding: SIZING.spacing.md,
     marginHorizontal: SIZING.spacing.md,
     marginBottom: SIZING.spacing.md,
     borderWidth: 1,
-    borderColor: 'rgba(0, 255, 255, 0.1)',
+    borderColor: themeMode === 'light' ? 'rgba(0, 100, 0, 0.2)' : 'rgba(0, 255, 255, 0.1)',
   },
   totalRow: {
     flexDirection: 'row',
@@ -245,12 +251,12 @@ const styles = StyleSheet.create({
     marginBottom: SIZING.spacing.sm,
   },
   totalLabel: {
-    color: COLORS.text.primary,
+    color: colors.text.primary,
     fontSize: SIZING.font.body,
     marginRight: SIZING.spacing.sm,
   },
   totalCount: {
-    color: '#00FF41',
+    color: colors.text.accent,
     fontSize: SIZING.font.h2,
     fontWeight: 'bold',
   },
@@ -260,24 +266,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: SIZING.spacing.lg,
     paddingVertical: SIZING.spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 255, 65, 0.2)',
+    borderBottomColor: themeMode === 'light' ? 'rgba(0, 100, 0, 0.3)' : 'rgba(0, 255, 65, 0.2)',
   },
   markButton: {
     paddingVertical: SIZING.spacing.xs,
     paddingHorizontal: SIZING.spacing.sm,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: 'rgba(0, 255, 65, 0.4)',
-    backgroundColor: 'rgba(26, 77, 51, 0.1)',
+    borderColor: themeMode === 'light' ? 'rgba(0, 100, 0, 0.6)' : 'rgba(0, 255, 65, 0.4)',
+    backgroundColor: themeMode === 'light' ? 'rgba(0, 100, 0, 0.1)' : 'rgba(26, 77, 51, 0.1)',
     minWidth: 70,
     alignItems: 'center',
   },
   selectedMark: {
-    backgroundColor: 'rgba(26, 77, 51, 0.4)',
-    borderColor: 'rgba(0, 255, 65, 0.8)',
+    backgroundColor: themeMode === 'light' ? 'rgba(0, 100, 0, 0.2)' : 'rgba(26, 77, 51, 0.4)',
+    borderColor: themeMode === 'light' ? 'rgba(0, 100, 0, 0.8)' : 'rgba(0, 255, 65, 0.8)',
   },
   markText: {
-    color: COLORS.text.primary,
+    color: colors.text.primary,
     fontSize: SIZING.font.small,
     fontWeight: 'bold',
   },
@@ -285,12 +291,12 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   botCard: {
-    backgroundColor: 'rgba(26, 77, 51, 0.3)',
+    backgroundColor: themeMode === 'light' ? 'rgba(0, 100, 0, 0.1)' : 'rgba(26, 77, 51, 0.3)',
     borderRadius: 8,
     padding: SIZING.spacing.sm,
     marginBottom: SIZING.spacing.md,
     borderWidth: 1,
-    borderColor: 'rgba(0, 255, 65, 0.4)',
+    borderColor: themeMode === 'light' ? 'rgba(0, 100, 0, 0.3)' : 'rgba(0, 255, 65, 0.4)',
   },
   botHeader: {
     flexDirection: 'row',
@@ -299,12 +305,12 @@ const styles = StyleSheet.create({
     marginBottom: SIZING.spacing.xs,
   },
   botName: {
-    color: '#2196F3',
+    color: colors.secondary,
     fontSize: SIZING.font.h2,
     fontWeight: 'bold',
   },
   botRole: {
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: colors.text.secondary,
     fontSize: SIZING.font.body,
   },
   botContent: {
@@ -314,16 +320,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 255, 65, 0.2)',
+    borderBottomColor: themeMode === 'light' ? 'rgba(0, 100, 0, 0.3)' : 'rgba(0, 255, 65, 0.2)',
     paddingBottom: SIZING.spacing.xs,
   },
   countLabel: {
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: colors.text.secondary,
     fontSize: SIZING.font.body,
     marginRight: SIZING.spacing.sm,
   },
   countValue: {
-    color: '#00FF41',
+    color: colors.text.accent,
     fontSize: SIZING.font.body,
     fontWeight: 'bold',
     marginRight: SIZING.spacing.lg,
@@ -340,22 +346,22 @@ const styles = StyleSheet.create({
     flex: 3,
   },
   lockedText: {
-    color: COLORS.text.secondary,
+    color: colors.text.secondary,
     fontSize: SIZING.font.body,
     textAlign: 'center',
     marginVertical: SIZING.spacing.lg,
   },
   hackerLore: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: colors.text.primary,
     fontSize: SIZING.font.small,
     fontStyle: 'italic',
     borderLeftWidth: 2,
-    borderLeftColor: '#4717F6',
+    borderLeftColor: colors.secondary,
     paddingLeft: SIZING.spacing.xs,
     marginBottom: SIZING.spacing.lg,
   },
   advantageText: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: colors.text.secondary,
     fontSize: SIZING.font.small,
     fontStyle: 'italic',
     paddingLeft: SIZING.spacing.xs,
@@ -370,12 +376,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statLabel: {
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: colors.text.secondary,
     fontSize: SIZING.font.small,
     flex: 1,
   },
   statValue: {
-    color: '#9C27B0',
+    color: colors.primary,
     fontSize: SIZING.font.body,
     fontWeight: 'bold',
     marginLeft: SIZING.spacing.sm,
@@ -385,7 +391,7 @@ const styles = StyleSheet.create({
   },
   barContainer: {
     height: 6,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: themeMode === 'light' ? 'rgba(0, 0, 0, 0.1)' : 'rgba(0, 0, 0, 0.3)',
     borderRadius: 3,
     flexDirection: 'row',
     overflow: 'hidden',
@@ -410,7 +416,7 @@ const styles = StyleSheet.create({
     marginRight: SIZING.spacing.xs,
   },
   legendText: {
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: colors.text.secondary,
     fontSize: SIZING.font.small,
   },
 });
