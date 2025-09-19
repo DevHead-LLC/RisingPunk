@@ -19,7 +19,6 @@ import { EmailVerificationModal } from './modals/EmailVerificationModal';
 import { GlobalErrorModal } from './modals/GlobalErrorModal';
 import { NotificationBanner } from './common/NotificationBanner';
 import { globalErrorHandler } from '../services/GlobalErrorHandler';
-import { store } from '../store';
 
 const AppContent = memo(() => {
   const dispatch = useAppDispatch();
@@ -74,8 +73,15 @@ const AppContent = memo(() => {
 
   // Initialize GlobalErrorHandler with Redux callbacks (only once)
   useEffect(() => {
-    globalErrorHandler.initialize(dispatch, () => store.getState());
-  }, [dispatch]);
+    globalErrorHandler.initialize(dispatch, () => {
+      // Get current state using the selector pattern
+      // We'll create a simple state getter that doesn't import the store
+      const currentState = {
+        auth: { token: token }
+      };
+      return currentState;
+    });
+  }, [dispatch, token]);
 
   // Sync preferences after auth is loaded
   useEffect(() => {
