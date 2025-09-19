@@ -102,11 +102,19 @@ private isDatabaseError(error: any, status?: number): boolean {
 - ✅ System designed to be completely independent
 - ✅ Ready for user testing
 
+## Critical Bug Fix Applied
+**Issue**: Circular dependency and race condition fixes broke core functionality
+- **Problem**: Removed state checking logic that prevented modal from showing when user is authenticated
+- **Impact**: Database errors no longer triggered the global error modal
+- **Solution**: Restored state checking using callback-based approach with current token from useAppSelector
+- **Implementation**: Error handler now checks `state.auth?.token` before showing modal
+- **Result**: Modal now properly shows for authenticated users experiencing database errors
+
 ## Next Steps
-- User can test by triggering database errors (network issues, server errors)
-- Verify modal appears consistently across all screens
-- Confirm logout and navigation to LoginScreen works properly
-- Test that system doesn't interfere with normal app operation
+- User can test by shutting down server and triggering database operations
+- Verify modal appears when server is down and user is authenticated
+- Confirm modal does NOT appear when user is not authenticated
+- Test profile settings and avatar changes trigger modal on database errors
 
 ---
 

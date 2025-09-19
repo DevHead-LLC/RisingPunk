@@ -4,19 +4,27 @@ export class GlobalErrorHandler {
   private dispatchCallback: ((action: any) => void) | null = null;
   private getStateCallback: (() => any) | null = null;
 
-  private constructor() {}
+  private constructor(dispatch?: (action: any) => void, getState?: () => any) {
+    this.dispatchCallback = dispatch || null;
+    this.getStateCallback = getState || null;
+  }
 
-  static getInstance(): GlobalErrorHandler {
+  static getInstance(dispatch?: (action: any) => void, getState?: () => any): GlobalErrorHandler {
     if (!GlobalErrorHandler.instance) {
-      GlobalErrorHandler.instance = new GlobalErrorHandler();
+      GlobalErrorHandler.instance = new GlobalErrorHandler(dispatch, getState);
     }
     return GlobalErrorHandler.instance;
   }
 
-  // Initialize with Redux store callbacks to avoid circular dependency
-  initialize(dispatch: (action: any) => void, getState: () => any): void {
+  // Update callbacks if needed (for cases where store isn't ready during instantiation)
+  updateCallbacks(dispatch: (action: any) => void, getState: () => any): void {
     this.dispatchCallback = dispatch;
     this.getStateCallback = getState;
+  }
+
+  // Backward compatibility method
+  initialize(dispatch: (action: any) => void, getState: () => any): void {
+    this.updateCallbacks(dispatch, getState);
   }
 
   handleDatabaseError(error: any): void {
@@ -35,9 +43,12 @@ export class GlobalErrorHandler {
       return;
     }
 
+    // Get current state to check if user is authenticated
     const state = this.getStateCallback();
     
+    // Only show modal if user is authenticated (has token)
     if (!state.auth?.token) {
+      console.log('🔴 GLOBAL ERROR HANDLER: User not authenticated, skipping modal');
       this.isHandlingError = false;
       return;
     }
@@ -96,4 +107,9 @@ export class GlobalErrorHandler {
   }
 }
 
+// Export the class and a function to get the instance
+export const getGlobalErrorHandler = (dispatch?: (action: any) => void, getState?: () => any) => 
+  GlobalErrorHandler.getInstance(dispatch, getState);
+
+// Backward compatibility export
 export const globalErrorHandler = GlobalErrorHandler.getInstance();
