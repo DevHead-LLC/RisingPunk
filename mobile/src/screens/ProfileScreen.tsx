@@ -20,6 +20,7 @@ import { useFetchBotStatsQuery } from '../store/api/botsApi';
 import { SIZING } from '../styles/theme';
 import { useTheme } from '../context/ThemeContext';
 import { useThemeColors } from '../hooks/useThemeColors';
+import { useResponsiveDimensions } from '../hooks/useResponsiveDimensions';
 import { PrivacyPolicyModal } from '../components/profile/PrivacyPolicyModal';
 import { TermsOfServiceModal } from '../components/profile/TermsOfServiceModal';
 import { DeleteAccountModal } from '../components/profile/DeleteAccountModal';
@@ -54,7 +55,7 @@ interface UserProfile {
 
 type TabType = 'profile' | 'settings' | 'account' | 'content';
 
-const createProfileStyles = (colors: any) => StyleSheet.create({
+const createProfileStyles = (colors: any, screenWidth: number, scaleFactor: number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -64,10 +65,9 @@ const createProfileStyles = (colors: any) => StyleSheet.create({
     flex: 1,
   },
   leftSidebar: {
-    width: SIZING.spacing.md * 8,
+    width: SIZING.spacing.md * 11,
     backgroundColor: colors.background + '33',
     paddingVertical: SIZING.spacing.md,
-    paddingRight: SIZING.spacing.sm,
     borderRightWidth: 1,
     borderRightColor: colors.text.primary + '1A',
     alignItems: 'center',
@@ -83,7 +83,7 @@ const createProfileStyles = (colors: any) => StyleSheet.create({
     borderRadius: 8,
     minHeight: 40,
     justifyContent: 'center',
-    width: '80%',
+    width: '70%', // Increased from 80% to 90% for wider tabs
   },
   activeLeftTab: {
     backgroundColor: colors.matrix + '1A',
@@ -92,10 +92,10 @@ const createProfileStyles = (colors: any) => StyleSheet.create({
   },
   leftTabText: {
     color: colors.text.primary + '99',
-    fontSize: SIZING.font.small,
+    fontSize: Math.max(SIZING.font.small * 0.95, 12), // Slightly smaller text, minimum 12px
     fontWeight: 'bold',
     textAlign: 'center',
-    lineHeight: SIZING.font.small + 4,
+    lineHeight: Math.max(SIZING.font.small * 0.95, 12) + 2, // Adjusted line height
   },
   activeLeftTabText: {
     color: colors.matrix,
@@ -104,6 +104,7 @@ const createProfileStyles = (colors: any) => StyleSheet.create({
   rightContent: {
     flex: 1,
     padding: SIZING.spacing.md,
+    maxWidth: screenWidth * 0.7, // Ensure right content doesn't exceed 75% of screen width
   },
   scrollView: {
     flex: 1,
@@ -497,12 +498,13 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const { themeMode, toggleTheme } = useTheme();
   const colors = useThemeColors();
   const profileGender = useAppSelector((state) => state.preferences.profileGender);
+  const { width: screenWidth, scaleFactor } = useResponsiveDimensions();
 
   const [updatePreferences] = useUpdatePreferencesMutation();
   const [deleteAccount] = useDeleteAccountMutation();
 
   
-  const styles = useMemo(() => createProfileStyles(colors), [colors]);
+  const styles = useMemo(() => createProfileStyles(colors, screenWidth, scaleFactor), [colors, screenWidth, scaleFactor]);
   
   // Use existing working APIs - only when authenticated
   const { data: profileData, isLoading: profileLoading, error: profileError, refetch } = useGetProfileQuery(undefined, {
