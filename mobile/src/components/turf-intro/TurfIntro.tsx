@@ -8,9 +8,10 @@ type TurfIntroProps = {
   onComplete: () => void;
   onSkip: () => void;
   horizontalScrollRef?: React.RefObject<any>;
+  onStepChange?: (currentStep: 'home' | 'barracks' | 'research' | 'investment1' | 'wallet' | 'profile') => void;
 };
 
-export const TurfIntro: React.FC<TurfIntroProps> = ({ onComplete, onSkip, horizontalScrollRef }) => {
+export const TurfIntro: React.FC<TurfIntroProps> = ({ onComplete, onSkip, horizontalScrollRef, onStepChange }) => {
   const dispatch = useAppDispatch();
   const [currentStep, setCurrentStep] = useState<'home' | 'barracks' | 'research' | 'investment1' | 'wallet' | 'profile'>('home');
 
@@ -29,6 +30,13 @@ export const TurfIntro: React.FC<TurfIntroProps> = ({ onComplete, onSkip, horizo
       });
     }
   }, [horizontalScrollRef]);
+
+  // Notify parent of step changes
+  useEffect(() => {
+    if (onStepChange) {
+      onStepChange(currentStep);
+    }
+  }, [currentStep, onStepChange]);
 
   const handleContinue = useCallback(() => {
     if (currentStep === 'home') {
@@ -163,41 +171,6 @@ export const TurfIntro: React.FC<TurfIntroProps> = ({ onComplete, onSkip, horizo
 
   return (
     <View style={styles.container}>
-      {/* Overlay sections covering everything except highlighted location */}
-      {currentStep === 'wallet' ? (
-        // For wallet step, create overlay that highlights top-left wallet area
-        <>
-          <View style={[styles.overlayTop, {
-            height: '3%' 
-          }]} />
-          <View style={[styles.overlayLeft, {
-            width: '1%'
-          }]} />
-          <View style={[styles.overlayRight, {
-            width: '81%'
-          }]} />
-          <View style={[styles.overlayBottom, {
-            height: '86%'
-          }]} />
-        </>
-      ) : currentStep === 'profile' ? (
-        // For profile step, create overlay that highlights top-right profile area
-        <>
-          <View style={[styles.overlayTop, { height: '3%' }]} />
-          <View style={[styles.overlayLeft, { width: '89%' }]} />
-          <View style={[styles.overlayRight, { width: '1%' }]} />
-          <View style={[styles.overlayBottom, { height: '78%' }]} />
-        </>
-      ) : (
-        // For all other steps, use standard overlay
-        <>
-          <View style={styles.overlayTop} />
-          <View style={styles.overlayLeft} />
-          <View style={styles.overlayRight} />
-          <View style={styles.overlayBottom} />
-        </>
-      )}
-      
       {/* Text overlay */}
       <TurfIntroText 
         text={getIntroText()}
@@ -220,38 +193,4 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 1000,
   },
-          overlayTop: {
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '25%',
-          backgroundColor: '#000000',
-          zIndex: 1001,
-        },
-        overlayLeft: {
-          position: 'absolute',
-          left: 0,
-          height: '100%',
-          width: '25%',
-          backgroundColor: '#000000',
-          zIndex: 1001,
-        },
-        overlayRight: {
-          position: 'absolute',
-          right: 0,
-          height: '100%',
-          width: '54%',
-          backgroundColor: '#000000',
-          zIndex: 1001,
-        },
-        overlayBottom: {
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: '30%',
-          backgroundColor: '#000000',
-          zIndex: 1001,
-        },
 });

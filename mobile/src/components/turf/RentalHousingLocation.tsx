@@ -21,6 +21,7 @@ type RentalHousingLocationProps = {
   onNavigateToRentalHousing?: () => void;
   onNavigateToFloorPlan?: (propertyId: number) => void;
   showTimer?: boolean;
+  isIntroActive?: boolean;
 };
 
 export const RentalHousingLocation = memo(function RentalHousingLocation({ 
@@ -28,7 +29,8 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
   onNavigateToRentalHousing,
   propertyId = 1,
   onNavigateToFloorPlan,
-  showTimer = true
+  showTimer = true,
+  isIntroActive = false
 }: RentalHousingLocationProps) {
   const colors = useThemeColors();
   const { themeMode } = useTheme();
@@ -165,6 +167,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
             onPress={() => {}}
             size={100}
             iconSize={85}
+            isIntroActive={isIntroActive}
           />
           <Text style={[styles.propertyNumber, { color: themeMode === 'light' ? '#FFFFFF' : colors.matrix }]}>{propertyId}</Text>
         </View>
@@ -184,6 +187,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
           onPress={handlePress}
           size={100}
           iconSize={85}
+          isIntroActive={isIntroActive}
         />
         <Text style={[styles.propertyNumber, { color: themeMode === 'light' ? '#FFFFFF' : colors.matrix }]}>{propertyId}</Text>
       </View>

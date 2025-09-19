@@ -90,6 +90,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   
   // Turf Intro state
   const showTurfIntro = useAppSelector((state) => state.auth.showTurfIntro);
+  const [currentIntroStep, setCurrentIntroStep] = useState<'home' | 'barracks' | 'research' | 'investment1' | 'wallet' | 'profile' | null>(null);
 
   // Email verification state
   const { user, showEmailVerification, emailVerificationPromptedUserId } = useAppSelector((state) => state.auth);
@@ -307,6 +308,9 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const handleTurfIntroComplete = useCallback(() => {
     console.log('Turf Intro completed');
     
+    // Reset intro step
+    setCurrentIntroStep(null);
+    
     // Center the view on home/digital barracks after turf intro completion
     setTimeout(() => {
       const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -329,6 +333,9 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const handleTurfIntroSkip = useCallback(() => {
     console.log('Turf Intro skipped');
     
+    // Reset intro step
+    setCurrentIntroStep(null);
+    
     // Center the view on home/digital barracks after skipping turf intro
     setTimeout(() => {
       const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -347,6 +354,10 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       dispatch(setEmailVerificationPrompted(user._id));
     }
   }, [user, emailVerificationPromptedUserId, dispatch]);
+
+  const handleTurfIntroStepChange = useCallback((step: 'home' | 'barracks' | 'research' | 'investment1' | 'wallet' | 'profile') => {
+    setCurrentIntroStep(step);
+  }, []);
 
   const navigateToScreen = useCallback((screen: 'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research' | 'investmentProperty') => {
     const previousScreenBeforeUpdate = currentScreen;
@@ -550,23 +561,26 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         return (
           <View style={[styles.container, { backgroundColor: colors.background }]}>
             <ErrorBoundary>
-              <Balance />
+              <Balance isIntroActive={currentIntroStep === 'wallet'} />
             </ErrorBoundary>
             <View style={styles.scrollWrapper}>
               <ScrollViewMemo horizontalScrollRef={horizontalScrollRef} onScroll={handleTurfScroll}>
                 <View style={[styles.scrollContent, { backgroundColor: colors.background, borderColor: colors.secondary + '99' }]}>
                   <DiagonalLines colors={colors} />
                   <View style={[styles.digitalGround, { backgroundColor: colors.matrix + '0D', borderColor: colors.matrix + '33' }]}>
-                    <HomeLocation onPress={() => navigateToScreen('hackRig')} />
-                    <DigitalBarracksLocation onPress={() => navigateToScreen('barracks')} />
+                    <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />
+                    <DigitalBarracksLocation onPress={() => navigateToScreen('barracks')} isIntroActive={currentIntroStep === 'barracks'} />
                   </View>
-                  <ResearchCenterLocation onNavigateToResearch={() => {
-                    // Capture current turf view position before navigating
-                    if (currentScrollPositionRef.current) {
-                      setTurfViewPosition(currentScrollPositionRef.current);
-                    }
-                    navigateToScreen('research');
-                  }} />
+                  <ResearchCenterLocation 
+                    onNavigateToResearch={() => {
+                      // Capture current turf view position before navigating
+                      if (currentScrollPositionRef.current) {
+                        setTurfViewPosition(currentScrollPositionRef.current);
+                      }
+                      navigateToScreen('research');
+                    }} 
+                    isIntroActive={currentIntroStep === 'research'}
+                  />
                   <DevelopmentZone buildingProperties={buildingProperties}>
                     {/* Property 2: Conditionally render based on Property 1's unlock status */}
                     {(() => {
@@ -576,6 +590,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                           onNavigateToRentalHousing={() => navigateToScreen('turf')}
                           onNavigateToFloorPlan={navigateToFloorPlan}
                           showTimer={false}
+                          isIntroActive={currentIntroStep === 'investment1'}
                         />
                       ) : (
                         <FutureBuildingPlaceholder propertyNumber={2} />
@@ -590,6 +605,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                           onNavigateToRentalHousing={() => navigateToScreen('turf')}
                           onNavigateToFloorPlan={navigateToFloorPlan}
                           showTimer={false}
+                          isIntroActive={currentIntroStep === 'investment1'}
                         />
                       ) : (
                         <FutureBuildingPlaceholder propertyNumber={3} />
@@ -601,6 +617,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                       onNavigateToRentalHousing={() => navigateToScreen('turf')}
                       onNavigateToFloorPlan={navigateToFloorPlan}
                       showTimer={false}
+                      isIntroActive={currentIntroStep === 'investment1'}
                     />
 
                     {/* Property 4: Conditionally render based on Properties 1, 2 & 3 being unlocked */}
@@ -611,6 +628,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                           onNavigateToRentalHousing={() => navigateToScreen('turf')}
                           onNavigateToFloorPlan={navigateToFloorPlan}
                           showTimer={false}
+                          isIntroActive={currentIntroStep === 'investment1'}
                         />
                       ) : (
                         <FutureBuildingPlaceholder propertyNumber={4} />
@@ -620,11 +638,11 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                 </View>
               </ScrollViewMemo>
             </View>
-            <ProfileLocation onPress={() => navigateToScreen('profile')} />
+            <ProfileLocation onPress={() => navigateToScreen('profile')} isIntroActive={currentIntroStep === 'profile'} />
           </View>
         );
     }
-  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip]);
+  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep]);
 
   return (
     <>
@@ -640,6 +658,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           onComplete={handleTurfIntroComplete}
           onSkip={handleTurfIntroSkip}
           horizontalScrollRef={horizontalScrollRef}
+          onStepChange={handleTurfIntroStepChange}
         />
       )}
     </>

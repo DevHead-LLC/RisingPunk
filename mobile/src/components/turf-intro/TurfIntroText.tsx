@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 
 type TurfIntroTextProps = {
   text: string;
@@ -11,6 +11,22 @@ type TurfIntroTextProps = {
 };
 
 export const TurfIntroText: React.FC<TurfIntroTextProps> = ({ text, onComplete, onSkip, buttonText = 'Continue', centerText = false, showSkipButton = true }) => {
+  const screenWidth = Dimensions.get('window').width;
+  const screenHeight = Dimensions.get('window').height;
+  
+  // Calculate responsive dimensions
+  const textContainerWidth = Math.min(screenWidth * 0.35, 320); // 35% of screen width, max 320px
+  const textContainerMaxWidth = Math.min(screenWidth * 0.4, 350); // 40% of screen width, max 350px
+  
+  // Calculate responsive font size
+  const baseFontSize = Math.max(screenWidth * 0.04, 14); // 4% of screen width, minimum 14px
+  const fontSize = Math.min(baseFontSize, 18); // Maximum 18px
+  
+  // Calculate responsive positioning
+  const rightOffset = Math.max(screenWidth * 0.1, 20); // 6% of screen width, minimum 20px (moved 2% left)
+  const centerOffsetX = textContainerWidth / 2; // Half the container width for centering
+  const centerOffsetY = screenHeight * 0.3; // 20% of screen height for vertical centering
+  
   return (
     <View style={styles.container}>
       {/* Skip button at top right - only show if showSkipButton is true */}
@@ -26,9 +42,21 @@ export const TurfIntroText: React.FC<TurfIntroTextProps> = ({ text, onComplete, 
       {/* Explanatory text - positioned based on centerText prop */}
       <View style={[
         styles.textContainer, 
-        centerText ? styles.textContainerCentered : styles.textContainerRight
+        centerText ? {
+          left: '50%',
+          top: '50%',
+          transform: [{ translateX: -centerOffsetX }, { translateY: -centerOffsetY }],
+        } : {
+          top: '50%',
+          right: rightOffset,
+          transform: [{ translateY: -centerOffsetY }],
+        },
+        {
+          width: textContainerWidth,
+          maxWidth: textContainerMaxWidth,
+        }
       ]}>
-        <Text style={styles.text}>{text}</Text>
+        <Text style={[styles.text, { fontSize }]}>{text}</Text>
         <TouchableOpacity 
           style={styles.continueButton} 
           onPress={onComplete}
@@ -51,61 +79,63 @@ const styles = StyleSheet.create({
   },
   skipButton: {
     position: 'absolute',
-    top: 50,
-    right: 20,
+    top: '6%',
+    left: '50%',
+    transform: [{ translateX: -30 }], // Half of approximate button width for centering
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     zIndex: 1004,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#000000',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   skipText: {
     fontSize: 14,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: '#FFFFFF',
   },
   textContainer: {
     position: 'absolute',
-    width: 280,
-    padding: 20,
+    padding: '4%',
     borderRadius: 12,
     alignItems: 'center',
     zIndex: 1004,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  textContainerCentered: {
-    left: '50%',
-    top: '50%',
-    transform: [{ translateX: -140 }, { translateY: -100 }],
-  },
-  textContainerRight: {
-    top: '45%',
-    right: 200,
-    transform: [{ translateY: -100 }],
-  },
-  text: {
-    fontSize: 16,
-    lineHeight: 24,
-    textAlign: 'center',
-    marginBottom: 20,
-    fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  continueButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: '#000000',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  text: {
+    lineHeight: 24,
+    textAlign: 'center',
+    marginBottom: '5%',
+    fontWeight: '500',
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  continueButton: {
+    paddingHorizontal: '6%',
+    paddingVertical: '3%',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    minWidth: '60%',
   },
   continueText: {
     fontSize: 16,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: '#FFFFFF',
+    textAlign: 'center',
   },
 });
