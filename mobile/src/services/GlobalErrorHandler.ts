@@ -1,10 +1,8 @@
-import { store } from '../store';
-import { logoutUser } from '../store/slices/authSlice';
-import { setGlobalErrorModal } from '../store/slices/uiSlice';
-
 export class GlobalErrorHandler {
   private static instance: GlobalErrorHandler;
   private isHandlingError = false;
+  private dispatchCallback: ((action: any) => void) | null = null;
+  private getStateCallback: (() => any) | null = null;
 
   private constructor() {}
 
@@ -13,6 +11,12 @@ export class GlobalErrorHandler {
       GlobalErrorHandler.instance = new GlobalErrorHandler();
     }
     return GlobalErrorHandler.instance;
+  }
+
+  // Initialize with Redux store callbacks to avoid circular dependency
+  initialize(dispatch: (action: any) => void, getState: () => any): void {
+    this.dispatchCallback = dispatch;
+    this.getStateCallback = getState;
   }
 
   handleDatabaseError(error: any): void {
@@ -24,9 +28,16 @@ export class GlobalErrorHandler {
 
     console.error('🔴 GLOBAL ERROR HANDLER: Database fetch error detected:', error);
 
-    const state = store.getState();
+    // Check if we have the callbacks initialized
+    if (!this.dispatchCallback || !this.getStateCallback) {
+      console.warn('🔴 GLOBAL ERROR HANDLER: Not initialized with Redux callbacks');
+      this.isHandlingError = false;
+      return;
+    }
+
+    const state = this.getStateCallback();
     
-    if (!state.auth.token) {
+    if (!state.auth?.token) {
       this.isHandlingError = false;
       return;
     }
@@ -37,7 +48,7 @@ export class GlobalErrorHandler {
     if (isDatabaseError) {
       console.log('🔴 GLOBAL ERROR HANDLER: Database error confirmed, showing modal');
       
-      store.dispatch(setGlobalErrorModal(true));
+      this.dispatchCallback({ type: 'ui/setGlobalErrorModal', payload: true });
       this.isHandlingError = false;
     } else {
       this.isHandlingError = false;
@@ -51,7 +62,7 @@ export class GlobalErrorHandler {
       return true;
     }
 
-    if (status >= 500) {
+    if (status && status >= 500) {
       return true;
     }
 
