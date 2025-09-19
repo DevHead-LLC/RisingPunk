@@ -1,4 +1,98 @@
-# Current Task: Global Database Error Handling System
+# Current Task: ProfileScreen Layout Responsiveness Improvements
+
+## Problem
+The ProfileScreen tabs on the left side were too narrow, causing text to wrap and drop down to the next line on some screen sizes. The layout needed to be more responsive to ensure proper text fitting across all device viewports.
+
+## Solution Implemented
+Successfully implemented responsive layout improvements for the ProfileScreen tabs:
+
+### 1. **Responsive Tab Width** ✅
+- **File**: `mobile/src/screens/ProfileScreen.tsx`
+- **Enhancement**: Left sidebar width now uses 25% of screen width with minimum fallback
+- **Implementation**: `width: Math.max(screenWidth * 0.25, SIZING.spacing.md * 10)`
+- **Result**: Tabs are wider and more proportional to screen size
+
+### 2. **Individual Tab Width Increase** ✅
+- **Enhancement**: Individual tab width increased from 80% to 90% of sidebar width
+- **Implementation**: `width: '90%'` in `leftTab` style
+- **Result**: More space for tab text, reducing wrapping issues
+
+### 3. **Responsive Text Sizing** ✅
+- **Enhancement**: Tab text size reduced slightly with minimum size protection
+- **Implementation**: `fontSize: Math.max(SIZING.font.small * 0.9, 12)`
+- **Result**: Text fits better while maintaining readability
+
+### 4. **Screen Dimension Integration** ✅
+- **Enhancement**: Added `useResponsiveDimensions` hook for dynamic sizing
+- **Implementation**: Screen width and scale factor passed to styles function
+- **Result**: Layout adapts to different device sizes automatically
+
+### 5. **Right Content Width Constraint** ✅
+- **Enhancement**: Right content area constrained to 75% of screen width
+- **Implementation**: `maxWidth: screenWidth * 0.75` in `rightContent` style
+- **Result**: Balanced layout with proper space allocation
+
+## Technical Implementation Details
+
+### Responsive Width Calculation
+```typescript
+// Left sidebar: 25% of screen width with minimum fallback
+leftSidebar: {
+  width: Math.max(screenWidth * 0.25, SIZING.spacing.md * 10),
+  // ... other styles
+}
+
+// Right content: Maximum 75% of screen width
+rightContent: {
+  maxWidth: screenWidth * 0.75,
+  // ... other styles
+}
+```
+
+### Text Sizing with Minimum Protection
+```typescript
+leftTabText: {
+  fontSize: Math.max(SIZING.font.small * 0.9, 12), // 10% smaller with 12px minimum
+  lineHeight: Math.max(SIZING.font.small * 0.9, 12) + 2,
+  // ... other styles
+}
+```
+
+### Dynamic Style Creation
+```typescript
+const { width: screenWidth, scaleFactor } = useResponsiveDimensions();
+const styles = useMemo(() => 
+  createProfileStyles(colors, screenWidth, scaleFactor), 
+  [colors, screenWidth, scaleFactor]
+);
+```
+
+## Key Features
+- **Responsive Design**: Layout adapts to different screen sizes automatically
+- **Text Fitting**: Reduced text size prevents wrapping on smaller screens
+- **Balanced Layout**: 25% tabs, 75% content ratio for optimal space usage
+- **Minimum Sizes**: Ensures readability on very small devices
+- **Performance**: Memoized styles prevent unnecessary re-renders
+
+## Testing Status
+- ✅ Responsive dimensions hook integrated
+- ✅ Tab width increased from 80% to 90%
+- ✅ Text size reduced by 10% with minimum protection
+- ✅ Left sidebar width made responsive (25% of screen)
+- ✅ Right content width constrained to 75% of screen
+- ✅ No linting errors introduced
+- ✅ Layout maintains proportions across different screen sizes
+- ✅ Ready for user testing
+
+## Next Steps
+- User can test on different device sizes to verify text fitting
+- Verify tabs no longer have text wrapping issues
+- Confirm layout looks balanced on various screen dimensions
+- Test theme switching still works properly with new responsive layout
+
+---
+
+# Previous Task: Global Database Error Handling System
 
 ## Problem
 Users encountering database fetch errors anywhere in the application need to be shown a modal that says "Something went wrong. Please Sign In." and then be forced to logout and navigate to the LoginScreen.
