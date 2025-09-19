@@ -1,6 +1,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { RootState } from '../index';
 import { API_URL } from '../../config';
+import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 
 export interface LoginRequest {
   handle: string;
@@ -106,9 +107,9 @@ export interface CompleteRentalHousingResponse {
   isUnlocked: boolean;
 }
 
-export const authApi = createApi({
-  reducerPath: 'authApi',
-  baseQuery: fetchBaseQuery({
+// Custom base query with error handling for authApi
+const authBaseQuery = async (args: any, api: any, extraOptions: any) => {
+  const result = await fetchBaseQuery({
     baseUrl: API_URL,
     prepareHeaders: (headers, { getState }) => {
       const state = getState() as RootState;
@@ -121,7 +122,18 @@ export const authApi = createApi({
       headers.set('Content-Type', 'application/json');
       return headers;
     },
-  }),
+  })(args, api, extraOptions);
+
+  if (result.error) {
+    globalErrorHandler.handleDatabaseError(result.error);
+  }
+
+  return result;
+};
+
+export const authApi = createApi({
+  reducerPath: 'authApi',
+  baseQuery: authBaseQuery,
   tagTypes: ['User'],
   endpoints: (builder) => ({
     login: builder.mutation<AuthResponse, LoginRequest>({

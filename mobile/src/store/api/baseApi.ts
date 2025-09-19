@@ -2,11 +2,11 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
 import type { RootState } from '../index';
 import { getDeviceId } from '../../utils/deviceId';
+import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 
-// Base API configuration
-export const baseApi = createApi({
-  reducerPath: 'api',
-  baseQuery: fetchBaseQuery({
+// Custom base query with global error handling
+const baseQueryWithErrorHandling = async (args: any, api: any, extraOptions: any) => {
+  const result = await fetchBaseQuery({
     baseUrl: API_URL,
     prepareHeaders: async (headers, { getState }) => {
       // Get token from Redux state
@@ -28,7 +28,19 @@ export const baseApi = createApi({
       headers.set('Content-Type', 'application/json');
       return headers;
     },
-  }),
+  })(args, api, extraOptions);
+
+  if (result.error) {
+    handleApiError(result.error);
+  }
+
+  return result;
+};
+
+// Base API configuration
+export const baseApi = createApi({
+  reducerPath: 'api',
+  baseQuery: baseQueryWithErrorHandling,
   endpoints: () => ({}),
   tagTypes: ['User', 'Balance', 'Bots', 'Battle', 'Map'],
 });
@@ -36,14 +48,16 @@ export const baseApi = createApi({
 // Error handling utilities
 export const handleApiError = (error: any) => {
   if (error?.status === 401) {
-    // Handle unauthorized - will dispatch logout in Phase 2
     console.warn('Unauthorized request');
+    globalErrorHandler.handleDatabaseError(error);
   } else if (error?.status >= 500) {
     console.error('Server error:', error);
+    globalErrorHandler.handleDatabaseError(error);
   } else if (error?.status >= 400) {
     console.warn('Client error:', error);
   } else {
     console.error('Network error:', error);
+    globalErrorHandler.handleDatabaseError(error);
   }
   return error;
 };

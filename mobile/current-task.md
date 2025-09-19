@@ -1,4 +1,116 @@
-# Current Task: Digital Barracks Screen Light/Dark Mode Implementation
+# Current Task: Global Database Error Handling System
+
+## Problem
+Users encountering database fetch errors anywhere in the application need to be shown a modal that says "Something went wrong. Please Sign In." and then be forced to logout and navigate to the LoginScreen.
+
+## Solution Implemented
+Successfully implemented a comprehensive global error handling system that intercepts all database fetch errors and provides a consistent user experience:
+
+### 1. **Global Error Modal Component** ✅
+- **File**: `mobile/src/components/modals/GlobalErrorModal.tsx`
+- **Features**: 
+  - Custom modal matching app's design system
+  - "Something went wrong. Please Sign In." message
+  - "Log Out" button that triggers logout and navigation
+  - Theme-aware styling with proper colors
+  - Optimized for landscape orientation with proper sizing
+  - Hardware acceleration and full-screen presentation
+
+### 2. **Global Error Handling Service** ✅
+- **File**: `mobile/src/services/GlobalErrorHandler.ts`
+- **Features**:
+  - Singleton pattern for consistent error handling
+  - Detects database-related errors (401, 500+, network, connection, timeout)
+  - Prevents multiple simultaneous error handling
+  - Integrates with Redux store for state management
+  - Automatic logout after showing modal
+
+### 3. **Enhanced Base API Configuration** ✅
+- **File**: `mobile/src/store/api/baseApi.ts`
+- **Features**:
+  - Custom `baseQueryWithErrorHandling` function
+  - Intercepts all RTK Query errors automatically
+  - Routes database errors to global error handler
+  - Maintains existing functionality for non-database errors
+
+### 4. **UI State Management** ✅
+- **File**: `mobile/src/store/slices/uiSlice.ts`
+- **Features**:
+  - Added `globalError` boolean to modals state
+  - `setGlobalErrorModal` action for controlling modal visibility
+  - Integrated with existing UI state management
+
+### 5. **AppContent Integration** ✅
+- **File**: `mobile/src/components/AppContent.tsx`
+- **Features**:
+  - Global error modal rendered at app level
+  - Handles modal visibility from Redux state
+  - Sign in handler that closes modal
+  - Independent of other app functionality
+
+## Technical Implementation Details
+
+### Error Detection Logic
+```typescript
+private isDatabaseError(error: any, status?: number): boolean {
+  if (status === 401) return true;  // Unauthorized
+  if (status >= 500) return true;   // Server errors
+  
+  // Check error messages for database-related keywords
+  const message = (error.message || error.error || '').toLowerCase();
+  return message.includes('database') || 
+         message.includes('connection') || 
+         message.includes('timeout') || 
+         message.includes('network') || 
+         message.includes('fetch');
+}
+```
+
+### Global Error Flow
+1. **API Call Fails**: Any RTK Query call encounters database error
+2. **Error Interception**: `baseQueryWithErrorHandling` catches the error
+3. **Error Analysis**: `GlobalErrorHandler` determines if it's database-related
+4. **Modal Display**: Redux state updated to show global error modal
+5. **User Interaction**: User sees "Something went wrong. Please Sign In." modal
+6. **User Action**: User clicks "Log Out" button
+7. **Automatic Logout**: System logs out user and navigates to LoginScreen
+
+### Key Features
+- **Independent Operation**: System works without affecting existing functionality
+- **Comprehensive Coverage**: Catches all database errors across the entire app
+- **User-Friendly**: Clear, simple error message with single action
+- **Consistent UX**: Uses app's existing modal design system
+- **Automatic Recovery**: Forces logout to ensure clean state
+
+## Testing Status
+- ✅ Global error modal component created and styled
+- ✅ Error handling service implemented with singleton pattern
+- ✅ Base API updated with global error interception
+- ✅ UI state management integrated
+- ✅ AppContent component updated with modal
+- ✅ Landscape orientation optimizations applied
+- ✅ Modal sizing and positioning optimized for landscape mode
+- ✅ Hardware acceleration and full-screen presentation enabled
+- ✅ **CRITICAL FIX**: Added custom baseQuery with error handling to authApi, balanceApi, botsApi, and mapApi
+- ✅ All API calls now properly route through global error handling without breaking Redux store
+- ✅ Fixed duplicate middleware references error by maintaining separate API instances
+- ✅ **USER EXPERIENCE FIX**: Removed automatic logout - now waits for user to click "Log Out" button
+- ✅ **DESIGN IMPROVEMENT**: Updated modal colors to use app's color scheme (blue button, green title, blue message)
+- ✅ **CIRCULAR DEPENDENCY FIX**: Refactored GlobalErrorHandler to use callback-based approach instead of direct store import
+- ✅ **STALE DATA FIX**: Fixed getState callback to use store.getState() directly instead of closure-captured values
+- ✅ No linting errors introduced
+- ✅ System designed to be completely independent
+- ✅ Ready for user testing
+
+## Next Steps
+- User can test by triggering database errors (network issues, server errors)
+- Verify modal appears consistently across all screens
+- Confirm logout and navigation to LoginScreen works properly
+- Test that system doesn't interfere with normal app operation
+
+---
+
+# Previous Task: Digital Barracks Screen Light/Dark Mode Implementation
 
 ## Problem
 The Digital Barracks Screen was only set up for dark mode (hacker mode) and needed to be updated to support both light mode (business mode) and dark mode theming like other screens in the application.
