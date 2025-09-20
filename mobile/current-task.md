@@ -226,6 +226,29 @@
 - **Consistent with login** - Same pattern as login endpoints (setCurrentToken + save)
 **Result**: ✅ Single-device enforcement now works for all authentication flows including registration
 
+### Attempt #20: Assess and Improve Auth Middleware Performance & Error Handling
+**Status**: COMPLETED
+**Problem**: Auth middleware performs database lookup on every request, potential performance and error handling issues
+**Assessment**: For mobile app context, performance impact is acceptable, but error handling needed improvement
+**What we did**:
+- **Added user not found handling** - Properly handle deleted users with specific error message
+- **Enhanced error handling** - Distinguish between JWT errors, token expiration, and database errors
+- **Added detailed logging** - Better error tracking for debugging
+- **Maintained security** - Database lookup required for single-device enforcement
+**Result**: ✅ Improved error handling while maintaining security requirements
+
+### Attempt #21: Fix Critical Performance Issue - Excessive API Polling
+**Status**: COMPLETED
+**Problem**: Battle components polling at 200ms intervals causing hundreds of auth middleware calls per second
+**Root cause**: BattleOverlayManager (1000ms) + BattleBattalionManager (200ms during battle) + multiple components = excessive requests
+**Performance impact**: Auth middleware hit 5+ times per second per battle component, causing server overload
+**What we did**:
+- **Reduced battle polling intervals** - Changed from 200ms to 2000ms during battle, 1000ms to 5000ms default
+- **Reduced BattleOverlayManager polling** - Changed from 1000ms to 5000ms
+- **Reduced auth logging spam** - Only log 1% of requests in development to prevent log overflow
+- **Maintained functionality** - Battle animations still work with reasonable polling intervals
+**Result**: ✅ Reduced API calls by 90%, eliminated performance bottleneck while maintaining battle functionality
+
 ### Files Modified:
 - `server/src/models/User.ts` - Replaced device session with simple currentTokenId field
 - `server/src/routes/auth.ts` - Updated login endpoints to set currentTokenId (invalidates old tokens)
