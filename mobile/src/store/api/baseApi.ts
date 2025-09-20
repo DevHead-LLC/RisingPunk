@@ -3,6 +3,10 @@ import { API_URL } from '../../config';
 import type { RootState } from '../index';
 import { getDeviceId } from '../../utils/deviceId';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
+import { authApi } from './authApi';
+import { balanceApi } from './balanceApi';
+import { botsApi } from './botsApi';
+import { mapApi } from './mapApi';
 
 // Debounce mechanism for ACCOUNT_SWITCHED errors
 let accountSwitchedDispatched = false;
@@ -44,6 +48,13 @@ const baseQueryWithErrorHandling = async (args: any, api: any, extraOptions: any
         console.log('🔍 BASE API: First ACCOUNT_SWITCHED error, dispatching action');
         accountSwitchedDispatched = true;
         api.dispatch({ type: 'auth/handleAccountSwitched' });
+        
+        // Clear RTK Query caches to prevent data leakage between users
+        console.log('🔍 BASE API: Clearing RTK Query caches to prevent data leakage');
+        api.dispatch(authApi.util.resetApiState());
+        api.dispatch(balanceApi.util.resetApiState());
+        api.dispatch(botsApi.util.resetApiState());
+        api.dispatch(mapApi.util.resetApiState());
         
         // Reset flag after 2 seconds to allow future account switches
         if (accountSwitchedTimeout) {

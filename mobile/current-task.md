@@ -183,12 +183,36 @@
 **Problem**: Banner design needed improvement for better visual appeal
 **What we did**:
 - **Pink border** - Added 2px pink border (#A239CA) with rounded corners
-- **Blank background** - Changed from colored background to transparent
+- **Black background** - Changed from transparent to solid black background
 - **Green text** - Changed text color to matrix green (#00FF41)
-- **Smaller size** - Reduced font size and padding, max width 300px
+- **80% viewport width** - Made banner responsive to 80% of screen width
 - **Vertical center** - Positioned banner in center of screen using top: 50% and transform
 - **Better spacing** - Improved padding and margins for cleaner look
 **Result**: ✅ Modern, clean banner design that's visually appealing and properly centered
+
+### Attempt #17: Fix Critical Security Vulnerability in Registration
+**Status**: COMPLETED
+**Problem**: Registration endpoints bypass single-device enforcement by issuing tokens without session IDs
+**Root cause**: Registration endpoints use old token pattern (userId only) while login uses new pattern (userId + sessionId)
+**Security impact**: Users could be logged in on multiple devices simultaneously, defeating single-device enforcement
+**What we did**:
+- **Fixed regular registration** - Added sessionId generation and setCurrentToken() call
+- **Fixed Google sign-up** - Added sessionId generation and setCurrentToken() call
+- **Consistent token pattern** - Both registration endpoints now use same pattern as login
+- **Maintained functionality** - All existing behavior preserved, just added security
+**Result**: ✅ Single-device enforcement now works for all authentication flows
+
+### Attempt #18: Fix Critical Data Leakage Vulnerability in Account Switching
+**Status**: COMPLETED
+**Problem**: handleAccountSwitched clears auth state but leaves RTK Query caches, causing data leakage between users
+**Root cause**: Account switched logout only clears auth state, not cached user data (balance, bots, map)
+**Security impact**: Next user could see previous user's cached data until manual refetch
+**What we did**:
+- **Added cache clearing to baseApi** - Clear all RTK Query caches when ACCOUNT_SWITCHED detected
+- **Imported API slices** - Added imports for authApi, balanceApi, botsApi, mapApi
+- **Consistent with logout** - Same cache clearing pattern as normal logoutUser flow
+- **Prevented data leakage** - Ensures clean state between different user sessions
+**Result**: ✅ No data leakage between users, complete cache clearing on account switch
 
 ### Files Modified:
 - `server/src/models/User.ts` - Replaced device session with simple currentTokenId field

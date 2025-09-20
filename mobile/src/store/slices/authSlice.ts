@@ -794,7 +794,7 @@ export const authSlice = createSlice({
     setShowAccountSwitchedBanner: (state, action: PayloadAction<boolean>) => {
       state.showAccountSwitchedBanner = action.payload;
     },
-    handleAccountSwitched: (state) => {
+    handleAccountSwitched: (state, action) => {
       console.log('🔍 AUTH SLICE: handleAccountSwitched action dispatched');
       
       // Prevent multiple calls - if already logged out, don't process again
@@ -824,6 +824,9 @@ export const authSlice = createSlice({
       // Only show banner if user was authenticated (old user being logged out)
       state.showAccountSwitchedBanner = wasAuthenticated;
       console.log('🔍 AUTH SLICE: showAccountSwitchedBanner set to:', wasAuthenticated);
+      
+      // Note: RTK Query cache clearing will be handled by the API error handlers
+      // that dispatch this action, to avoid circular dependencies
     },
   },
   extraReducers: (builder) => {

@@ -147,9 +147,12 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
       // Create research data for new user
       await createUserResearchData(user._id as mongoose.Types.ObjectId);
 
-      // Generate token
+      // Generate session ID and token
+      const sessionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      await user.setCurrentToken(sessionId);
+      
       const token = jwt.sign(
-        { userId: user._id },
+        { userId: user._id, sessionId },
         process.env.JWT_SECRET || 'defaultsecret',
         { expiresIn: '7d' }
       );
@@ -463,8 +466,12 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
       // Create research data for new user
       await createUserResearchData(user._id as mongoose.Types.ObjectId);
 
+      // Generate session ID and token
+      const sessionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      await user.setCurrentToken(sessionId);
+      
       const token = jwt.sign(
-        { userId: user._id },
+        { userId: user._id, sessionId },
         process.env.JWT_SECRET || 'defaultsecret',
         { expiresIn: '7d' }
       );
