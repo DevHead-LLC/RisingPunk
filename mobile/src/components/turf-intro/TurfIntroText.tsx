@@ -14,18 +14,11 @@ export const TurfIntroText: React.FC<TurfIntroTextProps> = ({ text, onComplete, 
   const screenWidth = Dimensions.get('window').width;
   const screenHeight = Dimensions.get('window').height;
   
-  // Calculate responsive dimensions
-  const textContainerWidth = Math.min(screenWidth * 0.35, 320); // 35% of screen width, max 320px
-  const textContainerMaxWidth = Math.min(screenWidth * 0.4, 350); // 40% of screen width, max 350px
-  
-  // Calculate responsive font size
-  const baseFontSize = Math.max(screenWidth * 0.04, 14); // 4% of screen width, minimum 14px
-  const fontSize = Math.min(baseFontSize, 18); // Maximum 18px
-  
-  // Calculate responsive positioning
-  const rightOffset = Math.max(screenWidth * 0.1, 20); // 6% of screen width, minimum 20px (moved 2% left)
-  const centerOffsetX = textContainerWidth / 2; // Half the container width for centering
-  const centerOffsetY = screenHeight * 0.3; // 20% of screen height for vertical centering
+  // Simple responsive calculations - keep it clean and working
+  const textContainerWidth = Math.min(screenWidth * 0.35, 320);
+  const rightOffset = Math.max(screenWidth * 0.08, 30);
+  const centerOffsetX = textContainerWidth / 2;
+  const centerOffsetY = screenHeight * 0.275;
   
   return (
     <View style={styles.container}>
@@ -53,10 +46,9 @@ export const TurfIntroText: React.FC<TurfIntroTextProps> = ({ text, onComplete, 
         },
         {
           width: textContainerWidth,
-          maxWidth: textContainerMaxWidth,
         }
       ]}>
-        <Text style={[styles.text, { fontSize }]}>{text}</Text>
+        <Text style={styles.text}>{text}</Text>
         <TouchableOpacity 
           style={styles.continueButton} 
           onPress={onComplete}
@@ -79,9 +71,9 @@ const styles = StyleSheet.create({
   },
   skipButton: {
     position: 'absolute',
-    top: '6%',
+    top: 25,
     left: '50%',
-    transform: [{ translateX: -30 }], // Half of approximate button width for centering
+    transform: [{ translateX: -30 }],
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
@@ -97,7 +89,8 @@ const styles = StyleSheet.create({
   },
   textContainer: {
     position: 'absolute',
-    padding: '4%',
+    width: 280,
+    padding: 20,
     borderRadius: 12,
     alignItems: 'center',
     zIndex: 1004,
@@ -114,9 +107,10 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   text: {
+    fontSize: 16,
     lineHeight: 24,
     textAlign: 'center',
-    marginBottom: '5%',
+    marginBottom: 20,
     fontWeight: '500',
     color: '#FFFFFF',
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
@@ -124,13 +118,13 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
   },
   continueButton: {
-    paddingHorizontal: '6%',
-    paddingVertical: '3%',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.4)',
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    minWidth: '60%',
+    minWidth: 120,
   },
   continueText: {
     fontSize: 16,
