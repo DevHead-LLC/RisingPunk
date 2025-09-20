@@ -7,7 +7,6 @@ import { authApi } from '../api/authApi';
 import { balanceApi } from '../api/balanceApi';
 import { botsApi } from '../api/botsApi';
 import { mapApi } from '../api/mapApi';
-import { getDeviceId } from '../../utils/deviceId';
 
 // Types
 export interface User {
@@ -51,12 +50,10 @@ export const loginUser = createAsyncThunk(
   'auth/login',
   async (credentials: { handle: string; accessKey: string }, { rejectWithValue, dispatch }) => {
     try {
-      const deviceId = await getDeviceId();
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-device-id': deviceId,
         },
         body: JSON.stringify(credentials),
       });
