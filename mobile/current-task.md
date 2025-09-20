@@ -1,506 +1,215 @@
-# Current Task: ProfileScreen Layout Responsiveness Improvements
-
-## Problem
-The ProfileScreen tabs on the left side were too narrow, causing text to wrap and drop down to the next line on some screen sizes. The layout needed to be more responsive to ensure proper text fitting across all device viewports.
-
-## Solution Implemented
-Successfully implemented responsive layout improvements for the ProfileScreen tabs:
-
-### 1. **Responsive Tab Width** ✅
-- **File**: `mobile/src/screens/ProfileScreen.tsx`
-- **Enhancement**: Left sidebar width now uses 25% of screen width with minimum fallback
-- **Implementation**: `width: Math.max(screenWidth * 0.25, SIZING.spacing.md * 10)`
-- **Result**: Tabs are wider and more proportional to screen size
-
-### 2. **Individual Tab Width Increase** ✅
-- **Enhancement**: Individual tab width increased from 80% to 90% of sidebar width
-- **Implementation**: `width: '90%'` in `leftTab` style
-- **Result**: More space for tab text, reducing wrapping issues
-
-### 3. **Responsive Text Sizing** ✅
-- **Enhancement**: Tab text size reduced slightly with minimum size protection
-- **Implementation**: `fontSize: Math.max(SIZING.font.small * 0.9, 12)`
-- **Result**: Text fits better while maintaining readability
-
-### 4. **Screen Dimension Integration** ✅
-- **Enhancement**: Added `useResponsiveDimensions` hook for dynamic sizing
-- **Implementation**: Screen width and scale factor passed to styles function
-- **Result**: Layout adapts to different device sizes automatically
-
-### 5. **Right Content Width Constraint** ✅
-- **Enhancement**: Right content area constrained to 75% of screen width
-- **Implementation**: `maxWidth: screenWidth * 0.75` in `rightContent` style
-- **Result**: Balanced layout with proper space allocation
-
-## Technical Implementation Details
-
-### Responsive Width Calculation
-```typescript
-// Left sidebar: 25% of screen width with minimum fallback
-leftSidebar: {
-  width: Math.max(screenWidth * 0.25, SIZING.spacing.md * 10),
-  // ... other styles
-}
-
-// Right content: Maximum 75% of screen width
-rightContent: {
-  maxWidth: screenWidth * 0.75,
-  // ... other styles
-}
-```
-
-### Text Sizing with Minimum Protection
-```typescript
-leftTabText: {
-  fontSize: Math.max(SIZING.font.small * 0.9, 12), // 10% smaller with 12px minimum
-  lineHeight: Math.max(SIZING.font.small * 0.9, 12) + 2,
-  // ... other styles
-}
-```
-
-### Dynamic Style Creation
-```typescript
-const { width: screenWidth, scaleFactor } = useResponsiveDimensions();
-const styles = useMemo(() => 
-  createProfileStyles(colors, screenWidth, scaleFactor), 
-  [colors, screenWidth, scaleFactor]
-);
-```
-
-## Key Features
-- **Responsive Design**: Layout adapts to different screen sizes automatically
-- **Text Fitting**: Reduced text size prevents wrapping on smaller screens
-- **Balanced Layout**: 25% tabs, 75% content ratio for optimal space usage
-- **Minimum Sizes**: Ensures readability on very small devices
-- **Performance**: Memoized styles prevent unnecessary re-renders
-
-## Testing Status
-- ✅ Responsive dimensions hook integrated
-- ✅ Tab width increased from 80% to 90%
-- ✅ Text size reduced by 10% with minimum protection
-- ✅ Left sidebar width made responsive (25% of screen)
-- ✅ Right content width constrained to 75% of screen
-- ✅ No linting errors introduced
-- ✅ Layout maintains proportions across different screen sizes
-- ✅ Ready for user testing
-
-## Next Steps
-- User can test on different device sizes to verify text fitting
-- Verify tabs no longer have text wrapping issues
-- Confirm layout looks balanced on various screen dimensions
-- Test theme switching still works properly with new responsive layout
-
----
-
-# Previous Task: Global Database Error Handling System
-
-## Problem
-Users encountering database fetch errors anywhere in the application need to be shown a modal that says "Something went wrong. Please Sign In." and then be forced to logout and navigate to the LoginScreen.
-
-## Solution Implemented
-Successfully implemented a comprehensive global error handling system that intercepts all database fetch errors and provides a consistent user experience:
-
-### 1. **Global Error Modal Component** ✅
-- **File**: `mobile/src/components/modals/GlobalErrorModal.tsx`
-- **Features**: 
-  - Custom modal matching app's design system
-  - "Something went wrong. Please Sign In." message
-  - "Log Out" button that triggers logout and navigation
-  - Theme-aware styling with proper colors
-  - Optimized for landscape orientation with proper sizing
-  - Hardware acceleration and full-screen presentation
-
-### 2. **Global Error Handling Service** ✅
-- **File**: `mobile/src/services/GlobalErrorHandler.ts`
-- **Features**:
-  - Singleton pattern for consistent error handling
-  - Detects database-related errors (401, 500+, network, connection, timeout)
-  - Prevents multiple simultaneous error handling
-  - Integrates with Redux store for state management
-  - Automatic logout after showing modal
-
-### 3. **Enhanced Base API Configuration** ✅
-- **File**: `mobile/src/store/api/baseApi.ts`
-- **Features**:
-  - Custom `baseQueryWithErrorHandling` function
-  - Intercepts all RTK Query errors automatically
-  - Routes database errors to global error handler
-  - Maintains existing functionality for non-database errors
-
-### 4. **UI State Management** ✅
-- **File**: `mobile/src/store/slices/uiSlice.ts`
-- **Features**:
-  - Added `globalError` boolean to modals state
-  - `setGlobalErrorModal` action for controlling modal visibility
-  - Integrated with existing UI state management
-
-### 5. **AppContent Integration** ✅
-- **File**: `mobile/src/components/AppContent.tsx`
-- **Features**:
-  - Global error modal rendered at app level
-  - Handles modal visibility from Redux state
-  - Sign in handler that closes modal
-  - Independent of other app functionality
-
-## Technical Implementation Details
-
-### Error Detection Logic
-```typescript
-private isDatabaseError(error: any, status?: number): boolean {
-  if (status === 401) return true;  // Unauthorized
-  if (status >= 500) return true;   // Server errors
-  
-  // Check error messages for database-related keywords
-  const message = (error.message || error.error || '').toLowerCase();
-  return message.includes('database') || 
-         message.includes('connection') || 
-         message.includes('timeout') || 
-         message.includes('network') || 
-         message.includes('fetch');
-}
-```
-
-### Global Error Flow
-1. **API Call Fails**: Any RTK Query call encounters database error
-2. **Error Interception**: `baseQueryWithErrorHandling` catches the error
-3. **Error Analysis**: `GlobalErrorHandler` determines if it's database-related
-4. **Modal Display**: Redux state updated to show global error modal
-5. **User Interaction**: User sees "Something went wrong. Please Sign In." modal
-6. **User Action**: User clicks "Log Out" button
-7. **Automatic Logout**: System logs out user and navigates to LoginScreen
-
-### Key Features
-- **Independent Operation**: System works without affecting existing functionality
-- **Comprehensive Coverage**: Catches all database errors across the entire app
-- **User-Friendly**: Clear, simple error message with single action
-- **Consistent UX**: Uses app's existing modal design system
-- **Automatic Recovery**: Forces logout to ensure clean state
-
-## Testing Status
-- ✅ Global error modal component created and styled
-- ✅ Error handling service implemented with singleton pattern
-- ✅ Base API updated with global error interception
-- ✅ UI state management integrated
-- ✅ AppContent component updated with modal
-- ✅ Landscape orientation optimizations applied
-- ✅ Modal sizing and positioning optimized for landscape mode
-- ✅ Hardware acceleration and full-screen presentation enabled
-- ✅ **CRITICAL FIX**: Added custom baseQuery with error handling to authApi, balanceApi, botsApi, and mapApi
-- ✅ All API calls now properly route through global error handling without breaking Redux store
-- ✅ Fixed duplicate middleware references error by maintaining separate API instances
-- ✅ **USER EXPERIENCE FIX**: Removed automatic logout - now waits for user to click "Log Out" button
-- ✅ **DESIGN IMPROVEMENT**: Updated modal colors to use app's color scheme (blue button, green title, blue message)
-- ✅ **CIRCULAR DEPENDENCY FIX**: Refactored GlobalErrorHandler to use callback-based approach instead of direct store import
-- ✅ **STALE DATA FIX**: Fixed getState callback to use store.getState() directly instead of closure-captured values
-- ✅ No linting errors introduced
-- ✅ System designed to be completely independent
-- ✅ Ready for user testing
-
-## Critical Bug Fix Applied
-**Issue**: Circular dependency and race condition fixes broke core functionality
-- **Problem**: Removed state checking logic that prevented modal from showing when user is authenticated
-- **Impact**: Database errors no longer triggered the global error modal
-- **Solution**: Restored state checking using callback-based approach with current token from useAppSelector
-- **Implementation**: Error handler now checks `state.auth?.token` before showing modal
-- **Result**: Modal now properly shows for authenticated users experiencing database errors
-
-## Next Steps
-- User can test by shutting down server and triggering database operations
-- Verify modal appears when server is down and user is authenticated
-- Confirm modal does NOT appear when user is not authenticated
-- Test profile settings and avatar changes trigger modal on database errors
-
----
-
-# Previous Task: Digital Barracks Screen Light/Dark Mode Implementation
-
-## Problem
-The Digital Barracks Screen was only set up for dark mode (hacker mode) and needed to be updated to support both light mode (business mode) and dark mode theming like other screens in the application.
-
-## Solution Implemented
-Successfully implemented comprehensive light and dark mode support for the Digital Barracks Screen:
-
-### 1. **Theme Integration** ✅
-- **File**: `mobile/src/screens/DigitalBarracksScreen.tsx`
-- **Imports**: Added `useThemeColors` and `useTheme` hooks
-- **Implementation**: Integrated theme context to access current theme mode and colors
-
-### 2. **Dynamic Styling System** ✅
-- **Function**: `createStyles(colors, themeMode)` 
-- **Purpose**: Replaces static StyleSheet with dynamic function that responds to theme changes
-- **Memoization**: Used `useMemo` to prevent unnecessary re-renders when theme changes
-
-### 3. **Color Theme Mapping** ✅
-- **Background**: `colors.background` (beige for light, dark for dark mode)
-- **Text Colors**: `colors.text.primary`, `colors.text.secondary`, `colors.text.accent`
-- **Accent Colors**: `colors.primary`, `colors.secondary` for bot names and highlights
-- **Borders**: Theme-aware border colors with appropriate opacity for each mode
-
-### 4. **Light Mode Optimizations** ✅
-- **Container Backgrounds**: Lighter, more professional backgrounds for light mode
-- **Border Colors**: Darker green borders for better contrast in light mode
-- **Text Contrast**: Ensured proper contrast ratios for readability
-- **Card Styling**: Subtle backgrounds and borders appropriate for business mode
-
-### 5. **Dark Mode Preservation** ✅
-- **Hacker Aesthetic**: Maintained original dark mode styling
-- **Matrix Colors**: Preserved green accent colors and glow effects
-- **Professional Look**: Kept the cyberpunk/hacker theme intact
-
-## Technical Implementation Details
-
-### Theme Integration
-```typescript
-const colors = useThemeColors();
-const { themeMode } = useTheme();
-const styles = useMemo(() => createStyles(colors, themeMode), [colors, themeMode]);
-```
-
-### Dynamic Color Mapping
-```typescript
-// Light mode: Professional business colors
-backgroundColor: themeMode === 'light' ? 'rgba(0, 100, 0, 0.1)' : 'rgba(26, 77, 51, 0.3)',
-borderColor: themeMode === 'light' ? 'rgba(0, 100, 0, 0.3)' : 'rgba(0, 255, 65, 0.4)',
-
-// Text colors adapt to theme
-color: colors.text.primary, // Black in light mode, purple in dark mode
-color: colors.text.accent,  // Dark green in light mode, bright green in dark mode
-```
-
-### Key Features
-- **Seamless Switching**: Theme changes instantly when user toggles in profile settings
-- **Consistent Styling**: Matches the theming pattern used in other screens
-- **Accessibility**: Proper contrast ratios for both light and dark modes
-- **Performance**: Memoized styles prevent unnecessary re-renders
-
-## Testing Status
-- ✅ Theme hooks properly integrated
-- ✅ Dynamic styling function created
-- ✅ All hardcoded colors replaced with theme-aware colors
-- ✅ Light mode styling optimized for business/professional appearance
-- ✅ Dark mode styling preserved for hacker aesthetic
-- ✅ No linting errors introduced
-- ✅ Ready for user testing
-
-## Enhancement: Number Formatting with Commas ✅
-
-### Problem
-Large numbers in the Digital Barracks Screen (Total Army Size and Available counts) were difficult to read without comma separators.
-
-### Solution Implemented
-Added comma formatting to improve number readability:
-
-### 1. **Number Formatting Utility** ✅
-- **File**: `mobile/src/utils/formatUtils.ts`
-- **Function**: `formatNumber(num: number): string`
-- **Purpose**: Formats numbers with comma separators using `toLocaleString()`
-- **Handles**: Edge cases for undefined, null, and NaN values
-
-### 2. **Total Army Size Formatting** ✅
-- **Location**: Digital Barracks Screen total count display
-- **Before**: `14127331`
-- **After**: `14,127,331`
-- **Implementation**: `{formatNumber(botCounts ? Object.values(botCounts).reduce((a, b) => a + b, 0) : 0)}`
-
-### 3. **Available Count Formatting** ✅
-- **Location**: Bot card "Available" counts for each bot type
-- **Before**: `3204002`
-- **After**: `3,204,002`
-- **Implementation**: `{formatNumber(botCounts?.[type] || 0)}`
-
-### Technical Details
-```typescript
-// Utility function
-export const formatNumber = (num: number): string => {
-  if (num === undefined || num === null || isNaN(num)) {
-    return '0';
-  }
-  return num.toLocaleString();
-};
-
-// Usage in component
-<Text style={styles.totalCount}>
-  {formatNumber(botCounts ? Object.values(botCounts).reduce((a, b) => a + b, 0) : 0)}
-</Text>
-```
-
-## Next Steps
-- User can test theme switching in profile settings
-- Verify all UI elements respond correctly to theme changes
-- Confirm readability and contrast in both modes
-- Test number formatting display in both light and dark modes
-
----
-
-# Previous Task: Implement Antivirus Shield Protection System
-
-## Problem
-Users with active antivirus shields should be protected from attacks by other users in the HackMapScreen. Currently, any user can attack any other user regardless of shield status.
-
-## Solution Implemented
-Implemented a comprehensive shield protection system that prevents users from attacking shielded users:
-
-### 1. **Server-Side API Endpoint** ✅
-- **File**: `server/src/routes/userRoutes.ts`
-- **Endpoint**: `GET /api/users/shield-status/:userId`
-- **Purpose**: Retrieve user's antivirus shield status by userId
-- **Returns**: User handle and complete antivirusShield object with active status
-
-### 2. **Map API Enhancement** ✅
-- **File**: `server/src/routes/map.ts`
-- **Enhancement**: Updated map data to include shield status for all user entities
-- **Implementation**: 
-  - Modified user query to include `antivirusShield` field
-  - Added user lookup map for efficient shield status retrieval
-  - Added `isShielded` field to grid cell data for player entities
-
-### 3. **Type Definition Update** ✅
-- **File**: `mobile/src/types/map.ts`
-- **Enhancement**: Added `isShielded?: boolean` to `CellData` interface
-- **Purpose**: Type safety for shield status in mobile app
-
-### 4. **HackMapScreen Protection Logic** ✅
-- **File**: `mobile/src/screens/HackMapScreen.tsx`
-- **Features**:
-  - **Shield Status Display**: Shows "SHIELD: ACTIVE" in modal for shielded users
-  - **Button Disabling**: "Hack User" button is disabled for shielded users
-  - **Visual Feedback**: Button text changes to "Shielded User" when disabled
-  - **Prevention Logic**: onPress handler returns early if user is shielded
-
-### 5. **Visual Indicators** ✅
-- **Shield Icon**: Shielded users show shield icon instead of home icon on map
-- **Modal Indicators**: Shield status displayed in info panel
-- **Button States**: Disabled styling for non-attackable users
-
-## Technical Implementation Details
-
-### Server-Side Changes
-```typescript
-// New API endpoint
-router.get('/shield-status/:userId', auth, async (req: Request, res: Response) => {
-  const user = await User.findById(userId).select('handle antivirusShield');
-  res.json({
-    userId: user._id,
-    handle: user.handle,
-    antivirusShield: user.antivirusShield
-  });
-});
-
-// Map API enhancement
-const users = await User.find({}, { _id: 1, handle: 1, antivirusShield: 1 }).lean();
-// ... shield status lookup and grid population
-```
-
-### Client-Side Changes
-```typescript
-// Type definition
-interface CellData {
-  // ... existing fields
-  isShielded?: boolean;
-}
-
-// Protection logic
-{selectedCell.info.owner === 'player' && 
- selectedCell.info.userId && 
- selectedCell.info.name !== currentUserHandle && (
-  <Pressable
-    style={[styles.hackButton, selectedCell.info.isShielded && styles.hackButtonDisabled]}
-    onPress={() => {
-      if (selectedCell.info.isShielded) return; // Block shielded users
-      // ... attack logic
-    }}
-    disabled={selectedCell.info.isShielded}
-  >
-    <Text>{selectedCell.info.isShielded ? 'Shielded User' : 'Hack User'}</Text>
-  </Pressable>
-)}
-```
-
-## Testing Status
-- ✅ API endpoint created and functional
-- ✅ Map data includes shield status
-- ✅ Type definitions updated
-- ✅ UI protection logic implemented
-- ✅ Visual indicators working
-- ✅ No linting errors introduced
-- ✅ Button disabling and visual feedback working
-- ✅ Real-time shield status updates implemented
-- ✅ **FIXED**: Shield icon display issue - `isShielded` property now included in `dynamicEntityData`
-
-## Issue Resolved
-**Problem**: Shield icons were not displaying on map tiles even though shield status was correctly fetched and updated.
-
-**Root Cause**: The Tile component was not receiving the `dynamicEntityData` and `isShieldActive` props needed to check for shield status.
-
-**Solution**: 
-1. Added `isShielded: cell.isShielded` to the entity data structure in the `separateStaticAndDynamicData` function
-2. Updated Tile component to accept `dynamicEntityData` and `isShieldActive` props
-3. Modified Tile component logic to check both grid data and dynamic entity data for shield status
-4. Updated all Tile component usages to pass the required props
-
-## Performance Fix Applied
-**Issue**: Circular dependency in useEffect causing excessive API calls
-- **Problem**: useEffect depended on `dynamicEntityData` but also updated it via `updateTileShieldStatus`
-- **Solution**: Used `setDynamicEntityData` with callback to access current data without dependency
-- **Result**: Eliminated circular dependency, reduced API calls from continuous to every 1 second
-
-## Critical Bug Fix Applied
-**Issue**: Shield status not preserved in CellData when materializing visible cells
-- **Problem**: `isShielded` property was dropped when creating `CellData` objects, causing UI inconsistencies
-- **Impact**: Shielded users could be attacked even when shield icon was visible on map
-- **Solution**: Added `isShielded: entity?.isShielded` to CellData construction
-- **Result**: Shield status now properly preserved in modal interactions
-
-## Performance Optimization Applied
-**Issue**: Excessive tile re-rendering causing blinking and poor user experience
-- **Problem**: Tiles were re-rendering constantly due to props changes and circular dependencies
-- **Solutions Applied**:
-  1. **Custom memo comparison**: Added precise comparison functions to Tile and PoolTile components
-  2. **Debounced updates**: Added 500ms debounce to prevent rapid shield status updates
-  3. **Reduced polling frequency**: Changed from 1 second to 3 seconds for shield checks
-  4. **Conditional updates**: Only update when shield status actually changes
-  5. **Optimized state updates**: Only return new state object when actual changes occur
-- **Result**: Eliminated tile blinking while preserving shield functionality
-
-## Panning/Scrolling Impact Analysis
-**Concern**: How optimizations affect map panning and tile loading/unloading
-- **Virtual Scrolling**: Optimizations actually improve panning performance
-- **Tile Stability**: Custom memo prevents unnecessary re-renders during panning
-- **Loading Efficiency**: Debounced updates don't interfere with tile loading
-- **State Optimization**: Only updates state when shield status actually changes
-- **Result**: Panning should be smoother with less visual interference
-
-## Circular Dependency Fix
-**Issue**: useEffect had circular dependency causing infinite loops
-- **Problem**: `updateTileShieldStatus` in dependency array caused function recreation
-- **Solution**: Removed `updateTileShieldStatus` from useEffect dependencies
-- **Result**: Eliminated circular dependency and excessive API calls
-
-## Stale Closure Fix
-**Issue**: useEffect used stale `updateTileShieldStatus` function
-- **Problem**: Missing dependency caused outdated token/lastUpdateTime values
-- **Solution**: Used useRef to store latest function reference
-- **Implementation**: `updateTileShieldStatusRef.current` provides latest function
-- **Result**: Eliminated stale closures while avoiding circular dependencies
-
-## Circular Dependency in useCallback Fix
-**Issue**: `updateTileShieldStatus` had circular dependency with `lastUpdateTime`
-- **Problem**: Function depended on `lastUpdateTime` but also updated it, causing recreation
-- **Solution**: Used `useRef` for `lastUpdateTime` instead of state
-- **Implementation**: `lastUpdateTimeRef.current` for debouncing without circular dependency
-- **Result**: Function is now stable and only recreates when `token` changes
-
-## Critical Shield Display Bug Fix
-**Issue**: Dynamic shield updates couldn't override stale map data
-- **Problem**: `||` operator treats `false` as falsy, so `dynamicEntity.isShielded = false` falls back to stale `cell.isShielded = true`
-- **Impact**: Shields never visually deactivate, hack button stays disabled after shield expires
-- **Solution**: Changed `||` to `??` (nullish coalescing) operator
-- **Implementation**: `dynamicEntity?.isShielded ?? (cell as any).isShielded`
-- **Result**: Dynamic updates now properly override stale data, shields deactivate correctly
-
-## Next Steps
-- Test shield icon display on map tiles
-- Verify real-time updates work for all users
-- Test shield activation/deactivation scenarios
-- Monitor API call frequency to ensure performance improvement
-- Verify clicking on tiles is now smooth and responsive
+# Single Device Login Enforcement
+
+## Core Goal
+**Only 1 user can log into 1 account at a time on a single device.**
+
+### Required Behavior:
+1. **User logs into account**: System checks for other logins, sees none, allows login
+2. **Another device logs in**: System finds old login, logs old user out with modal saying "someone else logged in", user clicks "OK" and gets logged out, new login stays active
+
+### Key Constraint:
+- **Preserve existing GlobalErrorHandler functionality** - it handles database issues that force logout
+- **Revert failed changes** - If an attempt doesn't work, revert the changes before trying the next approach
+- **Add account switching on top** - log out old users when new device logs in
+
+## Implementation Status: IN PROGRESS
+
+### What We've Built:
+- ✅ Server-side device session tracking in User model
+- ✅ Auth middleware validates device sessions, returns `ACCOUNT_SWITCHED` error
+- ✅ Login endpoints clear old sessions when new device logs in
+- ✅ AccountSwitchedModal component created
+- ✅ Mobile auth slice handles account switching state
+- ✅ AppContent renders AccountSwitchedModal
+
+### Current Issue:
+**Modal not showing** - Token invalidation is working (old account can't access database), but old user is not seeing AccountSwitchedModal. Need to debug the error flow to see where the ACCOUNT_SWITCHED error is getting lost.
+
+### Attempt #1: Exclude ACCOUNT_SWITCHED from GlobalErrorHandler
+**Status**: Implemented
+**What we did**: Modified `GlobalErrorHandler.isDatabaseError()` to exclude `ACCOUNT_SWITCHED` errors
+**Result**: Fixed modal selection issue
+
+### Attempt #2: Fix AccountSwitchedModal import/sizing errors
+**Status**: Implemented
+**What we did**: Fixed incorrect SIZING property references in AccountSwitchedModal styles
+**Result**: Modal loads without errors
+
+### Attempt #3: Fix device session validation logic
+**Status**: FAILED - Need to revert
+**Problem**: Both devices can stay logged in - single-device enforcement not working
+**Root cause**: `isDeviceSessionValid` was checking JWT tokenId, but JWT tokens are unique each time
+**What we did**: 
+- Modified `isDeviceSessionValid` to only check deviceId (not tokenId)
+- Added debug logging to auth middleware
+**Result**: Server logs show "No deviceId provided" - deviceId header not being sent from client
+**Issue**: Device ID header not reaching server despite being set in baseApi
+
+### Attempt #4: Debug device ID header transmission
+**Status**: ABANDONED - Too complex
+**Problem**: Device ID header not reaching server despite CORS fixes
+**Result**: Complex device session tracking approach was unreliable
+
+### Attempt #5: Simple Token Invalidation Approach
+**Status**: PARTIALLY WORKING
+**Problem**: Complex device session tracking was overkill and unreliable
+**Solution**: Simple approach - invalidate ALL tokens when user logs in anywhere
+**What we did**:
+- Replaced `deviceSession` with simple `currentTokenId` field
+- When user logs in → set `currentTokenId` to new token (invalidates all old tokens)
+- When old token used → check if it matches `currentTokenId`, if not → `ACCOUNT_SWITCHED`
+- Removed device ID header logic (no longer needed)
+- Simplified auth middleware to just check token validity
+- **Cleaned up remaining device session references** that were causing TypeScript errors
+**Result**: ✅ Token invalidation working - old account can't access database
+**Issue**: ❌ Old user not seeing AccountSwitchedModal - need to debug error flow
+
+### Attempt #6: Debug Modal Display Issue
+**Status**: PARTIALLY FIXED
+**Problem**: Old user not seeing AccountSwitchedModal when logged out
+**Root cause**: `authApi` was using its own `authBaseQuery` that bypassed our `ACCOUNT_SWITCHED` error handling
+**What we did**:
+- Added debug logging to baseApi and authApi to see what errors are received
+- Added debug logging to auth slice to see if action is dispatched
+- **Fixed authApi error handling** - Updated `authBaseQuery` to check for `ACCOUNT_SWITCHED` before calling GlobalErrorHandler
+**Result**: Now both baseApi and authApi handle `ACCOUNT_SWITCHED` errors consistently
+
+### Attempt #7: Fix Race Condition
+**Status**: PARTIALLY FIXED
+**Problem**: Race condition causing new user to get logged out immediately after login
+**Root cause**: Using JWT token as session ID created circular validation - token was invalidating itself
+**What we did**:
+- **Separated session ID from JWT token** - Generate unique sessionId, store in JWT payload
+- **Updated auth middleware** - Check sessionId from JWT instead of JWT token itself
+- **Updated all login endpoints** - Use sessionId pattern consistently
+- **Added detailed debugging** - Track sessionId vs currentTokenId validation
+**Result**: ✅ Fixed race condition, but created new issue
+
+### Attempt #8: Fix verify-token Endpoint Mismatch
+**Status**: PARTIALLY FIXED
+**Problem**: verify-token endpoint not using sessionId validation, causing mismatch with auth middleware
+**Root cause**: verify-token was using old JWT validation (no sessionId check), but auth middleware expects sessionId
+**What we did**:
+- **Updated verify-token endpoint** - Added sessionId validation to match auth middleware
+- **Made sessionId optional** - Handle both old tokens (no sessionId) and new tokens (with sessionId)
+- **Added ACCOUNT_SWITCHED response** - Return same error as auth middleware for consistency
+**Result**: ✅ Fixed mismatch, but created new issue
+
+### Attempt #9: Fix Old Token Compatibility
+**Status**: PARTIALLY FIXED
+**Problem**: User logging in with old token (no sessionId) but auth middleware expecting sessionId
+**Root cause**: Old stored tokens don't have sessionId, but auth middleware was checking sessionId for all tokens
+**What we did**:
+- **Updated auth middleware** - Only check sessionId if token has one (new tokens)
+- **Updated verify-token endpoint** - Same logic for consistency
+- **Added backward compatibility** - Old tokens without sessionId are still valid
+- **Added detailed debugging** - Track hasSessionId vs isValid logic
+**Result**: ✅ Fixed old token compatibility, but modal still not showing
+
+### Attempt #10: Fix Multiple API Error Handling
+**Status**: COMPLETED
+**Problem**: Multiple API files calling GlobalErrorHandler directly, bypassing ACCOUNT_SWITCHED handling
+**Root cause**: balanceApi, botsApi, mapApi were calling globalErrorHandler.handleDatabaseError directly without checking for ACCOUNT_SWITCHED
+**What we did**:
+- **Updated balanceApi** - Added ACCOUNT_SWITCHED check before calling GlobalErrorHandler
+- **Updated botsApi** - Added ACCOUNT_SWITCHED check before calling GlobalErrorHandler  
+- **Updated mapApi** - Added ACCOUNT_SWITCHED check before calling GlobalErrorHandler
+- **Consistent error handling** - All API files now handle ACCOUNT_SWITCHED the same way
+**Result**: ✅ Old account now gets logged out properly
+
+### Attempt #11: Replace Modal with Banner Notification
+**Status**: PARTIALLY WORKING
+**Problem**: Modal was too intrusive for account switching notification
+**Solution**: Replace modal with 5-second banner notification on login screen
+**What we did**:
+- **Added banner state** - `showAccountSwitchedBanner` to auth slice
+- **Updated handleAccountSwitched** - Set banner instead of modal
+- **Added banner reducer** - `setShowAccountSwitchedBanner` action
+- **Updated AppContent** - Show NotificationBanner with 5-second duration
+- **Better UX** - Less intrusive notification that auto-dismisses
+**Result**: ✅ Banner state is being set correctly, but there are other issues
+
+### Current Issues Identified:
+1. **React Hooks Order Error** - RentalHousingLocation component has hooks order issue causing crashes
+2. **Infinite Auth Validation Loop** - Continuous auth validation calls causing performance issues
+3. **Banner May Not Be Visible** - Due to crashes, banner might not be displaying properly
+
+### Attempt #12: Fix React Hooks Order Issue
+**Status**: COMPLETED
+**Problem**: RentalHousingLocation component has hooks order issue causing crashes
+**Root cause**: Conditional hook call - `useAppSelector` was called conditionally inside a ternary operator
+**What we did**:
+- **Fixed conditional hook** - Moved `useAppSelector` to always be called unconditionally
+- **Separated logic** - Get Redux balance first, then use it in the ternary
+- **Maintained functionality** - Same behavior but follows Rules of Hooks
+**Result**: ✅ Fixed React hooks order error that was causing crashes
+
+### Attempt #13: Fix Banner Display Timing
+**Status**: COMPLETED
+**Problem**: Banner showing on new account instead of old account that got logged out
+**Root cause**: Both accounts were getting ACCOUNT_SWITCHED errors, causing infinite logout loop
+**What we did**:
+- **Reverted API changes** - Removed authentication checks from API files
+- **Fixed handleAccountSwitched logic** - Only show banner if user was authenticated when error occurred
+- **Added authentication check** - `const wasAuthenticated = !!state.token` before clearing token
+- **Smart banner display** - `state.showAccountSwitchedBanner = wasAuthenticated`
+- **Prevented infinite loop** - New user (not authenticated) won't show banner
+**Result**: ✅ Banner only shows for old authenticated user, prevents infinite logout loop
+
+### Attempt #14: Fix Banner Persistence Through Navigation
+**Status**: COMPLETED
+**Problem**: Banner disappears when user gets navigated to login screen
+**Root cause**: Banner was only rendered in authenticated section, not on login screen
+**What we did**:
+- **Moved banner to login screen** - Banner now renders in `!token` section (login screen)
+- **Removed duplicate banner** - Removed banner from authenticated section
+- **Persistent notification** - Banner now follows user to login screen after logout
+- **Proper timing** - Banner shows on login screen where user can see it
+**Result**: ✅ Banner now persists through navigation and shows on login screen
+
+### Attempt #15: Fix Race Condition in Account Switching
+**Status**: COMPLETED
+**Problem**: Inconsistent logout behavior - sometimes immediate, sometimes delayed, sometimes with banner, sometimes without
+**Root cause**: Multiple API calls triggering `handleAccountSwitched` simultaneously, causing race conditions
+**What we did**:
+- **Added duplicate call prevention** - `handleAccountSwitched` now checks if user already logged out
+- **Added debounce mechanism** - Prevents multiple rapid `ACCOUNT_SWITCHED` dispatches
+- **Consistent behavior** - First API call triggers logout, subsequent calls are ignored
+- **2-second reset** - Debounce resets after 2 seconds to allow future account switches
+**Result**: ✅ Consistent logout behavior with reliable banner display
+
+### Attempt #16: Improve Banner Design
+**Status**: COMPLETED
+**Problem**: Banner design needed improvement for better visual appeal
+**What we did**:
+- **Pink border** - Added 2px pink border (#A239CA) with rounded corners
+- **Blank background** - Changed from colored background to transparent
+- **Green text** - Changed text color to matrix green (#00FF41)
+- **Smaller size** - Reduced font size and padding, max width 300px
+- **Vertical center** - Positioned banner in center of screen using top: 50% and transform
+- **Better spacing** - Improved padding and margins for cleaner look
+**Result**: ✅ Modern, clean banner design that's visually appealing and properly centered
+
+### Files Modified:
+- `server/src/models/User.ts` - Replaced device session with simple currentTokenId field
+- `server/src/routes/auth.ts` - Updated login endpoints to set currentTokenId (invalidates old tokens)
+- `server/src/middleware/auth.ts` - Simplified to check token validity against currentTokenId
+- `mobile/src/store/api/baseApi.ts` - Added ACCOUNT_SWITCHED error handling and debug logging
+- `mobile/src/store/api/authApi.ts` - **FIXED** - Added ACCOUNT_SWITCHED error handling to authBaseQuery
+- `mobile/src/store/slices/authSlice.ts` - Added account switching state, actions, and debug logging
+- `mobile/src/components/modals/AccountSwitchedModal.tsx` - New modal component
+- `mobile/src/components/AppContent.tsx` - Added modal to render
+- `mobile/src/services/GlobalErrorHandler.ts` - Excluded ACCOUNT_SWITCHED from database errors
+
+### Next Steps:
+1. Test the current implementation
+2. If still showing wrong modal, investigate error flow further
+3. If working, verify complete behavior works as expected
+4. Document final working solution
+
+### Process of Elimination:
+- ✅ Server sending correct error
+- ✅ Mobile receiving error  
+- 🔄 Testing if GlobalErrorHandler exclusion fixes modal issue
+- ⏳ If not, check error transformation in API layer
+- ⏳ If not, check if error is being handled elsewhere

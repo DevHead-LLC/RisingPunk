@@ -49,8 +49,11 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
   
   const dispatch = useAppDispatch();
   
+  // Get balance from Redux store (always call hooks unconditionally)
+  const reduxBalance = useAppSelector((state) => state.balance.total);
+  
   // Use both sources to ensure we have the most up-to-date balance
-  const currentBalance = balanceData?.total ?? useAppSelector((state) => state.balance.total);
+  const currentBalance = balanceData?.total ?? reduxBalance;
   
   // Ensure balance is a number
   const numericBalance = typeof currentBalance === 'string' ? parseFloat(currentBalance) : currentBalance;

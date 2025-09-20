@@ -17,7 +17,15 @@ const botsBaseQuery = async (args: any, api: any, extraOptions: any) => {
   })(args, api, extraOptions);
 
   if (result.error) {
-    globalErrorHandler.handleDatabaseError(result.error);
+    // Check for account switched error first
+    if (result.error?.status === 401 && result.error?.data?.error === 'ACCOUNT_SWITCHED') {
+      console.log('🔍 BOTS API: ACCOUNT_SWITCHED detected, dispatching action');
+      // Always dispatch account switched action - the auth slice will handle showing banner appropriately
+      api.dispatch({ type: 'auth/handleAccountSwitched' });
+      return result; // Return early to prevent other error handling
+    } else {
+      globalErrorHandler.handleDatabaseError(result.error);
+    }
   }
 
   return result;

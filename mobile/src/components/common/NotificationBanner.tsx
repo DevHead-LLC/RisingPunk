@@ -70,18 +70,17 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
       style={[
         styles.banner,
         {
-          backgroundColor: getBannerColor(),
           opacity: fadeAnim,
         },
       ]}
     >
       <View style={styles.bannerContent}>
-        <Text style={[styles.bannerText, { color: '#FFFFFF' }]}>
+        <Text style={[styles.bannerText, { color: colors.matrix }]}>
           {message}
         </Text>
         {onClose && (
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Text style={[styles.closeButtonText, { color: '#FFFFFF' }]}>×</Text>
+            <Text style={[styles.closeButtonText, { color: colors.matrix }]}>×</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -92,13 +91,18 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
 const styles = StyleSheet.create({
   banner: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+    top: '50%',
+    left: '10%', // 10% margin on each side = 80% width
+    right: '10%',
+    transform: [{ translateY: -40 }], // Center vertically
     zIndex: 1000,
-    paddingTop: 50, // Account for status bar
-    paddingBottom: SIZING.spacing.md,
+    backgroundColor: '#000000', // Black background
+    borderWidth: 2,
+    borderColor: '#A239CA', // Pink border
+    borderRadius: 8,
+    paddingVertical: SIZING.spacing.md,
     paddingHorizontal: SIZING.spacing.md,
+    alignSelf: 'center',
   },
   bannerContent: {
     flexDirection: 'row',
@@ -106,17 +110,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   bannerText: {
-    fontSize: SIZING.font.body,
+    fontSize: SIZING.font.small,
     fontWeight: '600',
     flex: 1,
     textAlign: 'center',
+    lineHeight: 20,
   },
   closeButton: {
     padding: SIZING.spacing.xs,
     marginLeft: SIZING.spacing.sm,
   },
   closeButtonText: {
-    fontSize: SIZING.font.h2,
+    fontSize: SIZING.font.large,
     fontWeight: 'bold',
   },
 });

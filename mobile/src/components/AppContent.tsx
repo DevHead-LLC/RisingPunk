@@ -1,7 +1,7 @@
 import React, { memo, useEffect, useRef, useCallback } from 'react';
 import { View, Text, Dimensions, AppState } from 'react-native';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
-import { loadStoredAuth, updateHandle, setShowEmailVerification, setShowEmailVerificationBanner, refreshUserData, logoutUser } from '../store/slices/authSlice';
+import { loadStoredAuth, updateHandle, setShowEmailVerification, setShowEmailVerificationBanner, refreshUserData, logoutUser, setShowAccountSwitched, setShowAccountSwitchedBanner } from '../store/slices/authSlice';
 import { updateBalance, triggerUpdate } from '../store/slices/balanceSlice';
 import { setBots, setBuildState } from '../store/slices/botsSlice';
 import { syncPreferencesFromStorage, syncPreferencesFromUser } from '../store/slices/preferencesSlice';
@@ -17,6 +17,7 @@ import { ConnectivityOverlay } from './common/ConnectivityOverlay';
 import { HandleSelectionModal } from './modals/HandleSelectionModal';
 import { EmailVerificationModal } from './modals/EmailVerificationModal';
 import { GlobalErrorModal } from './modals/GlobalErrorModal';
+import { AccountSwitchedModal } from './modals/AccountSwitchedModal';
 import { NotificationBanner } from './common/NotificationBanner';
 import { globalErrorHandler } from '../services/GlobalErrorHandler';
 
@@ -24,7 +25,7 @@ const AppContent = memo(() => {
   const dispatch = useAppDispatch();
   const showFinancials = useAppSelector((state) => state.ui.modals.financialStatements);
   const showGlobalError = useAppSelector((state) => state.ui.modals.globalError);
-  const { token, isLoading, showHandleSelection, showEmailVerification, showEmailVerificationBanner, user } = useAppSelector((state) => state.auth);
+  const { token, isLoading, showHandleSelection, showEmailVerification, showEmailVerificationBanner, showAccountSwitched, showAccountSwitchedBanner, user } = useAppSelector((state) => state.auth);
   const balanceDisplayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const turfScreenRef = useRef<any>(null);
   const { isConnected, isInternetReachable } = useNetworkConnectivity();
@@ -179,6 +180,17 @@ const AppContent = memo(() => {
     dispatch(logoutUser());
   }, [dispatch]);
 
+  // Handle account switched modal log out
+  const handleAccountSwitchedLogOut = useCallback(() => {
+    dispatch(setShowAccountSwitched(false));
+    dispatch(logoutUser());
+  }, [dispatch]);
+
+  // Handle account switched banner close
+  const handleAccountSwitchedBannerClose = useCallback(() => {
+    dispatch(setShowAccountSwitchedBanner(false));
+  }, [dispatch]);
+
   // Determine if we should show the connectivity overlay
   // Only show when we're definitely disconnected (both flags are false)
   const shouldShowConnectivityOverlay = isConnected === false && isInternetReachable === false;
@@ -192,6 +204,13 @@ const AppContent = memo(() => {
     return (
       <>
         <LoginScreen />
+        <NotificationBanner
+          visible={showAccountSwitchedBanner}
+          message="Someone else logged into this account on another device. You have been logged out."
+          type="info"
+          duration={5000}
+          onClose={handleAccountSwitchedBannerClose}
+        />
         <ConnectivityOverlay visible={shouldShowConnectivityOverlay} />
       </>
     );
@@ -233,6 +252,10 @@ const AppContent = memo(() => {
       <GlobalErrorModal
         visible={showGlobalError}
         onLogOut={handleGlobalErrorLogOut}
+      />
+      <AccountSwitchedModal
+        visible={showAccountSwitched}
+        onLogOut={handleAccountSwitchedLogOut}
       />
       <ConnectivityOverlay visible={shouldShowConnectivityOverlay} />
     </>

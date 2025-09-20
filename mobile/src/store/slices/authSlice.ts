@@ -7,6 +7,7 @@ import { authApi } from '../api/authApi';
 import { balanceApi } from '../api/balanceApi';
 import { botsApi } from '../api/botsApi';
 import { mapApi } from '../api/mapApi';
+import { getDeviceId } from '../../utils/deviceId';
 
 // Types
 export interface User {
@@ -41,6 +42,8 @@ export interface AuthState {
   showEmailVerificationBanner: boolean;
   emailVerificationPromptedUserId: string | null; // Track which user has been prompted for email verification in this session
   isInitialized: boolean; // Track if initial database verification is complete
+  showAccountSwitched: boolean; // Show modal when account is switched on another device
+  showAccountSwitchedBanner: boolean; // Show banner notification when account is switched
 }
 
 // Async thunks
@@ -48,10 +51,12 @@ export const loginUser = createAsyncThunk(
   'auth/login',
   async (credentials: { handle: string; accessKey: string }, { rejectWithValue, dispatch }) => {
     try {
+      const deviceId = await getDeviceId();
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-device-id': deviceId,
         },
         body: JSON.stringify(credentials),
       });
@@ -703,6 +708,8 @@ const initialState: AuthState = {
   showEmailVerificationBanner: false,
   emailVerificationPromptedUserId: null,
   isInitialized: false,
+  showAccountSwitched: false,
+  showAccountSwitchedBanner: false,
 };
 
 // Slice
@@ -780,6 +787,43 @@ export const authSlice = createSlice({
     forceRefreshData: (state) => {
       // This action will trigger a complete data refresh
       console.log('🔵 FORCE REFRESH: Triggering complete data refresh from database');
+    },
+    setShowAccountSwitched: (state, action: PayloadAction<boolean>) => {
+      state.showAccountSwitched = action.payload;
+    },
+    setShowAccountSwitchedBanner: (state, action: PayloadAction<boolean>) => {
+      state.showAccountSwitchedBanner = action.payload;
+    },
+    handleAccountSwitched: (state) => {
+      console.log('🔍 AUTH SLICE: handleAccountSwitched action dispatched');
+      
+      // Prevent multiple calls - if already logged out, don't process again
+      if (!state.token) {
+        console.log('🔍 AUTH SLICE: User already logged out, skipping handleAccountSwitched');
+        return;
+      }
+      
+      // Only show banner if user was actually authenticated (old user being logged out)
+      const wasAuthenticated = !!state.token;
+      console.log('🔍 AUTH SLICE: User was authenticated:', wasAuthenticated);
+      
+      // Clear all auth data
+      state.token = null;
+      state.user = null;
+      state.isLoading = false;
+      state.error = null;
+      state.showOnboarding = false;
+      state.showTurfIntro = false;
+      state.showHandleSelection = false;
+      state.showEmailVerification = false;
+      state.showEmailVerificationBanner = false;
+      state.emailVerificationPromptedUserId = null;
+      state.isInitialized = false;
+      state.showAccountSwitched = false; // Don't show modal
+      
+      // Only show banner if user was authenticated (old user being logged out)
+      state.showAccountSwitchedBanner = wasAuthenticated;
+      console.log('🔍 AUTH SLICE: showAccountSwitchedBanner set to:', wasAuthenticated);
     },
   },
   extraReducers: (builder) => {
@@ -1053,7 +1097,7 @@ export const authSlice = createSlice({
   },
 });
 
-export const { clearError, setCredentials, setOnboardingCompleted, setShowOnboarding, setShowTurfIntro, setShowHandleSelection, setShowEmailVerification, setShowEmailVerificationBanner, setEmailVerificationPrompted, forceRefreshData } = authSlice.actions;
+export const { clearError, setCredentials, setOnboardingCompleted, setShowOnboarding, setShowTurfIntro, setShowHandleSelection, setShowEmailVerification, setShowEmailVerificationBanner, setEmailVerificationPrompted, forceRefreshData, setShowAccountSwitched, setShowAccountSwitchedBanner, handleAccountSwitched } = authSlice.actions;
 export const logout = logoutUser;
 export const googleSignIn = googleSignInUser;
 export const googleSignUp = googleSignUpUser;

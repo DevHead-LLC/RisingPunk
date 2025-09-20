@@ -42,6 +42,7 @@ export interface IUser extends Document {
     enableDataRefresh: boolean;
     enableDebugLogs: boolean;
   };
+  currentTokenId?: string;
   researchCenterBuild?: {
     startedAt: Date | null;
     completesAt: Date | null;
@@ -61,6 +62,8 @@ export interface IUser extends Document {
   verifyAccessKey(accessKey: string): Promise<boolean>;
   getDecryptedEmail(): string;
   setEncryptedEmail(email: string): void;
+  setCurrentToken(tokenId: string): void;
+  isTokenValid(tokenId: string): boolean;
 }
 
 export interface IUserModel extends mongoose.Model<IUser> {
@@ -295,6 +298,10 @@ const userSchema = new Schema({
       type: Date,
       default: null
     }
+  },
+  currentTokenId: {
+    type: String,
+    required: false
   }
 }, { 
   collection: 'users',  // Explicitly name the collection
@@ -380,6 +387,16 @@ userSchema.statics.emailExists = async function(email: string): Promise<boolean>
 // Static method to find user by Google ID
 userSchema.statics.findByGoogleId = async function(googleId: string): Promise<IUser | null> {
   return this.findOne({ googleId });
+};
+
+// Method to set current token (invalidates all previous tokens)
+userSchema.methods.setCurrentToken = function(tokenId: string): void {
+  this.currentTokenId = tokenId;
+};
+
+// Method to check if token is valid
+userSchema.methods.isTokenValid = function(tokenId: string): boolean {
+  return this.currentTokenId === tokenId;
 };
 
 export const User = mongoose.model<IUser, IUserModel>('User', userSchema); 

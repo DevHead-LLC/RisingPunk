@@ -125,7 +125,22 @@ const authBaseQuery = async (args: any, api: any, extraOptions: any) => {
   })(args, api, extraOptions);
 
   if (result.error) {
-    globalErrorHandler.handleDatabaseError(result.error);
+    console.log('🔍 AUTH API: Error received:', {
+      status: result.error?.status,
+      data: result.error?.data,
+      error: result.error?.data?.error
+    });
+    
+    // Check for account switched error first
+    if (result.error?.status === 401 && result.error?.data?.error === 'ACCOUNT_SWITCHED') {
+      console.log('🔍 AUTH API: ACCOUNT_SWITCHED detected, dispatching action');
+      // Always dispatch account switched action - the auth slice will handle showing banner appropriately
+      api.dispatch({ type: 'auth/handleAccountSwitched' });
+      return result; // Return early to prevent other error handling
+    } else {
+      console.log('🔍 AUTH API: Not ACCOUNT_SWITCHED, calling globalErrorHandler');
+      globalErrorHandler.handleDatabaseError(result.error);
+    }
   }
 
   return result;

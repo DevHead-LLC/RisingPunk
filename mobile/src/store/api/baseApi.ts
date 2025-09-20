@@ -4,6 +4,10 @@ import type { RootState } from '../index';
 import { getDeviceId } from '../../utils/deviceId';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 
+// Debounce mechanism for ACCOUNT_SWITCHED errors
+let accountSwitchedDispatched = false;
+let accountSwitchedTimeout: NodeJS.Timeout | null = null;
+
 // Custom base query with global error handling
 const baseQueryWithErrorHandling = async (args: any, api: any, extraOptions: any) => {
   const result = await fetchBaseQuery({
@@ -17,13 +21,7 @@ const baseQueryWithErrorHandling = async (args: any, api: any, extraOptions: any
         headers.set('authorization', `Bearer ${token}`);
       }
 
-      // Add device ID for privacy policy compliance
-      try {
-        const deviceId = await getDeviceId();
-        headers.set('x-device-id', deviceId);
-      } catch (error) {
-        console.error('❌ Failed to get device ID for headers:', error);
-      }
+      // Device ID no longer needed for simple token invalidation approach
 
       headers.set('Content-Type', 'application/json');
       return headers;
@@ -31,7 +29,39 @@ const baseQueryWithErrorHandling = async (args: any, api: any, extraOptions: any
   })(args, api, extraOptions);
 
   if (result.error) {
-    handleApiError(result.error);
+    console.log('🔍 BASE API: Error received:', {
+      status: result.error?.status,
+      data: result.error?.data,
+      error: result.error?.data?.error
+    });
+    
+    // Check for account switched error first
+    if (result.error?.status === 401 && result.error?.data?.error === 'ACCOUNT_SWITCHED') {
+      console.log('🔍 BASE API: ACCOUNT_SWITCHED detected, checking debounce');
+      
+      // Debounce multiple ACCOUNT_SWITCHED errors
+      if (!accountSwitchedDispatched) {
+        console.log('🔍 BASE API: First ACCOUNT_SWITCHED error, dispatching action');
+        accountSwitchedDispatched = true;
+        api.dispatch({ type: 'auth/handleAccountSwitched' });
+        
+        // Reset flag after 2 seconds to allow future account switches
+        if (accountSwitchedTimeout) {
+          clearTimeout(accountSwitchedTimeout);
+        }
+        accountSwitchedTimeout = setTimeout(() => {
+          accountSwitchedDispatched = false;
+          console.log('🔍 BASE API: Account switched debounce reset');
+        }, 2000);
+      } else {
+        console.log('🔍 BASE API: ACCOUNT_SWITCHED already dispatched, skipping');
+      }
+      
+      return result; // Return early to prevent other error handling
+    } else {
+      console.log('🔍 BASE API: Not ACCOUNT_SWITCHED, calling handleApiError');
+      handleApiError(result.error);
+    }
   }
 
   return result;

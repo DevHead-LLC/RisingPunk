@@ -38,6 +38,7 @@ app.use(helmet());
 app.use(cors({
   origin: CORS_ORIGINS.length ? CORS_ORIGINS : true,
   credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-device-id'],
 }));
 app.use(express.json());
 
