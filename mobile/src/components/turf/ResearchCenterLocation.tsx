@@ -1,5 +1,5 @@
 import React, {memo, useState, useEffect} from 'react';
-import {TouchableOpacity, View, Text, Image, StyleSheet, Modal} from 'react-native';
+import {TouchableOpacity, View, Text, Image, StyleSheet, Modal, Animated} from 'react-native';
 import {SIZING} from '../../styles/theme';
 import {useThemeColors} from '../../hooks/useThemeColors';
 import { useUnlockResearchCenterMutation, useGetProfileQuery, useGetResearchCenterStatusQuery } from '../../store/api/authApi';
@@ -12,15 +12,20 @@ import { LockedFeatureModal } from './index';
 type ResearchCenterLocationProps = {
   onPress?: () => void;
   onNavigateToResearch?: () => void;
+  isIntroActive?: boolean;
 };
 
-export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onPress, onNavigateToResearch }: ResearchCenterLocationProps) {
+export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onPress, onNavigateToResearch, isIntroActive = false }: ResearchCenterLocationProps) {
   const colors = useThemeColors();
   const [showPopup, setShowPopup] = useState(false);
   const [showLoadingModal, setShowLoadingModal] = useState(false);
   const [showInsufficientFundsModal, setShowInsufficientFundsModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [currentColorIndex, setCurrentColorIndex] = useState(0);
+  const animatedBorderColor = useState(new Animated.Value(0))[0];
+  
+  const introColors = [colors.primary, colors.secondary, colors.matrix];
   const [unlockResearchCenter] = useUnlockResearchCenterMutation();
   const { data: profile, isLoading } = useGetProfileQuery();
   const { data: buildStatus, isLoading: buildStatusLoading, refetch: refetchBuildStatus } = useGetResearchCenterStatusQuery();
@@ -39,6 +44,31 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
   const RESEARCH_CENTER_COST = 50000;
   
   const hasSufficientFunds = numericBalance !== null && !isNaN(numericBalance as number) && numericBalance >= RESEARCH_CENTER_COST;
+  
+  useEffect(() => {
+    if (isIntroActive) {
+      const interval = setInterval(() => {
+        setCurrentColorIndex(prev => (prev + 1) % introColors.length);
+      }, 1000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [isIntroActive, introColors.length]);
+  
+  useEffect(() => {
+    if (isIntroActive) {
+      Animated.timing(animatedBorderColor, {
+        toValue: currentColorIndex,
+        duration: 500,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [currentColorIndex, isIntroActive, animatedBorderColor]);
+  
+  const animatedBorderColorValue = animatedBorderColor.interpolate({
+    inputRange: [0, 1, 2],
+    outputRange: introColors,
+  });
 
   const handlePress = () => {
     if (isBuilding) {
@@ -94,7 +124,13 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
         style={styles.location}
         onPress={handlePress}
       >
-        <View style={[styles.iconContainer, { borderColor: colors.matrix }]}>
+        <Animated.View style={[
+          styles.iconContainer, 
+          { 
+            borderColor: isIntroActive ? animatedBorderColorValue : colors.matrix,
+            borderWidth: isIntroActive ? 3 : 1
+          }
+        ]}>
           <Image
             source={isBuilding 
               ? require('../../assets/images/underConstruction.png')
@@ -104,7 +140,7 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
             }
             style={styles.locationIcon}
           />
-        </View>
+        </Animated.View>
       </TouchableOpacity>
       
       <Text style={[styles.locationLabel, { color: colors.secondary }]}>

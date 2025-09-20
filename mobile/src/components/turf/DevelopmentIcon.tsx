@@ -1,5 +1,5 @@
-import React from 'react';
-import { TouchableOpacity, View, Image, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { TouchableOpacity, View, Image, StyleSheet, Animated } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 
@@ -12,6 +12,7 @@ interface DevelopmentIconProps {
   onPress: () => void;
   size?: number;
   iconSize?: number;
+  isIntroActive?: boolean;
 }
 
 export const DevelopmentIcon: React.FC<DevelopmentIconProps> = ({
@@ -22,9 +23,39 @@ export const DevelopmentIcon: React.FC<DevelopmentIconProps> = ({
   underConstructionImage,
   onPress,
   size = 120,
-  iconSize = 100
+  iconSize = 100,
+  isIntroActive = false
 }) => {
   const colors = useThemeColors();
+  const [currentColorIndex, setCurrentColorIndex] = useState(0);
+  const animatedBorderColor = useState(new Animated.Value(0))[0];
+  
+  const introColors = [colors.primary, colors.secondary, colors.matrix];
+
+  useEffect(() => {
+    if (isIntroActive) {
+      const interval = setInterval(() => {
+        setCurrentColorIndex(prev => (prev + 1) % introColors.length);
+      }, 1000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [isIntroActive, introColors.length]);
+  
+  useEffect(() => {
+    if (isIntroActive) {
+      Animated.timing(animatedBorderColor, {
+        toValue: currentColorIndex,
+        duration: 500,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [currentColorIndex, isIntroActive, animatedBorderColor]);
+  
+  const animatedBorderColorValue = animatedBorderColor.interpolate({
+    inputRange: [0, 1, 2],
+    outputRange: introColors,
+  });
 
   const getImageSource = () => {
     if (isBuilding) {
@@ -41,7 +72,8 @@ export const DevelopmentIcon: React.FC<DevelopmentIconProps> = ({
     {
       width: size,
       height: size,
-      borderColor: colors.matrix
+      borderColor: isIntroActive ? animatedBorderColorValue : colors.matrix,
+      borderWidth: isIntroActive ? 3 : 1
     }
   ];
 
@@ -58,12 +90,12 @@ export const DevelopmentIcon: React.FC<DevelopmentIconProps> = ({
       style={styles.location}
       onPress={onPress}
     >
-      <View style={containerStyle}>
+      <Animated.View style={containerStyle}>
         <Image
           source={getImageSource()}
           style={iconStyle}
         />
-      </View>
+      </Animated.View>
     </TouchableOpacity>
   );
 };
