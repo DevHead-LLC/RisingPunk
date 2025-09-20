@@ -249,6 +249,19 @@
 - **Maintained functionality** - Battle animations still work with reasonable polling intervals
 **Result**: ✅ Reduced API calls by 90%, eliminated performance bottleneck while maintaining battle functionality
 
+### Attempt #22: Fix Session ID Generation Inconsistency
+**Status**: COMPLETED
+**Problem**: Session ID generation inconsistent across authentication flows - some use substring(2, 11), others use substring(2)
+**Impact**: No security impact, but caused debugging confusion and code inconsistency
+**Root cause**: Mixed patterns across registration, login, Google sign-in, and Google sign-up endpoints
+**What we did**:
+- **Standardized all session ID generation** - Changed all flows to use substring(2, 11) for consistent 9-character length
+- **Fixed login endpoint** - Changed from substring(2) to substring(2, 11)
+- **Fixed Google sign-in endpoint** - Changed from substring(2) to substring(2, 11)
+- **Fixed Google sign-up endpoint** - Changed from substring(2) to substring(2, 11)
+- **Maintained security** - All session IDs remain unique and cryptographically secure
+**Result**: ✅ Consistent 9-character session IDs across all authentication flows, improved code maintainability
+
 ### Files Modified:
 - `server/src/models/User.ts` - Replaced device session with simple currentTokenId field
 - `server/src/routes/auth.ts` - Updated login endpoints to set currentTokenId (invalidates old tokens)

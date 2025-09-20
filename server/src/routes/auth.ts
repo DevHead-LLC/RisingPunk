@@ -220,7 +220,7 @@ router.post<{}, UserResponse | { error: string }, LoginRequest['body']>(
       }
 
       // Generate a unique session ID for this login
-      const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2)}`;
+      const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
       
       const token = jwt.sign(
         { userId: user._id, sessionId: sessionId },
@@ -303,7 +303,7 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
         
         // User exists, log them in
         // Generate a unique session ID for this login
-        const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2)}`;
+        const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
         
         const token = jwt.sign(
           { userId: user._id, sessionId: sessionId },
@@ -352,7 +352,7 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
           await user.save();
           
           // Generate a unique session ID for this login
-          const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2)}`;
+          const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
           
           const token = jwt.sign(
             { userId: user._id, sessionId: sessionId },
