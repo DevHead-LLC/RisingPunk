@@ -148,8 +148,9 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
       await createUserResearchData(user._id as mongoose.Types.ObjectId);
 
       // Generate session ID and token
-      const sessionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      await user.setCurrentToken(sessionId);
+      const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+      user.setCurrentToken(sessionId);
+      await user.save();
       
       const token = jwt.sign(
         { userId: user._id, sessionId },
@@ -467,8 +468,9 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
       await createUserResearchData(user._id as mongoose.Types.ObjectId);
 
       // Generate session ID and token
-      const sessionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      await user.setCurrentToken(sessionId);
+      const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+      user.setCurrentToken(sessionId);
+      await user.save();
       
       const token = jwt.sign(
         { userId: user._id, sessionId },

@@ -214,6 +214,18 @@
 - **Prevented data leakage** - Ensures clean state between different user sessions
 **Result**: ✅ No data leakage between users, complete cache clearing on account switch
 
+### Attempt #19: Fix Critical Session Persistence Bug in Registration
+**Status**: COMPLETED
+**Problem**: Registration endpoints call setCurrentToken() but don't save to database, breaking single-device enforcement
+**Root cause**: Registration endpoints missing user.save() after setCurrentToken(), session IDs not persisted
+**Security impact**: Newly registered users could stay logged in on multiple devices simultaneously
+**What we did**:
+- **Fixed regular registration** - Added user.save() after setCurrentToken() call
+- **Fixed Google sign-up** - Added user.save() after setCurrentToken() call
+- **Fixed session ID generation** - Changed from substr() to substring() for consistency
+- **Consistent with login** - Same pattern as login endpoints (setCurrentToken + save)
+**Result**: ✅ Single-device enforcement now works for all authentication flows including registration
+
 ### Files Modified:
 - `server/src/models/User.ts` - Replaced device session with simple currentTokenId field
 - `server/src/routes/auth.ts` - Updated login endpoints to set currentTokenId (invalidates old tokens)
