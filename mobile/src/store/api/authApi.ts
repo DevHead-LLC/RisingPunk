@@ -2,6 +2,9 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { RootState } from '../index';
 import { API_URL } from '../../config';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
+import { balanceApi } from './balanceApi';
+import { botsApi } from './botsApi';
+import { mapApi } from './mapApi';
 
 export interface LoginRequest {
   handle: string;
@@ -136,6 +139,14 @@ const authBaseQuery = async (args: any, api: any, extraOptions: any) => {
       console.log('🔍 AUTH API: ACCOUNT_SWITCHED detected, dispatching action');
       // Always dispatch account switched action - the auth slice will handle showing banner appropriately
       api.dispatch({ type: 'auth/handleAccountSwitched' });
+      
+      // Clear RTK Query caches to prevent data leakage between users
+      console.log('🔍 AUTH API: Clearing RTK Query caches to prevent data leakage');
+      api.dispatch(authApi.util.resetApiState());
+      api.dispatch(balanceApi.util.resetApiState());
+      api.dispatch(botsApi.util.resetApiState());
+      api.dispatch(mapApi.util.resetApiState());
+      
       return result; // Return early to prevent other error handling
     } else {
       console.log('🔍 AUTH API: Not ACCOUNT_SWITCHED, calling globalErrorHandler');

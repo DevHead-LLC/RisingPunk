@@ -274,6 +274,18 @@
 - **Simplified login flow** - Removed unnecessary complexity and potential failure point
 **Result**: ✅ Cleaner code, eliminated potential login failures, simplified authentication flow
 
+### Attempt #24: Fix P1 Security Vulnerability - Missing Cache Clearing in Auth API
+**Status**: COMPLETED
+**Problem**: Auth API handler not clearing RTK Query caches on ACCOUNT_SWITCHED, allowing data leakage between user sessions
+**Security impact**: P1 - Previous user's cached data (profile, balance, bots, map) could bleed into next session
+**Root cause**: Auth API handler only dispatched auth/handleAccountSwitched but didn't clear caches like base API handler
+**What we did**:
+- **Added cache clearing to auth API** - Clear authApi, balanceApi, botsApi, mapApi caches on ACCOUNT_SWITCHED
+- **Added missing imports** - Imported balanceApi, botsApi, mapApi for cache clearing
+- **Consistent with base API** - Same cache clearing pattern as base API handler
+- **Prevented data leakage** - Ensures clean state between different user sessions
+**Result**: ✅ Fixed P1 security vulnerability, prevented data leakage between user sessions
+
 ### Files Modified:
 - `server/src/models/User.ts` - Replaced device session with simple currentTokenId field
 - `server/src/routes/auth.ts` - Updated login endpoints to set currentTokenId (invalidates old tokens)
