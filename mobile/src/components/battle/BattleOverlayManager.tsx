@@ -55,7 +55,7 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
     error: battleError,
   } = useBattleState({
     battleId,
-    pollingInterval: 1000,
+    pollingInterval: 5000, // Reduced from 1000ms to 5 seconds
   });
 
   // SIMPLE LOG: Only log problems (once per error)

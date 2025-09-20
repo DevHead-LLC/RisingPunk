@@ -70,6 +70,10 @@ export class GlobalErrorHandler {
     if (!error) return false;
 
     if (status === 401) {
+      // Don't treat ACCOUNT_SWITCHED as a database error - let it be handled by the account switched flow
+      if (error?.data?.error === 'ACCOUNT_SWITCHED') {
+        return false;
+      }
       return true;
     }
 

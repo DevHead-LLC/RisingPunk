@@ -147,9 +147,13 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
       // Create research data for new user
       await createUserResearchData(user._id as mongoose.Types.ObjectId);
 
-      // Generate token
+      // Generate session ID and token
+      const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+      user.setCurrentToken(sessionId);
+      await user.save();
+      
       const token = jwt.sign(
-        { userId: user._id },
+        { userId: user._id, sessionId },
         process.env.JWT_SECRET || 'defaultsecret',
         { expiresIn: '7d' }
       );
@@ -215,11 +219,24 @@ router.post<{}, UserResponse | { error: string }, LoginRequest['body']>(
         return;
       }
 
+      // Generate a unique session ID for this login
+      const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+      
       const token = jwt.sign(
-        { userId: user._id },
+        { userId: user._id, sessionId: sessionId },
         process.env.JWT_SECRET || 'defaultsecret',
         { expiresIn: '7d' }
       );
+      
+      // Set current session ID (invalidates all previous sessions)
+      console.log('🔍 LOGIN: Setting current session:', {
+        userId: user._id,
+        oldSessionId: user.currentTokenId,
+        newSessionId: sessionId
+      });
+      user.setCurrentToken(sessionId);
+      await user.save();
+      console.log('🔍 LOGIN: Session set and saved, new currentTokenId:', user.currentTokenId);
 
       res.json({
         token,
@@ -281,12 +298,22 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
       
       if (user) {
         console.log('🔵 GSI Server Route: Existing user found with Google ID');
+        
+        // No device session check needed - simple token invalidation handles this
+        
         // User exists, log them in
+        // Generate a unique session ID for this login
+        const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+        
         const token = jwt.sign(
-          { userId: user._id },
+          { userId: user._id, sessionId: sessionId },
           process.env.JWT_SECRET || 'defaultsecret',
           { expiresIn: '7d' }
         );
+
+        // Set current session ID (invalidates all previous sessions)
+        user.setCurrentToken(sessionId);
+        await user.save();
 
         console.log('🔵 GSI Server Route: JWT token created, sending response');
         res.json({
@@ -319,14 +346,23 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
         // Email exists but no Google ID, link accounts
         user = await User.findOne({ emailHash: require('../services/EncryptionService').EncryptionService.hashEmail(googleUser.email) });
         if (user) {
+          // No device session check needed - simple token invalidation handles this
+          
           user.googleId = googleUser.googleId;
           await user.save();
           
+          // Generate a unique session ID for this login
+          const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+          
           const token = jwt.sign(
-            { userId: user._id },
+            { userId: user._id, sessionId: sessionId },
             process.env.JWT_SECRET || 'defaultsecret',
             { expiresIn: '7d' }
           );
+
+          // Set current session ID (invalidates all previous sessions)
+          user.setCurrentToken(sessionId);
+          await user.save();
 
           res.json({
             token,
@@ -431,8 +467,13 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
       // Create research data for new user
       await createUserResearchData(user._id as mongoose.Types.ObjectId);
 
+      // Generate session ID and token
+      const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+      user.setCurrentToken(sessionId);
+      await user.save();
+      
       const token = jwt.sign(
-        { userId: user._id },
+        { userId: user._id, sessionId },
         process.env.JWT_SECRET || 'defaultsecret',
         { expiresIn: '7d' }
       );
@@ -613,11 +654,20 @@ router.get('/verify-token', async (req, res): Promise<void> => {
     }
 
     const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'defaultsecret') as { userId: string };
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'defaultsecret') as { userId: string; sessionId?: string };
     
     const user = await User.findById(decoded.userId);
     if (!user) {
       res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Check if session is still valid (not invalidated by new login)
+    // Only check sessionId if the token has one (new tokens)
+    // Old tokens without sessionId are still valid
+    if (decoded.sessionId && !user.isTokenValid(decoded.sessionId)) {
+      console.log('🔍 VERIFY-TOKEN: Session invalidated by new login, sending ACCOUNT_SWITCHED');
+      res.status(401).json({ error: 'ACCOUNT_SWITCHED' });
       return;
     }
 
