@@ -262,6 +262,18 @@
 - **Maintained security** - All session IDs remain unique and cryptographically secure
 **Result**: ✅ Consistent 9-character session IDs across all authentication flows, improved code maintainability
 
+### Attempt #23: Remove Dead Device ID Code
+**Status**: COMPLETED
+**Problem**: Dead device ID code in loginUser thunk and baseApi causing unnecessary complexity and potential login failures
+**Root cause**: Leftover code from old device session approach, no longer needed with simple token invalidation
+**Impact**: Unnecessary getDeviceId() calls could cause login failures if device ID generation throws errors
+**What we did**:
+- **Removed device ID from loginUser thunk** - Eliminated getDeviceId() call and x-device-id header
+- **Removed device ID from baseApi** - Cleaned up unused import and dead code
+- **Deleted deviceId.ts utility** - No longer needed anywhere in the codebase
+- **Simplified login flow** - Removed unnecessary complexity and potential failure point
+**Result**: ✅ Cleaner code, eliminated potential login failures, simplified authentication flow
+
 ### Files Modified:
 - `server/src/models/User.ts` - Replaced device session with simple currentTokenId field
 - `server/src/routes/auth.ts` - Updated login endpoints to set currentTokenId (invalidates old tokens)

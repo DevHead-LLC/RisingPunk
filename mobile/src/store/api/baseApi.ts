@@ -1,7 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
 import type { RootState } from '../index';
-import { getDeviceId } from '../../utils/deviceId';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 import { authApi } from './authApi';
 import { balanceApi } from './balanceApi';
