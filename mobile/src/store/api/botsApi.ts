@@ -4,6 +4,8 @@ import { BotType } from '../slices/botsSlice';
 import { balanceApi } from './balanceApi';
 import { subtractFromBalance, addToBalance } from '../slices/balanceSlice';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
+import { authApi } from './authApi';
+import { mapApi } from './mapApi';
 
 // Custom base query with error handling for botsApi
 const botsBaseQuery = async (args: any, api: any, extraOptions: any) => {
@@ -22,6 +24,14 @@ const botsBaseQuery = async (args: any, api: any, extraOptions: any) => {
       console.log('🔍 BOTS API: ACCOUNT_SWITCHED detected, dispatching action');
       // Always dispatch account switched action - the auth slice will handle showing banner appropriately
       api.dispatch({ type: 'auth/handleAccountSwitched' });
+      
+      // Clear RTK Query caches to prevent data leakage between users
+      console.log('🔍 BOTS API: Clearing RTK Query caches to prevent data leakage');
+      api.dispatch(authApi.util.resetApiState());
+      api.dispatch(balanceApi.util.resetApiState());
+      api.dispatch(botsApi.util.resetApiState());
+      api.dispatch(mapApi.util.resetApiState());
+      
       return result; // Return early to prevent other error handling
     } else {
       globalErrorHandler.handleDatabaseError(result.error);

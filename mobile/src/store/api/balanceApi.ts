@@ -1,6 +1,9 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
+import { authApi } from './authApi';
+import { botsApi } from './botsApi';
+import { mapApi } from './mapApi';
 
 // Custom base query with error handling for balanceApi
 const balanceBaseQuery = async (args: any, api: any, extraOptions: any) => {
@@ -19,6 +22,14 @@ const balanceBaseQuery = async (args: any, api: any, extraOptions: any) => {
       console.log('🔍 BALANCE API: ACCOUNT_SWITCHED detected, dispatching action');
       // Always dispatch account switched action - the auth slice will handle showing banner appropriately
       api.dispatch({ type: 'auth/handleAccountSwitched' });
+      
+      // Clear RTK Query caches to prevent data leakage between users
+      console.log('🔍 BALANCE API: Clearing RTK Query caches to prevent data leakage');
+      api.dispatch(authApi.util.resetApiState());
+      api.dispatch(balanceApi.util.resetApiState());
+      api.dispatch(botsApi.util.resetApiState());
+      api.dispatch(mapApi.util.resetApiState());
+      
       return result; // Return early to prevent other error handling
     } else {
       globalErrorHandler.handleDatabaseError(result.error);

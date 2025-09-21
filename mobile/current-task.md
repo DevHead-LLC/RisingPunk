@@ -176,3 +176,21 @@
 
 ## **Summary**
 All balance-related race conditions and duplicate logic have been systematically identified and resolved. The balance system now has a clean, single source of truth with no conflicts.
+
+## **Phase 6: RTK Query Cache Security Fix** ✅ COMPLETED
+**Target**: Fix data leakage vulnerability in ACCOUNT_SWITCHED error handling
+**Issue**: Non-auth APIs (balanceApi, botsApi, mapApi) were not clearing RTK Query caches when ACCOUNT_SWITCHED errors occurred, potentially showing previous user's data to new user
+
+**Files modified**:
+- `mobile/src/store/api/balanceApi.ts` ✅ FIXED
+- `mobile/src/store/api/botsApi.ts` ✅ FIXED  
+- `mobile/src/store/api/mapApi.ts` ✅ FIXED
+
+**Changes made**:
+- Added cache clearing logic to match pattern in baseApi.ts and authApi.ts
+- Added imports for all API modules to enable cache reset
+- Added logging for cache clearing operations
+
+**Result**: All APIs now properly clear RTK Query caches when ACCOUNT_SWITCHED errors occur, preventing cross-user data leakage
+
+**Status**: ✅ COMPLETED - Security vulnerability fixed
