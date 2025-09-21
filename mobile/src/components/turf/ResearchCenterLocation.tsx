@@ -101,7 +101,7 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
           total: result.balance.total,
           ratePerSecond: result.balance.ratePerSecond,
           lastUpdated: result.balance.lastUpdated,
-          fractionalRemainder: (result.balance as any).fractionalRemainder || 0
+          fractionalRemainder: result.balance.fractionalRemainder
         }));
       }
       

@@ -236,11 +236,12 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
     // Debug logging (disabled - issue resolved)
     // console.log(`🔍 BALANCE DEBUG:`, { ... });
     
-    // Only update if there's accumulated amount to add
+    // Only update if there's accumulated amount to add or fractional remainder changed
     if (wholeDollarsToAdd > 0 || finalFractionalRemainder !== (user.balance.fractionalRemainder || 0)) {
       user.balance.total += wholeDollarsToAdd;
       user.balance.fractionalRemainder = finalFractionalRemainder;
-      user.balance.lastUpdated = now;
+      // Only advance lastUpdated by the credited time to prevent time loss
+      user.balance.lastUpdated = new Date(user.balance.lastUpdated.getTime() + (roundedSecondsElapsed * 1000));
       await user.save();
     }
 
