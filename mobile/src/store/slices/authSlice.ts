@@ -85,22 +85,8 @@ export const loginUser = createAsyncThunk(
 
       // Fetch initial data after successful login
       try {
-        // Fetch balance
-        const balanceResponse = await fetch(`${API_URL}/api/balance`, {
-          headers: {
-            'Authorization': `Bearer ${data.token}`,
-          },
-        });
-
-        if (balanceResponse.ok) {
-          const balanceData = await balanceResponse.json();
-          dispatch(updateBalance({
-            total: balanceData.total,
-            ratePerSecond: balanceData.ratePerSecond,
-            lastUpdated: new Date().toISOString(),
-          }));
-        }
-
+        // Balance fetching is handled by DataFetcher + RTK Query polling
+        
         // Fetch bots
         const botsResponse = await fetch(`${API_URL}/api/bots`, {
           headers: {
@@ -228,22 +214,8 @@ export const googleSignInUser = createAsyncThunk(
 
       // Fetch initial data after successful login
       try {
-        // Fetch balance
-        const balanceResponse = await fetch(`${API_URL}/api/balance`, {
-          headers: {
-            'Authorization': `Bearer ${data.token}`,
-          },
-        });
-
-        if (balanceResponse.ok) {
-          const balanceData = await balanceResponse.json();
-          dispatch(updateBalance({
-            total: balanceData.total,
-            ratePerSecond: balanceData.ratePerSecond,
-            lastUpdated: new Date().toISOString(),
-          }));
-        }
-
+        // Balance fetching is handled by DataFetcher + RTK Query polling
+        
         // Fetch bots
         const botsResponse = await fetch(`${API_URL}/api/bots`, {
           headers: {

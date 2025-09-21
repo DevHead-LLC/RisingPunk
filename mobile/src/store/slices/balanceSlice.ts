@@ -4,6 +4,7 @@ export interface BalanceState {
   total: number | null;
   ratePerSecond: number;
   lastUpdated: number | null; // timestamp (ms)
+  fractionalRemainder: number;
   updateTrigger: number; // Add this to force selector recalculation
 }
 
@@ -11,6 +12,7 @@ const initialState: BalanceState = {
   total: null,
   ratePerSecond: 1,
   lastUpdated: Date.now(), // Start with current time instead of null
+  fractionalRemainder: 0,
   updateTrigger: 0,
 };
 
@@ -18,9 +20,10 @@ export const balanceSlice = createSlice({
   name: 'balance',
   initialState,
   reducers: {
-    updateBalance: (state, action: PayloadAction<{ total: number; ratePerSecond: number; lastUpdated: string | Date | null }>) => {
+    updateBalance: (state, action: PayloadAction<{ total: number; ratePerSecond: number; lastUpdated: string | Date | null; fractionalRemainder?: number }>) => {
       state.total = action.payload.total;
       state.ratePerSecond = action.payload.ratePerSecond;
+      state.fractionalRemainder = action.payload.fractionalRemainder || 0;
       
       // Handle lastUpdated more robustly
       if (action.payload.lastUpdated) {
@@ -66,12 +69,13 @@ export const balanceSlice = createSlice({
 export const { updateBalance, addToBalance, subtractFromBalance, triggerUpdate } = balanceSlice.actions;
 export default balanceSlice.reducer;
 
-// Selector to get the current balance (with time-based accrual)
-// Updates every 10 seconds to match API polling interval
+// Selector to get the current balance (server-calculated with fractional remainder)
+// Server handles all calculations, mobile just displays the result
 export const getCurrentBalance = (state: { balance: BalanceState }) => {
-  const { total, ratePerSecond, lastUpdated } = state.balance;
-  if (total === null || lastUpdated === null) return 0;
-  const elapsed = (Date.now() - lastUpdated) / 1000;
-  const roundedElapsed = Math.floor(elapsed / 10) * 10;
-  return Math.floor(total + ratePerSecond * roundedElapsed);
+  const { total, fractionalRemainder } = state.balance;
+  if (total === null) return 0;
+  
+  // Server already calculated the balance with fractional remainder
+  // Just return the floor-rounded value for display
+  return Math.floor(total + (fractionalRemainder || 0));
 };

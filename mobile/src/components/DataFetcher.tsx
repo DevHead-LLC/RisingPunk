@@ -24,6 +24,7 @@ export const DataFetcher: React.FC<DataFetcherProps> = ({ children }) => {
         total: balanceData.total,
         ratePerSecond: balanceData.ratePerSecond,
         lastUpdated: balanceData.lastUpdated,
+        fractionalRemainder: balanceData.fractionalRemainder,
       }));
     }
   }, [balanceData, dispatch]);
