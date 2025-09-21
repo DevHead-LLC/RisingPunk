@@ -4,7 +4,7 @@ import { BotType } from '../slices/botsSlice';
 import { balanceApi } from './balanceApi';
 import { subtractFromBalance, addToBalance } from '../slices/balanceSlice';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
-import { clearAllApiCaches } from './cacheUtils';
+import { resetAllApiCaches } from './resetApiCaches';
 
 // Custom base query with error handling for botsApi
 const botsBaseQuery = async (args: any, api: any, extraOptions: any) => {
@@ -25,7 +25,7 @@ const botsBaseQuery = async (args: any, api: any, extraOptions: any) => {
       api.dispatch({ type: 'auth/handleAccountSwitched' });
       
       // Clear RTK Query caches to prevent data leakage between users
-      clearAllApiCaches(api);
+      resetAllApiCaches(api);
       
       return result; // Return early to prevent other error handling
     } else {

@@ -217,3 +217,26 @@ All balance-related race conditions and duplicate logic have been systematically
 **Result**: Clean architecture with no circular imports, same security benefits
 
 **Status**: ✅ COMPLETED - Circular imports eliminated
+
+## **Phase 8: Final Circular Import Fix** ✅ COMPLETED
+**Target**: Fix remaining circular import issue with cacheUtils.ts
+**Issue**: cacheUtils.ts imported all APIs, but APIs also imported cacheUtils.ts, creating circular dependencies
+
+**Solution**: Created resetApiCaches.ts utility that uses Redux action types instead of direct API imports
+**Files created**:
+- `mobile/src/store/api/resetApiCaches.ts` ✅ CREATED
+
+**Files modified**:
+- `mobile/src/store/api/balanceApi.ts` ✅ FIXED
+- `mobile/src/store/api/botsApi.ts` ✅ FIXED  
+- `mobile/src/store/api/mapApi.ts` ✅ FIXED
+
+**Changes made**:
+- Deleted cacheUtils.ts to eliminate circular imports
+- Created resetApiCaches.ts that dispatches Redux actions by type string
+- All APIs now import and use the new utility
+- No circular dependencies - utility doesn't import any APIs
+
+**Result**: Clean architecture with no circular imports, same security benefits, proper cache clearing
+
+**Status**: ✅ COMPLETED - All circular import issues resolved

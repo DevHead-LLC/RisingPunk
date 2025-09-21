@@ -2,7 +2,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
 import { MapResponse } from '../../types/map';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
-import { clearAllApiCaches } from './cacheUtils';
+import { resetAllApiCaches } from './resetApiCaches';
 
 // Custom base query with error handling for mapApi
 const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
@@ -23,7 +23,7 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
       api.dispatch({ type: 'auth/handleAccountSwitched' });
       
       // Clear RTK Query caches to prevent data leakage between users
-      clearAllApiCaches(api);
+      resetAllApiCaches(api);
       
       return result; // Return early to prevent other error handling
     } else {
