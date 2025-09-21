@@ -4,8 +4,7 @@ import { BotType } from '../slices/botsSlice';
 import { balanceApi } from './balanceApi';
 import { subtractFromBalance, addToBalance } from '../slices/balanceSlice';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
-import { authApi } from './authApi';
-import { mapApi } from './mapApi';
+import { clearAllApiCaches } from './cacheUtils';
 
 // Custom base query with error handling for botsApi
 const botsBaseQuery = async (args: any, api: any, extraOptions: any) => {
@@ -20,17 +19,13 @@ const botsBaseQuery = async (args: any, api: any, extraOptions: any) => {
 
   if (result.error) {
     // Check for account switched error first
-    if (result.error?.status === 401 && result.error?.data?.error === 'ACCOUNT_SWITCHED') {
+    if ((result.error as any)?.status === 401 && (result.error as any)?.data?.error === 'ACCOUNT_SWITCHED') {
       console.log('🔍 BOTS API: ACCOUNT_SWITCHED detected, dispatching action');
       // Always dispatch account switched action - the auth slice will handle showing banner appropriately
       api.dispatch({ type: 'auth/handleAccountSwitched' });
       
       // Clear RTK Query caches to prevent data leakage between users
-      console.log('🔍 BOTS API: Clearing RTK Query caches to prevent data leakage');
-      api.dispatch(authApi.util.resetApiState());
-      api.dispatch(balanceApi.util.resetApiState());
-      api.dispatch(botsApi.util.resetApiState());
-      api.dispatch(mapApi.util.resetApiState());
+      clearAllApiCaches(api);
       
       return result; // Return early to prevent other error handling
     } else {
