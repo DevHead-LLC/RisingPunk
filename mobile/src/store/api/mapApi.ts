@@ -2,6 +2,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
 import { MapResponse } from '../../types/map';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
+import { clearAllApiCaches } from './cacheUtils';
 
 // Custom base query with error handling for mapApi
 const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
@@ -16,10 +17,14 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
 
   if (result.error) {
     // Check for account switched error first
-    if (result.error?.status === 401 && result.error?.data?.error === 'ACCOUNT_SWITCHED') {
+    if ((result.error as any)?.status === 401 && (result.error as any)?.data?.error === 'ACCOUNT_SWITCHED') {
       console.log('🔍 MAP API: ACCOUNT_SWITCHED detected, dispatching action');
       // Always dispatch account switched action - the auth slice will handle showing banner appropriately
       api.dispatch({ type: 'auth/handleAccountSwitched' });
+      
+      // Clear RTK Query caches to prevent data leakage between users
+      clearAllApiCaches(api);
+      
       return result; // Return early to prevent other error handling
     } else {
       globalErrorHandler.handleDatabaseError(result.error);
