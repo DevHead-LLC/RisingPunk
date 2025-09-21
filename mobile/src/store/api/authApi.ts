@@ -62,6 +62,7 @@ export interface UnlockResearchCenterResponse {
     total: number;
     ratePerSecond: number;
     lastUpdated: string;
+    fractionalRemainder: number;
   };
   researchCenterBuild: {
     startedAt: string;

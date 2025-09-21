@@ -36,6 +36,7 @@ export const antivirusApi = createApi({
         total: number;
         ratePerSecond: number;
         lastUpdated: string;
+        fractionalRemainder: number;
       };
       antivirusShield: {
         active: boolean;
