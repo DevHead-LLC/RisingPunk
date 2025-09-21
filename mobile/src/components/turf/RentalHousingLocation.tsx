@@ -5,7 +5,7 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { useTheme } from '../../context/ThemeContext';
 import { useFetchBalanceQuery } from '../../store/api/balanceApi';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
-import { updateBalance } from '../../store/slices/balanceSlice';
+import { updateBalance, getCurrentBalance } from '../../store/slices/balanceSlice';
 import { useGetRentalHousingStatusQuery, useUnlockRentalHousingMutation, useCompleteRentalHousingMutation } from '../../store/api/authApi';
 import {
   DevelopmentIcon,
@@ -34,6 +34,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
 }: RentalHousingLocationProps) {
   const colors = useThemeColors();
   const { themeMode } = useTheme();
+  const currentBalanceState = useAppSelector((state) => state.balance);
   const [showPopup, setShowPopup] = useState(false);
   const [showLoadingModal, setShowLoadingModal] = useState(false);
   const [showInsufficientFundsModal, setShowInsufficientFundsModal] = useState(false);
@@ -112,11 +113,12 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
       const result = await unlockRentalHousing(propertyId).unwrap();
       
       if (result.success) {
-        // Update local balance
+        // Update local balance - preserve existing ratePerSecond, lastUpdated, and fractionalRemainder
         dispatch(updateBalance({ 
           total: result.newBalance, 
-          ratePerSecond: 1, 
-          lastUpdated: new Date() 
+          ratePerSecond: currentBalanceState.ratePerSecond, 
+          lastUpdated: currentBalanceState.lastUpdated ? new Date(currentBalanceState.lastUpdated) : null,
+          fractionalRemainder: currentBalanceState.fractionalRemainder
         }));
         
         // Show success modal

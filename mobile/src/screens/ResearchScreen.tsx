@@ -52,6 +52,7 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
   const { researchStatus, loading, error, canAccessResearch, getResearchRequirements, refreshAfterUnlock } = useResearchStatus();
   const userLevel = useAppSelector(state => state.auth.user?.level || 1);
   const userBalance = useAppSelector(state => getCurrentBalance(state));
+  const currentBalanceState = useAppSelector((state) => state.balance);
   
   // Get the selected research card
   const selectedCard = RESEARCH_CARDS.find(card => card.id === currentScreen);
@@ -184,11 +185,12 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
     setShowLockedModal(false);
     setSelectedResearch(null);
     
-    // Update balance in Redux store
+    // Update balance in Redux store - preserve existing ratePerSecond, lastUpdated, and fractionalRemainder
     dispatch(updateBalance({
       total: newBalance,
-      ratePerSecond: 1, // Keep existing rate
-      lastUpdated: new Date().toISOString(),
+      ratePerSecond: currentBalanceState.ratePerSecond,
+      lastUpdated: currentBalanceState.lastUpdated ? new Date(currentBalanceState.lastUpdated) : null,
+      fractionalRemainder: currentBalanceState.fractionalRemainder,
     }));
     
     // Refresh research status

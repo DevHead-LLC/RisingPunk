@@ -105,10 +105,14 @@ const AppContent = memo(() => {
   // Update balance slice when data is fetched
   useEffect(() => {
     if (balanceData) {
+      // Debug logging (disabled - issue resolved)
+      // console.log('🔍 MOBILE BALANCE UPDATE:', { ... });
+      
       dispatch(updateBalance({
         total: balanceData.total,
         ratePerSecond: balanceData.ratePerSecond,
         lastUpdated: balanceData.lastUpdated,
+        fractionalRemainder: balanceData.fractionalRemainder,
       }));
     }
   }, [balanceData, dispatch]);

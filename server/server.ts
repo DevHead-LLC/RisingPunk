@@ -214,16 +214,32 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
       return;
     }
 
-    // Calculate and update accumulated balance FIRST (before sync)
+    // Calculate and update accumulated balance with fractional remainder tracking
     const now = new Date();
     const secondsElapsed = (now.getTime() - user.balance.lastUpdated.getTime()) / 1000;
     
-    // Calculate income from total effective rate (includes rental housing income)
-    const accumulatedAmount = Math.floor(secondsElapsed * user.balance.ratePerSecond);
+    // Round down to 10-second intervals to prevent over-crediting
+    const roundedSecondsElapsed = Math.floor(secondsElapsed / 10) * 10;
+    
+    // Calculate full precision income (includes fractional cents)
+    const fullPrecisionIncome = roundedSecondsElapsed * user.balance.ratePerSecond;
+    
+    // Add to existing fractional remainder
+    const totalWithRemainder = (user.balance.fractionalRemainder || 0) + fullPrecisionIncome;
+    
+    // Calculate whole dollars to add (floor of total amount)
+    const wholeDollarsToAdd = Math.floor(totalWithRemainder);
+    
+    // Calculate new fractional remainder (decimal part after adding whole dollars)
+    const finalFractionalRemainder = totalWithRemainder - wholeDollarsToAdd;
+    
+    // Debug logging (disabled - issue resolved)
+    // console.log(`🔍 BALANCE DEBUG:`, { ... });
     
     // Only update if there's accumulated amount to add
-    if (accumulatedAmount > 0) {
-      user.balance.total += accumulatedAmount;
+    if (wholeDollarsToAdd > 0 || finalFractionalRemainder !== (user.balance.fractionalRemainder || 0)) {
+      user.balance.total += wholeDollarsToAdd;
+      user.balance.fractionalRemainder = finalFractionalRemainder;
       user.balance.lastUpdated = now;
       await user.save();
     }
@@ -236,7 +252,8 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
     const currentBalance = {
       total: user.balance.total,
       ratePerSecond: user.balance.ratePerSecond,
-      lastUpdated: user.balance.lastUpdated
+      lastUpdated: user.balance.lastUpdated,
+      fractionalRemainder: user.balance.fractionalRemainder || 0
     };
 
     res.json(currentBalance);
@@ -246,41 +263,7 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
   }
 });
 
-// Update balance endpoint that accumulates and saves time
-app.post('/api/balance/update', auth, async (req: Request, res: Response) => {
-  try {
-    const user = await User.findById(req.user._id);
-    
-    if (!user) {
-      res.status(404).json({ error: 'User not found' });
-      return;
-    }
-
-    // Calculate and update accumulated balance FIRST (before sync)
-    const now = new Date();
-    const secondsElapsed = (now.getTime() - user.balance.lastUpdated.getTime()) / 1000;
-    
-    // Calculate income from total effective rate (includes rental housing income)
-    const accumulatedAmount = Math.floor(secondsElapsed * user.balance.ratePerSecond);
-    
-    user.balance.total += accumulatedAmount;
-    user.balance.lastUpdated = now;
-    await user.save();
-
-    // THEN check and sync rental housing income if needed
-    const { RentalHousingSyncService } = await import('./src/services/RentalHousingSyncService');
-    await RentalHousingSyncService.performSync(user);
-
-    res.json({
-      total: user.balance.total,
-      ratePerSecond: user.balance.ratePerSecond,
-      lastUpdated: user.balance.lastUpdated
-    });
-  } catch (error: any) {
-    console.error('Balance update error:', error);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
+// Removed duplicate /api/balance/update endpoint - GET /api/balance already handles updates
 
 // Bot routes
 app.post('/api/bots/test', auth, async (req: Request, res: Response) => {
@@ -394,30 +377,7 @@ app.post('/api/bots/build', auth, async (req: Request, res: Response) => {
   }
 });
 
-app.post('/api/balance/deduct', auth, async (req: Request, res: Response) => {
-  try {
-    const { amount } = req.body;
-    const user = await User.findById(req.user._id);
-    
-    if (!user) {
-      res.status(404).json({ error: 'User not found' });
-      return;
-    }
-
-    if (user.balance.total < amount) {
-      res.status(400).json({ error: 'Insufficient balance' });
-      return;
-    }
-
-    user.balance.total -= amount;
-    await user.save();
-
-    res.json(user.balance);
-  } catch (error: any) {
-    console.error('Balance deduction error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+// Removed unused /api/balance/deduct endpoint - not used by mobile app
 
 // Get rental housing income data
 app.get('/api/rental-housing/income', auth, async (req: Request, res: Response) => {
