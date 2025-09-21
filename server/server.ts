@@ -218,8 +218,8 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
     const now = new Date();
     const secondsElapsed = (now.getTime() - user.balance.lastUpdated.getTime()) / 1000;
     
-    // Round to nearest 10-second interval to ensure consistent timing
-    const roundedSecondsElapsed = Math.round(secondsElapsed / 10) * 10;
+    // Round down to 10-second intervals to prevent over-crediting
+    const roundedSecondsElapsed = Math.floor(secondsElapsed / 10) * 10;
     
     // Calculate full precision income (includes fractional cents)
     const fullPrecisionIncome = roundedSecondsElapsed * user.balance.ratePerSecond;
