@@ -1,7 +1,7 @@
 name: Deploy API (production)
 
 on:
-  push:
+  pull_request:
     branches: [ prod ]
     paths:
       - 'server/**'
