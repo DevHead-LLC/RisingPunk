@@ -4,8 +4,8 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
+  ScrollView,
+  Keyboard,
 } from 'react-native';
 import { GoogleSignin, GoogleSigninButton } from '@react-native-google-signin/google-signin';
 
@@ -412,10 +412,12 @@ export const LoginScreen = () => {
 
   return (
     <ScreenContainer>
-      <KeyboardAvoidingView 
-        style={styles.keyboardAvoidingView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        bounces={false}
       >
         <View style={styles.content}>
           <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -431,7 +433,7 @@ export const LoginScreen = () => {
             </View>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </ScrollView>
       
       <ForgotPasswordModal
         isVisible={showForgotPasswordModal}
@@ -448,6 +450,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     maxWidth: SIZING.screen.width * 0.9,
     alignSelf: 'center',
+    paddingVertical: SIZING.spacing.lg,
   },
   container: {
     flex: 1,
@@ -565,8 +568,13 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.5,
   },
-  keyboardAvoidingView: {
+  scrollView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    minHeight: '100%',
   },
   errorText: {
     color: '#ff4444',
