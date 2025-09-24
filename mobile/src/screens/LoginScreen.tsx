@@ -445,12 +445,12 @@ export const LoginScreen = () => {
 
 const styles = StyleSheet.create({
   content: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     maxWidth: SIZING.screen.width * 0.9,
     alignSelf: 'center',
     paddingVertical: SIZING.spacing.lg,
+    minHeight: '100%',
   },
   container: {
     flex: 1,
