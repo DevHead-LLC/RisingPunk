@@ -31,6 +31,20 @@
 
 **Result**: Apple Sign In UI will now properly appear when users tap the sign-in button.
 
+## DUPLICATE FILE BUG FIX - Both Apple Sign In Modules Fixed ✅
+**Issue**: Two Apple Sign In module files existed with the same bug:
+- `mobile/ios/AppleSignInModule.swift` (broken - missing presentation context)
+- `mobile/ios/mobile/AppleSignInModule.swift` (fixed - has presentation context)
+
+**Fix Applied to Both Files**:
+- Added `UIKit` import
+- Added `ASAuthorizationControllerPresentationContextProviding` protocol conformance
+- Set `authorizationController.presentationContextProvider = self`
+- Implemented `presentationAnchor(for controller:)` method with proper window detection
+- Added fallback for older iOS versions
+
+**Result**: Both Apple Sign In module files now have the required presentation context implementation.
+
 **Issue Identified**: 
 - Google Auth configuration was moved from hardcoded values to environment variables using react-native-config
 - Environment variables are loading correctly (confirmed by debug logs)
