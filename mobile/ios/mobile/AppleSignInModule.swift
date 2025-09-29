@@ -4,7 +4,7 @@ import React
 import UIKit
 
 @objc(AppleSignInModule)
-class AppleSignInModule: NSObject, ASAuthorizationControllerDelegate {
+class AppleSignInModule: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
   
   private var resolve: RCTPromiseResolveBlock?
   private var reject: RCTPromiseRejectBlock?
@@ -36,10 +36,23 @@ class AppleSignInModule: NSObject, ASAuthorizationControllerDelegate {
       
       let authorizationController = ASAuthorizationController(authorizationRequests: [request])
       authorizationController.delegate = self
+      authorizationController.presentationContextProvider = self
       authorizationController.performRequests()
     } else {
       reject("UNSUPPORTED_VERSION", "Apple Sign In requires iOS 13.0 or later", nil)
     }
+  }
+  
+  // MARK: - ASAuthorizationControllerPresentationContextProviding
+  
+  @available(iOS 13.0, *)
+  func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+    guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+          let window = windowScene.windows.first else {
+      // Fallback to key window if window scene is not available
+      return UIApplication.shared.windows.first ?? UIWindow()
+    }
+    return window
   }
   
   // MARK: - ASAuthorizationControllerDelegate

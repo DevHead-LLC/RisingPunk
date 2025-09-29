@@ -592,6 +592,7 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
           token,
           user: {
             handle: user.handle,
+            email: user.getDecryptedEmail(),
             level: user.level,
             experience: user.experience,
             armyBonus: user.armyBonus,
@@ -612,8 +613,65 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
         return;
       }
 
-      // User not found with Apple ID
+      // User not found with Apple ID - check if email exists for account linking
       console.log('🔴 ASI Server Route: No account found with this Apple ID');
+      
+      // If Apple provided an email, check if there's an existing account with that email
+      if (appleUser.email) {
+        console.log('🔍 ASI Server Route: Checking for existing account with email:', appleUser.email);
+        const existingUser = await User.findOne({ emailHash: EncryptionService.hashEmail(appleUser.email) });
+        
+        if (existingUser) {
+          // Check if this account can be linked with Apple ID
+          if (!existingUser.appleId) {
+            console.log('🔗 ASI Server Route: Linking Apple ID to existing account');
+            existingUser.appleId = appleUser.appleId;
+            await existingUser.save();
+            
+            // Generate session and return user data
+            const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+            const token = jwt.sign(
+              { userId: existingUser._id, sessionId: sessionId },
+              process.env.JWT_SECRET || 'defaultsecret',
+              { expiresIn: '7d' }
+            );
+            
+            existingUser.setCurrentToken(sessionId);
+            await existingUser.save();
+            
+            res.json({
+              token,
+              user: {
+                handle: existingUser.handle,
+                email: existingUser.getDecryptedEmail(),
+                level: existingUser.level,
+                experience: existingUser.experience,
+                armyBonus: existingUser.armyBonus,
+                balance: existingUser.balance,
+                unlockedFeatures: existingUser.unlockedFeatures,
+                profileGender: existingUser.profileGender,
+                onboardingCompleted: existingUser.onboardingCompleted || false,
+                needsHandleSelection: existingUser.needsHandleSelection || false,
+                emailVerified: existingUser.emailVerified || false,
+                emailVerificationToken: existingUser.emailVerificationToken || null,
+                emailVerificationPrompted: existingUser.emailVerificationPrompted || false,
+                debugFeatures: {
+                  enableDataRefresh: existingUser.debugFeatures?.enableDataRefresh || false,
+                  enableDebugLogs: existingUser.debugFeatures?.enableDebugLogs || false
+                }
+              }
+            });
+            return;
+          } else {
+            console.log('🔴 ASI Server Route: Account already has Apple ID');
+            res.status(400).json({ 
+              error: 'This email is already associated with an Apple account. Please use the correct Apple ID.'
+            });
+            return;
+          }
+        }
+      }
+      
       res.status(404).json({ 
         error: 'No account found with this Apple ID. Please use the "NEW_IDENTITY (SIGN_UP)" option to create an account.'
       });
@@ -665,28 +723,123 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
         return;
       }
 
-      // Check if user exists with this email (if provided)
+      // Check if user exists with this email (if provided) - handle account linking
       if (appleUser.email) {
         const emailExists = await User.emailExists(appleUser.email);
         if (emailExists) {
-          console.log('🔴 ASU Server Route: User already exists with this email address');
-          res.status(400).json({ 
-            error: 'An account already exists with this email address. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.'
-          });
-          return;
+          console.log('🔴 ASU Server Route: Email already exists - checking for account linking');
+          
+          // Find the existing user with this email
+          const existingUser = await User.findOne({ emailHash: EncryptionService.hashEmail(appleUser.email) });
+          if (existingUser) {
+            // Check if this is a Google account that can be linked
+            if (existingUser.googleId && !existingUser.appleId) {
+              console.log('🔗 ASU Server Route: Linking Apple ID to existing Google account');
+              existingUser.appleId = appleUser.appleId;
+              await existingUser.save();
+              
+              // Generate session and return user data
+              const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+              const token = jwt.sign(
+                { userId: existingUser._id, sessionId: sessionId },
+                process.env.JWT_SECRET || 'defaultsecret',
+                { expiresIn: '7d' }
+              );
+              
+              existingUser.setCurrentToken(sessionId);
+              await existingUser.save();
+              
+              res.json({
+                token,
+                user: {
+                  handle: existingUser.handle,
+                  email: existingUser.getDecryptedEmail(),
+                  level: existingUser.level,
+                  experience: existingUser.experience,
+                  armyBonus: existingUser.armyBonus,
+                  balance: existingUser.balance,
+                  unlockedFeatures: existingUser.unlockedFeatures,
+                  profileGender: existingUser.profileGender,
+                  onboardingCompleted: existingUser.onboardingCompleted || false,
+                  needsHandleSelection: existingUser.needsHandleSelection || false,
+                  emailVerified: existingUser.emailVerified || false,
+                  emailVerificationToken: existingUser.emailVerificationToken || null,
+                  emailVerificationPrompted: existingUser.emailVerificationPrompted || false,
+                  debugFeatures: {
+                    enableDataRefresh: existingUser.debugFeatures?.enableDataRefresh || false,
+                    enableDebugLogs: existingUser.debugFeatures?.enableDebugLogs || false
+                  }
+                }
+              });
+              return;
+            }
+            // Check if this is a basic email/password account that can be linked
+            else if (existingUser.hashedAccessKey && !existingUser.appleId) {
+              console.log('🔗 ASU Server Route: Linking Apple ID to existing email/password account');
+              existingUser.appleId = appleUser.appleId;
+              await existingUser.save();
+              
+              // Generate session and return user data
+              const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+              const token = jwt.sign(
+                { userId: existingUser._id, sessionId: sessionId },
+                process.env.JWT_SECRET || 'defaultsecret',
+                { expiresIn: '7d' }
+              );
+              
+              existingUser.setCurrentToken(sessionId);
+              await existingUser.save();
+              
+              res.json({
+                token,
+                user: {
+                  handle: existingUser.handle,
+                  email: existingUser.getDecryptedEmail(),
+                  level: existingUser.level,
+                  experience: existingUser.experience,
+                  armyBonus: existingUser.armyBonus,
+                  balance: existingUser.balance,
+                  unlockedFeatures: existingUser.unlockedFeatures,
+                  profileGender: existingUser.profileGender,
+                  onboardingCompleted: existingUser.onboardingCompleted || false,
+                  needsHandleSelection: existingUser.needsHandleSelection || false,
+                  emailVerified: existingUser.emailVerified || false,
+                  emailVerificationToken: existingUser.emailVerificationToken || null,
+                  emailVerificationPrompted: existingUser.emailVerificationPrompted || false,
+                  debugFeatures: {
+                    enableDataRefresh: existingUser.debugFeatures?.enableDataRefresh || false,
+                    enableDebugLogs: existingUser.debugFeatures?.enableDebugLogs || false
+                  }
+                }
+              });
+              return;
+            }
+            // Account already has Apple ID or other conflicts
+            else {
+              console.log('🔴 ASU Server Route: Account already has Apple ID or other conflicts');
+              res.status(400).json({ 
+                error: 'An account already exists with this email address. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.'
+              });
+              return;
+            }
+          }
         }
       }
 
       // Create new user
       console.log('🍎 ASU Server Route: Creating new user with Apple ID');
+      const isRealEmail = appleUser.email && !appleUser.email.includes('@privaterelay.appleid.com');
+      const userEmail = appleUser.email || `apple_${appleUser.appleId}@privaterelay.appleid.com`;
+      
       const newUser = new User({
-        email: appleUser.email || `apple_${appleUser.appleId}@privaterelay.appleid.com`,
+        email: userEmail,
         emailHash: appleUser.email ? EncryptionService.hashEmail(appleUser.email) : undefined,
         handle: `AppleUser${Date.now()}`,
         hashedAccessKey: '', // No password for Apple Sign-In accounts
         appleId: appleUser.appleId,
         needsHandleSelection: true,
-        emailVerified: true, // Apple Sign-In emails are pre-verified
+        emailVerified: isRealEmail, // Only auto-verify if it's a real email, not private relay
+        emailVerificationPrompted: !isRealEmail, // Prompt for verification if using private relay
         // Note: Let schema defaults handle balance, experience, armyBonus, unlockedFeatures, etc.
       });
 
@@ -714,6 +867,7 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
         token,
         user: {
           handle: newUser.handle,
+          email: newUser.getDecryptedEmail(),
           level: newUser.level,
           experience: newUser.experience,
           armyBonus: newUser.armyBonus,
@@ -1219,7 +1373,16 @@ router.post('/forgot-password', async (req: Request, res: Response): Promise<voi
       res.status(400).json({ error: 'This account uses Google Sign-In. Please use the "Sign in with Google" button instead.' });
       return;
     }
-    console.log('✅ [DEBUG] Not a Google account - proceeding with password reset');
+    
+    // Check if this is an Apple account (has appleId but no hashedAccessKey)
+    console.log('🔍 [DEBUG] Checking if Apple account:', { appleId: !!user.appleId, hashedAccessKey: !!user.hashedAccessKey });
+    if (user.appleId && !user.hashedAccessKey) {
+      console.log('❌ [DEBUG] Apple account - cannot reset password');
+      res.status(400).json({ error: 'This account uses Apple Sign-In. Please use the "Sign in with Apple" button instead.' });
+      return;
+    }
+    
+    console.log('✅ [DEBUG] Not a social auth account - proceeding with password reset');
 
     // Generate password reset token
     console.log('🔍 [DEBUG] Generating password reset token');

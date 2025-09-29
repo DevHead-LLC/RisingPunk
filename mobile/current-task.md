@@ -1,7 +1,35 @@
 # Apple Sign In Implementation Checklist
 
-## Current Status: Debugging Google Sign In Issue
-**Goal**: Fix Google Sign In functionality that was broken when environment variables were introduced. The issue appears to be that Google Sign In takes users to the Google account selection screen but becomes unresponsive when clicking on accounts.
+## Current Status: Apple Sign In Email Field Bug Fixes Complete
+**Goal**: Fix Apple Sign In email field issues and implement proper email verification handling for all three authentication methods (Google, Apple, and basic email/password).
+
+## Apple Sign In Email Field Fixes - COMPLETED ✅
+**Issues Fixed**:
+1. ✅ **Missing Email Field**: Fixed Apple Sign In responses to include email field in UserResponse
+2. ✅ **Forgot Password Protection**: Added Apple account detection to prevent password reset attempts
+3. ✅ **Email Verification Logic**: Implemented proper email verification for Apple users (real emails auto-verified, private relay emails require verification)
+4. ✅ **Account Linking**: Added comprehensive account linking for Apple users with existing Google or email/password accounts
+5. ✅ **Consistent Interface**: Verified UserResponse interface is consistent across all auth methods
+
+**Key Changes Made**:
+- Apple Sign In/Up responses now include `email: user.getDecryptedEmail()` 
+- Forgot password endpoint checks for `appleId` and shows appropriate error message
+- Apple users with real emails are auto-verified, private relay emails require verification
+- Account linking allows Apple ID to be added to existing Google or email/password accounts
+- All three auth methods now handle email verification consistently
+
+**Next Steps**: Ready for testing all three authentication scenarios
+
+## CRITICAL BUG FIX - Apple Sign In Presentation Context ✅
+**Issue**: Apple Sign In module was missing `presentationContextProvider`, causing `ASAuthorizationErrorDomain Code=1001` and preventing the Apple Sign In UI from appearing.
+
+**Fix Applied**:
+- Added `ASAuthorizationControllerPresentationContextProviding` protocol to `AppleSignInModule`
+- Set `authorizationController.presentationContextProvider = self`
+- Implemented `presentationAnchor(for controller:)` method with proper window detection
+- Added fallback for older iOS versions using `UIApplication.shared.windows`
+
+**Result**: Apple Sign In UI will now properly appear when users tap the sign-in button.
 
 **Issue Identified**: 
 - Google Auth configuration was moved from hardcoded values to environment variables using react-native-config
