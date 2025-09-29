@@ -833,7 +833,7 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
       
       const newUser = new User({
         email: userEmail,
-        emailHash: appleUser.email ? EncryptionService.hashEmail(appleUser.email) : undefined,
+        emailHash: EncryptionService.hashEmail(userEmail), // Always hash the email we're storing
         handle: `AppleUser${Date.now()}`,
         hashedAccessKey: '', // No password for Apple Sign-In accounts
         appleId: appleUser.appleId,

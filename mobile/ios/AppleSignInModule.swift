@@ -64,7 +64,13 @@ class AppleSignInModule: NSObject, ASAuthorizationControllerDelegate, ASAuthoriz
     }
     
     let userIdentifier = appleIDCredential.user
-    let identityToken = String(data: appleIDCredential.identityToken ?? Data(), encoding: .utf8) ?? ""
+    
+    // Safely extract identity token
+    guard let identityTokenData = appleIDCredential.identityToken,
+          let identityToken = String(data: identityTokenData, encoding: .utf8) else {
+      self.reject?("INVALID_IDENTITY_TOKEN", "Failed to extract identity token from Apple credential", nil)
+      return
+    }
     
     var result: [String: Any] = [
       "user": userIdentifier,

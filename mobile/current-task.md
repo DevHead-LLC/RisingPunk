@@ -45,6 +45,60 @@
 
 **Result**: Both Apple Sign In module files now have the required presentation context implementation.
 
+## CRITICAL BUG FIX - Apple Sign-Up Email Hashing ✅
+**Issue**: Apple Sign-Up was setting `emailHash: undefined` when Apple didn't provide an email, breaking email existence checks and duplicate detection.
+
+**Root Cause**: 
+- When Apple user chooses "Hide My Email", we create fallback email: `apple_${appleUser.appleId}@privaterelay.appleid.com`
+- But we were only hashing `appleUser.email` (which is undefined), not the fallback email
+- This broke `User.emailExists()` checks and could lead to duplicate user creation
+
+**Fix Applied**:
+- Changed `emailHash: appleUser.email ? EncryptionService.hashEmail(appleUser.email) : undefined`
+- To `emailHash: EncryptionService.hashEmail(userEmail)` (always hash the email we're storing)
+- Now both real emails and fallback emails are properly hashed for duplicate detection
+
+**Impact**: Prevents duplicate user creation and ensures proper email existence checks across all Apple Sign In scenarios.
+
+## CLEANUP - Google Auth Hardcoded Debug Values Removed ✅
+**Issue**: Google Auth configuration contained hardcoded debug values that bypassed environment variable configuration.
+
+**Cleanup Applied**:
+- Removed hardcoded debug values and console.log statements
+- Restored proper `react-native-config` import and usage
+- Simplified `getGoogleAuthConfig()` function to return the config directly
+- Now uses environment variables with proper fallbacks
+
+**Result**: Google Auth configuration is now clean and uses proper environment variable management.
+
+## CRITICAL BUG FIX - Duplicate Apple Sign In Module Removed ✅
+**Issue**: Two identical `AppleSignInModule.swift` files existed, causing Xcode compilation errors due to duplicate class definitions.
+
+**Problems Fixed**:
+1. **Duplicate Class Definition**: Xcode would fail to compile with "duplicate symbol" errors
+2. **Silent Identity Token Failures**: Identity token conversion could fail silently, causing server authentication failures
+
+**Fixes Applied**:
+- **Removed duplicate file**: `mobile/ios/mobile/AppleSignInModule.swift` deleted
+- **Fixed identity token handling**: Added proper guard statement to catch conversion failures
+- **Added error handling**: Now rejects with "INVALID_IDENTITY_TOKEN" if token extraction fails
+
+**Before**:
+```swift
+let identityToken = String(data: appleIDCredential.identityToken ?? Data(), encoding: .utf8) ?? ""
+```
+
+**After**:
+```swift
+guard let identityTokenData = appleIDCredential.identityToken,
+      let identityToken = String(data: identityTokenData, encoding: .utf8) else {
+  self.reject?("INVALID_IDENTITY_TOKEN", "Failed to extract identity token from Apple credential", nil)
+  return
+}
+```
+
+**Result**: Xcode compilation errors resolved and Apple Sign In failures are now properly reported instead of silent.
+
 **Issue Identified**: 
 - Google Auth configuration was moved from hardcoded values to environment variables using react-native-config
 - Environment variables are loading correctly (confirmed by debug logs)
