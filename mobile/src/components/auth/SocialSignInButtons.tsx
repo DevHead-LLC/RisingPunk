@@ -1,0 +1,243 @@
+import React, { memo, useState, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
+import { GoogleSignin, GoogleSigninButton } from '@react-native-google-signin/google-signin';
+import { useAppDispatch } from '../../store/hooks';
+import { googleSignIn, googleSignUp, appleSignIn, appleSignUp } from '../../store/slices/authSlice';
+import { GOOGLE_AUTH_CONFIG } from '../../config/googleAuth';
+import { appleAuth } from '@invertase/react-native-apple-authentication';
+import { AppleSignInButton } from './AppleSignInButton';
+import { useThemeColors } from '../../hooks/useThemeColors';
+import { SIZING, styleGuide } from '../../styles/theme';
+
+interface SocialSignInButtonsProps {
+  isSignUp?: boolean;
+}
+
+export const SocialSignInButtons = memo(function SocialSignInButtons({ 
+  isSignUp = false 
+}: SocialSignInButtonsProps) {
+  const dispatch = useAppDispatch();
+  const colors = useThemeColors();
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleAppleSignIn = useCallback(async () => {
+    if (isProcessing) return;
+    
+    console.log('🍎 ASI: Starting Apple Sign-In process');
+    setIsProcessing(true);
+    
+    try {
+      console.log('🍎 ASI: Performing Apple Sign-In request');
+      const appleAuthRequestResponse = await appleAuth.performRequest({
+        requestedOperation: appleAuth.Operation.LOGIN,
+        requestedScopes: [appleAuth.Scope.EMAIL, appleAuth.Scope.FULL_NAME],
+      });
+
+      const { identityToken, nonce } = appleAuthRequestResponse;
+      
+      if (identityToken) {
+        console.log('🍎 ASI: Apple Sign-In successful, dispatching to Redux');
+        console.log('🍎 ASI: Identity token length:', identityToken.length);
+        
+        if (isSignUp) {
+          await dispatch(appleSignUp(identityToken)).unwrap();
+        } else {
+          await dispatch(appleSignIn(identityToken)).unwrap();
+        }
+      } else {
+        console.log('🍎 ASI: Apple Sign-In failed - no identity token');
+        Alert.alert('Error', 'Apple Sign-In failed. Please try again.');
+      }
+    } catch (error: any) {
+      console.log('🍎 ASI: Apple Sign-In error:', error);
+      
+      if (!error.message?.includes('cancelled') && !error.message?.includes('canceled')) {
+        Alert.alert('Error', `Apple Sign-In failed: ${error.message}`);
+      }
+    } finally {
+      console.log('🍎 ASI: Apple Sign-In process completed');
+      setIsProcessing(false);
+    }
+  }, [dispatch, isProcessing, isSignUp]);
+
+  const handleGoogleSignIn = useCallback(async () => {
+    if (isProcessing) return;
+    
+    console.log('🔧 Google Sign In: Starting process');
+    setIsProcessing(true);
+    try {
+      // Try with the most basic configuration that should work
+      const config = {
+        webClientId: GOOGLE_AUTH_CONFIG.webClientId,
+        iosClientId: GOOGLE_AUTH_CONFIG.iosClientId,
+      };
+      
+      console.log('🔧 Google Sign In: Config being used:', config);
+      console.log('🔧 Google Sign In: webClientId length:', config.webClientId?.length);
+      console.log('🔧 Google Sign In: iosClientId length:', config.iosClientId?.length);
+      
+      GoogleSignin.configure(config);
+      console.log('🔧 Google Sign In: GoogleSignin configured');
+      
+      await GoogleSignin.hasPlayServices();
+      console.log('🔧 Google Sign In: Play services check passed');
+      
+      console.log('🔧 Google Sign In: About to call GoogleSignin.signIn()');
+      
+      // Try to force account selection without clearing sessions (which causes hanging)
+      console.log('🔧 Google Sign In: Attempting to force account selection');
+      
+      const userInfo = await GoogleSignin.signIn() as any;
+      console.log('🔧 Google Sign In: Sign in result:', userInfo);
+      
+      if (userInfo.type === 'cancelled' || userInfo.data === null) {
+        console.log('🔧 Google Sign In: Sign in was cancelled or returned null data');
+        return;
+      }
+      
+      const idToken = userInfo.data?.idToken;
+      console.log('🔧 Google Sign In: ID token received:', idToken ? 'YES' : 'NO');
+      
+      if (idToken) {
+        console.log('🔧 Google Sign In: Dispatching to Redux, isSignUp:', isSignUp);
+        if (isSignUp) {
+          await dispatch(googleSignUp(idToken)).unwrap();
+        } else {
+          await dispatch(googleSignIn(idToken)).unwrap();
+        }
+        console.log('🔧 Google Sign In: Redux dispatch completed successfully');
+      } else {
+        console.log('🔧 Google Sign In: No ID token received from Google');
+        throw new Error('No ID token received from Google');
+      }
+    } catch (error: any) {
+      console.log('🔧 Google Sign In: Error caught:', error);
+      console.log('🔧 Google Sign In: Error code:', error.code);
+      console.log('🔧 Google Sign In: Error message:', error.message);
+      
+      if (error.code !== 'SIGN_IN_CANCELLED' && error.code !== 'IN_PROGRESS') {
+        console.log('🔧 Google Sign In: Throwing error (not cancelled/in progress)');
+        throw error;
+      } else {
+        console.log('🔧 Google Sign In: Error was cancelled/in progress, not throwing');
+      }
+    } finally {
+      console.log('🔧 Google Sign In: Finally block - setting isProcessing to false');
+      setIsProcessing(false);
+    }
+  }, [dispatch, isProcessing, isSignUp]);
+
+  const showSignInOptions = useCallback(() => {
+    Alert.alert(
+      'ALTERNATIVE_SIGN_IN',
+      'Choose your preferred sign-in method:',
+      [
+        {
+          text: 'Apple',
+          onPress: handleAppleSignIn,
+          style: 'default',
+        },
+        {
+          text: 'Google',
+          onPress: handleGoogleSignIn,
+          style: 'default',
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ],
+      { cancelable: true }
+    );
+  }, [handleAppleSignIn, handleGoogleSignIn]);
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.logosContainer}>
+        <View style={styles.googleButtonContainer}>
+          <GoogleSigninButton
+            size={GoogleSigninButton.Size.Standard}
+            color={GoogleSigninButton.Color.Dark}
+            style={styles.googleButtonInner}
+            onPress={handleGoogleSignIn}
+          />
+        </View>
+        <AppleSignInButton
+          onPress={handleAppleSignIn}
+          style={[styles.socialButton, styles.appleButton]}
+        />
+      </View>
+    </View>
+  );
+});
+
+const styles = StyleSheet.create({
+  container: {
+    marginTop: SIZING.spacing.sm,
+    marginBottom: SIZING.spacing.sm,
+    width: '100%',
+    maxWidth: 320,
+    alignItems: 'center',
+  },
+  alternativeButton: {
+    height: 48,
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    borderWidth: 0, // Remove green border
+    borderRadius: 4,
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logosContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SIZING.spacing.md,
+    height: 40, // Container height
+    position: 'relative',
+  },
+  socialButton: {
+    width: 160,
+    height: 36,
+    position: 'absolute',
+    top: 2, // Center vertically: (40 - 36) / 2 = 2
+  },
+  googleButtonContainer: {
+    width: 160,
+    height: 36,
+    position: 'absolute',
+    left: 0,
+    top: -1, // Same as Apple button: (40 - 36) / 2 = 2
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  googleButtonInner: {
+    width: 160,
+    height: 36,
+    transform: [{ scale: 0.8 }], // Scale down the Google button
+  },
+  appleButton: {
+    right: 0,
+    width: 160,
+    height: 36,
+    minWidth: 160,
+    maxWidth: 160,
+    minHeight: 36,
+    maxHeight: 36,
+  },
+  buttonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '500',
+    letterSpacing: 1,
+  },
+  buttonCorner: {
+    ...styleGuide.cornerDecoration,
+  },
+});

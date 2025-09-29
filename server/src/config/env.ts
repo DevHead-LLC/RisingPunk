@@ -12,3 +12,12 @@ export const CORS_ORIGINS: string[] = (process.env.CORS_ORIGINS || '')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean);
+
+// Google Sign In Configuration
+export const GOOGLE_CLIENT_ID: string = process.env.GOOGLE_CLIENT_ID || '';
+
+// Apple Sign In Configuration
+export const APPLE_CLIENT_ID: string = process.env.APPLE_CLIENT_ID || 'com.devheadllc.risingpunk';
+export const APPLE_TEAM_ID: string = process.env.APPLE_TEAM_ID || '';
+export const APPLE_KEY_ID: string = process.env.APPLE_KEY_ID || '';
+export const APPLE_PRIVATE_KEY: string = process.env.APPLE_PRIVATE_KEY || '';
