@@ -1,4 +1,4 @@
-import React, { memo, useState, useCallback } from 'react';
+import React, { memo, useState, useCallback, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
 import { GoogleSignin, GoogleSigninButton } from '@react-native-google-signin/google-signin';
 import { useAppDispatch } from '../../store/hooks';
@@ -19,12 +19,14 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
   const dispatch = useAppDispatch();
   const colors = useThemeColors();
   const [isProcessing, setIsProcessing] = useState(false);
+  const isProcessingRef = useRef(false); // Additional race condition protection
 
   const handleAppleSignIn = useCallback(async () => {
-    if (isProcessing) return;
+    if (isProcessing || isProcessingRef.current) return;
     
     console.log('🍎 ASI: Starting Apple Sign-In process');
     setIsProcessing(true);
+    isProcessingRef.current = true;
     
     try {
       console.log('🍎 ASI: Performing Apple Sign-In request');
@@ -57,37 +59,41 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
     } finally {
       console.log('🍎 ASI: Apple Sign-In process completed');
       setIsProcessing(false);
+      isProcessingRef.current = false;
     }
-  }, [dispatch, isProcessing, isSignUp]);
+  }, [dispatch, isSignUp]); // Removed isProcessing from dependencies to prevent race condition
 
   const handleGoogleSignIn = useCallback(async () => {
-    if (isProcessing) return;
+    if (isProcessing || isProcessingRef.current) return;
     
     console.log('🔧 Google Sign In: Starting process');
     setIsProcessing(true);
+    isProcessingRef.current = true;
     try {
-      // Try with the most basic configuration that should work
+      // Configure Google Sign In
       const config = {
         webClientId: GOOGLE_AUTH_CONFIG.webClientId,
         iosClientId: GOOGLE_AUTH_CONFIG.iosClientId,
+        forceCodeForRefreshToken: true, // Force account selection
       };
       
       console.log('🔧 Google Sign In: Config being used:', config);
-      console.log('🔧 Google Sign In: webClientId length:', config.webClientId?.length);
-      console.log('🔧 Google Sign In: iosClientId length:', config.iosClientId?.length);
-      
       GoogleSignin.configure(config);
       console.log('🔧 Google Sign In: GoogleSignin configured');
       
       await GoogleSignin.hasPlayServices();
       console.log('🔧 Google Sign In: Play services check passed');
       
+      // Clear any cached sign-in to force account selection
+      try {
+        await GoogleSignin.signOut();
+        console.log('🔧 Google Sign In: Cleared cached sign-in to force account selection');
+      } catch (signOutError) {
+        console.log('🔧 Google Sign In: Sign out error (expected if not signed in):', signOutError);
+      }
+      
       console.log('🔧 Google Sign In: About to call GoogleSignin.signIn()');
-      
-      // Try to force account selection without clearing sessions (which causes hanging)
-      console.log('🔧 Google Sign In: Attempting to force account selection');
-      
-      const userInfo = await GoogleSignin.signIn() as any;
+      const userInfo = await GoogleSignin.signIn();
       console.log('🔧 Google Sign In: Sign in result:', userInfo);
       
       if (userInfo.type === 'cancelled' || userInfo.data === null) {
@@ -124,8 +130,9 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
     } finally {
       console.log('🔧 Google Sign In: Finally block - setting isProcessing to false');
       setIsProcessing(false);
+      isProcessingRef.current = false;
     }
-  }, [dispatch, isProcessing, isSignUp]);
+  }, [dispatch, isSignUp]); // Removed isProcessing from dependencies to prevent race condition
 
   const showSignInOptions = useCallback(() => {
     Alert.alert(

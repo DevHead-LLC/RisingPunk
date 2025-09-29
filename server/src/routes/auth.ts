@@ -44,7 +44,7 @@ interface UserResponse {
   token: string;
   user: {
     handle: string;
-    email?: string;
+    email: string;
     level: number;
     experience?: {
       current: number;
@@ -197,9 +197,11 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
           handle: user.handle,
           email: user.getDecryptedEmail(),
           level: user.level,
-          unlockedFeatures: {
-            hackRig: user.unlockedFeatures?.hackRig || false
-          },
+          experience: user.experience,
+          armyBonus: user.armyBonus,
+          balance: user.balance,
+          unlockedFeatures: user.unlockedFeatures,
+          profileGender: user.profileGender,
           onboardingCompleted: user.onboardingCompleted || false,
           needsHandleSelection: user.needsHandleSelection || false,
           emailVerified: user.emailVerified || false,
@@ -275,9 +277,11 @@ router.post<{}, UserResponse | { error: string }, LoginRequest['body']>(
           handle: user.handle,
           email: user.getDecryptedEmail(),
           level: user.level,
-          unlockedFeatures: {
-            hackRig: user.unlockedFeatures?.hackRig || false
-          },
+          experience: user.experience,
+          armyBonus: user.armyBonus,
+          balance: user.balance,
+          unlockedFeatures: user.unlockedFeatures,
+          profileGender: user.profileGender,
           onboardingCompleted: user.onboardingCompleted || false,
           needsHandleSelection: user.needsHandleSelection || false,
           emailVerified: user.emailVerified || false,
@@ -353,14 +357,16 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
             handle: user.handle,
             email: user.getDecryptedEmail(),
             level: user.level,
-            unlockedFeatures: {
-              hackRig: user.unlockedFeatures?.hackRig || false
-            },
+            experience: user.experience,
+            armyBonus: user.armyBonus,
+            balance: user.balance,
+            unlockedFeatures: user.unlockedFeatures,
+            profileGender: user.profileGender,
             onboardingCompleted: user.onboardingCompleted || false,
             needsHandleSelection: user.needsHandleSelection || false,
             emailVerified: user.emailVerified || false,
-          emailVerificationToken: user.emailVerificationToken || null,
-          emailVerificationPrompted: user.emailVerificationPrompted || false,
+            emailVerificationToken: user.emailVerificationToken || null,
+            emailVerificationPrompted: user.emailVerificationPrompted || false,
             debugFeatures: {
               enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
               enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
@@ -401,14 +407,16 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
               handle: user.handle,
               email: user.getDecryptedEmail(),
               level: user.level,
-              unlockedFeatures: {
-                hackRig: user.unlockedFeatures?.hackRig || false
-              },
+              experience: user.experience,
+              armyBonus: user.armyBonus,
+              balance: user.balance,
+              unlockedFeatures: user.unlockedFeatures,
+              profileGender: user.profileGender,
               onboardingCompleted: user.onboardingCompleted || false,
               needsHandleSelection: user.needsHandleSelection || false,
               emailVerified: user.emailVerified || false,
-          emailVerificationToken: user.emailVerificationToken || null,
-          emailVerificationPrompted: user.emailVerificationPrompted || false,
+              emailVerificationToken: user.emailVerificationToken || null,
+              emailVerificationPrompted: user.emailVerificationPrompted || false,
               debugFeatures: {
                 enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
                 enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
@@ -518,9 +526,11 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
           handle: user.handle,
           email: user.getDecryptedEmail(),
           level: user.level,
-          unlockedFeatures: {
-            hackRig: user.unlockedFeatures?.hackRig || false
-          },
+          experience: user.experience,
+          armyBonus: user.armyBonus,
+          balance: user.balance,
+          unlockedFeatures: user.unlockedFeatures,
+          profileGender: user.profileGender,
           onboardingCompleted: user.onboardingCompleted || false,
           needsHandleSelection: user.needsHandleSelection || false,
           emailVerified: user.emailVerified || false,
@@ -829,17 +839,18 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
       // Create new user
       console.log('🍎 ASU Server Route: Creating new user with Apple ID');
       const isRealEmail = appleUser.email && !appleUser.email.includes('@privaterelay.appleid.com');
-      const userEmail = appleUser.email || `apple_${appleUser.appleId}@privaterelay.appleid.com`;
+      const isApplePrivateRelay = appleUser.email && appleUser.email.includes('@privaterelay.appleid.com');
+      const userEmail = appleUser.email || `apple_${appleUser.appleId}@system.appleid.com`; // Use system domain, not privaterelay
       
       const newUser = new User({
         email: userEmail,
-        emailHash: EncryptionService.hashEmail(userEmail), // Always hash the email we're storing
+        // Don't set emailHash here - let pre-save middleware handle it to avoid double hashing
         handle: `AppleUser${Date.now()}`,
         hashedAccessKey: '', // No password for Apple Sign-In accounts
         appleId: appleUser.appleId,
         needsHandleSelection: true,
-        emailVerified: isRealEmail, // Only auto-verify if it's a real email, not private relay
-        emailVerificationPrompted: !isRealEmail, // Prompt for verification if using private relay
+        emailVerified: isRealEmail, // Only auto-verify if it's a real email
+        emailVerificationPrompted: !isRealEmail && !isApplePrivateRelay, // Only prompt if no email provided (not private relay)
         // Note: Let schema defaults handle balance, experience, armyBonus, unlockedFeatures, etc.
       });
 
