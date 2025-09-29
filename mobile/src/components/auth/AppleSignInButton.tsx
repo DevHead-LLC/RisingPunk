@@ -28,6 +28,6 @@ export const AppleSignInButton = memo(function AppleSignInButton({
 const styles = {
   appleButton: {
     width: 160,
-    height: 36,
+    height: 48, // Match container height
   },
 };
