@@ -84,14 +84,6 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
       await GoogleSignin.hasPlayServices();
       console.log('🔧 Google Sign In: Play services check passed');
       
-      // Clear any cached sign-in to force account selection
-      try {
-        await GoogleSignin.signOut();
-        console.log('🔧 Google Sign In: Cleared cached sign-in to force account selection');
-      } catch (signOutError) {
-        console.log('🔧 Google Sign In: Sign out error (expected if not signed in):', signOutError);
-      }
-      
       console.log('🔧 Google Sign In: About to call GoogleSignin.signIn()');
       const userInfo = await GoogleSignin.signIn();
       console.log('🔧 Google Sign In: Sign in result:', userInfo);
@@ -169,10 +161,12 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
             onPress={handleGoogleSignIn}
           />
         </View>
-        <AppleSignInButton
-          onPress={handleAppleSignIn}
-          style={[styles.socialButton, styles.appleButton]}
-        />
+        <View style={styles.appleButtonContainer}>
+          <AppleSignInButton
+            onPress={handleAppleSignIn}
+            style={styles.appleButtonInner}
+          />
+        </View>
       </View>
     </View>
   );
@@ -203,41 +197,52 @@ const styles = StyleSheet.create({
   },
   logosContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SIZING.spacing.md,
-    height: 40, // Container height
+    height: 48, // Increased container height to accommodate Google button
     position: 'relative',
   },
   socialButton: {
     width: 160,
-    height: 36,
+    height: 48, // Match container height
     position: 'absolute',
-    top: 2, // Center vertically: (40 - 36) / 2 = 2
+    top: 0, // Force both buttons to same top position
   },
   googleButtonContainer: {
     width: 160,
-    height: 36,
+    height: 48, // Match the parent container height
     position: 'absolute',
     left: 0,
-    top: -1, // Same as Apple button: (40 - 36) / 2 = 2
-    overflow: 'hidden',
+    top: 0, // Force to same top position as Apple button
     justifyContent: 'center',
     alignItems: 'center',
+    transform: [{ translateY: -2 }], // Move Google button up to match Apple button
   },
   googleButtonInner: {
     width: 160,
-    height: 36,
-    transform: [{ scale: 0.8 }], // Scale down the Google button
+    height: 48, // Match container height
+    // Removed scale transform to match Apple button height
+  },
+  appleButtonContainer: {
+    width: 160,
+    height: 48, // Match the parent container height
+    position: 'absolute',
+    right: 0,
+    top: 0, // Force to same top position as Google button
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  appleButtonInner: {
+    width: 160,
+    height: 48, // Match container height
   },
   appleButton: {
-    right: 0,
     width: 160,
-    height: 36,
+    height: 48, // Match container height
     minWidth: 160,
     maxWidth: 160,
-    minHeight: 36,
-    maxHeight: 36,
+    minHeight: 48,
+    maxHeight: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   buttonText: {
     fontSize: SIZING.font.body,

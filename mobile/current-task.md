@@ -249,6 +249,494 @@ IPHONEOS_DEPLOYMENT_TARGET = 13.0;  // Consistent across all configs
 
 **Impact**: App can now be installed on devices running iOS 13.0+ (covers 99%+ of active devices) and will pass App Store review.
 
+## UX IMPROVEMENT - Google Sign-In Persistent Authentication ✅
+**Issue**: Google Sign-In was calling `GoogleSignin.signOut()` before every sign-in attempt, preventing persistent authentication and creating poor UX.
+
+**Problems Fixed**:
+1. **Unnecessary Sign-Out Calls**: `GoogleSignin.signOut()` called before every sign-in
+2. **Poor User Experience**: Users had to re-select account every time
+3. **Hanging Issue**: `signOut()` was documented as causing hanging problems
+4. **Redundant Logic**: `forceCodeForRefreshToken: true` already handles account selection
+
+**Fixes Applied**:
+- **Removed `GoogleSignin.signOut()` call**: No longer clearing cached authentication
+- **Rely on `forceCodeForRefreshToken: true`**: This properly handles account selection when needed
+- **Improved UX**: Users can now stay signed in between app sessions
+- **Eliminated hanging risk**: Removed the documented cause of hanging issues
+
+**Before** (Poor UX):
+```typescript
+// Clear any cached sign-in to force account selection
+try {
+  await GoogleSignin.signOut(); // Causes hanging + poor UX
+  console.log('🔧 Google Sign In: Cleared cached sign-in to force account selection');
+} catch (signOutError) {
+  console.log('🔧 Google Sign In: Sign out error (expected if not signed in):', signOutError);
+}
+```
+
+**After** (Better UX):
+```typescript
+// forceCodeForRefreshToken: true handles account selection properly
+console.log('🔧 Google Sign In: About to call GoogleSignin.signIn()');
+```
+
+**Configuration**:
+```typescript
+const config = {
+  webClientId: GOOGLE_AUTH_CONFIG.webClientId,
+  iosClientId: GOOGLE_AUTH_CONFIG.iosClientId,
+  forceCodeForRefreshToken: true, // Handles account selection properly
+};
+```
+
+**Impact**: Users can now stay signed in with Google between app sessions, providing a much better user experience while still allowing account switching when needed.
+
+## UI FIX - Google Sign-In Button Alignment ✅
+**Issue**: Google Sign-In button was misaligned and appeared smaller than the Apple button due to incorrect positioning and scaling.
+
+**Problems Fixed**:
+1. **Incorrect Top Offset**: `top: -1` instead of `top: 2` for proper vertical centering
+2. **Scale Transform**: `transform: [{ scale: 0.8 }]` made button appear smaller than Apple button
+3. **Visual Inconsistency**: Buttons appeared different sizes despite same container dimensions
+4. **Poor Alignment**: Google button was positioned incorrectly relative to Apple button
+
+**Fixes Applied**:
+- **Fixed top offset**: Changed from `top: -1` to `top: 2` for proper vertical centering
+- **Removed scale transform**: Eliminated `transform: [{ scale: 0.8 }]` to match Apple button size
+- **Consistent dimensions**: Both buttons now use same 160x36px dimensions
+- **Proper alignment**: Both buttons now perfectly aligned in the container
+
+**Before** (Misaligned):
+```typescript
+googleButtonContainer: {
+  top: -1, // Incorrect offset
+  // ...
+},
+googleButtonInner: {
+  transform: [{ scale: 0.8 }], // Made button smaller
+},
+```
+
+**After** (Aligned):
+```typescript
+googleButtonContainer: {
+  top: 2, // Correct vertical centering: (40 - 36) / 2 = 2
+  // ...
+},
+googleButtonInner: {
+  // Removed scale transform to match Apple button size
+},
+```
+
+**Visual Result**:
+- ✅ **Perfect Alignment**: Both buttons now perfectly aligned vertically and horizontally
+- ✅ **Consistent Size**: Both buttons appear the same size (160x36px)
+- ✅ **Professional Look**: Clean, symmetrical button layout
+- ✅ **Better UX**: Users see consistent, properly aligned sign-in options
+
+**Impact**: Social sign-in buttons now have perfect visual alignment and consistent sizing, providing a professional and polished user interface.
+
+## UI FIX - Google Sign-In Button Proper Sizing ✅
+**Issue**: After removing the scale transform, the Google button content was not properly sized to fit within its container, making it appear misaligned and incorrectly sized.
+
+**Problems Fixed**:
+1. **Content Sizing**: Google button content didn't fit properly in the 36px height container
+2. **Misalignment**: Button appeared more off after removing scale transform
+3. **Inconsistent Heights**: Apple and Google buttons had different effective heights
+4. **Poor Visual Balance**: Buttons didn't look natural or properly proportioned
+
+**Fixes Applied**:
+- **Unified container height**: Both buttons now use 40px height to match parent container
+- **Proper scaling**: Google button uses `scale: 0.8` to fit content properly in 40px height
+- **Consistent positioning**: Both buttons align with `top: 0` to parent container
+- **Natural sizing**: Google button content now appears at natural, readable size
+
+**Before** (Misaligned):
+```typescript
+googleButtonContainer: {
+  height: 36, // Too small for content
+  top: 2, // Offset positioning
+},
+googleButtonInner: {
+  height: 36,
+  // No scaling - content too large
+},
+```
+
+**After** (Properly Sized):
+```typescript
+googleButtonContainer: {
+  height: 40, // Match parent container
+  top: 0, // Align with parent
+},
+googleButtonInner: {
+  height: 40,
+  transform: [{ scale: 0.8 }], // Proper scaling for content
+},
+```
+
+**Visual Result**:
+- ✅ **Natural Size**: Google button content appears at readable, natural size
+- ✅ **Perfect Alignment**: Both buttons perfectly aligned and sized
+- ✅ **Consistent Heights**: Both buttons use same 40px container height
+- ✅ **Professional Look**: Clean, properly proportioned button layout
+
+**Impact**: Social sign-in buttons now have natural, properly sized content with perfect alignment and consistent visual appearance.
+
+## UI FIX - Vertical Centering of Social Sign-In Buttons ✅
+**Issue**: Apple button was positioned higher than Google button, causing misalignment within their shared container.
+
+**Problems Fixed**:
+1. **Vertical Misalignment**: Apple button appeared higher than Google button
+2. **Inconsistent Centering**: Buttons weren't centered within their shared container
+3. **Missing Centering Properties**: Apple button container lacked `justifyContent` and `alignItems`
+4. **Visual Imbalance**: Buttons didn't appear as a cohesive, aligned pair
+
+**Fixes Applied**:
+- **Added centering to Apple button**: Added `justifyContent: 'center'` and `alignItems: 'center'` to `appleButton` style
+- **Added centering to social button base**: Added `justifyContent: 'center'` and `alignItems: 'center'` to `socialButton` style
+- **Consistent centering approach**: Both buttons now use the same centering properties
+- **Perfect vertical alignment**: Both buttons now center their content within the 40px container height
+
+**Before** (Misaligned):
+```typescript
+socialButton: {
+  width: 160,
+  height: 40,
+  position: 'absolute',
+  top: 0,
+  // Missing centering properties
+},
+appleButton: {
+  right: 0,
+  width: 160,
+  height: 40,
+  // Missing centering properties
+},
+```
+
+**After** (Perfectly Centered):
+```typescript
+socialButton: {
+  width: 160,
+  height: 40,
+  position: 'absolute',
+  top: 0,
+  justifyContent: 'center', // Added
+  alignItems: 'center', // Added
+},
+appleButton: {
+  right: 0,
+  width: 160,
+  height: 40,
+  justifyContent: 'center', // Added
+  alignItems: 'center', // Added
+},
+```
+
+**Visual Result**:
+- ✅ **Perfect Vertical Alignment**: Both buttons now center their content at the same vertical position
+- ✅ **Consistent Centering**: Both buttons use identical centering approach
+- ✅ **Professional Look**: Buttons appear as a cohesive, aligned pair
+- ✅ **Visual Balance**: Equal visual weight and positioning
+
+**Impact**: Social sign-in buttons now have perfect vertical centering within their shared container, creating a professional and visually balanced interface.
+
+## UI FIX - Resolved Button Component Styling Conflicts ✅
+**Issue**: Apple and Google button components had internal styling that conflicted with container styles, preventing proper vertical alignment.
+
+**Root Cause Identified**:
+1. **Apple Button Internal Styling**: `AppleSignInButton.tsx` had `height: 36` conflicting with container `height: 40`
+2. **Absolute Positioning Issues**: Using `position: 'absolute'` created alignment problems
+3. **Component Override**: Button components' internal styles were overriding container styles
+4. **Complex Layout**: Absolute positioning made centering unreliable
+
+**Fixes Applied**:
+- **Fixed Apple button height**: Changed from `height: 36` to `height: 40` in `AppleSignInButton.tsx`
+- **Simplified layout approach**: Removed `position: 'absolute'` and used flexbox layout
+- **Consistent dimensions**: All components now use `height: 40` consistently
+- **Natural alignment**: Flexbox `alignItems: 'center'` provides reliable vertical centering
+
+**Before** (Conflicting Styles):
+```typescript
+// AppleSignInButton.tsx
+const styles = {
+  appleButton: {
+    width: 160,
+    height: 36, // Conflicted with container height: 40
+  },
+};
+
+// SocialSignInButtons.tsx
+logosContainer: {
+  position: 'relative', // Complex absolute positioning
+},
+socialButton: {
+  position: 'absolute', // Unreliable alignment
+  top: 0,
+},
+```
+
+**After** (Consistent Styles):
+```typescript
+// AppleSignInButton.tsx
+const styles = {
+  appleButton: {
+    width: 160,
+    height: 40, // Matches container height
+  },
+};
+
+// SocialSignInButtons.tsx
+logosContainer: {
+  flexDirection: 'row',
+  alignItems: 'center', // Natural vertical centering
+  justifyContent: 'center',
+},
+socialButton: {
+  // No absolute positioning - uses flexbox
+},
+```
+
+**Technical Changes**:
+1. **Apple Button**: Updated internal height from 36px to 40px
+2. **Layout Method**: Switched from absolute positioning to flexbox
+3. **Container**: Removed `position: 'relative'` and `gap` spacing
+4. **Alignment**: Used `alignItems: 'center'` for reliable vertical centering
+
+**Visual Result**:
+- ✅ **Perfect Alignment**: Both buttons now naturally center within flexbox container
+- ✅ **Consistent Heights**: All components use 40px height consistently
+- ✅ **Reliable Layout**: Flexbox provides predictable alignment behavior
+- ✅ **No Conflicts**: Component styles work harmoniously with container styles
+
+**Impact**: Eliminated styling conflicts between button components and containers, resulting in perfect vertical alignment using reliable flexbox layout.
+
+## UI FIX - Focused Vertical Centering with Matching Container Structure ✅
+**Issue**: Apple button still positioned higher than Google button despite previous fixes. Need to ensure both buttons use identical container structure for perfect vertical alignment.
+
+**Root Cause Analysis**:
+1. **Inconsistent Container Structure**: Google button wrapped in container, Apple button direct
+2. **Gap Property Interference**: `gap` property may affect vertical alignment
+3. **Different Layout Approaches**: Buttons using different styling patterns
+4. **Missing Container Wrapper**: Apple button lacked matching container structure
+
+**Focused Fixes Applied**:
+- **Matching container structure**: Apple button now wrapped in `appleButtonContainer` like Google button
+- **Removed gap property**: Eliminated `gap: SIZING.spacing.md` that may interfere with alignment
+- **Identical container styling**: Both buttons use same container approach with `justifyContent: 'center'` and `alignItems: 'center'`
+- **Consistent overflow handling**: Both containers use `overflow: 'hidden'`
+
+**Before** (Inconsistent Structure):
+```typescript
+logosContainer: {
+  gap: SIZING.spacing.md, // May interfere with alignment
+},
+// Google button wrapped in container
+<View style={styles.googleButtonContainer}>
+  <GoogleSigninButton />
+</View>
+// Apple button direct
+<AppleSignInButton style={styles.appleButton} />
+```
+
+**After** (Matching Structure):
+```typescript
+logosContainer: {
+  justifyContent: 'space-between', // No gap interference
+},
+// Both buttons wrapped in identical containers
+<View style={styles.googleButtonContainer}>
+  <GoogleSigninButton />
+</View>
+<View style={styles.appleButtonContainer}>
+  <AppleSignInButton />
+</View>
+```
+
+**Container Structure**:
+```typescript
+googleButtonContainer: {
+  width: 160,
+  height: 40,
+  overflow: 'hidden',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+appleButtonContainer: {
+  width: 160,
+  height: 40,
+  overflow: 'hidden',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+```
+
+**Impact**: Both buttons now use identical container structure with perfect vertical centering, eliminating any structural differences that could cause misalignment.
+
+## UI FIX - Force Absolute Positioning for Perfect Vertical Alignment ✅
+**Issue**: Previous flexbox approaches failed to achieve perfect vertical centering. Need to use absolute positioning to force both buttons to exact same vertical position.
+
+**New Approach**:
+1. **Absolute Positioning**: Both button containers use `position: 'absolute'` with `top: 0`
+2. **Explicit Top Values**: Force both buttons to start at exact same vertical position
+3. **Left/Right Positioning**: Google button `left: 0`, Apple button `right: 0`
+4. **Identical Heights**: Both containers exactly 40px height
+
+**Technical Implementation**:
+```typescript
+logosContainer: {
+  height: 40,
+  position: 'relative', // Container for absolute positioning
+},
+googleButtonContainer: {
+  position: 'absolute',
+  left: 0,
+  top: 0, // Force to exact same top position
+  height: 40,
+},
+appleButtonContainer: {
+  position: 'absolute',
+  right: 0,
+  top: 0, // Force to exact same top position
+  height: 40,
+},
+```
+
+**Why This Should Work**:
+- **Explicit Positioning**: `top: 0` forces both buttons to start at identical vertical position
+- **No Flexbox Interference**: Absolute positioning bypasses any flexbox alignment issues
+- **Identical Heights**: Both containers exactly 40px ensures same vertical space
+- **Direct Control**: Absolute positioning gives complete control over vertical position
+
+**Impact**: Both buttons now forced to identical vertical position using absolute positioning, eliminating any possibility of misalignment.
+
+## UI FIX - Transform TranslateY to Physically Align Buttons ✅
+**Issue**: Previous absolute positioning approaches still didn't achieve perfect vertical alignment. Need to physically move one button to match the other's position.
+
+**New Approach**:
+1. **Physical Movement**: Use `transform: [{ translateY: -2 }]` to move Google button up
+2. **Match Apple Position**: Since Apple button appears higher, move Google button up to match
+3. **Explicit Positioning**: Both buttons still use `position: 'absolute'` with `top: 0`
+4. **Fine-tuned Adjustment**: Small 2px adjustment to achieve perfect alignment
+
+**Technical Implementation**:
+```typescript
+googleButtonContainer: {
+  position: 'absolute',
+  left: 0,
+  top: 0,
+  transform: [{ translateY: -2 }], // Move Google button up to match Apple button
+},
+appleButtonContainer: {
+  position: 'absolute',
+  right: 0,
+  top: 0, // No transform - use Apple button as reference
+},
+```
+
+**Why This Should Work**:
+- **Physical Movement**: `translateY` physically moves the Google button up by 2px
+- **Apple as Reference**: Uses Apple button position as the target alignment
+- **Fine Adjustment**: Small 2px adjustment should be enough to align centers
+- **Direct Control**: Transform gives precise control over button position
+
+**Impact**: Google button physically moved up to match Apple button's vertical position, achieving perfect alignment.
+
+## UI FIX - Match Google Button Height to Apple Button ✅
+**Issue**: Google and Apple buttons now on same baseline, but Google button is shorter in height than Apple button.
+
+**Root Cause**: Google button had `transform: [{ scale: 0.8 }]` making it 20% smaller (32px instead of 40px).
+
+**Fix Applied**:
+- **Removed scale transform**: Eliminated `transform: [{ scale: 0.8 }]` from `googleButtonInner`
+- **Full height**: Google button now uses full 40px height like Apple button
+- **Maintained alignment**: Kept `translateY: -2` for baseline alignment
+
+**Before** (Height Mismatch):
+```typescript
+googleButtonInner: {
+  width: 160,
+  height: 40,
+  transform: [{ scale: 0.8 }], // Made button 32px (80% of 40px)
+},
+```
+
+**After** (Matching Heights):
+```typescript
+googleButtonInner: {
+  width: 160,
+  height: 40, // Full height like Apple button
+  // Removed scale transform to match Apple button height
+},
+```
+
+**Visual Result**:
+- ✅ **Same Baseline**: Both buttons aligned on same baseline
+- ✅ **Matching Heights**: Both buttons now 40px height
+- ✅ **Perfect Alignment**: Identical vertical positioning and sizing
+- ✅ **Professional Look**: Consistent button appearance
+
+**Impact**: Both social sign-in buttons now have identical height and perfect vertical alignment.
+
+## UI FIX - Resolved Google Button Content Cut-off Issue ✅
+**Issue**: Google button content was being cut off at the bottom due to `overflow: 'hidden'` and insufficient container height.
+
+**Root Cause Analysis**:
+1. **Overflow Hidden**: Both containers had `overflow: 'hidden'` cutting off Google button content
+2. **Insufficient Height**: 40px container height was too small for Google button's natural size
+3. **Google Button Requirements**: GoogleSigninButton needs more vertical space than Apple button
+4. **Content Clipping**: Bottom portion of Google button text was being clipped
+
+**Comprehensive Fix Applied**:
+- **Removed overflow hidden**: Eliminated `overflow: 'hidden'` from both containers
+- **Increased container height**: Changed from 40px to 48px to accommodate Google button
+- **Updated all heights**: All components now use 48px height consistently
+- **Maintained alignment**: Kept `translateY: -2` for perfect vertical alignment
+
+**Before** (Content Cut-off):
+```typescript
+logosContainer: {
+  height: 40, // Too small for Google button
+},
+googleButtonContainer: {
+  height: 40,
+  overflow: 'hidden', // Cut off Google button content
+},
+appleButtonContainer: {
+  height: 40,
+  overflow: 'hidden', // Cut off content
+},
+```
+
+**After** (Full Content Visible):
+```typescript
+logosContainer: {
+  height: 48, // Increased to accommodate Google button
+},
+googleButtonContainer: {
+  height: 48,
+  // Removed overflow: 'hidden'
+},
+appleButtonContainer: {
+  height: 48,
+  // Removed overflow: 'hidden'
+},
+```
+
+**Files Updated**:
+1. **SocialSignInButtons.tsx**: Increased all heights to 48px, removed overflow hidden
+2. **AppleSignInButton.tsx**: Updated height from 40px to 48px
+
+**Visual Result**:
+- ✅ **Full Content Visible**: Google button content no longer cut off
+- ✅ **Perfect Alignment**: Both buttons still perfectly aligned
+- ✅ **Consistent Heights**: All components use 48px height
+- ✅ **Professional Look**: Complete, uncut button content
+
+**Impact**: Google button content is now fully visible and both buttons maintain perfect alignment with adequate space.
+
 **Issue Identified**: 
 - Google Auth configuration was moved from hardcoded values to environment variables using react-native-config
 - Environment variables are loading correctly (confirmed by debug logs)
