@@ -5,6 +5,7 @@ import { ResearchUser } from '../models/ResearchUser';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import { GoogleAuthService } from '../services/GoogleAuthService';
+import { AppleAuthService } from '../services/AppleAuthService';
 import { EmailService } from '../services/EmailService';
 import { EncryptionService } from '../services/EncryptionService';
 
@@ -33,15 +34,45 @@ interface GoogleSignInRequest extends Request {
   }
 }
 
+interface AppleSignInRequest extends Request {
+  body: {
+    idToken: string;
+  }
+}
+
 interface UserResponse {
   token: string;
   user: {
     handle: string;
-    email: string;
+    email?: string;
     level: number;
+    experience?: {
+      current: number;
+      nextLevel: number;
+      total: number;
+    };
+    armyBonus?: {
+      strength: number;
+      defense: number;
+      speed: number;
+      health: number;
+    };
+    balance?: {
+      total: number;
+      ratePerSecond: number;
+      lastUpdated: Date;
+      fractionalRemainder: number;
+      rentalHousingIncomeLastSynced?: Date | null;
+    };
     unlockedFeatures: {
       hackRig: boolean;
+      researchCenter?: boolean;
+      rentalHousing1?: boolean;
+      rentalHousing2?: boolean;
+      rentalHousing3?: boolean;
+      rentalHousing4?: boolean;
     };
+    profileGender?: 'male' | 'female';
     onboardingCompleted: boolean;
     needsHandleSelection: boolean;
     emailVerified: boolean;
@@ -507,6 +538,360 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
       res.status(500).json({ error: 'Server error' });
     }
   });
+
+// Apple Sign-In (Login only - no account creation)
+router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
+  '/apple-signin',
+  async (req, res): Promise<void> => {
+    console.log('🍎 ASI Server Route: Apple Sign-In request received');
+    try {
+      const { idToken } = req.body;
+      console.log('🍎 ASI Server Route: ID Token received, length:', idToken?.length);
+      
+      if (!AppleAuthService.isEnabled()) {
+        console.log('🔴 ASI Server Route: Apple Sign-In service not enabled');
+        res.status(503).json({ error: 'Apple Sign-In is not configured' });
+        return;
+      }
+
+      console.log('🍎 ASI Server Route: Verifying Apple token');
+      // Verify Apple token
+      const appleUser = await AppleAuthService.verifyToken(idToken);
+      if (!appleUser) {
+        console.log('🔴 ASI Server Route: Apple token verification failed');
+        res.status(401).json({ error: 'Invalid Apple token' });
+        return;
+      }
+      
+      console.log('🍎 ASI Server Route: Apple token verified successfully');
+      console.log('🍎 ASI Server Route: Apple user ID:', appleUser.appleId);
+      console.log('🍎 ASI Server Route: Apple user email:', appleUser.email);
+
+      // Check if user exists with this Apple ID
+      console.log('🍎 ASI Server Route: Looking up user by Apple ID:', appleUser.appleId);
+      let user = await User.findByAppleId(appleUser.appleId);
+      
+      if (user) {
+        console.log('🍎 ASI Server Route: User found with Apple ID, signing in');
+        
+        // Generate a unique session ID for this login
+        const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+        
+        const token = jwt.sign(
+          { userId: user._id, sessionId: sessionId },
+          process.env.JWT_SECRET || 'defaultsecret',
+          { expiresIn: '7d' }
+        );
+        
+        // Set current session ID (invalidates all previous sessions)
+        user.setCurrentToken(sessionId);
+        await user.save();
+        
+        console.log('🍎 ASI Server Route: Apple Sign-In successful, returning user data');
+        res.json({
+          token,
+          user: {
+            handle: user.handle,
+            email: user.getDecryptedEmail(),
+            level: user.level,
+            experience: user.experience,
+            armyBonus: user.armyBonus,
+            balance: user.balance,
+            unlockedFeatures: user.unlockedFeatures,
+            profileGender: user.profileGender,
+            onboardingCompleted: user.onboardingCompleted || false,
+            needsHandleSelection: user.needsHandleSelection || false,
+            emailVerified: user.emailVerified || false,
+            emailVerificationToken: user.emailVerificationToken || null,
+            emailVerificationPrompted: user.emailVerificationPrompted || false,
+            debugFeatures: {
+              enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
+              enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
+            }
+          }
+        });
+        return;
+      }
+
+      // User not found with Apple ID - check if email exists for account linking
+      console.log('🔴 ASI Server Route: No account found with this Apple ID');
+      
+      // If Apple provided an email, check if there's an existing account with that email
+      if (appleUser.email) {
+        console.log('🔍 ASI Server Route: Checking for existing account with email:', appleUser.email);
+        const existingUser = await User.findOne({ emailHash: EncryptionService.hashEmail(appleUser.email) });
+        
+        if (existingUser) {
+          // Check if this account can be linked with Apple ID
+          if (!existingUser.appleId) {
+            console.log('🔗 ASI Server Route: Linking Apple ID to existing account');
+            existingUser.appleId = appleUser.appleId;
+            await existingUser.save();
+            
+            // Generate session and return user data
+            const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+            const token = jwt.sign(
+              { userId: existingUser._id, sessionId: sessionId },
+              process.env.JWT_SECRET || 'defaultsecret',
+              { expiresIn: '7d' }
+            );
+            
+            existingUser.setCurrentToken(sessionId);
+            await existingUser.save();
+            
+            res.json({
+              token,
+              user: {
+                handle: existingUser.handle,
+                email: existingUser.getDecryptedEmail(),
+                level: existingUser.level,
+                experience: existingUser.experience,
+                armyBonus: existingUser.armyBonus,
+                balance: existingUser.balance,
+                unlockedFeatures: existingUser.unlockedFeatures,
+                profileGender: existingUser.profileGender,
+                onboardingCompleted: existingUser.onboardingCompleted || false,
+                needsHandleSelection: existingUser.needsHandleSelection || false,
+                emailVerified: existingUser.emailVerified || false,
+                emailVerificationToken: existingUser.emailVerificationToken || null,
+                emailVerificationPrompted: existingUser.emailVerificationPrompted || false,
+                debugFeatures: {
+                  enableDataRefresh: existingUser.debugFeatures?.enableDataRefresh || false,
+                  enableDebugLogs: existingUser.debugFeatures?.enableDebugLogs || false
+                }
+              }
+            });
+            return;
+          } else {
+            console.log('🔴 ASI Server Route: Account already has Apple ID');
+            res.status(400).json({ 
+              error: 'This email is already associated with an Apple account. Please use the correct Apple ID.'
+            });
+            return;
+          }
+        }
+      }
+      
+      res.status(404).json({ 
+        error: 'No account found with this Apple ID. Please use the "NEW_IDENTITY (SIGN_UP)" option to create an account.'
+      });
+
+    } catch (error) {
+      console.error('Apple Sign-In error:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  }
+);
+
+// Apple Sign-Up (Account creation)
+router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
+  '/apple-signup',
+  async (req, res): Promise<void> => {
+    console.log('🍎 ASU Server Route: Apple Sign-Up request received');
+    try {
+      const { idToken } = req.body;
+      console.log('🍎 ASU Server Route: ID Token received, length:', idToken?.length);
+      
+      if (!AppleAuthService.isEnabled()) {
+        console.log('🔴 ASU Server Route: Apple Sign-In service not enabled');
+        res.status(503).json({ error: 'Apple Sign-In is not configured' });
+        return;
+      }
+
+      console.log('🍎 ASU Server Route: Verifying Apple token');
+      // Verify Apple token
+      const appleUser = await AppleAuthService.verifyToken(idToken);
+      if (!appleUser) {
+        console.log('🔴 ASU Server Route: Apple token verification failed');
+        res.status(401).json({ error: 'Invalid Apple token' });
+        return;
+      }
+      
+      console.log('🍎 ASU Server Route: Apple token verified successfully');
+      console.log('🍎 ASU Server Route: Apple user ID:', appleUser.appleId);
+      console.log('🍎 ASU Server Route: Apple user email:', appleUser.email);
+
+      // Check if user already exists with this Apple ID
+      console.log('🍎 ASU Server Route: Checking if user already exists with Apple ID:', appleUser.appleId);
+      let user = await User.findByAppleId(appleUser.appleId);
+      
+      if (user) {
+        console.log('🔴 ASU Server Route: User already exists with this Apple ID');
+        res.status(400).json({ 
+          error: 'An account already exists with this Apple ID. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.'
+        });
+        return;
+      }
+
+      // Check if user exists with this email (if provided) - handle account linking
+      if (appleUser.email) {
+        const emailExists = await User.emailExists(appleUser.email);
+        if (emailExists) {
+          console.log('🔴 ASU Server Route: Email already exists - checking for account linking');
+          
+          // Find the existing user with this email
+          const existingUser = await User.findOne({ emailHash: EncryptionService.hashEmail(appleUser.email) });
+          if (existingUser) {
+            // Check if this is a Google account that can be linked
+            if (existingUser.googleId && !existingUser.appleId) {
+              console.log('🔗 ASU Server Route: Linking Apple ID to existing Google account');
+              existingUser.appleId = appleUser.appleId;
+              await existingUser.save();
+              
+              // Generate session and return user data
+              const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+              const token = jwt.sign(
+                { userId: existingUser._id, sessionId: sessionId },
+                process.env.JWT_SECRET || 'defaultsecret',
+                { expiresIn: '7d' }
+              );
+              
+              existingUser.setCurrentToken(sessionId);
+              await existingUser.save();
+              
+              res.json({
+                token,
+                user: {
+                  handle: existingUser.handle,
+                  email: existingUser.getDecryptedEmail(),
+                  level: existingUser.level,
+                  experience: existingUser.experience,
+                  armyBonus: existingUser.armyBonus,
+                  balance: existingUser.balance,
+                  unlockedFeatures: existingUser.unlockedFeatures,
+                  profileGender: existingUser.profileGender,
+                  onboardingCompleted: existingUser.onboardingCompleted || false,
+                  needsHandleSelection: existingUser.needsHandleSelection || false,
+                  emailVerified: existingUser.emailVerified || false,
+                  emailVerificationToken: existingUser.emailVerificationToken || null,
+                  emailVerificationPrompted: existingUser.emailVerificationPrompted || false,
+                  debugFeatures: {
+                    enableDataRefresh: existingUser.debugFeatures?.enableDataRefresh || false,
+                    enableDebugLogs: existingUser.debugFeatures?.enableDebugLogs || false
+                  }
+                }
+              });
+              return;
+            }
+            // Check if this is a basic email/password account that can be linked
+            else if (existingUser.hashedAccessKey && !existingUser.appleId) {
+              console.log('🔗 ASU Server Route: Linking Apple ID to existing email/password account');
+              existingUser.appleId = appleUser.appleId;
+              await existingUser.save();
+              
+              // Generate session and return user data
+              const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+              const token = jwt.sign(
+                { userId: existingUser._id, sessionId: sessionId },
+                process.env.JWT_SECRET || 'defaultsecret',
+                { expiresIn: '7d' }
+              );
+              
+              existingUser.setCurrentToken(sessionId);
+              await existingUser.save();
+              
+              res.json({
+                token,
+                user: {
+                  handle: existingUser.handle,
+                  email: existingUser.getDecryptedEmail(),
+                  level: existingUser.level,
+                  experience: existingUser.experience,
+                  armyBonus: existingUser.armyBonus,
+                  balance: existingUser.balance,
+                  unlockedFeatures: existingUser.unlockedFeatures,
+                  profileGender: existingUser.profileGender,
+                  onboardingCompleted: existingUser.onboardingCompleted || false,
+                  needsHandleSelection: existingUser.needsHandleSelection || false,
+                  emailVerified: existingUser.emailVerified || false,
+                  emailVerificationToken: existingUser.emailVerificationToken || null,
+                  emailVerificationPrompted: existingUser.emailVerificationPrompted || false,
+                  debugFeatures: {
+                    enableDataRefresh: existingUser.debugFeatures?.enableDataRefresh || false,
+                    enableDebugLogs: existingUser.debugFeatures?.enableDebugLogs || false
+                  }
+                }
+              });
+              return;
+            }
+            // Account already has Apple ID or other conflicts
+            else {
+              console.log('🔴 ASU Server Route: Account already has Apple ID or other conflicts');
+              res.status(400).json({ 
+                error: 'An account already exists with this email address. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.'
+              });
+              return;
+            }
+          }
+        }
+      }
+
+      // Create new user
+      console.log('🍎 ASU Server Route: Creating new user with Apple ID');
+      const isRealEmail = appleUser.email && !appleUser.email.includes('@privaterelay.appleid.com');
+      const userEmail = appleUser.email || `apple_${appleUser.appleId}@privaterelay.appleid.com`;
+      
+      const newUser = new User({
+        email: userEmail,
+        emailHash: EncryptionService.hashEmail(userEmail), // Always hash the email we're storing
+        handle: `AppleUser${Date.now()}`,
+        hashedAccessKey: '', // No password for Apple Sign-In accounts
+        appleId: appleUser.appleId,
+        needsHandleSelection: true,
+        emailVerified: isRealEmail, // Only auto-verify if it's a real email, not private relay
+        emailVerificationPrompted: !isRealEmail, // Prompt for verification if using private relay
+        // Note: Let schema defaults handle balance, experience, armyBonus, unlockedFeatures, etc.
+      });
+
+      await newUser.save();
+      console.log('🍎 ASU Server Route: New user created successfully');
+
+      // Create research data for new user
+      await createUserResearchData(newUser._id as mongoose.Types.ObjectId);
+
+      // Generate a unique session ID for this login
+      const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+      
+      const token = jwt.sign(
+        { userId: newUser._id, sessionId: sessionId },
+        process.env.JWT_SECRET || 'defaultsecret',
+        { expiresIn: '7d' }
+      );
+      
+      // Set current session ID (invalidates all previous sessions)
+      newUser.setCurrentToken(sessionId);
+      await newUser.save();
+      
+      console.log('🍎 ASU Server Route: Apple Sign-Up successful, returning user data');
+      res.json({
+        token,
+        user: {
+          handle: newUser.handle,
+          email: newUser.getDecryptedEmail(),
+          level: newUser.level,
+          experience: newUser.experience,
+          armyBonus: newUser.armyBonus,
+          balance: newUser.balance,
+          unlockedFeatures: newUser.unlockedFeatures,
+          profileGender: newUser.profileGender,
+          onboardingCompleted: newUser.onboardingCompleted || false,
+          needsHandleSelection: newUser.needsHandleSelection || false,
+          emailVerified: newUser.emailVerified || false,
+          emailVerificationToken: newUser.emailVerificationToken || null,
+          emailVerificationPrompted: newUser.emailVerificationPrompted || false,
+          debugFeatures: {
+            enableDataRefresh: newUser.debugFeatures?.enableDataRefresh || false,
+            enableDebugLogs: newUser.debugFeatures?.enableDebugLogs || false
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('Apple Sign-Up error:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  }
+);
 
 // Mark onboarding as completed
 router.post('/onboarding-complete', async (req, res): Promise<void> => {
@@ -988,7 +1373,16 @@ router.post('/forgot-password', async (req: Request, res: Response): Promise<voi
       res.status(400).json({ error: 'This account uses Google Sign-In. Please use the "Sign in with Google" button instead.' });
       return;
     }
-    console.log('✅ [DEBUG] Not a Google account - proceeding with password reset');
+    
+    // Check if this is an Apple account (has appleId but no hashedAccessKey)
+    console.log('🔍 [DEBUG] Checking if Apple account:', { appleId: !!user.appleId, hashedAccessKey: !!user.hashedAccessKey });
+    if (user.appleId && !user.hashedAccessKey) {
+      console.log('❌ [DEBUG] Apple account - cannot reset password');
+      res.status(400).json({ error: 'This account uses Apple Sign-In. Please use the "Sign in with Apple" button instead.' });
+      return;
+    }
+    
+    console.log('✅ [DEBUG] Not a social auth account - proceeding with password reset');
 
     // Generate password reset token
     console.log('🔍 [DEBUG] Generating password reset token');
