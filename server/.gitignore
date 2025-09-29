@@ -4,26 +4,16 @@ npm-debug.log
 yarn-debug.log
 yarn-error.log
 
-# Environment variables
+# Environment variables (PRIVATE - never commit)
 .env
 .env.local
 .env.*.local
 .env.production
+.env.prod
 .env.development
 .env.staging
 .env.test
-.env.test.local
-.env.production.local
-.env.staging.local
-.env.test.local
-.env.production.local
-.env.staging.local
-.env.test.local
-.env.production.local
-.env.staging.local
-.env.test.local
-.env.production.local
-.env.staging.local
+.env.dev
 
 # IDE
 .idea/
@@ -41,4 +31,4 @@ logs
 
 # Build
 dist/
-build/ 
+build/

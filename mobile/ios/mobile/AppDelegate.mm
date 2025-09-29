@@ -28,4 +28,17 @@
 #endif
 }
 
+// Force landscape orientation for all modals, including Apple Sign In
+- (UIInterfaceOrientationMask)application:(UIApplication *)application supportedInterfaceOrientationsForWindow:(UIWindow *)window
+{
+  // Always return landscape for this app
+  return UIInterfaceOrientationMaskLandscape;
+}
+
+// Additional method to ensure landscape orientation is enforced
+- (UIInterfaceOrientation)preferredInterfaceOrientationForPresentation
+{
+  return UIInterfaceOrientationLandscapeLeft;
+}
+
 @end

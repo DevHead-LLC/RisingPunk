@@ -8,6 +8,7 @@ export interface IUser extends Document {
   handle: string;
   hashedAccessKey: string;
   googleId?: string;
+  appleId?: string;
   level: number;
   experience: {
     current: number;
@@ -70,6 +71,7 @@ export interface IUser extends Document {
 export interface IUserModel extends mongoose.Model<IUser> {
   emailExists(email: string): Promise<boolean>;
   findByGoogleId(googleId: string): Promise<IUser | null>;
+  findByAppleId(appleId: string): Promise<IUser | null>;
 }
 
 const userSchema = new Schema({
@@ -95,6 +97,13 @@ const userSchema = new Schema({
     required: false
   },
   googleId: {
+    type: String,
+    required: false,
+    unique: true,
+    sparse: true,
+    index: true
+  },
+  appleId: {
     type: String,
     required: false,
     unique: true,
@@ -392,6 +401,11 @@ userSchema.statics.emailExists = async function(email: string): Promise<boolean>
 // Static method to find user by Google ID
 userSchema.statics.findByGoogleId = async function(googleId: string): Promise<IUser | null> {
   return this.findOne({ googleId });
+};
+
+// Static method to find user by Apple ID
+userSchema.statics.findByAppleId = async function(appleId: string): Promise<IUser | null> {
+  return this.findOne({ appleId });
 };
 
 // Method to set current token (invalidates all previous tokens)
