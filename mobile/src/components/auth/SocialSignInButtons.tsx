@@ -76,7 +76,7 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
       console.log('🍎 ASI: Error message:', error.message);
       
       // Handle specific Apple Sign In errors more gracefully
-      const errorCode = String(error.code || '');
+      const errorCode = error.code !== undefined ? String(error.code) : '';
       const isUserCancellation = errorCode === '1001' || 
                                 error.message?.includes('cancelled') || 
                                 error.message?.includes('canceled');
