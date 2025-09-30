@@ -737,6 +737,88 @@ appleButtonContainer: {
 
 **Impact**: Google button content is now fully visible and both buttons maintain perfect alignment with adequate space.
 
+## iOS DEPLOYMENT TARGET FIX - React Native Compatibility ✅
+**Issue**: iOS deployment target was set to 13.0, which is incompatible with React Native 0.76.6's minimum requirement of iOS 15.1.
+
+**Root Cause**: 
+- **React Native 0.76.6 minimum iOS version**: 15.1 (not 13.0)
+- **Compilation failures**: iOS 13.0 deployment target causes build errors
+- **App Store compatibility**: Need to support modern iOS versions
+
+**Fix Applied**:
+- **Updated deployment target**: Changed from 13.0 to 15.1 across all build configurations
+- **React Native compatibility**: Now supports React Native 0.76.6 requirements
+- **Marketing version maintained**: Kept at 1.0.0 for App Store submission
+
+**Before** (Incompatible):
+```pbxproj
+IPHONEOS_DEPLOYMENT_TARGET = 13.0; // Too low for React Native 0.76.6
+```
+
+**After** (Compatible):
+```pbxproj
+IPHONEOS_DEPLOYMENT_TARGET = 15.1; // React Native 0.76.6 minimum
+```
+
+**Build Configurations Updated**:
+- Debug target
+- Release target  
+- Test target
+- All 6 occurrences updated
+
+**App Store Impact**:
+- ✅ **Compilation success**: React Native 0.76.6 will build correctly
+- ✅ **Marketing version**: 1.0.0 maintained for App Store submission
+- ✅ **Device support**: iOS 15.1+ (covers 95%+ of active devices)
+- ✅ **Future compatibility**: Aligned with React Native requirements
+
+**Impact**: iOS deployment target now compatible with React Native 0.76.6 while maintaining App Store submission requirements.
+
+## APPLE AUTH SERVICE FIX - Remove Unnecessary Environment Variable Requirements ✅
+**Issue**: Apple Auth Service was requiring `APPLE_TEAM_ID` and `APPLE_KEY_ID` environment variables that are never used, causing Apple Sign-In to be disabled in production.
+
+**Root Cause Analysis**:
+- **Unused variables**: `APPLE_TEAM_ID` and `APPLE_KEY_ID` are never referenced in the code
+- **Token verification only needs**: `APPLE_CLIENT_ID` and Apple's public JWKS endpoint
+- **Production impact**: Service disabled in AWS Elastic Beanstalk where these variables aren't configured
+- **503 errors**: `/apple-signin` and `/apple-signup` endpoints failing
+
+**What Apple Sign-In Actually Needs**:
+- ✅ **`APPLE_CLIENT_ID`**: Used as JWT audience for token verification
+- ✅ **Apple's JWKS endpoint**: `https://appleid.apple.com/auth/keys` for public keys
+- ❌ **`APPLE_TEAM_ID`**: Not used anywhere in the code
+- ❌ **`APPLE_KEY_ID`**: Not used anywhere in the code
+- ❌ **`APPLE_PRIVATE_KEY`**: Not used anywhere in the code
+
+**Fix Applied**:
+- **Removed unnecessary checks**: Eliminated `APPLE_TEAM_ID` and `APPLE_KEY_ID` requirements
+- **Only check required variable**: Only validate `APPLE_CLIENT_ID` presence
+- **Maintained functionality**: Token verification works with just client ID and JWKS
+
+**Before** (Unnecessarily Restrictive):
+```typescript
+if (!teamId || !keyId || !clientId) {
+  console.warn('🔴 ASI Server: Apple Sign-In environment variables not set. Apple Sign-In will be disabled.');
+  return;
+}
+```
+
+**After** (Only Required Variables):
+```typescript
+if (!clientId) {
+  console.warn('🔴 ASI Server: APPLE_CLIENT_ID not set. Apple Sign-In will be disabled.');
+  return;
+}
+```
+
+**Production Impact**:
+- ✅ **Apple Sign-In enabled**: Service will initialize in AWS Elastic Beanstalk
+- ✅ **No 503 errors**: `/apple-signin` and `/apple-signup` endpoints will work
+- ✅ **Proper validation**: Still validates the actually required `APPLE_CLIENT_ID`
+- ✅ **Cleaner logs**: Removed unnecessary environment variable checks
+
+**Impact**: Apple Sign-In will now work in production environments where only `APPLE_CLIENT_ID` is configured.
+
 **Issue Identified**: 
 - Google Auth configuration was moved from hardcoded values to environment variables using react-native-config
 - Environment variables are loading correctly (confirmed by debug logs)
