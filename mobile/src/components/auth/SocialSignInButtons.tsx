@@ -76,7 +76,7 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
       console.log('🍎 ASI: Error message:', error.message);
       
       // Handle specific Apple Sign In errors more gracefully
-      if (error.code === '1001') {
+      if (error.code === '1001' || error.code === 1001) {
         console.log('🍎 ASI: Authentication cancelled by user (1001)');
         // Don't show error for user cancellation
         return;
@@ -87,6 +87,7 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
       } else {
         console.log('🍎 ASI: Authentication error:', error.message);
         console.log('🍎 ASI: Error code:', error.code);
+        console.log('🍎 ASI: Error code type:', typeof error.code);
         // Show error for all other cases (including 1000 - unknown errors)
         Alert.alert('Error', `Apple Sign-In failed: ${error.message || 'Unknown error'}`);
       }
