@@ -1,10 +1,11 @@
 import { OAuth2Client } from 'google-auth-library';
+import { GOOGLE_CLIENT_ID } from '../config/env';
 
 export class GoogleAuthService {
   private static client: OAuth2Client;
 
   static initialize(): void {
-    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientId = GOOGLE_CLIENT_ID;
     console.log('🔵 GSI Server: Initializing Google Auth Service');
     console.log('🔵 GSI Server: GOOGLE_CLIENT_ID found:', !!clientId);
     console.log('🔵 GSI Server: GOOGLE_CLIENT_ID value:', clientId);
@@ -36,7 +37,7 @@ export class GoogleAuthService {
       console.log('🔵 GSI Server: Calling Google OAuth2Client.verifyIdToken');
       const ticket = await this.client.verifyIdToken({
         idToken,
-        audience: process.env.GOOGLE_CLIENT_ID
+        audience: GOOGLE_CLIENT_ID
       });
 
       console.log('🔵 GSI Server: Token verification successful, getting payload');

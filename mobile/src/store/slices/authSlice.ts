@@ -357,6 +357,203 @@ export const googleSignUpUser = createAsyncThunk(
   }
 );
 
+export const appleSignInUser = createAsyncThunk(
+  'auth/appleSignIn',
+  async (idToken: string, { rejectWithValue, dispatch }) => {
+    console.log('🔵 ASI Redux: Starting Apple Sign-In thunk');
+    console.log('🔵 ASI Redux: API URL:', API_URL);
+    console.log('🔵 ASI Redux: ID Token length:', idToken?.length);
+    
+    try {
+      console.log('🔵 ASI Redux: Making fetch request to server');
+      const response = await fetch(`${API_URL}/api/auth/apple-signin`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ idToken }),
+      });
+      
+      console.log('🔵 ASI Redux: Server response received');
+      console.log('🔵 ASI Redux: Response status:', response.status);
+      console.log('🔵 ASI Redux: Response ok:', response.ok);
+
+      if (!response.ok) {
+        console.log('🔴 ASI Redux: Server response not ok, parsing error');
+        const error = await response.json().catch(() => ({ error: 'Apple Sign-In failed' }));
+        console.log('🔴 ASI Redux: Server error:', error);
+        
+        // Handle specific error cases with user-friendly messages
+        if (error.error && error.error.includes('No account found')) {
+          return rejectWithValue('No account found with this Apple ID. Please use the "NEW_IDENTITY (SIGN_UP)" option to create an account.');
+        } else if (error.error && error.error.includes('account already exists with this Apple ID')) {
+          return rejectWithValue('An account already exists with this Apple ID. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.');
+        } else if (error.error && error.error.includes('account already exists with this email address')) {
+          return rejectWithValue('An account already exists with this email address. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.');
+        }
+        
+        return rejectWithValue(error.error || 'Apple Sign-In failed');
+      }
+
+      console.log('🔵 ASI Redux: Parsing successful response');
+      const data = await response.json();
+      console.log('🔵 ASI Redux: Response data parsed successfully');
+
+      // Store in AsyncStorage
+      await AsyncStorage.setItem('token', data.token);
+      await AsyncStorage.setItem('user', JSON.stringify(data.user));
+
+      // Clear any existing RTK Query cache to ensure fresh data for new user
+      dispatch(authApi.util.resetApiState());
+      dispatch(balanceApi.util.resetApiState());
+      dispatch(botsApi.util.resetApiState());
+      dispatch(mapApi.util.resetApiState());
+
+      // Fetch initial data after successful login
+      try {
+        // Balance fetching is handled by DataFetcher + RTK Query polling
+        
+        // Fetch bots
+        const botsResponse = await fetch(`${API_URL}/api/bots`, {
+          headers: {
+            'Authorization': `Bearer ${data.token}`,
+          },
+        });
+
+        if (botsResponse.ok) {
+          const botsData = await botsResponse.json();
+          dispatch(setBots(botsData.bots));
+        }
+
+        // Fetch build state
+        const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
+          headers: {
+            'Authorization': `Bearer ${data.token}`,
+          },
+        });
+
+        if (buildStateResponse.ok) {
+          const buildStateData = await buildStateResponse.json();
+          dispatch(setBuildState(buildStateData));
+        }
+      } catch (fetchError) {
+        // Don't fail login if data fetching fails
+        console.warn('Failed to fetch initial data:', fetchError);
+      }
+
+      console.log('🔵 ASI Redux: Returning successful data');
+      return data;
+    } catch (error) {
+      console.log('🔴 ASI Redux: Error caught in thunk');
+      console.log('🔴 ASI Redux: Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        type: typeof error,
+        isTypeError: error instanceof TypeError,
+        isNetworkError: error instanceof TypeError && error.message.includes('Network request failed'),
+      });
+      
+      if (error instanceof TypeError && error.message.includes('Network request failed')) {
+        console.log('🔴 ASI Redux: Network request failed error detected');
+        return rejectWithValue('Network error: Cannot connect to server');
+      }
+      console.log('🔴 ASI Redux: Other error, rejecting with message');
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+);
+
+export const appleSignUpUser = createAsyncThunk(
+  'auth/appleSignUp',
+  async (idToken: string, { rejectWithValue, dispatch }) => {
+    try {
+      const response = await fetch(`${API_URL}/api/auth/apple-signup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ idToken }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Apple Sign-Up failed' }));
+        
+        // Handle specific error cases with user-friendly messages
+        if (error.error && error.error.includes('account already exists with this Apple ID')) {
+          return rejectWithValue('An account already exists with this Apple ID. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.');
+        } else if (error.error && error.error.includes('account already exists with this email address')) {
+          return rejectWithValue('An account already exists with this email address. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.');
+        }
+        
+        return rejectWithValue(error.error || 'Apple Sign-Up failed');
+      }
+
+      const data = await response.json();
+
+      // Store in AsyncStorage
+      await AsyncStorage.setItem('token', data.token);
+      await AsyncStorage.setItem('user', JSON.stringify(data.user));
+
+      // Clear any existing RTK Query cache to ensure fresh data for new user
+      dispatch(authApi.util.resetApiState());
+      dispatch(balanceApi.util.resetApiState());
+      dispatch(botsApi.util.resetApiState());
+      dispatch(mapApi.util.resetApiState());
+
+      // Fetch initial data after successful signup
+      try {
+        // Fetch balance
+        const balanceResponse = await fetch(`${API_URL}/api/balance`, {
+          headers: {
+            'Authorization': `Bearer ${data.token}`,
+          },
+        });
+
+        if (balanceResponse.ok) {
+          const balanceData = await balanceResponse.json();
+          dispatch(updateBalance({
+            total: balanceData.total,
+            ratePerSecond: balanceData.ratePerSecond,
+            lastUpdated: new Date().toISOString(),
+          }));
+        }
+
+        // Fetch bots
+        const botsResponse = await fetch(`${API_URL}/api/bots`, {
+          headers: {
+            'Authorization': `Bearer ${data.token}`,
+          },
+        });
+
+        if (botsResponse.ok) {
+          const botsData = await botsResponse.json();
+          dispatch(setBots(botsData.bots));
+        }
+
+        // Fetch build state
+        const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
+          headers: {
+            'Authorization': `Bearer ${data.token}`,
+          },
+        });
+
+        if (buildStateResponse.ok) {
+          const buildStateData = await buildStateResponse.json();
+          dispatch(setBuildState(buildStateData));
+        }
+      } catch (fetchError) {
+        // Silently handle fetch errors
+      }
+
+      return data;
+    } catch (error) {
+      if (error instanceof TypeError && error.message.includes('Network request failed')) {
+        return rejectWithValue('Network error: Cannot connect to server');
+      }
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+);
+
 export const updateUserHandle = createAsyncThunk(
   'auth/updateHandle',
   async (handle: string, { rejectWithValue, getState, dispatch }) => {
@@ -892,6 +1089,51 @@ export const authSlice = createSlice({
         state.error = action.payload as string;
       });
 
+    // Apple Sign-In
+    builder
+      .addCase(appleSignInUser.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(appleSignInUser.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.token = action.payload.token;
+        state.user = action.payload.user;
+        state.error = null;
+        state.showOnboarding = !action.payload.user.onboardingCompleted;
+        state.showHandleSelection = action.payload.user.needsHandleSelection;
+        state.showEmailVerification = false;
+        state.showEmailVerificationBanner = false;
+        state.isInitialized = true; // Mark as initialized after successful Apple Sign-In
+      })
+      .addCase(appleSignInUser.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      });
+
+    // Apple Sign-Up
+    builder
+      .addCase(appleSignUpUser.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(appleSignUpUser.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.token = action.payload.token;
+        state.user = action.payload.user;
+        state.error = null;
+        state.showOnboarding = !action.payload.user.onboardingCompleted;
+        // Store needsHandleSelection but don't show modal yet - wait for onboarding + turf intro to complete
+        state.showHandleSelection = false; // Will be set to true after turf intro completes
+        state.showEmailVerification = false;
+        state.showEmailVerificationBanner = false;
+        state.isInitialized = true; // Mark as initialized after successful Apple Sign-Up
+      })
+      .addCase(appleSignUpUser.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      });
+
     // Update Handle
     builder
       .addCase(updateUserHandle.pending, (state) => {
@@ -1073,6 +1315,8 @@ export const { clearError, setCredentials, setOnboardingCompleted, setShowOnboar
 export const logout = logoutUser;
 export const googleSignIn = googleSignInUser;
 export const googleSignUp = googleSignUpUser;
+export const appleSignIn = appleSignInUser;
+export const appleSignUp = appleSignUpUser;
 export const updateHandle = updateUserHandle;
 export const forceRefresh = forceRefreshAllData;
 export default authSlice.reducer;

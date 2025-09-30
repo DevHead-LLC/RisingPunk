@@ -109,6 +109,15 @@ mongoose.connect(process.env.MONGODB_URI, {
     console.warn('⚠️  Google Auth Service not available:', error);
   }
   
+  // Initialize Apple Auth Service
+  try {
+    const { AppleAuthService } = require('./src/services/AppleAuthService');
+    AppleAuthService.initialize();
+    console.log('✅ Apple Auth Service initialized');
+  } catch (error) {
+    console.warn('⚠️  Apple Auth Service not available:', error);
+  }
+  
   // Initialize leveling and bot stats services
   try {
           const { LevelingService } = require('./src/services/LevelingService');
@@ -737,7 +746,7 @@ app.post('/api/battalions/assign', auth, async (req: Request, res: Response) => 
 
     // Now verify sufficient bots available
     if (bot.bots[botType] < quantity) {
-      res.status(400).json({ error: 'Insufficient Bots Available!' });
+      res.status(400).json({ error: 'Insufficient Bots Available' });
       return;
     }
 

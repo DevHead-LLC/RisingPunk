@@ -6,14 +6,12 @@ import {
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
-import { GoogleSignin, GoogleSigninButton } from '@react-native-google-signin/google-signin';
-
 import {SIZING, styleGuide} from '../styles/theme';
-import { GOOGLE_AUTH_CONFIG } from '../config/googleAuth';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { loginUser, registerUser, clearError, googleSignIn, googleSignUp } from '../store/slices/authSlice';
+import { loginUser, registerUser, clearError } from '../store/slices/authSlice';
 import { TitleSection } from '../components/auth/TitleSection';
 import { AuthInputs } from '../components/auth/AuthInputs';
+import { SocialSignInButtons } from '../components/auth/SocialSignInButtons';
 import { useFormState } from '../hooks/useFormState';
 import { ScreenContainer } from '../components/common/ScreenContainer';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -53,168 +51,6 @@ const ErrorMessage = memo(function ErrorMessage({ error }: { error: string | nul
   return <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>;
 });
 
-const GoogleSignInButton = memo(function GoogleSignInButton() {
-  const dispatch = useAppDispatch();
-  const colors = useThemeColors();
-  const [isProcessing, setIsProcessing] = useState(false);
-  
-  const handleGoogleSignIn = useCallback(async () => {
-    // Prevent double execution
-    if (isProcessing) {
-      console.log('🔵 GSI LOGIN: Already processing, ignoring duplicate call');
-      return;
-    }
-    
-    console.log('🔵 GSI LOGIN: Starting Google Sign-In process');
-    setIsProcessing(true);
-    
-    try {
-      console.log('🔵 GSI LOGIN: Configuring Google Sign-In');
-      const config = {
-        webClientId: GOOGLE_AUTH_CONFIG.webClientId,
-        iosClientId: GOOGLE_AUTH_CONFIG.iosClientId,
-        offlineAccess: false,
-        forceCodeForRefreshToken: false,
-        openIdConnect: true,
-      };
-      
-      GoogleSignin.configure(config);
-      await GoogleSignin.hasPlayServices();
-      
-      console.log('🔵 GSI LOGIN: Initiating Google Sign-In UI');
-      const userInfo = await GoogleSignin.signIn();
-      
-      if (userInfo.type === 'cancelled' || userInfo.data === null) {
-        console.log('🔵 GSI LOGIN: User cancelled Google Sign-In');
-        return;
-      }
-      
-      const idToken = userInfo.data?.idToken;
-      if (idToken) {
-        console.log('🔵 GSI LOGIN: ID token received, dispatching to Redux');
-        await dispatch(googleSignIn(idToken)).unwrap();
-        console.log('🔵 GSI LOGIN: Redux dispatch completed successfully');
-      } else {
-        throw new Error('No ID token received from Google');
-      }
-    } catch (error: any) {
-      console.log('🔴 GSI LOGIN: Error caught:', error);
-      
-      if (error.code === 'SIGN_IN_CANCELLED' || error.code === 'IN_PROGRESS') {
-        return; // Handle silently
-      }
-      
-      // Let Redux handle the error display
-      throw error;
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [dispatch, isProcessing]);
-
-  return (
-    <View style={styles.googleButtonContainer}>
-      <TouchableOpacity 
-        style={[styles.googleButton, { 
-          backgroundColor: colors.surface,
-          borderColor: colors.matrix 
-        }]} 
-        onPress={handleGoogleSignIn}
-        disabled={isProcessing}
-      >
-        <View style={styles.googleButtonContent}>
-          <View style={styles.googleLogoContainer}>
-            <GoogleSigninButton
-              size={GoogleSigninButton.Size.Icon}
-              color={GoogleSigninButton.Color.Dark}
-              onPress={() => {}} // Empty handler since we're using TouchableOpacity
-            />
-          </View>
-          <Text style={[styles.googleButtonText, { color: colors.matrix }]}>
-            SIGN_IN_WITH_GOOGLE
-          </Text>
-        </View>
-        <View style={[styles.buttonCorner, { borderColor: colors.matrix }]} />
-      </TouchableOpacity>
-    </View>
-  );
-});
-
-const GoogleSignUpButton = memo(function GoogleSignUpButton() {
-  const dispatch = useAppDispatch();
-  const colors = useThemeColors();
-  const [isProcessing, setIsProcessing] = useState(false);
-  
-  const handleGoogleSignUp = useCallback(async () => {
-    // Prevent double execution
-    if (isProcessing) {
-      return;
-    }
-    
-    setIsProcessing(true);
-    
-    try {
-      const config = {
-        webClientId: GOOGLE_AUTH_CONFIG.webClientId,
-        iosClientId: GOOGLE_AUTH_CONFIG.iosClientId,
-        offlineAccess: false,
-        forceCodeForRefreshToken: false,
-        openIdConnect: true,
-      };
-      
-      GoogleSignin.configure(config);
-      await GoogleSignin.hasPlayServices();
-      
-      const userInfo = await GoogleSignin.signIn();
-      
-      if (userInfo.type === 'cancelled' || userInfo.data === null) {
-        return;
-      }
-        
-      const idToken = userInfo.data?.idToken;
-      if (idToken) {
-        await dispatch(googleSignUp(idToken)).unwrap();
-      } else {
-        throw new Error('No ID token received from Google');
-      }
-    } catch (error: any) {
-      if (error.code === 'SIGN_IN_CANCELLED' || error.code === 'IN_PROGRESS') {
-        return; // Handle silently
-      }
-      
-      // Let Redux handle the error display
-      throw error;
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [dispatch, isProcessing]);
-
-  return (
-    <View style={styles.googleButtonContainer}>
-      <TouchableOpacity 
-        style={[styles.googleButton, { 
-          backgroundColor: colors.surface,
-          borderColor: colors.matrix 
-        }]} 
-        onPress={handleGoogleSignUp}
-        disabled={isProcessing}
-      >
-        <View style={styles.googleButtonContent}>
-          <View style={styles.googleLogoContainer}>
-            <GoogleSigninButton
-              size={GoogleSigninButton.Size.Icon}
-              color={GoogleSigninButton.Color.Dark}
-              onPress={() => {}} // Empty handler since we're using TouchableOpacity
-            />
-          </View>
-          <Text style={[styles.googleButtonText, { color: colors.matrix }]}>
-            SIGN_UP_WITH_GOOGLE
-          </Text>
-        </View>
-        <View style={[styles.buttonCorner, { borderColor: colors.matrix }]} />
-      </TouchableOpacity>
-    </View>
-  );
-});
 
 export const LoginScreen = () => {
   const dispatch = useAppDispatch();
@@ -427,7 +263,7 @@ export const LoginScreen = () => {
               <WelcomeMessage formType={formType} />
               <ErrorMessage error={error} />
               {formType === 'login' ? renderLoginForm() : renderRegisterForm()}
-              {formType === 'login' ? <GoogleSignInButton /> : <GoogleSignUpButton />}
+              <SocialSignInButtons isSignUp={formType === 'register'} />
               <ToggleFormButton formType={formType} onPress={toggleFormType} />
             </View>
           </View>
@@ -521,36 +357,6 @@ const styles = StyleSheet.create({
   },
   toggleText: {
     fontSize: SIZING.font.small,
-    letterSpacing: 1,
-  },
-  googleButtonContainer: {
-    marginTop: SIZING.spacing.sm,
-    marginBottom: SIZING.spacing.sm,
-    width: '100%',
-    maxWidth: 320,
-    alignItems: 'center',
-  },
-  googleButton: {
-    height: 48,
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-    borderWidth: 2,
-    borderRadius: 4,
-  },
-  googleButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  googleLogoContainer: {
-    marginRight: SIZING.spacing.sm,
-  },
-  googleButtonText: {
-    fontSize: SIZING.font.body,
-    fontWeight: '500',
     letterSpacing: 1,
   },
   inputSpacing: {
