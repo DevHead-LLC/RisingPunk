@@ -4,7 +4,7 @@ import { GoogleSignin, GoogleSigninButton } from '@react-native-google-signin/go
 import { useAppDispatch } from '../../store/hooks';
 import { googleSignIn, googleSignUp, appleSignIn, appleSignUp } from '../../store/slices/authSlice';
 import { GOOGLE_AUTH_CONFIG } from '../../config/googleAuth';
-import { appleAuth } from '@invertase/react-native-apple-authentication';
+import { appleAuth, AppleButton } from '@invertase/react-native-apple-authentication';
 import { AppleSignInButton } from './AppleSignInButton';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING, styleGuide } from '../../styles/theme';
@@ -29,17 +29,37 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
     isProcessingRef.current = true;
     
     try {
-      console.log('🍎 ASI: Performing Apple Sign-In request');
+      console.log('🍎 ASI: Performing Apple Sign-In request with modern configuration');
+      
+      // Check if Apple Sign In is available first
+      const isAvailable = appleAuth.isSupported;
+      if (!isAvailable) {
+        console.log('🍎 ASI: Apple Sign In not available on this device');
+        Alert.alert('Error', 'Apple Sign In is not available on this device');
+        return;
+      }
+      
+      // Modern Apple Sign In configuration for 2024-2025
+      // This configuration should handle the email sharing prompt more smoothly
       const appleAuthRequestResponse = await appleAuth.performRequest({
         requestedOperation: appleAuth.Operation.LOGIN,
         requestedScopes: [appleAuth.Scope.EMAIL, appleAuth.Scope.FULL_NAME],
+        // Add nonce for better security and to avoid token reuse issues
+        nonce: `risingpunk_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+        // Add state parameter to help with flow management
+        state: `state_${Date.now()}`,
       });
 
-      const { identityToken, nonce } = appleAuthRequestResponse;
+      const { identityToken, nonce, email, fullName, user } = appleAuthRequestResponse;
+      
+      console.log('🍎 ASI: Apple Sign-In response received');
+      console.log('🍎 ASI: Identity token length:', identityToken?.length);
+      console.log('🍎 ASI: Email provided:', email ? 'Yes' : 'No');
+      console.log('🍎 ASI: Full name provided:', fullName ? 'Yes' : 'No');
+      console.log('🍎 ASI: User ID provided:', user ? 'Yes' : 'No');
       
       if (identityToken) {
         console.log('🍎 ASI: Apple Sign-In successful, dispatching to Redux');
-        console.log('🍎 ASI: Identity token length:', identityToken.length);
         
         if (isSignUp) {
           await dispatch(appleSignUp(identityToken)).unwrap();
@@ -52,9 +72,23 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
       }
     } catch (error: any) {
       console.log('🍎 ASI: Apple Sign-In error:', error);
+      console.log('🍎 ASI: Error code:', error.code);
+      console.log('🍎 ASI: Error message:', error.message);
       
-      if (!error.message?.includes('cancelled') && !error.message?.includes('canceled')) {
-        Alert.alert('Error', `Apple Sign-In failed: ${error.message}`);
+      // Handle specific Apple Sign In errors more gracefully
+      if (error.code === '1001') {
+        console.log('🍎 ASI: Authentication cancelled by user (1001)');
+        // Don't show error for user cancellation
+        return;
+      } else if (error.message?.includes('cancelled') || error.message?.includes('canceled')) {
+        console.log('🍎 ASI: User cancelled authentication');
+        // Don't show error for user cancellation
+        return;
+      } else {
+        console.log('🍎 ASI: Authentication error:', error.message);
+        console.log('🍎 ASI: Error code:', error.code);
+        // Show error for all other cases (including 1000 - unknown errors)
+        Alert.alert('Error', `Apple Sign-In failed: ${error.message || 'Unknown error'}`);
       }
     } finally {
       console.log('🍎 ASI: Apple Sign-In process completed');
