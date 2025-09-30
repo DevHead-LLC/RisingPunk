@@ -76,28 +76,18 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
       console.log('🍎 ASI: Error message:', error.message);
       
       // Handle specific Apple Sign In errors more gracefully
-      if (error.code === '1000') {
-        console.log('🍎 ASI: User cancelled or authentication failed (1000)');
-        // This is often the "Sign in failed" error you're seeing
-        // It usually means the user needs to complete the email sharing prompt
-        console.log('🍎 ASI: This may indicate the user needs to complete email sharing prompt');
-        // Don't show error for this specific case - let user try again
-        return;
-      } else if (error.code === '1001') {
+      if (error.code === '1001') {
         console.log('🍎 ASI: Authentication cancelled by user (1001)');
         // Don't show error for user cancellation
-        return;
-      } else if (error.code === '1002') {
-        console.log('🍎 ASI: Authentication failed (1002)');
-        // This might be related to the email sharing prompt
-        console.log('🍎 ASI: This may indicate an issue with email sharing prompt');
         return;
       } else if (error.message?.includes('cancelled') || error.message?.includes('canceled')) {
         console.log('🍎 ASI: User cancelled authentication');
         // Don't show error for user cancellation
         return;
       } else {
-        console.log('🍎 ASI: Unexpected error:', error.message);
+        console.log('🍎 ASI: Authentication error:', error.message);
+        console.log('🍎 ASI: Error code:', error.code);
+        // Show error for all other cases (including 1000 - unknown errors)
         Alert.alert('Error', `Apple Sign-In failed: ${error.message || 'Unknown error'}`);
       }
     } finally {
