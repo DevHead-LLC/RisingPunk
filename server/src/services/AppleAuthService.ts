@@ -7,17 +7,13 @@ export class AppleAuthService {
   private static isInitialized = false;
 
   static initialize(): void {
-    const teamId = APPLE_TEAM_ID;
-    const keyId = APPLE_KEY_ID;
     const clientId = APPLE_CLIENT_ID;
     
     console.log('🍎 ASI Server: Initializing Apple Auth Service');
-    console.log('🍎 ASI Server: APPLE_TEAM_ID found:', !!teamId);
-    console.log('🍎 ASI Server: APPLE_KEY_ID found:', !!keyId);
     console.log('🍎 ASI Server: APPLE_CLIENT_ID found:', !!clientId);
     
-    if (!teamId || !keyId || !clientId) {
-      console.warn('🔴 ASI Server: Apple Sign-In environment variables not set. Apple Sign-In will be disabled.');
+    if (!clientId) {
+      console.warn('🔴 ASI Server: APPLE_CLIENT_ID not set. Apple Sign-In will be disabled.');
       return;
     }
     
