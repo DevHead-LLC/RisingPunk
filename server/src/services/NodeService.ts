@@ -55,6 +55,6 @@ export const createNodesWithTugOfWar = (totalArmyHealth: number, screenWidth: nu
     position: nodeTemplate.position,
     owner: nodeTemplate.owner,
     tugOfWarProgress: 0,
-    maxCaptureThreshold: totalArmyHealth,
+    maxCaptureThreshold: totalArmyHealth * 0.5, // 50% of total army health
   }));
 }; 

@@ -99,7 +99,7 @@ export class CombatService {
 
   static initializeTugOfWarProgress(node: INode, totalArmyHealth: number): void {
     node.tugOfWarProgress = 0;
-    node.maxCaptureThreshold = totalArmyHealth;
+    node.maxCaptureThreshold = totalArmyHealth * 0.5; // 50% of total army health
   }
 
   static getTugOfWarProgress(node: INode): number {
