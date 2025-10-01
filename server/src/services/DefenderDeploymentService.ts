@@ -8,6 +8,8 @@ import { BotType, IBattalion, INode, NodeOwner } from '../types/battle';
 import { BattalionService } from './BattalionService';
 import { BotService } from './BotService';
 import { BattalionFactory } from './BattalionFactory';
+import { RetargetingService } from './RetargetingService';
+import { AttackService } from './AttackService';
 import mongoose from 'mongoose';
 
 // Safety constants for defender deployment
@@ -178,6 +180,10 @@ export class DefenderDeploymentService {
         }
       );
       
+      // Assign targets to newly deployed battalions using retargeting system
+      if (deployments.length > 0) {
+        await this.assignTargetsToNewBattalions(battle, deployments.map(d => d.battalion.id));
+      }
       
     } catch (error) {
       console.error(`DefenderDeploymentService deployWave error:`, error);
@@ -257,5 +263,19 @@ export class DefenderDeploymentService {
       defenderLevel,
       nodes
     );
+  }
+
+  /**
+   * Assign targets to newly deployed battalions using the retargeting system
+   */
+  private static async assignTargetsToNewBattalions(battle: IBattleDocument, newBattalionIds: string[]): Promise<void> {
+    try {
+      // Use the retargeting system to assign targets to new battalions
+      await AttackService.executeUnifiedRetargeting(battle, newBattalionIds, 'NEW_DEFENDER_DEPLOYMENT');
+      
+      console.log(`🎯 Assigned targets to ${newBattalionIds.length} newly deployed defender battalions`);
+    } catch (error) {
+      console.error(`DefenderDeploymentService assignTargetsToNewBattalions error:`, error);
+    }
   }
 }
