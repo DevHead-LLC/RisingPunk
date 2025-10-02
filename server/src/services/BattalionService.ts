@@ -18,18 +18,8 @@ export class BattalionService {
   private static enemyBotTypeCache = new Map<string, BotType>();
 
   static async triggerInitialTargeting(battalions: IBattalion[], nodes: INode[], battleId: string): Promise<BattalionTargetingResult[]> {
-    console.log(`🔍 INITIAL TARGETING DEBUG: Starting initial targeting for battle ${battleId} with ${battalions.length} battalions`);
     const results = TargetingService.assignInitialTargets(battalions, nodes);
     
-    // Log each result to see what targetType values are being created
-    results.forEach((result, index) => {
-      console.log(`🔍 INITIAL TARGETING DEBUG: Result ${index + 1}:`, {
-        battalionId: result.battalionId,
-        targetType: result.targetType,
-        targetNode: result.targetNode,
-        isValidTarget: result.isValidTarget
-      });
-    });
     
     this.targetingResults.set(battleId, results);
     return results;
@@ -67,22 +57,6 @@ export class BattalionService {
     const targetingResults = this.getTargetingResults(battleId);
     const result = targetingResults.find(result => result.battalionId === battalionId);
     
-    // Add debug logging
-    if (result) {
-      console.log(`🔍 TARGETING DEBUG: Found targeting result for ${battalionId}:`, {
-        battalionId: result.battalionId,
-        targetType: result.targetType,
-        targetNode: result.targetNode,
-        isValidTarget: result.isValidTarget
-      });
-      
-      // Check if targetType is undefined or the string "undefined"
-      if (result.targetType === undefined || (result.targetType as any) === "undefined") {
-        console.log(`🔍 TARGETING DEBUG: WARNING - Found targeting result with targetType: "${result.targetType}" for ${battalionId}`);
-      }
-    } else {
-      console.log(`🔍 TARGETING DEBUG: No targeting result found for ${battalionId}`);
-    }
     
     if (result) {
       return result;

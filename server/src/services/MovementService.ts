@@ -246,11 +246,6 @@ export class MovementService {
               const targetingResult = BattalionService.getTargetingResultForBattalion(battalion.id, battleId);
               
               // Add detailed logging for the condition
-              console.log(`🔍 MOVEMENT CONDITION DEBUG: targetingResult exists: ${!!targetingResult}`);
-              if (targetingResult) {
-                console.log(`🔍 MOVEMENT CONDITION DEBUG: targetType: "${targetingResult.targetType}"`);
-                console.log(`🔍 MOVEMENT CONDITION DEBUG: targetType === 'enemy_battalion': ${targetingResult.targetType === 'enemy_battalion'}`);
-              }
               
               if (targetingResult && targetingResult.targetType === 'enemy_battalion') {
                 let enemyBattalion: IBattalion | undefined;
