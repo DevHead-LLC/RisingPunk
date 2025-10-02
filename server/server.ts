@@ -726,12 +726,16 @@ app.post('/api/battalions/assign', auth, async (req: Request, res: Response) => 
   try {
     const { botType, quantity, battalionId } = req.body;
     
+    console.log(`🔍 BATTALION ASSIGNMENT: Starting assignment - botType: ${botType}, quantity: ${quantity}, battalionId: ${battalionId}`);
+    
     // Use findOneAndUpdate instead of findOne to handle concurrent updates
     const bot = await Bot.findOneAndUpdate(
       { userId: req.user._id },
       {},
       { new: true, upsert: true }
     );
+
+    console.log(`🔍 BATTALION ASSIGNMENT: Initial bot counts - ${botType}: ${bot.bots[botType]}`);
 
     // Find existing assignment for this battalion
     const existingAssignment = bot.battalionAssignments.find(
@@ -740,20 +744,25 @@ app.post('/api/battalions/assign', auth, async (req: Request, res: Response) => 
 
     // If exists, return those bots to the available pool first
     if (existingAssignment) {
+      console.log(`🔍 BATTALION ASSIGNMENT: Found existing assignment - returning ${existingAssignment.quantity} ${existingAssignment.botType} bots`);
       bot.bots[existingAssignment.botType] += existingAssignment.quantity;
       bot.battalionAssignments = bot.battalionAssignments.filter(
         (assignment: { battalionId: string }) => assignment.battalionId !== battalionId
       );
+      console.log(`🔍 BATTALION ASSIGNMENT: After returning existing - ${botType}: ${bot.bots[botType]}`);
     }
 
     // Now verify sufficient bots available
     if (bot.bots[botType] < quantity) {
+      console.log(`🔍 BATTALION ASSIGNMENT: Insufficient bots - need ${quantity}, have ${bot.bots[botType]}`);
       res.status(400).json({ error: 'Insufficient Bots Available' });
       return;
     }
 
     // Make the new assignment
+    console.log(`🔍 BATTALION ASSIGNMENT: Before decrement - ${botType}: ${bot.bots[botType]}`);
     bot.bots[botType] -= quantity;
+    console.log(`🔍 BATTALION ASSIGNMENT: After decrement - ${botType}: ${bot.bots[botType]}`);
     if (quantity > 0) {
       bot.battalionAssignments.push({
         battalionId,
@@ -771,6 +780,8 @@ app.post('/api/battalions/assign', auth, async (req: Request, res: Response) => 
       },
       { new: true }
     );
+
+    console.log(`🔍 BATTALION ASSIGNMENT: Final result - ${botType}: ${bot.bots[botType]}, assignments: ${bot.battalionAssignments.length}`);
 
     res.json({ 
       success: true,

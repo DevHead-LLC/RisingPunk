@@ -188,7 +188,8 @@ export class DefenderDeploymentService {
       
       // Enable retargeting for newly deployed battalions
       if (deployments.length > 0) {
-        
+        console.log(`🎯 DEFENDER DEPLOYMENT: Created ${deployments.length} defender battalions for battle ${battle.battleId}`);
+        console.log(`🎯 DEFENDER DEPLOYMENT: Battalion IDs:`, deployments.map(d => d.battalion.id));
         
         // Enable retargeting for newly deployed battalions
         try {
@@ -197,6 +198,7 @@ export class DefenderDeploymentService {
           ScreenDimensionService.setBattleScreenDimensions(battle.battleId, (battle as any).screenWidth, (battle as any).screenHeight);
           
           await AttackService.executeUnifiedRetargeting(battle, deployments.map(d => d.battalion.id), 'NEW_DEFENDER_DEPLOYMENT');
+          console.log(`🎯 DEFENDER DEPLOYMENT: Retargeting completed for ${deployments.length} battalions`);
         } catch (error) {
           console.error(`❌ Error assigning targets to new battalions:`, error);
         }

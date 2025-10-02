@@ -125,9 +125,11 @@ export class BattleService {
   }
 
   private async handlePhaseChange(battleId: string, phase: BattlePhase): Promise<void> {
+    console.log(`🔍 PHASE CHANGE: handlePhaseChange called for battle ${battleId}, phase: ${phase}`);
     const updates: { phase: BattlePhase; countdown?: number; battleTime?: number } = { phase };
     
     if (phase === BattlePhase.ACTIVE) {
+      console.log(`🔍 PHASE CHANGE: Transitioning to ACTIVE for battle ${battleId}`);
       updates.countdown = 0;
       updates.battleTime = 0;
       BattalionService.startMovementUpdates(battleId);
@@ -135,6 +137,7 @@ export class BattleService {
       // For user defender battles, deploy the first wave immediately
       const battle = await this.getBattle(battleId);
       if (battle?.isUserDefender) {
+        console.log(`🔍 PHASE CHANGE: Deploying defender wave for battle ${battleId}`);
         await DefenderDeploymentService.onTick(battleId);
       }
     }
