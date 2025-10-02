@@ -210,7 +210,9 @@ const battleSchema = new Schema({
   processedRewards: {
     type: Schema.Types.Mixed,
     default: undefined
-  }
+  },
+  screenWidth: { type: Number, required: true },
+  screenHeight: { type: Number, required: true }
 }, {
   collection: 'battles',
   timestamps: true

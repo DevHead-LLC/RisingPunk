@@ -591,6 +591,33 @@ Enable retargeting for newly deployed battalions so they get proper targeting da
 - Added call to `AttackService.executeUnifiedRetargeting` for newly deployed battalions
 - This should give all newly deployed battalions proper targeting data
 
+### Bug Fixes Applied
+- ✅ **Fixed event type string** - Changed from 'NEW_DEPLOYMENT' to 'NEW_DEFENDER_DEPLOYMENT' for defender-specific targeting
+- ✅ **Removed redundant require()** - Using existing AttackService import instead of require()
+- ✅ **Cleaned up debug logs** - Removed debug console.log statements that were committed
+
+### Root Cause Analysis: Screen Dimensions Issue
+- ❌ **REVERTED FALLBACK** - Removed fallback as per user request (no fallbacks or mock data)
+- 🔍 **Root Cause Found** - Screen dimensions were only stored in memory in `ScreenDimensionService`, not persisted to database
+- 🔍 **Issue** - When battles are loaded from database, screen dimensions are lost, causing retargeting to fail
+- ✅ **Proper Fix Applied** - Added `screenWidth` and `screenHeight` to battle model and interface
+- ✅ **Updated BattleSetupService** - Now stores screen dimensions when creating battles
+- ✅ **Updated DefenderDeploymentService** - Now uses screen dimensions from battle object and sets them in ScreenDimensionService for retargeting
+
+### Battle End Cleanup Issue
+- 🔍 **Root Cause Found** - Retargeting queue continues processing tasks for completed battles
+- 🔍 **Issue** - Screen dimensions are cleared when battle ends, but retargeting tasks still try to access them
+- ✅ **Added Battle Phase Check** - Retargeting queue now skips processing for completed battles
+- ✅ **Added Queue Cleanup** - Added method to clear retargeting queue for specific battle when it ends
+- ✅ **Updated Battle End Process** - Now clears retargeting queue when battle ends
+
+### Client-Side Bot Assignment Error
+- 🔍 **Root Cause Found** - Client calling `/api/bots/assign` but server only had `/api/battalions/assign`
+- 🔍 **Issue** - Battalion assignment worked through local state, but API calls were failing with 404
+- ✅ **Created Missing Endpoint** - Added `/api/bots/assign` endpoint to handle bot assignments
+- ✅ **Registered Route** - Added bots route to server.ts
+- ✅ **Maintained Compatibility** - Both endpoints now work for bot assignments
+
 ### Medium Solutions
 4. **Modify RetargetingService** - Change how it generates data for new battalions
 5. **Create wrapper method** - Add method that doesn't modify existing targeting system

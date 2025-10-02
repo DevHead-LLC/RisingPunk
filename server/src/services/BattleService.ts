@@ -65,6 +65,7 @@ export class BattleService {
     
     BattalionService.clearTargetingResults(battleId);
     AttackService.clearAllAttacks();
+    AttackService.clearRetargetingQueueForBattle(battleId);
     ScreenDimensionService.clearBattleScreenDimensions(battleId);
     
     return updatedBattle;

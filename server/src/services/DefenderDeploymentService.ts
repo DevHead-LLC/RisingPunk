@@ -31,6 +31,12 @@ export class DefenderDeploymentService {
         return;
       }
 
+      // Ensure screen dimensions are available for this battle
+      if (!(battle as any).screenWidth || !(battle as any).screenHeight) {
+        console.error(`❌ Screen dimensions not set for battle ${battleId}. Cannot process defender deployment.`);
+        return;
+      }
+
       // Only process user defender battles
       if (!battle.isUserDefender) {
         return;
@@ -184,26 +190,14 @@ export class DefenderDeploymentService {
       if (deployments.length > 0) {
         console.log(`🎯 Deployed ${deployments.length} defender battalions (enabling retargeting for new battalions)`);
         
-        // Add detailed logging to understand what happens with subsequent waves
-        console.log(`🔍 SUBSEQUENT WAVE DEBUG: Deployed ${deployments.length} battalions`);
-        console.log(`🔍 SUBSEQUENT WAVE DEBUG: Total battalions in battle: ${battle.battalions.length}`);
-        console.log(`🔍 SUBSEQUENT WAVE DEBUG: Existing targeting results: ${BattalionService.getTargetingResults(battle.battleId).length}`);
-        
-        // Check if user battalion has targeting
-        const userBattalion = battle.battalions.find(b => b.owner === 'user');
-        if (userBattalion) {
-          const userTargeting = BattalionService.getTargetingResultForBattalion(userBattalion.id, battle.battleId);
-          console.log(`🔍 SUBSEQUENT WAVE DEBUG: User battalion targeting:`, userTargeting ? {
-            targetType: userTargeting.targetType,
-            targetNode: userTargeting.targetNode,
-            isValidTarget: userTargeting.isValidTarget
-          } : 'No targeting found');
-        }
         
         // Enable retargeting for newly deployed battalions
         try {
-          const { AttackService } = require('./AttackService');
-          await AttackService.executeUnifiedRetargeting(battle, deployments.map(d => d.battalion.id), 'NEW_DEPLOYMENT');
+          // Set screen dimensions in ScreenDimensionService for retargeting
+          const { ScreenDimensionService } = require('./ScreenDimensionService');
+          ScreenDimensionService.setBattleScreenDimensions(battle.battleId, (battle as any).screenWidth, (battle as any).screenHeight);
+          
+          await AttackService.executeUnifiedRetargeting(battle, deployments.map(d => d.battalion.id), 'NEW_DEFENDER_DEPLOYMENT');
           console.log(`🎯 Assigned targets to ${deployments.length} newly deployed defender battalions`);
         } catch (error) {
           console.error(`❌ Error assigning targets to new battalions:`, error);
