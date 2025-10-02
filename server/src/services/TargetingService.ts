@@ -19,16 +19,21 @@ export class TargetingService {
    * Assign initial random targets to all battalions
    */
   static assignInitialTargets(battalions: IBattalion[], nodes: INode[]): BattalionTargetingResult[] {
-    const neutralNodeIndices = nodes.filter(node => node.owner === NodeOwner.NEUTRAL).map(node => node.index);
+    console.log(`🔍 TARGETING SERVICE DEBUG: Starting assignInitialTargets with ${battalions.length} battalions and ${nodes.length} nodes`);
     
+    const neutralNodeIndices = nodes.filter(node => node.owner === NodeOwner.NEUTRAL).map(node => node.index);
+    console.log(`🔍 TARGETING SERVICE DEBUG: Found ${neutralNodeIndices.length} neutral nodes: [${neutralNodeIndices.join(', ')}]`);
     
     const results = battalions.map(battalion => {
       const ownerLabel = battalion.owner === NodeOwner.USER ? 'user' : 'enemy';
+      console.log(`🔍 TARGETING SERVICE DEBUG: Assigning target to ${ownerLabel} battalion ${battalion.id} at node ${battalion.position.nodeIndex}`);
       return this.assignTargetToBattalion(battalion, neutralNodeIndices, ownerLabel);
     });
     
     const validTargets = results.filter(r => r.isValidTarget);
     const invalidTargets = results.filter(r => !r.isValidTarget);
+    
+    console.log(`🔍 TARGETING SERVICE DEBUG: Created ${validTargets.length} valid targets and ${invalidTargets.length} invalid targets`);
     
     return results;
   }
@@ -45,18 +50,21 @@ export class TargetingService {
     const validTargets = this.getValidTargets(startingNode, neutralNodeIndices);
     
     if (validTargets.length === 0) {
+      console.log(`🔍 TARGETING SERVICE DEBUG: No valid targets for battalion ${battalion.id}`);
       return {
         battalionId: battalion.id,
         battalionType: battalion.type,
         battalionOwner: battalion.owner,
         startingNode,
         targetNode: -1,
+        targetType: 'neutral_node' as const,
         isValidTarget: false,
         reason: 'No valid targets reachable via network'
       };
     }
     
     const targetNode = validTargets[Math.floor(Math.random() * validTargets.length)];
+    console.log(`🔍 TARGETING SERVICE DEBUG: Assigned target node ${targetNode} to battalion ${battalion.id}`);
     
     return {
       battalionId: battalion.id,
@@ -64,6 +72,7 @@ export class TargetingService {
       battalionOwner: battalion.owner,
       startingNode,
       targetNode,
+      targetType: 'neutral_node' as const,
       isValidTarget: true
     };
   }

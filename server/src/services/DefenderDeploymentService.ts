@@ -180,9 +180,34 @@ export class DefenderDeploymentService {
         }
       );
       
-      // Assign targets to newly deployed battalions using retargeting system
+      // Enable retargeting for newly deployed battalions
       if (deployments.length > 0) {
-        await this.assignTargetsToNewBattalions(battle, deployments.map(d => d.battalion.id));
+        console.log(`🎯 Deployed ${deployments.length} defender battalions (enabling retargeting for new battalions)`);
+        
+        // Add detailed logging to understand what happens with subsequent waves
+        console.log(`🔍 SUBSEQUENT WAVE DEBUG: Deployed ${deployments.length} battalions`);
+        console.log(`🔍 SUBSEQUENT WAVE DEBUG: Total battalions in battle: ${battle.battalions.length}`);
+        console.log(`🔍 SUBSEQUENT WAVE DEBUG: Existing targeting results: ${BattalionService.getTargetingResults(battle.battleId).length}`);
+        
+        // Check if user battalion has targeting
+        const userBattalion = battle.battalions.find(b => b.owner === 'user');
+        if (userBattalion) {
+          const userTargeting = BattalionService.getTargetingResultForBattalion(userBattalion.id, battle.battleId);
+          console.log(`🔍 SUBSEQUENT WAVE DEBUG: User battalion targeting:`, userTargeting ? {
+            targetType: userTargeting.targetType,
+            targetNode: userTargeting.targetNode,
+            isValidTarget: userTargeting.isValidTarget
+          } : 'No targeting found');
+        }
+        
+        // Enable retargeting for newly deployed battalions
+        try {
+          const { AttackService } = require('./AttackService');
+          await AttackService.executeUnifiedRetargeting(battle, deployments.map(d => d.battalion.id), 'NEW_DEPLOYMENT');
+          console.log(`🎯 Assigned targets to ${deployments.length} newly deployed defender battalions`);
+        } catch (error) {
+          console.error(`❌ Error assigning targets to new battalions:`, error);
+        }
       }
       
     } catch (error) {
@@ -265,17 +290,4 @@ export class DefenderDeploymentService {
     );
   }
 
-  /**
-   * Assign targets to newly deployed battalions using the retargeting system
-   */
-  private static async assignTargetsToNewBattalions(battle: IBattleDocument, newBattalionIds: string[]): Promise<void> {
-    try {
-      // Use the retargeting system to assign targets to new battalions
-      await AttackService.executeUnifiedRetargeting(battle, newBattalionIds, 'NEW_DEFENDER_DEPLOYMENT');
-      
-      console.log(`🎯 Assigned targets to ${newBattalionIds.length} newly deployed defender battalions`);
-    } catch (error) {
-      console.error(`DefenderDeploymentService assignTargetsToNewBattalions error:`, error);
-    }
-  }
 }
