@@ -100,6 +100,8 @@ export class BattleController {
       if (currentPhase === BattlePhase.ACTIVE && currentCountdown === 0) {
         if (BattalionService.getTargetingResults(battleId).length === 0) {
           await this.battleService.triggerInitialTargeting(battleId);
+          // Immediately start movement for initial targeting
+          await MovementService.updateBattleMovement(battleId, battle, BattalionService.getTargetingResults(battleId));
         }
         targetingResults = BattalionService.getTargetingResults(battleId);
       }

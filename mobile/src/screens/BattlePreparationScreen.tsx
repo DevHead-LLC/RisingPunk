@@ -248,38 +248,11 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
     }
   }, [battleStartData, startBattle, onBattleStart, deactivateShield]);
 
+  // Reset assignments when component mounts - start fresh each battle prep session
   useEffect(() => {
-    const fetchAssignments = async () => {
-      try {
-        const response = await fetch(`${API_URL}/api/bots`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        const data = await response.json();
-
-        // Load existing assignments from server
-        if (data.battalionAssignments?.length > 0) {
-          const existingAssignments: Record<string, BattalionAssignment> = {};
-          data.battalionAssignments.forEach((assignment: any) => {
-            existingAssignments[assignment.battalionId] = {
-              botType: assignment.botType,
-              quantity: assignment.quantity,
-              markLevel: assignment.markLevel
-            };
-          });
-          setAssignments(existingAssignments);
-        } else {
-          setAssignments({});
-        }
-      } catch (error) {
-        console.error('Failed to fetch assignments:', error);
-      }
-    };
-
-    fetchAssignments();
-    return () => {
-      void resetBattalions();
-    };
-  }, [token, assignToBattalion]);
+    setAssignments({});
+    setSelectedBattalion(null);
+  }, []);
 
   const renderBattalionSlots = React.useCallback((names: string[], isEnemy = false, isLocked = false) => (
     <View style={styles.battalionColumn}>
