@@ -3,7 +3,7 @@
  * @description Attack state management and coordination with combat system
  */
 
-import { IBattalion, INode, NodeOwner, RetargetingQueueTask } from '../types/battle';
+import { IBattalion, INode, NodeOwner, RetargetingQueueTask, BattlePhase } from '../types/battle';
 import { CombatService } from './CombatService';
 import { RetargetingService } from './RetargetingService';
 import { BattalionService } from './BattalionService';
@@ -143,6 +143,10 @@ export class AttackService {
     this.attackStates.clear();
   }
 
+  static clearRetargetingQueueForBattle(battleId: string): void {
+    this.retargetingQueue = this.retargetingQueue.filter(task => task.battleId !== battleId);
+  }
+
   static clearBattalionAttacks(battalionId: string): void {
     this.attackStates.delete(battalionId);
   }
@@ -261,6 +265,11 @@ export class AttackService {
       
       const battle = await Battle.findOne({ battleId: task.battleId });
       if (!battle) {
+        continue;
+      }
+      
+      // Skip retargeting for completed battles
+      if (battle.phase === BattlePhase.COMPLETE) {
         continue;
       }
       

@@ -184,6 +184,8 @@ export class BattleSetupService {
       winner: null,
       startTime: new Date(),
       endTime: null,
+      screenWidth,
+      screenHeight,
       ...(unlockHackRigOnWin ? { unlockHackRigOnWin: true } as any : {}),
       ...(defenderNpcSlug ? { defenderNpcSlug } as any : {}),
       ...(defenderNpcInstanceId ? { defenderNpcInstanceId } as any : {}),

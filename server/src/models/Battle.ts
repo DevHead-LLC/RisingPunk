@@ -127,7 +127,7 @@ const nodeSchema = new Schema({
   },
   maxCaptureThreshold: {
     type: Number,
-    default: 0         // USER REQUIREMENT: Total army health (100%)
+    default: 0         // USER REQUIREMENT: 50% of total army health
   },
   position: {
     x: {
@@ -210,7 +210,9 @@ const battleSchema = new Schema({
   processedRewards: {
     type: Schema.Types.Mixed,
     default: undefined
-  }
+  },
+  screenWidth: { type: Number, required: true },
+  screenHeight: { type: Number, required: true }
 }, {
   collection: 'battles',
   timestamps: true
