@@ -19,8 +19,8 @@ export class TargetingService {
    * Assign initial random targets to all battalions
    */
   static assignInitialTargets(battalions: IBattalion[], nodes: INode[]): BattalionTargetingResult[] {
-    const neutralNodeIndices = nodes.filter(node => node.owner === NodeOwner.NEUTRAL).map(node => node.index);
     
+    const neutralNodeIndices = nodes.filter(node => node.owner === NodeOwner.NEUTRAL).map(node => node.index);
     
     const results = battalions.map(battalion => {
       const ownerLabel = battalion.owner === NodeOwner.USER ? 'user' : 'enemy';
@@ -29,6 +29,7 @@ export class TargetingService {
     
     const validTargets = results.filter(r => r.isValidTarget);
     const invalidTargets = results.filter(r => !r.isValidTarget);
+    
     
     return results;
   }
@@ -51,6 +52,7 @@ export class TargetingService {
         battalionOwner: battalion.owner,
         startingNode,
         targetNode: -1,
+        targetType: 'neutral_node' as const,
         isValidTarget: false,
         reason: 'No valid targets reachable via network'
       };
@@ -64,6 +66,7 @@ export class TargetingService {
       battalionOwner: battalion.owner,
       startingNode,
       targetNode,
+      targetType: 'neutral_node' as const,
       isValidTarget: true
     };
   }

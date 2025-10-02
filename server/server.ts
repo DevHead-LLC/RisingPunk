@@ -20,6 +20,7 @@ import healthRoute from './src/routes/health';
 import researchRoutes from './src/routes/research';
 import documentsRoutes from './src/routes/documents';
 import testRoutes from './src/routes/test';
+import botsRoutes from './src/routes/bots';
 
 declare global {
   namespace Express {
@@ -713,6 +714,7 @@ app.use('/documents', documentsRoutes);
 
 // Test routes for privacy policy compliance verification
 app.use('/api/test', testRoutes);
+app.use('/api/bots', botsRoutes);
 
 // Admin routes for privacy policy compliance and data management
 import adminRoutes from './src/routes/admin';

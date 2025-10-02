@@ -31,6 +31,12 @@ export class DefenderDeploymentService {
         return;
       }
 
+      // Ensure screen dimensions are available for this battle
+      if (!(battle as any).screenWidth || !(battle as any).screenHeight) {
+        console.error(`❌ Screen dimensions not set for battle ${battleId}. Cannot process defender deployment.`);
+        return;
+      }
+
       // Only process user defender battles
       if (!battle.isUserDefender) {
         return;
@@ -180,9 +186,20 @@ export class DefenderDeploymentService {
         }
       );
       
-      // Assign targets to newly deployed battalions using retargeting system
+      // Enable retargeting for newly deployed battalions
       if (deployments.length > 0) {
-        await this.assignTargetsToNewBattalions(battle, deployments.map(d => d.battalion.id));
+        
+        
+        // Enable retargeting for newly deployed battalions
+        try {
+          // Set screen dimensions in ScreenDimensionService for retargeting
+          const { ScreenDimensionService } = require('./ScreenDimensionService');
+          ScreenDimensionService.setBattleScreenDimensions(battle.battleId, (battle as any).screenWidth, (battle as any).screenHeight);
+          
+          await AttackService.executeUnifiedRetargeting(battle, deployments.map(d => d.battalion.id), 'NEW_DEFENDER_DEPLOYMENT');
+        } catch (error) {
+          console.error(`❌ Error assigning targets to new battalions:`, error);
+        }
       }
       
     } catch (error) {
@@ -265,17 +282,4 @@ export class DefenderDeploymentService {
     );
   }
 
-  /**
-   * Assign targets to newly deployed battalions using the retargeting system
-   */
-  private static async assignTargetsToNewBattalions(battle: IBattleDocument, newBattalionIds: string[]): Promise<void> {
-    try {
-      // Use the retargeting system to assign targets to new battalions
-      await AttackService.executeUnifiedRetargeting(battle, newBattalionIds, 'NEW_DEFENDER_DEPLOYMENT');
-      
-      console.log(`🎯 Assigned targets to ${newBattalionIds.length} newly deployed defender battalions`);
-    } catch (error) {
-      console.error(`DefenderDeploymentService assignTargetsToNewBattalions error:`, error);
-    }
-  }
 }

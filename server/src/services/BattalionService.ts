@@ -19,6 +19,8 @@ export class BattalionService {
 
   static async triggerInitialTargeting(battalions: IBattalion[], nodes: INode[], battleId: string): Promise<BattalionTargetingResult[]> {
     const results = TargetingService.assignInitialTargets(battalions, nodes);
+    
+    
     this.targetingResults.set(battleId, results);
     return results;
   }
@@ -54,6 +56,7 @@ export class BattalionService {
   static getTargetingResultForBattalion(battalionId: string, battleId?: string): BattalionTargetingResult | null {
     const targetingResults = this.getTargetingResults(battleId);
     const result = targetingResults.find(result => result.battalionId === battalionId);
+    
     
     if (result) {
       return result;
