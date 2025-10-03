@@ -119,6 +119,8 @@ export interface IBattle extends Document {
   defenderDeploymentExhausted?: boolean;
   lastTickProcessed?: number;
   processedRewards?: any;
+  screenWidth: number;
+  screenHeight: number;
   createdAt: Date;
   updatedAt: Date;
 }

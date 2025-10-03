@@ -60,11 +60,16 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
 
   // Calculate available bot counts by subtracting assigned quantities
   const availableBots = useMemo(() => {
+    console.log(`🔍 AVAILABLE BOTS CALC: Starting calculation`);
+    console.log(`🔍 AVAILABLE BOTS CALC: botCounts from Redux:`, botCounts);
+    console.log(`🔍 AVAILABLE BOTS CALC: assignments:`, assignments);
+    
     const available = { ...botCounts };
     
     // Subtract assigned quantities from available pool
     Object.values(assignments).forEach((assignment) => {
       if (assignment && assignment.quantity > 0) {
+        console.log(`🔍 AVAILABLE BOTS CALC: Subtracting ${assignment.quantity} ${assignment.botType} bots`);
         available[assignment.botType as BotType] -= assignment.quantity;
       }
     });
@@ -76,6 +81,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       }
     });
     
+    console.log(`🔍 AVAILABLE BOTS CALC: Final available:`, available);
     return available;
   }, [botCounts, assignments]);
 
@@ -109,26 +115,36 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
   const handleBotAssignment = React.useCallback(async (data: { botType: BotType; quantity: number }) => {
     if (!selectedBattalion) return;
 
+    console.log(`🔍 CLIENT ASSIGNMENT: Starting assignment - botType: ${data.botType}, quantity: ${data.quantity}, battalionId: ${selectedBattalion}`);
+    console.log(`🔍 CLIENT ASSIGNMENT: Current botCounts from Redux:`, botCounts);
+    console.log(`🔍 CLIENT ASSIGNMENT: Current assignments:`, assignments);
+
     try {
-      await assignToBattalion({
+      const result = await assignToBattalion({
         botType: data.botType,
         quantity: data.quantity,
         battalionId: selectedBattalion,
       });
 
-      setAssignments(prev => ({
-        ...prev,
-        [selectedBattalion]: {
-          botType: data.botType,
-          quantity: data.quantity,
-          markLevel: 1,
-        },
-      }));
+      console.log(`🔍 CLIENT ASSIGNMENT: API response:`, result);
+
+      setAssignments(prev => {
+        const newAssignments = {
+          ...prev,
+          [selectedBattalion]: {
+            botType: data.botType,
+            quantity: data.quantity,
+            markLevel: 1,
+          },
+        };
+        console.log(`🔍 CLIENT ASSIGNMENT: New assignments:`, newAssignments);
+        return newAssignments;
+      });
     } catch (error) {
       console.error('Failed to assign bots:', error);
     }
     setSelectorVisible(false);
-  }, [selectedBattalion, assignToBattalion]);
+  }, [selectedBattalion, assignToBattalion, botCounts, assignments]);
 
   const resetBattalions = React.useCallback(async () => {
     try {
@@ -248,38 +264,11 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
     }
   }, [battleStartData, startBattle, onBattleStart, deactivateShield]);
 
+  // Reset assignments when component mounts - start fresh each battle prep session
   useEffect(() => {
-    const fetchAssignments = async () => {
-      try {
-        const response = await fetch(`${API_URL}/api/bots`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        const data = await response.json();
-
-        // Load existing assignments from server
-        if (data.battalionAssignments?.length > 0) {
-          const existingAssignments: Record<string, BattalionAssignment> = {};
-          data.battalionAssignments.forEach((assignment: any) => {
-            existingAssignments[assignment.battalionId] = {
-              botType: assignment.botType,
-              quantity: assignment.quantity,
-              markLevel: assignment.markLevel
-            };
-          });
-          setAssignments(existingAssignments);
-        } else {
-          setAssignments({});
-        }
-      } catch (error) {
-        console.error('Failed to fetch assignments:', error);
-      }
-    };
-
-    fetchAssignments();
-    return () => {
-      void resetBattalions();
-    };
-  }, [token, assignToBattalion]);
+    setAssignments({});
+    setSelectedBattalion(null);
+  }, []);
 
   const renderBattalionSlots = React.useCallback((names: string[], isEnemy = false, isLocked = false) => (
     <View style={styles.battalionColumn}>

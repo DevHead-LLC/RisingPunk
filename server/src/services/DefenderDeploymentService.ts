@@ -8,6 +8,8 @@ import { BotType, IBattalion, INode, NodeOwner } from '../types/battle';
 import { BattalionService } from './BattalionService';
 import { BotService } from './BotService';
 import { BattalionFactory } from './BattalionFactory';
+import { RetargetingService } from './RetargetingService';
+import { AttackService } from './AttackService';
 import mongoose from 'mongoose';
 
 // Safety constants for defender deployment
@@ -26,6 +28,12 @@ export class DefenderDeploymentService {
     try {
       const battle = await Battle.findOne({ battleId });
       if (!battle) {
+        return;
+      }
+
+      // Ensure screen dimensions are available for this battle
+      if (!(battle as any).screenWidth || !(battle as any).screenHeight) {
+        console.error(`❌ Screen dimensions not set for battle ${battleId}. Cannot process defender deployment.`);
         return;
       }
 
@@ -178,6 +186,23 @@ export class DefenderDeploymentService {
         }
       );
       
+      // Enable retargeting for newly deployed battalions
+      if (deployments.length > 0) {
+        console.log(`🎯 DEFENDER DEPLOYMENT: Created ${deployments.length} defender battalions for battle ${battle.battleId}`);
+        console.log(`🎯 DEFENDER DEPLOYMENT: Battalion IDs:`, deployments.map(d => d.battalion.id));
+        
+        // Enable retargeting for newly deployed battalions
+        try {
+          // Set screen dimensions in ScreenDimensionService for retargeting
+          const { ScreenDimensionService } = require('./ScreenDimensionService');
+          ScreenDimensionService.setBattleScreenDimensions(battle.battleId, (battle as any).screenWidth, (battle as any).screenHeight);
+          
+          await AttackService.executeUnifiedRetargeting(battle, deployments.map(d => d.battalion.id), 'NEW_DEFENDER_DEPLOYMENT');
+          console.log(`🎯 DEFENDER DEPLOYMENT: Retargeting completed for ${deployments.length} battalions`);
+        } catch (error) {
+          console.error(`❌ Error assigning targets to new battalions:`, error);
+        }
+      }
       
     } catch (error) {
       console.error(`DefenderDeploymentService deployWave error:`, error);
@@ -258,4 +283,5 @@ export class DefenderDeploymentService {
       nodes
     );
   }
+
 }
