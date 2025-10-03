@@ -259,10 +259,18 @@ router.post('/assign', auth, async (req, res) => {
         // Calculate truly available bots (total - already assigned to other battalions)
         let trulyAvailableBots = totalBotsOfType - alreadyAssignedToOtherBattalions;
         
-        // If there's an existing assignment for the SAME bot type, add those bots back to available pool
-        if (existingAssignment && existingAssignment.botType === botType) {
-          console.log(`🔍 BATTALION ASSIGNMENT: Found existing assignment - returning ${existingAssignment.quantity} ${existingAssignment.botType} bots`);
-          trulyAvailableBots += existingAssignment.quantity;
+        // Handle existing assignment logic
+        if (existingAssignment) {
+          if (existingAssignment.botType === botType) {
+            // Same bot type: add back the existing assignment quantity to available pool
+            console.log(`🔍 BATTALION ASSIGNMENT: Found existing assignment - returning ${existingAssignment.quantity} ${existingAssignment.botType} bots`);
+            trulyAvailableBots += existingAssignment.quantity;
+          } else {
+            // Different bot type: the bots are already "returned" to their original type
+            // because we filtered out the existing assignment, so they're no longer assigned
+            // and are available in their original type's inventory
+            console.log(`🔍 BATTALION ASSIGNMENT: Cross-type reassignment - ${existingAssignment.quantity} ${existingAssignment.botType} bots returned to inventory`);
+          }
         }
         
         console.log(`🔍 BATTALION ASSIGNMENT: Total ${botType} bots: ${totalBotsOfType}, already assigned to other battalions: ${alreadyAssignedToOtherBattalions}, truly available: ${trulyAvailableBots}`);

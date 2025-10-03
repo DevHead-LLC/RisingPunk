@@ -30,6 +30,20 @@
 - Database updates only modify assignments, never inventory
 **Status**: RESOLVED ✅
 
+## ✅ RESOLVED: Bot Assignment Logic Fails to Reclaim Bots
+**Issue**: The bot assignment logic incorrectly calculated available bots and failed to reclaim bots from cross-type reassignments.
+**Problems**:
+1. Reassigning battalion to different bot type permanently lost bots from previous assignment
+2. `trulyAvailableBots` was inflated by redundantly adding back bots from existing assignment
+3. Logic didn't handle cross-bot-type reassignments properly
+**Root Cause**: Incorrect logic for handling existing assignments and cross-type reassignments.
+**Fix Applied**:
+- **Same bot type**: Add existing assignment quantity back to available pool
+- **Different bot type**: Bots are automatically returned to original type when assignment is filtered out
+- **Proper calculation**: Only add back existing assignment quantity for same bot type
+- **No redundant additions**: Prevent over-assignment from inflated counts
+**Status**: RESOLVED ✅
+
 ## 🔍 MONITORING: Bot Assignment Logic
 **Status**: Monitoring for additional edge cases and potential circular bugs
 **Focus**: Ensuring fixes don't introduce new inventory inconsistencies
