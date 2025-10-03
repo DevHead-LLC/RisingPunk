@@ -4,6 +4,7 @@ export class ShieldService {
   /**
    * Checks and updates shield status for a single user
    * Returns the current active status after checking for expiry
+   * Also updates the in-memory user object to prevent stale data issues
    */
   static async checkAndUpdateShieldStatus(user: any): Promise<boolean> {
     const now = new Date();
@@ -22,6 +23,12 @@ export class ShieldService {
             }
           }
         );
+        
+        // Update the in-memory user object to prevent stale data issues
+        user.antivirusShield.active = false;
+        user.antivirusShield.startedAt = null;
+        user.antivirusShield.completesAt = null;
+        
         return false;
       } else {
         // Shield is still active
