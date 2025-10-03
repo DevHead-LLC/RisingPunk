@@ -8,6 +8,7 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { User } from './src/models/User';
+import { ShieldService } from './src/services/ShieldService';
 import authRoutes from './src/routes/auth';
 import auth from './src/middleware/auth';
 const Bot = require('./src/models/Bot');
@@ -340,24 +341,16 @@ app.get('/api/antivirus-shield/status', auth, async (req: Request, res: Response
     let isActive = false;
     let cooldownStatus = null;
 
-    // Check if shield is active and should be completed
-    if (user.antivirusShield?.active && user.antivirusShield?.startedAt && user.antivirusShield?.completesAt) {
-      if (now >= user.antivirusShield.completesAt) {
-        // Shield has expired, deactivate it
-        user.antivirusShield.active = false;
-        user.antivirusShield.startedAt = null;
-        user.antivirusShield.completesAt = null;
-        await user.save();
-        isActive = false;
-      } else {
-        // Shield is still active
-        isActive = true;
-        shieldStatus = {
-          startedAt: user.antivirusShield.startedAt.toISOString(),
-          completesAt: user.antivirusShield.completesAt.toISOString(),
-          timeRemaining: Math.max(0, user.antivirusShield.completesAt.getTime() - now.getTime())
-        };
-      }
+    // Use ShieldService to check and update shield status
+    isActive = await ShieldService.checkAndUpdateShieldStatus(user);
+
+    // If shield is active, get status details
+    if (isActive && user.antivirusShield?.startedAt && user.antivirusShield?.completesAt) {
+      shieldStatus = {
+        startedAt: user.antivirusShield.startedAt.toISOString(),
+        completesAt: user.antivirusShield.completesAt.toISOString(),
+        timeRemaining: Math.max(0, user.antivirusShield.completesAt.getTime() - now.getTime())
+      };
     }
 
     // Check cooldown status

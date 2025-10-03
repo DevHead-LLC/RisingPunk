@@ -1,50 +1,56 @@
-# Current Task: Bot Assignment API Bug Tracking
+# Shield Expiry Issue - Other Account Views
 
-## ✅ RESOLVED: Cross-Bot-Type Reassignment Inventory Corruption
-**Issue**: When reassigning battalion from one bot type to another, bots were permanently lost and inventory counts were corrupted.
-**Root Cause**: Incorrect order of operations - adding existing assignment quantity to wrong bot type's available pool.
-**Fix Applied**: 
-- Return bots to original type's inventory FIRST
-- Only add existing assignment quantity if SAME bot type
-- Use corrected inventory counts for validation
-**Status**: RESOLVED ✅
+## Problem
+When User A shields, User B can see the shield from their account. However, when User A's shield expires, User B continues to see User A as shielded indefinitely, even days/weeks later. The shield appears permanent from other accounts' viewpoints.
 
-## ✅ RESOLVED: Bot Assignment Error Causes Inventory Duplication
-**Issue**: The `/assign` endpoint's availableBots calculation used total bot inventory rather than truly unassigned count.
-**Problem**: Overlooked bots already assigned to other battalions, allowing over-assignment and bot duplication.
-**Root Cause**: Validation against total inventory instead of truly available (unassigned) bots.
-**Fix Applied**:
-- Calculate truly unassigned bots by subtracting all other assignments
-- Validate against `trulyAvailableBots` instead of total inventory
-- Prevent over-assignment by accounting for existing battalion assignments
-**Status**: RESOLVED ✅
+## Root Cause Analysis
+1. **Shield expiry only happens on the shielding user's side** - The `/api/antivirus-shield/status` endpoint only checks and deactivates shields for the authenticated user (lines 344-350 in server.ts)
 
-## ✅ RESOLVED: Bot Inventory Corruption During Assignment
-**Issue**: The `/assign` endpoint was corrupting the user's total bot inventory by overwriting it with calculated 'available' count.
-**Problem**: Line 284 incorrectly overwrote `bot.bots[botType]` with `trulyAvailableBots - quantity`, causing bots assigned to other battalions to permanently disappear.
-**Root Cause**: Fundamental misunderstanding - we were modifying total inventory instead of only tracking assignments.
-**Fix Applied**:
-- **CRITICAL**: Never modify total bot inventory - it remains constant
-- Only track assignments in `battalionAssignments` array
-- Calculate available bots as: `total - sum of all assignments`
-- Database updates only modify assignments, never inventory
-**Status**: RESOLVED ✅
+2. **Map data uses stale shield status** - The map endpoint (`/api/map/:name`) fetches all users' shield data once and caches it (lines 61, 194-196 in map.ts). It doesn't check if shields have expired for other users.
 
-## ✅ RESOLVED: Bot Assignment Logic Fails to Reclaim Bots
-**Issue**: The bot assignment logic incorrectly calculated available bots and failed to reclaim bots from cross-type reassignments.
-**Problems**:
-1. Reassigning battalion to different bot type permanently lost bots from previous assignment
-2. `trulyAvailableBots` was inflated by redundantly adding back bots from existing assignment
-3. Logic didn't handle cross-bot-type reassignments properly
-**Root Cause**: Incorrect logic for handling existing assignments and cross-type reassignments.
-**Fix Applied**:
-- **Same bot type**: Add existing assignment quantity back to available pool
-- **Different bot type**: Bots are automatically returned to original type when assignment is filtered out
-- **Proper calculation**: Only add back existing assignment quantity for same bot type
-- **No redundant additions**: Prevent over-assignment from inflated counts
-**Status**: RESOLVED ✅
+3. **No real-time updates for other users** - The `updateTileShieldStatus` function in HackMapScreen.tsx only updates when explicitly called, but there's no mechanism to detect when other users' shields expire.
 
-## 🔍 MONITORING: Bot Assignment Logic
-**Status**: Monitoring for additional edge cases and potential circular bugs
-**Focus**: Ensuring fixes don't introduce new inventory inconsistencies
-**Next**: Watch for any new assignment-related issues that may arise
+## Current Flow
+- User A shields → Shield data stored in database
+- User B views map → Map endpoint fetches User A's shield data (shows as active)
+- User A's shield expires → Only User A's shield status gets updated when they check their own status
+- User B continues to see User A as shielded because map data is never refreshed
+
+## Solution Implemented ✅
+1. **Created ShieldService** - Centralized shield expiry logic in `/server/src/services/ShieldService.ts`
+2. **Updated map endpoint** - Now checks and updates all users' shield statuses when map is loaded
+3. **Updated shield status endpoints** - Both `/api/antivirus-shield/status` and `/api/users/shield-status/:userId` now use ShieldService
+4. **Eliminated duplicate logic** - All shield expiry checking now goes through the centralized service
+
+## Key Changes Made
+- **ShieldService.ts**: New service with methods for checking/updating single or multiple user shield statuses
+- **map.ts**: Map endpoint now calls `ShieldService.checkAndUpdateMultipleShieldStatuses()` before returning map data
+- **server.ts**: Shield status endpoint now uses `ShieldService.checkAndUpdateShieldStatus()`
+- **userRoutes.ts**: User shield status endpoint now uses `ShieldService.checkAndUpdateShieldStatus()`
+
+## How It Works Now
+1. When any user loads the map, ALL users' shield statuses are checked for expiry
+2. Expired shields are automatically deactivated in the database
+3. Map data reflects the current (updated) shield status for all users
+4. Other accounts will immediately see when shields have expired
+5. No duplicate logic - all shield expiry goes through ShieldService
+
+## Testing
+- Created test script: `/server/test-shield-expiry.js`
+- Tests verify expired shields are deactivated and active shields remain active
+- Tests multiple users scenario to ensure proper batch processing
+
+## Result
+✅ **FIXED**: Other accounts now see real-time shield status updates. When User A's shield expires, User B will immediately see User A as unshielded when viewing the map, without needing to wait for User A to log in.
+
+## Bug Fix Applied 🔧
+**Issue**: ShieldService was calling `user.save()` on projected documents (missing required fields like email), causing map requests to fail when shields expired.
+
+**Solution**: 
+- Replaced `user.save()` with `User.updateOne()` and `User.updateMany()` 
+- These operations bypass Mongoose schema validation
+- More efficient: single `updateMany()` call for multiple expired shields
+- No more map request failures when shields expire
+
+**Files Updated**:
+- `ShieldService.ts`: Now uses direct database updates instead of document saves
