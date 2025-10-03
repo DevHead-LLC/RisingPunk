@@ -1,6 +1,7 @@
 import express, { Request, Response, Router } from 'express';
 import auth from '../middleware/auth';
 import { MapService } from '../services/MapService';
+import { ShieldService } from '../services/ShieldService';
 import { Map } from '../models/Map';
 import { User } from '../models/User';
 
@@ -58,7 +59,7 @@ router.get('/:name', async (req: Request, res: Response) => {
     }
 
     // Get users data for shield status lookup
-    const users = await User.find({}, { _id: 1, handle: 1, antivirusShield: 1 }).lean();
+    const users = await User.find({}, { _id: 1, handle: 1, antivirusShield: 1 });
 
     // Migrate old maps: enforce version >=2 and gridSize 50, friendly cleanup, and placement rules
     const docAny = mapDoc as any;
@@ -169,6 +170,9 @@ router.get('/:name', async (req: Request, res: Response) => {
     );
     let mutated = false;
     
+    // Check and update shield statuses for all users to ensure expired shields are deactivated
+    const shieldStatusMap = await ShieldService.checkAndUpdateMultipleShieldStatuses(users);
+    
     // Create a map of userId to user data for quick lookup
     const userMap = new Map();
     users.forEach((user: any) => {
@@ -189,11 +193,10 @@ router.get('/:name', async (req: Request, res: Response) => {
       const npcInstanceId = c.occupiedBy === 'npc' ? (c.npcInstanceId || undefined) : undefined;
       const npcLevel = c.occupiedBy === 'npc' && npcSlug ? getNPCLevelFromSlug(npcSlug) : undefined;
       
-      // Get shield status for player entities
+      // Get current shield status for player entities (using updated status from ShieldService)
       let isShielded = false;
       if (c.occupiedBy === 'player' && c.userId) {
-        const user = userMap.get(String(c.userId));
-        isShielded = user?.antivirusShield?.active || false;
+        isShielded = shieldStatusMap.get(String(c.userId)) || false;
       }
       
       emptyGrid[y][x] = {

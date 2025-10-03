@@ -1,5 +1,6 @@
 import express from 'express';
 import { User } from '../models/User';
+import { ShieldService } from '../services/ShieldService';
 import auth from '../middleware/auth';
 import { Request, Response } from 'express';
 import { FinanceTier } from '../models/Finance';
@@ -62,13 +63,16 @@ router.get('/shield-status/:userId', auth, async (req: Request, res: Response) =
       return;
     }
 
+    // Use ShieldService to check and update shield status
+    const isActive = await ShieldService.checkAndUpdateShieldStatus(user);
+
     res.json({
       userId: user._id,
       handle: user.handle,
       antivirusShield: {
-        active: user.antivirusShield?.active || false,
-        startedAt: user.antivirusShield?.startedAt || null,
-        completesAt: user.antivirusShield?.completesAt || null,
+        active: isActive,
+        startedAt: isActive ? user.antivirusShield?.startedAt || null : null,
+        completesAt: isActive ? user.antivirusShield?.completesAt || null : null,
         cooldownUntil: user.antivirusShield?.cooldownUntil || null
       }
     });
