@@ -252,7 +252,7 @@ router.post('/assign', auth, async (req, res) => {
           console.log(`🔍 BATTALION ASSIGNMENT: Returning ${existingAssignment.quantity} ${existingAssignment.botType} bots to inventory`);
         }
 
-        // Calculate available bots for the new type (after returning any existing assignment)
+        // Calculate truly available (unassigned) bots for the new type
         let availableBots = newBotCounts[botType] || 0;
         
         // If there's an existing assignment for the SAME bot type, add those bots back to available pool
@@ -261,15 +261,27 @@ router.post('/assign', auth, async (req, res) => {
           availableBots += existingAssignment.quantity;
         }
 
-        // Verify sufficient bots available
-        if (availableBots < quantity) {
-          console.log(`🔍 BATTALION ASSIGNMENT: Insufficient bots - need ${quantity}, have ${availableBots}`);
+        // CRITICAL FIX: Calculate truly unassigned bots by subtracting all other assignments
+        const otherAssignments = newAssignments.filter(
+          (assignment: any) => assignment.botType === botType
+        );
+        const alreadyAssignedToOtherBattalions = otherAssignments.reduce(
+          (sum: number, assignment: any) => sum + assignment.quantity, 0
+        );
+        
+        const trulyAvailableBots = availableBots - alreadyAssignedToOtherBattalions;
+        
+        console.log(`🔍 BATTALION ASSIGNMENT: Total ${botType} bots: ${availableBots}, already assigned to other battalions: ${alreadyAssignedToOtherBattalions}, truly available: ${trulyAvailableBots}`);
+
+        // Verify sufficient truly available bots
+        if (trulyAvailableBots < quantity) {
+          console.log(`🔍 BATTALION ASSIGNMENT: Insufficient bots - need ${quantity}, have ${trulyAvailableBots} truly available`);
           res.status(400).json({ error: 'Insufficient Bots Available' });
           return;
         }
 
-        // Update bot counts: subtract the new assignment quantity
-        newBotCounts[botType] = availableBots - quantity;
+        // Update bot counts: subtract the new assignment quantity from truly available bots
+        newBotCounts[botType] = trulyAvailableBots - quantity;
 
         // Add new assignment if quantity > 0
         if (quantity > 0) {
