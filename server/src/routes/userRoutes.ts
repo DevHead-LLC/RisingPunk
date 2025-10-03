@@ -71,8 +71,8 @@ router.get('/shield-status/:userId', auth, async (req: Request, res: Response) =
       handle: user.handle,
       antivirusShield: {
         active: isActive,
-        startedAt: user.antivirusShield?.startedAt || null,
-        completesAt: user.antivirusShield?.completesAt || null,
+        startedAt: isActive ? user.antivirusShield?.startedAt || null : null,
+        completesAt: isActive ? user.antivirusShield?.completesAt || null : null,
         cooldownUntil: user.antivirusShield?.cooldownUntil || null
       }
     });

@@ -54,3 +54,18 @@ When User A shields, User B can see the shield from their account. However, when
 
 **Files Updated**:
 - `ShieldService.ts`: Now uses direct database updates instead of document saves
+
+## Critical Bug Fixes Applied 🚨
+**Issue 1 - Shield Reactivation Bug**: After `ShieldService` deactivated shields via `updateOne()`, the in-memory `user` object still had stale data. When cooldown logic called `user.save()`, it overwrote the database with stale shield data, effectively reactivating expired shields.
+
+**Issue 2 - Inconsistent API Responses**: API returned `active: false` but still included stale `startedAt` and `completesAt` timestamps.
+
+**Solutions Applied**:
+1. **ShieldService**: Now updates both database AND in-memory user object
+2. **server.ts**: Added conditional save logic to prevent overwriting shield updates
+3. **userRoutes.ts**: Only return timestamps when shield is actually active
+
+**Result**: 
+- ✅ No more shield reactivation after expiry
+- ✅ Consistent API responses (no stale timestamps when inactive)
+- ✅ Proper data synchronization between database and memory

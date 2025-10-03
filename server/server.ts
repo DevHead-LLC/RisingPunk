@@ -354,11 +354,12 @@ app.get('/api/antivirus-shield/status', auth, async (req: Request, res: Response
     }
 
     // Check cooldown status
+    let needsCooldownUpdate = false;
     if (user.antivirusShield?.cooldownUntil) {
       if (now >= user.antivirusShield.cooldownUntil) {
         // Cooldown has expired, clear it
         user.antivirusShield.cooldownUntil = null;
-        await user.save();
+        needsCooldownUpdate = true;
       } else {
         // Still in cooldown
         cooldownStatus = {
@@ -366,6 +367,11 @@ app.get('/api/antivirus-shield/status', auth, async (req: Request, res: Response
           timeRemaining: Math.max(0, user.antivirusShield.cooldownUntil.getTime() - now.getTime())
         };
       }
+    }
+
+    // Only save if we need to update cooldown (avoid overwriting shield updates)
+    if (needsCooldownUpdate) {
+      await user.save();
     }
 
     res.json({
