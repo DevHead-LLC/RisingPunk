@@ -239,29 +239,16 @@ router.post('/assign', auth, async (req, res) => {
           (assignment: { battalionId: string }) => assignment.battalionId === battalionId
         );
 
-        // Calculate new bot counts and assignments
-        const newBotCounts = { ...bot.bots };
+        // CRITICAL FIX: Never modify total bot inventory - only track assignments
+        // The total bot inventory should remain constant, assignments are tracked separately
         const newAssignments = bot.battalionAssignments.filter(
           (assignment: { battalionId: string }) => assignment.battalionId !== battalionId
         );
 
-        // CRITICAL FIX: Handle cross-bot-type reassignments properly
-        if (existingAssignment && existingAssignment.botType !== botType) {
-          // Return bots to their original type's inventory
-          newBotCounts[existingAssignment.botType] = (newBotCounts[existingAssignment.botType] || 0) + existingAssignment.quantity;
-          console.log(`🔍 BATTALION ASSIGNMENT: Returning ${existingAssignment.quantity} ${existingAssignment.botType} bots to inventory`);
-        }
-
         // Calculate truly available (unassigned) bots for the new type
-        let availableBots = newBotCounts[botType] || 0;
+        const totalBotsOfType = bot.bots[botType] || 0;
         
-        // If there's an existing assignment for the SAME bot type, add those bots back to available pool
-        if (existingAssignment && existingAssignment.botType === botType) {
-          console.log(`🔍 BATTALION ASSIGNMENT: Found existing assignment - returning ${existingAssignment.quantity} ${existingAssignment.botType} bots`);
-          availableBots += existingAssignment.quantity;
-        }
-
-        // CRITICAL FIX: Calculate truly unassigned bots by subtracting all other assignments
+        // Calculate how many bots of this type are already assigned to other battalions
         const otherAssignments = newAssignments.filter(
           (assignment: any) => assignment.botType === botType
         );
@@ -269,9 +256,16 @@ router.post('/assign', auth, async (req, res) => {
           (sum: number, assignment: any) => sum + assignment.quantity, 0
         );
         
-        const trulyAvailableBots = availableBots - alreadyAssignedToOtherBattalions;
+        // Calculate truly available bots (total - already assigned to other battalions)
+        let trulyAvailableBots = totalBotsOfType - alreadyAssignedToOtherBattalions;
         
-        console.log(`🔍 BATTALION ASSIGNMENT: Total ${botType} bots: ${availableBots}, already assigned to other battalions: ${alreadyAssignedToOtherBattalions}, truly available: ${trulyAvailableBots}`);
+        // If there's an existing assignment for the SAME bot type, add those bots back to available pool
+        if (existingAssignment && existingAssignment.botType === botType) {
+          console.log(`🔍 BATTALION ASSIGNMENT: Found existing assignment - returning ${existingAssignment.quantity} ${existingAssignment.botType} bots`);
+          trulyAvailableBots += existingAssignment.quantity;
+        }
+        
+        console.log(`🔍 BATTALION ASSIGNMENT: Total ${botType} bots: ${totalBotsOfType}, already assigned to other battalions: ${alreadyAssignedToOtherBattalions}, truly available: ${trulyAvailableBots}`);
 
         // Verify sufficient truly available bots
         if (trulyAvailableBots < quantity) {
@@ -280,8 +274,8 @@ router.post('/assign', auth, async (req, res) => {
           return;
         }
 
-        // Update bot counts: subtract the new assignment quantity from truly available bots
-        newBotCounts[botType] = trulyAvailableBots - quantity;
+        // CRITICAL: Do NOT modify total bot inventory - it should remain constant
+        // The assignment system works by tracking assignments, not by modifying inventory
 
         // Add new assignment if quantity > 0
         if (quantity > 0) {
@@ -293,9 +287,10 @@ router.post('/assign', auth, async (req, res) => {
           });
         }
 
-        console.log(`🔍 BATTALION ASSIGNMENT: New bot counts - ${botType}: ${newBotCounts[botType]}`);
+        console.log(`🔍 BATTALION ASSIGNMENT: Assignment complete - ${botType}: ${quantity} bots assigned to battalion ${battalionId}`);
 
         // Atomic update with version check to prevent race conditions
+        // CRITICAL: Only update assignments, never modify total bot inventory
         const updatedBot = await Bot.findOneAndUpdate(
           { 
             userId: req.user._id,
@@ -306,7 +301,6 @@ router.post('/assign', auth, async (req, res) => {
             ]
           },
           { 
-            bots: newBotCounts,
             battalionAssignments: newAssignments,
             $inc: { __v: 1 } // Increment version for optimistic locking
           },
@@ -323,9 +317,16 @@ router.post('/assign', auth, async (req, res) => {
 
         console.log(`🔍 BATTALION ASSIGNMENT: Final result - ${botType}: ${updatedBot.bots[botType]}, assignments: ${updatedBot.battalionAssignments.length}`);
 
+        // Calculate final available count for response
+        const finalAvailableCount = (updatedBot.bots[botType] || 0) - 
+          updatedBot.battalionAssignments
+            .filter((assignment: any) => assignment.botType === botType)
+            .reduce((sum: number, assignment: any) => sum + assignment.quantity, 0);
+
         res.json({ 
           success: true,
-          updatedBotCount: updatedBot.bots[botType],
+          availableBotCount: finalAvailableCount,
+          totalBotCount: updatedBot.bots[botType],
           previousAssignment: existingAssignment || null
         });
         return; // Success - exit retry loop
