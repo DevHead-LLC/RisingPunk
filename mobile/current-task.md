@@ -1,22 +1,39 @@
-# Current Task: Bot Assignment API Data Consistency Fix - RESOLVED ✅
+# Current Task: Bot Assignment API Critical Fixes - RESOLVED ✅
 
-## Issue Fixed: Bot Assignment API Fails to Update Inventory Counts
-- **Problem**: The `/api/bots/assign` endpoint created data inconsistency by only updating battalion assignments without properly adjusting main bot inventory counts
-- **Root Cause**: Race condition from multiple database operations and improper inventory calculation logic
-- **Solution**: Implemented atomic single-operation update with proper available bot calculation
+## Issues Fixed: Race Condition and Bot Inventory Mismatch
+- **Problem 1**: Race condition due to read-modify-write pattern causing stale data overwrites
+- **Problem 2**: Bot inventory mismatch when reassigning battalion to different bot type causing permanent bot loss
+- **Root Cause**: Lack of concurrency control and improper handling of cross-bot-type reassignments
+- **Solution**: Implemented optimistic locking with retry logic and proper cross-bot-type inventory management
 
-## Changes Made:
-1. **Eliminated race conditions** by using single atomic database operation
-2. **Fixed inventory calculation** to properly account for existing assignments being returned to pool
-3. **Improved validation** to prevent over-assignment of bots
-4. **Enhanced logging** for better debugging of assignment operations
+## Critical Fixes Applied:
+1. **Race Condition Resolution**:
+   - Added optimistic locking with version checking (`__v` field)
+   - Implemented retry logic with exponential backoff (max 3 retries)
+   - Atomic operations with version conflict detection
 
-## Technical Details:
-- Replaced two-step database operations with single `findOneAndUpdate`
-- Proper calculation of `availableBots` including existing assignment returns
-- **Bot inventory counts ARE properly updated** in `newBotCounts[botType] = availableBots - quantity`
-- Database update includes both `bots: newBotCounts` and `battalionAssignments: newAssignments`
-- Better error handling and validation logic
+2. **Cross-Bot-Type Reassignment Fix**:
+   - **CRITICAL**: Return bots to their original type's inventory FIRST
+   - **CRITICAL**: Only add existing assignment quantity to available pool if SAME bot type
+   - **CRITICAL**: Use corrected inventory counts for validation, not mixed pools
+   - Proper inventory tracking for all bot type transitions
+
+3. **Inventory Corruption Prevention**:
+   - Fixed order of operations: return original bots → calculate available → validate
+   - Prevents artificial inflation of new bot type's available count
+   - Ensures accurate validation against correct inventory levels
+
+4. **Concurrency Safety**:
+   - Version-based optimistic locking prevents stale data overwrites
+   - Retry mechanism handles concurrent access conflicts
+   - Proper error handling for duplicate key errors
+
+## Technical Implementation:
+- **Optimistic Locking**: Uses MongoDB `__v` field for version control
+- **Retry Logic**: 3 retry attempts with exponential backoff (50ms, 100ms, 150ms)
+- **Cross-Type Handling**: `existingAssignment.botType !== botType` logic
+- **Inventory Restoration**: `newBotCounts[existingAssignment.botType] += existingAssignment.quantity`
+- **Atomic Updates**: Single `findOneAndUpdate` with version check
 
 ## Status: RESOLVED
-The assignment endpoint now correctly updates both bot inventory counts and battalion assignments in a single atomic operation, maintaining data consistency.
+The assignment endpoint now handles race conditions and cross-bot-type reassignments correctly, preventing bot loss and maintaining data consistency under concurrent access.

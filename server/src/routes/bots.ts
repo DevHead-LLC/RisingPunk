@@ -213,77 +213,125 @@ router.post('/assign', auth, async (req, res) => {
     
     console.log(`🔍 BATTALION ASSIGNMENT: Starting assignment - botType: ${botType}, quantity: ${quantity}, battalionId: ${battalionId}`);
     
-    // Get current bot state
-    let bot = await Bot.findOne({ userId: req.user._id });
-    if (!bot) {
-      bot = new Bot({
-        userId: req.user._id,
-        bots: { breacher: 0, guardian: 0, phreak: 0 },
-        battalionAssignments: []
-      });
-    }
-
-    console.log(`🔍 BATTALION ASSIGNMENT: Initial bot counts - ${botType}: ${bot.bots[botType]}`);
-
-    // Find existing assignment for this battalion
-    const existingAssignment = bot.battalionAssignments.find(
-      (assignment: { battalionId: string }) => assignment.battalionId === battalionId
-    );
-
-    // Calculate current available bots for this type
-    let availableBots = bot.bots[botType] || 0;
+    // Use atomic operation with retry logic to handle race conditions
+    let retryCount = 0;
+    const maxRetries = 3;
     
-    // If there's an existing assignment, add those bots back to available pool
-    if (existingAssignment) {
-      console.log(`🔍 BATTALION ASSIGNMENT: Found existing assignment - returning ${existingAssignment.quantity} ${existingAssignment.botType} bots`);
-      availableBots += existingAssignment.quantity;
+    while (retryCount < maxRetries) {
+      try {
+        // Get current bot state with optimistic locking
+        const bot = await Bot.findOne({ userId: req.user._id });
+        if (!bot) {
+          // Create new bot if none exists
+          const newBot = new Bot({
+            userId: req.user._id,
+            bots: { breacher: 0, guardian: 0, phreak: 0 },
+            battalionAssignments: []
+          });
+          await newBot.save();
+          continue; // Retry with the new bot
+        }
+
+        console.log(`🔍 BATTALION ASSIGNMENT: Initial bot counts - ${botType}: ${bot.bots[botType]}`);
+
+        // Find existing assignment for this battalion
+        const existingAssignment = bot.battalionAssignments.find(
+          (assignment: { battalionId: string }) => assignment.battalionId === battalionId
+        );
+
+        // Calculate new bot counts and assignments
+        const newBotCounts = { ...bot.bots };
+        const newAssignments = bot.battalionAssignments.filter(
+          (assignment: { battalionId: string }) => assignment.battalionId !== battalionId
+        );
+
+        // CRITICAL FIX: Handle cross-bot-type reassignments properly
+        if (existingAssignment && existingAssignment.botType !== botType) {
+          // Return bots to their original type's inventory
+          newBotCounts[existingAssignment.botType] = (newBotCounts[existingAssignment.botType] || 0) + existingAssignment.quantity;
+          console.log(`🔍 BATTALION ASSIGNMENT: Returning ${existingAssignment.quantity} ${existingAssignment.botType} bots to inventory`);
+        }
+
+        // Calculate available bots for the new type (after returning any existing assignment)
+        let availableBots = newBotCounts[botType] || 0;
+        
+        // If there's an existing assignment for the SAME bot type, add those bots back to available pool
+        if (existingAssignment && existingAssignment.botType === botType) {
+          console.log(`🔍 BATTALION ASSIGNMENT: Found existing assignment - returning ${existingAssignment.quantity} ${existingAssignment.botType} bots`);
+          availableBots += existingAssignment.quantity;
+        }
+
+        // Verify sufficient bots available
+        if (availableBots < quantity) {
+          console.log(`🔍 BATTALION ASSIGNMENT: Insufficient bots - need ${quantity}, have ${availableBots}`);
+          res.status(400).json({ error: 'Insufficient Bots Available' });
+          return;
+        }
+
+        // Update bot counts: subtract the new assignment quantity
+        newBotCounts[botType] = availableBots - quantity;
+
+        // Add new assignment if quantity > 0
+        if (quantity > 0) {
+          newAssignments.push({
+            battalionId,
+            botType,
+            quantity,
+            markLevel: 1
+          });
+        }
+
+        console.log(`🔍 BATTALION ASSIGNMENT: New bot counts - ${botType}: ${newBotCounts[botType]}`);
+
+        // Atomic update with version check to prevent race conditions
+        const updatedBot = await Bot.findOneAndUpdate(
+          { 
+            userId: req.user._id,
+            // Add version check to prevent stale updates
+            $or: [
+              { __v: bot.__v },
+              { __v: { $exists: false } }
+            ]
+          },
+          { 
+            bots: newBotCounts,
+            battalionAssignments: newAssignments,
+            $inc: { __v: 1 } // Increment version for optimistic locking
+          },
+          { new: true, upsert: false }
+        );
+
+        if (!updatedBot) {
+          // Version mismatch - retry
+          retryCount++;
+          console.log(`🔍 BATTALION ASSIGNMENT: Version conflict, retrying... (${retryCount}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, 50 * retryCount)); // Exponential backoff
+          continue;
+        }
+
+        console.log(`🔍 BATTALION ASSIGNMENT: Final result - ${botType}: ${updatedBot.bots[botType]}, assignments: ${updatedBot.battalionAssignments.length}`);
+
+        res.json({ 
+          success: true,
+          updatedBotCount: updatedBot.bots[botType],
+          previousAssignment: existingAssignment || null
+        });
+        return; // Success - exit retry loop
+
+      } catch (updateError: any) {
+        if (updateError.code === 11000) { // Duplicate key error
+          retryCount++;
+          console.log(`🔍 BATTALION ASSIGNMENT: Duplicate key error, retrying... (${retryCount}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, 50 * retryCount));
+          continue;
+        }
+        throw updateError; // Re-throw non-retryable errors
+      }
     }
 
-    // Verify sufficient bots available
-    if (availableBots < quantity) {
-      console.log(`🔍 BATTALION ASSIGNMENT: Insufficient bots - need ${quantity}, have ${availableBots}`);
-      res.status(400).json({ error: 'Insufficient Bots Available' });
-      return;
-    }
-
-    // Calculate new bot counts and assignments
-    const newBotCounts = { ...bot.bots };
-    const newAssignments = bot.battalionAssignments.filter(
-      (assignment: { battalionId: string }) => assignment.battalionId !== battalionId
-    );
-
-    // Update bot counts: subtract the new assignment quantity
-    newBotCounts[botType] = availableBots - quantity;
-
-    // Add new assignment if quantity > 0
-    if (quantity > 0) {
-      newAssignments.push({
-        battalionId,
-        botType,
-        quantity,
-        markLevel: 1
-      });
-    }
-
-    console.log(`🔍 BATTALION ASSIGNMENT: New bot counts - ${botType}: ${newBotCounts[botType]}`);
-
-    // Update database with new counts and assignments in a single atomic operation
-    const updatedBot = await Bot.findOneAndUpdate(
-      { userId: req.user._id },
-      { 
-        bots: newBotCounts,
-        battalionAssignments: newAssignments
-      },
-      { new: true, upsert: true }
-    );
-
-    console.log(`🔍 BATTALION ASSIGNMENT: Final result - ${botType}: ${updatedBot.bots[botType]}, assignments: ${updatedBot.battalionAssignments.length}`);
-
-    res.json({ 
-      success: true,
-      updatedBotCount: updatedBot.bots[botType],
-      previousAssignment: existingAssignment || null
-    });
+    // If we get here, all retries failed
+    console.error('🔍 BATTALION ASSIGNMENT: Max retries exceeded');
+    res.status(500).json({ error: 'Assignment failed due to concurrency conflicts' });
 
   } catch (error: any) {
     console.error('Battalion assignment error:', error);
