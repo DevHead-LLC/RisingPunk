@@ -42,3 +42,15 @@ When User A shields, User B can see the shield from their account. However, when
 
 ## Result
 ✅ **FIXED**: Other accounts now see real-time shield status updates. When User A's shield expires, User B will immediately see User A as unshielded when viewing the map, without needing to wait for User A to log in.
+
+## Bug Fix Applied 🔧
+**Issue**: ShieldService was calling `user.save()` on projected documents (missing required fields like email), causing map requests to fail when shields expired.
+
+**Solution**: 
+- Replaced `user.save()` with `User.updateOne()` and `User.updateMany()` 
+- These operations bypass Mongoose schema validation
+- More efficient: single `updateMany()` call for multiple expired shields
+- No more map request failures when shields expire
+
+**Files Updated**:
+- `ShieldService.ts`: Now uses direct database updates instead of document saves

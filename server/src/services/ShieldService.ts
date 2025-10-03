@@ -11,11 +11,17 @@ export class ShieldService {
     // Check if shield is active and should be completed
     if (user.antivirusShield?.active && user.antivirusShield?.startedAt && user.antivirusShield?.completesAt) {
       if (now >= user.antivirusShield.completesAt) {
-        // Shield has expired, deactivate it
-        user.antivirusShield.active = false;
-        user.antivirusShield.startedAt = null;
-        user.antivirusShield.completesAt = null;
-        await user.save();
+        // Shield has expired, deactivate it using updateOne to avoid schema validation issues
+        await User.updateOne(
+          { _id: user._id },
+          {
+            $set: {
+              'antivirusShield.active': false,
+              'antivirusShield.startedAt': null,
+              'antivirusShield.completesAt': null
+            }
+          }
+        );
         return false;
       } else {
         // Shield is still active
@@ -34,13 +40,38 @@ export class ShieldService {
     const shieldStatusMap = new Map<string, boolean>();
     const now = new Date();
     
-    // Process all users in parallel
-    const updatePromises = users.map(async (user) => {
-      const isShielded = await this.checkAndUpdateShieldStatus(user);
-      shieldStatusMap.set(String(user._id), isShielded);
+    // Find users with expired shields
+    const expiredUserIds: string[] = [];
+    const activeUserIds: string[] = [];
+    
+    users.forEach((user) => {
+      if (user.antivirusShield?.active && user.antivirusShield?.startedAt && user.antivirusShield?.completesAt) {
+        if (now >= user.antivirusShield.completesAt) {
+          expiredUserIds.push(String(user._id));
+          shieldStatusMap.set(String(user._id), false);
+        } else {
+          activeUserIds.push(String(user._id));
+          shieldStatusMap.set(String(user._id), true);
+        }
+      } else {
+        shieldStatusMap.set(String(user._id), false);
+      }
     });
     
-    await Promise.all(updatePromises);
+    // Update all expired shields in a single operation
+    if (expiredUserIds.length > 0) {
+      await User.updateMany(
+        { _id: { $in: expiredUserIds } },
+        {
+          $set: {
+            'antivirusShield.active': false,
+            'antivirusShield.startedAt': null,
+            'antivirusShield.completesAt': null
+          }
+        }
+      );
+    }
+    
     return shieldStatusMap;
   }
 
