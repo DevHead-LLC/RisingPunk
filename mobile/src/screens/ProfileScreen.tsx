@@ -511,12 +511,6 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
     skip: !token,
   });
 
-  // Log when profile data changes
-  useEffect(() => {
-    if (profileData) {
-      console.log('🔵 PROFILE: Profile data updated, handle:', profileData.handle);
-    }
-  }, [profileData]);
   const { data: botStatsData, isLoading: botStatsLoading, error: botStatsError } = useFetchBotStatsQuery(undefined, {
     skip: !token,
   });

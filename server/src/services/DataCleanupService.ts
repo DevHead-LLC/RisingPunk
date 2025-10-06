@@ -8,7 +8,6 @@ export class DataCleanupService {
 
   static async cleanupExpiredData(): Promise<void> {
     try {
-      console.log('🧹 Starting data cleanup process...');
       
       // Clean up expired user activity logs (older than 30 days)
       const cutoffDate = new Date(Date.now() - this.RETENTION_DAYS * 24 * 60 * 60 * 1000);
@@ -18,9 +17,7 @@ export class DataCleanupService {
       });
       
       if (deleteResult.deletedCount > 0) {
-        console.log(`🗑️  Deleted ${deleteResult.deletedCount} expired activity log entries`);
       } else {
-        console.log('✅ No expired activity log entries to delete');
       }
       
       // Clean up inactive users (inactive for 12 months as per privacy policy)
@@ -33,18 +30,14 @@ export class DataCleanupService {
       });
       
       if (inactiveUsers.length > 0) {
-        console.log(`⚠️  Found ${inactiveUsers.length} potentially inactive users (inactive for 12+ months)`);
-        console.log('📝 Manual review required before deletion');
         
         // Log inactive users for manual review
         for (const user of inactiveUsers) {
-          console.log(`   - User: ${user.handle} (${user._id}) - Last active: ${(user as any).updatedAt}`);
         }
       }
       
-      console.log('✅ Data cleanup completed successfully');
     } catch (error) {
-      console.error('❌ Data cleanup error:', error);
+      console.error('Data cleanup error:', error);
     }
   }
 
@@ -72,19 +65,16 @@ export class DataCleanupService {
         potentiallyInactiveUsers
       };
     } catch (error) {
-      console.error('❌ Error getting data retention stats:', error);
+      console.error('Error getting data retention stats:', error);
       throw error;
     }
   }
 
   static startScheduledCleanup(): void {
     if (this.cleanupInterval) {
-      console.log('⚠️  Cleanup service already running');
       return;
     }
     
-    console.log('🚀 Starting scheduled data cleanup service');
-    console.log(`⏰ Cleanup interval: ${this.CLEANUP_INTERVAL_MS / (1000 * 60 * 60)} hours`);
     
     // Run initial cleanup
     this.cleanupExpiredData();
@@ -99,12 +89,10 @@ export class DataCleanupService {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
-      console.log('🛑 Stopped scheduled data cleanup service');
     }
   }
 
   static async manualCleanup(): Promise<void> {
-    console.log('🔧 Manual cleanup triggered');
     await this.cleanupExpiredData();
   }
 }

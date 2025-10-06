@@ -306,7 +306,6 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
 
   // Turf Intro handlers
   const handleTurfIntroComplete = useCallback(() => {
-    console.log('Turf Intro completed');
     
     // Reset intro step
     setCurrentIntroStep(null);
@@ -331,7 +330,6 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   }, [user, emailVerificationPromptedUserId, dispatch]);
 
   const handleTurfIntroSkip = useCallback(() => {
-    console.log('Turf Intro skipped');
     
     // Reset intro step
     setCurrentIntroStep(null);

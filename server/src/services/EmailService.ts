@@ -32,7 +32,6 @@ export class EmailService {
   };
 
   private static async getTransporter(): Promise<nodemailer.Transporter> {
-    console.log('🔍 [DEBUG] EmailService.getTransporter() called');
     if (!this.transporter) {
       const emailUser = process.env.EMAIL_USER;
       const emailPassword = process.env.EMAIL_PASSWORD;
@@ -41,7 +40,6 @@ export class EmailService {
         throw new Error('EMAIL_USER and EMAIL_PASSWORD environment variables are required');
       }
 
-      console.log('🔍 [DEBUG] Creating nodemailer transporter');
       this.transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
@@ -54,7 +52,7 @@ export class EmailService {
       try {
         await this.transporter.verify();
       } catch (error) {
-        console.error('❌ Email service configuration failed:', error);
+        console.error('Email service configuration failed:', error);
         throw new Error('Failed to configure email service');
       }
     }

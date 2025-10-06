@@ -78,7 +78,6 @@ export const LoginScreen = () => {
 
   const handleSubmit = useCallback(async () => {
     clearFormError();
-    console.log('🔵 LOGIN: Form submission started, formType:', formType);
 
     const validateForm = () => {
       setError('');
@@ -112,7 +111,6 @@ export const LoginScreen = () => {
     if (validateForm()) {
       try {
         setLoading(true);
-        console.log('🔵 LOGIN: Form validation passed, dispatching:', formType);
         
         if (formType === 'login') {
           await dispatch(loginUser({
@@ -120,12 +118,10 @@ export const LoginScreen = () => {
             accessKey: formData.accessKey,
           })).unwrap();
         } else {
-          console.log('🔵 LOGIN: Registering user with email:', formData.email);
           await dispatch(registerUser({
             email: formData.email,
             accessKey: formData.accessKey,
           })).unwrap();
-          console.log('🔵 LOGIN: Registration completed successfully');
         }
       } catch (err) {
         console.error('🔴 LOGIN: Form submission error:', err);

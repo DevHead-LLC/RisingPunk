@@ -48,7 +48,6 @@ export class GlobalErrorHandler {
     
     // Only show modal if user is authenticated (has token)
     if (!state.auth?.token) {
-      console.log('🔴 GLOBAL ERROR HANDLER: User not authenticated, skipping modal');
       this.isHandlingError = false;
       return;
     }
@@ -56,9 +55,7 @@ export class GlobalErrorHandler {
     const errorStatus = error?.status || error?.statusCode;
     const isDatabaseError = this.isDatabaseError(error, errorStatus);
 
-    if (isDatabaseError) {
-      console.log('🔴 GLOBAL ERROR HANDLER: Database error confirmed, showing modal');
-      
+    if (isDatabaseError) {      
       this.dispatchCallback({ type: 'ui/setGlobalErrorModal', payload: true });
       this.isHandlingError = false;
     } else {
