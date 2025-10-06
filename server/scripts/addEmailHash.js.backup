@@ -65,16 +65,22 @@ function decryptEmail(encryptedEmail) {
 
 async function addEmailHashToUsers() {
   try {
+    console.log('Connecting to MongoDB...');
     await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/risingpunk');
+    console.log('Connected to MongoDB');
 
     const db = mongoose.connection.db;
     const usersCollection = db.collection('users');
 
+    console.log('Finding users without emailHash...');
     const usersWithoutHash = await usersCollection.find({ emailHash: { $exists: false } }).toArray();
     
     if (usersWithoutHash.length === 0) {
+      console.log('All users already have emailHash field');
       return;
     }
+
+    console.log(`Found ${usersWithoutHash.length} users without emailHash field`);
 
     let processed = 0;
     let errors = 0;
@@ -97,19 +103,26 @@ async function addEmailHashToUsers() {
         );
 
         processed++;
+        if (processed % 100 === 0) {
+          console.log(`Processed ${processed} users...`);
+        }
       } catch (error) {
         console.error(`Error processing user ${user._id}:`, error);
         errors++;
       }
     }
 
+    console.log(`Migration completed: ${processed} users processed, ${errors} errors`);
+    
     // Verify the migration
     const remainingUsersWithoutHash = await usersCollection.find({ emailHash: { $exists: false } }).count();
+    console.log(`Users still without emailHash: ${remainingUsersWithoutHash}`);
 
   } catch (error) {
     console.error('Migration failed:', error);
   } finally {
     await mongoose.disconnect();
+    console.log('Disconnected from MongoDB');
   }
 }
 

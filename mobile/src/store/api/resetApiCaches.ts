@@ -1,8 +1,6 @@
 // Utility to reset all RTK Query API caches
 // This avoids circular imports by not importing the APIs directly
-export const resetAllApiCaches = (api: any) => {
-  console.log('🔍 RESET UTILS: Clearing all RTK Query caches to prevent data leakage');
-  
+export const resetAllApiCaches = (api: any) => {  
   // Reset each API cache using their reducer paths
   api.dispatch({ type: 'api/resetApiState' });
   api.dispatch({ type: 'authApi/resetApiState' });
