@@ -98,17 +98,12 @@ export class BattleController {
       const currentCountdown = timerState?.countdown ?? battle.countdown;
       
       if (currentPhase === BattlePhase.ACTIVE && currentCountdown === 0) {
-        console.log(`🔍 BATTLE STATE: getBattleState called for ACTIVE battle ${battleId}`);
-        console.log(`🔍 BATTLE STATE: Current targeting results count: ${BattalionService.getTargetingResults(battleId).length}`);
         if (BattalionService.getTargetingResults(battleId).length === 0) {
-          console.log(`🔍 BATTLE STATE: Triggering initial targeting from getBattleState`);
           await this.battleService.triggerInitialTargeting(battleId);
           // Immediately start movement for initial targeting
           await MovementService.updateBattleMovement(battleId, battle, BattalionService.getTargetingResults(battleId));
-          console.log(`🔍 BATTLE STATE: Movement triggered from getBattleState`);
         }
         targetingResults = BattalionService.getTargetingResults(battleId);
-        console.log(`🔍 BATTLE STATE: Final targeting results count: ${targetingResults.length}`);
       }
 
       return await BattleResponseService.createBattleStateResponse(

@@ -17,12 +17,9 @@ export class ActivityAggregationService {
 
   static startAggregationService(): void {
     if (this.flushInterval) {
-      console.log('⚠️ Activity aggregation service already running');
       return;
     }
     
-    console.log('🚀 Starting activity aggregation service');
-    console.log(`⏰ Flush interval: ${this.FLUSH_INTERVAL_MS / (1000 * 60)} minutes`);
     
     // Flush buffer every 5 minutes
     this.flushInterval = setInterval(() => {
@@ -34,7 +31,6 @@ export class ActivityAggregationService {
     if (this.flushInterval) {
       clearInterval(this.flushInterval);
       this.flushInterval = null;
-      console.log('🛑 Stopped activity aggregation service');
     }
   }
 
@@ -62,7 +58,6 @@ export class ActivityAggregationService {
       return;
     }
 
-    console.log(`🔄 Flushing activity buffer with ${this.activityBuffer.size} daily summaries`);
     
     try {
       for (const [key, activities] of this.activityBuffer.entries()) {
@@ -98,10 +93,9 @@ export class ActivityAggregationService {
       
       // Clear buffer after successful flush
       this.activityBuffer.clear();
-      console.log('✅ Activity buffer flushed successfully');
       
     } catch (error) {
-      console.error('❌ Error flushing activity buffer:', error);
+      console.error('Error flushing activity buffer:', error);
     }
   }
 
@@ -117,7 +111,7 @@ export class ActivityAggregationService {
       
       return summaries;
     } catch (error) {
-      console.error('❌ Error getting activity summary:', error);
+      console.error('Error getting activity summary:', error);
       return [];
     }
   }
@@ -142,14 +136,13 @@ export class ActivityAggregationService {
         averageDailyRequests: Math.round(avgRequests)
       };
     } catch (error) {
-      console.error('❌ Error getting system stats:', error);
+      console.error('Error getting system stats:', error);
       return { totalSummaries: 0, totalUsers: 0, averageDailyRequests: 0 };
     }
   }
 
   // Force flush for testing or shutdown
   static async forceFlush(): Promise<void> {
-    console.log('🔧 Force flushing activity buffer');
     await this.flushBuffer();
   }
 }

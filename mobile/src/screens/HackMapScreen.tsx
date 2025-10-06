@@ -544,11 +544,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   // Trigger immediate updates for ALL users when current user's shield status changes
   useEffect(() => {
     if (lastShieldStatus !== null && lastShieldStatus !== isShieldActive && currentUserId) {
-      console.log('🛡️ Current user shield status changed, immediately updating ALL visible tiles...', {
-        previous: lastShieldStatus, 
-        current: isShieldActive,
-        userId: currentUserId
-      });
       
       // First, immediately update ALL visible player tiles with fresh shield status
       if (dynamicEntityData) {

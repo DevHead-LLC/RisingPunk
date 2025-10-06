@@ -55,10 +55,8 @@ export function FeatureModal({
         setResearchTimeRemaining(remaining);
         
         if (remaining === 0) {
-          console.log('🔬 RESEARCH: Timer reached zero, attempting to complete research for:', feature.id);
           // Research completed - automatically complete it
           completeResearch({ categoryId, featureId: feature.id }).unwrap().then((result) => {
-            console.log('🔬 RESEARCH: Successfully completed research:', result);
             setIsResearching(false);
             // RTK Query will automatically invalidate cache and refetch data
           }).catch((error) => {

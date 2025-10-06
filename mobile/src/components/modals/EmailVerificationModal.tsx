@@ -49,10 +49,6 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
           'Content-Type': 'application/json',
         },
       });
-      
-      if (response.ok) {
-        console.log('✅ User marked as prompted for email verification');
-      }
     } catch (error) {
       console.error('❌ Failed to mark user as prompted:', error);
     }
