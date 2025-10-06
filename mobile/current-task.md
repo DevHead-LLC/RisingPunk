@@ -1,71 +1,37 @@
-# Shield Expiry Issue - Other Account Views
+# App Store Submission Checklist
 
-## Problem
-When User A shields, User B can see the shield from their account. However, when User A's shield expires, User B continues to see User A as shielded indefinitely, even days/weeks later. The shield appears permanent from other accounts' viewpoints.
+## Phase 1: Xcode Build Preparation
+- [x] **1.1** Set Build Configuration to Release
+- [x] **1.2** Verify Bundle Identifier matches App Store Connect
+- [x] **1.3** Confirm Version Number (1.0.0)
+- [x] **1.4** Confirm Build Number (18+)
+- [x] **1.5** Verify Code Signing Settings
+- [x] **1.6** Clean Build Folder
+- [x] **1.7** Create Archive
 
-## Root Cause Analysis
-1. **Shield expiry only happens on the shielding user's side** - The `/api/antivirus-shield/status` endpoint only checks and deactivates shields for the authenticated user (lines 344-350 in server.ts)
+## Phase 2: Upload to App Store Connect
+- [x] **2.1** Upload Archive via Xcode (Completed with hermes.framework symbol warning - will fix in next release)
+- [x] **2.2** Verify Upload Success
+- [x] **2.3** Wait for Processing (5-10 minutes)
 
-2. **Map data uses stale shield status** - The map endpoint (`/api/map/:name`) fetches all users' shield data once and caches it (lines 61, 194-196 in map.ts). It doesn't check if shields have expired for other users.
+## Phase 3: App Store Connect Configuration
+- [x] **3.1** Select Build in App Store Connect
+- [x] **3.2** Review Final Metadata
+- [x] **3.3** Verify All Required Fields Complete
+- [ ] **3.4** Check App Review Information
 
-3. **No real-time updates for other users** - The `updateTileShieldStatus` function in HackMapScreen.tsx only updates when explicitly called, but there's no mechanism to detect when other users' shields expire.
+## Phase 4: Submit for Review
+- [ ] **4.1** Submit App for Review
+- [ ] **4.2** Confirm Submission
+- [ ] **4.3** Note Submission ID
 
-## Current Flow
-- User A shields → Shield data stored in database
-- User B views map → Map endpoint fetches User A's shield data (shows as active)
-- User A's shield expires → Only User A's shield status gets updated when they check their own status
-- User B continues to see User A as shielded because map data is never refreshed
+## Phase 5: Monitor Review
+- [ ] **5.1** Check Review Status
+- [ ] **5.2** Respond to Any Feedback
+- [ ] **5.3** Handle Rejection (if any)
 
-## Solution Implemented ✅
-1. **Created ShieldService** - Centralized shield expiry logic in `/server/src/services/ShieldService.ts`
-2. **Updated map endpoint** - Now checks and updates all users' shield statuses when map is loaded
-3. **Updated shield status endpoints** - Both `/api/antivirus-shield/status` and `/api/users/shield-status/:userId` now use ShieldService
-4. **Eliminated duplicate logic** - All shield expiry checking now goes through the centralized service
+---
 
-## Key Changes Made
-- **ShieldService.ts**: New service with methods for checking/updating single or multiple user shield statuses
-- **map.ts**: Map endpoint now calls `ShieldService.checkAndUpdateMultipleShieldStatuses()` before returning map data
-- **server.ts**: Shield status endpoint now uses `ShieldService.checkAndUpdateShieldStatus()`
-- **userRoutes.ts**: User shield status endpoint now uses `ShieldService.checkAndUpdateShieldStatus()`
+## Current Step: 1.1 - Set Build Configuration to Release
 
-## How It Works Now
-1. When any user loads the map, ALL users' shield statuses are checked for expiry
-2. Expired shields are automatically deactivated in the database
-3. Map data reflects the current (updated) shield status for all users
-4. Other accounts will immediately see when shields have expired
-5. No duplicate logic - all shield expiry goes through ShieldService
-
-## Testing
-- Created test script: `/server/test-shield-expiry.js`
-- Tests verify expired shields are deactivated and active shields remain active
-- Tests multiple users scenario to ensure proper batch processing
-
-## Result
-✅ **FIXED**: Other accounts now see real-time shield status updates. When User A's shield expires, User B will immediately see User A as unshielded when viewing the map, without needing to wait for User A to log in.
-
-## Bug Fix Applied 🔧
-**Issue**: ShieldService was calling `user.save()` on projected documents (missing required fields like email), causing map requests to fail when shields expired.
-
-**Solution**: 
-- Replaced `user.save()` with `User.updateOne()` and `User.updateMany()` 
-- These operations bypass Mongoose schema validation
-- More efficient: single `updateMany()` call for multiple expired shields
-- No more map request failures when shields expire
-
-**Files Updated**:
-- `ShieldService.ts`: Now uses direct database updates instead of document saves
-
-## Critical Bug Fixes Applied 🚨
-**Issue 1 - Shield Reactivation Bug**: After `ShieldService` deactivated shields via `updateOne()`, the in-memory `user` object still had stale data. When cooldown logic called `user.save()`, it overwrote the database with stale shield data, effectively reactivating expired shields.
-
-**Issue 2 - Inconsistent API Responses**: API returned `active: false` but still included stale `startedAt` and `completesAt` timestamps.
-
-**Solutions Applied**:
-1. **ShieldService**: Now updates both database AND in-memory user object
-2. **server.ts**: Added conditional save logic to prevent overwriting shield updates
-3. **userRoutes.ts**: Only return timestamps when shield is actually active
-
-**Result**: 
-- ✅ No more shield reactivation after expiry
-- ✅ Consistent API responses (no stale timestamps when inactive)
-- ✅ Proper data synchronization between database and memory
+**Status:** 🔍 **IN PROGRESS**

@@ -1,6 +1,5 @@
 import helmet from 'helmet';
 import { CORS_ORIGINS, PORT } from './src/config/env';
-console.log('Environment loaded via dotenv-flow. Connecting to MongoDB...');
 
 import express from 'express';
 import mongoose from 'mongoose';
@@ -49,7 +48,7 @@ import { activityLogging } from './src/middleware/activityLogging';
 
 // MongoDB connection - simplified to match mongosh
 if (!process.env.MONGODB_URI) {
-  console.error('❌ MONGODB_URI environment variable is not set');
+  console.error('MONGODB_URI environment variable is not set');
   process.exit(1);
 }
 
@@ -71,7 +70,6 @@ mongoose.connect(process.env.MONGODB_URI, {
   appName: 'mongosh+2.2.12'  // matching the working mongosh connection
 })
 .then(async () => {
-  console.log('✅ MongoDB connected successfully');
   
   // Wait for connection to be fully ready before proceeding
   await new Promise<void>((resolve, reject) => {
@@ -92,12 +90,10 @@ mongoose.connect(process.env.MONGODB_URI, {
     }
   });
   
-  console.log('📦 Database:', mongoose.connection.db?.databaseName || 'Unknown');
-  console.log('🔗 Connected to:', mongoose.connection.host);
   
   // Verify database object is available after full connection
   if (!mongoose.connection.db) {
-    console.error('❌ Database object not available after connection');
+    console.error('Database object not available after connection');
     process.exit(1);
   }
 
@@ -106,18 +102,16 @@ mongoose.connect(process.env.MONGODB_URI, {
   try {
     const { GoogleAuthService } = require('./src/services/GoogleAuthService');
     GoogleAuthService.initialize();
-    console.log('✅ Google Auth Service initialized');
   } catch (error) {
-    console.warn('⚠️  Google Auth Service not available:', error);
+    console.error('Google Auth Service not available:', error);
   }
   
   // Initialize Apple Auth Service
   try {
     const { AppleAuthService } = require('./src/services/AppleAuthService');
     AppleAuthService.initialize();
-    console.log('✅ Apple Auth Service initialized');
   } catch (error) {
-    console.warn('⚠️  Apple Auth Service not available:', error);
+    console.error('Apple Auth Service not available:', error);
   }
   
   // Initialize leveling and bot stats services
@@ -136,16 +130,13 @@ mongoose.connect(process.env.MONGODB_URI, {
     const { ActivityAggregationService } = require('./src/services/ActivityAggregationService');
     ActivityAggregationService.startAggregationService();
     
-    console.log('✅ Game services initialized successfully');
-    console.log('✅ Data cleanup service started for privacy compliance');
-    console.log('✅ Activity aggregation service started for privacy compliance');
   } catch (error) {
-    console.error('❌ Failed to initialize game services:', error);
+    console.error('Failed to initialize game services:', error);
     process.exit(1);
   }
 })
 .catch((err: Error) => {
-  console.error('❌ MongoDB connection error:', err);
+  console.error('MongoDB connection error:', err);
   process.exit(1);
 });
 
@@ -243,9 +234,6 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
     
     // Calculate new fractional remainder (decimal part after adding whole dollars)
     const finalFractionalRemainder = totalWithRemainder - wholeDollarsToAdd;
-    
-    // Debug logging (disabled - issue resolved)
-    // console.log(`🔍 BALANCE DEBUG:`, { ... });
     
     // Only update if there's accumulated amount to add or fractional remainder changed
     if (wholeDollarsToAdd > 0 || finalFractionalRemainder !== (user.balance.fractionalRemainder || 0)) {
@@ -527,26 +515,24 @@ app.use('/', healthRoute);
 const startServer = (port = PORT, maxAttempts = 0) => {
   try {
     const server = app.listen(port, () => {
-      console.log(`✅ Server running successfully on port ${port}`);
     });
     
     // Setup server error handler
     server.on('error', (e: NodeJS.ErrnoException) => {
       if (e.code === 'EADDRINUSE') {
-        console.log(`⚠️ Port ${port} is busy, trying ${port + 1}...`);
         if (maxAttempts > 0) {
           startServer(port + 1, maxAttempts - 1);
         } else {
-          console.error('❌ Failed to find an available port');
+          console.error('Failed to find an available port');
           process.exit(1);
         }
       } else {
-        console.error('❌ Server error:', e);
+        console.error('Server error:', e);
         process.exit(1);
       }
     });
   } catch (err) {
-    console.error('❌ Failed to start server:', err);
+    console.error('Failed to start server:', err);
     process.exit(1);
   }
 };

@@ -20,7 +20,6 @@ const botsBaseQuery = async (args: any, api: any, extraOptions: any) => {
   if (result.error) {
     // Check for account switched error first
     if ((result.error as any)?.status === 401 && (result.error as any)?.data?.error === 'ACCOUNT_SWITCHED') {
-      console.log('🔍 BOTS API: ACCOUNT_SWITCHED detected, dispatching action');
       // Always dispatch account switched action - the auth slice will handle showing banner appropriately
       api.dispatch({ type: 'auth/handleAccountSwitched' });
       

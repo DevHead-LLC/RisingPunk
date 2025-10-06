@@ -56,22 +56,17 @@ function isEncrypted(value) {
 }
 
 async function migrateEmails() {
-  try {
-    console.log('🔐 Starting email encryption migration...');
-    
+  try {    
     // Connect to MongoDB
     await mongoose.connect(process.env.MONGODB_URI, {
       dbName: 'RisingPunk'
-    });
-    console.log('✅ Connected to MongoDB');
-    
+    });    
     // Get users collection
     const db = mongoose.connection.db;
     const usersCollection = db.collection('users');
     
     // Find all users with unencrypted emails
     const users = await usersCollection.find({}).toArray();
-    console.log(`📊 Found ${users.length} users to process`);
     
     let encryptedCount = 0;
     let alreadyEncryptedCount = 0;
@@ -80,7 +75,6 @@ async function migrateEmails() {
     for (const user of users) {
       try {
         if (!user.email) {
-          console.log(`⚠️  User ${user.handle || user._id} has no email, skipping`);
           continue;
         }
         
@@ -99,7 +93,6 @@ async function migrateEmails() {
         );
         
         encryptedCount++;
-        console.log(`✅ Encrypted email for user: ${user.handle || user._id}`);
         
       } catch (error) {
         errorCount++;
@@ -107,24 +100,11 @@ async function migrateEmails() {
       }
     }
     
-    console.log('\n📈 Migration Summary:');
-    console.log(`   Total users processed: ${users.length}`);
-    console.log(`   Emails encrypted: ${encryptedCount}`);
-    console.log(`   Already encrypted: ${alreadyEncryptedCount}`);
-    console.log(`   Errors: ${errorCount}`);
-    
-    if (errorCount === 0) {
-      console.log('\n🎉 Email encryption migration completed successfully!');
-    } else {
-      console.log('\n⚠️  Migration completed with some errors. Please review the logs above.');
-    }
-    
   } catch (error) {
     console.error('❌ Migration failed:', error);
     process.exit(1);
   } finally {
     await mongoose.disconnect();
-    console.log('🔌 Disconnected from MongoDB');
   }
 }
 

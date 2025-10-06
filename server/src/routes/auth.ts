@@ -164,7 +164,6 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
       }
 
       // Create user with temporary handle and needsHandleSelection flag
-      console.log('🔵 SERVER: Creating user with needsHandleSelection: true');
       const user = new User({
         email,
         handle: `user_${Date.now()}`,
@@ -173,7 +172,6 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
       });
 
       await user.save();
-      console.log('🔵 SERVER: User saved, needsHandleSelection:', user.needsHandleSelection);
 
       // Create research data for new user
       await createUserResearchData(user._id as mongoose.Types.ObjectId);
@@ -189,7 +187,6 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
         { expiresIn: '7d' }
       );
 
-      console.log('🔵 SERVER: About to send response, user.needsHandleSelection:', user.needsHandleSelection);
       
       res.status(201).json({
         token,
@@ -262,14 +259,8 @@ router.post<{}, UserResponse | { error: string }, LoginRequest['body']>(
       );
       
       // Set current session ID (invalidates all previous sessions)
-      console.log('🔍 LOGIN: Setting current session:', {
-        userId: user._id,
-        oldSessionId: user.currentTokenId,
-        newSessionId: sessionId
-      });
       user.setCurrentToken(sessionId);
       await user.save();
-      console.log('🔍 LOGIN: Session set and saved, new currentTokenId:', user.currentTokenId);
 
       res.json({
         token,
@@ -304,35 +295,26 @@ router.post<{}, UserResponse | { error: string }, LoginRequest['body']>(
 router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
   '/google-signin',
   async (req, res): Promise<void> => {
-    console.log('🔵 GSI Server Route: Google Sign-In request received');
     try {
       const { idToken } = req.body;
-      console.log('🔵 GSI Server Route: ID Token received, length:', idToken?.length);
       
       if (!GoogleAuthService.isEnabled()) {
-        console.log('🔴 GSI Server Route: Google Sign-In service not enabled');
         res.status(503).json({ error: 'Google Sign-In is not configured' });
         return;
       }
 
-      console.log('🔵 GSI Server Route: Verifying Google token');
       // Verify Google token
       const googleUser = await GoogleAuthService.verifyToken(idToken);
       if (!googleUser) {
-        console.log('🔴 GSI Server Route: Google token verification failed');
         res.status(401).json({ error: 'Invalid Google token' });
         return;
       }
       
-      console.log('🔵 GSI Server Route: Google token verified successfully');
-      console.log('🔵 GSI Server Route: Google user email:', googleUser.email);
 
       // Check if user exists with this Google ID
-      console.log('🔵 GSI Server Route: Looking up user by Google ID:', googleUser.googleId);
       let user = await User.findByGoogleId(googleUser.googleId);
       
       if (user) {
-        console.log('🔵 GSI Server Route: Existing user found with Google ID');
         
         // No device session check needed - simple token invalidation handles this
         
@@ -350,7 +332,6 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
         user.setCurrentToken(sessionId);
         await user.save();
 
-        console.log('🔵 GSI Server Route: JWT token created, sending response');
         res.json({
           token,
           user: {
@@ -379,7 +360,6 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
       // Check if user exists with this email but no Google ID
       const emailExists = await User.emailExists(googleUser.email);
       if (emailExists) {
-        console.log('🔵 GSI Server Route: Email exists but no Google ID - linking accounts');
         // Email exists but no Google ID, link accounts
         user = await User.findOne({ emailHash: require('../services/EncryptionService').EncryptionService.hashEmail(googleUser.email) });
         if (user) {
@@ -428,7 +408,6 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
       }
 
       // No account found - return error for login attempt
-      console.log('🔴 GSI Server Route: No account found for Google Sign-In');
       res.status(404).json({ 
         error: 'No account found with this Google account. Please use the "NEW_IDENTITY (SIGN_UP)" option to create an account.'
       });
@@ -443,35 +422,26 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
 router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
   '/google-signup',
   async (req, res): Promise<void> => {
-    console.log('🔵 GSU Server Route: Google Sign-Up request received');
     try {
       const { idToken } = req.body;
-      console.log('🔵 GSU Server Route: ID Token received, length:', idToken?.length);
       
       if (!GoogleAuthService.isEnabled()) {
-        console.log('🔴 GSU Server Route: Google Sign-In service not enabled');
         res.status(503).json({ error: 'Google Sign-In is not configured' });
         return;
       }
 
-      console.log('🔵 GSU Server Route: Verifying Google token');
       // Verify Google token
       const googleUser = await GoogleAuthService.verifyToken(idToken);
       if (!googleUser) {
-        console.log('🔴 GSU Server Route: Google token verification failed');
         res.status(401).json({ error: 'Invalid Google token' });
         return;
       }
       
-      console.log('🔵 GSU Server Route: Google token verified successfully');
-      console.log('🔵 GSU Server Route: Google user email:', googleUser.email);
 
       // Check if user already exists with this Google ID
-      console.log('🔵 GSU Server Route: Checking if user already exists with Google ID:', googleUser.googleId);
       let user = await User.findByGoogleId(googleUser.googleId);
       
       if (user) {
-        console.log('🔴 GSU Server Route: User already exists with this Google ID');
         res.status(400).json({ 
           error: 'An account already exists with this Google account. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.'
         });
@@ -481,7 +451,6 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
       // Check if user exists with this email
       const emailExists = await User.emailExists(googleUser.email);
       if (emailExists) {
-        console.log('🔴 GSU Server Route: Email already exists');
         res.status(400).json({ 
           error: 'An account already exists with this email address. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.'
         });
@@ -489,7 +458,6 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
       }
 
       // Create new user with Google Sign-Up
-      console.log('🔵 GSU Server Route: Creating new user account');
       const handle = `user_${Date.now()}`; // Generate unique handle
       user = new User({
         email: googleUser.email,
@@ -501,7 +469,6 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
       });
 
       await user.save();
-      console.log('🔵 GSU SERVER: User saved, needsHandleSelection:', user.needsHandleSelection);
 
       // Create research data for new user
       await createUserResearchData(user._id as mongoose.Types.ObjectId);
@@ -517,8 +484,6 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
         { expiresIn: '7d' }
       );
 
-      console.log('🔵 GSU Server Route: New user created successfully');
-      console.log('🔵 GSU SERVER: About to send response, user.needsHandleSelection:', user.needsHandleSelection);
       
       res.status(201).json({
         token,
@@ -553,36 +518,26 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
 router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
   '/apple-signin',
   async (req, res): Promise<void> => {
-    console.log('🍎 ASI Server Route: Apple Sign-In request received');
     try {
       const { idToken } = req.body;
-      console.log('🍎 ASI Server Route: ID Token received, length:', idToken?.length);
       
       if (!AppleAuthService.isEnabled()) {
-        console.log('🔴 ASI Server Route: Apple Sign-In service not enabled');
         res.status(503).json({ error: 'Apple Sign-In is not configured' });
         return;
       }
 
-      console.log('🍎 ASI Server Route: Verifying Apple token');
       // Verify Apple token
       const appleUser = await AppleAuthService.verifyToken(idToken);
       if (!appleUser) {
-        console.log('🔴 ASI Server Route: Apple token verification failed');
         res.status(401).json({ error: 'Invalid Apple token' });
         return;
       }
       
-      console.log('🍎 ASI Server Route: Apple token verified successfully');
-      console.log('🍎 ASI Server Route: Apple user ID:', appleUser.appleId);
-      console.log('🍎 ASI Server Route: Apple user email:', appleUser.email);
 
       // Check if user exists with this Apple ID
-      console.log('🍎 ASI Server Route: Looking up user by Apple ID:', appleUser.appleId);
       let user = await User.findByAppleId(appleUser.appleId);
       
       if (user) {
-        console.log('🍎 ASI Server Route: User found with Apple ID, signing in');
         
         // Generate a unique session ID for this login
         const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
@@ -597,7 +552,6 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
         user.setCurrentToken(sessionId);
         await user.save();
         
-        console.log('🍎 ASI Server Route: Apple Sign-In successful, returning user data');
         res.json({
           token,
           user: {
@@ -624,17 +578,14 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
       }
 
       // User not found with Apple ID - check if email exists for account linking
-      console.log('🔴 ASI Server Route: No account found with this Apple ID');
       
       // If Apple provided an email, check if there's an existing account with that email
       if (appleUser.email) {
-        console.log('🔍 ASI Server Route: Checking for existing account with email:', appleUser.email);
         const existingUser = await User.findOne({ emailHash: EncryptionService.hashEmail(appleUser.email) });
         
         if (existingUser) {
           // Check if this account can be linked with Apple ID
           if (!existingUser.appleId) {
-            console.log('🔗 ASI Server Route: Linking Apple ID to existing account');
             existingUser.appleId = appleUser.appleId;
             await existingUser.save();
             
@@ -673,7 +624,6 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
             });
             return;
           } else {
-            console.log('🔴 ASI Server Route: Account already has Apple ID');
             res.status(400).json({ 
               error: 'This email is already associated with an Apple account. Please use the correct Apple ID.'
             });
@@ -697,36 +647,26 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
 router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
   '/apple-signup',
   async (req, res): Promise<void> => {
-    console.log('🍎 ASU Server Route: Apple Sign-Up request received');
     try {
       const { idToken } = req.body;
-      console.log('🍎 ASU Server Route: ID Token received, length:', idToken?.length);
       
       if (!AppleAuthService.isEnabled()) {
-        console.log('🔴 ASU Server Route: Apple Sign-In service not enabled');
         res.status(503).json({ error: 'Apple Sign-In is not configured' });
         return;
       }
 
-      console.log('🍎 ASU Server Route: Verifying Apple token');
       // Verify Apple token
       const appleUser = await AppleAuthService.verifyToken(idToken);
       if (!appleUser) {
-        console.log('🔴 ASU Server Route: Apple token verification failed');
         res.status(401).json({ error: 'Invalid Apple token' });
         return;
       }
       
-      console.log('🍎 ASU Server Route: Apple token verified successfully');
-      console.log('🍎 ASU Server Route: Apple user ID:', appleUser.appleId);
-      console.log('🍎 ASU Server Route: Apple user email:', appleUser.email);
 
       // Check if user already exists with this Apple ID
-      console.log('🍎 ASU Server Route: Checking if user already exists with Apple ID:', appleUser.appleId);
       let user = await User.findByAppleId(appleUser.appleId);
       
       if (user) {
-        console.log('🔴 ASU Server Route: User already exists with this Apple ID');
         res.status(400).json({ 
           error: 'An account already exists with this Apple ID. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.'
         });
@@ -737,14 +677,12 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
       if (appleUser.email) {
         const emailExists = await User.emailExists(appleUser.email);
         if (emailExists) {
-          console.log('🔴 ASU Server Route: Email already exists - checking for account linking');
           
           // Find the existing user with this email
           const existingUser = await User.findOne({ emailHash: EncryptionService.hashEmail(appleUser.email) });
           if (existingUser) {
             // Check if this is a Google account that can be linked
             if (existingUser.googleId && !existingUser.appleId) {
-              console.log('🔗 ASU Server Route: Linking Apple ID to existing Google account');
               existingUser.appleId = appleUser.appleId;
               await existingUser.save();
               
@@ -785,7 +723,6 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
             }
             // Check if this is a basic email/password account that can be linked
             else if (existingUser.hashedAccessKey && !existingUser.appleId) {
-              console.log('🔗 ASU Server Route: Linking Apple ID to existing email/password account');
               existingUser.appleId = appleUser.appleId;
               await existingUser.save();
               
@@ -826,7 +763,6 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
             }
             // Account already has Apple ID or other conflicts
             else {
-              console.log('🔴 ASU Server Route: Account already has Apple ID or other conflicts');
               res.status(400).json({ 
                 error: 'An account already exists with this email address. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.'
               });
@@ -837,7 +773,6 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
       }
 
       // Create new user
-      console.log('🍎 ASU Server Route: Creating new user with Apple ID');
       const isRealEmail = appleUser.email && !appleUser.email.includes('@privaterelay.appleid.com');
       const isApplePrivateRelay = appleUser.email && appleUser.email.includes('@privaterelay.appleid.com');
       const userEmail = appleUser.email || `apple_${appleUser.appleId}@system.appleid.com`; // Use system domain, not privaterelay
@@ -855,7 +790,6 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
       });
 
       await newUser.save();
-      console.log('🍎 ASU Server Route: New user created successfully');
 
       // Create research data for new user
       await createUserResearchData(newUser._id as mongoose.Types.ObjectId);
@@ -873,7 +807,6 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
       newUser.setCurrentToken(sessionId);
       await newUser.save();
       
-      console.log('🍎 ASU Server Route: Apple Sign-Up successful, returning user data');
       res.json({
         token,
         user: {
@@ -982,12 +915,6 @@ router.post('/update-handle', async (req, res): Promise<void> => {
     user.needsHandleSelection = false;
     await user.save();
 
-    console.log('🔵 SERVER: Handle updated successfully:', {
-      userId: user._id,
-      oldHandle: user.handle,
-      newHandle: handle,
-      needsHandleSelection: user.needsHandleSelection
-    });
 
     res.json({
       success: true,
@@ -1062,17 +989,10 @@ router.get('/verify-token', async (req, res): Promise<void> => {
     // Only check sessionId if the token has one (new tokens)
     // Old tokens without sessionId are still valid
     if (decoded.sessionId && !user.isTokenValid(decoded.sessionId)) {
-      console.log('🔍 VERIFY-TOKEN: Session invalidated by new login, sending ACCOUNT_SWITCHED');
       res.status(401).json({ error: 'ACCOUNT_SWITCHED' });
       return;
     }
 
-    console.log('🔵 SERVER: Token verified, returning current user data:', {
-      userId: user._id,
-      handle: user.handle,
-      onboardingCompleted: user.onboardingCompleted,
-      needsHandleSelection: user.needsHandleSelection
-    });
 
     res.json({
       success: true,
@@ -1130,14 +1050,8 @@ router.post('/send-verification', async (req: Request, res: Response): Promise<v
 
     // Check if the email is already in use by another user
     const emailExists = await User.emailExists(email);
-    console.log('🔵 SERVER: Email existence check:', {
-      email: email,
-      emailExists: emailExists,
-      currentUser: user.handle
-    });
     
     if (emailExists) {
-      console.log('🔴 SERVER: Email already exists:', email);
       res.status(400).json({ error: 'Please select a new email address or log into the existing account.' });
       return;
     }
@@ -1347,82 +1261,60 @@ router.post('/resend-verification', async (req: Request, res: Response): Promise
 // Password reset endpoints
 router.post('/forgot-password', async (req: Request, res: Response): Promise<void> => {
   try {
-    console.log('🔍 [DEBUG] Forgot password request received');
     const { email } = req.body;
-    console.log('🔍 [DEBUG] Email provided:', email);
     
     if (!email) {
-      console.log('❌ [DEBUG] No email provided');
       res.status(400).json({ error: 'Email is required' });
       return;
     }
 
     // Find user by email
-    console.log('🔍 [DEBUG] Looking up user by email hash');
     const user = await User.findOne({ emailHash: EncryptionService.hashEmail(email) });
     if (!user) {
-      console.log('❌ [DEBUG] User not found for email');
       // Don't reveal if user exists or not for security
       res.status(200).json({ message: 'If the email exists, a password reset link has been sent' });
       return;
     }
-    console.log('✅ [DEBUG] User found:', user.handle);
 
     // Check if email is verified
-    console.log('🔍 [DEBUG] Checking if email is verified:', user.emailVerified);
     if (!user.emailVerified) {
-      console.log('❌ [DEBUG] Email not verified');
       res.status(400).json({ error: 'Email must be verified before resetting password' });
       return;
     }
-    console.log('✅ [DEBUG] Email is verified');
 
     // Check if this is a Google account (has googleId but no hashedAccessKey)
-    console.log('🔍 [DEBUG] Checking if Google account:', { googleId: !!user.googleId, hashedAccessKey: !!user.hashedAccessKey });
     if (user.googleId && !user.hashedAccessKey) {
-      console.log('❌ [DEBUG] Google account - cannot reset password');
       res.status(400).json({ error: 'This account uses Google Sign-In. Please use the "Sign in with Google" button instead.' });
       return;
     }
     
     // Check if this is an Apple account (has appleId but no hashedAccessKey)
-    console.log('🔍 [DEBUG] Checking if Apple account:', { appleId: !!user.appleId, hashedAccessKey: !!user.hashedAccessKey });
     if (user.appleId && !user.hashedAccessKey) {
-      console.log('❌ [DEBUG] Apple account - cannot reset password');
       res.status(400).json({ error: 'This account uses Apple Sign-In. Please use the "Sign in with Apple" button instead.' });
       return;
     }
     
-    console.log('✅ [DEBUG] Not a social auth account - proceeding with password reset');
 
     // Generate password reset token
-    console.log('🔍 [DEBUG] Generating password reset token');
     const resetToken = EmailService.generatePasswordResetToken();
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-    console.log('✅ [DEBUG] Reset token generated, expires at:', expiresAt);
 
     // Update user with reset token
-    console.log('🔍 [DEBUG] Saving reset token to user');
     user.emailVerificationToken = resetToken; // Reuse the same field for password reset
     user.emailVerificationExpires = expiresAt;
     user.emailVerificationSentAt = new Date();
     await user.save();
-    console.log('✅ [DEBUG] Reset token saved to database');
 
     // Send password reset email
-    console.log('📧 [DEBUG] Attempting to send password reset email to:', user.getDecryptedEmail());
     const emailSent = await EmailService.sendPasswordResetEmail(
       user.getDecryptedEmail(),
       user.handle,
       resetToken
     );
-    console.log('📧 [DEBUG] Email send result:', emailSent);
 
     if (emailSent) {
-      console.log('✅ [DEBUG] Password reset email sent successfully');
       res.status(200).json({ message: 'If the email exists, a password reset link has been sent' });
     } else {
-      console.log('❌ [DEBUG] Failed to send password reset email');
       res.status(500).json({ error: 'Failed to send password reset email' });
     }
   } catch (error) {

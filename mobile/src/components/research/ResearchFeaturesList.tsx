@@ -110,10 +110,8 @@ export function ResearchFeaturesList({
           
           // Auto-complete research when timer reaches zero
           if (remaining === 0) {
-            console.log('🔬 RESEARCH: ⚡ TIMER REACHED ZERO! Completing research for:', feature.id);
             completedFeaturesRef.current.add(feature.id);
             completeResearch({ categoryId, featureId: feature.id }).unwrap().then((result) => {
-              console.log('🔬 RESEARCH: ✅ Successfully completed research:', result);
               onResearchStarted?.();
             }).catch((error) => {
               console.error('🔬 RESEARCH: ❌ Failed to complete research:', error);

@@ -60,16 +60,12 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
 
   // Calculate available bot counts by subtracting assigned quantities
   const availableBots = useMemo(() => {
-    console.log(`🔍 AVAILABLE BOTS CALC: Starting calculation`);
-    console.log(`🔍 AVAILABLE BOTS CALC: botCounts from Redux:`, botCounts);
-    console.log(`🔍 AVAILABLE BOTS CALC: assignments:`, assignments);
     
     const available = { ...botCounts };
     
     // Subtract assigned quantities from available pool
     Object.values(assignments).forEach((assignment) => {
       if (assignment && assignment.quantity > 0) {
-        console.log(`🔍 AVAILABLE BOTS CALC: Subtracting ${assignment.quantity} ${assignment.botType} bots`);
         available[assignment.botType as BotType] -= assignment.quantity;
       }
     });
@@ -81,7 +77,6 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       }
     });
     
-    console.log(`🔍 AVAILABLE BOTS CALC: Final available:`, available);
     return available;
   }, [botCounts, assignments]);
 
@@ -115,9 +110,6 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
   const handleBotAssignment = React.useCallback(async (data: { botType: BotType; quantity: number }) => {
     if (!selectedBattalion) return;
 
-    console.log(`🔍 CLIENT ASSIGNMENT: Starting assignment - botType: ${data.botType}, quantity: ${data.quantity}, battalionId: ${selectedBattalion}`);
-    console.log(`🔍 CLIENT ASSIGNMENT: Current botCounts from Redux:`, botCounts);
-    console.log(`🔍 CLIENT ASSIGNMENT: Current assignments:`, assignments);
 
     try {
       const result = await assignToBattalion({
@@ -126,7 +118,6 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
         battalionId: selectedBattalion,
       });
 
-      console.log(`🔍 CLIENT ASSIGNMENT: API response:`, result);
 
       setAssignments(prev => {
         const newAssignments = {
@@ -137,7 +128,6 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
             markLevel: 1,
           },
         };
-        console.log(`🔍 CLIENT ASSIGNMENT: New assignments:`, newAssignments);
         return newAssignments;
       });
     } catch (error) {
@@ -213,7 +203,6 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
   const handleBattleStart = React.useCallback(async () => {
     // Prevent double-clicks
     if (isStartingBattle) {
-      console.log('Battle start already in progress, ignoring click');
       return;
     }
 

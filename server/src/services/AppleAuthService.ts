@@ -9,11 +9,9 @@ export class AppleAuthService {
   static initialize(): void {
     const clientId = APPLE_CLIENT_ID;
     
-    console.log('🍎 ASI Server: Initializing Apple Auth Service');
-    console.log('🍎 ASI Server: APPLE_CLIENT_ID found:', !!clientId);
     
     if (!clientId) {
-      console.warn('🔴 ASI Server: APPLE_CLIENT_ID not set. Apple Sign-In will be disabled.');
+      console.error('APPLE_CLIENT_ID not set. Apple Sign-In will be disabled.');
       return;
     }
     
@@ -26,7 +24,6 @@ export class AppleAuthService {
     });
     
     this.isInitialized = true;
-    console.log('🍎 ASI Server: Apple Auth Service initialized successfully');
   }
 
   static isEnabled(): boolean {
@@ -39,33 +36,27 @@ export class AppleAuthService {
     name?: string;
   } | null> {
     if (!this.isEnabled()) {
-      console.log('🔴 ASI Server: Apple Auth Service not initialized');
       return null;
     }
 
     try {
-      console.log('🍎 ASI Server: Verifying Apple token');
       
       // Decode the token header to get the key ID
       const decodedHeader = jwt.decode(idToken, { complete: true });
       if (!decodedHeader || typeof decodedHeader === 'string') {
-        console.log('🔴 ASI Server: Invalid token format');
         return null;
       }
 
       const { kid } = decodedHeader.header;
       if (!kid) {
-        console.log('🔴 ASI Server: No key ID in token header');
         return null;
       }
 
-      console.log('🍎 ASI Server: Token key ID:', kid);
 
       // Get the public key from Apple's JWKS
       const key = await this.client.getSigningKey(kid);
       const publicKey = key.getPublicKey();
 
-      console.log('🍎 ASI Server: Got public key from Apple JWKS');
 
       // Verify the token
       const decoded = jwt.verify(idToken, publicKey, {
@@ -74,9 +65,6 @@ export class AppleAuthService {
         issuer: 'https://appleid.apple.com',
       }) as any;
 
-      console.log('🍎 ASI Server: Token verified successfully');
-      console.log('🍎 ASI Server: Token subject (Apple ID):', decoded.sub);
-      console.log('🍎 ASI Server: Token email:', decoded.email);
 
       // Extract user information
       const appleId = decoded.sub;
@@ -89,7 +77,7 @@ export class AppleAuthService {
         name,
       };
     } catch (error) {
-      console.error('🔴 ASI Server: Apple token verification failed:', error);
+      console.error('Apple token verification failed:', error);
       return null;
     }
   }

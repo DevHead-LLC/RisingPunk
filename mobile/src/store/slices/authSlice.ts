@@ -143,8 +143,6 @@ export const registerUser = createAsyncThunk(
       }
 
       const data = await response.json();
-      console.log('🔵 CLIENT: Received registration response:', data);
-      console.log('🔵 CLIENT: User needsHandleSelection:', data.user.needsHandleSelection);
 
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
@@ -163,12 +161,7 @@ export const registerUser = createAsyncThunk(
 export const googleSignInUser = createAsyncThunk(
   'auth/googleSignIn',
   async (idToken: string, { rejectWithValue, dispatch }) => {
-    console.log('🔵 GSI Redux: Starting Google Sign-In thunk');
-    console.log('🔵 GSI Redux: API URL:', API_URL);
-    console.log('🔵 GSI Redux: ID Token length:', idToken?.length);
-    
     try {
-      console.log('🔵 GSI Redux: Making fetch request to server');
       const response = await fetch(`${API_URL}/api/auth/google-signin`, {
         method: 'POST',
         headers: {
@@ -176,15 +169,10 @@ export const googleSignInUser = createAsyncThunk(
         },
         body: JSON.stringify({ idToken }),
       });
-      
-      console.log('🔵 GSI Redux: Server response received');
-      console.log('🔵 GSI Redux: Response status:', response.status);
-      console.log('🔵 GSI Redux: Response ok:', response.ok);
 
       if (!response.ok) {
-        console.log('🔴 GSI Redux: Server response not ok, parsing error');
         const error = await response.json().catch(() => ({ error: 'Google Sign-In failed' }));
-        console.log('🔴 GSI Redux: Server error:', error);
+        console.error('Google Sign-In server error:', error);
         
         // Handle specific error cases with user-friendly messages
         if (error.error && error.error.includes('No account found')) {
@@ -198,9 +186,7 @@ export const googleSignInUser = createAsyncThunk(
         return rejectWithValue(error.error || 'Google Sign-In failed');
       }
 
-      console.log('🔵 GSI Redux: Parsing successful response');
       const data = await response.json();
-      console.log('🔵 GSI Redux: Response data parsed successfully');
 
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
@@ -244,22 +230,13 @@ export const googleSignInUser = createAsyncThunk(
         console.warn('Failed to fetch initial data:', fetchError);
       }
 
-      console.log('🔵 GSI Redux: Returning successful data');
       return data;
     } catch (error) {
-      console.log('🔴 GSI Redux: Error caught in thunk');
-      console.log('🔴 GSI Redux: Error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        type: typeof error,
-        isTypeError: error instanceof TypeError,
-        isNetworkError: error instanceof TypeError && error.message.includes('Network request failed'),
-      });
+      console.error('Google Sign-In error:', error);
       
       if (error instanceof TypeError && error.message.includes('Network request failed')) {
-        console.log('🔴 GSI Redux: Network request failed error detected');
         return rejectWithValue('Network error: Cannot connect to server');
       }
-      console.log('🔴 GSI Redux: Other error, rejecting with message');
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -360,12 +337,7 @@ export const googleSignUpUser = createAsyncThunk(
 export const appleSignInUser = createAsyncThunk(
   'auth/appleSignIn',
   async (idToken: string, { rejectWithValue, dispatch }) => {
-    console.log('🔵 ASI Redux: Starting Apple Sign-In thunk');
-    console.log('🔵 ASI Redux: API URL:', API_URL);
-    console.log('🔵 ASI Redux: ID Token length:', idToken?.length);
-    
     try {
-      console.log('🔵 ASI Redux: Making fetch request to server');
       const response = await fetch(`${API_URL}/api/auth/apple-signin`, {
         method: 'POST',
         headers: {
@@ -373,15 +345,10 @@ export const appleSignInUser = createAsyncThunk(
         },
         body: JSON.stringify({ idToken }),
       });
-      
-      console.log('🔵 ASI Redux: Server response received');
-      console.log('🔵 ASI Redux: Response status:', response.status);
-      console.log('🔵 ASI Redux: Response ok:', response.ok);
 
       if (!response.ok) {
-        console.log('🔴 ASI Redux: Server response not ok, parsing error');
         const error = await response.json().catch(() => ({ error: 'Apple Sign-In failed' }));
-        console.log('🔴 ASI Redux: Server error:', error);
+        console.error('Apple Sign-In server error:', error);
         
         // Handle specific error cases with user-friendly messages
         if (error.error && error.error.includes('No account found')) {
@@ -395,9 +362,7 @@ export const appleSignInUser = createAsyncThunk(
         return rejectWithValue(error.error || 'Apple Sign-In failed');
       }
 
-      console.log('🔵 ASI Redux: Parsing successful response');
       const data = await response.json();
-      console.log('🔵 ASI Redux: Response data parsed successfully');
 
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
@@ -438,25 +403,16 @@ export const appleSignInUser = createAsyncThunk(
         }
       } catch (fetchError) {
         // Don't fail login if data fetching fails
-        console.warn('Failed to fetch initial data:', fetchError);
+        console.error('Failed to fetch initial data:', fetchError);
       }
 
-      console.log('🔵 ASI Redux: Returning successful data');
       return data;
     } catch (error) {
-      console.log('🔴 ASI Redux: Error caught in thunk');
-      console.log('🔴 ASI Redux: Error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        type: typeof error,
-        isTypeError: error instanceof TypeError,
-        isNetworkError: error instanceof TypeError && error.message.includes('Network request failed'),
-      });
+      console.error('Apple Sign-In error:', error);
       
       if (error instanceof TypeError && error.message.includes('Network request failed')) {
-        console.log('🔴 ASI Redux: Network request failed error detected');
         return rejectWithValue('Network error: Cannot connect to server');
       }
-      console.log('🔴 ASI Redux: Other error, rejecting with message');
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -581,8 +537,6 @@ export const updateUserHandle = createAsyncThunk(
 
       const data = await response.json();
       
-      console.log('🔵 HANDLE UPDATE: Handle updated successfully, invalidating User cache');
-      
       // Update AsyncStorage with new user data
       try {
         const currentUserData = await AsyncStorage.getItem('user');
@@ -591,15 +545,13 @@ export const updateUserHandle = createAsyncThunk(
           userData.handle = data.user.handle;
           userData.needsHandleSelection = false;
           await AsyncStorage.setItem('user', JSON.stringify(userData));
-          console.log('🔵 HANDLE UPDATE: AsyncStorage updated with new handle:', data.user.handle);
         }
       } catch (storageError) {
-        console.warn('🔵 HANDLE UPDATE: Failed to update AsyncStorage:', storageError);
+        console.error('Failed to update AsyncStorage:', storageError);
       }
       
       // Invalidate RTK Query cache to ensure profile data is refreshed
       dispatch(authApi.util.invalidateTags(['User']));
-      console.log('🔵 HANDLE UPDATE: User cache invalidated, profile should refresh');
       
       return data;
     } catch (error: any) {
@@ -683,9 +635,6 @@ export const loadStoredAuth = createAsyncThunk(
       }
 
       const userData = await response.json();
-      
-      console.log('🔵 LOAD STORED AUTH: Raw response from verify-token:', userData);
-      console.log('🔵 LOAD STORED AUTH: User data from database:', userData.user);
       
       // Update stored user data with fresh database data
       await AsyncStorage.setItem('user', JSON.stringify(userData.user));
@@ -803,7 +752,6 @@ export const forceRefreshAllData = createAsyncThunk(
         return rejectWithValue('No authentication token');
       }
 
-      console.log('🔵 FORCE REFRESH: Starting complete data refresh from database');
 
       // Clear all RTK Query caches to force fresh data
       dispatch(authApi.util.resetApiState());
@@ -820,7 +768,6 @@ export const forceRefreshAllData = createAsyncThunk(
 
       if (balanceResponse.ok) {
         const balanceData = await balanceResponse.json();
-        console.log('🔵 FORCE REFRESH: Fresh balance data:', balanceData);
         dispatch(updateBalance({
           total: balanceData.total,
           ratePerSecond: balanceData.ratePerSecond,
@@ -836,7 +783,6 @@ export const forceRefreshAllData = createAsyncThunk(
 
       if (botsResponse.ok) {
         const botsData = await botsResponse.json();
-        console.log('🔵 FORCE REFRESH: Fresh bots data:', botsData);
         dispatch(setBots(botsData.bots));
       }
 
@@ -848,14 +794,12 @@ export const forceRefreshAllData = createAsyncThunk(
 
       if (buildStateResponse.ok) {
         const buildStateData = await buildStateResponse.json();
-        console.log('🔵 FORCE REFRESH: Fresh build state data:', buildStateData);
         dispatch(setBuildState(buildStateData));
       }
 
-      console.log('🔵 FORCE REFRESH: Complete data refresh completed');
       return { success: true };
     } catch (error) {
-      console.error('🔴 FORCE REFRESH: Error during data refresh:', error);
+      console.error('Error during data refresh:', error);
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -894,11 +838,9 @@ export const authSlice = createSlice({
     setOnboardingCompleted: (state) => {
       // Only allow onboarding completion if app is initialized
       if (!state.isInitialized) {
-        console.log('🔵 ONB: Skipping onboarding completion - app not yet initialized');
         return;
       }
       
-      console.log('🔵 ONB: Onboarding completed, current showHandleSelection:', state.showHandleSelection);
       // Store the current handle selection state before making changes
       const shouldShowHandleSelection = state.showHandleSelection;
       
@@ -910,7 +852,6 @@ export const authSlice = createSlice({
       if (state.user) {
         state.user.onboardingCompleted = true;
       }
-      console.log('🔵 ONB: After update - showOnboarding:', state.showOnboarding, 'showTurfIntro:', state.showTurfIntro, 'showHandleSelection:', state.showHandleSelection);
     },
     setShowOnboarding: (state, action: PayloadAction<boolean>) => {
       state.showOnboarding = action.payload;
@@ -918,25 +859,18 @@ export const authSlice = createSlice({
     setShowTurfIntro: (state, action: PayloadAction<boolean>) => {
       // Only allow turf intro changes if app is initialized
       if (!state.isInitialized) {
-        console.log('🔵 TURF: Skipping turf intro change - app not yet initialized');
         return;
       }
-      
-      console.log('🔵 TURF: Setting showTurfIntro to:', action.payload, 'current showHandleSelection:', state.showHandleSelection);
       
       // If we're hiding turf intro (setting to false), check if user needs handle selection
       if (action.payload === false) {
         // Check if user needs handle selection and set it to true
         if (state.user && state.user.needsHandleSelection) {
           state.showHandleSelection = true;
-          console.log('🔵 TURF: Hiding turf intro, user needs handle selection, setting showHandleSelection: true');
-        } else {
-          console.log('🔵 TURF: Hiding turf intro, user does not need handle selection');
         }
       }
       
       state.showTurfIntro = action.payload;
-      console.log('🔵 TURF: After update - showTurfIntro:', state.showTurfIntro, 'showHandleSelection:', state.showHandleSelection);
     },
     setShowHandleSelection: (state, action: PayloadAction<boolean>) => {
       state.showHandleSelection = action.payload;
@@ -952,7 +886,6 @@ export const authSlice = createSlice({
     },
     forceRefreshData: (state) => {
       // This action will trigger a complete data refresh
-      console.log('🔵 FORCE REFRESH: Triggering complete data refresh from database');
     },
     setShowAccountSwitched: (state, action: PayloadAction<boolean>) => {
       state.showAccountSwitched = action.payload;
@@ -961,17 +894,13 @@ export const authSlice = createSlice({
       state.showAccountSwitchedBanner = action.payload;
     },
     handleAccountSwitched: (state, action) => {
-      console.log('🔍 AUTH SLICE: handleAccountSwitched action dispatched');
-      
       // Prevent multiple calls - if already logged out, don't process again
       if (!state.token) {
-        console.log('🔍 AUTH SLICE: User already logged out, skipping handleAccountSwitched');
         return;
       }
       
       // Only show banner if user was actually authenticated (old user being logged out)
       const wasAuthenticated = !!state.token;
-      console.log('🔍 AUTH SLICE: User was authenticated:', wasAuthenticated);
       
       // Clear all auth data
       state.token = null;
@@ -989,7 +918,6 @@ export const authSlice = createSlice({
       
       // Only show banner if user was authenticated (old user being logged out)
       state.showAccountSwitchedBanner = wasAuthenticated;
-      console.log('🔍 AUTH SLICE: showAccountSwitchedBanner set to:', wasAuthenticated);
       
       // Note: RTK Query cache clearing will be handled by the API error handlers
       // that dispatch this action, to avoid circular dependencies
@@ -1025,10 +953,6 @@ export const authSlice = createSlice({
         state.error = null;
       })
           .addCase(registerUser.fulfilled, (state, action) => {
-      console.log('🔵 REG: Registration fulfilled, payload:', action.payload);
-      console.log('🔵 REG: User needsHandleSelection:', action.payload.user.needsHandleSelection);
-      console.log('🔵 REG: User onboardingCompleted:', action.payload.user.onboardingCompleted);
-      
       state.isLoading = false;
       state.token = action.payload.token;
       state.user = action.payload.user;
@@ -1036,8 +960,6 @@ export const authSlice = createSlice({
       state.showOnboarding = !action.payload.user.onboardingCompleted;
       state.showHandleSelection = action.payload.user.needsHandleSelection;
       state.isInitialized = true; // Mark as initialized after successful registration
-      
-      console.log('🔵 REG: State after update - showOnboarding:', state.showOnboarding, 'showHandleSelection:', state.showHandleSelection, 'isInitialized:', state.isInitialized);
     })
       .addCase(registerUser.rejected, (state, action) => {
         state.isLoading = false;
@@ -1143,7 +1065,6 @@ export const authSlice = createSlice({
       .addCase(updateUserHandle.fulfilled, (state, action) => {
         state.isLoading = false;
         if (state.user) {
-          console.log('🔵 AUTH SLICE: Updating local user handle from', state.user.handle, 'to', action.payload.user.handle);
           state.user.handle = action.payload.user.handle;
           state.user.needsHandleSelection = false;
         }
@@ -1151,9 +1072,6 @@ export const authSlice = createSlice({
         // Show email verification modal after handle selection if email is not verified
         if (state.user && !state.user.emailVerified) {
           state.showEmailVerification = true;
-          console.log('🔵 AUTH SLICE: Handle update completed, showing email verification modal');
-        } else {
-          console.log('🔵 AUTH SLICE: Handle update completed, email already verified');
         }
         state.error = null;
       })
@@ -1200,12 +1118,6 @@ export const authSlice = createSlice({
         if (action.payload) {
           const { token, user } = action.payload;
           
-          console.log('🔵 LOAD STORED AUTH: Loading fresh user data from database:', {
-            handle: user.handle,
-            onboardingCompleted: user.onboardingCompleted,
-            needsHandleSelection: user.needsHandleSelection
-          });
-          
           state.token = token;
           state.user = user;
           
@@ -1215,15 +1127,7 @@ export const authSlice = createSlice({
           state.showHandleSelection = user.needsHandleSelection && user.onboardingCompleted;
           state.isInitialized = true; // Mark that initial database verification is complete
           
-          console.log('🔵 LOAD STORED AUTH: UI states set:', {
-            showOnboarding: state.showOnboarding,
-            showTurfIntro: state.showTurfIntro,
-            showHandleSelection: state.showHandleSelection,
-            isInitialized: state.isInitialized
-          });
-          
           // Force fetch fresh balance and bot data immediately after auth
-          console.log('🔵 LOAD STORED AUTH: Triggering immediate data refresh');
         } else {
           // No stored auth, reset all states
           state.token = null;
@@ -1283,8 +1187,6 @@ export const authSlice = createSlice({
           if (action.payload.emailVerified) {
             state.emailVerificationPromptedUserId = null;
           }
-          
-          console.log('🔵 AUTH SLICE: User data refreshed, emailVerified:', action.payload.emailVerified);
         }
       })
       .addCase(refreshUserData.rejected, (state, action) => {
@@ -1301,12 +1203,11 @@ export const authSlice = createSlice({
       .addCase(forceRefreshAllData.fulfilled, (state, _action) => {
         state.isLoading = false;
         state.error = null;
-        console.log('🔵 FORCE REFRESH: Data refresh completed successfully');
       })
       .addCase(forceRefreshAllData.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
-        console.error('🔴 FORCE REFRESH: Data refresh failed:', action.payload);
+        console.error('Data refresh failed:', action.payload);
       });
   },
 });

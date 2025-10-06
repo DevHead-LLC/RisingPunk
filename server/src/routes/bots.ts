@@ -211,7 +211,6 @@ router.post('/assign', auth, async (req, res) => {
   try {
     const { botType, quantity, battalionId } = req.body;
     
-    console.log(`🔍 BATTALION ASSIGNMENT: Starting assignment - botType: ${botType}, quantity: ${quantity}, battalionId: ${battalionId}`);
     
     // Use atomic operation with retry logic to handle race conditions
     let retryCount = 0;
@@ -232,7 +231,6 @@ router.post('/assign', auth, async (req, res) => {
           continue; // Retry with the new bot
         }
 
-        console.log(`🔍 BATTALION ASSIGNMENT: Initial bot counts - ${botType}: ${bot.bots[botType]}`);
 
         // Find existing assignment for this battalion
         const existingAssignment = bot.battalionAssignments.find(
@@ -263,21 +261,17 @@ router.post('/assign', auth, async (req, res) => {
         if (existingAssignment) {
           if (existingAssignment.botType === botType) {
             // Same bot type: add back the existing assignment quantity to available pool
-            console.log(`🔍 BATTALION ASSIGNMENT: Found existing assignment - returning ${existingAssignment.quantity} ${existingAssignment.botType} bots`);
             trulyAvailableBots += existingAssignment.quantity;
           } else {
             // Different bot type: the bots are already "returned" to their original type
             // because we filtered out the existing assignment, so they're no longer assigned
             // and are available in their original type's inventory
-            console.log(`🔍 BATTALION ASSIGNMENT: Cross-type reassignment - ${existingAssignment.quantity} ${existingAssignment.botType} bots returned to inventory`);
           }
         }
         
-        console.log(`🔍 BATTALION ASSIGNMENT: Total ${botType} bots: ${totalBotsOfType}, already assigned to other battalions: ${alreadyAssignedToOtherBattalions}, truly available: ${trulyAvailableBots}`);
 
         // Verify sufficient truly available bots
         if (trulyAvailableBots < quantity) {
-          console.log(`🔍 BATTALION ASSIGNMENT: Insufficient bots - need ${quantity}, have ${trulyAvailableBots} truly available`);
           res.status(400).json({ error: 'Insufficient Bots Available' });
           return;
         }
@@ -295,7 +289,6 @@ router.post('/assign', auth, async (req, res) => {
           });
         }
 
-        console.log(`🔍 BATTALION ASSIGNMENT: Assignment complete - ${botType}: ${quantity} bots assigned to battalion ${battalionId}`);
 
         // Atomic update with version check to prevent race conditions
         // CRITICAL: Only update assignments, never modify total bot inventory
@@ -318,12 +311,10 @@ router.post('/assign', auth, async (req, res) => {
         if (!updatedBot) {
           // Version mismatch - retry
           retryCount++;
-          console.log(`🔍 BATTALION ASSIGNMENT: Version conflict, retrying... (${retryCount}/${maxRetries})`);
           await new Promise(resolve => setTimeout(resolve, 50 * retryCount)); // Exponential backoff
           continue;
         }
 
-        console.log(`🔍 BATTALION ASSIGNMENT: Final result - ${botType}: ${updatedBot.bots[botType]}, assignments: ${updatedBot.battalionAssignments.length}`);
 
         // Calculate final available count for response
         const finalAvailableCount = (updatedBot.bots[botType] || 0) - 
@@ -342,7 +333,6 @@ router.post('/assign', auth, async (req, res) => {
       } catch (updateError: any) {
         if (updateError.code === 11000) { // Duplicate key error
           retryCount++;
-          console.log(`🔍 BATTALION ASSIGNMENT: Duplicate key error, retrying... (${retryCount}/${maxRetries})`);
           await new Promise(resolve => setTimeout(resolve, 50 * retryCount));
           continue;
         }
@@ -351,7 +341,7 @@ router.post('/assign', auth, async (req, res) => {
     }
 
     // If we get here, all retries failed
-    console.error('🔍 BATTALION ASSIGNMENT: Max retries exceeded');
+    console.error('Max retries exceeded');
     res.status(500).json({ error: 'Assignment failed due to concurrency conflicts' });
 
   } catch (error: any) {
