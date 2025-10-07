@@ -26,12 +26,24 @@
 - [ ] **4.3** Note Submission ID
 
 ## Phase 5: Monitor Review
-- [ ] **5.1** Check Review Status
-- [ ] **5.2** Respond to Any Feedback
-- [ ] **5.3** Handle Rejection (if any)
+- [x] **5.1** Check Review Status (Received rejection - metadata issue)
+- [x] **5.2** Respond to Any Feedback (Fixed app display name)
+- [ ] **5.3** Handle Rejection (if any) - RESOLVED: App name mismatch
+
+## Phase 6: App Store Rejection Resolution
+- [x] **6.1** Identify Issue: App display name "mobile" vs marketplace name "RisingPunk"
+- [x] **6.2** Update app.json displayName to "RisingPunk"
+- [x] **6.3** Update Info.plist CFBundleDisplayName to "RisingPunk"
+- [ ] **6.4** Create new build with corrected metadata
+- [ ] **6.5** Resubmit to App Store
 
 ---
 
-## Current Step: 1.1 - Set Build Configuration to Release
+## Current Step: 6.4 - Create new build with corrected metadata
 
 **Status:** 🔍 **IN PROGRESS**
+
+**Issue Resolved:** App Store rejection due to metadata mismatch
+- **Problem:** App displayed as "mobile" on device vs "RisingPunk" in App Store
+- **Solution:** Updated both app.json and Info.plist to use "RisingPunk" as display name
+- **Next:** Need to create new build and resubmit
