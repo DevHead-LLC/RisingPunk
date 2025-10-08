@@ -26,10 +26,18 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
     setIsProcessing(true);
     isProcessingRef.current = true;
     
+    // Enhanced logging for iOS 26.1 debugging
+    console.log('Apple Sign In attempt started:', {
+      platform: Platform.OS,
+      version: Platform.Version,
+      timestamp: new Date().toISOString()
+    });
+    
     try {
       // Check if Apple Sign In is available first
       const isAvailable = appleAuth.isSupported;
       if (!isAvailable) {
+        console.log('Apple Sign In not supported on this device');
         Alert.alert('Error', 'Apple Sign In is not available on this device');
         return;
       }
@@ -57,10 +65,21 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
         Alert.alert('Error', 'Apple Sign-In failed. Please try again.');
       }
     } catch (error: any) {
+      // Enhanced logging for iOS 26.1 debugging
+      console.log('Apple Sign In Error Details:', {
+        platform: Platform.OS,
+        version: Platform.Version,
+        errorCode: error.code,
+        errorMessage: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString()
+      });
       
       // Handle specific Apple Sign In errors more gracefully
       const errorCode = error.code !== undefined ? String(error.code) : '';
       const isUserCancellation = errorCode === '1001' || 
+                                errorCode === '1002' || // iOS 26.1 specific
+                                errorCode === '1003' || // Additional iOS 26.1 codes
                                 error.message?.includes('cancelled') || 
                                 error.message?.includes('canceled');
       
@@ -162,6 +181,7 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
           <AppleSignInButton
             onPress={handleAppleSignIn}
             style={styles.appleButtonInner}
+            isSignUp={isSignUp}
           />
         </View>
       </View>
@@ -176,32 +196,13 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 320,
     alignItems: 'center',
-  },
-  alternativeButton: {
-    height: 48,
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-    borderWidth: 0, // Remove green border
-    borderRadius: 4,
-  },
-  buttonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    // Ensure minimum margin around buttons (1/10 of button height = 4.8pt for 48pt button)
+    paddingHorizontal: Math.max(5, 48 * 0.1), // At least 5pt, or 1/10 of button height
   },
   logosContainer: {
     flexDirection: 'row',
     height: 48, // Increased container height to accommodate Google button
     position: 'relative',
-  },
-  socialButton: {
-    width: 160,
-    height: 48, // Match container height
-    position: 'absolute',
-    top: 0, // Force both buttons to same top position
   },
   googleButtonContainer: {
     width: 160,
@@ -211,7 +212,6 @@ const styles = StyleSheet.create({
     top: 0, // Force to same top position as Apple button
     justifyContent: 'center',
     alignItems: 'center',
-    transform: [{ translateY: -2 }], // Move Google button up to match Apple button
   },
   googleButtonInner: {
     width: 160,
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
   },
   appleButtonInner: {
     width: 160,
-    height: 48, // Match container height
+    height: 41, // Match container height
   },
   appleButton: {
     width: 160,
@@ -240,13 +240,5 @@ const styles = StyleSheet.create({
     maxHeight: 48,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  buttonText: {
-    fontSize: SIZING.font.body,
-    fontWeight: '500',
-    letterSpacing: 1,
-  },
-  buttonCorner: {
-    ...styleGuide.cornerDecoration,
   },
 });
