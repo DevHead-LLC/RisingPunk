@@ -78,16 +78,17 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
       // Handle specific Apple Sign In errors more gracefully
       const errorCode = error.code !== undefined ? String(error.code) : '';
       const isUserCancellation = errorCode === '1001' || 
-                                errorCode === '1002' || // iOS 26.1 specific
-                                errorCode === '1003' || // Additional iOS 26.1 codes
                                 error.message?.includes('cancelled') || 
                                 error.message?.includes('canceled');
       
       if (isUserCancellation) {
-        // Don't show error for user cancellation
+        // Don't show error for user cancellation (only 1001)
         return;
       } else {
-        // Show error for all other cases (including 1000 - unknown errors)
+        // Show error for all other cases including:
+        // 1002 = ASAuthorizationErrorFailed (sign-in failed)
+        // 1003 = ASAuthorizationErrorInvalidResponse (invalid response)
+        // 1000 = ASAuthorizationErrorUnknown (unknown errors)
         Alert.alert('Error', `Apple Sign-In failed: ${error.message || 'Unknown error'}`);
       }
     } finally {
