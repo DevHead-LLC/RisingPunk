@@ -26,12 +26,6 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
     setIsProcessing(true);
     isProcessingRef.current = true;
     
-    // Enhanced logging for iOS 26.1 debugging
-    console.log('Apple Sign In attempt started:', {
-      platform: Platform.OS,
-      version: Platform.Version,
-      timestamp: new Date().toISOString()
-    });
     
     try {
       // Check if Apple Sign In is available first
@@ -65,15 +59,8 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
         Alert.alert('Error', 'Apple Sign-In failed. Please try again.');
       }
     } catch (error: any) {
-      // Enhanced logging for iOS 26.1 debugging
-      console.log('Apple Sign In Error Details:', {
-        platform: Platform.OS,
-        version: Platform.Version,
-        errorCode: error.code,
-        errorMessage: error.message,
-        stack: error.stack,
-        timestamp: new Date().toISOString()
-      });
+      // Log only essential error information for debugging
+      console.error('Apple Sign In failed:', error.code, error.message);
       
       // Handle specific Apple Sign In errors more gracefully
       const errorCode = error.code !== undefined ? String(error.code) : '';
