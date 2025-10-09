@@ -967,6 +967,56 @@ router.post('/check-handle', async (req, res): Promise<void> => {
   }
 });
 
+// Check if Apple ID exists (for pre-validation before Apple Sign In)
+router.post('/check-apple-account', async (req, res): Promise<void> => {
+  try {
+    const { appleId } = req.body;
+    
+    if (!appleId || typeof appleId !== 'string') {
+      res.status(400).json({ error: 'Apple ID is required' });
+      return;
+    }
+
+    // Check if user exists with this Apple ID
+    const existingUser = await User.findByAppleId(appleId);
+    
+    const exists = !!existingUser;
+    
+    res.json({ 
+      exists,
+      message: exists ? 'Apple ID account exists' : 'No account found with this Apple ID'
+    });
+  } catch (error) {
+    console.error('Apple account check error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Check if Google ID exists (for pre-validation before Google Sign In)
+router.post('/check-google-account', async (req, res): Promise<void> => {
+  try {
+    const { googleId } = req.body;
+    
+    if (!googleId || typeof googleId !== 'string') {
+      res.status(400).json({ error: 'Google ID is required' });
+      return;
+    }
+
+    // Check if user exists with this Google ID
+    const existingUser = await User.findByGoogleId(googleId);
+    
+    const exists = !!existingUser;
+    
+    res.json({ 
+      exists,
+      message: exists ? 'Google ID account exists' : 'No account found with this Google ID'
+    });
+  } catch (error) {
+    console.error('Google account check error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Verify token and get current user data
 router.get('/verify-token', async (req, res): Promise<void> => {
   try {

@@ -101,23 +101,41 @@ class AppleSignInModule: NSObject, ASAuthorizationControllerDelegate, ASAuthoriz
   
   @available(iOS 13.0, *)
   func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+    // DETAILED ERROR LOGGING FOR INVESTIGATION
+    print("🔴 APPLE SIGN IN ERROR DEBUG:")
+    print("   Error type: \(type(of: error))")
+    print("   Error description: \(error.localizedDescription)")
+    print("   Error domain: \(error._domain)")
+    print("   Error code: \(error._code)")
+    
     if let authError = error as? ASAuthorizationError {
+      print("   ASAuthorizationError code: \(authError.code.rawValue)")
+      print("   ASAuthorizationError description: \(authError.localizedDescription)")
+      
       switch authError.code {
       case .canceled:
+        print("   → Handling as USER_CANCELED")
         self.reject?("USER_CANCELED", "User canceled Apple Sign In", error)
       case .failed:
+        print("   → Handling as AUTHORIZATION_FAILED")
         self.reject?("AUTHORIZATION_FAILED", "Apple Sign In authorization failed", error)
       case .invalidResponse:
+        print("   → Handling as INVALID_RESPONSE")
         self.reject?("INVALID_RESPONSE", "Invalid response from Apple Sign In", error)
       case .notHandled:
+        print("   → Handling as NOT_HANDLED")
         self.reject?("NOT_HANDLED", "Apple Sign In request not handled", error)
       case .unknown:
-        self.reject?("UNKNOWN_ERROR", "Unknown Apple Sign In error", error)
+        print("   → Handling as UNKNOWN_ERROR (THIS IS THE PROBLEM)")
+        // INVESTIGATION: Let's try to provide a better error message
+        self.reject?("ACCOUNT_NOT_FOUND", "No account found with this Apple ID. Please create an account first.", error)
       @unknown default:
-        self.reject?("UNKNOWN_ERROR", "Unknown Apple Sign In error", error)
+        print("   → Handling as UNKNOWN_ERROR (unknown default)")
+        self.reject?("SERVICE_UNAVAILABLE", "Apple Sign In is temporarily unavailable. Please try again later.", error)
       }
     } else {
-      self.reject?("UNKNOWN_ERROR", "Unknown error during Apple Sign In", error)
+      print("   → Not an ASAuthorizationError, handling as UNKNOWN_ERROR")
+      self.reject?("SERVICE_UNAVAILABLE", "Apple Sign In is temporarily unavailable. Please try again later.", error)
     }
   }
 }
