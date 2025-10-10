@@ -9,6 +9,7 @@ import { AppleSignInButton } from './AppleSignInButton';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING, styleGuide } from '../../styles/theme';
 import { API_URL } from '../../config';
+import { AuthAlertModal } from '../modals/AuthAlertModal';
 
 interface SocialSignInButtonsProps {
   isSignUp?: boolean;
@@ -21,6 +22,21 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
   const colors = useThemeColors();
   const [isProcessing, setIsProcessing] = useState(false);
   const isProcessingRef = useRef(false); // Additional race condition protection
+  
+  // Custom modal state
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalMessage, setModalMessage] = useState('');
+
+  const showCustomAlert = useCallback((title: string, message: string) => {
+    setModalTitle(title);
+    setModalMessage(message);
+    setModalVisible(true);
+  }, []);
+
+  const hideCustomAlert = useCallback(() => {
+    setModalVisible(false);
+  }, []);
 
   const checkAppleAccountExists = async (appleUserId: string, identityToken: string): Promise<{exists: boolean}> => {
     try {
@@ -87,7 +103,7 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
           // For sign-in, check if account exists first
           const accountCheck = await checkAppleAccountExists(user, identityToken);
           if (!accountCheck.exists) {
-            Alert.alert(
+            showCustomAlert(
               'Account Not Found', 
               'No account found with this Apple ID. Please use the "NEW_IDENTITY (SIGN_UP)" option to create an account.'
             );
@@ -97,7 +113,7 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
           // For sign-up, check if account already exists
           const accountCheck = await checkAppleAccountExists(user, identityToken);
           if (accountCheck.exists) {
-            Alert.alert(
+            showCustomAlert(
               'Account Already Exists', 
               'An account already exists with this Apple ID. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.'
             );
@@ -176,7 +192,7 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
             // For sign-in, check if account exists first
             const accountCheck = await checkGoogleAccountExists(googleUserId, idToken);
             if (!accountCheck.exists) {
-              Alert.alert(
+              showCustomAlert(
                 'Account Not Found', 
                 'No account found with this Google account. Please use the "NEW_IDENTITY (SIGN_UP)" option to create an account.'
               );
@@ -186,7 +202,7 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
             // For sign-up, check if account already exists
             const accountCheck = await checkGoogleAccountExists(googleUserId, idToken);
             if (accountCheck.exists) {
-              Alert.alert(
+              showCustomAlert(
                 'Account Already Exists', 
                 'An account already exists with this Google account. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.'
               );
@@ -241,25 +257,34 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
   }, [handleAppleSignIn, handleGoogleSignIn]);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.logosContainer}>
-        <View style={styles.googleButtonContainer}>
-          <GoogleSigninButton
-            size={GoogleSigninButton.Size.Standard}
-            color={GoogleSigninButton.Color.Dark}
-            style={styles.googleButtonInner}
-            onPress={handleGoogleSignIn}
-          />
-        </View>
-        <View style={styles.appleButtonContainer}>
-          <AppleSignInButton
-            onPress={handleAppleSignIn}
-            style={styles.appleButtonInner}
-            isSignUp={isSignUp}
-          />
+    <>
+      <View style={styles.container}>
+        <View style={styles.logosContainer}>
+          <View style={styles.googleButtonContainer}>
+            <GoogleSigninButton
+              size={GoogleSigninButton.Size.Standard}
+              color={GoogleSigninButton.Color.Dark}
+              style={styles.googleButtonInner}
+              onPress={handleGoogleSignIn}
+            />
+          </View>
+          <View style={styles.appleButtonContainer}>
+            <AppleSignInButton
+              onPress={handleAppleSignIn}
+              style={styles.appleButtonInner}
+              isSignUp={isSignUp}
+            />
+          </View>
         </View>
       </View>
-    </View>
+      
+      <AuthAlertModal
+        visible={modalVisible}
+        title={modalTitle}
+        message={modalMessage}
+        onPress={hideCustomAlert}
+      />
+    </>
   );
 });
 

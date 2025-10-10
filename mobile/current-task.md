@@ -52,3 +52,30 @@
 - Button styling now follows Apple's HIG properly
 
 **Next:** Investigate and fix Apple Sign In error - see `apple-signin-error-fix.md` for detailed plan
+
+---
+
+## Current Task: Custom Auth Modal Implementation
+
+**Status:** ✅ **COMPLETED - CUSTOM AUTH MODAL IMPLEMENTED**
+
+**Task:** Replace native iOS Alert.alert modals with custom application-themed modals for authentication scenarios
+
+**Completed:**
+- ✅ Created `AuthAlertModal` component matching existing modal design patterns
+- ✅ Updated `SocialSignInButtons` to use custom modal instead of native alerts
+- ✅ Replaced all 4 Alert.alert calls:
+  - Apple Sign-In: "Account Not Found" 
+  - Apple Sign-Up: "Account Already Exists"
+  - Google Sign-In: "Account Not Found"
+  - Google Sign-Up: "Account Already Exists"
+
+**Modal Features:**
+- Custom styling matching app theme (purple, green, blue color scheme)
+- Works in both light and dark modes
+- Clean, minimalistic design
+- Same functionality as native alerts
+- Proper landscape orientation support
+- Matrix glow effects on title text
+
+**Next:** Ready for testing - user should test all 4 auth scenarios to verify custom modal appearance and functionality
