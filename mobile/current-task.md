@@ -39,18 +39,43 @@
 
 ---
 
-## Current Step: Apple Sign In Design Issue Resolution
+## Current Step: Apple Sign In Error Fix - App Store Rejection
 
-**Status:** ✅ **COMPLETED**
+**Status:** 🔴 **CRITICAL - BLOCKING APP STORE APPROVAL**
 
-**Issue Resolved:** Apple Sign In button design compliance
-- **Problem:** Button used BLACK style in dark mode, making it unclear it's clickable
-- **Solution:** Implemented proper theme-aware button styling following Apple's HIG
-- **Changes Made:**
-  - Updated AppleSignInButton to use WHITE style for dark mode, BLACK for light mode
-  - Added proper button type switching (SIGN_IN vs SIGN_UP) based on context
-  - Ensured minimum size compliance (160x48pt, exceeds Apple's 140x30pt minimum)
-  - Added proper margin spacing (1/10 of button height as per Apple guidelines)
-  - Verified accessibility compliance (VoiceOver support via system-provided labels)
+**New Issue:** Apple Sign In "Unknown Error" causing App Store rejection
+- **Problem:** Sign in with Apple displays "Unknown error" on iPad Air (5th generation) with iPadOS 26.0.1
+- **App Store Guideline:** 2.1 - Performance - App Completeness
+- **Priority:** HIGH - Must fix before resubmission
 
-**Next:** Ready for new build creation and App Store resubmission
+**Previous Issue Resolved:** ✅ Apple Sign In button design compliance
+- Button styling now follows Apple's HIG properly
+
+**Next:** Investigate and fix Apple Sign In error - see `apple-signin-error-fix.md` for detailed plan
+
+---
+
+## Current Task: Custom Auth Modal Implementation
+
+**Status:** ✅ **COMPLETED - CUSTOM AUTH MODAL IMPLEMENTED**
+
+**Task:** Replace native iOS Alert.alert modals with custom application-themed modals for authentication scenarios
+
+**Completed:**
+- ✅ Created `AuthAlertModal` component matching existing modal design patterns
+- ✅ Updated `SocialSignInButtons` to use custom modal instead of native alerts
+- ✅ Replaced all 4 Alert.alert calls:
+  - Apple Sign-In: "Account Not Found" 
+  - Apple Sign-Up: "Account Already Exists"
+  - Google Sign-In: "Account Not Found"
+  - Google Sign-Up: "Account Already Exists"
+
+**Modal Features:**
+- Custom styling matching app theme (purple, green, blue color scheme)
+- Works in both light and dark modes
+- Clean, minimalistic design
+- Same functionality as native alerts
+- Proper landscape orientation support
+- Matrix glow effects on title text
+
+**Next:** Ready for testing - user should test all 4 auth scenarios to verify custom modal appearance and functionality
