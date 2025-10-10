@@ -8,6 +8,8 @@ import { appleAuth, AppleButton } from '@invertase/react-native-apple-authentica
 import { AppleSignInButton } from './AppleSignInButton';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING, styleGuide } from '../../styles/theme';
+import { API_URL } from '../../config';
+import { AuthAlertModal } from '../modals/AuthAlertModal';
 
 interface SocialSignInButtonsProps {
   isSignUp?: boolean;
@@ -20,6 +22,53 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
   const colors = useThemeColors();
   const [isProcessing, setIsProcessing] = useState(false);
   const isProcessingRef = useRef(false); // Additional race condition protection
+  
+  // Custom modal state
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalMessage, setModalMessage] = useState('');
+
+  const showCustomAlert = useCallback((title: string, message: string) => {
+    setModalTitle(title);
+    setModalMessage(message);
+    setModalVisible(true);
+  }, []);
+
+  const hideCustomAlert = useCallback(() => {
+    setModalVisible(false);
+  }, []);
+
+  const checkAppleAccountExists = async (appleUserId: string, identityToken: string): Promise<{exists: boolean}> => {
+    try {
+      const response = await fetch(`${API_URL}/api/auth/check-apple-account`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appleId: appleUserId, identityToken }),
+      });
+      
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('Error checking Apple account:', error);
+      return { exists: false };
+    }
+  };
+
+  const checkGoogleAccountExists = async (googleUserId: string, idToken: string): Promise<{exists: boolean}> => {
+    try {
+      const response = await fetch(`${API_URL}/api/auth/check-google-account`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ googleId: googleUserId, idToken }),
+      });
+      
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('Error checking Google account:', error);
+      return { exists: false };
+    }
+  };
 
   const handleAppleSignIn = useCallback(async () => {
     if (isProcessing || isProcessingRef.current) return;
@@ -31,7 +80,6 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
       // Check if Apple Sign In is available first
       const isAvailable = appleAuth.isSupported;
       if (!isAvailable) {
-        console.log('Apple Sign In not supported on this device');
         Alert.alert('Error', 'Apple Sign In is not available on this device');
         return;
       }
@@ -50,6 +98,30 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
       const { identityToken, nonce, email, fullName, user } = appleAuthRequestResponse;
       
       if (identityToken) {
+        // NEW APPROACH: Check if account exists before calling server
+        if (!isSignUp) {
+          // For sign-in, check if account exists first
+          const accountCheck = await checkAppleAccountExists(user, identityToken);
+          if (!accountCheck.exists) {
+            showCustomAlert(
+              'Account Not Found', 
+              'No account found with this Apple ID. Please use the "NEW_IDENTITY (SIGN_UP)" option to create an account.'
+            );
+            return; // Don't call server, no Apple error popup
+          }
+        } else {
+          // For sign-up, check if account already exists
+          const accountCheck = await checkAppleAccountExists(user, identityToken);
+          if (accountCheck.exists) {
+            showCustomAlert(
+              'Account Already Exists', 
+              'An account already exists with this Apple ID. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.'
+            );
+            return; // Don't call server, no Apple error popup
+          }
+        }
+        
+        // Account exists or user is signing up - proceed with server call
         if (isSignUp) {
           await dispatch(appleSignUp(identityToken)).unwrap();
         } else {
@@ -59,9 +131,6 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
         Alert.alert('Error', 'Apple Sign-In failed. Please try again.');
       }
     } catch (error: any) {
-      // Log only essential error information for debugging
-      console.error('Apple Sign In failed:', error.code, error.message);
-      
       // Handle specific Apple Sign In errors more gracefully
       const errorCode = error.code !== undefined ? String(error.code) : '';
       const isUserCancellation = errorCode === '1001' || 
@@ -69,14 +138,20 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
                                 error.message?.includes('canceled');
       
       if (isUserCancellation) {
-        // Don't show error for user cancellation (only 1001)
+        // Don't log or show error for user cancellation
         return;
+      }
+      
+      // DETAILED ERROR LOGGING FOR INVESTIGATION (only for non-cancellation errors)
+      console.error('🔴 REACT NATIVE APPLE SIGN IN ERROR DEBUG:');
+      console.error('   Error code:', error.code);
+      console.error('   Error message:', error.message);
+      console.error('   Full error object:', error);
+      
+      if (errorCode === 'UNKNOWN_ERROR') {
+        Alert.alert('Sign In Issue', error.message || 'Unable to sign in with Apple. Please try again.');
       } else {
-        // Show error for all other cases including:
-        // 1002 = ASAuthorizationErrorFailed (sign-in failed)
-        // 1003 = ASAuthorizationErrorInvalidResponse (invalid response)
-        // 1000 = ASAuthorizationErrorUnknown (unknown errors)
-        Alert.alert('Error', `Apple Sign-In failed: ${error.message || 'Unknown error'}`);
+        Alert.alert('Sign In Issue', error.message || 'Unable to sign in with Apple. Please try again.');
       }
     } finally {
       setIsProcessing(false);
@@ -108,8 +183,35 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
       }
       
       const idToken = userInfo.data?.idToken;
+      const googleUserId = userInfo.data?.user?.id;
       
       if (idToken) {
+        // NEW APPROACH: Check if account exists before calling server (only if we have googleUserId)
+        if (googleUserId) {
+          if (!isSignUp) {
+            // For sign-in, check if account exists first
+            const accountCheck = await checkGoogleAccountExists(googleUserId, idToken);
+            if (!accountCheck.exists) {
+              showCustomAlert(
+                'Account Not Found', 
+                'No account found with this Google account. Please use the "NEW_IDENTITY (SIGN_UP)" option to create an account.'
+              );
+              return; // Don't call server, no Google error popup
+            }
+          } else {
+            // For sign-up, check if account already exists
+            const accountCheck = await checkGoogleAccountExists(googleUserId, idToken);
+            if (accountCheck.exists) {
+              showCustomAlert(
+                'Account Already Exists', 
+                'An account already exists with this Google account. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.'
+              );
+              return; // Don't call server, no Google error popup
+            }
+          }
+        }
+        
+        // Account exists, user is signing up, or we don't have googleUserId - proceed with server call
         if (isSignUp) {
           await dispatch(googleSignUp(idToken)).unwrap();
         } else {
@@ -155,25 +257,34 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
   }, [handleAppleSignIn, handleGoogleSignIn]);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.logosContainer}>
-        <View style={styles.googleButtonContainer}>
-          <GoogleSigninButton
-            size={GoogleSigninButton.Size.Standard}
-            color={GoogleSigninButton.Color.Dark}
-            style={styles.googleButtonInner}
-            onPress={handleGoogleSignIn}
-          />
-        </View>
-        <View style={styles.appleButtonContainer}>
-          <AppleSignInButton
-            onPress={handleAppleSignIn}
-            style={styles.appleButtonInner}
-            isSignUp={isSignUp}
-          />
+    <>
+      <View style={styles.container}>
+        <View style={styles.logosContainer}>
+          <View style={styles.googleButtonContainer}>
+            <GoogleSigninButton
+              size={GoogleSigninButton.Size.Standard}
+              color={GoogleSigninButton.Color.Dark}
+              style={styles.googleButtonInner}
+              onPress={handleGoogleSignIn}
+            />
+          </View>
+          <View style={styles.appleButtonContainer}>
+            <AppleSignInButton
+              onPress={handleAppleSignIn}
+              style={styles.appleButtonInner}
+              isSignUp={isSignUp}
+            />
+          </View>
         </View>
       </View>
-    </View>
+      
+      <AuthAlertModal
+        visible={modalVisible}
+        title={modalTitle}
+        message={modalMessage}
+        onPress={hideCustomAlert}
+      />
+    </>
   );
 });
 

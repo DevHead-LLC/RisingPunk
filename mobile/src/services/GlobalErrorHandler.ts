@@ -34,8 +34,6 @@ export class GlobalErrorHandler {
 
     this.isHandlingError = true;
 
-    console.error('🔴 GLOBAL ERROR HANDLER: Database fetch error detected:', error);
-
     // Check if we have the callbacks initialized
     if (!this.dispatchCallback || !this.getStateCallback) {
       console.warn('🔴 GLOBAL ERROR HANDLER: Not initialized with Redux callbacks');
@@ -46,11 +44,14 @@ export class GlobalErrorHandler {
     // Get current state to check if user is authenticated
     const state = this.getStateCallback();
     
-    // Only show modal if user is authenticated (has token)
+    // Only show modal and log errors if user is authenticated (has token)
+    // This prevents logging "User not found" errors after account deletion/logout
     if (!state.auth?.token) {
       this.isHandlingError = false;
       return;
     }
+
+    console.error('🔴 GLOBAL ERROR HANDLER: Database fetch error detected:', error);
 
     const errorStatus = error?.status || error?.statusCode;
     const isDatabaseError = this.isDatabaseError(error, errorStatus);

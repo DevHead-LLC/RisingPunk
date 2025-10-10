@@ -967,6 +967,90 @@ router.post('/check-handle', async (req, res): Promise<void> => {
   }
 });
 
+// Check if Apple ID exists (requires valid Apple ID token to prevent enumeration attacks)
+router.post('/check-apple-account', async (req, res): Promise<void> => {
+  try {
+    const { appleId, identityToken } = req.body;
+    
+    if (!appleId || typeof appleId !== 'string') {
+      res.status(400).json({ error: 'Apple ID is required' });
+      return;
+    }
+
+    if (!identityToken || typeof identityToken !== 'string') {
+      res.status(400).json({ error: 'Apple identity token is required for security' });
+      return;
+    }
+
+    // Verify the Apple ID token to prevent enumeration attacks
+    try {
+      const appleUser = await AppleAuthService.verifyToken(identityToken);
+      if (!appleUser || appleUser.appleId !== appleId) {
+        res.status(401).json({ error: 'Invalid Apple identity token' });
+        return;
+      }
+    } catch (verifyError) {
+      console.error('Apple token verification failed:', verifyError);
+      res.status(401).json({ error: 'Invalid Apple identity token' });
+      return;
+    }
+
+    // Check if user exists with this Apple ID (now that we've verified the token)
+    const existingUser = await User.findByAppleId(appleId);
+    const exists = !!existingUser;
+    
+    res.json({ 
+      exists,
+      message: exists ? 'Apple ID account exists' : 'No account found with this Apple ID'
+    });
+  } catch (error) {
+    console.error('Apple account check error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Check if Google ID exists (requires valid Google ID token to prevent enumeration attacks)
+router.post('/check-google-account', async (req, res): Promise<void> => {
+  try {
+    const { googleId, idToken } = req.body;
+    
+    if (!googleId || typeof googleId !== 'string') {
+      res.status(400).json({ error: 'Google ID is required' });
+      return;
+    }
+
+    if (!idToken || typeof idToken !== 'string') {
+      res.status(400).json({ error: 'Google ID token is required for security' });
+      return;
+    }
+
+    // Verify the Google ID token to prevent enumeration attacks
+    try {
+      const googleUser = await GoogleAuthService.verifyToken(idToken);
+      if (!googleUser || googleUser.googleId !== googleId) {
+        res.status(401).json({ error: 'Invalid Google ID token' });
+        return;
+      }
+    } catch (verifyError) {
+      console.error('Google token verification failed:', verifyError);
+      res.status(401).json({ error: 'Invalid Google ID token' });
+      return;
+    }
+
+    // Check if user exists with this Google ID (now that we've verified the token)
+    const existingUser = await User.findByGoogleId(googleId);
+    const exists = !!existingUser;
+    
+    res.json({ 
+      exists,
+      message: exists ? 'Google ID account exists' : 'No account found with this Google ID'
+    });
+  } catch (error) {
+    console.error('Google account check error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Verify token and get current user data
 router.get('/verify-token', async (req, res): Promise<void> => {
   try {
