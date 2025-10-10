@@ -967,50 +967,118 @@ router.post('/check-handle', async (req, res): Promise<void> => {
   }
 });
 
-// Check if Apple ID exists (for pre-validation before Apple Sign In)
+// Check if Apple ID exists (requires valid Apple ID token to prevent enumeration attacks)
 router.post('/check-apple-account', async (req, res): Promise<void> => {
   try {
-    const { appleId } = req.body;
+    console.log('🔍 SERVER DEBUG: Apple account check endpoint called');
+    const { appleId, identityToken } = req.body;
+    
+    console.log('🔍 SERVER DEBUG: Apple ID:', appleId);
+    console.log('🔍 SERVER DEBUG: Identity Token length:', identityToken?.length);
     
     if (!appleId || typeof appleId !== 'string') {
+      console.log('🔍 SERVER DEBUG: Missing or invalid Apple ID');
       res.status(400).json({ error: 'Apple ID is required' });
       return;
     }
 
-    // Check if user exists with this Apple ID
+    if (!identityToken || typeof identityToken !== 'string') {
+      console.log('🔍 SERVER DEBUG: Missing or invalid identity token');
+      res.status(400).json({ error: 'Apple identity token is required for security' });
+      return;
+    }
+
+    // Verify the Apple ID token to prevent enumeration attacks
+    try {
+      console.log('🔍 SERVER DEBUG: Verifying Apple identity token');
+      const appleUser = await AppleAuthService.verifyToken(identityToken);
+      console.log('🔍 SERVER DEBUG: Apple user from token:', appleUser);
+      
+      if (!appleUser || appleUser.appleId !== appleId) {
+        console.log('🔍 SERVER DEBUG: Token verification failed - user mismatch');
+        res.status(401).json({ error: 'Invalid Apple identity token' });
+        return;
+      }
+      console.log('🔍 SERVER DEBUG: Token verification successful');
+    } catch (verifyError) {
+      console.error('🔍 SERVER DEBUG: Apple token verification failed:', verifyError);
+      res.status(401).json({ error: 'Invalid Apple identity token' });
+      return;
+    }
+
+    // Check if user exists with this Apple ID (now that we've verified the token)
+    console.log('🔍 SERVER DEBUG: Checking if user exists with Apple ID:', appleId);
     const existingUser = await User.findByAppleId(appleId);
+    console.log('🔍 SERVER DEBUG: Existing user found:', !!existingUser);
     
     const exists = !!existingUser;
     
-    res.json({ 
+    const result = { 
       exists,
       message: exists ? 'Apple ID account exists' : 'No account found with this Apple ID'
-    });
+    };
+    
+    console.log('🔍 SERVER DEBUG: Returning result:', result);
+    res.json(result);
   } catch (error) {
     console.error('Apple account check error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Check if Google ID exists (for pre-validation before Google Sign In)
+// Check if Google ID exists (requires valid Google ID token to prevent enumeration attacks)
 router.post('/check-google-account', async (req, res): Promise<void> => {
   try {
-    const { googleId } = req.body;
+    console.log('🔍 SERVER DEBUG: Google account check endpoint called');
+    const { googleId, idToken } = req.body;
+    
+    console.log('🔍 SERVER DEBUG: Google ID:', googleId);
+    console.log('🔍 SERVER DEBUG: ID Token length:', idToken?.length);
     
     if (!googleId || typeof googleId !== 'string') {
+      console.log('🔍 SERVER DEBUG: Missing or invalid Google ID');
       res.status(400).json({ error: 'Google ID is required' });
       return;
     }
 
-    // Check if user exists with this Google ID
+    if (!idToken || typeof idToken !== 'string') {
+      console.log('🔍 SERVER DEBUG: Missing or invalid ID token');
+      res.status(400).json({ error: 'Google ID token is required for security' });
+      return;
+    }
+
+    // Verify the Google ID token to prevent enumeration attacks
+    try {
+      console.log('🔍 SERVER DEBUG: Verifying Google ID token');
+      const googleUser = await GoogleAuthService.verifyToken(idToken);
+      console.log('🔍 SERVER DEBUG: Google user from token:', googleUser);
+      
+      if (!googleUser || googleUser.googleId !== googleId) {
+        console.log('🔍 SERVER DEBUG: Token verification failed - user mismatch');
+        res.status(401).json({ error: 'Invalid Google ID token' });
+        return;
+      }
+      console.log('🔍 SERVER DEBUG: Token verification successful');
+    } catch (verifyError) {
+      console.error('🔍 SERVER DEBUG: Google token verification failed:', verifyError);
+      res.status(401).json({ error: 'Invalid Google ID token' });
+      return;
+    }
+
+    // Check if user exists with this Google ID (now that we've verified the token)
+    console.log('🔍 SERVER DEBUG: Checking if user exists with Google ID:', googleId);
     const existingUser = await User.findByGoogleId(googleId);
+    console.log('🔍 SERVER DEBUG: Existing user found:', !!existingUser);
     
     const exists = !!existingUser;
     
-    res.json({ 
+    const result = { 
       exists,
       message: exists ? 'Google ID account exists' : 'No account found with this Google ID'
-    });
+    };
+    
+    console.log('🔍 SERVER DEBUG: Returning result:', result);
+    res.json(result);
   } catch (error) {
     console.error('Google account check error:', error);
     res.status(500).json({ error: 'Server error' });

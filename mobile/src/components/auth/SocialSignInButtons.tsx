@@ -22,32 +22,54 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
   const [isProcessing, setIsProcessing] = useState(false);
   const isProcessingRef = useRef(false); // Additional race condition protection
 
-  const checkAppleAccountExists = async (appleUserId: string): Promise<{exists: boolean}> => {
+  const checkAppleAccountExists = async (appleUserId: string, identityToken: string): Promise<{exists: boolean}> => {
     try {
+      console.log('🔍 DEBUG: Starting Apple account check');
+      console.log('🔍 DEBUG: Apple User ID:', appleUserId);
+      console.log('🔍 DEBUG: Identity Token length:', identityToken?.length);
+      console.log('🔍 DEBUG: API URL:', API_URL);
+      
       const response = await fetch(`${API_URL}/api/auth/check-apple-account`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ appleId: appleUserId }),
+        body: JSON.stringify({ appleId: appleUserId, identityToken }),
       });
+      
+      console.log('🔍 DEBUG: Response status:', response.status);
+      console.log('🔍 DEBUG: Response ok:', response.ok);
+      
       const result = await response.json();
+      console.log('🔍 DEBUG: Response result:', result);
+      
       return result;
     } catch (error) {
-      console.error('🔍 Error checking Apple account:', error);
+      console.error('🔍 DEBUG: Error checking Apple account:', error);
       return { exists: false };
     }
   };
 
-  const checkGoogleAccountExists = async (googleUserId: string): Promise<{exists: boolean}> => {
+  const checkGoogleAccountExists = async (googleUserId: string, idToken: string): Promise<{exists: boolean}> => {
     try {
+      console.log('🔍 DEBUG: Starting Google account check');
+      console.log('🔍 DEBUG: Google User ID:', googleUserId);
+      console.log('🔍 DEBUG: ID Token length:', idToken?.length);
+      console.log('🔍 DEBUG: API URL:', API_URL);
+      
       const response = await fetch(`${API_URL}/api/auth/check-google-account`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ googleId: googleUserId }),
+        body: JSON.stringify({ googleId: googleUserId, idToken }),
       });
+      
+      console.log('🔍 DEBUG: Response status:', response.status);
+      console.log('🔍 DEBUG: Response ok:', response.ok);
+      
       const result = await response.json();
+      console.log('🔍 DEBUG: Response result:', result);
+      
       return result;
     } catch (error) {
-      console.error('🔍 Error checking Google account:', error);
+      console.error('🔍 DEBUG: Error checking Google account:', error);
       return { exists: false };
     }
   };
@@ -80,27 +102,41 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
       const { identityToken, nonce, email, fullName, user } = appleAuthRequestResponse;
       
       if (identityToken) {
+        console.log('🔍 DEBUG: Apple Sign In successful, starting pre-validation');
+        console.log('🔍 DEBUG: isSignUp:', isSignUp);
+        console.log('🔍 DEBUG: Apple User ID:', user);
+        
         // NEW APPROACH: Check if account exists before calling server
         if (!isSignUp) {
+          console.log('🔍 DEBUG: Sign-in flow - checking if account exists');
           // For sign-in, check if account exists first
-          const accountCheck = await checkAppleAccountExists(user);
+          const accountCheck = await checkAppleAccountExists(user, identityToken);
+          console.log('🔍 DEBUG: Account check result:', accountCheck);
+          
           if (!accountCheck.exists) {
+            console.log('🔍 DEBUG: Account not found - showing custom error and returning');
             Alert.alert(
               'Account Not Found', 
               'No account found with this Apple ID. Please use the "NEW_IDENTITY (SIGN_UP)" option to create an account.'
             );
             return; // Don't call server, no Apple error popup
           }
+          console.log('🔍 DEBUG: Account exists - proceeding with server call');
         } else {
+          console.log('🔍 DEBUG: Sign-up flow - checking if account already exists');
           // For sign-up, check if account already exists
-          const accountCheck = await checkAppleAccountExists(user);
+          const accountCheck = await checkAppleAccountExists(user, identityToken);
+          console.log('🔍 DEBUG: Account check result:', accountCheck);
+          
           if (accountCheck.exists) {
+            console.log('🔍 DEBUG: Account already exists - showing custom error and returning');
             Alert.alert(
               'Account Already Exists', 
               'An account already exists with this Apple ID. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.'
             );
             return; // Don't call server, no Apple error popup
           }
+          console.log('🔍 DEBUG: Account does not exist - proceeding with server call');
         }
         
         // Account exists or user is signing up - proceed with server call
@@ -113,12 +149,6 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
         Alert.alert('Error', 'Apple Sign-In failed. Please try again.');
       }
     } catch (error: any) {
-      // DETAILED ERROR LOGGING FOR INVESTIGATION
-      console.error('🔴 REACT NATIVE APPLE SIGN IN ERROR DEBUG:');
-      console.error('   Error code:', error.code);
-      console.error('   Error message:', error.message);
-      console.error('   Full error object:', error);
-      
       // Handle specific Apple Sign In errors more gracefully
       const errorCode = error.code !== undefined ? String(error.code) : '';
       const isUserCancellation = errorCode === '1001' || 
@@ -126,9 +156,18 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
                                 error.message?.includes('canceled');
       
       if (isUserCancellation) {
+        // Don't log or show error for user cancellation
         return;
-      } else if (errorCode === 'ACCOUNT_NOT_FOUND') {
-        Alert.alert('Account Not Found', error.message || 'No account found with this Apple ID. Please create an account first.');
+      }
+      
+      // DETAILED ERROR LOGGING FOR INVESTIGATION (only for non-cancellation errors)
+      console.error('🔴 REACT NATIVE APPLE SIGN IN ERROR DEBUG:');
+      console.error('   Error code:', error.code);
+      console.error('   Error message:', error.message);
+      console.error('   Full error object:', error);
+      
+      if (errorCode === 'UNKNOWN_ERROR') {
+        Alert.alert('Sign In Issue', error.message || 'Unable to sign in with Apple. Please try again.');
       } else {
         Alert.alert('Sign In Issue', error.message || 'Unable to sign in with Apple. Please try again.');
       }
@@ -164,31 +203,49 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
       const idToken = userInfo.data?.idToken;
       const googleUserId = userInfo.data?.user?.id;
       
-      if (idToken && googleUserId) {
-        // NEW APPROACH: Check if account exists before calling server
-        if (!isSignUp) {
-          // For sign-in, check if account exists first
-          const accountCheck = await checkGoogleAccountExists(googleUserId);
-          if (!accountCheck.exists) {
-            Alert.alert(
-              'Account Not Found', 
-              'No account found with this Google account. Please use the "NEW_IDENTITY (SIGN_UP)" option to create an account.'
-            );
-            return; // Don't call server, no Google error popup
+      if (idToken) {
+        console.log('🔍 DEBUG: Google Sign In successful, starting pre-validation');
+        console.log('🔍 DEBUG: isSignUp:', isSignUp);
+        console.log('🔍 DEBUG: Google User ID:', googleUserId);
+        
+        // NEW APPROACH: Check if account exists before calling server (only if we have googleUserId)
+        if (googleUserId) {
+          if (!isSignUp) {
+            console.log('🔍 DEBUG: Sign-in flow - checking if account exists');
+            // For sign-in, check if account exists first
+            const accountCheck = await checkGoogleAccountExists(googleUserId, idToken);
+            console.log('🔍 DEBUG: Account check result:', accountCheck);
+            
+            if (!accountCheck.exists) {
+              console.log('🔍 DEBUG: Account not found - showing custom error and returning');
+              Alert.alert(
+                'Account Not Found', 
+                'No account found with this Google account. Please use the "NEW_IDENTITY (SIGN_UP)" option to create an account.'
+              );
+              return; // Don't call server, no Google error popup
+            }
+            console.log('🔍 DEBUG: Account exists - proceeding with server call');
+          } else {
+            console.log('🔍 DEBUG: Sign-up flow - checking if account already exists');
+            // For sign-up, check if account already exists
+            const accountCheck = await checkGoogleAccountExists(googleUserId, idToken);
+            console.log('🔍 DEBUG: Account check result:', accountCheck);
+            
+            if (accountCheck.exists) {
+              console.log('🔍 DEBUG: Account already exists - showing custom error and returning');
+              Alert.alert(
+                'Account Already Exists', 
+                'An account already exists with this Google account. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.'
+              );
+              return; // Don't call server, no Google error popup
+            }
+            console.log('🔍 DEBUG: Account does not exist - proceeding with server call');
           }
         } else {
-          // For sign-up, check if account already exists
-          const accountCheck = await checkGoogleAccountExists(googleUserId);
-          if (accountCheck.exists) {
-            Alert.alert(
-              'Account Already Exists', 
-              'An account already exists with this Google account. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.'
-            );
-            return; // Don't call server, no Google error popup
-          }
+          console.log('🔍 DEBUG: No Google User ID available - proceeding with server call');
         }
         
-        // Account exists or user is signing up - proceed with server call
+        // Account exists, user is signing up, or we don't have googleUserId - proceed with server call
         if (isSignUp) {
           await dispatch(googleSignUp(idToken)).unwrap();
         } else {

@@ -125,10 +125,9 @@ class AppleSignInModule: NSObject, ASAuthorizationControllerDelegate, ASAuthoriz
       case .notHandled:
         print("   → Handling as NOT_HANDLED")
         self.reject?("NOT_HANDLED", "Apple Sign In request not handled", error)
-      case .unknown:
-        print("   → Handling as UNKNOWN_ERROR (THIS IS THE PROBLEM)")
-        // INVESTIGATION: Let's try to provide a better error message
-        self.reject?("ACCOUNT_NOT_FOUND", "No account found with this Apple ID. Please create an account first.", error)
+        case .unknown:
+          print("   → Handling as UNKNOWN_ERROR")
+          self.reject?("UNKNOWN_ERROR", "Unknown Apple Sign In error", error)
       @unknown default:
         print("   → Handling as UNKNOWN_ERROR (unknown default)")
         self.reject?("SERVICE_UNAVAILABLE", "Apple Sign In is temporarily unavailable. Please try again later.", error)
