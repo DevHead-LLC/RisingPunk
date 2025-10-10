@@ -39,18 +39,16 @@
 
 ---
 
-## Current Step: Apple Sign In Design Issue Resolution
+## Current Step: Apple Sign In Error Fix - App Store Rejection
 
-**Status:** ✅ **COMPLETED**
+**Status:** 🔴 **CRITICAL - BLOCKING APP STORE APPROVAL**
 
-**Issue Resolved:** Apple Sign In button design compliance
-- **Problem:** Button used BLACK style in dark mode, making it unclear it's clickable
-- **Solution:** Implemented proper theme-aware button styling following Apple's HIG
-- **Changes Made:**
-  - Updated AppleSignInButton to use WHITE style for dark mode, BLACK for light mode
-  - Added proper button type switching (SIGN_IN vs SIGN_UP) based on context
-  - Ensured minimum size compliance (160x48pt, exceeds Apple's 140x30pt minimum)
-  - Added proper margin spacing (1/10 of button height as per Apple guidelines)
-  - Verified accessibility compliance (VoiceOver support via system-provided labels)
+**New Issue:** Apple Sign In "Unknown Error" causing App Store rejection
+- **Problem:** Sign in with Apple displays "Unknown error" on iPad Air (5th generation) with iPadOS 26.0.1
+- **App Store Guideline:** 2.1 - Performance - App Completeness
+- **Priority:** HIGH - Must fix before resubmission
 
-**Next:** Ready for new build creation and App Store resubmission
+**Previous Issue Resolved:** ✅ Apple Sign In button design compliance
+- Button styling now follows Apple's HIG properly
+
+**Next:** Investigate and fix Apple Sign In error - see `apple-signin-error-fix.md` for detailed plan
