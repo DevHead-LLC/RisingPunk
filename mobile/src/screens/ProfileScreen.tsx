@@ -15,8 +15,10 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { logout, setShowOnboarding, updateUserHandle, forceRefresh, setShowEmailVerification, refreshUserData } from '../store/slices/authSlice';
 import { updateProfileGender } from '../store/slices/preferencesSlice';
 import { useUpdatePreferencesMutation } from '../store/api/preferencesApi';
-import { useGetProfileQuery, useGetResearchCenterStatusQuery, useDeleteAccountMutation } from '../store/api/authApi';
-import { useFetchBotStatsQuery } from '../store/api/botsApi';
+import { useGetProfileQuery, useGetResearchCenterStatusQuery, useDeleteAccountMutation, authApi } from '../store/api/authApi';
+import { useFetchBotStatsQuery, botsApi } from '../store/api/botsApi';
+import { balanceApi } from '../store/api/balanceApi';
+import { mapApi } from '../store/api/mapApi';
 import { SIZING } from '../styles/theme';
 import { useTheme } from '../context/ThemeContext';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -525,6 +527,13 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const handleDeleteAccount = async (handle: string) => {
     try {
       await deleteAccount({ handle }).unwrap();
+      
+      // Clear all API caches before logout to prevent pending requests from failing
+      dispatch(authApi.util.resetApiState());
+      dispatch(balanceApi.util.resetApiState());
+      dispatch(botsApi.util.resetApiState());
+      dispatch(mapApi.util.resetApiState());
+      
       dispatch(logout());
     } catch (error) {
       console.error('ProfileScreen: Failed to delete account:', error);
