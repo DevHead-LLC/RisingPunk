@@ -8,8 +8,8 @@ module.exports = {
     },
     'react-native-config': {
       platforms: {
-        android: null, // disable autolinking on Android
-        ios: null, // disable autolinking on iOS
+        android: null, // disable autolinking on Android (manually linked)
+        // iOS autolinking remains enabled - no platform override needed
       },
     },
   },
