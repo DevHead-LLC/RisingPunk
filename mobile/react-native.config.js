@@ -6,6 +6,12 @@ module.exports = {
         android: null,
       },
     },
+    'react-native-config': {
+      platforms: {
+        android: null, // disable autolinking on Android (manually linked)
+        // iOS autolinking remains enabled - no platform override needed
+      },
+    },
   },
   assets: ['./src/assets/fonts/'],
 };
