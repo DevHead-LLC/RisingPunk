@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "android": "react-native run-android",
+    "android": "cd android && ./gradlew clean && cd .. && react-native run-android",
     "android:dev": "API_ENV=dev react-native run-android",
     "android:staging": "API_ENV=staging react-native run-android",
     "android:prod": "API_ENV=prod react-native run-android",
@@ -25,7 +25,7 @@
     "react": "18.3.1",
     "react-native": "0.76.6",
     "react-native-config": "^1.5.9",
-    "react-native-gesture-handler": "^2.16.2",
+    "react-native-gesture-handler": "^2.28.0",
     "react-native-reanimated": "^3.17.1",
     "react-native-svg": "^15.11.1",
     "react-redux": "^9.2.0"
