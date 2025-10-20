@@ -119,19 +119,19 @@ mobile/
 #### What to Test:
 1. **Android Development**: `npm run android:dev`
    - Expected: Uses `http://10.0.2.2:5001`
-   - Check: Diagnostic logs show `API_ENV=dev`
+   - Check: App connects to local development server
 
 2. **iOS Development**: `npm run ios:dev`
    - Expected: Uses `http://localhost:5001`
-   - Check: Diagnostic logs show `API_ENV=dev`
+   - Check: App connects to local development server
 
 3. **Android Staging**: `npm run android:staging`
    - Expected: Uses `https://api.risingpunk.dev`
-   - Check: Diagnostic logs show `API_ENV=staging`
+   - Check: App connects to staging server
 
 4. **iOS Staging**: `npm run ios:staging`
    - Expected: Uses `https://api.risingpunk.dev`
-   - Check: Diagnostic logs show `API_ENV=staging`
+   - Check: App connects to staging server
 
 5. **Xcode Schemes**: Test each scheme in Xcode
    - `mobile-dev` → Development environment
@@ -164,7 +164,7 @@ mobile/
 
 ### Core Configuration:
 - `mobile/package.json` - Updated all scripts to use `ENVFILE=`
-- `mobile/src/config.ts` - Added diagnostic logging, dynamic URL loading
+- `mobile/src/config.ts` - Dynamic URL loading from .env files
 - `mobile/android/app/build.gradle` - Added react-native-config integration
 
 ### Environment Files:
