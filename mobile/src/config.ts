@@ -18,9 +18,9 @@ const getApiUrl = () => {
       case 'dev':
         return getDevUrl();
       case 'staging':
-        return 'https://api.risingpunk.dev';
+        return Config.API_URL || 'https://api.risingpunk.dev';  // Read from .env.staging
       case 'prod':
-        return 'https://api.risingpunk.com';
+        return Config.API_URL || 'https://api.risingpunk.com';  // Read from .env.prod
       default:
         return getDevUrl();
     }
