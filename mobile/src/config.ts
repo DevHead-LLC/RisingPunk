@@ -6,14 +6,6 @@ const getApiUrl = () => {
   // Check for environment variables first (set during build)
   const apiEnv = Config.API_ENV;
   
-  // DIAGNOSTIC LOGGING - Phase 1
-  console.log('🔍 Config object:', Config);
-  console.log('🔍 API_ENV:', Config.API_ENV);
-  console.log('🔍 Config keys:', Object.keys(Config));
-  console.log('🔍 Platform:', Platform.OS);
-  console.log('🔍 DEV_URL_ANDROID:', Config.DEV_URL_ANDROID);
-  console.log('🔍 DEV_URL_IOS:', Config.DEV_URL_IOS);
-  
   // Helper function to get dev URL based on platform from .env files
   const getDevUrl = () => {
     return Platform.OS === 'android' 
@@ -41,9 +33,6 @@ const getApiUrl = () => {
 };
 
 export const API_URL = getApiUrl();
-
-// DIAGNOSTIC LOGGING - Phase 1
-console.log('🔍 API_URL resolved to:', API_URL);
 
 // Animation timing constants
 export const ANIMATION_CONFIG = {

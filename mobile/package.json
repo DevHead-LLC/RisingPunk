@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "android": "cd android && ./gradlew clean && cd .. && react-native run-android",
-    "android:dev": "cd android && ./gradlew clean && cd .. && API_ENV=dev react-native run-android",
-    "android:staging": "cd android && ./gradlew clean && cd .. && API_ENV=staging react-native run-android",
-    "android:prod": "cd android && ./gradlew clean && cd .. && API_ENV=prod react-native run-android",
+    "android:dev": "ENVFILE=.env.dev cd android && ./gradlew clean && cd .. && react-native run-android",
+    "android:staging": "ENVFILE=.env.staging cd android && ./gradlew clean && cd .. && react-native run-android",
+    "android:prod": "ENVFILE=.env.prod cd android && ./gradlew clean && cd .. && react-native run-android",
     "ios": "cd ios && pod install && cd .. && react-native run-ios --simulator='iPhone 16 Pro Max'",
     "ios:dev": "API_ENV=dev react-native run-ios",
     "ios:staging": "API_ENV=staging react-native run-ios",

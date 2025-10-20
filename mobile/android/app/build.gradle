@@ -4,7 +4,6 @@ apply plugin: "com.facebook.react"
 
 // react-native-config configuration
 apply from: project(':react-native-config').projectDir.getPath() + "/dotenv.gradle"
-project.ext.envConfigFiles = ['.env', '.env.dev', '.env.staging', '.env.prod']
 
 /**
  * This is the configuration block to customize your React Native Android app.
