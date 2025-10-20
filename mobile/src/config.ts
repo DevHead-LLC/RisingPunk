@@ -3,6 +3,13 @@ import Config from 'react-native-config';
 
 // Environment detection based on build configuration
 const getApiUrl = () => {
+  // DIAGNOSTIC LOGGING - Phase 2
+  console.log('🔍 Config object:', Config);
+  console.log('🔍 API_ENV:', Config.API_ENV);
+  console.log('🔍 DEV_URL_ANDROID:', Config.DEV_URL_ANDROID);
+  console.log('🔍 DEV_URL_IOS:', Config.DEV_URL_IOS);
+  console.log('🔍 API_URL:', Config.API_URL);
+  
   // Check for environment variables first (set during build)
   const apiEnv = Config.API_ENV;
   
@@ -18,9 +25,9 @@ const getApiUrl = () => {
       case 'dev':
         return getDevUrl();
       case 'staging':
-        return 'https://api.risingpunk.dev';
+        return Config.API_URL || 'https://api.risingpunk.dev';  // Read from .env.staging
       case 'prod':
-        return 'https://api.risingpunk.com';
+        return Config.API_URL || 'https://api.risingpunk.com';  // Read from .env.prod
       default:
         return getDevUrl();
     }
