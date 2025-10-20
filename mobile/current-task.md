@@ -596,6 +596,29 @@ Based on AI Assessments 1, 2, 3 & 4, here are the most promising approaches to t
 - Test environment switching with different scripts
 - Verify each environment loads correct .env file and API URLs
 
+### Phase 4.1 - Shell Syntax Fix 🔧
+**Date**: October 18, 2025
+**Issue Identified**:
+- **Shell Syntax Error**: `ENVFILE=.env.dev cd android` only applies ENVFILE to the `cd` command
+- **Impact**: Subsequent `gradlew` and `react-native` commands don't have access to ENVFILE
+
+**Changes Made**:
+1. ✅ **Fixed shell syntax**: Changed to `ENVFILE=.env.dev && cd android` 
+2. ✅ **Environment variable persistence**: ENVFILE now persists for all subsequent commands
+3. ✅ **Removed duplicate**: Cleaned up duplicate `android:prod` entry
+
+**Files Modified**:
+- `mobile/package.json` - Fixed shell syntax for all Android environment scripts
+
+**Expected Results**:
+- **ENVFILE persistence**: Environment variable now available to all commands in the chain
+- **Correct .env loading**: Gradle and react-native will now use the specified .env file
+- **Environment switching working**: Each script should load the correct environment configuration
+
+**Next Steps**:
+- Test environment switching to verify shell syntax fix works
+- Confirm each environment loads correct .env file and API URLs
+
 ## Next Steps
 1. **Test Phase 1 changes**: Run Android build to see diagnostic logs
 2. **Proceed to Phase 2**: Add Android Gradle configuration
