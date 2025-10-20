@@ -619,6 +619,31 @@ Based on AI Assessments 1, 2, 3 & 4, here are the most promising approaches to t
 - Test environment switching to verify shell syntax fix works
 - Confirm each environment loads correct .env file and API URLs
 
+### Phase 4.2 - Environment Variable Export Fix 🔧
+**Date**: October 18, 2025
+**Issue Identified**:
+- **Environment Variable Not Exported**: `ENVFILE=.env.dev &&` sets local shell variable but doesn't export it
+- **Impact**: `gradlew` and `react-native` commands can't access ENVFILE, causing environment switching to fail
+- **Root Cause**: Local variables don't propagate to subprocesses without `export`
+
+**Changes Made**:
+1. ✅ **Added export keyword**: Changed to `export ENVFILE=.env.dev &&` for all Android scripts
+2. ✅ **Environment variable propagation**: ENVFILE now properly exported to subprocesses
+3. ✅ **Fixed all environment scripts**: android:dev, android:staging, android:prod now use export
+
+**Files Modified**:
+- `mobile/package.json` - Added export keyword to all Android environment scripts
+
+**Expected Results**:
+- **ENVFILE propagation**: Environment variable now available to gradlew and react-native commands
+- **Environment switching working**: Each script should now load the correct .env file
+- **Gradle configuration**: react-native-config should now use the specified .env file
+- **API URL switching**: Different environments should use different API URLs
+
+**Next Steps**:
+- Test environment switching to verify export fix works
+- Confirm each environment loads correct .env file and uses correct API URLs
+
 ## Next Steps
 1. **Test Phase 1 changes**: Run Android build to see diagnostic logs
 2. **Proceed to Phase 2**: Add Android Gradle configuration
