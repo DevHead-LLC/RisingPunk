@@ -1,29 +1,49 @@
 import Config from 'react-native-config';
+  import { Platform } from 'react-native';
 
 // Environment detection based on build configuration
 const getApiUrl = () => {
   // Check for environment variables first (set during build)
   const apiEnv = Config.API_ENV;
+  
+  // DIAGNOSTIC LOGGING - Phase 1
+  console.log('🔍 Config object:', Config);
+  console.log('🔍 API_ENV:', Config.API_ENV);
+  console.log('🔍 Config keys:', Object.keys(Config));
+  console.log('🔍 Platform:', Platform.OS);
+  console.log('🔍 DEV_URL_ANDROID:', Config.DEV_URL_ANDROID);
+  console.log('🔍 DEV_URL_IOS:', Config.DEV_URL_IOS);
+  
+  // Helper function to get dev URL based on platform from .env files
+  const getDevUrl = () => {
+    return Platform.OS === 'android' 
+      ? Config.DEV_URL_ANDROID || 'http://10.0.2.2:5001'  // Android emulator from .env
+      : Config.DEV_URL_IOS || 'http://localhost:5001'; // iOS simulator from .env
+  };
+  
   if (apiEnv) {
     switch (apiEnv) {
       case 'dev':
-        return 'http://localhost:5001';
+        return getDevUrl();
       case 'staging':
         return 'https://api.risingpunk.dev';
       case 'prod':
         return 'https://api.risingpunk.com';
       default:
-        return 'http://localhost:5001';
+        return getDevUrl();
     }
   }
   
   // Fallback to __DEV__ for backward compatibility
   return __DEV__
-    ? 'http://localhost:5001'  // or 'http://10.0.2.2:5001' for Android emulator
+    ? getDevUrl()
     : 'https://api.risingpunk.dev';
 };
 
 export const API_URL = getApiUrl();
+
+// DIAGNOSTIC LOGGING - Phase 1
+console.log('🔍 API_URL resolved to:', API_URL);
 
 // Animation timing constants
 export const ANIMATION_CONFIG = {
