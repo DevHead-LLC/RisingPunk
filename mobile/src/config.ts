@@ -22,14 +22,27 @@ const getApiUrl = () => {
       case 'prod':
         return Config.API_URL || 'https://api.risingpunk.com';  // Read from .env.prod
       default:
-        return getDevUrl();
+        throw new Error(`🚨 INVALID API_ENV: "${apiEnv}". Expected: dev, staging, or prod`);
     }
   }
   
-  // Fallback to __DEV__ for backward compatibility
-  return __DEV__
-    ? getDevUrl()
-    : 'https://api.risingpunk.dev';
+  // Fail fast: if we can't determine environment, something is fundamentally broken
+  const errorMessage = `
+🚨 CRITICAL: Environment detection failed!
+
+Expected: API_ENV to be set during build
+Actual: API_ENV is undefined
+Config object: ${JSON.stringify(Config, null, 2)}
+
+This indicates a build configuration problem:
+- Check that ENVFILE is set in package.json scripts
+- Verify .env files exist and contain API_ENV
+- Ensure react-native-config is properly configured
+
+DO NOT CONTINUE - this could cause data corruption!
+  `;
+  
+  throw new Error(errorMessage);
 };
 
 export const API_URL = getApiUrl();
