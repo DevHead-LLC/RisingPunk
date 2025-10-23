@@ -48,7 +48,6 @@ export class GoogleAuthService {
           continue; // Try next client ID
         }
 
-        console.log(`✅ Google token verified with client ID: ${clientId}`);
         return {
           googleId: payload.sub,
           email: payload.email!,
@@ -56,8 +55,8 @@ export class GoogleAuthService {
           picture: payload.picture
         };
       } catch (error) {
-        console.log(`❌ Failed to verify with client ID ${clientId}:`, error instanceof Error ? error.message : String(error));
-        continue; // Try next client ID
+        // Try next client ID
+        continue;
       }
     }
 

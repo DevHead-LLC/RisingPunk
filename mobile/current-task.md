@@ -647,6 +647,128 @@ try {
 - ✅ **Clear cached credentials**: Sign out before signing in
 - ✅ **Allow account choice**: User can select which Google account to use
 
+## 🔧 HARDCODED VALUES FIXED
+
+**Issue**: Client IDs were hardcoded in both mobile and server code, preventing proper environment configuration.
+
+**Mobile Fix (SocialSignInButtons.tsx):**
+```javascript
+// BEFORE: Hardcoded Web client ID
+webClientId: '213914599866-t8gaip17no3h323d71njchb4hbs3csco.apps.googleusercontent.com'
+
+// AFTER: Environment variable
+webClientId: GOOGLE_AUTH_CONFIG.androidWebClientId
+```
+
+**Server Fix (GoogleAuthService.ts):**
+```javascript
+// BEFORE: Hardcoded client IDs
+this.allowedClientIds = [
+  clientId,
+  '213914599866-kp888124r46si64s764mvft70649sbh4.apps.googleusercontent.com',
+  '213914599866-t8gaip17no3h323d71njchb4hbs3csco.apps.googleusercontent.com'
+];
+
+// AFTER: Environment variables
+this.allowedClientIds = [
+  clientId, // iOS client ID (existing from GOOGLE_CLIENT_ID)
+  process.env.GOOGLE_ANDROID_CLIENT_ID || '', // Android client ID from environment
+  process.env.GOOGLE_WEB_CLIENT_ID || '' // Web client ID from environment
+].filter(Boolean); // Remove any empty strings
+```
+
+**Benefits:**
+- ✅ **Environment-specific**: Works across dev/staging/production
+- ✅ **No hardcoded values**: All client IDs come from environment variables
+- ✅ **Maintainable**: Easy to update client IDs without code changes
+
+## ⚠️ REVERTED TO WORKING CONFIGURATION
+
+**Issue**: Recent changes broke the Android Google Sign In functionality that we worked hard to fix.
+
+**Reverted Changes:**
+- ✅ **Mobile**: Restored hardcoded Web client ID for Android (this was working)
+- ✅ **Server**: Restored hardcoded client IDs in allowedClientIds (this was working)
+- ✅ **Logs**: Kept essential authentication logs for debugging
+
+**Current Working Configuration:**
+```javascript
+// Mobile - Android uses hardcoded Web client ID (this works)
+webClientId: Platform.OS === 'ios' 
+  ? GOOGLE_AUTH_CONFIG.webClientId      // iOS: use iOS client ID (works)
+  : '213914599866-t8gaip17no3h323d71njchb4hbs3csco.apps.googleusercontent.com', // Android: use Web client ID
+
+// Server - hardcoded client IDs (this works)
+this.allowedClientIds = [
+  clientId, // iOS client ID (existing)
+  '213914599866-kp888124r46si64s764mvft70649sbh4.apps.googleusercontent.com', // Android client ID
+  '213914599866-t8gaip17no3h323d71njchb4hbs3csco.apps.googleusercontent.com' // Web client ID
+];
+```
+
+**Status**: Android Google Sign In should now work again with the original working configuration.
+
+## 🧹 CONSOLE.LOG CLEANUP COMPLETED
+
+**Cleaned up all console.log statements in SocialSignInButtons.tsx:**
+
+**✅ Kept Error Logs (with proper console.error):**
+```javascript
+// Apple Sign In errors
+console.error('Apple Sign In Error:', {
+  code: error.code,
+  message: error.message,
+  error: error
+});
+
+// Google Sign In errors
+console.error('Google Sign In Error:', {
+  code: error.code,
+  message: error.message,
+  error: error
+});
+```
+
+**✅ Removed Debug Logs:**
+- Removed all debug console.log statements that exposed client IDs
+- Removed verbose logging that cluttered production output
+- Removed non-error related logging
+
+**✅ Benefits:**
+- ✅ **Security**: No client IDs or sensitive data exposed in logs
+- ✅ **Clean production**: Only essential error logging remains
+- ✅ **Proper error handling**: Uses console.error for actual errors
+- ✅ **Descriptive errors**: Error logs include code, message, and full error object
+
+## 🧹 GOOGLEAUTHSERVICE.TS CLEANUP COMPLETED
+
+**Cleaned up console.log statements in GoogleAuthService.ts:**
+
+**✅ Kept Error Logs (with proper console.error):**
+```javascript
+// Configuration errors
+console.error('GOOGLE_CLIENT_ID not set. Google Sign-In will be disabled.');
+console.error('Google Auth Service not initialized');
+
+// Verification failure
+console.error('Google token verification failed with all client IDs');
+```
+
+**✅ Removed Debug Logs:**
+```javascript
+// REMOVED: Success logging that exposed client IDs
+console.log(`✅ Google token verified with client ID: ${clientId}`);
+
+// REMOVED: Failure logging that exposed client IDs  
+console.log(`❌ Failed to verify with client ID ${clientId}:`, error);
+```
+
+**✅ Benefits:**
+- ✅ **Security**: No client IDs exposed in server logs
+- ✅ **Clean production**: Only essential error logging remains
+- ✅ **Performance**: Reduced logging overhead
+- ✅ **Professional**: Clean server-side logging
+
 ## Key Constraints
 - ✅ **Must not break iOS**: iOS is currently working and must remain functional
 - ✅ **Must fix Android**: Android must work with proper authentication

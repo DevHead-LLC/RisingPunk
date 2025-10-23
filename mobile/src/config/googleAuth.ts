@@ -1,11 +1,5 @@
 import Config from 'react-native-config';
 
-// DEBUG: Log what's being loaded from environment
-console.log('🔍 DEBUG - Raw Config values:');
-console.log('🔍 Config.GOOGLE_IOS_CLIENT_ID:', Config.GOOGLE_IOS_CLIENT_ID);
-console.log('🔍 Config.GOOGLE_WEB_CLIENT_ID:', Config.GOOGLE_WEB_CLIENT_ID);
-console.log('🔍 Config.GOOGLE_ANDROID_CLIENT_ID:', Config.GOOGLE_ANDROID_CLIENT_ID);
-console.log('🔍 Config.GOOGLE_ANDROID_WEB_CLIENT_ID:', Config.GOOGLE_ANDROID_WEB_CLIENT_ID);
 
 // Google Sign-In Configuration using environment variables
 export const GOOGLE_AUTH_CONFIG = {

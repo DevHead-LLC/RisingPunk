@@ -142,11 +142,12 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
         return;
       }
       
-      // DETAILED ERROR LOGGING FOR INVESTIGATION (only for non-cancellation errors)
-      console.error('🔴 REACT NATIVE APPLE SIGN IN ERROR DEBUG:');
-      console.error('   Error code:', error.code);
-      console.error('   Error message:', error.message);
-      console.error('   Full error object:', error);
+      // Log error details for debugging
+      console.error('Apple Sign In Error:', {
+        code: error.code,
+        message: error.message,
+        error: error
+      });
       
       if (errorCode === 'UNKNOWN_ERROR') {
         Alert.alert('Sign In Issue', error.message || 'Unable to sign in with Apple. Please try again.');
@@ -165,13 +166,6 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
     setIsProcessing(true);
     isProcessingRef.current = true;
     try {
-      // DEBUG: Log all environment variables being loaded
-      console.log('🔍 DEBUG - Environment Variables:');
-      console.log('🔍 GOOGLE_IOS_CLIENT_ID:', GOOGLE_AUTH_CONFIG.iosClientId);
-      console.log('🔍 GOOGLE_WEB_CLIENT_ID:', GOOGLE_AUTH_CONFIG.webClientId);
-      console.log('🔍 GOOGLE_ANDROID_CLIENT_ID:', GOOGLE_AUTH_CONFIG.androidClientId);
-      console.log('🔍 GOOGLE_ANDROID_WEB_CLIENT_ID:', GOOGLE_AUTH_CONFIG.androidWebClientId);
-      console.log('🔍 Platform:', Platform.OS);
 
       // Configure Google Sign In with correct webClientId for each platform
       const config = {
@@ -184,9 +178,6 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
         accountName: '', // Clear any cached account
       };
 
-      console.log('🔍 Final config being used:', config);
-      
-      console.log('🔧 Final attempt - Platform:', Platform.OS, 'webClientId:', config.webClientId);
       
       GoogleSignin.configure(config);
       await GoogleSignin.hasPlayServices();
@@ -194,23 +185,18 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
       // Sign out first to clear any cached credentials and force account selection
       try {
         await GoogleSignin.signOut();
-        console.log('🔍 Signed out to clear cached credentials');
       } catch (error) {
-        console.log('🔍 No previous sign-in to clear:', error.message);
+        // No previous sign-in to clear
       }
       
       const userInfo = await GoogleSignin.signIn();
-      console.log('🟢 GOOGLE SIGN IN SUCCESS:', userInfo);
       
       if (userInfo.type === 'cancelled' || userInfo.data === null) {
-        console.log('🟡 Google Sign In cancelled or no data');
         return;
       }
       
       const idToken = userInfo.data?.idToken;
       const googleUserId = userInfo.data?.user?.id;
-      console.log('🟢 ID Token received:', idToken ? 'YES' : 'NO');
-      console.log('🟢 Google User ID:', googleUserId);
       
       if (idToken) {
         // NEW APPROACH: Check if account exists before calling server (only if we have googleUserId)
@@ -247,17 +233,15 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
       } else {
         throw new Error('No ID token received from Google');
       }
-    } catch (error: any) {
-      console.log('🔴 GOOGLE SIGN IN ERROR:', error);
-      console.log('🔴 Error code:', error.code);
-      console.log('🔴 Error message:', error.message);
-      
-      if (error.code !== 'SIGN_IN_CANCELLED' && error.code !== 'IN_PROGRESS') {
-        console.log('🔴 Throwing error:', error);
-        throw error;
-      } else {
-        console.log('🔴 User cancelled or in progress, ignoring error');
-      }
+        } catch (error: any) {
+          if (error.code !== 'SIGN_IN_CANCELLED' && error.code !== 'IN_PROGRESS') {
+            console.error('Google Sign In Error:', {
+              code: error.code,
+              message: error.message,
+              error: error
+            });
+            throw error;
+          }
     } finally {
       setIsProcessing(false);
       isProcessingRef.current = false;
