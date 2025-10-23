@@ -165,25 +165,52 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
     setIsProcessing(true);
     isProcessingRef.current = true;
     try {
-      // Configure Google Sign In
+      // DEBUG: Log all environment variables being loaded
+      console.log('🔍 DEBUG - Environment Variables:');
+      console.log('🔍 GOOGLE_IOS_CLIENT_ID:', GOOGLE_AUTH_CONFIG.iosClientId);
+      console.log('🔍 GOOGLE_WEB_CLIENT_ID:', GOOGLE_AUTH_CONFIG.webClientId);
+      console.log('🔍 GOOGLE_ANDROID_CLIENT_ID:', GOOGLE_AUTH_CONFIG.androidClientId);
+      console.log('🔍 GOOGLE_ANDROID_WEB_CLIENT_ID:', GOOGLE_AUTH_CONFIG.androidWebClientId);
+      console.log('🔍 Platform:', Platform.OS);
+
+      // Configure Google Sign In with correct webClientId for each platform
       const config = {
-        webClientId: GOOGLE_AUTH_CONFIG.webClientId,
-        iosClientId: GOOGLE_AUTH_CONFIG.iosClientId,
+        webClientId: Platform.OS === 'ios' 
+          ? GOOGLE_AUTH_CONFIG.webClientId      // iOS: use iOS client ID (works)
+          : '213914599866-t8gaip17no3h323d71njchb4hbs3csco.apps.googleusercontent.com', // Android: use Web client ID
+        iosClientId: GOOGLE_AUTH_CONFIG.iosClientId, // iOS Client ID (only for iOS)
+        offlineAccess: true,
         forceCodeForRefreshToken: true, // Force account selection
+        accountName: '', // Clear any cached account
       };
+
+      console.log('🔍 Final config being used:', config);
+      
+      console.log('🔧 Final attempt - Platform:', Platform.OS, 'webClientId:', config.webClientId);
       
       GoogleSignin.configure(config);
-      
       await GoogleSignin.hasPlayServices();
       
+      // Sign out first to clear any cached credentials and force account selection
+      try {
+        await GoogleSignin.signOut();
+        console.log('🔍 Signed out to clear cached credentials');
+      } catch (error) {
+        console.log('🔍 No previous sign-in to clear:', error.message);
+      }
+      
       const userInfo = await GoogleSignin.signIn();
+      console.log('🟢 GOOGLE SIGN IN SUCCESS:', userInfo);
       
       if (userInfo.type === 'cancelled' || userInfo.data === null) {
+        console.log('🟡 Google Sign In cancelled or no data');
         return;
       }
       
       const idToken = userInfo.data?.idToken;
       const googleUserId = userInfo.data?.user?.id;
+      console.log('🟢 ID Token received:', idToken ? 'YES' : 'NO');
+      console.log('🟢 Google User ID:', googleUserId);
       
       if (idToken) {
         // NEW APPROACH: Check if account exists before calling server (only if we have googleUserId)
@@ -221,10 +248,15 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
         throw new Error('No ID token received from Google');
       }
     } catch (error: any) {
+      console.log('🔴 GOOGLE SIGN IN ERROR:', error);
+      console.log('🔴 Error code:', error.code);
+      console.log('🔴 Error message:', error.message);
       
       if (error.code !== 'SIGN_IN_CANCELLED' && error.code !== 'IN_PROGRESS') {
+        console.log('🔴 Throwing error:', error);
         throw error;
       } else {
+        console.log('🔴 User cancelled or in progress, ignoring error');
       }
     } finally {
       setIsProcessing(false);
@@ -259,8 +291,14 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
   return (
     <>
       <View style={styles.container}>
-        <View style={styles.logosContainer}>
-          <View style={styles.googleButtonContainer}>
+        <View style={[
+          styles.logosContainer,
+          Platform.OS === 'android' ? styles.logosContainerAndroid : styles.logosContainerIOS
+        ]}>
+          <View style={[
+            styles.googleButtonContainer,
+            Platform.OS === 'android' ? styles.googleButtonContainerAndroid : styles.googleButtonContainerIOS
+          ]}>
             <GoogleSigninButton
               size={GoogleSigninButton.Size.Standard}
               color={GoogleSigninButton.Color.Dark}
@@ -268,13 +306,15 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
               onPress={handleGoogleSignIn}
             />
           </View>
-          <View style={styles.appleButtonContainer}>
-            <AppleSignInButton
-              onPress={handleAppleSignIn}
-              style={styles.appleButtonInner}
-              isSignUp={isSignUp}
-            />
-          </View>
+          {Platform.OS === 'ios' && (
+            <View style={styles.appleButtonContainer}>
+              <AppleSignInButton
+                onPress={handleAppleSignIn}
+                style={styles.appleButtonInner}
+                isSignUp={isSignUp}
+              />
+            </View>
+          )}
         </View>
       </View>
       
@@ -303,12 +343,46 @@ const styles = StyleSheet.create({
     height: 48, // Increased container height to accommodate Google button
     position: 'relative',
   },
+  // Android-specific styles - center the Google button
+  logosContainerAndroid: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: 48,
+    position: 'relative',
+  },
+  // iOS-specific styles - keep side-by-side layout
+  logosContainerIOS: {
+    flexDirection: 'row',
+    height: 48,
+    position: 'relative',
+  },
   googleButtonContainer: {
     width: 160,
     height: 48, // Match the parent container height
     position: 'absolute',
     left: 0,
     top: 0, // Force to same top position as Apple button
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Android-specific Google button container - center it
+  googleButtonContainerAndroid: {
+    width: 160,
+    height: 48,
+    position: 'relative', // Change from absolute to relative for centering
+    left: 'auto',
+    top: 'auto',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // iOS-specific Google button container - keep left positioning
+  googleButtonContainerIOS: {
+    width: 160,
+    height: 48,
+    position: 'absolute',
+    left: 0,
+    top: 0,
     justifyContent: 'center',
     alignItems: 'center',
   },

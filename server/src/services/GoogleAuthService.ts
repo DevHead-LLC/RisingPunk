@@ -3,6 +3,7 @@ import { GOOGLE_CLIENT_ID } from '../config/env';
 
 export class GoogleAuthService {
   private static client: OAuth2Client;
+  private static allowedClientIds: string[];
 
   static initialize(): void {
     const clientId = GOOGLE_CLIENT_ID;
@@ -13,6 +14,13 @@ export class GoogleAuthService {
     }
     
     this.client = new OAuth2Client(clientId);
+    
+    // Allow iOS, Android, and Web client IDs
+    this.allowedClientIds = [
+      clientId, // iOS client ID (existing)
+      '213914599866-kp888124r46si64s764mvft70649sbh4.apps.googleusercontent.com', // Android client ID
+      '213914599866-t8gaip17no3h323d71njchb4hbs3csco.apps.googleusercontent.com' // Web client ID
+    ];
   }
 
   static async verifyToken(idToken: string): Promise<{
@@ -27,28 +35,34 @@ export class GoogleAuthService {
       throw new Error('Google Auth Service not initialized');
     }
 
-    try {
-      const ticket = await this.client.verifyIdToken({
-        idToken,
-        audience: GOOGLE_CLIENT_ID
-      });
+    // Try each allowed client ID until one works
+    for (const clientId of this.allowedClientIds) {
+      try {
+        const ticket = await this.client.verifyIdToken({
+          idToken,
+          audience: clientId
+        });
 
-      const payload = ticket.getPayload();
-      if (!payload) {
-        return null;
+        const payload = ticket.getPayload();
+        if (!payload) {
+          continue; // Try next client ID
+        }
+
+        console.log(`✅ Google token verified with client ID: ${clientId}`);
+        return {
+          googleId: payload.sub,
+          email: payload.email!,
+          name: payload.name || '',
+          picture: payload.picture
+        };
+      } catch (error) {
+        console.log(`❌ Failed to verify with client ID ${clientId}:`, error instanceof Error ? error.message : String(error));
+        continue; // Try next client ID
       }
-
-      
-      return {
-        googleId: payload.sub,
-        email: payload.email!,
-        name: payload.name || '',
-        picture: payload.picture
-      };
-    } catch (error) {
-      console.error('Google token verification failed:', error);
-      return null;
     }
+
+    console.error('Google token verification failed with all client IDs');
+    return null;
   }
 
   static isEnabled(): boolean {

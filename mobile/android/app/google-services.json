@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "213914599866",
+    "project_id": "rising-punk",
+    "storage_bucket": "rising-punk.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:213914599866:android:4142d3599b06d2230f1d83",
+        "android_client_info": {
+          "package_name": "com.devheadllc.risingpunk"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "213914599866-kp888124r46si64s764mvft70649sbh4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.devheadllc.risingpunk",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "213914599866-t8gaip17no3h323d71njchb4hbs3csco.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAQmFruVuJQglm8E27A-PjZ-IJPVGo5UMA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "213914599866-t8gaip17no3h323d71njchb4hbs3csco.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "213914599866-omj66uek6jte9rrge2secalb8sf4bacs.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.devheadllc.risingpunk"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
