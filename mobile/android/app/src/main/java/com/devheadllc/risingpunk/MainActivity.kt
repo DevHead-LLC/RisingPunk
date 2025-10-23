@@ -1,4 +1,4 @@
-package com.mobile
+package com.devheadllc.risingpunk
 
 import android.content.pm.ActivityInfo
 import android.os.Bundle
