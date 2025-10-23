@@ -142,11 +142,12 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
         return;
       }
       
-      // DETAILED ERROR LOGGING FOR INVESTIGATION (only for non-cancellation errors)
-      console.error('🔴 REACT NATIVE APPLE SIGN IN ERROR DEBUG:');
-      console.error('   Error code:', error.code);
-      console.error('   Error message:', error.message);
-      console.error('   Full error object:', error);
+      // Log error details for debugging
+      console.error('Apple Sign In Error:', {
+        code: error.code,
+        message: error.message,
+        error: error
+      });
       
       if (errorCode === 'UNKNOWN_ERROR') {
         Alert.alert('Sign In Issue', error.message || 'Unable to sign in with Apple. Please try again.');
@@ -165,16 +166,28 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
     setIsProcessing(true);
     isProcessingRef.current = true;
     try {
-      // Configure Google Sign In
+
+      // Configure Google Sign In with correct webClientId for each platform
       const config = {
-        webClientId: GOOGLE_AUTH_CONFIG.webClientId,
-        iosClientId: GOOGLE_AUTH_CONFIG.iosClientId,
+        webClientId: Platform.OS === 'ios' 
+          ? GOOGLE_AUTH_CONFIG.webClientId      // iOS: use iOS client ID (works)
+          : '213914599866-t8gaip17no3h323d71njchb4hbs3csco.apps.googleusercontent.com', // Android: use Web client ID
+        iosClientId: GOOGLE_AUTH_CONFIG.iosClientId, // iOS Client ID (only for iOS)
+        offlineAccess: true,
         forceCodeForRefreshToken: true, // Force account selection
+        accountName: '', // Clear any cached account
       };
+
       
       GoogleSignin.configure(config);
-      
       await GoogleSignin.hasPlayServices();
+      
+      // Sign out first to clear any cached credentials and force account selection
+      try {
+        await GoogleSignin.signOut();
+      } catch (error) {
+        // No previous sign-in to clear
+      }
       
       const userInfo = await GoogleSignin.signIn();
       
@@ -220,12 +233,15 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
       } else {
         throw new Error('No ID token received from Google');
       }
-    } catch (error: any) {
-      
-      if (error.code !== 'SIGN_IN_CANCELLED' && error.code !== 'IN_PROGRESS') {
-        throw error;
-      } else {
-      }
+        } catch (error: any) {
+          if (error.code !== 'SIGN_IN_CANCELLED' && error.code !== 'IN_PROGRESS') {
+            console.error('Google Sign In Error:', {
+              code: error.code,
+              message: error.message,
+              error: error
+            });
+            throw error;
+          }
     } finally {
       setIsProcessing(false);
       isProcessingRef.current = false;
@@ -259,8 +275,14 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
   return (
     <>
       <View style={styles.container}>
-        <View style={styles.logosContainer}>
-          <View style={styles.googleButtonContainer}>
+        <View style={[
+          styles.logosContainer,
+          Platform.OS === 'android' ? styles.logosContainerAndroid : styles.logosContainerIOS
+        ]}>
+          <View style={[
+            styles.googleButtonContainer,
+            Platform.OS === 'android' ? styles.googleButtonContainerAndroid : styles.googleButtonContainerIOS
+          ]}>
             <GoogleSigninButton
               size={GoogleSigninButton.Size.Standard}
               color={GoogleSigninButton.Color.Dark}
@@ -268,13 +290,15 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
               onPress={handleGoogleSignIn}
             />
           </View>
-          <View style={styles.appleButtonContainer}>
-            <AppleSignInButton
-              onPress={handleAppleSignIn}
-              style={styles.appleButtonInner}
-              isSignUp={isSignUp}
-            />
-          </View>
+          {Platform.OS === 'ios' && (
+            <View style={styles.appleButtonContainer}>
+              <AppleSignInButton
+                onPress={handleAppleSignIn}
+                style={styles.appleButtonInner}
+                isSignUp={isSignUp}
+              />
+            </View>
+          )}
         </View>
       </View>
       
@@ -303,12 +327,46 @@ const styles = StyleSheet.create({
     height: 48, // Increased container height to accommodate Google button
     position: 'relative',
   },
+  // Android-specific styles - center the Google button
+  logosContainerAndroid: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: 48,
+    position: 'relative',
+  },
+  // iOS-specific styles - keep side-by-side layout
+  logosContainerIOS: {
+    flexDirection: 'row',
+    height: 48,
+    position: 'relative',
+  },
   googleButtonContainer: {
     width: 160,
     height: 48, // Match the parent container height
     position: 'absolute',
     left: 0,
     top: 0, // Force to same top position as Apple button
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Android-specific Google button container - center it
+  googleButtonContainerAndroid: {
+    width: 160,
+    height: 48,
+    position: 'relative', // Change from absolute to relative for centering
+    left: 'auto',
+    top: 'auto',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // iOS-specific Google button container - keep left positioning
+  googleButtonContainerIOS: {
+    width: 160,
+    height: 48,
+    position: 'absolute',
+    left: 0,
+    top: 0,
     justifyContent: 'center',
     alignItems: 'center',
   },
