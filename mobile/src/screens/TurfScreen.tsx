@@ -257,33 +257,29 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     .maxPointers(1)
     .onStart(() => {
       'worklet';
-      if (Platform.OS === 'android') {
-        startX.value = offsetX.value;
-        startY.value = offsetY.value;
-      }
+      startX.value = offsetX.value;
+      startY.value = offsetY.value;
     })
         .onUpdate((g: any) => {
           'worklet';
-          if (Platform.OS === 'android') {
-            let x = startX.value + g.translationX;
-            let y = startY.value + g.translationY;
+          let x = startX.value + g.translationX;
+          let y = startY.value + g.translationY;
+          
+          // Always enforce bounds if ready (hard stops)
+          if (boundsReady.value) {
+            const originalX = x;
+            const originalY = y;
+            x = Math.min(maxX.value, Math.max(minX.value, x));
+            y = Math.min(maxY.value, Math.max(minY.value, y));
             
-            // Always enforce bounds if ready (hard stops)
-            if (boundsReady.value && Platform.OS === 'android') {
-              const originalX = x;
-              const originalY = y;
-              x = Math.min(maxX.value, Math.max(minX.value, x));
-              y = Math.min(maxY.value, Math.max(minY.value, y));
-              
-            }
-            
-            offsetX.value = x;
-            offsetY.value = y;
           }
+          
+          offsetX.value = x;
+          offsetY.value = y;
         })
         .onEnd((g: any) => {
           'worklet';
-          if (Platform.OS === 'android' && boundsReady.value) {
+          if (boundsReady.value) {
             // Apply decay with boundary enforcement
             offsetX.value = withDecay({ 
               velocity: g.velocityX, 
