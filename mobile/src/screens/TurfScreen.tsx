@@ -239,10 +239,24 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     }
   }, [minX, maxX, minY, maxY, boundsReady, computePanBounds]);
 
-  // Expose horizontalScrollRef and centerAndroidView to parent component
+  // Expose horizontalScrollRef, centerAndroidView, and pan method to parent component
   useImperativeHandle(ref, () => ({
     horizontalScrollRef: horizontalScrollRef,
-    centerAndroidView: centerAndroidView
+    centerAndroidView: centerAndroidView,
+    panTo: (x: number, y: number, animated: boolean = true) => {
+      if (Platform.OS === 'android') {
+        // For Android, set the shared values directly
+        offsetX.value = -x;
+        offsetY.value = -y;
+      } else {
+        // For iOS, use the ScrollView
+        horizontalScrollRef.current?.scrollTo({
+          x: x,
+          y: y,
+          animated: animated,
+        });
+      }
+    }
   }));
 
   // Track turf view position using ref to avoid re-renders
@@ -251,15 +265,17 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     currentScrollPositionRef.current = { x: contentOffset.x, y: contentOffset.y };
   }, []);
 
-  // Android-specific pan gesture (only for Android) - Optimized for performance
-  const panGesture = Platform.OS === 'android' ? Gesture.Pan()
-    .minPointers(1)
-    .maxPointers(1)
-    .onStart(() => {
-      'worklet';
-      startX.value = offsetX.value;
-      startY.value = offsetY.value;
-    })
+  // Android-specific pan gesture (only for Android) - Memoized for performance
+  const panGesture = useMemo(() => {
+    if (Platform.OS === 'android') {
+      return Gesture.Pan()
+        .minPointers(1)
+        .maxPointers(1)
+        .onStart(() => {
+          'worklet';
+          startX.value = offsetX.value;
+          startY.value = offsetY.value;
+        })
         .onUpdate((g: any) => {
           'worklet';
           let x = startX.value + g.translationX;
@@ -292,7 +308,10 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
               clamp: [minY.value, maxY.value]
             });
           }
-        }) : null;
+        });
+    }
+    return null;
+  }, [offsetX, offsetY, startX, startY, boundsReady, minX, maxX, minY, maxY, withDecay]);
 
   // Fetch Property 1's status to determine Property 2's rendering
   const { data: property1Status } = useGetRentalHousingStatusQuery(1);
