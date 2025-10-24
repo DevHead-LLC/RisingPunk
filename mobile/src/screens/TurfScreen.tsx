@@ -188,16 +188,12 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     }
   }, [user, showOnboarding, showTurfIntro, showEmailVerification, emailVerificationPromptedUserId, dispatch]);
 
-  // Android-specific status bar configuration (optional - hide status bar for immersive experience)
+  // Android-specific status bar configuration - hide status bar for immersive experience throughout the app
   useEffect(() => {
     if (Platform.OS === 'android') {
-      // Hide status bar for immersive experience (optional)
+      // Hide status bar for immersive experience - should stay hidden throughout the entire application
       StatusBar.setHidden(true, 'fade');
-      
-      // Cleanup: restore status bar when component unmounts
-      return () => {
-        StatusBar.setHidden(false, 'fade');
-      };
+      // No cleanup needed - status bar should remain hidden when navigating between screens
     }
   }, []);
 
