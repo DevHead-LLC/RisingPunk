@@ -598,8 +598,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           if (Platform.OS === 'android') {
             // For Android, set the shared values to the saved position
             if (offsetX && offsetY) {
-              offsetX.value = -turfViewPosition.x;
-              offsetY.value = -turfViewPosition.y;
+              offsetX.value = turfViewPosition.x;
+              offsetY.value = turfViewPosition.y;
             }
           } else {
             horizontalScrollRef.current?.scrollTo({
@@ -616,9 +616,9 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const navigateToFloorPlan = useCallback((propertyId: number) => {
     // Capture current turf view position
     if (Platform.OS === 'android') {
-      // For Android, capture the current offset values
+      // For Android, capture the current offset values (no negation needed)
       if (offsetX && offsetY) {
-        setTurfViewPosition({ x: -offsetX.value, y: -offsetY.value });
+        setTurfViewPosition({ x: offsetX.value, y: offsetY.value });
       }
     } else {
       // For iOS, capture from the ref
@@ -784,8 +784,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                 if (Platform.OS === 'android') {
                   // For Android, set the shared values to the saved position
                   if (offsetX && offsetY) {
-                    offsetX.value = -turfViewPosition.x;
-                    offsetY.value = -turfViewPosition.y;
+                    offsetX.value = turfViewPosition.x;
+                    offsetY.value = turfViewPosition.y;
                   }
                 } else {
                   horizontalScrollRef.current?.scrollTo({
@@ -819,7 +819,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                         if (Platform.OS === 'android') {
                           // For Android, capture the current offset values
                           if (offsetX && offsetY) {
-                            setTurfViewPosition({ x: -offsetX.value, y: -offsetY.value });
+                            setTurfViewPosition({ x: offsetX.value, y: offsetY.value });
                           }
                         } else {
                           // For iOS, capture from the ref
@@ -907,7 +907,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                       if (Platform.OS === 'android') {
                         // For Android, capture the current offset values
                         if (offsetX && offsetY) {
-                          setTurfViewPosition({ x: -offsetX.value, y: -offsetY.value });
+                          setTurfViewPosition({ x: offsetX.value, y: offsetY.value });
                         }
                       } else {
                         // For iOS, capture from the ref
