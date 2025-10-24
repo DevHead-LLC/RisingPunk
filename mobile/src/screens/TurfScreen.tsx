@@ -25,23 +25,21 @@ import {useGetRentalHousingStatusQuery, useCompleteRentalHousingMutation, useCom
 import {OnboardingSlides} from '../components/onboarding';
 import {TurfIntro} from '../components/turf-intro';
 
-// Android-specific imports (only for Android) - using conditional imports to avoid bundling on iOS
+// Platform-specific imports - available on both platforms but only used on Android
 let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, computePanBounds: any;
 
-if (Platform.OS === 'android') {
-  // Only import these modules on Android to avoid bundling on iOS
-  const gestureHandler = require('react-native-gesture-handler');
-  const reanimated = require('react-native-reanimated');
-  const mapPanBounds = require('../utils/mapPanBounds');
-  
-  Gesture = gestureHandler.Gesture;
-  GestureDetector = gestureHandler.GestureDetector;
-  Animated = reanimated.default;
-  useSharedValue = reanimated.useSharedValue;
-  useAnimatedStyle = reanimated.useAnimatedStyle;
-  withDecay = reanimated.withDecay;
-  computePanBounds = mapPanBounds.computePanBounds;
-}
+// Import on both platforms to avoid undefined function errors
+const gestureHandler = require('react-native-gesture-handler');
+const reanimated = require('react-native-reanimated');
+const mapPanBounds = require('../utils/mapPanBounds');
+
+Gesture = gestureHandler.Gesture;
+GestureDetector = gestureHandler.GestureDetector;
+Animated = reanimated.default;
+useSharedValue = reanimated.useSharedValue;
+useAnimatedStyle = reanimated.useAnimatedStyle;
+withDecay = reanimated.withDecay;
+computePanBounds = mapPanBounds.computePanBounds;
 
 const DiagonalLines = memo(({ colors }: { colors: any }) => (
   <>
@@ -143,22 +141,22 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const currentScrollPositionRef = useRef<{ x: number; y: number } | null>(null);
   const dispatch = useAppDispatch();
 
-  // Android-specific gesture state (only for Android)
-  const offsetX: any = Platform.OS === 'android' ? useSharedValue(0) : null;
-  const offsetY: any = Platform.OS === 'android' ? useSharedValue(0) : null;
-  const startX: any = Platform.OS === 'android' ? useSharedValue(0) : null;
-  const startY: any = Platform.OS === 'android' ? useSharedValue(0) : null;
+  // Android-specific gesture state - always call hooks unconditionally
+  const offsetX: any = useSharedValue(0);
+  const offsetY: any = useSharedValue(0);
+  const startX: any = useSharedValue(0);
+  const startY: any = useSharedValue(0);
   
-  // Android-specific bounds state (only for Android)
-  const minX: any = Platform.OS === 'android' ? useSharedValue(-1000000) : null;
-  const maxX: any = Platform.OS === 'android' ? useSharedValue(1000000) : null;
-  const minY: any = Platform.OS === 'android' ? useSharedValue(-1000000) : null;
-  const maxY: any = Platform.OS === 'android' ? useSharedValue(1000000) : null;
-  const boundsReady: any = Platform.OS === 'android' ? useSharedValue(false) : null;
+  // Android-specific bounds state - always call hooks unconditionally
+  const minX: any = useSharedValue(-1000000);
+  const maxX: any = useSharedValue(1000000);
+  const minY: any = useSharedValue(-1000000);
+  const maxY: any = useSharedValue(1000000);
+  const boundsReady: any = useSharedValue(false);
 
   // Android-specific centering function
   const centerAndroidView = useCallback(() => {
-    if (Platform.OS === 'android' && offsetX && offsetY) {
+    if (Platform.OS === 'android') {
       const SCREEN_WIDTH = Dimensions.get('window').width;
       const CONTENT_WIDTH = 2000;
       const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
@@ -199,7 +197,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
 
   // Android-specific bounds calculation (only for Android)
   useEffect(() => {
-    if (Platform.OS === 'android' && minX && maxX && minY && maxY && boundsReady && computePanBounds) {
+    if (Platform.OS === 'android' && computePanBounds) {
       const WINDOW_WIDTH = Dimensions.get('window').width;
       const WINDOW_HEIGHT = Dimensions.get('window').height;
       const SCREEN_WIDTH = Dimensions.get('screen').width;
@@ -259,19 +257,19 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     .maxPointers(1)
     .onStart(() => {
       'worklet';
-      if (startX && startY && offsetX && offsetY) {
+      if (Platform.OS === 'android') {
         startX.value = offsetX.value;
         startY.value = offsetY.value;
       }
     })
         .onUpdate((g: any) => {
           'worklet';
-          if (startX && startY && offsetX && offsetY) {
+          if (Platform.OS === 'android') {
             let x = startX.value + g.translationX;
             let y = startY.value + g.translationY;
             
             // Always enforce bounds if ready (hard stops)
-            if (boundsReady && boundsReady.value && minX && maxX && minY && maxY) {
+            if (boundsReady.value && Platform.OS === 'android') {
               const originalX = x;
               const originalY = y;
               x = Math.min(maxX.value, Math.max(minX.value, x));
@@ -285,7 +283,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         })
         .onEnd((g: any) => {
           'worklet';
-          if (offsetX && offsetY && boundsReady && boundsReady.value && minX && maxX && minY && maxY) {
+          if (Platform.OS === 'android' && boundsReady.value) {
             // Apply decay with boundary enforcement
             offsetX.value = withDecay({ 
               velocity: g.velocityX, 
@@ -597,10 +595,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         setTimeout(() => {
           if (Platform.OS === 'android') {
             // For Android, set the shared values to the saved position
-            if (offsetX && offsetY) {
-              offsetX.value = turfViewPosition.x;
-              offsetY.value = turfViewPosition.y;
-            }
+            offsetX.value = turfViewPosition.x;
+            offsetY.value = turfViewPosition.y;
           } else {
             horizontalScrollRef.current?.scrollTo({
               x: turfViewPosition.x,
@@ -617,9 +613,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     // Capture current turf view position
     if (Platform.OS === 'android') {
       // For Android, capture the current offset values (no negation needed)
-      if (offsetX && offsetY) {
-        setTurfViewPosition({ x: offsetX.value, y: offsetY.value });
-      }
+      setTurfViewPosition({ x: offsetX.value, y: offsetY.value });
     } else {
       // For iOS, capture from the ref
       if (currentScrollPositionRef.current) {
@@ -783,10 +777,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
               setTimeout(() => {
                 if (Platform.OS === 'android') {
                   // For Android, set the shared values to the saved position
-                  if (offsetX && offsetY) {
-                    offsetX.value = turfViewPosition.x;
-                    offsetY.value = turfViewPosition.y;
-                  }
+                  offsetX.value = turfViewPosition.x;
+                  offsetY.value = turfViewPosition.y;
                 } else {
                   horizontalScrollRef.current?.scrollTo({
                     x: turfViewPosition.x,
@@ -818,9 +810,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                         // Capture current turf view position before navigating
                         if (Platform.OS === 'android') {
                           // For Android, capture the current offset values
-                          if (offsetX && offsetY) {
-                            setTurfViewPosition({ x: offsetX.value, y: offsetY.value });
-                          }
+                          setTurfViewPosition({ x: offsetX.value, y: offsetY.value });
                         } else {
                           // For iOS, capture from the ref
                           if (currentScrollPositionRef.current) {
@@ -906,9 +896,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                       // Capture current turf view position before navigating
                       if (Platform.OS === 'android') {
                         // For Android, capture the current offset values
-                        if (offsetX && offsetY) {
-                          setTurfViewPosition({ x: offsetX.value, y: offsetY.value });
-                        }
+                        setTurfViewPosition({ x: offsetX.value, y: offsetY.value });
                       } else {
                         // For iOS, capture from the ref
                         if (currentScrollPositionRef.current) {
