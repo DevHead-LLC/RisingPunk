@@ -25,9 +25,9 @@ export const TurfIntro: React.FC<TurfIntroProps> = ({ onComplete, onSkip, horizo
       // Use the new panTo method that works on both platforms
       if (horizontalScrollRef.current.panTo) {
         horizontalScrollRef.current.panTo(CENTER_X, 0, true);
-      } else {
+      } else if (horizontalScrollRef.current.horizontalScrollRef?.current) {
         // Fallback to scrollTo for iOS
-        horizontalScrollRef.current.scrollTo({
+        horizontalScrollRef.current.horizontalScrollRef.current.scrollTo({
           x: CENTER_X,
           y: 0,
           animated: true,
@@ -58,8 +58,8 @@ export const TurfIntro: React.FC<TurfIntroProps> = ({ onComplete, onSkip, horizo
         
         if (horizontalScrollRef.current.panTo) {
           horizontalScrollRef.current.panTo(BARRACKS_X, 0, true);
-        } else {
-          horizontalScrollRef.current.scrollTo({
+        } else if (horizontalScrollRef.current.horizontalScrollRef?.current) {
+          horizontalScrollRef.current.horizontalScrollRef.current.scrollTo({
             x: BARRACKS_X,
             y: 0,
             animated: true,
@@ -80,8 +80,8 @@ export const TurfIntro: React.FC<TurfIntroProps> = ({ onComplete, onSkip, horizo
         
         if (horizontalScrollRef.current.panTo) {
           horizontalScrollRef.current.panTo(RESEARCH_X, RESEARCH_Y, true);
-        } else {
-          horizontalScrollRef.current.scrollTo({
+        } else if (horizontalScrollRef.current.horizontalScrollRef?.current) {
+          horizontalScrollRef.current.horizontalScrollRef.current.scrollTo({
             x: RESEARCH_X,
             y: RESEARCH_Y,
             animated: true,
@@ -102,8 +102,8 @@ export const TurfIntro: React.FC<TurfIntroProps> = ({ onComplete, onSkip, horizo
         
         if (horizontalScrollRef.current.panTo) {
           horizontalScrollRef.current.panTo(INVESTMENT_X, INVESTMENT_Y, true);
-        } else {
-          horizontalScrollRef.current.scrollTo({
+        } else if (horizontalScrollRef.current.horizontalScrollRef?.current) {
+          horizontalScrollRef.current.horizontalScrollRef.current.scrollTo({
             x: INVESTMENT_X,
             y: INVESTMENT_Y,
             animated: true,
@@ -122,8 +122,8 @@ export const TurfIntro: React.FC<TurfIntroProps> = ({ onComplete, onSkip, horizo
         
         if (horizontalScrollRef.current.panTo) {
           horizontalScrollRef.current.panTo(CENTER_X, 0, true);
-        } else {
-          horizontalScrollRef.current.scrollTo({
+        } else if (horizontalScrollRef.current.horizontalScrollRef?.current) {
+          horizontalScrollRef.current.horizontalScrollRef.current.scrollTo({
             x: CENTER_X,
             y: 0,
             animated: true,
@@ -142,8 +142,8 @@ export const TurfIntro: React.FC<TurfIntroProps> = ({ onComplete, onSkip, horizo
         
         if (horizontalScrollRef.current.panTo) {
           horizontalScrollRef.current.panTo(CENTER_X, 0, true);
-        } else {
-          horizontalScrollRef.current.scrollTo({
+        } else if (horizontalScrollRef.current.horizontalScrollRef?.current) {
+          horizontalScrollRef.current.horizontalScrollRef.current.scrollTo({
             x: CENTER_X,
             y: 0,
             animated: true,

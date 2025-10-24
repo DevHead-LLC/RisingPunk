@@ -998,7 +998,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         <TurfIntro
           onComplete={handleTurfIntroComplete}
           onSkip={handleTurfIntroSkip}
-          horizontalScrollRef={horizontalScrollRef}
+          horizontalScrollRef={ref as React.RefObject<any>}
           onStepChange={handleTurfIntroStepChange}
         />
       )}
