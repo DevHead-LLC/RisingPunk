@@ -1,5 +1,5 @@
 import React, { memo, useEffect, useRef, useCallback } from 'react';
-import { View, Text, Dimensions, AppState } from 'react-native';
+import { View, Text, Dimensions, AppState, Platform } from 'react-native';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { loadStoredAuth, updateHandle, setShowEmailVerification, setShowEmailVerificationBanner, refreshUserData, logoutUser, setShowAccountSwitched, setShowAccountSwitchedBanner } from '../store/slices/authSlice';
 import { updateBalance, triggerUpdate } from '../store/slices/balanceSlice';
@@ -36,12 +36,20 @@ const AppContent = memo(() => {
     const CONTENT_WIDTH = 2000;
     const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
     
-    if (turfScreenRef.current?.horizontalScrollRef?.current) {
-      turfScreenRef.current.horizontalScrollRef.current.scrollTo({
-        x: CENTER_X,
-        y: 0,
-        animated: false,
-      });
+    if (Platform.OS === 'android') {
+      // For Android, use the centerAndroidView function from TurfScreen
+      if (turfScreenRef.current?.centerAndroidView) {
+        turfScreenRef.current.centerAndroidView();
+      }
+    } else {
+      // For iOS, use the horizontalScrollRef
+      if (turfScreenRef.current?.horizontalScrollRef?.current) {
+        turfScreenRef.current.horizontalScrollRef.current.scrollTo({
+          x: CENTER_X,
+          y: 0,
+          animated: false,
+        });
+      }
     }
   }, []);
 
