@@ -229,6 +229,20 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         marginSize: MARGIN_SIZE,
       });
 
+      // Calculate Android header/toolbar height for landscape mode
+      // Status bar is hidden, but we need to account for the space it would take
+      // In landscape mode, status bar is typically 24-48dp, navigation bar is 48dp
+      // Since status bar is hidden, we only need to account for navigation bar
+      const ANDROID_NAVIGATION_BAR_HEIGHT = 24; // 24dp in landscape mode
+      const ANDROID_HEADER_HEIGHT = ANDROID_NAVIGATION_BAR_HEIGHT; // Total hidden header height
+      
+      // Adjust only the bottom boundary to allow scroll past bottom by header height
+      // This allows the bottom border to be visible when user scrolls past the normal bottom
+      const adjustedBounds = {
+        ...bounds,
+        minY: bounds.minY - ANDROID_HEADER_HEIGHT // Allow scroll past bottom by header height
+      };
+
       // Log bounds calculation for bottom border analysis
       console.log('🚨 TURF BOUNDS CALCULATION:', {
         WINDOW_HEIGHT,
@@ -239,21 +253,24 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         ADJUSTED_WIDTH,
         CONTENT_SIZE,
         bounds,
+        adjustedBounds,
+        androidHeaderHeight: ANDROID_HEADER_HEIGHT,
         bottomBorderAnalysis: {
           contentHeight: CONTENT_SIZE,
           containerHeight: ADJUSTED_HEIGHT,
           scrollableHeight: CONTENT_SIZE - ADJUSTED_HEIGHT,
           maxY: bounds.maxY,
           minY: bounds.minY,
+          adjustedMinY: adjustedBounds.minY,
           bottomVisible: bounds.maxY > 0
         },
-        note: 'Bounds calculation for bottom border visibility analysis'
+        note: 'Bounds calculation with Android header height adjustment for bottom border visibility'
       });
 
-      minX.value = bounds.minX;
-      maxX.value = bounds.maxX;
-      minY.value = bounds.minY;
-      maxY.value = bounds.maxY;
+      minX.value = adjustedBounds.minX;
+      maxX.value = adjustedBounds.maxX;
+      minY.value = adjustedBounds.minY;
+      maxY.value = adjustedBounds.maxY;
       boundsReady.value = true;
     }
   }, [minX, maxX, minY, maxY, boundsReady, computePanBounds]);
