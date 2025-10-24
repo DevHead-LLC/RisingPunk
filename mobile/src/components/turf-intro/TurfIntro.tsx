@@ -22,12 +22,17 @@ export const TurfIntro: React.FC<TurfIntroProps> = ({ onComplete, onSkip, horizo
       const CONTENT_WIDTH = 2000;
       const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
       
-      // Use the exact same centering logic as when closing profile
-      horizontalScrollRef.current.scrollTo({
-        x: CENTER_X,
-        y: 0,
-        animated: true,
-      });
+      // Use the new panTo method that works on both platforms
+      if (horizontalScrollRef.current.panTo) {
+        horizontalScrollRef.current.panTo(CENTER_X, 0, true);
+      } else if (horizontalScrollRef.current.horizontalScrollRef?.current) {
+        // Fallback to scrollTo for iOS
+        horizontalScrollRef.current.horizontalScrollRef.current.scrollTo({
+          x: CENTER_X,
+          y: 0,
+          animated: true,
+        });
+      }
     }
   }, [horizontalScrollRef]);
 
@@ -51,11 +56,15 @@ export const TurfIntro: React.FC<TurfIntroProps> = ({ onComplete, onSkip, horizo
         // Reduced offset to better center in the overlay window
         const BARRACKS_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2 + 275; // Adjusted from 400 to 200
         
-        horizontalScrollRef.current.scrollTo({
-          x: BARRACKS_X,
-          y: 0,
-          animated: true,
-        });
+        if (horizontalScrollRef.current.panTo) {
+          horizontalScrollRef.current.panTo(BARRACKS_X, 0, true);
+        } else if (horizontalScrollRef.current.horizontalScrollRef?.current) {
+          horizontalScrollRef.current.horizontalScrollRef.current.scrollTo({
+            x: BARRACKS_X,
+            y: 0,
+            animated: true,
+          });
+        }
       }
     } else if (currentStep === 'barracks') {
       // Move to Research Center step
@@ -69,11 +78,15 @@ export const TurfIntro: React.FC<TurfIntroProps> = ({ onComplete, onSkip, horizo
         const RESEARCH_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2 + 135; // Keep same horizontal position
         const RESEARCH_Y = 300; // Move down by 350 pixels
         
-        horizontalScrollRef.current.scrollTo({
-          x: RESEARCH_X,
-          y: RESEARCH_Y,
-          animated: true,
-        });
+        if (horizontalScrollRef.current.panTo) {
+          horizontalScrollRef.current.panTo(RESEARCH_X, RESEARCH_Y, true);
+        } else if (horizontalScrollRef.current.horizontalScrollRef?.current) {
+          horizontalScrollRef.current.horizontalScrollRef.current.scrollTo({
+            x: RESEARCH_X,
+            y: RESEARCH_Y,
+            animated: true,
+          });
+        }
       }
     } else if (currentStep === 'research') {
       // Move to Investment Property 1 step
@@ -87,11 +100,15 @@ export const TurfIntro: React.FC<TurfIntroProps> = ({ onComplete, onSkip, horizo
         const INVESTMENT_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2 - 390; // Move left from center
         const INVESTMENT_Y = 725; // Move further down from Research Center
         
-        horizontalScrollRef.current.scrollTo({
-          x: INVESTMENT_X,
-          y: INVESTMENT_Y,
-          animated: true,
-        });
+        if (horizontalScrollRef.current.panTo) {
+          horizontalScrollRef.current.panTo(INVESTMENT_X, INVESTMENT_Y, true);
+        } else if (horizontalScrollRef.current.horizontalScrollRef?.current) {
+          horizontalScrollRef.current.horizontalScrollRef.current.scrollTo({
+            x: INVESTMENT_X,
+            y: INVESTMENT_Y,
+            animated: true,
+          });
+        }
       }
     } else if (currentStep === 'investment1') {
       // Move to Wallet step (centered on Home but highlighting top-left wallet)
@@ -103,11 +120,15 @@ export const TurfIntro: React.FC<TurfIntroProps> = ({ onComplete, onSkip, horizo
         const CONTENT_WIDTH = 2000;
         const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
         
-        horizontalScrollRef.current.scrollTo({
-          x: CENTER_X,
-          y: 0,
-          animated: true,
-        });
+        if (horizontalScrollRef.current.panTo) {
+          horizontalScrollRef.current.panTo(CENTER_X, 0, true);
+        } else if (horizontalScrollRef.current.horizontalScrollRef?.current) {
+          horizontalScrollRef.current.horizontalScrollRef.current.scrollTo({
+            x: CENTER_X,
+            y: 0,
+            animated: true,
+          });
+        }
       }
     } else if (currentStep === 'wallet') {
       // Move to Profile step (centered on Home but highlighting top-right profile)
@@ -119,11 +140,15 @@ export const TurfIntro: React.FC<TurfIntroProps> = ({ onComplete, onSkip, horizo
         const CONTENT_WIDTH = 2000;
         const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
         
-        horizontalScrollRef.current.scrollTo({
-          x: CENTER_X,
-          y: 0,
-          animated: true,
-        });
+        if (horizontalScrollRef.current.panTo) {
+          horizontalScrollRef.current.panTo(CENTER_X, 0, true);
+        } else if (horizontalScrollRef.current.horizontalScrollRef?.current) {
+          horizontalScrollRef.current.horizontalScrollRef.current.scrollTo({
+            x: CENTER_X,
+            y: 0,
+            animated: true,
+          });
+        }
       }
     } else {
       // Complete the intro
