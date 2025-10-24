@@ -25,12 +25,15 @@ import {useGetRentalHousingStatusQuery, useCompleteRentalHousingMutation, useCom
 import {OnboardingSlides} from '../components/onboarding';
 import {TurfIntro} from '../components/turf-intro';
 
-// Android-specific imports (only for Android)
+// Android-specific imports (only for Android) - using conditional imports to avoid bundling on iOS
 let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, computePanBounds: any;
+
 if (Platform.OS === 'android') {
+  // Only import these modules on Android to avoid bundling on iOS
   const gestureHandler = require('react-native-gesture-handler');
   const reanimated = require('react-native-reanimated');
   const mapPanBounds = require('../utils/mapPanBounds');
+  
   Gesture = gestureHandler.Gesture;
   GestureDetector = gestureHandler.GestureDetector;
   Animated = reanimated.default;
@@ -93,6 +96,7 @@ const GesturePanView = memo(function GesturePanView({
   offsetX,
   offsetY,
   panGesture,
+  colors,
 }: {
   children: React.ReactNode;
   horizontalScrollRef: React.RefObject<ScrollView>;
@@ -100,6 +104,7 @@ const GesturePanView = memo(function GesturePanView({
   offsetX: any;
   offsetY: any;
   panGesture: any;
+  colors: any;
 }) {
   const animatedStyle: any = useAnimatedStyle(() => {
     'worklet';
@@ -108,18 +113,6 @@ const GesturePanView = memo(function GesturePanView({
       { translateY: offsetY.value },
     ];
     
-    // Log style application when near bottom border
-    const nearBottom = Math.abs(offsetY.value - 1552) < 100; // Assuming maxY is around 1552
-    if (nearBottom) {
-      console.log('🚨 TURF STYLE APPLICATION:', {
-        offsetX: offsetX.value,
-        offsetY: offsetY.value,
-        transform,
-        nearBottom,
-        distanceFromBottom: Math.abs(offsetY.value - 1552),
-        note: 'Style being applied near bottom border'
-      });
-    }
     
     return {
       transform,
@@ -128,7 +121,7 @@ const GesturePanView = memo(function GesturePanView({
 
   return (
     <GestureDetector gesture={panGesture}>
-      <Animated.View style={[styles.scrollContent, { borderColor: '#007AFF' }, animatedStyle]}>
+      <Animated.View style={[styles.scrollContent, { borderColor: colors.secondary + '99' }, animatedStyle]}>
         {children}
       </Animated.View>
     </GestureDetector>
@@ -231,7 +224,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
 
       // Calculate Android header/toolbar height for landscape mode
       // Status bar is hidden, but we need to account for the space it would take
-      // In landscape mode, status bar is typically 24-48dp, navigation bar is 48dp
+      // In landscape mode, navigation bar is 24dp
       // Since status bar is hidden, we only need to account for navigation bar
       const ANDROID_NAVIGATION_BAR_HEIGHT = 24; // 24dp in landscape mode
       const ANDROID_HEADER_HEIGHT = ANDROID_NAVIGATION_BAR_HEIGHT; // Total hidden header height
@@ -243,29 +236,6 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         minY: bounds.minY - ANDROID_HEADER_HEIGHT // Allow scroll past bottom by header height
       };
 
-      // Log bounds calculation for bottom border analysis
-      console.log('🚨 TURF BOUNDS CALCULATION:', {
-        WINDOW_HEIGHT,
-        SCREEN_HEIGHT,
-        ADJUSTED_HEIGHT,
-        WINDOW_WIDTH,
-        SCREEN_WIDTH,
-        ADJUSTED_WIDTH,
-        CONTENT_SIZE,
-        bounds,
-        adjustedBounds,
-        androidHeaderHeight: ANDROID_HEADER_HEIGHT,
-        bottomBorderAnalysis: {
-          contentHeight: CONTENT_SIZE,
-          containerHeight: ADJUSTED_HEIGHT,
-          scrollableHeight: CONTENT_SIZE - ADJUSTED_HEIGHT,
-          maxY: bounds.maxY,
-          minY: bounds.minY,
-          adjustedMinY: adjustedBounds.minY,
-          bottomVisible: bounds.maxY > 0
-        },
-        note: 'Bounds calculation with Android header height adjustment for bottom border visibility'
-      });
 
       minX.value = adjustedBounds.minX;
       maxX.value = adjustedBounds.maxX;
@@ -311,34 +281,6 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
               x = Math.min(maxX.value, Math.max(minX.value, x));
               y = Math.min(maxY.value, Math.max(minY.value, y));
               
-              // Log when reaching bottom border (Y position near maxY)
-              const nearBottomBorder = Math.abs(y - maxY.value) < 50;
-              const atBottomBorder = Math.abs(y - maxY.value) < 10;
-              
-              if (nearBottomBorder) {
-                console.log('🚨 TURF BOTTOM BORDER APPROACH:', {
-                  currentY: y,
-                  maxY: maxY.value,
-                  distanceFromBottom: Math.abs(y - maxY.value),
-                  originalY,
-                  translationY: g.translationY,
-                  nearBottom: nearBottomBorder,
-                  atBottom: atBottomBorder,
-                  note: 'User approaching bottom border - checking visibility'
-                });
-              }
-              
-              // Log when actually at bottom border
-              if (atBottomBorder) {
-                console.log('🚨 TURF AT BOTTOM BORDER:', {
-                  currentY: y,
-                  maxY: maxY.value,
-                  originalY,
-                  translationY: g.translationY,
-                  bounds: { minY: minY.value, maxY: maxY.value },
-                  note: 'User at bottom border - bottom should be visible'
-                });
-              }
             }
             
             offsetX.value = x;
@@ -956,6 +898,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                   offsetX={offsetX}
                   offsetY={offsetY}
                   panGesture={panGesture}
+                  colors={colors}
                 >
                   <DiagonalLines colors={colors} />
                   <View style={[styles.digitalGround, { backgroundColor: colors.matrix + '0D', borderColor: colors.matrix + '33' }]}>
@@ -1041,7 +984,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           </View>
         );
     }
-  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep]);
+  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, offsetX, offsetY, panGesture, centerAndroidView]);
 
   return (
     <>
