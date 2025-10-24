@@ -26,7 +26,7 @@ import {OnboardingSlides} from '../components/onboarding';
 import {TurfIntro} from '../components/turf-intro';
 
 // Platform-specific imports - available on both platforms but only used on Android
-let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, computePanBounds: any;
+let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, withTiming: any, computePanBounds: any;
 
 // Import on both platforms to avoid undefined function errors
 const gestureHandler = require('react-native-gesture-handler');
@@ -39,6 +39,7 @@ Animated = reanimated.default;
 useSharedValue = reanimated.useSharedValue;
 useAnimatedStyle = reanimated.useAnimatedStyle;
 withDecay = reanimated.withDecay;
+withTiming = reanimated.withTiming;
 computePanBounds = mapPanBounds.computePanBounds;
 
 const DiagonalLines = memo(({ colors }: { colors: any }) => (
@@ -245,9 +246,14 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     centerAndroidView: centerAndroidView,
     panTo: (x: number, y: number, animated: boolean = true) => {
       if (Platform.OS === 'android') {
-        // For Android, set the shared values directly
-        offsetX.value = -x;
-        offsetY.value = -y;
+        // For Android, use withTiming for smooth animation or direct assignment
+        if (animated) {
+          offsetX.value = withTiming(-x, { duration: 300 });
+          offsetY.value = withTiming(-y, { duration: 300 });
+        } else {
+          offsetX.value = -x;
+          offsetY.value = -y;
+        }
       } else {
         // For iOS, use the ScrollView
         horizontalScrollRef.current?.scrollTo({
