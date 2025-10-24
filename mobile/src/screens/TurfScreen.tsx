@@ -163,6 +163,19 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const maxY: any = Platform.OS === 'android' ? useSharedValue(1000000) : null;
   const boundsReady: any = Platform.OS === 'android' ? useSharedValue(false) : null;
 
+  // Android-specific centering function
+  const centerAndroidView = useCallback(() => {
+    if (Platform.OS === 'android' && offsetX && offsetY) {
+      const SCREEN_WIDTH = Dimensions.get('window').width;
+      const CONTENT_WIDTH = 2000;
+      const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+      
+      // Center the Android view by setting the shared values
+      offsetX.value = -CENTER_X;
+      offsetY.value = 0;
+    }
+  }, [offsetX, offsetY]);
+
   // Onboarding state
   const showOnboarding = useAppSelector((state) => state.auth.showOnboarding);
   
@@ -245,9 +258,10 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     }
   }, [minX, maxX, minY, maxY, boundsReady, computePanBounds]);
 
-  // Expose horizontalScrollRef to parent component
+  // Expose horizontalScrollRef and centerAndroidView to parent component
   useImperativeHandle(ref, () => ({
-    horizontalScrollRef: horizontalScrollRef
+    horizontalScrollRef: horizontalScrollRef,
+    centerAndroidView: centerAndroidView
   }));
 
   // Track turf view position using ref to avoid re-renders
@@ -457,14 +471,18 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       
       // Center the view on home/digital barracks after onboarding completion
       setTimeout(() => {
-        const SCREEN_WIDTH = Dimensions.get('window').width;
-        const CONTENT_WIDTH = 2000;
-        const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
-        horizontalScrollRef.current?.scrollTo({
-          x: CENTER_X,
-          y: 0,
-          animated: false,
-        });
+        if (Platform.OS === 'android') {
+          centerAndroidView();
+        } else {
+          const SCREEN_WIDTH = Dimensions.get('window').width;
+          const CONTENT_WIDTH = 2000;
+          const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+          horizontalScrollRef.current?.scrollTo({
+            x: CENTER_X,
+            y: 0,
+            animated: false,
+          });
+        }
       }, 0);
     } catch (error) {
       console.error('Error completing onboarding:', error);
@@ -473,17 +491,21 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       
       // Center the view even if API call fails
       setTimeout(() => {
-        const SCREEN_WIDTH = Dimensions.get('window').width;
-        const CONTENT_WIDTH = 2000;
-        const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
-        horizontalScrollRef.current?.scrollTo({
-          x: CENTER_X,
-          y: 0,
-          animated: false,
-        });
+        if (Platform.OS === 'android') {
+          centerAndroidView();
+        } else {
+          const SCREEN_WIDTH = Dimensions.get('window').width;
+          const CONTENT_WIDTH = 2000;
+          const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+          horizontalScrollRef.current?.scrollTo({
+            x: CENTER_X,
+            y: 0,
+            animated: false,
+          });
+        }
       }, 0);
     }
-  }, [dispatch, completeOnboarding]);
+  }, [dispatch, completeOnboarding, centerAndroidView]);
 
   const handleOnboardingSkip = useCallback(async () => {
     try {
@@ -492,14 +514,18 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       
       // Center the view on home/digital barracks after skipping onboarding
       setTimeout(() => {
-        const SCREEN_WIDTH = Dimensions.get('window').width;
-        const CONTENT_WIDTH = 2000;
-        const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
-        horizontalScrollRef.current?.scrollTo({
-          x: CENTER_X,
-          y: 0,
-          animated: false,
-        });
+        if (Platform.OS === 'android') {
+          centerAndroidView();
+        } else {
+          const SCREEN_WIDTH = Dimensions.get('window').width;
+          const CONTENT_WIDTH = 2000;
+          const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+          horizontalScrollRef.current?.scrollTo({
+            x: CENTER_X,
+            y: 0,
+            animated: false,
+          });
+        }
       }, 0);
     } catch (error) {
       console.error('Error skipping onboarding:', error);
@@ -508,17 +534,21 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       
       // Center the view even if API call fails
       setTimeout(() => {
-        const SCREEN_WIDTH = Dimensions.get('window').width;
-        const CONTENT_WIDTH = 2000;
-        const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
-        horizontalScrollRef.current?.scrollTo({
-          x: CENTER_X,
-          y: 0,
-          animated: false,
-        });
+        if (Platform.OS === 'android') {
+          centerAndroidView();
+        } else {
+          const SCREEN_WIDTH = Dimensions.get('window').width;
+          const CONTENT_WIDTH = 2000;
+          const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+          horizontalScrollRef.current?.scrollTo({
+            x: CENTER_X,
+            y: 0,
+            animated: false,
+          });
+        }
       }, 0);
     }
-  }, [dispatch, completeOnboarding]);
+  }, [dispatch, completeOnboarding, centerAndroidView]);
 
   // Turf Intro handlers
   const handleTurfIntroComplete = useCallback(() => {
@@ -528,14 +558,18 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     
     // Center the view on home/digital barracks after turf intro completion
     setTimeout(() => {
-      const SCREEN_WIDTH = Dimensions.get('window').width;
-      const CONTENT_WIDTH = 2000;
-      const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
-      horizontalScrollRef.current?.scrollTo({
-        x: CENTER_X,
-        y: 0,
-        animated: false,
-      });
+      if (Platform.OS === 'android') {
+        centerAndroidView();
+      } else {
+        const SCREEN_WIDTH = Dimensions.get('window').width;
+        const CONTENT_WIDTH = 2000;
+        const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+        horizontalScrollRef.current?.scrollTo({
+          x: CENTER_X,
+          y: 0,
+          animated: false,
+        });
+      }
     }, 0);
 
     // Check if user needs email verification after turf intro
@@ -543,7 +577,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       dispatch(setShowEmailVerification(true));
       dispatch(setEmailVerificationPrompted(user._id));
     }
-  }, [user, emailVerificationPromptedUserId, dispatch]);
+  }, [user, emailVerificationPromptedUserId, dispatch, centerAndroidView]);
 
   const handleTurfIntroSkip = useCallback(() => {
     
@@ -552,14 +586,18 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     
     // Center the view on home/digital barracks after skipping turf intro
     setTimeout(() => {
-      const SCREEN_WIDTH = Dimensions.get('window').width;
-      const CONTENT_WIDTH = 2000;
-      const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
-      horizontalScrollRef.current?.scrollTo({
-        x: CENTER_X,
-        y: 0,
-        animated: false,
-      });
+      if (Platform.OS === 'android') {
+        centerAndroidView();
+      } else {
+        const SCREEN_WIDTH = Dimensions.get('window').width;
+        const CONTENT_WIDTH = 2000;
+        const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+        horizontalScrollRef.current?.scrollTo({
+          x: CENTER_X,
+          y: 0,
+          animated: false,
+        });
+      }
     }, 0);
 
     // Check if user needs email verification after turf intro
@@ -567,7 +605,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       dispatch(setShowEmailVerification(true));
       dispatch(setEmailVerificationPrompted(user._id));
     }
-  }, [user, emailVerificationPromptedUserId, dispatch]);
+  }, [user, emailVerificationPromptedUserId, dispatch, centerAndroidView]);
 
   const handleTurfIntroStepChange = useCallback((step: 'home' | 'barracks' | 'research' | 'investment1' | 'wallet' | 'profile') => {
     setCurrentIntroStep(step);
@@ -585,36 +623,57 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         // Clear any saved position and center the view
         setTurfViewPosition(null);
         setTimeout(() => {
-          const SCREEN_WIDTH = Dimensions.get('window').width;
-          const CONTENT_WIDTH = 2000;
-          const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
-          horizontalScrollRef.current?.scrollTo({
-            x: CENTER_X,
-            y: 0,
-            animated: false,
-          });
+          if (Platform.OS === 'android') {
+            // Use Android centering function
+            centerAndroidView();
+          } else {
+            const SCREEN_WIDTH = Dimensions.get('window').width;
+            const CONTENT_WIDTH = 2000;
+            const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+            horizontalScrollRef.current?.scrollTo({
+              x: CENTER_X,
+              y: 0,
+              animated: false,
+            });
+          }
         }, 0);
       } else if (turfViewPosition) {
         // Research and Investment Properties should restore their last position
         setTimeout(() => {
-          horizontalScrollRef.current?.scrollTo({
-            x: turfViewPosition.x,
-            y: turfViewPosition.y,
-            animated: false,
-          });
+          if (Platform.OS === 'android') {
+            // For Android, set the shared values to the saved position
+            if (offsetX && offsetY) {
+              offsetX.value = -turfViewPosition.x;
+              offsetY.value = -turfViewPosition.y;
+            }
+          } else {
+            horizontalScrollRef.current?.scrollTo({
+              x: turfViewPosition.x,
+              y: turfViewPosition.y,
+              animated: false,
+            });
+          }
         }, 0);
       }
     }
-  }, [currentScreen, turfViewPosition]);
+  }, [currentScreen, turfViewPosition, centerAndroidView, offsetX, offsetY]);
 
   const navigateToFloorPlan = useCallback((propertyId: number) => {
-    // Capture current turf view position from the ref
-    if (currentScrollPositionRef.current) {
-      setTurfViewPosition(currentScrollPositionRef.current);
+    // Capture current turf view position
+    if (Platform.OS === 'android') {
+      // For Android, capture the current offset values
+      if (offsetX && offsetY) {
+        setTurfViewPosition({ x: -offsetX.value, y: -offsetY.value });
+      }
+    } else {
+      // For iOS, capture from the ref
+      if (currentScrollPositionRef.current) {
+        setTurfViewPosition(currentScrollPositionRef.current);
+      }
     }
     setCurrentPropertyId(propertyId);
     navigateToScreen('investmentProperty');
-  }, [navigateToScreen]);
+  }, [navigateToScreen, offsetX, offsetY]);
 
   const handleBattleEnd = useCallback(() => {
     navigateToScreen('hackRig');
@@ -625,22 +684,27 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     const CONTENT_WIDTH = 2000;
     const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
 
-    // If we have a saved turf view position, restore it; otherwise center the view
-    if (turfViewPosition && currentScreen === 'turf') {
-      horizontalScrollRef.current?.scrollTo({
-        x: turfViewPosition.x,
-        y: turfViewPosition.y,
-        animated: false,
-      });
+    if (Platform.OS === 'android') {
+      // For Android, use the centering function
+      centerAndroidView();
     } else {
-      // Set initial scroll position without animation
-      horizontalScrollRef.current?.scrollTo({
-        x: CENTER_X,
-        y: 0,
-        animated: false,
-      });
+      // If we have a saved turf view position, restore it; otherwise center the view
+      if (turfViewPosition && currentScreen === 'turf') {
+        horizontalScrollRef.current?.scrollTo({
+          x: turfViewPosition.x,
+          y: turfViewPosition.y,
+          animated: false,
+        });
+      } else {
+        // Set initial scroll position without animation
+        horizontalScrollRef.current?.scrollTo({
+          x: CENTER_X,
+          y: 0,
+          animated: false,
+        });
+      }
     }
-  }, [turfViewPosition, currentScreen]);
+  }, [turfViewPosition, currentScreen, centerAndroidView]);
 
   useEffect(() => {
     // Center the view immediately when the screen mounts
@@ -762,11 +826,19 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
             // Restore turf view position when returning
             if (turfViewPosition) {
               setTimeout(() => {
-                horizontalScrollRef.current?.scrollTo({
-                  x: turfViewPosition.x,
-                  y: turfViewPosition.y,
-                  animated: false,
-                });
+                if (Platform.OS === 'android') {
+                  // For Android, set the shared values to the saved position
+                  if (offsetX && offsetY) {
+                    offsetX.value = -turfViewPosition.x;
+                    offsetY.value = -turfViewPosition.y;
+                  }
+                } else {
+                  horizontalScrollRef.current?.scrollTo({
+                    x: turfViewPosition.x,
+                    y: turfViewPosition.y,
+                    animated: false,
+                  });
+                }
               }, 100); // Small delay to ensure screen transition completes
             }
           }}
@@ -789,8 +861,16 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                     <ResearchCenterLocation 
                       onNavigateToResearch={() => {
                         // Capture current turf view position before navigating
-                        if (currentScrollPositionRef.current) {
-                          setTurfViewPosition(currentScrollPositionRef.current);
+                        if (Platform.OS === 'android') {
+                          // For Android, capture the current offset values
+                          if (offsetX && offsetY) {
+                            setTurfViewPosition({ x: -offsetX.value, y: -offsetY.value });
+                          }
+                        } else {
+                          // For iOS, capture from the ref
+                          if (currentScrollPositionRef.current) {
+                            setTurfViewPosition(currentScrollPositionRef.current);
+                          }
                         }
                         navigateToScreen('research');
                       }} 
@@ -868,8 +948,16 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                   <ResearchCenterLocation 
                     onNavigateToResearch={() => {
                       // Capture current turf view position before navigating
-                      if (currentScrollPositionRef.current) {
-                        setTurfViewPosition(currentScrollPositionRef.current);
+                      if (Platform.OS === 'android') {
+                        // For Android, capture the current offset values
+                        if (offsetX && offsetY) {
+                          setTurfViewPosition({ x: -offsetX.value, y: -offsetY.value });
+                        }
+                      } else {
+                        // For iOS, capture from the ref
+                        if (currentScrollPositionRef.current) {
+                          setTurfViewPosition(currentScrollPositionRef.current);
+                        }
                       }
                       navigateToScreen('research');
                     }} 
