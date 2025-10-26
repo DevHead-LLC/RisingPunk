@@ -1,5 +1,5 @@
 import React, {useState, useRef, useEffect, useCallback, memo, forwardRef, useImperativeHandle, useMemo} from 'react';
-import {View, StyleSheet, ScrollView, Dimensions} from 'react-native';
+import {View, StyleSheet, ScrollView, Dimensions, Platform, StatusBar} from 'react-native';
 import {Balance} from '../components/common/Balance';
 import {HomeScreen} from './HomeScreen';
 import {DigitalBarracksScreen} from './DigitalBarracksScreen';
@@ -24,6 +24,23 @@ import {mapApi} from '../store/api/mapApi';
 import {useGetRentalHousingStatusQuery, useCompleteRentalHousingMutation, useCompleteOnboardingMutation, authApi} from '../store/api/authApi';
 import {OnboardingSlides} from '../components/onboarding';
 import {TurfIntro} from '../components/turf-intro';
+
+// Platform-specific imports - available on both platforms but only used on Android
+let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, withTiming: any, computePanBounds: any;
+
+// Import on both platforms to avoid undefined function errors
+const gestureHandler = require('react-native-gesture-handler');
+const reanimated = require('react-native-reanimated');
+const mapPanBounds = require('../utils/mapPanBounds');
+
+Gesture = gestureHandler.Gesture;
+GestureDetector = gestureHandler.GestureDetector;
+Animated = reanimated.default;
+useSharedValue = reanimated.useSharedValue;
+useAnimatedStyle = reanimated.useAnimatedStyle;
+withDecay = reanimated.withDecay;
+withTiming = reanimated.withTiming;
+computePanBounds = mapPanBounds.computePanBounds;
 
 const DiagonalLines = memo(({ colors }: { colors: any }) => (
   <>
@@ -70,6 +87,46 @@ const ScrollViewMemo = memo(function ScrollViewMemo({
   );
 });
 
+// Android-specific gesture pan view (only for Android)
+const GesturePanView = memo(function GesturePanView({
+  children,
+  horizontalScrollRef,
+  onScroll,
+  offsetX,
+  offsetY,
+  panGesture,
+  colors,
+}: {
+  children: React.ReactNode;
+  horizontalScrollRef: React.RefObject<ScrollView>;
+  onScroll?: (event: any) => void;
+  offsetX: any;
+  offsetY: any;
+  panGesture: any;
+  colors: any;
+}) {
+  const animatedStyle: any = useAnimatedStyle(() => {
+    'worklet';
+    const transform = [
+      { translateX: offsetX.value },
+      { translateY: offsetY.value },
+    ];
+    
+    
+    return {
+      transform,
+    };
+  }, [offsetX, offsetY]);
+
+  return (
+    <GestureDetector gesture={panGesture}>
+      <Animated.View style={[styles.scrollContent, { borderColor: colors.secondary + '99' }, animatedStyle]}>
+        {children}
+      </Animated.View>
+    </GestureDetector>
+  );
+});
+
 export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element => {
   const colors = useThemeColors();
   const [currentScreen, setCurrentScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research' | 'investmentProperty'>('turf');
@@ -84,6 +141,32 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const horizontalScrollRef = useRef<ScrollView>(null);
   const currentScrollPositionRef = useRef<{ x: number; y: number } | null>(null);
   const dispatch = useAppDispatch();
+
+  // Android-specific gesture state - always call hooks unconditionally
+  const offsetX: any = useSharedValue(0);
+  const offsetY: any = useSharedValue(0);
+  const startX: any = useSharedValue(0);
+  const startY: any = useSharedValue(0);
+  
+  // Android-specific bounds state - always call hooks unconditionally
+  const minX: any = useSharedValue(-1000000);
+  const maxX: any = useSharedValue(1000000);
+  const minY: any = useSharedValue(-1000000);
+  const maxY: any = useSharedValue(1000000);
+  const boundsReady: any = useSharedValue(false);
+
+  // Android-specific centering function
+  const centerAndroidView = useCallback(() => {
+    if (Platform.OS === 'android') {
+      const SCREEN_WIDTH = Dimensions.get('window').width;
+      const CONTENT_WIDTH = 2000;
+      const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+      
+      // Center the Android view by setting the shared values
+      offsetX.value = -CENTER_X;
+      offsetY.value = 0;
+    }
+  }, [offsetX, offsetY]);
 
   // Onboarding state
   const showOnboarding = useAppSelector((state) => state.auth.showOnboarding);
@@ -104,9 +187,82 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     }
   }, [user, showOnboarding, showTurfIntro, showEmailVerification, emailVerificationPromptedUserId, dispatch]);
 
-  // Expose horizontalScrollRef to parent component
+  // Android-specific status bar configuration - hide status bar for immersive experience throughout the app
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      // Hide status bar for immersive experience - should stay hidden throughout the entire application
+      StatusBar.setHidden(true, 'fade');
+      // No cleanup needed - status bar should remain hidden when navigating between screens
+    }
+  }, []);
+
+  // Android-specific bounds calculation (only for Android)
+  useEffect(() => {
+    if (Platform.OS === 'android' && computePanBounds) {
+      const WINDOW_WIDTH = Dimensions.get('window').width;
+      const WINDOW_HEIGHT = Dimensions.get('window').height;
+      const SCREEN_WIDTH = Dimensions.get('screen').width;
+      const SCREEN_HEIGHT = Dimensions.get('screen').height;
+      const CONTENT_SIZE = 2000;
+      const MARGIN_SIZE = 0; // No margin for turf screen
+      
+      // Hybrid approach: window for top/bottom, screen for left/right
+      const ADJUSTED_WIDTH = SCREEN_WIDTH;  // Use screen width for left/right
+      const ADJUSTED_HEIGHT = WINDOW_HEIGHT; // Use window height for top/bottom
+
+      const bounds = computePanBounds({
+        totalSize: CONTENT_SIZE,
+        containerWidth: ADJUSTED_WIDTH,
+        containerHeight: ADJUSTED_HEIGHT,
+        marginSize: MARGIN_SIZE,
+      });
+
+      // Calculate Android header/toolbar height for landscape mode
+      // Status bar is hidden, but we need to account for the space it would take
+      // In landscape mode, navigation bar is 24dp
+      // Since status bar is hidden, we only need to account for navigation bar
+      const ANDROID_NAVIGATION_BAR_HEIGHT = 24; // 24dp in landscape mode
+      const ANDROID_HEADER_HEIGHT = ANDROID_NAVIGATION_BAR_HEIGHT; // Total hidden header height
+      
+      // Adjust only the bottom boundary to allow scroll past bottom by header height
+      // This allows the bottom border to be visible when user scrolls past the normal bottom
+      const adjustedBounds = {
+        ...bounds,
+        minY: bounds.minY - ANDROID_HEADER_HEIGHT // Allow scroll past bottom by header height
+      };
+
+
+      minX.value = adjustedBounds.minX;
+      maxX.value = adjustedBounds.maxX;
+      minY.value = adjustedBounds.minY;
+      maxY.value = adjustedBounds.maxY;
+      boundsReady.value = true;
+    }
+  }, [minX, maxX, minY, maxY, boundsReady, computePanBounds]);
+
+  // Expose horizontalScrollRef, centerAndroidView, and pan method to parent component
   useImperativeHandle(ref, () => ({
-    horizontalScrollRef: horizontalScrollRef
+    horizontalScrollRef: horizontalScrollRef,
+    centerAndroidView: centerAndroidView,
+    panTo: (x: number, y: number, animated: boolean = true) => {
+      if (Platform.OS === 'android') {
+        // For Android, use withTiming for smooth animation or direct assignment
+        if (animated) {
+          offsetX.value = withTiming(-x, { duration: 300 });
+          offsetY.value = withTiming(-y, { duration: 300 });
+        } else {
+          offsetX.value = -x;
+          offsetY.value = -y;
+        }
+      } else {
+        // For iOS, use the ScrollView
+        horizontalScrollRef.current?.scrollTo({
+          x: x,
+          y: y,
+          animated: animated,
+        });
+      }
+    }
   }));
 
   // Track turf view position using ref to avoid re-renders
@@ -114,6 +270,54 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     const { contentOffset } = event.nativeEvent;
     currentScrollPositionRef.current = { x: contentOffset.x, y: contentOffset.y };
   }, []);
+
+  // Android-specific pan gesture (only for Android) - Memoized for performance
+  const panGesture = useMemo(() => {
+    if (Platform.OS === 'android') {
+      return Gesture.Pan()
+        .minPointers(1)
+        .maxPointers(1)
+        .onStart(() => {
+          'worklet';
+          startX.value = offsetX.value;
+          startY.value = offsetY.value;
+        })
+        .onUpdate((g: any) => {
+          'worklet';
+          let x = startX.value + g.translationX;
+          let y = startY.value + g.translationY;
+          
+          // Always enforce bounds if ready (hard stops)
+          if (boundsReady.value) {
+            const originalX = x;
+            const originalY = y;
+            x = Math.min(maxX.value, Math.max(minX.value, x));
+            y = Math.min(maxY.value, Math.max(minY.value, y));
+            
+          }
+          
+          offsetX.value = x;
+          offsetY.value = y;
+        })
+        .onEnd((g: any) => {
+          'worklet';
+          if (boundsReady.value) {
+            // Apply decay with boundary enforcement
+            offsetX.value = withDecay({ 
+              velocity: g.velocityX, 
+              deceleration: 0.99,
+              clamp: [minX.value, maxX.value]
+            });
+            offsetY.value = withDecay({ 
+              velocity: g.velocityY, 
+              deceleration: 0.99,
+              clamp: [minY.value, maxY.value]
+            });
+          }
+        });
+    }
+    return null;
+  }, [offsetX, offsetY, startX, startY, boundsReady, minX, maxX, minY, maxY, withDecay]);
 
   // Fetch Property 1's status to determine Property 2's rendering
   const { data: property1Status } = useGetRentalHousingStatusQuery(1);
@@ -241,14 +445,18 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       
       // Center the view on home/digital barracks after onboarding completion
       setTimeout(() => {
-        const SCREEN_WIDTH = Dimensions.get('window').width;
-        const CONTENT_WIDTH = 2000;
-        const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
-        horizontalScrollRef.current?.scrollTo({
-          x: CENTER_X,
-          y: 0,
-          animated: false,
-        });
+        if (Platform.OS === 'android') {
+          centerAndroidView();
+        } else {
+          const SCREEN_WIDTH = Dimensions.get('window').width;
+          const CONTENT_WIDTH = 2000;
+          const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+          horizontalScrollRef.current?.scrollTo({
+            x: CENTER_X,
+            y: 0,
+            animated: false,
+          });
+        }
       }, 0);
     } catch (error) {
       console.error('Error completing onboarding:', error);
@@ -257,17 +465,21 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       
       // Center the view even if API call fails
       setTimeout(() => {
-        const SCREEN_WIDTH = Dimensions.get('window').width;
-        const CONTENT_WIDTH = 2000;
-        const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
-        horizontalScrollRef.current?.scrollTo({
-          x: CENTER_X,
-          y: 0,
-          animated: false,
-        });
+        if (Platform.OS === 'android') {
+          centerAndroidView();
+        } else {
+          const SCREEN_WIDTH = Dimensions.get('window').width;
+          const CONTENT_WIDTH = 2000;
+          const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+          horizontalScrollRef.current?.scrollTo({
+            x: CENTER_X,
+            y: 0,
+            animated: false,
+          });
+        }
       }, 0);
     }
-  }, [dispatch, completeOnboarding]);
+  }, [dispatch, completeOnboarding, centerAndroidView]);
 
   const handleOnboardingSkip = useCallback(async () => {
     try {
@@ -276,14 +488,18 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       
       // Center the view on home/digital barracks after skipping onboarding
       setTimeout(() => {
-        const SCREEN_WIDTH = Dimensions.get('window').width;
-        const CONTENT_WIDTH = 2000;
-        const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
-        horizontalScrollRef.current?.scrollTo({
-          x: CENTER_X,
-          y: 0,
-          animated: false,
-        });
+        if (Platform.OS === 'android') {
+          centerAndroidView();
+        } else {
+          const SCREEN_WIDTH = Dimensions.get('window').width;
+          const CONTENT_WIDTH = 2000;
+          const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+          horizontalScrollRef.current?.scrollTo({
+            x: CENTER_X,
+            y: 0,
+            animated: false,
+          });
+        }
       }, 0);
     } catch (error) {
       console.error('Error skipping onboarding:', error);
@@ -292,17 +508,21 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       
       // Center the view even if API call fails
       setTimeout(() => {
-        const SCREEN_WIDTH = Dimensions.get('window').width;
-        const CONTENT_WIDTH = 2000;
-        const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
-        horizontalScrollRef.current?.scrollTo({
-          x: CENTER_X,
-          y: 0,
-          animated: false,
-        });
+        if (Platform.OS === 'android') {
+          centerAndroidView();
+        } else {
+          const SCREEN_WIDTH = Dimensions.get('window').width;
+          const CONTENT_WIDTH = 2000;
+          const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+          horizontalScrollRef.current?.scrollTo({
+            x: CENTER_X,
+            y: 0,
+            animated: false,
+          });
+        }
       }, 0);
     }
-  }, [dispatch, completeOnboarding]);
+  }, [dispatch, completeOnboarding, centerAndroidView]);
 
   // Turf Intro handlers
   const handleTurfIntroComplete = useCallback(() => {
@@ -312,14 +532,18 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     
     // Center the view on home/digital barracks after turf intro completion
     setTimeout(() => {
-      const SCREEN_WIDTH = Dimensions.get('window').width;
-      const CONTENT_WIDTH = 2000;
-      const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
-      horizontalScrollRef.current?.scrollTo({
-        x: CENTER_X,
-        y: 0,
-        animated: false,
-      });
+      if (Platform.OS === 'android') {
+        centerAndroidView();
+      } else {
+        const SCREEN_WIDTH = Dimensions.get('window').width;
+        const CONTENT_WIDTH = 2000;
+        const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+        horizontalScrollRef.current?.scrollTo({
+          x: CENTER_X,
+          y: 0,
+          animated: false,
+        });
+      }
     }, 0);
 
     // Check if user needs email verification after turf intro
@@ -327,7 +551,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       dispatch(setShowEmailVerification(true));
       dispatch(setEmailVerificationPrompted(user._id));
     }
-  }, [user, emailVerificationPromptedUserId, dispatch]);
+  }, [user, emailVerificationPromptedUserId, dispatch, centerAndroidView]);
 
   const handleTurfIntroSkip = useCallback(() => {
     
@@ -336,14 +560,18 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     
     // Center the view on home/digital barracks after skipping turf intro
     setTimeout(() => {
-      const SCREEN_WIDTH = Dimensions.get('window').width;
-      const CONTENT_WIDTH = 2000;
-      const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
-      horizontalScrollRef.current?.scrollTo({
-        x: CENTER_X,
-        y: 0,
-        animated: false,
-      });
+      if (Platform.OS === 'android') {
+        centerAndroidView();
+      } else {
+        const SCREEN_WIDTH = Dimensions.get('window').width;
+        const CONTENT_WIDTH = 2000;
+        const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+        horizontalScrollRef.current?.scrollTo({
+          x: CENTER_X,
+          y: 0,
+          animated: false,
+        });
+      }
     }, 0);
 
     // Check if user needs email verification after turf intro
@@ -351,7 +579,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       dispatch(setShowEmailVerification(true));
       dispatch(setEmailVerificationPrompted(user._id));
     }
-  }, [user, emailVerificationPromptedUserId, dispatch]);
+  }, [user, emailVerificationPromptedUserId, dispatch, centerAndroidView]);
 
   const handleTurfIntroStepChange = useCallback((step: 'home' | 'barracks' | 'research' | 'investment1' | 'wallet' | 'profile') => {
     setCurrentIntroStep(step);
@@ -369,36 +597,53 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         // Clear any saved position and center the view
         setTurfViewPosition(null);
         setTimeout(() => {
-          const SCREEN_WIDTH = Dimensions.get('window').width;
-          const CONTENT_WIDTH = 2000;
-          const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
-          horizontalScrollRef.current?.scrollTo({
-            x: CENTER_X,
-            y: 0,
-            animated: false,
-          });
+          if (Platform.OS === 'android') {
+            // Use Android centering function
+            centerAndroidView();
+          } else {
+            const SCREEN_WIDTH = Dimensions.get('window').width;
+            const CONTENT_WIDTH = 2000;
+            const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+            horizontalScrollRef.current?.scrollTo({
+              x: CENTER_X,
+              y: 0,
+              animated: false,
+            });
+          }
         }, 0);
       } else if (turfViewPosition) {
         // Research and Investment Properties should restore their last position
         setTimeout(() => {
-          horizontalScrollRef.current?.scrollTo({
-            x: turfViewPosition.x,
-            y: turfViewPosition.y,
-            animated: false,
-          });
+          if (Platform.OS === 'android') {
+            // For Android, set the shared values to the saved position
+            offsetX.value = turfViewPosition.x;
+            offsetY.value = turfViewPosition.y;
+          } else {
+            horizontalScrollRef.current?.scrollTo({
+              x: turfViewPosition.x,
+              y: turfViewPosition.y,
+              animated: false,
+            });
+          }
         }, 0);
       }
     }
-  }, [currentScreen, turfViewPosition]);
+  }, [currentScreen, turfViewPosition, centerAndroidView, offsetX, offsetY]);
 
   const navigateToFloorPlan = useCallback((propertyId: number) => {
-    // Capture current turf view position from the ref
-    if (currentScrollPositionRef.current) {
-      setTurfViewPosition(currentScrollPositionRef.current);
+    // Capture current turf view position
+    if (Platform.OS === 'android') {
+      // For Android, capture the current offset values (no negation needed)
+      setTurfViewPosition({ x: offsetX.value, y: offsetY.value });
+    } else {
+      // For iOS, capture from the ref
+      if (currentScrollPositionRef.current) {
+        setTurfViewPosition(currentScrollPositionRef.current);
+      }
     }
     setCurrentPropertyId(propertyId);
     navigateToScreen('investmentProperty');
-  }, [navigateToScreen]);
+  }, [navigateToScreen, offsetX, offsetY]);
 
   const handleBattleEnd = useCallback(() => {
     navigateToScreen('hackRig');
@@ -409,22 +654,27 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     const CONTENT_WIDTH = 2000;
     const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
 
-    // If we have a saved turf view position, restore it; otherwise center the view
-    if (turfViewPosition && currentScreen === 'turf') {
-      horizontalScrollRef.current?.scrollTo({
-        x: turfViewPosition.x,
-        y: turfViewPosition.y,
-        animated: false,
-      });
+    if (Platform.OS === 'android') {
+      // For Android, use the centering function
+      centerAndroidView();
     } else {
-      // Set initial scroll position without animation
-      horizontalScrollRef.current?.scrollTo({
-        x: CENTER_X,
-        y: 0,
-        animated: false,
-      });
+      // If we have a saved turf view position, restore it; otherwise center the view
+      if (turfViewPosition && currentScreen === 'turf') {
+        horizontalScrollRef.current?.scrollTo({
+          x: turfViewPosition.x,
+          y: turfViewPosition.y,
+          animated: false,
+        });
+      } else {
+        // Set initial scroll position without animation
+        horizontalScrollRef.current?.scrollTo({
+          x: CENTER_X,
+          y: 0,
+          animated: false,
+        });
+      }
     }
-  }, [turfViewPosition, currentScreen]);
+  }, [turfViewPosition, currentScreen, centerAndroidView]);
 
   useEffect(() => {
     // Center the view immediately when the screen mounts
@@ -546,11 +796,17 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
             // Restore turf view position when returning
             if (turfViewPosition) {
               setTimeout(() => {
-                horizontalScrollRef.current?.scrollTo({
-                  x: turfViewPosition.x,
-                  y: turfViewPosition.y,
-                  animated: false,
-                });
+                if (Platform.OS === 'android') {
+                  // For Android, set the shared values to the saved position
+                  offsetX.value = turfViewPosition.x;
+                  offsetY.value = turfViewPosition.y;
+                } else {
+                  horizontalScrollRef.current?.scrollTo({
+                    x: turfViewPosition.x,
+                    y: turfViewPosition.y,
+                    animated: false,
+                  });
+                }
               }, 100); // Small delay to ensure screen transition completes
             }
           }}
@@ -562,8 +818,90 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
               <Balance isIntroActive={currentIntroStep === 'wallet'} />
             </ErrorBoundary>
             <View style={styles.scrollWrapper}>
-              <ScrollViewMemo horizontalScrollRef={horizontalScrollRef} onScroll={handleTurfScroll}>
-                <View style={[styles.scrollContent, { backgroundColor: colors.background, borderColor: colors.secondary + '99' }]}>
+              {Platform.OS === 'ios' ? (
+                <ScrollViewMemo horizontalScrollRef={horizontalScrollRef} onScroll={handleTurfScroll}>
+                  <View style={[styles.scrollContent, { backgroundColor: colors.background, borderColor: colors.secondary + '99' }]}>
+                    <DiagonalLines colors={colors} />
+                    <View style={[styles.digitalGround, { backgroundColor: colors.matrix + '0D', borderColor: colors.matrix + '33' }]}>
+                      <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />
+                      <DigitalBarracksLocation onPress={() => navigateToScreen('barracks')} isIntroActive={currentIntroStep === 'barracks'} />
+                    </View>
+                    <ResearchCenterLocation 
+                      onNavigateToResearch={() => {
+                        // Capture current turf view position before navigating
+                        // For iOS, capture from the ref
+                        if (currentScrollPositionRef.current) {
+                          setTurfViewPosition(currentScrollPositionRef.current);
+                        }
+                        navigateToScreen('research');
+                      }} 
+                      isIntroActive={currentIntroStep === 'research'}
+                    />
+                    <DevelopmentZone buildingProperties={buildingProperties}>
+                      {/* Property 2: Conditionally render based on Property 1's unlock status */}
+                      {(() => {
+                        return property1Unlocked ? (
+                          <RentalHousingLocation 
+                            propertyId={2}
+                            onNavigateToRentalHousing={() => navigateToScreen('turf')}
+                            onNavigateToFloorPlan={navigateToFloorPlan}
+                            showTimer={false}
+                            isIntroActive={currentIntroStep === 'investment1'}
+                          />
+                        ) : (
+                          <FutureBuildingPlaceholder propertyNumber={2} />
+                        );
+                      })()}
+
+                      {/* Property 3: Conditionally render based on Properties 1 & 2 being unlocked */}
+                      {(() => {
+                        return (property1Unlocked && property2Unlocked) ? (
+                          <RentalHousingLocation 
+                            propertyId={3}
+                            onNavigateToRentalHousing={() => navigateToScreen('turf')}
+                            onNavigateToFloorPlan={navigateToFloorPlan}
+                            showTimer={false}
+                            isIntroActive={currentIntroStep === 'investment1'}
+                          />
+                        ) : (
+                          <FutureBuildingPlaceholder propertyNumber={3} />
+                        );
+                      })()}
+
+                      <RentalHousingLocation 
+                        propertyId={1}
+                        onNavigateToRentalHousing={() => navigateToScreen('turf')}
+                        onNavigateToFloorPlan={navigateToFloorPlan}
+                        showTimer={false}
+                        isIntroActive={currentIntroStep === 'investment1'}
+                      />
+
+                      {/* Property 4: Conditionally render based on Properties 1, 2 & 3 being unlocked */}
+                      {(() => {
+                        return (property1Unlocked && property2Unlocked && property3Unlocked) ? (
+                          <RentalHousingLocation 
+                            propertyId={4}
+                            onNavigateToRentalHousing={() => navigateToScreen('turf')}
+                            onNavigateToFloorPlan={navigateToFloorPlan}
+                            showTimer={false}
+                            isIntroActive={currentIntroStep === 'investment1'}
+                          />
+                        ) : (
+                          <FutureBuildingPlaceholder propertyNumber={4} />
+                        );
+                      })()}
+                    </DevelopmentZone>
+                  </View>
+                </ScrollViewMemo>
+              ) : (
+                <GesturePanView 
+                  horizontalScrollRef={horizontalScrollRef} 
+                  onScroll={handleTurfScroll}
+                  offsetX={offsetX}
+                  offsetY={offsetY}
+                  panGesture={panGesture}
+                  colors={colors}
+                >
                   <DiagonalLines colors={colors} />
                   <View style={[styles.digitalGround, { backgroundColor: colors.matrix + '0D', borderColor: colors.matrix + '33' }]}>
                     <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />
@@ -572,8 +910,14 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                   <ResearchCenterLocation 
                     onNavigateToResearch={() => {
                       // Capture current turf view position before navigating
-                      if (currentScrollPositionRef.current) {
-                        setTurfViewPosition(currentScrollPositionRef.current);
+                      if (Platform.OS === 'android') {
+                        // For Android, capture the current offset values
+                        setTurfViewPosition({ x: offsetX.value, y: offsetY.value });
+                      } else {
+                        // For iOS, capture from the ref
+                        if (currentScrollPositionRef.current) {
+                          setTurfViewPosition(currentScrollPositionRef.current);
+                        }
                       }
                       navigateToScreen('research');
                     }} 
@@ -633,8 +977,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                       );
                     })()}
                   </DevelopmentZone>
-                </View>
-              </ScrollViewMemo>
+                </GesturePanView>
+              )}
             </View>
             <ProfileLocation onPress={() => navigateToScreen('profile')} isIntroActive={currentIntroStep === 'profile'} />
           </View>
@@ -655,7 +999,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         <TurfIntro
           onComplete={handleTurfIntroComplete}
           onSkip={handleTurfIntroSkip}
-          horizontalScrollRef={horizontalScrollRef}
+          horizontalScrollRef={ref as React.RefObject<any>}
           onStepChange={handleTurfIntroStepChange}
         />
       )}
