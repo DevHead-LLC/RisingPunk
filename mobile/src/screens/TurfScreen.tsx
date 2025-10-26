@@ -829,14 +829,9 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                     <ResearchCenterLocation 
                       onNavigateToResearch={() => {
                         // Capture current turf view position before navigating
-                        if (Platform.OS === 'android') {
-                          // For Android, capture the current offset values
-                          setTurfViewPosition({ x: offsetX.value, y: offsetY.value });
-                        } else {
-                          // For iOS, capture from the ref
-                          if (currentScrollPositionRef.current) {
-                            setTurfViewPosition(currentScrollPositionRef.current);
-                          }
+                        // For iOS, capture from the ref
+                        if (currentScrollPositionRef.current) {
+                          setTurfViewPosition(currentScrollPositionRef.current);
                         }
                         navigateToScreen('research');
                       }} 
