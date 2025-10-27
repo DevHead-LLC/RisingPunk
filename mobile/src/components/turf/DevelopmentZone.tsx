@@ -98,9 +98,8 @@ const styles = StyleSheet.create({
   timerContainer: {
     position: 'absolute',
     top: '105%',
-    left: '50%',
-    transform: [{ translateX: -75 }],
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    width: '35%',
   },
 });
