@@ -101,6 +101,5 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
-    paddingHorizontal: SIZING.spacing.lg,
   },
 });
