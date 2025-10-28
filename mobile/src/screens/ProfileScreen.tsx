@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Image,
   Alert,
+  Platform,
 } from 'react-native';
 import { CloseButton } from '../components/common/CloseButton';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
@@ -110,6 +111,10 @@ const createProfileStyles = (colors: any, screenWidth: number, scaleFactor: numb
   },
   scrollView: {
     flex: 1,
+  },
+  scrollContentContainer: {
+    flexGrow: 1,
+    paddingBottom: Platform.OS === 'android' ? 25 : 20,
   },
   loadingContainer: {
     flex: 1,
@@ -605,7 +610,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const experiencePercentage = (profile.experience.current / profile.experience.nextLevel) * 100;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, Platform.OS === 'android' && { paddingBottom: 20 }]}>
       <CloseButton onPress={onClose} />
       
       <View style={styles.mainLayout}>
@@ -651,7 +656,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
         {/* RIGHT SIDE CONTENT */}
         <View style={styles.rightContent}>
           {activeTab === 'profile' ? (
-            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContentContainer}>
               {/* Compact Header */}
               <View style={styles.header}>
                 <View style={styles.usernameContainer}>
@@ -815,7 +820,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
               </View>
             </View>
           ) : activeTab === 'account' ? (
-            <ScrollView style={styles.settingsContainer} showsVerticalScrollIndicator={false}>
+            <ScrollView style={styles.settingsContainer} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContentContainer}>
               <Text style={styles.settingsTitle}>ACCOUNT SETTINGS</Text>
               
               <View style={styles.settingCard}>
@@ -887,7 +892,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
               </View>
             </ScrollView>
           ) : activeTab === 'content' ? (
-            <ScrollView style={styles.contentContainer} showsVerticalScrollIndicator={false}>
+            <ScrollView style={styles.contentContainer} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContentContainer}>
               <Text style={styles.contentTitle}>CONTENT</Text>
               
               {/* Intro Replay Section */}
