@@ -39,6 +39,16 @@ Applied the same pattern as TurfScreen:
 8. ✅ Both screens: Updated render to conditionally use iOS ScrollView vs Android GesturePanView
 9. ✅ Both screens: Updated centering logic for both platforms
 
+## Bug Fix: iOS Panning Issue
+- **Issue**: ScrollView in React Native only supports horizontal OR vertical, not both
+- **Root Cause**: Removing `horizontal` prop made iOS ScrollView vertical-only, breaking horizontal panning
+- **Solution**: Use gesture handlers for BOTH iOS and Android (not just Android)
+- **Changes**: 
+  - Both platforms now use GesturePanView with gesture handlers
+  - Removed iOS ScrollView implementation
+  - Updated bounds calculations to work for both platforms
+  - Unified centering logic for both platforms
+
 ## Testing
-Ready for manual testing on Android device (Google Pixel 9 Pro XL).
+Ready for manual testing on both iOS and Android devices.
 

@@ -1,5 +1,5 @@
 import React, { forwardRef } from 'react';
-import { View, TextInput, StyleSheet, Keyboard } from 'react-native';
+import { View, TextInput, StyleSheet, Keyboard, Platform } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useTheme } from '../../context/ThemeContext';
@@ -87,6 +87,10 @@ export const KeyboardAwareInput = forwardRef<TextInput, KeyboardAwareInputProps>
           blurOnSubmit={blurOnSubmit}
           editable={editable}
           maxLength={maxLength}
+          {...(Platform.OS === 'android' && {
+            includeFontPadding: false,
+            textAlignVertical: 'center',
+          })}
         />
         <View style={[styles.corner, { borderColor: colors.primary }]} />
       </View>

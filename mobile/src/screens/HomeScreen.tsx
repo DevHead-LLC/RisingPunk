@@ -30,7 +30,7 @@ type HomeScreenProps = {
   onNavigateToBattle: () => void;
 };
 
-const GesturePanView = memo(function GesturePanView({
+function GesturePanView({
   children,
   offsetX,
   offsetY,
@@ -62,7 +62,7 @@ const GesturePanView = memo(function GesturePanView({
       </Animated.View>
     </GestureDetector>
   );
-});
+}
 
 export const HomeScreen = memo(function HomeScreen({
   onClose,
@@ -102,37 +102,53 @@ export const HomeScreen = memo(function HomeScreen({
   const garageMaxY: any = useSharedValue(1000000);
   const garageBoundsReady: any = useSharedValue(false);
 
-  const centerFloorPlanAndroid = useCallback(() => {
-    if (Platform.OS === 'android') {
-      const SCREEN_WIDTH = Dimensions.get('window').width;
-      const CENTER_X = (FLOOR_PLAN_WIDTH - SCREEN_WIDTH) / 2;
-      
-      floorPlanOffsetX.value = -CENTER_X;
-      floorPlanOffsetY.value = 0;
+  const centerFloorPlan = useCallback(() => {
+    const SCREEN_WIDTH = Dimensions.get('window').width;
+    const CENTER_X = (FLOOR_PLAN_WIDTH - SCREEN_WIDTH) / 2;
+    
+    let x = -CENTER_X;
+    let y = 0;
+    
+    if (Platform.OS === 'android' && floorPlanBoundsReady.value) {
+      x = Math.min(floorPlanMaxX.value, Math.max(floorPlanMinX.value, x));
+      y = Math.min(floorPlanMaxY.value, Math.max(floorPlanMinY.value, y));
     }
-  }, [floorPlanOffsetX, floorPlanOffsetY, FLOOR_PLAN_WIDTH]);
+    
+    floorPlanOffsetX.value = x;
+    floorPlanOffsetY.value = y;
+  }, [floorPlanOffsetX, floorPlanOffsetY, FLOOR_PLAN_WIDTH, floorPlanBoundsReady, floorPlanMinX, floorPlanMaxX, floorPlanMinY, floorPlanMaxY]);
 
-  const centerGarageAndroid = useCallback(() => {
-    if (Platform.OS === 'android') {
-      const SCREEN_WIDTH = Dimensions.get('window').width;
-      const SCREEN_HEIGHT = Dimensions.get('window').height;
-      const CENTER_X = (GARAGE_WIDTH - SCREEN_WIDTH) / 2;
-      const CENTER_Y = (GARAGE_HEIGHT - SCREEN_HEIGHT) / 2;
-      
-      garageOffsetX.value = -CENTER_X;
-      garageOffsetY.value = -CENTER_Y;
+  const centerGarage = useCallback(() => {
+    const SCREEN_WIDTH = Dimensions.get('window').width;
+    const SCREEN_HEIGHT = Dimensions.get('window').height;
+    const CENTER_X = (GARAGE_WIDTH - SCREEN_WIDTH) / 2;
+    const CENTER_Y = (GARAGE_HEIGHT - SCREEN_HEIGHT) / 2;
+    
+    let x = -CENTER_X;
+    let y = -CENTER_Y;
+    
+    if (Platform.OS === 'android' && garageBoundsReady.value) {
+      x = Math.min(garageMaxX.value, Math.max(garageMinX.value, x));
+      y = Math.min(garageMaxY.value, Math.max(garageMinY.value, y));
     }
-  }, [garageOffsetX, garageOffsetY, GARAGE_WIDTH, GARAGE_HEIGHT]);
+    
+    garageOffsetX.value = x;
+    garageOffsetY.value = y;
+  }, [garageOffsetX, garageOffsetY, GARAGE_WIDTH, GARAGE_HEIGHT, garageBoundsReady, garageMinX, garageMaxX, garageMinY, garageMaxY]);
 
   useEffect(() => {
-    if (Platform.OS === 'android' && computePanBounds) {
+    if (computePanBounds) {
       const WINDOW_WIDTH = Dimensions.get('window').width;
       const WINDOW_HEIGHT = Dimensions.get('window').height;
-      const SCREEN_WIDTH = Dimensions.get('screen').width;
       const MARGIN_SIZE = 0;
       
-      const ADJUSTED_WIDTH = SCREEN_WIDTH;
-      const ADJUSTED_HEIGHT = WINDOW_HEIGHT;
+      let ADJUSTED_WIDTH = WINDOW_WIDTH;
+      let ADJUSTED_HEIGHT = WINDOW_HEIGHT;
+
+      if (Platform.OS === 'android') {
+        const SCREEN_WIDTH = Dimensions.get('screen').width;
+        ADJUSTED_WIDTH = SCREEN_WIDTH;
+      }
 
       const boundsX = computePanBounds({
         totalSize: FLOOR_PLAN_WIDTH,
@@ -148,15 +164,25 @@ export const HomeScreen = memo(function HomeScreen({
         marginSize: MARGIN_SIZE,
       });
 
-      const ANDROID_NAVIGATION_BAR_HEIGHT = 24;
-      const ANDROID_HEADER_HEIGHT = ANDROID_NAVIGATION_BAR_HEIGHT;
-      
-      const adjustedBounds = {
-        minX: boundsX.minX,
-        maxX: boundsX.maxX,
-        minY: boundsY.minY - ANDROID_HEADER_HEIGHT,
-        maxY: boundsY.maxY
-      };
+      let adjustedBounds;
+      if (Platform.OS === 'android') {
+        const ANDROID_NAVIGATION_BAR_HEIGHT = 24;
+        const ANDROID_HEADER_HEIGHT = ANDROID_NAVIGATION_BAR_HEIGHT;
+        
+        adjustedBounds = {
+          minX: boundsX.minX,
+          maxX: boundsX.maxX,
+          minY: boundsY.minY - ANDROID_HEADER_HEIGHT,
+          maxY: boundsY.maxY
+        };
+      } else {
+        adjustedBounds = {
+          minX: boundsX.minX,
+          maxX: boundsX.maxX,
+          minY: boundsY.minY,
+          maxY: boundsY.maxY
+        };
+      }
 
       floorPlanMinX.value = adjustedBounds.minX;
       floorPlanMaxX.value = adjustedBounds.maxX;
@@ -167,14 +193,18 @@ export const HomeScreen = memo(function HomeScreen({
   }, [floorPlanMinX, floorPlanMaxX, floorPlanMinY, floorPlanMaxY, floorPlanBoundsReady, computePanBounds, FLOOR_PLAN_WIDTH, FLOOR_PLAN_HEIGHT]);
 
   useEffect(() => {
-    if (Platform.OS === 'android' && computePanBounds) {
+    if (computePanBounds) {
       const WINDOW_WIDTH = Dimensions.get('window').width;
       const WINDOW_HEIGHT = Dimensions.get('window').height;
-      const SCREEN_WIDTH = Dimensions.get('screen').width;
       const MARGIN_SIZE = 0;
       
-      const ADJUSTED_WIDTH = SCREEN_WIDTH;
-      const ADJUSTED_HEIGHT = WINDOW_HEIGHT;
+      let ADJUSTED_WIDTH = WINDOW_WIDTH;
+      let ADJUSTED_HEIGHT = WINDOW_HEIGHT;
+
+      if (Platform.OS === 'android') {
+        const SCREEN_WIDTH = Dimensions.get('screen').width;
+        ADJUSTED_WIDTH = SCREEN_WIDTH;
+      }
 
       const boundsX = computePanBounds({
         totalSize: GARAGE_WIDTH,
@@ -190,15 +220,25 @@ export const HomeScreen = memo(function HomeScreen({
         marginSize: MARGIN_SIZE,
       });
 
-      const ANDROID_NAVIGATION_BAR_HEIGHT = 24;
-      const ANDROID_HEADER_HEIGHT = ANDROID_NAVIGATION_BAR_HEIGHT;
-      
-      const adjustedBounds = {
-        minX: boundsX.minX,
-        maxX: boundsX.maxX,
-        minY: boundsY.minY - ANDROID_HEADER_HEIGHT,
-        maxY: boundsY.maxY
-      };
+      let adjustedBounds;
+      if (Platform.OS === 'android') {
+        const ANDROID_NAVIGATION_BAR_HEIGHT = 24;
+        const ANDROID_HEADER_HEIGHT = ANDROID_NAVIGATION_BAR_HEIGHT;
+        
+        adjustedBounds = {
+          minX: boundsX.minX,
+          maxX: boundsX.maxX,
+          minY: boundsY.minY - ANDROID_HEADER_HEIGHT,
+          maxY: boundsY.maxY
+        };
+      } else {
+        adjustedBounds = {
+          minX: boundsX.minX,
+          maxX: boundsX.maxX,
+          minY: boundsY.minY,
+          maxY: boundsY.maxY
+        };
+      }
 
       garageMinX.value = adjustedBounds.minX;
       garageMaxX.value = adjustedBounds.maxX;
@@ -209,225 +249,141 @@ export const HomeScreen = memo(function HomeScreen({
   }, [garageMinX, garageMaxX, garageMinY, garageMaxY, garageBoundsReady, computePanBounds, GARAGE_WIDTH, GARAGE_HEIGHT]);
 
   const floorPlanPanGesture = useMemo(() => {
-    if (Platform.OS === 'android') {
-      return Gesture.Pan()
-        .minPointers(1)
-        .maxPointers(1)
-        .onStart(() => {
-          'worklet';
-          floorPlanStartX.value = floorPlanOffsetX.value;
-          floorPlanStartY.value = floorPlanOffsetY.value;
-        })
-        .onUpdate((g: any) => {
-          'worklet';
-          let x = floorPlanStartX.value + g.translationX;
-          let y = floorPlanStartY.value + g.translationY;
-          
-          if (floorPlanBoundsReady.value) {
-            x = Math.min(floorPlanMaxX.value, Math.max(floorPlanMinX.value, x));
-            y = Math.min(floorPlanMaxY.value, Math.max(floorPlanMinY.value, y));
-          }
-          
-          floorPlanOffsetX.value = x;
-          floorPlanOffsetY.value = y;
-        })
-        .onEnd((g: any) => {
-          'worklet';
-          if (floorPlanBoundsReady.value) {
-            floorPlanOffsetX.value = withDecay({ 
-              velocity: g.velocityX, 
-              deceleration: 0.99,
-              clamp: [floorPlanMinX.value, floorPlanMaxX.value]
-            });
-            floorPlanOffsetY.value = withDecay({ 
-              velocity: g.velocityY, 
-              deceleration: 0.99,
-              clamp: [floorPlanMinY.value, floorPlanMaxY.value]
-            });
-          }
-        });
-    }
-    return null;
+    return Gesture.Pan()
+      .minPointers(1)
+      .maxPointers(1)
+      .onStart(() => {
+        'worklet';
+        floorPlanStartX.value = floorPlanOffsetX.value;
+        floorPlanStartY.value = floorPlanOffsetY.value;
+      })
+      .onUpdate((g: any) => {
+        'worklet';
+        let x = floorPlanStartX.value + g.translationX;
+        let y = floorPlanStartY.value + g.translationY;
+        
+        if (floorPlanBoundsReady.value) {
+          x = Math.min(floorPlanMaxX.value, Math.max(floorPlanMinX.value, x));
+          y = Math.min(floorPlanMaxY.value, Math.max(floorPlanMinY.value, y));
+        }
+        
+        floorPlanOffsetX.value = x;
+        floorPlanOffsetY.value = y;
+      })
+      .onEnd((g: any) => {
+        'worklet';
+        if (floorPlanBoundsReady.value) {
+          floorPlanOffsetX.value = withDecay({ 
+            velocity: g.velocityX, 
+            deceleration: 0.99,
+            clamp: [floorPlanMinX.value, floorPlanMaxX.value]
+          });
+          floorPlanOffsetY.value = withDecay({ 
+            velocity: g.velocityY, 
+            deceleration: 0.99,
+            clamp: [floorPlanMinY.value, floorPlanMaxY.value]
+          });
+        }
+      });
   }, [floorPlanOffsetX, floorPlanOffsetY, floorPlanStartX, floorPlanStartY, floorPlanBoundsReady, floorPlanMinX, floorPlanMaxX, floorPlanMinY, floorPlanMaxY, withDecay]);
 
   const garagePanGesture = useMemo(() => {
-    if (Platform.OS === 'android') {
-      return Gesture.Pan()
-        .minPointers(1)
-        .maxPointers(1)
-        .onStart(() => {
-          'worklet';
-          garageStartX.value = garageOffsetX.value;
-          garageStartY.value = garageOffsetY.value;
-        })
-        .onUpdate((g: any) => {
-          'worklet';
-          let x = garageStartX.value + g.translationX;
-          let y = garageStartY.value + g.translationY;
-          
-          if (garageBoundsReady.value) {
-            x = Math.min(garageMaxX.value, Math.max(garageMinX.value, x));
-            y = Math.min(garageMaxY.value, Math.max(garageMinY.value, y));
-          }
-          
-          garageOffsetX.value = x;
-          garageOffsetY.value = y;
-        })
-        .onEnd((g: any) => {
-          'worklet';
-          if (garageBoundsReady.value) {
-            garageOffsetX.value = withDecay({ 
-              velocity: g.velocityX, 
-              deceleration: 0.99,
-              clamp: [garageMinX.value, garageMaxX.value]
-            });
-            garageOffsetY.value = withDecay({ 
-              velocity: g.velocityY, 
-              deceleration: 0.99,
-              clamp: [garageMinY.value, garageMaxY.value]
-            });
-          }
-        });
-    }
-    return null;
+    return Gesture.Pan()
+      .minPointers(1)
+      .maxPointers(1)
+      .onStart(() => {
+        'worklet';
+        garageStartX.value = garageOffsetX.value;
+        garageStartY.value = garageOffsetY.value;
+      })
+      .onUpdate((g: any) => {
+        'worklet';
+        let x = garageStartX.value + g.translationX;
+        let y = garageStartY.value + g.translationY;
+        
+        if (garageBoundsReady.value) {
+          x = Math.min(garageMaxX.value, Math.max(garageMinX.value, x));
+          y = Math.min(garageMaxY.value, Math.max(garageMinY.value, y));
+        }
+        
+        garageOffsetX.value = x;
+        garageOffsetY.value = y;
+      })
+      .onEnd((g: any) => {
+        'worklet';
+        if (garageBoundsReady.value) {
+          garageOffsetX.value = withDecay({ 
+            velocity: g.velocityX, 
+            deceleration: 0.99,
+            clamp: [garageMinX.value, garageMaxX.value]
+          });
+          garageOffsetY.value = withDecay({ 
+            velocity: g.velocityY, 
+            deceleration: 0.99,
+            clamp: [garageMinY.value, garageMaxY.value]
+          });
+        }
+      });
   }, [garageOffsetX, garageOffsetY, garageStartX, garageStartY, garageBoundsReady, garageMinX, garageMaxX, garageMinY, garageMaxY, withDecay]);
 
   useEffect(() => {
-    if (Platform.OS === 'android') {
-      setTimeout(() => {
-        centerFloorPlanAndroid();
-      }, 100);
-    } else {
-      const screenWidth = Dimensions.get('window').width;
-      const centerX = (FLOOR_PLAN_WIDTH - screenWidth) / 2;
-      const centerY = 0;
-      
-      setTimeout(() => {
-        scrollViewRef.current?.scrollTo({
-          x: centerX,
-          y: centerY,
-          animated: false,
-        });
-      }, 100);
-    }
-  }, [centerFloorPlanAndroid, FLOOR_PLAN_WIDTH]);
-
-  useEffect(() => {
     if (activeTab === 'garage') {
-      if (Platform.OS === 'android') {
-        setTimeout(() => {
-          centerGarageAndroid();
-        }, 100);
-      } else {
-        const screenWidth = Dimensions.get('window').width;
-        const screenHeight = Dimensions.get('window').height;
-        const centerX = (GARAGE_WIDTH - screenWidth) / 2;
-        const centerY = (GARAGE_HEIGHT - screenHeight) / 2;
-        
-        setTimeout(() => {
-          garageScrollViewRef.current?.scrollTo({
-            x: centerX,
-            y: centerY,
-            animated: false,
-          });
-        }, 100);
-      }
+      garageStartX.value = garageOffsetX.value;
+      garageStartY.value = garageOffsetY.value;
+      setTimeout(() => {
+        centerGarage();
+      }, 100);
+    } else if (activeTab === 'floorPlan') {
+      floorPlanStartX.value = 0;
+      floorPlanStartY.value = 0;
+      setTimeout(() => {
+        centerFloorPlan();
+        floorPlanStartX.value = floorPlanOffsetX.value;
+        floorPlanStartY.value = floorPlanOffsetY.value;
+      }, 100);
     }
-  }, [activeTab, centerGarageAndroid, GARAGE_WIDTH, GARAGE_HEIGHT]);
+  }, [activeTab, centerGarage, centerFloorPlan, floorPlanStartX, floorPlanStartY, floorPlanOffsetX, floorPlanOffsetY, garageStartX, garageStartY, garageOffsetX, garageOffsetY]);
 
-  const renderFloorPlan = () => {
-    if (Platform.OS === 'ios') {
-      return (
-        <ScrollView
-          ref={scrollViewRef}
-          showsHorizontalScrollIndicator={false}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-          style={styles.scrollView}
-          directionalLockEnabled={false}
-          alwaysBounceHorizontal={true}
-          alwaysBounceVertical={true}
-        >
-          <View style={[styles.floorPlanContainer, { borderColor: colors.matrix }]}>
-            <HomeFloorPlan
-              onHackRigPress={onNavigateToMap}
+  const renderFloorPlan = () => (
+    <View style={styles.scrollView}>
+      <GesturePanView 
+        offsetX={floorPlanOffsetX}
+        offsetY={floorPlanOffsetY}
+        panGesture={floorPlanPanGesture}
+        style={styles.scrollContent}
+      >
+        <View style={[styles.floorPlanContainer, { borderColor: colors.matrix }]}>
+          <HomeFloorPlan
+            onHackRigPress={onNavigateToMap}
+            onNavigateToBattle={onNavigateToBattle}
+          />
+          <View style={styles.hackRigContainer}>
+            <HackRigDisplay
+              onPress={onNavigateToMap}
               onNavigateToBattle={onNavigateToBattle}
             />
-            <View style={styles.hackRigContainer}>
-              <HackRigDisplay
-                onPress={onNavigateToMap}
-                onNavigateToBattle={onNavigateToBattle}
-              />
-            </View>
           </View>
-        </ScrollView>
-      );
-    } else {
-      return (
-        <View style={styles.scrollView}>
-          <GesturePanView 
-            offsetX={floorPlanOffsetX}
-            offsetY={floorPlanOffsetY}
-            panGesture={floorPlanPanGesture}
-            style={styles.scrollContent}
-          >
-            <View style={[styles.floorPlanContainer, { borderColor: colors.matrix }]}>
-              <HomeFloorPlan
-                onHackRigPress={onNavigateToMap}
-                onNavigateToBattle={onNavigateToBattle}
-              />
-              <View style={styles.hackRigContainer}>
-                <HackRigDisplay
-                  onPress={onNavigateToMap}
-                  onNavigateToBattle={onNavigateToBattle}
-                />
-              </View>
-            </View>
-          </GesturePanView>
         </View>
-      );
-    }
-  };
+      </GesturePanView>
+    </View>
+  );
 
-  const renderGarage = () => {
-    if (Platform.OS === 'ios') {
-      return (
-        <ScrollView
-          ref={garageScrollViewRef}
-          showsHorizontalScrollIndicator={false}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.garageScrollContent}
-          style={styles.scrollView}
-          directionalLockEnabled={false}
-          alwaysBounceHorizontal={true}
-          alwaysBounceVertical={true}
-        >
-          <View style={[styles.garageContainer, { borderColor: colors.matrix }]}>
-            <View style={styles.botAssemblyContainer}>
-              <BotAssembly onPress={onNavigateToBotAssembly} />
-            </View>
+  const renderGarage = () => (
+    <View style={styles.scrollView}>
+      <GesturePanView 
+        offsetX={garageOffsetX}
+        offsetY={garageOffsetY}
+        panGesture={garagePanGesture}
+        style={styles.garageScrollContent}
+      >
+        <View style={[styles.garageContainer, { borderColor: colors.matrix }]}>
+          <View style={styles.botAssemblyContainer}>
+            <BotAssembly onPress={onNavigateToBotAssembly} />
           </View>
-        </ScrollView>
-      );
-    } else {
-      return (
-        <View style={styles.scrollView}>
-          <GesturePanView 
-            offsetX={garageOffsetX}
-            offsetY={garageOffsetY}
-            panGesture={garagePanGesture}
-            style={styles.garageScrollContent}
-          >
-            <View style={[styles.garageContainer, { borderColor: colors.matrix }]}>
-              <View style={styles.botAssemblyContainer}>
-                <BotAssembly onPress={onNavigateToBotAssembly} />
-              </View>
-            </View>
-          </GesturePanView>
         </View>
-      );
-    }
-  };
+      </GesturePanView>
+    </View>
+  );
 
   const TabButton = ({ label, tab, isActive }: { label: string; tab: TabType; isActive: boolean }) => (
     <TouchableOpacity
@@ -450,7 +406,15 @@ export const HomeScreen = memo(function HomeScreen({
       </View>
       
       {/* Content based on active tab */}
-      {activeTab === 'floorPlan' ? renderFloorPlan() : renderGarage()}
+      {activeTab === 'floorPlan' ? (
+        <View key="floorPlan-view">
+          {renderFloorPlan()}
+        </View>
+      ) : (
+        <View key="garage-view">
+          {renderGarage()}
+        </View>
+      )}
       
       {/* Tab Navigation - Fixed at bottom */}
       <View style={styles.tabContainer}>

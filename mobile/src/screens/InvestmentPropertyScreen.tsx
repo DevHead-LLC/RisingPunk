@@ -132,8 +132,76 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
     }
   }, [minX, maxX, minY, maxY, boundsReady, computePanBounds, FLOOR_PLAN_WIDTH, FLOOR_PLAN_HEIGHT]);
 
-  const panGesture = useMemo(() => {
+  const centerView = useCallback(() => {
     if (Platform.OS === 'android') {
+      centerAndroidView();
+    } else {
+      const screenWidth = Dimensions.get('window').width;
+      const CENTER_X = (FLOOR_PLAN_WIDTH - screenWidth) / 2;
+      
+      offsetX.value = -CENTER_X;
+      offsetY.value = 0;
+    }
+  }, [Platform.OS, centerAndroidView, offsetX, offsetY, FLOOR_PLAN_WIDTH]);
+
+  useEffect(() => {
+    if (computePanBounds) {
+      const WINDOW_WIDTH = Dimensions.get('window').width;
+      const WINDOW_HEIGHT = Dimensions.get('window').height;
+      const MARGIN_SIZE = 0;
+      
+      let ADJUSTED_WIDTH = WINDOW_WIDTH;
+      let ADJUSTED_HEIGHT = WINDOW_HEIGHT;
+
+      if (Platform.OS === 'android') {
+        const SCREEN_WIDTH = Dimensions.get('screen').width;
+        ADJUSTED_WIDTH = SCREEN_WIDTH;
+      }
+
+      const boundsX = computePanBounds({
+        totalSize: FLOOR_PLAN_WIDTH,
+        containerWidth: ADJUSTED_WIDTH,
+        containerHeight: ADJUSTED_HEIGHT,
+        marginSize: MARGIN_SIZE,
+      });
+
+      const boundsY = computePanBounds({
+        totalSize: FLOOR_PLAN_HEIGHT,
+        containerWidth: ADJUSTED_WIDTH,
+        containerHeight: ADJUSTED_HEIGHT,
+        marginSize: MARGIN_SIZE,
+      });
+
+      let adjustedBounds;
+      if (Platform.OS === 'android') {
+        const ANDROID_NAVIGATION_BAR_HEIGHT = 24;
+        const ANDROID_HEADER_HEIGHT = ANDROID_NAVIGATION_BAR_HEIGHT;
+        
+        adjustedBounds = {
+          minX: boundsX.minX,
+          maxX: boundsX.maxX,
+          minY: boundsY.minY - ANDROID_HEADER_HEIGHT,
+          maxY: boundsY.maxY
+        };
+      } else {
+        adjustedBounds = {
+          minX: boundsX.minX,
+          maxX: boundsX.maxX,
+          minY: boundsY.minY,
+          maxY: boundsY.maxY
+        };
+      }
+
+      minX.value = adjustedBounds.minX;
+      maxX.value = adjustedBounds.maxX;
+      minY.value = adjustedBounds.minY;
+      maxY.value = adjustedBounds.maxY;
+      boundsReady.value = true;
+    }
+  }, [minX, maxX, minY, maxY, boundsReady, computePanBounds, FLOOR_PLAN_WIDTH, FLOOR_PLAN_HEIGHT]);
+
+  const panGesture = useMemo(() => {
+    if (computePanBounds) {
       return Gesture.Pan()
         .minPointers(1)
         .maxPointers(1)
@@ -172,27 +240,13 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
         });
     }
     return null;
-  }, [offsetX, offsetY, startX, startY, boundsReady, minX, maxX, minY, maxY, withDecay]);
+  }, [offsetX, offsetY, startX, startY, boundsReady, minX, maxX, minY, maxY, withDecay, computePanBounds]);
 
   useEffect(() => {
-    if (Platform.OS === 'android') {
-      setTimeout(() => {
-        centerAndroidView();
-      }, 100);
-    } else {
-      const screenWidth = Dimensions.get('window').width;
-      const centerX = (FLOOR_PLAN_WIDTH - screenWidth) / 2;
-      const centerY = 0;
-      
-      setTimeout(() => {
-        scrollViewRef.current?.scrollTo({
-          x: centerX,
-          y: centerY,
-          animated: false,
-        });
-      }, 100);
-    }
-  }, [propertyId, centerAndroidView, FLOOR_PLAN_WIDTH]);
+    setTimeout(() => {
+      centerView();
+    }, 100);
+  }, [propertyId, centerView]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -203,34 +257,17 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
         <Text style={styles.fixedPropertyText}>Property {propertyId}</Text>
       </View>
       
-      {Platform.OS === 'ios' ? (
-        <ScrollView
-          ref={scrollViewRef}
-          showsHorizontalScrollIndicator={false}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-          style={styles.scrollView}
-          directionalLockEnabled={false}
-          alwaysBounceHorizontal={true}
-          alwaysBounceVertical={true}
+      <View style={styles.scrollView}>
+        <GesturePanView 
+          offsetX={offsetX}
+          offsetY={offsetY}
+          panGesture={panGesture}
         >
           <View style={[styles.floorPlanContainer, { borderColor: colors.matrix }]}>
             <FloorPlan propertyId={propertyId} />
           </View>
-        </ScrollView>
-      ) : (
-        <View style={styles.scrollView}>
-          <GesturePanView 
-            offsetX={offsetX}
-            offsetY={offsetY}
-            panGesture={panGesture}
-          >
-            <View style={[styles.floorPlanContainer, { borderColor: colors.matrix }]}>
-              <FloorPlan propertyId={propertyId} />
-            </View>
-          </GesturePanView>
-        </View>
-      )}
+        </GesturePanView>
+      </View>
     </View>
   );
 };
