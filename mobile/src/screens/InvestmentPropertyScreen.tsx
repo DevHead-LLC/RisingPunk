@@ -79,70 +79,21 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
   const maxY: any = useSharedValue(1000000);
   const boundsReady: any = useSharedValue(false);
 
-  const centerAndroidView = useCallback(() => {
-    if (Platform.OS === 'android') {
-      const SCREEN_WIDTH = Dimensions.get('window').width;
-      const CENTER_X = (FLOOR_PLAN_WIDTH - SCREEN_WIDTH) / 2;
-      
-      offsetX.value = -CENTER_X;
-      offsetY.value = 0;
-    }
-  }, [offsetX, offsetY, FLOOR_PLAN_WIDTH]);
-
-  useEffect(() => {
-    if (Platform.OS === 'android' && computePanBounds) {
-      const WINDOW_WIDTH = Dimensions.get('window').width;
-      const WINDOW_HEIGHT = Dimensions.get('window').height;
-      const SCREEN_WIDTH = Dimensions.get('screen').width;
-      const SCREEN_HEIGHT = Dimensions.get('screen').height;
-      const MARGIN_SIZE = 0;
-      
-      const ADJUSTED_WIDTH = SCREEN_WIDTH;
-      const ADJUSTED_HEIGHT = WINDOW_HEIGHT;
-
-      const boundsX = computePanBounds({
-        totalSize: FLOOR_PLAN_WIDTH,
-        containerWidth: ADJUSTED_WIDTH,
-        containerHeight: ADJUSTED_HEIGHT,
-        marginSize: MARGIN_SIZE,
-      });
-
-      const boundsY = computePanBounds({
-        totalSize: FLOOR_PLAN_HEIGHT,
-        containerWidth: ADJUSTED_WIDTH,
-        containerHeight: ADJUSTED_HEIGHT,
-        marginSize: MARGIN_SIZE,
-      });
-
-      const ANDROID_NAVIGATION_BAR_HEIGHT = 24;
-      const ANDROID_HEADER_HEIGHT = ANDROID_NAVIGATION_BAR_HEIGHT;
-      
-      const adjustedBounds = {
-        minX: boundsX.minX,
-        maxX: boundsX.maxX,
-        minY: boundsY.minY - ANDROID_HEADER_HEIGHT,
-        maxY: boundsY.maxY
-      };
-
-      minX.value = adjustedBounds.minX;
-      maxX.value = adjustedBounds.maxX;
-      minY.value = adjustedBounds.minY;
-      maxY.value = adjustedBounds.maxY;
-      boundsReady.value = true;
-    }
-  }, [minX, maxX, minY, maxY, boundsReady, computePanBounds, FLOOR_PLAN_WIDTH, FLOOR_PLAN_HEIGHT]);
-
   const centerView = useCallback(() => {
-    if (Platform.OS === 'android') {
-      centerAndroidView();
-    } else {
-      const screenWidth = Dimensions.get('window').width;
-      const CENTER_X = (FLOOR_PLAN_WIDTH - screenWidth) / 2;
-      
-      offsetX.value = -CENTER_X;
-      offsetY.value = 0;
+    const screenWidth = Dimensions.get('window').width;
+    const CENTER_X = (FLOOR_PLAN_WIDTH - screenWidth) / 2;
+    
+    let x = -CENTER_X;
+    let y = 0;
+    
+    if (boundsReady.value) {
+      x = Math.min(maxX.value, Math.max(minX.value, x));
+      y = Math.min(maxY.value, Math.max(minY.value, y));
     }
-  }, [Platform.OS, centerAndroidView, offsetX, offsetY, FLOOR_PLAN_WIDTH]);
+    
+    offsetX.value = x;
+    offsetY.value = y;
+  }, [offsetX, offsetY, FLOOR_PLAN_WIDTH, boundsReady, minX, maxX, minY, maxY]);
 
   useEffect(() => {
     if (computePanBounds) {

@@ -109,7 +109,7 @@ export const HomeScreen = memo(function HomeScreen({
     let x = -CENTER_X;
     let y = 0;
     
-    if (Platform.OS === 'android' && floorPlanBoundsReady.value) {
+    if (floorPlanBoundsReady.value) {
       x = Math.min(floorPlanMaxX.value, Math.max(floorPlanMinX.value, x));
       y = Math.min(floorPlanMaxY.value, Math.max(floorPlanMinY.value, y));
     }
@@ -127,7 +127,7 @@ export const HomeScreen = memo(function HomeScreen({
     let x = -CENTER_X;
     let y = -CENTER_Y;
     
-    if (Platform.OS === 'android' && garageBoundsReady.value) {
+    if (garageBoundsReady.value) {
       x = Math.min(garageMaxX.value, Math.max(garageMinX.value, x));
       y = Math.min(garageMaxY.value, Math.max(garageMinY.value, y));
     }
