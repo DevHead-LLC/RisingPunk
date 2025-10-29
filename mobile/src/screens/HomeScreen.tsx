@@ -55,6 +55,14 @@ function GesturePanView({
     };
   }, [offsetX, offsetY]);
 
+  if (!panGesture) {
+    return (
+      <Animated.View style={[style, animatedStyle]}>
+        {children}
+      </Animated.View>
+    );
+  }
+
   return (
     <GestureDetector gesture={panGesture}>
       <Animated.View style={[style, animatedStyle]}>
@@ -249,6 +257,9 @@ export const HomeScreen = memo(function HomeScreen({
   }, [garageMinX, garageMaxX, garageMinY, garageMaxY, garageBoundsReady, computePanBounds, GARAGE_WIDTH, GARAGE_HEIGHT]);
 
   const floorPlanPanGesture = useMemo(() => {
+    if (!Gesture) {
+      return null;
+    }
     return Gesture.Pan()
       .minPointers(1)
       .maxPointers(1)
@@ -288,6 +299,9 @@ export const HomeScreen = memo(function HomeScreen({
   }, [floorPlanOffsetX, floorPlanOffsetY, floorPlanStartX, floorPlanStartY, floorPlanBoundsReady, floorPlanMinX, floorPlanMaxX, floorPlanMinY, floorPlanMaxY, withDecay]);
 
   const garagePanGesture = useMemo(() => {
+    if (!Gesture) {
+      return null;
+    }
     return Gesture.Pan()
       .minPointers(1)
       .maxPointers(1)

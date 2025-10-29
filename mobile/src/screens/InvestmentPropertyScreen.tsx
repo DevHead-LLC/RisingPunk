@@ -48,6 +48,14 @@ const GesturePanView = memo(function GesturePanView({
     };
   }, [offsetX, offsetY]);
 
+  if (!panGesture) {
+    return (
+      <Animated.View style={[styles.scrollContent, animatedStyle]}>
+        {children}
+      </Animated.View>
+    );
+  }
+
   return (
     <GestureDetector gesture={panGesture}>
       <Animated.View style={[styles.scrollContent, animatedStyle]}>
@@ -152,7 +160,7 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
   }, [minX, maxX, minY, maxY, boundsReady, computePanBounds, FLOOR_PLAN_WIDTH, FLOOR_PLAN_HEIGHT]);
 
   const panGesture = useMemo(() => {
-    if (computePanBounds) {
+    if (Gesture && computePanBounds) {
       return Gesture.Pan()
         .minPointers(1)
         .maxPointers(1)
