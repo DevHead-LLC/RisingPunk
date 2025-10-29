@@ -69,7 +69,9 @@ export const BuildCountdownTimer: React.FC<BuildCountdownTimerProps> = ({ comple
 
   return (
     <View style={styles.container}>
-      <Text style={timerTextStyle}>Time Remaining: {formatTime(timeRemaining)}</Text>
+      <Text style={timerTextStyle} numberOfLines={1} adjustsFontSizeToFit>
+        Time Remaining: {formatTime(timeRemaining)}
+      </Text>
     </View>
   );
 };
