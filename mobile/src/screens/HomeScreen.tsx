@@ -346,6 +346,8 @@ export const HomeScreen = memo(function HomeScreen({
       garageStartY.value = garageOffsetY.value;
       setTimeout(() => {
         centerGarage();
+        garageStartX.value = garageOffsetX.value;
+        garageStartY.value = garageOffsetY.value;
       }, 100);
     } else if (activeTab === 'floorPlan') {
       floorPlanStartX.value = floorPlanOffsetX.value;
