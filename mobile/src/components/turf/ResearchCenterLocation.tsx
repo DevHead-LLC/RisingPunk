@@ -286,12 +286,13 @@ const styles = StyleSheet.create({
   timerContainer: {
     position: 'absolute',
     top: '115%',
-    left: '50%',
-    transform: [{ translateX: -70 }],
+    left: 0,
+    right: 0,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: SIZING.spacing.md,
-    width: 140,
+    width: '95%',
+    marginLeft: '2.5%',
   },
   modalOverlay: {
     position: 'absolute',

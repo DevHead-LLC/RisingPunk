@@ -6,6 +6,7 @@ import {
   Modal,
   TouchableOpacity,
   SafeAreaView,
+  Platform,
 } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -294,7 +295,7 @@ const styles = StyleSheet.create({
     padding: SIZING.spacing.md,
   },
   modal: {
-    width: '100%',
+    width: Platform.OS === 'android' ? '75%' : '100%',
     maxWidth: 400,
     borderRadius: 12,
     borderWidth: 2,
