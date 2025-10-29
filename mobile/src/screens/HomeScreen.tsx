@@ -348,8 +348,8 @@ export const HomeScreen = memo(function HomeScreen({
         centerGarage();
       }, 100);
     } else if (activeTab === 'floorPlan') {
-      floorPlanStartX.value = 0;
-      floorPlanStartY.value = 0;
+      floorPlanStartX.value = floorPlanOffsetX.value;
+      floorPlanStartY.value = floorPlanOffsetY.value;
       setTimeout(() => {
         centerFloorPlan();
         floorPlanStartX.value = floorPlanOffsetX.value;
