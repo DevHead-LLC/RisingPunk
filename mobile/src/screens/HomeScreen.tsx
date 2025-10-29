@@ -1,11 +1,25 @@
-import React, {memo, useRef, useEffect, useState} from 'react';
-import {View, StyleSheet, ScrollView, Dimensions, Text, TouchableOpacity} from 'react-native';
+import React, {memo, useRef, useEffect, useState, useMemo, useCallback} from 'react';
+import {View, StyleSheet, ScrollView, Dimensions, Text, TouchableOpacity, Platform} from 'react-native';
 import { SIZING } from '../styles/theme';
 import { CloseButton } from '../components/common/CloseButton';
 import { HackRigDisplay } from '../components/home/HackRigDisplay';
 import { BotAssembly } from '../components/home/BotAssembly';
 import { HomeFloorPlan } from '../components/home/HomeFloorPlan';
 import { useThemeColors } from '../hooks/useThemeColors';
+
+let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, computePanBounds: any;
+
+const gestureHandler = require('react-native-gesture-handler');
+const reanimated = require('react-native-reanimated');
+const mapPanBounds = require('../utils/mapPanBounds');
+
+Gesture = gestureHandler.Gesture;
+GestureDetector = gestureHandler.GestureDetector;
+Animated = reanimated.default;
+useSharedValue = reanimated.useSharedValue;
+useAnimatedStyle = reanimated.useAnimatedStyle;
+withDecay = reanimated.withDecay;
+computePanBounds = mapPanBounds.computePanBounds;
 
 type TabType = 'floorPlan' | 'garage';
 
@@ -15,6 +29,48 @@ type HomeScreenProps = {
   onNavigateToBotAssembly: () => void;
   onNavigateToBattle: () => void;
 };
+
+function GesturePanView({
+  children,
+  offsetX,
+  offsetY,
+  panGesture,
+  style,
+}: {
+  children: React.ReactNode;
+  offsetX: any;
+  offsetY: any;
+  panGesture: any;
+  style: any;
+}) {
+  const animatedStyle: any = useAnimatedStyle(() => {
+    'worklet';
+    const transform = [
+      { translateX: offsetX.value },
+      { translateY: offsetY.value },
+    ];
+    
+    return {
+      transform,
+    };
+  }, [offsetX, offsetY]);
+
+  if (!panGesture) {
+    return (
+      <Animated.View style={[style, animatedStyle]}>
+        {children}
+      </Animated.View>
+    );
+  }
+
+  return (
+    <GestureDetector gesture={panGesture}>
+      <Animated.View style={[style, animatedStyle]}>
+        {children}
+      </Animated.View>
+    </GestureDetector>
+  );
+}
 
 export const HomeScreen = memo(function HomeScreen({
   onClose,
@@ -27,88 +83,322 @@ export const HomeScreen = memo(function HomeScreen({
   const scrollViewRef = useRef<ScrollView>(null);
   const garageScrollViewRef = useRef<ScrollView>(null);
 
-  useEffect(() => {
-    // Center the view on the floor plan when first loaded
-    const screenWidth = Dimensions.get('window').width;
-    const floorPlanWidth = 1200;
-    const centerX = (floorPlanWidth - screenWidth) / 2;
-    const centerY = 0;
+  const FLOOR_PLAN_WIDTH = 1250;
+  const FLOOR_PLAN_HEIGHT = 950;
+  const GARAGE_WIDTH = 1200;
+  const GARAGE_HEIGHT = 900;
+
+  const floorPlanOffsetX: any = useSharedValue(0);
+  const floorPlanOffsetY: any = useSharedValue(0);
+  const floorPlanStartX: any = useSharedValue(0);
+  const floorPlanStartY: any = useSharedValue(0);
+  
+  const floorPlanMinX: any = useSharedValue(-1000000);
+  const floorPlanMaxX: any = useSharedValue(1000000);
+  const floorPlanMinY: any = useSharedValue(-1000000);
+  const floorPlanMaxY: any = useSharedValue(1000000);
+  const floorPlanBoundsReady: any = useSharedValue(false);
+
+  const garageOffsetX: any = useSharedValue(0);
+  const garageOffsetY: any = useSharedValue(0);
+  const garageStartX: any = useSharedValue(0);
+  const garageStartY: any = useSharedValue(0);
+  
+  const garageMinX: any = useSharedValue(-1000000);
+  const garageMaxX: any = useSharedValue(1000000);
+  const garageMinY: any = useSharedValue(-1000000);
+  const garageMaxY: any = useSharedValue(1000000);
+  const garageBoundsReady: any = useSharedValue(false);
+
+  const centerFloorPlan = useCallback(() => {
+    const SCREEN_WIDTH = Dimensions.get('window').width;
+    const CENTER_X = (FLOOR_PLAN_WIDTH - SCREEN_WIDTH) / 2;
     
-    setTimeout(() => {
-      scrollViewRef.current?.scrollTo({
-        x: centerX,
-        y: centerY,
-        animated: false,
-      });
-    }, 100);
-  }, []);
+    let x = -CENTER_X;
+    let y = 0;
+    
+    if (floorPlanBoundsReady.value) {
+      x = Math.min(floorPlanMaxX.value, Math.max(floorPlanMinX.value, x));
+      y = Math.min(floorPlanMaxY.value, Math.max(floorPlanMinY.value, y));
+    }
+    
+    floorPlanOffsetX.value = x;
+    floorPlanOffsetY.value = y;
+  }, [floorPlanOffsetX, floorPlanOffsetY, FLOOR_PLAN_WIDTH, floorPlanBoundsReady, floorPlanMinX, floorPlanMaxX, floorPlanMinY, floorPlanMaxY]);
+
+  const centerGarage = useCallback(() => {
+    const SCREEN_WIDTH = Dimensions.get('window').width;
+    const SCREEN_HEIGHT = Dimensions.get('window').height;
+    const CENTER_X = (GARAGE_WIDTH - SCREEN_WIDTH) / 2;
+    const CENTER_Y = (GARAGE_HEIGHT - SCREEN_HEIGHT) / 2;
+    
+    let x = -CENTER_X;
+    let y = -CENTER_Y;
+    
+    if (garageBoundsReady.value) {
+      x = Math.min(garageMaxX.value, Math.max(garageMinX.value, x));
+      y = Math.min(garageMaxY.value, Math.max(garageMinY.value, y));
+    }
+    
+    garageOffsetX.value = x;
+    garageOffsetY.value = y;
+  }, [garageOffsetX, garageOffsetY, GARAGE_WIDTH, GARAGE_HEIGHT, garageBoundsReady, garageMinX, garageMaxX, garageMinY, garageMaxY]);
 
   useEffect(() => {
-    // Center the garage view when garage tab is selected
-    if (activeTab === 'garage') {
-      const screenWidth = Dimensions.get('window').width;
-      const screenHeight = Dimensions.get('window').height;
-      const garageWidth = 1200;
-      const garageHeight = 900;
-      const centerX = (garageWidth - screenWidth) / 2;
-      const centerY = (garageHeight - screenHeight) / 2;
+    if (computePanBounds) {
+      const WINDOW_WIDTH = Dimensions.get('window').width;
+      const WINDOW_HEIGHT = Dimensions.get('window').height;
+      const MARGIN_SIZE = 0;
       
+      let ADJUSTED_WIDTH = WINDOW_WIDTH;
+      let ADJUSTED_HEIGHT = WINDOW_HEIGHT;
+
+      if (Platform.OS === 'android') {
+        const SCREEN_WIDTH = Dimensions.get('screen').width;
+        ADJUSTED_WIDTH = SCREEN_WIDTH;
+      }
+
+      const boundsX = computePanBounds({
+        totalSize: FLOOR_PLAN_WIDTH,
+        containerWidth: ADJUSTED_WIDTH,
+        containerHeight: ADJUSTED_HEIGHT,
+        marginSize: MARGIN_SIZE,
+      });
+
+      const boundsY = computePanBounds({
+        totalSize: FLOOR_PLAN_HEIGHT,
+        containerWidth: ADJUSTED_WIDTH,
+        containerHeight: ADJUSTED_HEIGHT,
+        marginSize: MARGIN_SIZE,
+      });
+
+      let adjustedBounds;
+      if (Platform.OS === 'android') {
+        const ANDROID_NAVIGATION_BAR_HEIGHT = 24;
+        const ANDROID_HEADER_HEIGHT = ANDROID_NAVIGATION_BAR_HEIGHT;
+        
+        adjustedBounds = {
+          minX: boundsX.minX,
+          maxX: boundsX.maxX,
+          minY: boundsY.minY - ANDROID_HEADER_HEIGHT,
+          maxY: boundsY.maxY
+        };
+      } else {
+        adjustedBounds = {
+          minX: boundsX.minX,
+          maxX: boundsX.maxX,
+          minY: boundsY.minY,
+          maxY: boundsY.maxY
+        };
+      }
+
+      floorPlanMinX.value = adjustedBounds.minX;
+      floorPlanMaxX.value = adjustedBounds.maxX;
+      floorPlanMinY.value = adjustedBounds.minY;
+      floorPlanMaxY.value = adjustedBounds.maxY;
+      floorPlanBoundsReady.value = true;
+    }
+  }, [floorPlanMinX, floorPlanMaxX, floorPlanMinY, floorPlanMaxY, floorPlanBoundsReady, computePanBounds, FLOOR_PLAN_WIDTH, FLOOR_PLAN_HEIGHT]);
+
+  useEffect(() => {
+    if (computePanBounds) {
+      const WINDOW_WIDTH = Dimensions.get('window').width;
+      const WINDOW_HEIGHT = Dimensions.get('window').height;
+      const MARGIN_SIZE = 0;
+      
+      let ADJUSTED_WIDTH = WINDOW_WIDTH;
+      let ADJUSTED_HEIGHT = WINDOW_HEIGHT;
+
+      if (Platform.OS === 'android') {
+        const SCREEN_WIDTH = Dimensions.get('screen').width;
+        ADJUSTED_WIDTH = SCREEN_WIDTH;
+      }
+
+      const boundsX = computePanBounds({
+        totalSize: GARAGE_WIDTH,
+        containerWidth: ADJUSTED_WIDTH,
+        containerHeight: ADJUSTED_HEIGHT,
+        marginSize: MARGIN_SIZE,
+      });
+
+      const boundsY = computePanBounds({
+        totalSize: GARAGE_HEIGHT,
+        containerWidth: ADJUSTED_WIDTH,
+        containerHeight: ADJUSTED_HEIGHT,
+        marginSize: MARGIN_SIZE,
+      });
+
+      let adjustedBounds;
+      if (Platform.OS === 'android') {
+        const ANDROID_NAVIGATION_BAR_HEIGHT = 24;
+        const ANDROID_HEADER_HEIGHT = ANDROID_NAVIGATION_BAR_HEIGHT;
+        
+        adjustedBounds = {
+          minX: boundsX.minX,
+          maxX: boundsX.maxX,
+          minY: boundsY.minY - ANDROID_HEADER_HEIGHT,
+          maxY: boundsY.maxY
+        };
+      } else {
+        adjustedBounds = {
+          minX: boundsX.minX,
+          maxX: boundsX.maxX,
+          minY: boundsY.minY,
+          maxY: boundsY.maxY
+        };
+      }
+
+      garageMinX.value = adjustedBounds.minX;
+      garageMaxX.value = adjustedBounds.maxX;
+      garageMinY.value = adjustedBounds.minY;
+      garageMaxY.value = adjustedBounds.maxY;
+      garageBoundsReady.value = true;
+    }
+  }, [garageMinX, garageMaxX, garageMinY, garageMaxY, garageBoundsReady, computePanBounds, GARAGE_WIDTH, GARAGE_HEIGHT]);
+
+  const floorPlanPanGesture = useMemo(() => {
+    if (!Gesture) {
+      return null;
+    }
+    return Gesture.Pan()
+      .minPointers(1)
+      .maxPointers(1)
+      .onStart(() => {
+        'worklet';
+        floorPlanStartX.value = floorPlanOffsetX.value;
+        floorPlanStartY.value = floorPlanOffsetY.value;
+      })
+      .onUpdate((g: any) => {
+        'worklet';
+        let x = floorPlanStartX.value + g.translationX;
+        let y = floorPlanStartY.value + g.translationY;
+        
+        if (floorPlanBoundsReady.value) {
+          x = Math.min(floorPlanMaxX.value, Math.max(floorPlanMinX.value, x));
+          y = Math.min(floorPlanMaxY.value, Math.max(floorPlanMinY.value, y));
+        }
+        
+        floorPlanOffsetX.value = x;
+        floorPlanOffsetY.value = y;
+      })
+      .onEnd((g: any) => {
+        'worklet';
+        if (floorPlanBoundsReady.value) {
+          floorPlanOffsetX.value = withDecay({ 
+            velocity: g.velocityX, 
+            deceleration: 0.99,
+            clamp: [floorPlanMinX.value, floorPlanMaxX.value]
+          });
+          floorPlanOffsetY.value = withDecay({ 
+            velocity: g.velocityY, 
+            deceleration: 0.99,
+            clamp: [floorPlanMinY.value, floorPlanMaxY.value]
+          });
+        }
+      });
+  }, [floorPlanOffsetX, floorPlanOffsetY, floorPlanStartX, floorPlanStartY, floorPlanBoundsReady, floorPlanMinX, floorPlanMaxX, floorPlanMinY, floorPlanMaxY, withDecay]);
+
+  const garagePanGesture = useMemo(() => {
+    if (!Gesture) {
+      return null;
+    }
+    return Gesture.Pan()
+      .minPointers(1)
+      .maxPointers(1)
+      .onStart(() => {
+        'worklet';
+        garageStartX.value = garageOffsetX.value;
+        garageStartY.value = garageOffsetY.value;
+      })
+      .onUpdate((g: any) => {
+        'worklet';
+        let x = garageStartX.value + g.translationX;
+        let y = garageStartY.value + g.translationY;
+        
+        if (garageBoundsReady.value) {
+          x = Math.min(garageMaxX.value, Math.max(garageMinX.value, x));
+          y = Math.min(garageMaxY.value, Math.max(garageMinY.value, y));
+        }
+        
+        garageOffsetX.value = x;
+        garageOffsetY.value = y;
+      })
+      .onEnd((g: any) => {
+        'worklet';
+        if (garageBoundsReady.value) {
+          garageOffsetX.value = withDecay({ 
+            velocity: g.velocityX, 
+            deceleration: 0.99,
+            clamp: [garageMinX.value, garageMaxX.value]
+          });
+          garageOffsetY.value = withDecay({ 
+            velocity: g.velocityY, 
+            deceleration: 0.99,
+            clamp: [garageMinY.value, garageMaxY.value]
+          });
+        }
+      });
+  }, [garageOffsetX, garageOffsetY, garageStartX, garageStartY, garageBoundsReady, garageMinX, garageMaxX, garageMinY, garageMaxY, withDecay]);
+
+  useEffect(() => {
+    if (activeTab === 'garage') {
+      garageStartX.value = garageOffsetX.value;
+      garageStartY.value = garageOffsetY.value;
       setTimeout(() => {
-        garageScrollViewRef.current?.scrollTo({
-          x: centerX,
-          y: centerY,
-          animated: false,
-        });
+        centerGarage();
+        garageStartX.value = garageOffsetX.value;
+        garageStartY.value = garageOffsetY.value;
+      }, 100);
+    } else if (activeTab === 'floorPlan') {
+      floorPlanStartX.value = floorPlanOffsetX.value;
+      floorPlanStartY.value = floorPlanOffsetY.value;
+      setTimeout(() => {
+        centerFloorPlan();
+        floorPlanStartX.value = floorPlanOffsetX.value;
+        floorPlanStartY.value = floorPlanOffsetY.value;
       }, 100);
     }
-  }, [activeTab]);
+  }, [activeTab, centerGarage, centerFloorPlan, floorPlanStartX, floorPlanStartY, floorPlanOffsetX, floorPlanOffsetY, garageStartX, garageStartY, garageOffsetX, garageOffsetY]);
 
   const renderFloorPlan = () => (
-    <ScrollView
-      ref={scrollViewRef}
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.scrollContent}
-      style={styles.scrollView}
-      directionalLockEnabled={false}
-      alwaysBounceHorizontal={true}
-      alwaysBounceVertical={true}
-    >
-      <View style={[styles.floorPlanContainer, { borderColor: colors.matrix }]}>
-        <HomeFloorPlan
-          onHackRigPress={onNavigateToMap}
-          onNavigateToBattle={onNavigateToBattle}
-        />
-        {/* Place HackRig in the bedroom section */}
-        <View style={styles.hackRigContainer}>
-          <HackRigDisplay
-            onPress={onNavigateToMap}
+    <View style={styles.scrollView}>
+      <GesturePanView 
+        offsetX={floorPlanOffsetX}
+        offsetY={floorPlanOffsetY}
+        panGesture={floorPlanPanGesture}
+        style={styles.scrollContent}
+      >
+        <View style={[styles.floorPlanContainer, { borderColor: colors.matrix }]}>
+          <HomeFloorPlan
+            onHackRigPress={onNavigateToMap}
             onNavigateToBattle={onNavigateToBattle}
           />
+          <View style={styles.hackRigContainer}>
+            <HackRigDisplay
+              onPress={onNavigateToMap}
+              onNavigateToBattle={onNavigateToBattle}
+            />
+          </View>
         </View>
-      </View>
-    </ScrollView>
+      </GesturePanView>
+    </View>
   );
 
   const renderGarage = () => (
-    <ScrollView
-      ref={garageScrollViewRef}
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.garageScrollContent}
-      style={styles.scrollView}
-      directionalLockEnabled={false}
-      alwaysBounceHorizontal={true}
-      alwaysBounceVertical={true}
-    >
-      <View style={[styles.garageContainer, { borderColor: colors.matrix }]}>
-        <View style={styles.botAssemblyContainer}>
-          <BotAssembly onPress={onNavigateToBotAssembly} />
+    <View style={styles.scrollView}>
+      <GesturePanView 
+        offsetX={garageOffsetX}
+        offsetY={garageOffsetY}
+        panGesture={garagePanGesture}
+        style={styles.garageScrollContent}
+      >
+        <View style={[styles.garageContainer, { borderColor: colors.matrix }]}>
+          <View style={styles.botAssemblyContainer}>
+            <BotAssembly onPress={onNavigateToBotAssembly} />
+          </View>
         </View>
-      </View>
-    </ScrollView>
+      </GesturePanView>
+    </View>
   );
 
   const TabButton = ({ label, tab, isActive }: { label: string; tab: TabType; isActive: boolean }) => (
@@ -132,7 +422,15 @@ export const HomeScreen = memo(function HomeScreen({
       </View>
       
       {/* Content based on active tab */}
-      {activeTab === 'floorPlan' ? renderFloorPlan() : renderGarage()}
+      {activeTab === 'floorPlan' ? (
+        <View key="floorPlan-view">
+          {renderFloorPlan()}
+        </View>
+      ) : (
+        <View key="garage-view">
+          {renderGarage()}
+        </View>
+      )}
       
       {/* Tab Navigation - Fixed at bottom */}
       <View style={styles.tabContainer}>
@@ -203,16 +501,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
     width: 1250,
     height: 950,
+    position: 'relative',
   },
   garageScrollContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
     width: 1200,
     height: 900,
+    position: 'relative',
   },
   floorPlanContainer: {
     padding: SIZING.spacing.lg,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, Platform } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { BotType } from '../../types/bots';
@@ -75,6 +75,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     textAlign: 'center',
     fontSize: SIZING.font.body,
+    ...(Platform.OS === 'android' && {
+      height: 48,
+      paddingHorizontal: SIZING.spacing.lg,
+      paddingVertical: 0,
+      lineHeight: SIZING.font.body,
+    }),
   },
   quantityInputContainer: {
     flex: 1,
