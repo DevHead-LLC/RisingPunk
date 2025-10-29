@@ -1,26 +1,54 @@
-# Android Research Center Modal Layout Fix - COMPLETED ✅
+# Fix Android Panning for Floor Plans
 
-## Problem
-Research center feature modal (Antivirus) was too wide on Android devices (Google Pixel 9 Pro XL), stretching almost edge-to-edge with very little margin. The modal content was being cut off, while iOS version displayed correctly.
+## Goal
+Fix Android panning on Investment Property Screen and HomeScreen (floor plan + garage) to allow free panning (X and Y axes) instead of only horizontal scrolling. iOS is working correctly.
 
 ## Root Cause
-Modal was using `width: '100%'` which on Android takes the full width of the overlay container (minus padding), making it too wide. On iOS, the same code works differently due to platform-specific rendering behavior.
+- Screens use basic `ScrollView` with `horizontal` prop
+- On Android, this limits scrolling to horizontal only
+- TurfScreen was fixed with the same issue using gesture handlers for Android
 
 ## Solution Applied
+Applied the same pattern as TurfScreen:
+- **iOS**: Uses ScrollView (removed `horizontal` prop, allows both directions)
+- **Android**: Uses `GesturePanView` with react-native-gesture-handler and react-native-reanimated
 
-### Changes to `FeatureModal.tsx`
-- Changed modal width to be platform-specific:
-  - **Android**: `width: '75%'` (75% of screen width, creating proper margins)
-  - **iOS**: `width: '100%'` (unchanged, preserves original iOS layout)
-- Both platforms maintain `maxWidth: 400` constraint
-- Reverted unnecessary font size and button size reductions
-- Kept original padding and spacing values
+## Implementation Details
 
-## Expected Result
-✅ Modal is properly sized with adequate margins on Android (75% width)
-✅ Modal content is fully visible without being cut off
-✅ iOS layout remains completely unchanged
-✅ Simple, maintainable solution that works across Android screen sizes
+### InvestmentPropertyScreen
+- Floor plan dimensions: 1250x950
+- Android header size: 24dp (accounted for in bounds calculation)
+- Bounds calculated separately for X and Y axes (non-square floor plan)
+- Initial centering: Centers on top-center to show Property label
 
-## Status
-Fixed - Android modal now uses 75% width instead of 100%, creating proper margins and preventing content overflow.
+### HomeScreen
+- Floor plan dimensions: 1250x950
+- Garage dimensions: 1200x900
+- Separate gesture handlers for floor plan and garage tabs
+- Android header size: 24dp for both views
+- Floor plan centers on top-center, garage centers in middle
+
+## Changes Made
+1. ✅ InvestmentPropertyScreen: Added gesture handler support
+2. ✅ InvestmentPropertyScreen: Created GesturePanView component
+3. ✅ InvestmentPropertyScreen: Added Android-specific gesture state
+4. ✅ InvestmentPropertyScreen: Implemented bounds calculation with 24dp header adjustment
+5. ✅ HomeScreen: Added gesture handler support for both floor plan and garage
+6. ✅ HomeScreen: Created separate gesture handlers for each view
+7. ✅ HomeScreen: Implemented bounds calculations for both views
+8. ✅ Both screens: Updated render to conditionally use iOS ScrollView vs Android GesturePanView
+9. ✅ Both screens: Updated centering logic for both platforms
+
+## Bug Fix: iOS Panning Issue
+- **Issue**: ScrollView in React Native only supports horizontal OR vertical, not both
+- **Root Cause**: Removing `horizontal` prop made iOS ScrollView vertical-only, breaking horizontal panning
+- **Solution**: Use gesture handlers for BOTH iOS and Android (not just Android)
+- **Changes**: 
+  - Both platforms now use GesturePanView with gesture handlers
+  - Removed iOS ScrollView implementation
+  - Updated bounds calculations to work for both platforms
+  - Unified centering logic for both platforms
+
+## Testing
+Ready for manual testing on both iOS and Android devices.
+
