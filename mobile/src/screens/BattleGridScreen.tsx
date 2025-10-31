@@ -3,8 +3,8 @@
  * @description Main battle screen container - orchestrates battle components
  */
 
-import React from 'react';
-import { View, SafeAreaView, Text } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, SafeAreaView, Text, StatusBar, Platform } from 'react-native';
 import { BattleNetworkGrid } from '../components/battle/BattleNetworkGrid';
 import { BattleBattalionManager } from '../components/battle/BattleBattalionManager';
 import { BattleOverlayManager } from '../components/battle/BattleOverlayManager';
@@ -19,6 +19,13 @@ type Props = {
 export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
   const colors = useThemeColors();
   const themeStyles = createThemeAwareBattleGridStyles(colors);
+
+  // Android-specific status bar configuration - hide status bar for immersive experience
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      StatusBar.setHidden(true, 'fade');
+    }
+  }, []);
 
   // Handle missing battleId
   if (!battleId) {

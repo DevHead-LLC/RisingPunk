@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Dimensions, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, Dimensions, TouchableOpacity, Animated, Platform } from 'react-native';
 import { SIZING } from '../styles/theme';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { CloseButton } from '../components/common/CloseButton';
@@ -434,7 +434,7 @@ const styles = StyleSheet.create({
   },
   executeButton: {
     marginHorizontal: SIZING.spacing.sm,
-    marginBottom: SIZING.spacing.sm,
+    marginBottom: Platform.OS === 'android' ? SIZING.spacing.sm + 24 : SIZING.spacing.sm,
     height: 50,
     borderWidth: 1,
     justifyContent: 'center',
