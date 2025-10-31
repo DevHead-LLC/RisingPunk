@@ -5,8 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  StatusBar,
-  Platform,
 } from 'react-native';
 import {SIZING, styleGuide} from '../styles/theme';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
@@ -67,13 +65,6 @@ export const LoginScreen = () => {
   const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
   const { isLoading: formLoading, error: formError, setLoading, setError, clearError: clearFormError } = useFormState();
   const colors = useThemeColors();
-
-  // Android-specific status bar configuration - hide status bar for immersive experience
-  useEffect(() => {
-    if (Platform.OS === 'android') {
-      StatusBar.setHidden(true, 'fade');
-    }
-  }, []);
 
   // Combine loading states
   const isLoading = authLoading || formLoading;
