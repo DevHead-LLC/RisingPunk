@@ -1,4 +1,4 @@
-import { StyleSheet, Dimensions } from 'react-native';
+import { StyleSheet, Dimensions, Platform } from 'react-native';
 import { ThemeColors } from './theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -16,6 +16,9 @@ export const battleGridStyles = StyleSheet.create({
     position: 'absolute',
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
+    ...(Platform.OS === 'android' && {
+      top: -5,
+    }),
   },
   loadingContainer: {
     flex: 1,
@@ -101,6 +104,9 @@ export const createThemeAwareBattleGridStyles = (colors: ThemeColors) => StyleSh
     position: 'absolute',
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
+    ...(Platform.OS === 'android' && {
+      top: -5,
+    }),
   },
   loadingContainer: {
     flex: 1,
