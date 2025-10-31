@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { SIZING } from '../../../styles/theme';
 import { useThemeColors } from '../../../hooks/useThemeColors';
 import { useTheme } from '../../../context/ThemeContext';
@@ -53,18 +53,21 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
             <Text style={[styles.buttonText, { color: colors.secondary }]}>-1</Text>
           </TouchableOpacity>
 
-          <KeyboardAwareInput
-            value={quantity.toString()}
-            onChangeText={handleDirectInput}
-            keyboardType="numeric"
-            style={[styles.input, { 
-              backgroundColor: themeMode === 'light' ? 'rgba(248, 246, 240, 0.8)' : 'rgba(0, 0, 0, 0.3)',
-              borderColor: colors.secondary,
-              color: colors.secondary 
-            }]}
-            isLastInput={true}
-            maxLength={3}
-          />
+          <View style={styles.inputWrapper}>
+            <KeyboardAwareInput
+              value={quantity.toString()}
+              onChangeText={handleDirectInput}
+              keyboardType="numeric"
+              style={[styles.input, { 
+                backgroundColor: themeMode === 'light' ? 'rgba(248, 246, 240, 0.8)' : 'rgba(0, 0, 0, 0.3)',
+                borderColor: colors.secondary,
+                color: colors.secondary 
+              }]}
+              containerStyle={styles.inputContainer}
+              isLastInput={true}
+              maxLength={3}
+            />
+          </View>
 
           <TouchableOpacity
             style={[styles.button, { 
@@ -125,6 +128,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   },
+  inputWrapper: {
+    ...(Platform.OS === 'android' && {
+      justifyContent: 'center',
+      alignItems: 'center',
+    }),
+  },
+  inputContainer: {
+    marginBottom: 0,
+    ...(Platform.OS === 'android' && {
+      height: 32,
+      justifyContent: 'center',
+    }),
+  },
   input: {
     borderWidth: 1,
     borderRadius: 4,
@@ -132,6 +148,10 @@ const styles = StyleSheet.create({
     height: 32,
     textAlign: 'center',
     fontSize: 16,
+    paddingHorizontal: 0,
+    ...(Platform.OS === 'android' && {
+      paddingVertical: 0,
+    }),
   },
   infoRow: {
     flexDirection: 'row',
