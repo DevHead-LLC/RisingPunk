@@ -116,6 +116,7 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
+            signingConfig signingConfigs.debug
             if (keystorePropertiesFile.exists()) {
                 signingConfig signingConfigs.release
             }
