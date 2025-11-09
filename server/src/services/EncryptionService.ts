@@ -66,8 +66,9 @@ export class EncryptionService {
 
   static hashEmail(email: string): string {
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       const key = this.getEncryptionKey();
-      return CryptoJS.SHA256(email + key).toString();
+      return CryptoJS.SHA256(normalizedEmail + key).toString();
     } catch (error) {
       console.error('Email hashing failed:', error);
       throw new Error('Failed to hash email');
