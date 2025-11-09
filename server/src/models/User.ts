@@ -330,24 +330,29 @@ userSchema.pre('save', async function(this: IUser, next: Function) {
     this.hashedAccessKey = await bcrypt.hash(this.hashedAccessKey, salt);
   }
   
-  // Encrypt email if it's modified and not already encrypted
-  if (this.isModified('email') && !EncryptionService.isEncrypted(this.email)) {
-    this.email = EncryptionService.encryptEmail(this.email);
-  }
-  
-  // Generate email hash for efficient duplicate checking
+  // Get the original email before any modifications
+  let originalEmail: string;
   if (this.isModified('email')) {
-    const originalEmail = this.isModified('email') && !EncryptionService.isEncrypted(this.email) 
-      ? this.email 
-      : this.getDecryptedEmail();
-    this.emailHash = EncryptionService.hashEmail(originalEmail);
+    if (!EncryptionService.isEncrypted(this.email)) {
+      // Email is not encrypted yet, normalize it
+      originalEmail = this.email.trim().toLowerCase();
+      this.email = EncryptionService.encryptEmail(originalEmail);
+    } else {
+      // Email is already encrypted, decrypt to get original
+      originalEmail = this.getDecryptedEmail();
+    }
+  } else if (this.email) {
+    // Email not modified, but we need to ensure emailHash exists
+    if (EncryptionService.isEncrypted(this.email)) {
+      originalEmail = this.getDecryptedEmail();
+    } else {
+      originalEmail = this.email.trim().toLowerCase();
+    }
+  } else {
+    originalEmail = '';
   }
   
-  // Ensure emailHash exists for new users or when updating email
-  if (!this.emailHash && this.email) {
-    const originalEmail = EncryptionService.isEncrypted(this.email) 
-      ? this.getDecryptedEmail() 
-      : this.email;
+  if (originalEmail) {
     this.emailHash = EncryptionService.hashEmail(originalEmail);
   }
   
@@ -377,9 +382,7 @@ userSchema.methods.setEncryptedEmail = function(email: string): void {
   this.email = EncryptionService.encryptEmail(email);
 };
 
-// Static method to check if email exists (for registration validation)
 userSchema.statics.emailExists = async function(email: string): Promise<boolean> {
-  // Use the email hash for efficient duplicate checking
   const emailHash = EncryptionService.hashEmail(email);
   const existingUser = await this.findOne({ emailHash });
   
@@ -387,7 +390,6 @@ userSchema.statics.emailExists = async function(email: string): Promise<boolean>
     return true;
   }
   
-  // Fall back to checking decrypted emails for users without emailHash (backward compatibility)
   const usersWithoutHash = await this.find({ 
     $or: [
       { emailHash: { $exists: false } },
@@ -395,7 +397,13 @@ userSchema.statics.emailExists = async function(email: string): Promise<boolean>
     ]
   });
   
-  return usersWithoutHash.some((user: IUser) => user.getDecryptedEmail() === email);
+  const normalizedEmail = email.trim().toLowerCase();
+  const foundInFallback = usersWithoutHash.some((user: IUser) => {
+    const decrypted = user.getDecryptedEmail().trim().toLowerCase();
+    return decrypted === normalizedEmail;
+  });
+  
+  return foundInFallback;
 };
 
 // Static method to find user by Google ID

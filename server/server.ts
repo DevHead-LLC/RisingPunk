@@ -19,6 +19,7 @@ import battleRoutes from './src/routes/battle';
 import healthRoute from './src/routes/health';
 import researchRoutes from './src/routes/research';
 import documentsRoutes from './src/routes/documents';
+import { deleteAccountHandler } from './src/routes/documents';
 import testRoutes from './src/routes/test';
 import botsRoutes from './src/routes/bots';
 
@@ -507,6 +508,8 @@ app.use('/api/bots', botsRoutes);
 // Admin routes for privacy policy compliance and data management
 import adminRoutes from './src/routes/admin';
 app.use('/api/admin', adminRoutes);
+
+app.get('/delete-account', deleteAccountHandler);
 
 app.use('/', healthRoute);
 
