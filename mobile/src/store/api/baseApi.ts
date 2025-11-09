@@ -6,6 +6,7 @@ import { authApi } from './authApi';
 import { balanceApi } from './balanceApi';
 import { botsApi } from './botsApi';
 import { mapApi } from './mapApi';
+import { logoutUser } from '../slices/authSlice';
 
 // Debounce mechanism for ACCOUNT_SWITCHED errors
 let accountSwitchedDispatched = false;
@@ -57,6 +58,9 @@ const baseQueryWithErrorHandling = async (args: any, api: any, extraOptions: any
       }
       
       return result; // Return early to prevent other error handling
+    } else if (result.error?.status === 401 && (result.error?.data as any)?.error === 'Token expired') {
+      api.dispatch(logoutUser());
+      return result;
     } else {
       handleApiError(result.error);
     }

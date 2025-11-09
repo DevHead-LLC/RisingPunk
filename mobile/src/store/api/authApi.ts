@@ -5,6 +5,7 @@ import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 import { balanceApi } from './balanceApi';
 import { botsApi } from './botsApi';
 import { mapApi } from './mapApi';
+import { logoutUser } from '../slices/authSlice';
 
 export interface LoginRequest {
   handle: string;
@@ -142,6 +143,9 @@ const authBaseQuery = async (args: any, api: any, extraOptions: any) => {
       api.dispatch(mapApi.util.resetApiState());
       
       return result; // Return early to prevent other error handling
+    } else if (result.error?.status === 401 && (result.error?.data as any)?.error === 'Token expired') {
+      api.dispatch(logoutUser());
+      return result;
     } else {
       globalErrorHandler.handleDatabaseError(result.error);
     }
