@@ -155,23 +155,114 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
     try {
       const { email, accessKey } = req.body;
       
-      // Check for existing email using the static method
-      const emailExists = await User.emailExists(email);
+      if (!email || !accessKey) {
+        res.status(400).json({ error: 'Email and password are required' });
+        return;
+      }
+
+      const normalizedEmail = email.trim().toLowerCase();
+      const emailHash = EncryptionService.hashEmail(normalizedEmail);
       
-      if (emailExists) {
+      // Debug: Check directly in database before emailExists check
+      console.log('🔵 REGISTER: Checking email - normalizedEmail:', normalizedEmail);
+      console.log('🔵 REGISTER: Email hash:', emailHash);
+      
+      // Direct database check to see if user exists
+      const directCheck = await User.findOne({ emailHash });
+      console.log('🔵 REGISTER: Direct database check result:', directCheck ? {
+        id: directCheck._id,
+        handle: directCheck.handle,
+        emailHash: directCheck.emailHash,
+        hasEmailHash: !!directCheck.emailHash
+      } : 'null');
+      
+      // Also check for the hash that appears in the error (for debugging)
+      const errorHash = '6a0eb4278c9c1bd085218f36d4c28e4bafee2c4a58918574be4cd5fa308db608';
+      const userWithErrorHash = await User.findOne({ emailHash: errorHash });
+      console.log('🔵 REGISTER: User with error hash found:', userWithErrorHash ? {
+        id: userWithErrorHash._id,
+        handle: userWithErrorHash.handle,
+        emailHash: userWithErrorHash.emailHash,
+        decryptedEmail: userWithErrorHash.getDecryptedEmail()
+      } : 'null');
+      
+      // Check for existing email using the static method
+      const emailExists = await User.emailExists(normalizedEmail);
+      console.log('🔵 REGISTER: emailExists result:', emailExists);
+      
+      if (emailExists || directCheck) {
+        const existingUser = directCheck || await User.findOne({ emailHash });
+        console.log('🔴 REGISTER: Email exists - existing user:', existingUser ? {
+          id: existingUser._id,
+          handle: existingUser.handle,
+          emailHash: existingUser.emailHash,
+          decryptedEmail: existingUser.getDecryptedEmail()
+        } : 'null');
+        
+        res.status(400).json({ error: 'Email already exists' });
+        return;
+      }
+      
+      // Final check right before creating user to prevent race conditions
+      const finalCheck = await User.findOne({ emailHash });
+      if (finalCheck) {
+        console.log('🔴 REGISTER: Race condition detected - user created between checks');
         res.status(400).json({ error: 'Email already exists' });
         return;
       }
 
       // Create user with temporary handle and needsHandleSelection flag
+      console.log('🟢 REGISTER: Creating new user with email:', normalizedEmail, 'hash:', emailHash);
       const user = new User({
-        email,
+        email: normalizedEmail,
         handle: `user_${Date.now()}`,
         hashedAccessKey: accessKey,
         needsHandleSelection: true
       });
 
-      await user.save();
+      // Check emailHash before save
+      console.log('🟢 REGISTER: User emailHash before save:', user.emailHash);
+      
+      try {
+        await user.save();
+        console.log('🟢 REGISTER: User saved successfully, emailHash after save:', user.emailHash);
+      } catch (saveError: any) {
+        console.error('🔴 REGISTER: Save error details:', {
+          message: saveError.message,
+          code: saveError.code,
+          keyValue: saveError.keyValue,
+          emailHash: user.emailHash
+        });
+        
+        // Handle duplicate key errors gracefully
+        if (saveError.code === 11000) {
+          // Check if it's an emailHash duplicate
+          if (saveError.keyValue && saveError.keyValue.emailHash) {
+            const existingUser = await User.findOne({ emailHash: saveError.keyValue.emailHash });
+            if (existingUser) {
+              console.log('🔴 REGISTER: Duplicate emailHash - user already exists (race condition or hash collision)');
+              res.status(400).json({ error: 'Email already exists' });
+              return;
+            }
+          }
+          // Check if it's an email duplicate
+          if (saveError.keyValue && saveError.keyValue.email) {
+            res.status(400).json({ error: 'Email already exists' });
+            return;
+          }
+          // Check if it's a handle duplicate
+          if (saveError.keyValue && saveError.keyValue.handle) {
+            res.status(400).json({ error: 'Username already exists. Please try again.' });
+            return;
+          }
+        }
+        
+        // Double-check if user was created despite error
+        const checkAfterError = await User.findOne({ emailHash: user.emailHash });
+        console.log('🔴 REGISTER: User found after save error:', checkAfterError ? 'YES' : 'NO');
+        
+        throw saveError;
+      }
 
       // Create research data for new user
       await createUserResearchData(user._id as mongoose.Types.ObjectId);
@@ -213,6 +304,23 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
 
     } catch (error) {
       console.error('Registration error:', error);
+      
+      // Handle duplicate key errors specifically
+      if (error instanceof Error && error.message.includes('E11000')) {
+        if (error.message.includes('emailHash')) {
+          res.status(400).json({ error: 'Email already exists' });
+          return;
+        }
+        if (error.message.includes('email')) {
+          res.status(400).json({ error: 'Email already exists' });
+          return;
+        }
+        if (error.message.includes('handle')) {
+          res.status(400).json({ error: 'Username already exists. Please try again.' });
+          return;
+        }
+      }
+      
       res.status(500).json({ error: error instanceof Error ? error.message : 'Registration failed' });
       return;
     }
