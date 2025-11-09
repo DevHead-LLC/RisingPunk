@@ -352,15 +352,8 @@ userSchema.pre('save', async function(this: IUser, next: Function) {
     originalEmail = '';
   }
   
-  // Generate email hash for efficient duplicate checking
   if (originalEmail) {
-    const normalizedEmail = originalEmail.trim().toLowerCase();
-    const calculatedHash = EncryptionService.hashEmail(normalizedEmail);
-    console.log('🔵 PRE-SAVE: Original email:', originalEmail);
-    console.log('🔵 PRE-SAVE: Normalized email:', normalizedEmail);
-    console.log('🔵 PRE-SAVE: Calculated hash:', calculatedHash);
-    console.log('🔵 PRE-SAVE: Current emailHash:', this.emailHash);
-    this.emailHash = calculatedHash;
+    this.emailHash = EncryptionService.hashEmail(originalEmail);
   }
   
   next();
@@ -389,19 +382,14 @@ userSchema.methods.setEncryptedEmail = function(email: string): void {
   this.email = EncryptionService.encryptEmail(email);
 };
 
-// Static method to check if email exists (for registration validation)
 userSchema.statics.emailExists = async function(email: string): Promise<boolean> {
-  // Normalize email before hashing to ensure consistency
-  const normalizedEmail = email.trim().toLowerCase();
-  const emailHash = EncryptionService.hashEmail(normalizedEmail);
+  const emailHash = EncryptionService.hashEmail(email);
   const existingUser = await this.findOne({ emailHash });
   
   if (existingUser) {
-    console.log('🔴 emailExists: Found user by hash - email:', normalizedEmail, 'hash:', emailHash);
     return true;
   }
   
-  // Fall back to checking decrypted emails for users without emailHash (backward compatibility)
   const usersWithoutHash = await this.find({ 
     $or: [
       { emailHash: { $exists: false } },
@@ -409,14 +397,11 @@ userSchema.statics.emailExists = async function(email: string): Promise<boolean>
     ]
   });
   
+  const normalizedEmail = email.trim().toLowerCase();
   const foundInFallback = usersWithoutHash.some((user: IUser) => {
     const decrypted = user.getDecryptedEmail().trim().toLowerCase();
     return decrypted === normalizedEmail;
   });
-  
-  if (foundInFallback) {
-    console.log('🔴 emailExists: Found user in fallback check - email:', normalizedEmail);
-  }
   
   return foundInFallback;
 };

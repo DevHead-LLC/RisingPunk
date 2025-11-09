@@ -685,6 +685,4 @@ router.get('/terms-of-service', (_req: Request, res: Response) => {
   `);
 });
 
-router.get('/delete-account', deleteAccountHandler);
-
 export default router;

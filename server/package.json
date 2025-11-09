@@ -11,9 +11,7 @@
     "test": "jest",
     "seed:map": "node scripts/seedMap.js",
     "seed:database": "node scripts/seedDatabase.js",
-    "backup:guide": "node scripts/backupRestore.js",
-    "migrate:encrypt-emails": "node scripts/encryptExistingEmails.js",
-    "migrate:add-email-hash": "node scripts/addEmailHash.js"
+    "backup:guide": "node scripts/backupRestore.js"
   },
   "keywords": [],
   "author": "",
