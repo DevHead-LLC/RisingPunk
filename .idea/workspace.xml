@@ -5,20 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9468092d-9a75-4dfa-835f-786cb5b7f68f" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/mobile/android-dev-no-daemon.ps1" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/mobile/android-dev.bat" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/mobile/android-dev.ps1" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/mobile/android-prod.ps1" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/mobile/android-staging.ps1" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/mobile/clean-gradle-admin.bat" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/mobile/clean-gradle-cache.ps1" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/mobile/setup-android-env.ps1" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/mobile/setup-env.ps1" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile/android/gradle.properties" beforeDir="false" afterPath="$PROJECT_DIR$/mobile/android/gradle.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/mobile/package-lock.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/mobile/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/server/src/config/env.ts" beforeDir="false" afterPath="$PROJECT_DIR$/server/src/config/env.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mobile/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/mobile/.gitignore" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -39,21 +26,21 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager": "true",
-    "RunOnceActivity.cidr.known.project.marker": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.readMode.enableVisualFormatting": "true",
-    "cf.first.check.clang-format": "false",
-    "cidr.known.project.marker": "true",
-    "git-widget-placeholder": "robbieComputerSetup",
-    "last_opened_file_path": "C:/Users/rathi/risingPunk"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ASKED_SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.readMode.enableVisualFormatting&quot;: &quot;true&quot;,
+    &quot;cf.first.check.clang-format&quot;: &quot;false&quot;,
+    &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;robbieComputerSetup&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/rathi/risingPunk&quot;
   }
-}]]></component>
+}</component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
       <changelist id="9468092d-9a75-4dfa-835f-786cb5b7f68f" name="Changes" comment="" />
