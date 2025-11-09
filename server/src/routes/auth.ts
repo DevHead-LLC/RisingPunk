@@ -1193,12 +1193,12 @@ router.post('/send-verification', async (req: Request, res: Response): Promise<v
       return;
     }
 
-    // Check if this is a new email (different from current user's email)
-    const isNewEmail = user.getDecryptedEmail() !== email;
+    const normalizedIncomingEmail = email.trim().toLowerCase();
+    const normalizedCurrentEmail = user.getDecryptedEmail().trim().toLowerCase();
+    const isNewEmail = normalizedCurrentEmail !== normalizedIncomingEmail;
     
     if (isNewEmail) {
-      // Store the new email temporarily (will be confirmed after verification)
-      user.emailVerificationNewEmail = email;
+      user.emailVerificationNewEmail = normalizedIncomingEmail;
     }
 
     // Generate verification token
