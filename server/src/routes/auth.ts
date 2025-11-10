@@ -1185,20 +1185,20 @@ router.post('/send-verification', async (req: Request, res: Response): Promise<v
       return;
     }
 
-    // Check if the email is already in use by another user
-    const emailExists = await User.emailExists(email);
-    
-    if (emailExists) {
-      res.status(400).json({ error: 'Please select a new email address or log into the existing account.' });
-      return;
-    }
-
-    // Check if this is a new email (different from current user's email)
-    const isNewEmail = user.getDecryptedEmail() !== email;
+    const normalizedIncomingEmail = email.trim().toLowerCase();
+    const normalizedCurrentEmail = user.getDecryptedEmail().trim().toLowerCase();
+    const isNewEmail = normalizedCurrentEmail !== normalizedIncomingEmail;
     
     if (isNewEmail) {
-      // Store the new email temporarily (will be confirmed after verification)
-      user.emailVerificationNewEmail = email;
+      const emailExists = await User.emailExists(normalizedIncomingEmail);
+      
+      if (emailExists) {
+        res.status(400).json({ error: 'Please select a new email address or log into the existing account.' });
+        return;
+      }
+      user.emailVerificationNewEmail = normalizedIncomingEmail;
+    } else {
+      user.emailVerificationNewEmail = undefined;
     }
 
     // Generate verification token
@@ -1214,7 +1214,7 @@ router.post('/send-verification', async (req: Request, res: Response): Promise<v
 
     // Send verification email
     const emailSent = await EmailService.sendVerificationEmail(
-      email, // Use the email from the request (new email if updating)
+      normalizedIncomingEmail,
       user.handle,
       verificationToken
     );
