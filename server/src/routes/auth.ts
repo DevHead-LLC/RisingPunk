@@ -1196,10 +1196,9 @@ router.post('/send-verification', async (req: Request, res: Response): Promise<v
         res.status(400).json({ error: 'Please select a new email address or log into the existing account.' });
         return;
       }
-    }
-    
-    if (isNewEmail) {
       user.emailVerificationNewEmail = normalizedIncomingEmail;
+    } else {
+      user.emailVerificationNewEmail = undefined;
     }
 
     // Generate verification token
@@ -1215,7 +1214,7 @@ router.post('/send-verification', async (req: Request, res: Response): Promise<v
 
     // Send verification email
     const emailSent = await EmailService.sendVerificationEmail(
-      email, // Use the email from the request (new email if updating)
+      normalizedIncomingEmail,
       user.handle,
       verificationToken
     );
