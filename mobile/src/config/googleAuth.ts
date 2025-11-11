@@ -9,10 +9,11 @@ export const GOOGLE_AUTH_CONFIG = {
   // Web Client ID for iOS
   webClientId: Config.GOOGLE_WEB_CLIENT_ID || '',
   
-  // Android Client ID from Google Cloud Console
+  // Android Client ID from Google Cloud Console (OAuth client type 1)
   androidClientId: Config.GOOGLE_ANDROID_CLIENT_ID || '',
   
-  // Android Web Client ID (same as Android Client ID)
+  // Android Web Client ID - MUST be the Web Client ID (OAuth client type 3), NOT the Android Client ID
+  // This is used for Google Sign In on Android
   androidWebClientId: Config.GOOGLE_ANDROID_WEB_CLIENT_ID || '',
   
   // Bundle ID

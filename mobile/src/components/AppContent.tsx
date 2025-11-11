@@ -1,7 +1,8 @@
 import React, { memo, useEffect, useRef, useCallback } from 'react';
 import { View, Text, Dimensions, AppState, Platform } from 'react-native';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
-import { loadStoredAuth, updateHandle, setShowEmailVerification, setShowEmailVerificationBanner, refreshUserData, logoutUser, setShowAccountSwitched, setShowAccountSwitchedBanner } from '../store/slices/authSlice';
+import { loadStoredAuth, updateHandle, setShowEmailVerification, setShowEmailVerificationBanner, refreshUserData, setShowAccountSwitched, setShowAccountSwitchedBanner } from '../store/slices/authSlice';
+import { logoutUser } from '../store/actions/authActions';
 import { updateBalance, triggerUpdate } from '../store/slices/balanceSlice';
 import { setBots, setBuildState } from '../store/slices/botsSlice';
 import { syncPreferencesFromStorage, syncPreferencesFromUser } from '../store/slices/preferencesSlice';

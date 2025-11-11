@@ -3,6 +3,7 @@ import { API_URL } from '../../config';
 import { MapResponse } from '../../types/map';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 import { resetAllApiCaches } from './resetApiCaches';
+import { logoutUser } from '../actions/authActions';
 
 // Custom base query with error handling for mapApi
 const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
@@ -25,6 +26,9 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
       resetAllApiCaches(api);
       
       return result; // Return early to prevent other error handling
+    } else if ((result.error as any)?.status === 401 && (result.error as any)?.data?.error === 'Token expired') {
+      api.dispatch(logoutUser());
+      return result;
     } else {
       globalErrorHandler.handleDatabaseError(result.error);
     }
