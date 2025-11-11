@@ -132,28 +132,32 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
       }
     } catch (error: any) {
       // Handle specific Apple Sign In errors more gracefully
+      // Error codes:
+      // 1000: ASAuthorizationError.unknown - Unknown errors, misconfiguration, or other failures (NOT a cancellation)
+      // 1001: ASAuthorizationError.canceled - User explicitly cancelled the authorization
       const errorCode = error.code !== undefined ? String(error.code) : '';
+      
+      // Only 1001 should be treated as user cancellation
       const isUserCancellation = errorCode === '1001' || 
                                 error.message?.includes('cancelled') || 
                                 error.message?.includes('canceled');
       
       if (isUserCancellation) {
-        // Don't log or show error for user cancellation
+        // Silently handle user cancellation - don't log or show error
         return;
       }
       
-      // Log error details for debugging
+      // Log all errors for developers (app-side errors, misconfigurations, etc.)
+      // Apple's native UI will handle displaying errors to users when appropriate
+      // We don't show Alert.alert here to avoid blocking Apple's native error handling
       console.error('Apple Sign In Error:', {
         code: error.code,
         message: error.message,
         error: error
       });
       
-      if (errorCode === 'UNKNOWN_ERROR') {
-        Alert.alert('Sign In Issue', error.message || 'Unable to sign in with Apple. Please try again.');
-      } else {
-        Alert.alert('Sign In Issue', error.message || 'Unable to sign in with Apple. Please try again.');
-      }
+      // Don't show Alert.alert - let Apple's native UI handle user-facing errors
+      // For app-side errors, we handle them silently behind the scenes
     } finally {
       setIsProcessing(false);
       isProcessingRef.current = false;

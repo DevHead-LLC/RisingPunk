@@ -2,9 +2,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { RootState } from '../index';
 import { API_URL } from '../../config';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
-import { balanceApi } from './balanceApi';
-import { botsApi } from './botsApi';
-import { mapApi } from './mapApi';
+import { resetAllApiCaches } from './resetApiCaches';
 
 export interface LoginRequest {
   handle: string;
@@ -136,10 +134,7 @@ const authBaseQuery = async (args: any, api: any, extraOptions: any) => {
       api.dispatch({ type: 'auth/handleAccountSwitched' });
       
       // Clear RTK Query caches to prevent data leakage between users
-      api.dispatch(authApi.util.resetApiState());
-      api.dispatch(balanceApi.util.resetApiState());
-      api.dispatch(botsApi.util.resetApiState());
-      api.dispatch(mapApi.util.resetApiState());
+      resetAllApiCaches(api);
       
       return result; // Return early to prevent other error handling
     } else {
