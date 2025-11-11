@@ -32,13 +32,13 @@ const auth = async (req: Request, res: Response, next: NextFunction): Promise<vo
     req.user = { _id: userId };
     next();
   } catch (error) {
-    console.error('🔴 AUTH: Authentication error:', error);
-    
     // Handle specific error types
-    if (error instanceof jwt.JsonWebTokenError) {
-      res.status(401).json({ error: 'Invalid token' });
-    } else if (error instanceof jwt.TokenExpiredError) {
+    // Check TokenExpiredError first since it extends JsonWebTokenError
+    if (error instanceof jwt.TokenExpiredError) {
       res.status(401).json({ error: 'Token expired' });
+    } else if (error instanceof jwt.JsonWebTokenError) {
+      console.error('🔴 AUTH: Authentication error:', error);
+      res.status(401).json({ error: 'Invalid token' });
     } else {
       // Database or other errors
       console.error('🔴 AUTH: Database or system error during authentication:', error);
