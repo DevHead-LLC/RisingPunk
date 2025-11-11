@@ -3,10 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../../config';
 import { updateBalance } from './balanceSlice';
 import { setBots, setBuildState } from './botsSlice';
-import { authApi } from '../api/authApi';
-import { balanceApi } from '../api/balanceApi';
-import { botsApi } from '../api/botsApi';
-import { mapApi } from '../api/mapApi';
+import { resetAllApiCaches } from '../api/resetApiCaches';
 
 // Types
 export interface User {
@@ -76,10 +73,7 @@ export const loginUser = createAsyncThunk(
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
 
       // Clear any existing RTK Query cache to ensure fresh data for new user
-      dispatch(authApi.util.resetApiState());
-      dispatch(balanceApi.util.resetApiState());
-      dispatch(botsApi.util.resetApiState());
-      dispatch(mapApi.util.resetApiState());
+      resetAllApiCaches({ dispatch } as any);
 
       // Note: Preferences will be synced by AppContent useEffect after login completes
 
@@ -193,10 +187,7 @@ export const googleSignInUser = createAsyncThunk(
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
 
       // Clear any existing RTK Query cache to ensure fresh data for new user
-      dispatch(authApi.util.resetApiState());
-      dispatch(balanceApi.util.resetApiState());
-      dispatch(botsApi.util.resetApiState());
-      dispatch(mapApi.util.resetApiState());
+      resetAllApiCaches({ dispatch } as any);
 
       // Fetch initial data after successful login
       try {
@@ -274,10 +265,7 @@ export const googleSignUpUser = createAsyncThunk(
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
 
       // Clear any existing RTK Query cache to ensure fresh data for new user
-      dispatch(authApi.util.resetApiState());
-      dispatch(balanceApi.util.resetApiState());
-      dispatch(botsApi.util.resetApiState());
-      dispatch(mapApi.util.resetApiState());
+      resetAllApiCaches({ dispatch } as any);
 
       // Fetch initial data after successful signup
       try {
@@ -369,10 +357,7 @@ export const appleSignInUser = createAsyncThunk(
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
 
       // Clear any existing RTK Query cache to ensure fresh data for new user
-      dispatch(authApi.util.resetApiState());
-      dispatch(balanceApi.util.resetApiState());
-      dispatch(botsApi.util.resetApiState());
-      dispatch(mapApi.util.resetApiState());
+      resetAllApiCaches({ dispatch } as any);
 
       // Fetch initial data after successful login
       try {
@@ -450,10 +435,7 @@ export const appleSignUpUser = createAsyncThunk(
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
 
       // Clear any existing RTK Query cache to ensure fresh data for new user
-      dispatch(authApi.util.resetApiState());
-      dispatch(balanceApi.util.resetApiState());
-      dispatch(botsApi.util.resetApiState());
-      dispatch(mapApi.util.resetApiState());
+      resetAllApiCaches({ dispatch } as any);
 
       // Fetch initial data after successful signup
       try {
@@ -602,11 +584,7 @@ export const logoutUser = createAsyncThunk(
     await AsyncStorage.removeItem('user');
     
     // Clear RTK Query cache to prevent data leakage between users
-    // Using proper RTK Query utility methods to avoid serializable warnings
-    dispatch(authApi.util.resetApiState());
-    dispatch(balanceApi.util.resetApiState());
-    dispatch(botsApi.util.resetApiState());
-    dispatch(mapApi.util.resetApiState());
+    resetAllApiCaches({ dispatch } as any);
   }
 );
 
@@ -754,10 +732,7 @@ export const forceRefreshAllData = createAsyncThunk(
 
 
       // Clear all RTK Query caches to force fresh data
-      dispatch(authApi.util.resetApiState());
-      dispatch(balanceApi.util.resetApiState());
-      dispatch(botsApi.util.resetApiState());
-      dispatch(mapApi.util.resetApiState());
+      resetAllApiCaches({ dispatch } as any);
 
       // Fetch fresh data
       const balanceResponse = await fetch(`${API_URL}/api/balance`, {
