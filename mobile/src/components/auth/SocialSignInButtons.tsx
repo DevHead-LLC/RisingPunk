@@ -149,17 +149,30 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
         return;
       }
       
-      // Log all errors for developers (app-side errors, misconfigurations, etc.)
+      // App-side errors (1000 and others) - log forcefully to force developer resolution
       // Apple's native UI will handle displaying errors to users when appropriate
       // We don't show Alert.alert here to avoid blocking Apple's native error handling
-      console.error('Apple Sign In Error:', {
-        code: error.code,
-        message: error.message,
-        error: error
-      });
+      const isAppSideError = errorCode === '1000' || errorCode === '';
+      
+      if (isAppSideError) {
+        // Forceful logging for app-side errors that need developer attention
+        console.error('🔴 APPLE SIGN IN APP-SIDE ERROR - REQUIRES DEVELOPER FIX:');
+        console.error('🔴 Error Code:', errorCode || 'UNKNOWN');
+        console.error('🔴 Error Message:', error.message || 'No message provided');
+        console.error('🔴 Full Error Object:', error);
+        console.error('🔴 This is likely a misconfiguration or app-side issue that must be resolved.');
+        console.error('🔴 Apple will handle user-facing error display - do not block with Alert.alert');
+      } else {
+        // Other errors (network, etc.) - standard logging
+        console.error('Apple Sign In Error:', {
+          code: error.code,
+          message: error.message,
+          error: error
+        });
+      }
       
       // Don't show Alert.alert - let Apple's native UI handle user-facing errors
-      // For app-side errors, we handle them silently behind the scenes
+      // For app-side errors, we handle them silently behind the scenes but log forcefully
     } finally {
       setIsProcessing(false);
       isProcessingRef.current = false;
