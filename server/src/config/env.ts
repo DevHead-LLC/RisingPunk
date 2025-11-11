@@ -15,10 +15,17 @@ const mappedNodeEnv = envFileMap[nodeEnv] || nodeEnv;
 
 // Load environment files: .env, .env.local, .env.<mappedNodeEnv>, .env.<mappedNodeEnv>.local
 // This will load .env.dev when NODE_ENV=development, .env.prod when NODE_ENV=production, etc.
+// Note: node_env option only affects which files are loaded, not process.env.NODE_ENV
 dotenvFlow.config({ 
   node_env: mappedNodeEnv,
   silent: true 
 });
+
+// Ensure process.env.NODE_ENV remains at the original value for production checks
+// (dotenvFlow may have mutated it, so we restore it)
+if (process.env.NODE_ENV !== nodeEnv) {
+  process.env.NODE_ENV = nodeEnv;
+}
 
 export const NODE_ENV: string = nodeEnv;
 export const PORT: number = Number(process.env.PORT || 5001);

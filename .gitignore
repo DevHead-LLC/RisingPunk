@@ -12,9 +12,6 @@ server/__tests__/
 
 node_modules/
 
-# IDE-specific files
-.idea/
-
 # Jest artifacts and coverage
 coverage/
 *.lcov
@@ -28,3 +25,13 @@ jest.setup.js
 
 *.md
 **/*.md
+
+# IDE configuration files
+.idea/
+**/.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store

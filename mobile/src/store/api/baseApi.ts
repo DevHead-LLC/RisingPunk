@@ -2,11 +2,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
 import type { RootState } from '../index';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
-import { authApi } from './authApi';
-import { balanceApi } from './balanceApi';
-import { botsApi } from './botsApi';
-import { mapApi } from './mapApi';
-import { logoutUser } from '../slices/authSlice';
+import { resetAllApiCaches } from './resetApiCaches';
 
 // Debounce mechanism for ACCOUNT_SWITCHED errors
 let accountSwitchedDispatched = false;
@@ -43,10 +39,7 @@ const baseQueryWithErrorHandling = async (args: any, api: any, extraOptions: any
         api.dispatch({ type: 'auth/handleAccountSwitched' });
         
         // Clear RTK Query caches to prevent data leakage between users
-        api.dispatch(authApi.util.resetApiState());
-        api.dispatch(balanceApi.util.resetApiState());
-        api.dispatch(botsApi.util.resetApiState());
-        api.dispatch(mapApi.util.resetApiState());
+        resetAllApiCaches(api);
         
         // Reset flag after 2 seconds to allow future account switches
         if (accountSwitchedTimeout) {

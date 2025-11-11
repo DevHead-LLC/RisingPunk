@@ -5,7 +5,6 @@ import { balanceApi } from './balanceApi';
 import { subtractFromBalance, addToBalance } from '../slices/balanceSlice';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 import { resetAllApiCaches } from './resetApiCaches';
-import { logoutUser } from '../slices/authSlice';
 
 // Custom base query with error handling for botsApi
 const botsBaseQuery = async (args: any, api: any, extraOptions: any) => {
@@ -29,7 +28,8 @@ const botsBaseQuery = async (args: any, api: any, extraOptions: any) => {
       
       return result; // Return early to prevent other error handling
     } else if ((result.error as any)?.status === 401 && (result.error as any)?.data?.error === 'Token expired') {
-      api.dispatch(logoutUser());
+      // Dispatch logout action using action type to avoid circular dependency
+      api.dispatch({ type: 'auth/logout' });
       return result;
     } else {
       globalErrorHandler.handleDatabaseError(result.error);
