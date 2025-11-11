@@ -7,6 +7,7 @@ import { authApi } from '../api/authApi';
 import { balanceApi } from '../api/balanceApi';
 import { botsApi } from '../api/botsApi';
 import { mapApi } from '../api/mapApi';
+import { logoutUser } from '../actions/authActions';
 
 // Types
 export interface User {
@@ -592,21 +593,6 @@ export const unlockHackRig = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
     }
-  }
-);
-
-export const logoutUser = createAsyncThunk(
-  'auth/logout',
-  async (_, { dispatch }) => {
-    await AsyncStorage.removeItem('token');
-    await AsyncStorage.removeItem('user');
-    
-    // Clear RTK Query cache to prevent data leakage between users
-    // Using proper RTK Query utility methods to avoid serializable warnings
-    dispatch(authApi.util.resetApiState());
-    dispatch(balanceApi.util.resetApiState());
-    dispatch(botsApi.util.resetApiState());
-    dispatch(mapApi.util.resetApiState());
   }
 );
 

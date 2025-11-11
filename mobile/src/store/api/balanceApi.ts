@@ -2,7 +2,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 import { resetAllApiCaches } from './resetApiCaches';
-import { logoutUser } from '../slices/authSlice';
+import { logoutUser } from '../actions/authActions';
 
 // Custom base query with error handling for balanceApi
 const balanceBaseQuery = async (args: any, api: any, extraOptions: any) => {

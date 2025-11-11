@@ -6,7 +6,7 @@ import { authApi } from './authApi';
 import { balanceApi } from './balanceApi';
 import { botsApi } from './botsApi';
 import { mapApi } from './mapApi';
-import { logoutUser } from '../slices/authSlice';
+import { logoutUser } from '../actions/authActions';
 
 // Debounce mechanism for ACCOUNT_SWITCHED errors
 let accountSwitchedDispatched = false;

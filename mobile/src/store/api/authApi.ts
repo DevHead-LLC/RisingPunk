@@ -5,7 +5,7 @@ import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 import { balanceApi } from './balanceApi';
 import { botsApi } from './botsApi';
 import { mapApi } from './mapApi';
-import { logoutUser } from '../slices/authSlice';
+import { logoutUser } from '../actions/authActions';
 
 export interface LoginRequest {
   handle: string;

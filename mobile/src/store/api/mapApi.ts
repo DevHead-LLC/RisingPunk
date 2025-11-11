@@ -3,7 +3,7 @@ import { API_URL } from '../../config';
 import { MapResponse } from '../../types/map';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 import { resetAllApiCaches } from './resetApiCaches';
-import { logoutUser } from '../slices/authSlice';
+import { logoutUser } from '../actions/authActions';
 
 // Custom base query with error handling for mapApi
 const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
