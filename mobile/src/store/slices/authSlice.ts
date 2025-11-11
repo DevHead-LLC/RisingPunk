@@ -577,7 +577,6 @@ export const unlockHackRig = createAsyncThunk(
   }
 );
 
-<<<<<<< HEAD
 export const logoutUser = createAsyncThunk(
   'auth/logout',
   async (_, { dispatch }) => {
