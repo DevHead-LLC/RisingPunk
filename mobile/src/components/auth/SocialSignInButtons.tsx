@@ -85,7 +85,8 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
       }
       
       // Modern Apple Sign In configuration for 2024-2025
-      // This configuration should handle the email sharing prompt more smoothly
+      // Note: Apple controls the email sharing prompt - we request it but handle gracefully if not provided
+      // Requesting EMAIL scope - user can choose to share or hide email (Apple's choice)
       const appleAuthRequestResponse = await appleAuth.performRequest({
         requestedOperation: appleAuth.Operation.LOGIN,
         requestedScopes: [appleAuth.Scope.EMAIL, appleAuth.Scope.FULL_NAME],
@@ -140,7 +141,8 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
       // Only 1001 should be treated as user cancellation
       const isUserCancellation = errorCode === '1001' || 
                                 error.message?.includes('cancelled') || 
-                                error.message?.includes('canceled');
+                                error.message?.includes('canceled') ||
+                                error.message?.includes("couldn't be completed");
       
       if (isUserCancellation) {
         // Silently handle user cancellation - don't log or show error
@@ -169,31 +171,73 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
 
     setIsProcessing(true);
     isProcessingRef.current = true;
+    
+    // Configure Google Sign In with correct webClientId for each platform
+    // IMPORTANT: Android MUST use the Web Client ID (type 3), NOT the Android Client ID (type 1)
+    let webClientId = Platform.OS === 'ios' 
+      ? GOOGLE_AUTH_CONFIG.webClientId
+      : GOOGLE_AUTH_CONFIG.androidWebClientId || '213914599866-t8gaip17no3h323d71njchb4hbs3csco.apps.googleusercontent.com';
+    
+    // TEMPORARY FIX: Force correct Web Client ID if Android Client ID is detected
+    // This prevents DEVELOPER_ERROR while .env file is being updated
+    if (Platform.OS === 'android' && webClientId === '213914599866-kp888124r46si64s764mvft70649sbh4.apps.googleusercontent.com') {
+      console.error('🔴 ERROR: Using Android Client ID instead of Web Client ID! Auto-correcting...');
+      console.error('🔴 Fix: Update mobile/.env.dev and set GOOGLE_ANDROID_WEB_CLIENT_ID=213914599866-t8gaip17no3h323d71njchb4hbs3csco.apps.googleusercontent.com');
+      webClientId = '213914599866-t8gaip17no3h323d71njchb4hbs3csco.apps.googleusercontent.com';
+    }
+    
+    const config = {
+      webClientId: webClientId,
+      iosClientId: GOOGLE_AUTH_CONFIG.iosClientId, // iOS Client ID (only for iOS)
+      offlineAccess: true,
+      forceCodeForRefreshToken: true, // Force account selection
+      accountName: '', // Clear any cached account
+    };
+    
     try {
 
-      // Configure Google Sign In with correct webClientId for each platform
-      const config = {
-        webClientId: Platform.OS === 'ios' 
-          ? GOOGLE_AUTH_CONFIG.webClientId      // iOS: use iOS client ID (works)
-          : '213914599866-t8gaip17no3h323d71njchb4hbs3csco.apps.googleusercontent.com', // Android: use Web client ID
-        iosClientId: GOOGLE_AUTH_CONFIG.iosClientId, // iOS Client ID (only for iOS)
-        offlineAccess: true,
-        forceCodeForRefreshToken: true, // Force account selection
-        accountName: '', // Clear any cached account
-      };
-
+      console.log('🔵 Google Sign In Configuration:', {
+        platform: Platform.OS,
+        webClientId: webClientId,
+        androidWebClientId: GOOGLE_AUTH_CONFIG.androidWebClientId,
+        iosClientId: GOOGLE_AUTH_CONFIG.iosClientId,
+        usingFallback: !GOOGLE_AUTH_CONFIG.androidWebClientId && Platform.OS === 'android'
+      });
       
+      console.log('🔵 Step 1: Configuring Google Sign In...');
       GoogleSignin.configure(config);
-      await GoogleSignin.hasPlayServices();
+      console.log('🔵 Step 1: Configuration complete');
       
+      console.log('🔵 Step 2: Checking Google Play Services...');
+      try {
+        const hasPlayServices = await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+        console.log('🔵 Step 2: Google Play Services available:', hasPlayServices);
+      } catch (playServicesError: any) {
+        console.error('🔴 Step 2 FAILED: Google Play Services Error:', {
+          code: playServicesError?.code,
+          message: playServicesError?.message,
+          error: playServicesError
+        });
+        showCustomAlert(
+          'Google Play Services Required',
+          'Google Play Services is required for Google Sign In. Please update Google Play Services and try again.'
+        );
+        return;
+      }
+      
+      console.log('🔵 Step 3: Signing out any existing sessions...');
       // Sign out first to clear any cached credentials and force account selection
       try {
         await GoogleSignin.signOut();
-      } catch (error) {
-        // No previous sign-in to clear
+        console.log('🔵 Step 3: Sign out complete (or no previous session)');
+      } catch (error: any) {
+        console.log('🔵 Step 3: Sign out skipped (no previous session):', error?.message);
       }
       
+      console.log('🔵 Step 4: Attempting Google Sign In...');
+      console.log('🔵 Step 4: Config used:', JSON.stringify(config, null, 2));
       const userInfo = await GoogleSignin.signIn();
+      console.log('🔵 Step 4: Google Sign In successful, userInfo type:', userInfo.type);
       
       if (userInfo.type === 'cancelled' || userInfo.data === null) {
         return;
@@ -238,12 +282,35 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
         throw new Error('No ID token received from Google');
       }
         } catch (error: any) {
+          console.error('🔴 Google Sign In Error Caught:', {
+            code: error.code,
+            message: error.message,
+            error: error,
+            stack: error.stack,
+            nativeError: error.error,
+            fullError: JSON.stringify(error, null, 2)
+          });
+          
           if (error.code !== 'SIGN_IN_CANCELLED' && error.code !== 'IN_PROGRESS') {
-            console.error('Google Sign In Error:', {
-              code: error.code,
-              message: error.message,
-              error: error
-            });
+            // Handle specific error codes with user-friendly messages
+            if (error.code === '7' || error.message?.includes('NETWORK_ERROR')) {
+              console.error('🔴 NETWORK_ERROR Details:', {
+                errorCode: error.code,
+                errorMessage: error.message,
+                nativeError: error.error,
+                configUsed: JSON.stringify(config, null, 2),
+                platform: Platform.OS,
+                webClientId: webClientId,
+                suggestion: 'This usually means SHA-1 not registered or OAuth client misconfigured'
+              });
+              
+              showCustomAlert(
+                'Network Error',
+                'Unable to connect to Google services. Please check your internet connection and try again.'
+              );
+              return;
+            }
+            
             throw error;
           }
     } finally {

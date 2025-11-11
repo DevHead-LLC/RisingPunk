@@ -137,6 +137,10 @@ const authBaseQuery = async (args: any, api: any, extraOptions: any) => {
       resetAllApiCaches(api);
       
       return result; // Return early to prevent other error handling
+    } else if (result.error?.status === 401 && (result.error?.data as any)?.error === 'Token expired') {
+      // Dispatch logout action using action type to avoid circular dependency
+      api.dispatch({ type: 'auth/logout' });
+      return result;
     } else {
       globalErrorHandler.handleDatabaseError(result.error);
     }
