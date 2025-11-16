@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "android": "cd android && ./gradlew clean && cd ..",
-    "android:clean": "npm run android && npm run android:dev",
+    "android:clean": "npm run android:clean:platform",
+    "android:clean:platform": "node -e \"process.platform==='win32'?process.exit(require('child_process').spawnSync('npm.cmd',['run','android:dev:setup'],{stdio:'inherit'}).status):process.exit(require('child_process').spawnSync('npm',['run','android'],{stdio:'inherit'}).status)\"",
     "android:dev": "ENVFILE=.env.dev react-native run-android",
     "android:staging": "ENVFILE=.env.staging react-native run-android",
     "android:prod": "ENVFILE=.env.prod react-native run-android",
