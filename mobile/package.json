@@ -23,7 +23,13 @@
     "ios:prod": "ENVFILE=.env.prod react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
-    "test": "jest --runInBand; cd ../server && npm test -- --runInBand"
+    "test": "jest --runInBand; cd ../server && npm test -- --runInBand",
+    "android:build:release": "node -e \"process.platform==='win32'?process.exit(require('child_process').spawnSync('npm.cmd',['run','android:build:release:win'],{stdio:'inherit'}).status):process.exit(require('child_process').spawnSync('npm',['run','android:build:release:mac'],{stdio:'inherit'}).status)\"",
+    "android:build:release:win": "cd android && gradlew.bat assembleRelease",
+    "android:build:release:mac": "cd android && ./gradlew assembleRelease",
+    "android:build:bundle": "node -e \"process.platform==='win32'?process.exit(require('child_process').spawnSync('npm.cmd',['run','android:build:bundle:win'],{stdio:'inherit'}).status):process.exit(require('child_process').spawnSync('npm',['run','android:build:bundle:mac'],{stdio:'inherit'}).status)\"",
+    "android:build:bundle:win": "cd android && gradlew.bat bundleRelease",
+    "android:build:bundle:mac": "cd android && ./gradlew bundleRelease"
   },
   "dependencies": {
     "@invertase/react-native-apple-authentication": "^2.4.1",
