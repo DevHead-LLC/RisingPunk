@@ -105,17 +105,18 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     setRecentlyPromotedUserIds(prev => {
       if (prev.size === 0) return prev;
       const memberUserIds = new Set(regularMembers.map(m => m.userId));
+      const executiveUserIds = new Set(executives.map((exec: any) => exec.userId));
       let hasChanges = false;
       const next = new Set(prev);
       prev.forEach(userId => {
-        if (!memberUserIds.has(userId)) {
+        if (!memberUserIds.has(userId) || executiveUserIds.has(userId)) {
           next.delete(userId);
           hasChanges = true;
         }
       });
       return hasChanges ? next : prev;
     });
-  }, [regularMembers]);
+  }, [regularMembers, executives]);
 
   const styles = createStyles(colors);
 
@@ -542,7 +543,11 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     }
 
     const executiveSlots = Array.from({ length: 4 }, (_, index) => executives[index] || null);
-    const effectiveExecutivesCount = executives.length + recentlyPromotedUserIds.size;
+    const executiveUserIds = new Set(executives.map((exec: any) => exec.userId));
+    const pendingPromotedCount = Array.from(recentlyPromotedUserIds).filter(
+      userId => !executiveUserIds.has(userId)
+    ).length;
+    const effectiveExecutivesCount = executives.length + pendingPromotedCount;
 
     const isLoggedInUser = (memberUserId: string): boolean => {
       if (!memberUserId) {

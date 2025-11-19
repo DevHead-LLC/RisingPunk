@@ -1001,31 +1001,10 @@ router.post('/promote-member', auth, async (req: PromoteMemberRequest, res: Resp
       return;
     }
 
-    if (crew.executives.length >= 4) {
-      res.status(400).json({ error: 'Crew already has maximum number of executives (4)' });
-      return;
-    }
-
     const memberObjectId = new mongoose.Types.ObjectId(memberUserId);
     
     if (crew.presidentId.toString() === memberUserId) {
       res.status(400).json({ error: 'Cannot promote the president' });
-      return;
-    }
-
-    const isAlreadyExecutive = crew.executives.some((execId: mongoose.Types.ObjectId) => 
-      execId.toString() === memberUserId
-    );
-    if (isAlreadyExecutive) {
-      res.status(400).json({ error: 'User is already an executive' });
-      return;
-    }
-
-    const isMember = crew.members.some((memberId: mongoose.Types.ObjectId) => 
-      memberId.toString() === memberUserId
-    );
-    if (!isMember) {
-      res.status(400).json({ error: 'User is not a member of this crew' });
       return;
     }
 
@@ -1040,30 +1019,70 @@ router.post('/promote-member', auth, async (req: PromoteMemberRequest, res: Resp
       return;
     }
 
-    crew.members = crew.members.filter(
-      (memberId: mongoose.Types.ObjectId) => memberId.toString() !== memberUserId
+    const updatedCrew = await Crew.findOneAndUpdate(
+      {
+        _id: crewId,
+        $expr: { $lt: [{ $size: '$executives' }, 4] },
+        members: memberObjectId,
+        executives: { $ne: memberObjectId }
+      },
+      {
+        $pull: { members: memberObjectId },
+        $addToSet: { executives: memberObjectId }
+      },
+      { new: true }
     );
-    crew.executives.push(memberObjectId);
-    await crew.save();
+
+    if (!updatedCrew) {
+      const currentCrew = await Crew.findById(crewId);
+      if (!currentCrew) {
+        res.status(404).json({ error: 'Crew not found' });
+        return;
+      }
+      
+      if (currentCrew.executives.length >= 4) {
+        res.status(400).json({ error: 'Crew already has maximum number of executives (4)' });
+        return;
+      }
+      
+      const isAlreadyExecutive = currentCrew.executives.some((execId: mongoose.Types.ObjectId) => 
+        execId.toString() === memberUserId
+      );
+      if (isAlreadyExecutive) {
+        res.status(400).json({ error: 'User is already an executive' });
+        return;
+      }
+      
+      const isMember = currentCrew.members.some((memberId: mongoose.Types.ObjectId) => 
+        memberId.toString() === memberUserId
+      );
+      if (!isMember) {
+        res.status(400).json({ error: 'User is not a member of this crew' });
+        return;
+      }
+      
+      res.status(400).json({ error: 'Unable to promote member. Please try again.' });
+      return;
+    }
 
     memberStatus.role = 'executive';
     await memberStatus.save();
 
-    const updatedCrew = await Crew.findById(crewId)
+    const populatedCrew = await Crew.findById(updatedCrew._id)
       .populate('presidentId', 'handle level')
       .populate('executives', 'handle level')
       .populate('members', 'handle level')
       .lean();
 
-    const president = updatedCrew?.presidentId as any;
-    const executives = (updatedCrew?.executives || []) as any[];
-    const members = (updatedCrew?.members || []) as any[];
+    const president = populatedCrew?.presidentId as any;
+    const executives = (populatedCrew?.executives || []) as any[];
+    const members = (populatedCrew?.members || []) as any[];
 
     res.json({
       success: true,
       message: 'Member promoted to executive successfully',
       crew: {
-        id: updatedCrew?._id.toString(),
+        id: populatedCrew?._id.toString(),
         executives: executives.map((exec: any) => ({
           userId: exec._id.toString(),
           handle: exec.handle,
