@@ -348,7 +348,7 @@ export class ResearchFeatureService {
         isResearching: userFeature.isResearching,
         researchStartedAt: userFeature.researchStartedAt,
         researchCompletesAt: userFeature.researchCompletesAt,
-        researchTimeHours: userFeature.researchTimeHours
+        researchTimeHours: userFeature.researchTimeHours ?? baseFeature.researchTimeHours ?? 4
       };
     } catch (error) {
       console.error('Error getting user feature status:', error);
