@@ -958,5 +958,240 @@ router.post('/update-identifier', auth, async (req: UpdateCrewIdentifierRequest,
   }
 });
 
+interface PromoteMemberRequest extends Request {
+  body: {
+    crewId: string;
+    memberUserId: string;
+  }
+}
+
+router.post('/promote-member', auth, async (req: PromoteMemberRequest, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const { crewId, memberUserId } = req.body;
+    if (!crewId || !memberUserId) {
+      res.status(400).json({ error: 'Crew ID and member user ID are required' });
+      return;
+    }
+
+    const crew = await Crew.findById(crewId);
+    if (!crew) {
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    const requesterStatus = await CrewStatus.findOne({ userId });
+    if (!requesterStatus || !requesterStatus.isInCrew || !requesterStatus.crewId) {
+      res.status(400).json({ error: 'Requester is not in a crew' });
+      return;
+    }
+
+    if (requesterStatus.crewId.toString() !== crewId) {
+      res.status(403).json({ error: 'Requester is not a member of this crew' });
+      return;
+    }
+
+    if (requesterStatus.role !== 'president') {
+      res.status(403).json({ error: 'Only the president can promote members' });
+      return;
+    }
+
+    if (crew.executives.length >= 4) {
+      res.status(400).json({ error: 'Crew already has maximum number of executives (4)' });
+      return;
+    }
+
+    const memberObjectId = new mongoose.Types.ObjectId(memberUserId);
+    
+    if (crew.presidentId.toString() === memberUserId) {
+      res.status(400).json({ error: 'Cannot promote the president' });
+      return;
+    }
+
+    const isAlreadyExecutive = crew.executives.some((execId: mongoose.Types.ObjectId) => 
+      execId.toString() === memberUserId
+    );
+    if (isAlreadyExecutive) {
+      res.status(400).json({ error: 'User is already an executive' });
+      return;
+    }
+
+    const isMember = crew.members.some((memberId: mongoose.Types.ObjectId) => 
+      memberId.toString() === memberUserId
+    );
+    if (!isMember) {
+      res.status(400).json({ error: 'User is not a member of this crew' });
+      return;
+    }
+
+    const memberStatus = await CrewStatus.findOne({ userId: memberObjectId });
+    if (!memberStatus) {
+      res.status(404).json({ error: 'Member crew status not found' });
+      return;
+    }
+
+    if (memberStatus.crewId?.toString() !== crewId) {
+      res.status(400).json({ error: 'Member is not in this crew' });
+      return;
+    }
+
+    crew.members = crew.members.filter(
+      (memberId: mongoose.Types.ObjectId) => memberId.toString() !== memberUserId
+    );
+    crew.executives.push(memberObjectId);
+    await crew.save();
+
+    memberStatus.role = 'executive';
+    await memberStatus.save();
+
+    const updatedCrew = await Crew.findById(crewId)
+      .populate('presidentId', 'handle level')
+      .populate('executives', 'handle level')
+      .populate('members', 'handle level')
+      .lean();
+
+    const president = updatedCrew?.presidentId as any;
+    const executives = (updatedCrew?.executives || []) as any[];
+    const members = (updatedCrew?.members || []) as any[];
+
+    res.json({
+      success: true,
+      message: 'Member promoted to executive successfully',
+      crew: {
+        id: updatedCrew?._id.toString(),
+        executives: executives.map((exec: any) => ({
+          userId: exec._id.toString(),
+          handle: exec.handle,
+          level: exec.level || 1
+        })),
+        members: members.map((member: any) => ({
+          userId: member._id.toString(),
+          handle: member.handle,
+          level: member.level || 1
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Error promoting member:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+interface DemoteExecutiveRequest extends Request {
+  body: {
+    crewId: string;
+    executiveUserId: string;
+  }
+}
+
+router.post('/demote-executive', auth, async (req: DemoteExecutiveRequest, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const { crewId, executiveUserId } = req.body;
+    if (!crewId || !executiveUserId) {
+      res.status(400).json({ error: 'Crew ID and executive user ID are required' });
+      return;
+    }
+
+    const crew = await Crew.findById(crewId);
+    if (!crew) {
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    const requesterStatus = await CrewStatus.findOne({ userId });
+    if (!requesterStatus || !requesterStatus.isInCrew || !requesterStatus.crewId) {
+      res.status(400).json({ error: 'Requester is not in a crew' });
+      return;
+    }
+
+    if (requesterStatus.crewId.toString() !== crewId) {
+      res.status(403).json({ error: 'Requester is not a member of this crew' });
+      return;
+    }
+
+    if (requesterStatus.role !== 'president') {
+      res.status(403).json({ error: 'Only the president can demote executives' });
+      return;
+    }
+
+    const executiveObjectId = new mongoose.Types.ObjectId(executiveUserId);
+    
+    if (crew.presidentId.toString() === executiveUserId) {
+      res.status(400).json({ error: 'Cannot demote the president' });
+      return;
+    }
+
+    const isExecutive = crew.executives.some((execId: mongoose.Types.ObjectId) => 
+      execId.toString() === executiveUserId
+    );
+    if (!isExecutive) {
+      res.status(400).json({ error: 'User is not an executive of this crew' });
+      return;
+    }
+
+    const executiveStatus = await CrewStatus.findOne({ userId: executiveObjectId });
+    if (!executiveStatus) {
+      res.status(404).json({ error: 'Executive crew status not found' });
+      return;
+    }
+
+    if (executiveStatus.crewId?.toString() !== crewId) {
+      res.status(400).json({ error: 'Executive is not in this crew' });
+      return;
+    }
+
+    crew.executives = crew.executives.filter(
+      (execId: mongoose.Types.ObjectId) => execId.toString() !== executiveUserId
+    );
+    crew.members.push(executiveObjectId);
+    await crew.save();
+
+    executiveStatus.role = 'member';
+    await executiveStatus.save();
+
+    const updatedCrew = await Crew.findById(crewId)
+      .populate('presidentId', 'handle level')
+      .populate('executives', 'handle level')
+      .populate('members', 'handle level')
+      .lean();
+
+    const president = updatedCrew?.presidentId as any;
+    const executives = (updatedCrew?.executives || []) as any[];
+    const members = (updatedCrew?.members || []) as any[];
+
+    res.json({
+      success: true,
+      message: 'Executive demoted to member successfully',
+      crew: {
+        id: updatedCrew?._id.toString(),
+        executives: executives.map((exec: any) => ({
+          userId: exec._id.toString(),
+          handle: exec.handle,
+          level: exec.level || 1
+        })),
+        members: members.map((member: any) => ({
+          userId: member._id.toString(),
+          handle: member.handle,
+          level: member.level || 1
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Error demoting executive:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;
 

@@ -8,7 +8,7 @@ import { VisitingProfileModal } from './VisitingProfileModal';
 import { LeaveCrewModal } from './LeaveCrewModal';
 import { EditCrewNameModal } from './EditCrewNameModal';
 import { EditCrewIdentifierModal } from './EditCrewIdentifierModal';
-import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation } from '../../store/api/authApi';
+import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, usePromoteMemberMutation, useDemoteExecutiveMutation } from '../../store/api/authApi';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CREW_MODAL_PADDING = SIZING.spacing.md * 2;
@@ -68,6 +68,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [leaveCrew, { isLoading: isLeaving }] = useLeaveCrewMutation();
   const [updateCrewName, { isLoading: isUpdatingCrewName }] = useUpdateCrewNameMutation();
   const [updateCrewIdentifier, { isLoading: isUpdatingCrewIdentifier }] = useUpdateCrewIdentifierMutation();
+  const [promoteMember, { isLoading: isPromoting }] = usePromoteMemberMutation();
+  const [demoteExecutive, { isLoading: isDemoting }] = useDemoteExecutiveMutation();
   const currentUser = useAppSelector((state) => state.auth.user);
   
   const userRole = crewStatus?.role;
@@ -239,6 +241,40 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       throw new Error(error?.data?.error || error?.error || 'Failed to update crew identifier');
     }
   }, [updateCrewIdentifier, refetchCrewDetails, refetchCrewStatus]);
+
+  const handlePromoteMember = useCallback(async (memberUserId: string) => {
+    if (!crewStatus?.crewId) {
+      return;
+    }
+
+    try {
+      await promoteMember({
+        crewId: crewStatus.crewId,
+        memberUserId,
+      }).unwrap();
+      await refetchCrewDetails();
+      await refetchCrewStatus();
+    } catch (error: any) {
+      console.error('Error promoting member:', error);
+    }
+  }, [promoteMember, crewStatus?.crewId, refetchCrewDetails, refetchCrewStatus]);
+
+  const handleDemoteExecutive = useCallback(async (executiveUserId: string) => {
+    if (!crewStatus?.crewId) {
+      return;
+    }
+
+    try {
+      await demoteExecutive({
+        crewId: crewStatus.crewId,
+        executiveUserId,
+      }).unwrap();
+      await refetchCrewDetails();
+      await refetchCrewStatus();
+    } catch (error: any) {
+      console.error('Error demoting executive:', error);
+    }
+  }, [demoteExecutive, crewStatus?.crewId, refetchCrewDetails, refetchCrewStatus]);
 
   const renderCategoryList = () => {
     if (!crewStatus?.isInCrew || !activeCrewDetails?.crew) {
@@ -531,18 +567,35 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                 >
                   {executive ? (
                     <>
-                      <Text style={[
-                        styles.memberHandle,
-                        { color: isLoggedInUser(executive.userId) ? colors.primary : colors.text.primary, fontWeight: isLoggedInUser(executive.userId) ? 'bold' : '600' }
-                      ]}>
-                        {executive.handle}
-                        {isLoggedInUser(executive.userId) && (
-                          <Text style={[styles.youLabel, { color: colors.primary }]}> (You)</Text>
-                        )}
-                      </Text>
-                      <Text style={[styles.memberLevel, { color: colors.text.secondary }]}>
-                        Lv {executive.level || 1}
-                      </Text>
+                      <View style={styles.memberInfoContainer}>
+                        <Text style={[
+                          styles.memberHandle,
+                          { color: isLoggedInUser(executive.userId) ? colors.primary : colors.text.primary, fontWeight: isLoggedInUser(executive.userId) ? 'bold' : '600' }
+                        ]}>
+                          {executive.handle}
+                          {isLoggedInUser(executive.userId) && (
+                            <Text style={[styles.youLabel, { color: colors.primary }]}> (You)</Text>
+                          )}
+                        </Text>
+                        <Text style={[styles.memberLevel, { color: colors.text.secondary }]}>
+                          Lv {executive.level || 1}
+                        </Text>
+                      </View>
+                      {userRole === 'president' && (
+                        <TouchableOpacity
+                          style={[
+                            styles.memberActionButton,
+                            { borderColor: colors.error, backgroundColor: colors.error }
+                          ]}
+                          onPress={() => handleDemoteExecutive(executive.userId)}
+                          disabled={isDemoting}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.memberActionButtonText, { color: '#FFFFFF' }]}>
+                            {isDemoting ? 'Demoting...' : 'Demote'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
                     </>
                   ) : null}
                 </View>
@@ -571,18 +624,35 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                     <Text style={[styles.memberNumber, { color: colors.text.primary }]}>
                       {index + 1}.
                     </Text>
-                    <Text style={[
-                      styles.memberHandle,
-                      { color: isLoggedInUser(member.userId) ? colors.primary : colors.text.primary, fontWeight: isLoggedInUser(member.userId) ? 'bold' : '600' }
-                    ]}>
-                      {member.handle}
-                      {isLoggedInUser(member.userId) && (
-                        <Text style={[styles.youLabel, { color: colors.primary }]}> (You)</Text>
-                      )}
-                    </Text>
-                    <Text style={[styles.memberLevel, { color: colors.text.secondary }]}>
-                      Lv {member.level || 1}
-                    </Text>
+                    <View style={styles.memberInfoContainer}>
+                      <Text style={[
+                        styles.memberHandle,
+                        { color: isLoggedInUser(member.userId) ? colors.primary : colors.text.primary, fontWeight: isLoggedInUser(member.userId) ? 'bold' : '600' }
+                      ]}>
+                        {member.handle}
+                        {isLoggedInUser(member.userId) && (
+                          <Text style={[styles.youLabel, { color: colors.primary }]}> (You)</Text>
+                        )}
+                      </Text>
+                      <Text style={[styles.memberLevel, { color: colors.text.secondary }]}>
+                        Lv {member.level || 1}
+                      </Text>
+                    </View>
+                    {userRole === 'president' && executives.length < 4 && (
+                      <TouchableOpacity
+                        style={[
+                          styles.memberActionButton,
+                          { borderColor: '#4CAF50', backgroundColor: '#4CAF50' }
+                        ]}
+                        onPress={() => handlePromoteMember(member.userId)}
+                        disabled={isPromoting}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.memberActionButtonText, { color: '#FFFFFF' }]}>
+                          {isPromoting ? 'Promoting...' : 'Promote'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 ))}
               </View>
@@ -1283,6 +1353,25 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: SIZING.font.small,
     fontWeight: '500',
     marginLeft: SIZING.spacing.sm,
+  },
+  memberInfoContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  memberActionButton: {
+    paddingVertical: SIZING.spacing.xs,
+    paddingHorizontal: SIZING.spacing.md,
+    borderRadius: 6,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 70,
+    marginLeft: SIZING.spacing.sm,
+  },
+  memberActionButtonText: {
+    fontSize: SIZING.font.small,
+    fontWeight: '600',
   },
   youLabel: {
     fontSize: SIZING.font.body,
