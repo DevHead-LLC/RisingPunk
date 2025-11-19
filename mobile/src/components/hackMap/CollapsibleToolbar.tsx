@@ -10,11 +10,17 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 interface CollapsibleToolbarProps {
   onAntivirusPress: () => void;
   isAntivirusUnlocked?: boolean;
+  onHackCrewPress?: () => void;
+  isHackCrewUnlocked?: boolean;
+  isInCrew?: boolean;
 }
 
 export const CollapsibleToolbar: React.FC<CollapsibleToolbarProps> = ({
   onAntivirusPress,
   isAntivirusUnlocked = false,
+  onHackCrewPress,
+  isHackCrewUnlocked = false,
+  isInCrew = false,
 }) => {
   const colors = useThemeColors();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -23,16 +29,23 @@ export const CollapsibleToolbar: React.FC<CollapsibleToolbarProps> = ({
   });
 
   const isShieldActive = shieldData?.isActive || false;
-  const styles = createStyles(colors);
 
   const toggleExpanded = () => {
     setIsExpanded(!isExpanded);
   };
 
-  // Don't render the toolbar at all if antivirus is not unlocked
-  if (!isAntivirusUnlocked) {
+  // Don't render the toolbar at all if neither feature is unlocked
+  if (!isAntivirusUnlocked && !isHackCrewUnlocked) {
     return null;
   }
+
+  // Calculate number of unlocked icons
+  const iconCount = (isAntivirusUnlocked ? 1 : 0) + (isHackCrewUnlocked ? 1 : 0);
+  const iconWidth = 36;
+  const horizontalPadding = SIZING.spacing.md;
+  const toolbarWidth = (iconWidth * iconCount) + (horizontalPadding * 2);
+
+  const styles = createStyles(colors, toolbarWidth);
 
   return (
     <View style={styles.container}>
@@ -49,31 +62,47 @@ export const CollapsibleToolbar: React.FC<CollapsibleToolbarProps> = ({
       {isExpanded && (
         <View style={styles.expandedToolbar}>
           {/* Antivirus Shield */}
-          <TouchableOpacity
-            style={[
-              styles.toolButton,
-              !isAntivirusUnlocked && styles.disabledToolButton
-            ]}
-            onPress={isAntivirusUnlocked ? onAntivirusPress : undefined}
-            activeOpacity={isAntivirusUnlocked ? 0.7 : 1}
-            disabled={!isAntivirusUnlocked}
-          >
-            <Image
-              source={isShieldActive 
-                ? require('../../assets/images/hackMap/activatedShield.png')
-                : require('../../assets/images/hackMap/antivirusShield.png')
-              }
-              style={styles.toolIcon}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
+          {isAntivirusUnlocked && (
+            <TouchableOpacity
+              style={styles.toolButton}
+              onPress={onAntivirusPress}
+              activeOpacity={0.7}
+            >
+              <Image
+                source={isShieldActive 
+                  ? require('../../assets/images/hackMap/activatedShield.png')
+                  : require('../../assets/images/hackMap/antivirusShield.png')
+                }
+                style={styles.toolIcon}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+          )}
+          
+          {/* Hack Crew */}
+          {isHackCrewUnlocked && (
+            <TouchableOpacity
+              style={styles.toolButton}
+              onPress={onHackCrewPress}
+              activeOpacity={0.7}
+            >
+              <Image
+                source={isInCrew 
+                  ? require('../../assets/images/hackMap/hackCrewActive.png')
+                  : require('../../assets/images/hackMap/hackCrew.png')
+                }
+                style={styles.toolIcon}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </View>
   );
 };
 
-const createStyles = (colors: any) => StyleSheet.create({
+const createStyles = (colors: any, toolbarWidth: number) => StyleSheet.create({
   container: {
     position: 'absolute',
     bottom: SIZING.spacing.lg,
@@ -108,23 +137,26 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderColor: colors.secondary,
     borderWidth: 1,
     borderRadius: 8,
-    padding: SIZING.spacing.xs,
+    paddingHorizontal: SIZING.spacing.md,
+    paddingVertical: SIZING.spacing.xs,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
-    width: 50, // Fixed width since no text
-    height: 50, // Square toolbar
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: toolbarWidth,
+    minHeight: 50,
   },
   toolButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: SIZING.spacing.xs,
     borderRadius: 6,
     backgroundColor: 'transparent',
-    width: '100%',
-    height: '100%',
+    width: 36,
+    height: 36,
   },
   disabledToolButton: {
     opacity: 0.5,
