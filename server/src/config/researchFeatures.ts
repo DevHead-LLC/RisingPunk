@@ -332,7 +332,7 @@ export const RESEARCH_FEATURES: Record<string, IResearchFeature[]> = {
       description: 'Unlock the ability to form, join, and manage hack crews',
       unlockCost: 250000,
       levelRequirement: 5,
-      researchTimeHours: 20 / 3600,
+      researchTimeHours: 5,
       isUnlocked: false,
       effect: {
         type: 'unlock',

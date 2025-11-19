@@ -833,3 +833,147 @@
     - VisitCrewModal header now uses crewDetails.crew.crewName instead of prop for real-time updates
     - Updates appear within 3 seconds for all users viewing the crew
 
+### 34. Implement Edit Crew Identifier Functionality
+- **Status**: ✅ Completed
+- **Description**: Implement the "Edit Crew Identifier" button functionality in Crew Settings view. When clicked, a modal should pop up allowing the president to edit the crew identifier with the same validation rules as crew creation (max 5 characters, a-z, 0-9, _, -, auto-uppercase). The system should check for identifier availability (crew identifiers must be unique). Once updated, it should update in the database for both the crew document AND all crewStatus documents for users associated with that crew (president, executives, members). All relevant views should refresh using RTK Query cache invalidation or events rather than constant database polling.
+- **Key Difference from Edit Crew Name**: 
+  - Must update the crew document (same as name)
+  - **MUST ALSO update ALL crewStatus documents** for users in that crew:
+    - President's crewStatus.crewIdentifier
+    - All executives' crewStatus.crewIdentifier  
+    - All members' crewStatus.crewIdentifier
+  - This ensures all users see the updated identifier in their crew status
+- **Progress**:
+  - ✅ Created EditCrewIdentifierModal component (mobile/src/components/hackMap/EditCrewIdentifierModal.tsx)
+    - Similar structure to EditCrewNameModal
+    - Validation: max 5 characters, a-z, 0-9, _, -
+    - Auto-uppercase input (converts to uppercase as user types, like crew creation)
+    - Real-time validation with error messages
+    - Character filtering to prevent invalid input
+    - Loading states and error handling
+    - Styled consistently with app theme
+  - ✅ Added server API endpoint (server/src/routes/crew.ts)
+    - POST /api/crew/update-identifier - Updates crew identifier with availability check
+    - Validates user is president
+    - Validates crew identifier format and length (max 5 chars)
+    - Auto-uppercase the identifier (normalize to uppercase like crew creation)
+    - Checks for identifier uniqueness (excludes current crew)
+    - Updates crew document: crew.crewIdentifier = new identifier
+    - **Updates ALL crewStatus documents** for users in that crew:
+      - Uses CrewStatus.updateMany() to find all documents where crewId matches the crew's _id
+      - Updates each one: crewStatus.crewIdentifier = new identifier
+      - This includes president, executives, and members
+    - Returns updated crew data
+  - ✅ Added client API mutation (mobile/src/store/api/authApi.ts)
+    - useUpdateCrewIdentifierMutation hook
+    - Invalidates 'User' tag to refresh all crew-related queries automatically
+    - Same pattern as useUpdateCrewNameMutation
+    - Exported for use in components
+  - ✅ Integrated into CrewModal (mobile/src/components/hackMap/CrewModal.tsx)
+    - "Edit Crew Identifier" button in Crew Settings view opens EditCrewIdentifierModal
+    - Passes current crew identifier from crewStatus as prop
+    - Handles update action with loading states
+    - Refetches crew details and crew status after update
+    - Modal closes on successful update
+    - Added state management and handlers following same pattern as EditCrewNameModal
+  - ✅ Automatic view updates via RTK Query cache invalidation and polling
+    - All crew-related queries use 'User' tag (getCrewDetails, getCrewStatus, searchCrews, getSuggestedCrews)
+    - Cache invalidation automatically refreshes on update
+    - Existing polling (3 second interval) provides backup:
+      - CrewModal: polls getCrewDetails when modal is visible
+      - VisitCrewModal: polls getCrewDetails when modal is visible
+      - CrewOnboardingModal: polls searchCrews (when search query active) and getSuggestedCrews when modal is visible
+    - CrewModal header shows crew identifier from crewStatus (already implemented)
+    - Updates appear within 3 seconds for all users viewing the crew
+- **Database Collections to Update**:
+  - **crews collection**: Update `crewIdentifier` field for the crew document
+  - **crewStatus collection**: Update `crewIdentifier` field for ALL users in that crew:
+    - Find all documents where `crewId` matches the crew's `_id`
+    - Update each document's `crewIdentifier` field to the new value
+    - This ensures all crew members see the updated identifier in their status
+  - **Views That Display Crew Identifier**:
+  - CrewModal header: Shows "crewName (CREWID)" - uses crewStatus.crewIdentifier
+  - Crew Information view: Shows crew identifier in info card
+  - CrewOnboardingModal search results: Shows crew identifier
+  - CrewOnboardingModal suggested crews: Shows crew identifier
+  - VisitCrewModal: Shows crew identifier in header and crew information view
+  - All views will automatically refresh via RTK Query cache invalidation
+
+### 35. Implement Executive Promotion/Demotion Feature
+- **Status**: ⏳ Pending
+- **Description**: Add ability for president to promote members to executive positions and demote executives back to members. Each crew has 4 executive slots. When all 4 slots are full, members should not show "Promote" button. Executives should always show "Demote" button. This feature should also fix the bug where CrewStatus schema doesn't support 'executive' role, causing issues when executives try to leave crew.
+- **Bug Fix Required**: The leave crew endpoint checks for `crewStatus.role === 'executive'` to remove executives from the crew, but the CrewStatus model only defines role as `'president' | 'member' | null` in the schema enum. The 'executive' role is not a valid value in the schema, so this condition will never be true. Executives who try to leave will not be properly removed from the crew.executives array, causing data inconsistency.
+- **Checklist**:
+  - [ ] **Fix CrewStatus Schema Bug**
+    - [ ] Update `server/src/models/CrewStatus.ts` to add 'executive' to role enum
+    - [ ] Update interface `ICrewStatus` to include 'executive' in role type: `role: 'president' | 'member' | 'executive' | null`
+    - [ ] Update schema enum: `enum: ['president', 'member', 'executive', null]`
+    - [ ] Verify leave crew endpoint now correctly handles executives (line 735 in crew.ts)
+  - [ ] **Create Promote Member API Endpoint**
+    - [ ] Add POST `/api/crew/promote-member` endpoint in `server/src/routes/crew.ts`
+    - [ ] Validate requester is president
+    - [ ] Validate requester is in the crew
+    - [ ] Validate target user is a member (not president, not already executive)
+    - [ ] Validate crew has less than 4 executives (enforce 4-executive limit)
+    - [ ] Update target user's CrewStatus: `role = 'executive'`
+    - [ ] Remove target user from `crew.members` array
+    - [ ] Add target user to `crew.executives` array (append to end, maintain order)
+    - [ ] Return success response with updated crew data
+  - [ ] **Create Demote Executive API Endpoint**
+    - [ ] Add POST `/api/crew/demote-executive` endpoint in `server/src/routes/crew.ts`
+    - [ ] Validate requester is president
+    - [ ] Validate requester is in the crew
+    - [ ] Validate target user is an executive (check crew.executives array)
+    - [ ] Update target user's CrewStatus: `role = 'member'`
+    - [ ] Remove target user from `crew.executives` array
+    - [ ] Add target user to `crew.members` array (append to end)
+    - [ ] Return success response with updated crew data
+  - [ ] **Add Client API Hooks**
+    - [ ] Add `usePromoteMemberMutation` hook in `mobile/src/store/api/authApi.ts`
+    - [ ] Add `useDemoteExecutiveMutation` hook in `mobile/src/store/api/authApi.ts`
+    - [ ] Both hooks should invalidate 'User' tag to refresh crew status and crew details
+    - [ ] Export both hooks for use in components
+  - [ ] **Update CrewModal Members View UI**
+    - [ ] In `renderMembers()` function, check if current user is president
+    - [ ] For regular members section (lines 553-590):
+      - [ ] Add "Promote" button to each member card
+      - [ ] Only show "Promote" button if `executives.length < 4` (4-executive limit)
+      - [ ] Button should be disabled if executives array is full (4 executives)
+      - [ ] Style button consistently with app theme (use similar styling as Accept/Deny buttons in recruiting view)
+      - [ ] Add handler `handlePromoteMember(memberUserId)` that calls promote mutation
+      - [ ] Show loading state while promoting
+      - [ ] Refetch crew details and crew status after successful promotion
+    - [ ] For executives section (lines 515-551):
+      - [ ] Add "Demote" button to each executive card (only when executive slot is filled)
+      - [ ] Button should always be visible for filled executive slots (no conditional hiding)
+      - [ ] Style button consistently with app theme (use danger styling similar to Deny button)
+      - [ ] Add handler `handleDemoteExecutive(executiveUserId)` that calls demote mutation
+      - [ ] Show loading state while demoting
+      - [ ] Refetch crew details and crew status after successful demotion
+    - [ ] Ensure buttons are only visible to president (check `userRole === 'president'`)
+  - [ ] **Update Crew Model Executives Array**
+    - [ ] Verify promote endpoint correctly adds user to `crew.executives` array
+    - [ ] Verify demote endpoint correctly removes user from `crew.executives` array
+    - [ ] Ensure executives array maintains order (append new executives to end)
+    - [ ] Ensure no duplicates can be added to executives array
+  - [ ] **Update CrewStatus Collection**
+    - [ ] Verify promote endpoint updates target user's CrewStatus: `role = 'executive'`
+    - [ ] Verify demote endpoint updates target user's CrewStatus: `role = 'member'`
+    - [ ] Ensure role changes are persisted correctly
+  - [ ] **UI Refresh and Real-Time Updates**
+    - [ ] Verify RTK Query cache invalidation refreshes crew details automatically
+    - [ ] Verify members view updates immediately after promote/demote actions
+    - [ ] Verify executive slots update correctly (filled/empty states)
+    - [ ] Verify member count updates correctly in crew information view
+    - [ ] Test that promoted user sees their role change in their own crew status
+    - [ ] Test that demoted user sees their role change in their own crew status
+  - [ ] **Edge Cases and Validation**
+    - [ ] Test promoting when 4 executives already exist (should fail validation)
+    - [ ] Test promoting a user who is already an executive (should fail validation)
+    - [ ] Test promoting the president (should fail validation)
+    - [ ] Test demoting a user who is not an executive (should fail validation)
+    - [ ] Test promote/demote as non-president user (should fail authorization)
+    - [ ] Test promote/demote when requester is not in crew (should fail validation)
+    - [ ] Verify executives array never exceeds 4 members
+    - [ ] Verify user cannot be in both members and executives arrays simultaneously
+
