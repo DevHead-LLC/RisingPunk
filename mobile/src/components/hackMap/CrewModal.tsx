@@ -105,13 +105,15 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     setRecentlyPromotedUserIds(prev => {
       if (prev.size === 0) return prev;
       const memberUserIds = new Set(regularMembers.map(m => m.userId));
+      let hasChanges = false;
       const next = new Set(prev);
       prev.forEach(userId => {
         if (!memberUserIds.has(userId)) {
           next.delete(userId);
+          hasChanges = true;
         }
       });
-      return next;
+      return hasChanges ? next : prev;
     });
   }, [regularMembers]);
 
@@ -131,6 +133,10 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     setShowLeaveCrewModal(false);
     setShowEditCrewNameModal(false);
     setShowEditCrewIdentifierModal(false);
+    setViewingProfileUserId(null);
+    setPromotingUserId(null);
+    setDemotingUserId(null);
+    setRecentlyPromotedUserIds(new Set());
     onClose();
   };
 
