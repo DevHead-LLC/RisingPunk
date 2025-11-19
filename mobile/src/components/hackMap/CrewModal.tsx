@@ -7,7 +7,8 @@ import { DisbandCrewModal } from './DisbandCrewModal';
 import { VisitingProfileModal } from './VisitingProfileModal';
 import { LeaveCrewModal } from './LeaveCrewModal';
 import { EditCrewNameModal } from './EditCrewNameModal';
-import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation } from '../../store/api/authApi';
+import { EditCrewIdentifierModal } from './EditCrewIdentifierModal';
+import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation } from '../../store/api/authApi';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CREW_MODAL_PADDING = SIZING.spacing.md * 2;
@@ -56,13 +57,17 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [showDisbandModal, setShowDisbandModal] = useState(false);
   const [showLeaveCrewModal, setShowLeaveCrewModal] = useState(false);
   const [showEditCrewNameModal, setShowEditCrewNameModal] = useState(false);
+  const [showEditCrewIdentifierModal, setShowEditCrewIdentifierModal] = useState(false);
   const [viewingProfileUserId, setViewingProfileUserId] = useState<string | null>(null);
-  const { data: crewStatus, refetch: refetchCrewStatus } = useGetCrewStatusQuery();
+  const { data: crewStatus, refetch: refetchCrewStatus } = useGetCrewStatusQuery(undefined, {
+    pollingInterval: visible ? 3000 : 0,
+  });
   const [disbandCrew, { isLoading: isDisbanding }] = useDisbandCrewMutation();
   const [acceptApplicant, { isLoading: isAccepting }] = useAcceptApplicantMutation();
   const [denyApplicant, { isLoading: isDenying }] = useDenyApplicantMutation();
   const [leaveCrew, { isLoading: isLeaving }] = useLeaveCrewMutation();
   const [updateCrewName, { isLoading: isUpdatingCrewName }] = useUpdateCrewNameMutation();
+  const [updateCrewIdentifier, { isLoading: isUpdatingCrewIdentifier }] = useUpdateCrewIdentifierMutation();
   const currentUser = useAppSelector((state) => state.auth.user);
   
   const userRole = crewStatus?.role;
@@ -94,6 +99,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     setShowDisbandModal(false);
     setShowLeaveCrewModal(false);
     setShowEditCrewNameModal(false);
+    setShowEditCrewIdentifierModal(false);
     onClose();
   };
 
@@ -218,6 +224,21 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       throw new Error(error?.data?.error || error?.error || 'Failed to update crew name');
     }
   }, [updateCrewName, refetchCrewDetails, refetchCrewStatus]);
+
+  const handleEditCrewIdentifierPress = useCallback(() => {
+    setShowEditCrewIdentifierModal(true);
+  }, []);
+
+  const handleUpdateCrewIdentifier = useCallback(async (crewIdentifier: string) => {
+    try {
+      await updateCrewIdentifier({ crewIdentifier }).unwrap();
+      await refetchCrewDetails();
+      await refetchCrewStatus();
+      setShowEditCrewIdentifierModal(false);
+    } catch (error: any) {
+      throw new Error(error?.data?.error || error?.error || 'Failed to update crew identifier');
+    }
+  }, [updateCrewIdentifier, refetchCrewDetails, refetchCrewStatus]);
 
   const renderCategoryList = () => {
     if (!crewStatus?.isInCrew || !activeCrewDetails?.crew) {
@@ -864,6 +885,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                 onPress={() => {
                   if (buttonText === 'Edit Crew Name') {
                     handleEditCrewNamePress();
+                  } else if (buttonText === 'Edit Crew Identifier') {
+                    handleEditCrewIdentifierPress();
                   } else if (isDisbandCrew) {
                     handleDisbandCrewPress();
                   } else {
@@ -973,6 +996,15 @@ export const CrewModal: React.FC<CrewModalProps> = ({
           onClose={() => setShowEditCrewNameModal(false)}
           onUpdate={handleUpdateCrewName}
           currentCrewName={activeCrewDetails.crew.crewName}
+        />
+      )}
+
+      {crewStatus?.crewIdentifier && (
+        <EditCrewIdentifierModal
+          visible={showEditCrewIdentifierModal}
+          onClose={() => setShowEditCrewIdentifierModal(false)}
+          onUpdate={handleUpdateCrewIdentifier}
+          currentCrewIdentifier={crewStatus.crewIdentifier}
         />
       )}
     </Modal>

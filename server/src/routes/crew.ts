@@ -853,5 +853,111 @@ router.post('/update-name', auth, async (req: UpdateCrewNameRequest, res: Respon
   }
 });
 
+interface UpdateCrewIdentifierRequest extends Request {
+  body: {
+    crewIdentifier: string;
+  }
+}
+
+router.post('/update-identifier', auth, async (req: UpdateCrewIdentifierRequest, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const { crewIdentifier } = req.body;
+    if (!crewIdentifier) {
+      res.status(400).json({ error: 'Crew identifier is required' });
+      return;
+    }
+
+    if (crewIdentifier.length > 5) {
+      res.status(400).json({ error: 'Crew identifier must be 5 characters or less' });
+      return;
+    }
+
+    const validCharRegex = /^[a-zA-Z0-9_-]+$/;
+    if (!validCharRegex.test(crewIdentifier)) {
+      res.status(400).json({ error: 'Crew identifier contains invalid characters' });
+      return;
+    }
+
+    const crewStatus = await CrewStatus.findOne({ userId });
+    if (!crewStatus || !crewStatus.isInCrew || !crewStatus.crewId) {
+      res.status(400).json({ error: 'User is not in a crew' });
+      return;
+    }
+
+    if (crewStatus.role !== 'president') {
+      res.status(403).json({ error: 'Only the president can update the crew identifier' });
+      return;
+    }
+
+    const crew = await Crew.findById(crewStatus.crewId);
+    if (!crew) {
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    const normalizedCrewIdentifier = crewIdentifier.trim().toUpperCase();
+
+    if (normalizedCrewIdentifier === crew.crewIdentifier.toUpperCase()) {
+      res.json({
+        success: true,
+        message: 'Crew identifier unchanged',
+        crew: {
+          id: (crew._id as mongoose.Types.ObjectId).toString(),
+          crewName: crew.crewName,
+          crewIdentifier: crew.crewIdentifier
+        }
+      });
+      return;
+    }
+
+    const existingCrewByIdentifier = await Crew.findOne({ 
+      crewIdentifier: normalizedCrewIdentifier,
+      _id: { $ne: crew._id }
+    });
+    if (existingCrewByIdentifier) {
+      res.status(400).json({ error: 'Crew identifier already exists' });
+      return;
+    }
+
+    crew.crewIdentifier = normalizedCrewIdentifier;
+    await crew.save();
+
+    const crewId = crew._id;
+    await CrewStatus.updateMany(
+      { crewId: crewId },
+      {
+        $set: {
+          crewIdentifier: normalizedCrewIdentifier
+        }
+      }
+    );
+
+    res.json({
+      success: true,
+      message: 'Crew identifier updated successfully',
+      crew: {
+        id: (crew._id as mongoose.Types.ObjectId).toString(),
+        crewName: crew.crewName,
+        crewIdentifier: crew.crewIdentifier
+      }
+    });
+  } catch (error: any) {
+    console.error('Error updating crew identifier:', error);
+    if (error.code === 11000) {
+      if (error.keyPattern?.crewIdentifier) {
+        res.status(400).json({ error: 'Crew identifier already exists' });
+        return;
+      }
+    }
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;
 

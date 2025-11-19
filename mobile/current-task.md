@@ -833,3 +833,69 @@
     - VisitCrewModal header now uses crewDetails.crew.crewName instead of prop for real-time updates
     - Updates appear within 3 seconds for all users viewing the crew
 
+### 34. Implement Edit Crew Identifier Functionality
+- **Status**: ✅ Completed
+- **Description**: Implement the "Edit Crew Identifier" button functionality in Crew Settings view. When clicked, a modal should pop up allowing the president to edit the crew identifier with the same validation rules as crew creation (max 5 characters, a-z, 0-9, _, -, auto-uppercase). The system should check for identifier availability (crew identifiers must be unique). Once updated, it should update in the database for both the crew document AND all crewStatus documents for users associated with that crew (president, executives, members). All relevant views should refresh using RTK Query cache invalidation or events rather than constant database polling.
+- **Key Difference from Edit Crew Name**: 
+  - Must update the crew document (same as name)
+  - **MUST ALSO update ALL crewStatus documents** for users in that crew:
+    - President's crewStatus.crewIdentifier
+    - All executives' crewStatus.crewIdentifier  
+    - All members' crewStatus.crewIdentifier
+  - This ensures all users see the updated identifier in their crew status
+- **Progress**:
+  - ✅ Created EditCrewIdentifierModal component (mobile/src/components/hackMap/EditCrewIdentifierModal.tsx)
+    - Similar structure to EditCrewNameModal
+    - Validation: max 5 characters, a-z, 0-9, _, -
+    - Auto-uppercase input (converts to uppercase as user types, like crew creation)
+    - Real-time validation with error messages
+    - Character filtering to prevent invalid input
+    - Loading states and error handling
+    - Styled consistently with app theme
+  - ✅ Added server API endpoint (server/src/routes/crew.ts)
+    - POST /api/crew/update-identifier - Updates crew identifier with availability check
+    - Validates user is president
+    - Validates crew identifier format and length (max 5 chars)
+    - Auto-uppercase the identifier (normalize to uppercase like crew creation)
+    - Checks for identifier uniqueness (excludes current crew)
+    - Updates crew document: crew.crewIdentifier = new identifier
+    - **Updates ALL crewStatus documents** for users in that crew:
+      - Uses CrewStatus.updateMany() to find all documents where crewId matches the crew's _id
+      - Updates each one: crewStatus.crewIdentifier = new identifier
+      - This includes president, executives, and members
+    - Returns updated crew data
+  - ✅ Added client API mutation (mobile/src/store/api/authApi.ts)
+    - useUpdateCrewIdentifierMutation hook
+    - Invalidates 'User' tag to refresh all crew-related queries automatically
+    - Same pattern as useUpdateCrewNameMutation
+    - Exported for use in components
+  - ✅ Integrated into CrewModal (mobile/src/components/hackMap/CrewModal.tsx)
+    - "Edit Crew Identifier" button in Crew Settings view opens EditCrewIdentifierModal
+    - Passes current crew identifier from crewStatus as prop
+    - Handles update action with loading states
+    - Refetches crew details and crew status after update
+    - Modal closes on successful update
+    - Added state management and handlers following same pattern as EditCrewNameModal
+  - ✅ Automatic view updates via RTK Query cache invalidation and polling
+    - All crew-related queries use 'User' tag (getCrewDetails, getCrewStatus, searchCrews, getSuggestedCrews)
+    - Cache invalidation automatically refreshes on update
+    - Existing polling (3 second interval) provides backup:
+      - CrewModal: polls getCrewDetails when modal is visible
+      - VisitCrewModal: polls getCrewDetails when modal is visible
+      - CrewOnboardingModal: polls searchCrews (when search query active) and getSuggestedCrews when modal is visible
+    - CrewModal header shows crew identifier from crewStatus (already implemented)
+    - Updates appear within 3 seconds for all users viewing the crew
+- **Database Collections to Update**:
+  - **crews collection**: Update `crewIdentifier` field for the crew document
+  - **crewStatus collection**: Update `crewIdentifier` field for ALL users in that crew:
+    - Find all documents where `crewId` matches the crew's `_id`
+    - Update each document's `crewIdentifier` field to the new value
+    - This ensures all crew members see the updated identifier in their status
+- **Views That Display Crew Identifier**:
+  - CrewModal header: Shows "crewName (CREWID)" - uses crewStatus.crewIdentifier
+  - Crew Information view: Shows crew identifier in info card
+  - CrewOnboardingModal search results: Shows crew identifier
+  - CrewOnboardingModal suggested crews: Shows crew identifier
+  - VisitCrewModal: Shows crew identifier in header and crew information view
+  - All views will automatically refresh via RTK Query cache invalidation
+

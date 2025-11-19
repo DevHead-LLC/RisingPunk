@@ -362,6 +362,15 @@ export const authApi = createApi({
       }),
       invalidatesTags: ['User'],
     }),
+
+    updateCrewIdentifier: builder.mutation<{ success: boolean; message: string; crew: { id: string; crewName: string; crewIdentifier: string } }, { crewIdentifier: string }>({
+      query: (data) => ({
+        url: '/api/crew/update-identifier',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
   }),
 });
 
@@ -392,4 +401,5 @@ export const {
   useDenyApplicantMutation,
   useLeaveCrewMutation,
   useUpdateCrewNameMutation,
+  useUpdateCrewIdentifierMutation,
 } = authApi;
