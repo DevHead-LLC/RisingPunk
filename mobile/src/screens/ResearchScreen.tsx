@@ -35,8 +35,8 @@ const ALL_RESEARCH_CARDS: ResearchCard[] = [
   { id: 'investments', name: 'Investments', image: require('../assets/images/investmentResearch.png') },
 ];
 
-// Only show Home Defense for App Store submission - other categories hidden
-const RESEARCH_CARDS: ResearchCard[] = ALL_RESEARCH_CARDS.filter(card => card.id === 'home-defense');
+// Show Home Defense and Hack Crew categories
+const RESEARCH_CARDS: ResearchCard[] = ALL_RESEARCH_CARDS.filter(card => card.id === 'home-defense' || card.id === 'hack-crew');
 
 const { width: screenWidth } = Dimensions.get('window');
 const cardSize = Math.min((screenWidth - SIZING.spacing.md * 3) / 2, 160);
@@ -66,6 +66,7 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
     if (canAccessResearch(cardId)) {
       setCurrentScreen(cardId);
     } else {
+      refreshAfterUnlock();
       setSelectedResearch(cardId);
       setShowLockedModal(true);
     }
