@@ -371,6 +371,24 @@ export const authApi = createApi({
       }),
       invalidatesTags: ['User'],
     }),
+
+    promoteMember: builder.mutation<{ success: boolean; message: string; crew: { id: string; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }> } }, { crewId: string; memberUserId: string }>({
+      query: (data) => ({
+        url: '/api/crew/promote-member',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
+
+    demoteExecutive: builder.mutation<{ success: boolean; message: string; crew: { id: string; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }> } }, { crewId: string; executiveUserId: string }>({
+      query: (data) => ({
+        url: '/api/crew/demote-executive',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
   }),
 });
 
@@ -402,4 +420,6 @@ export const {
   useLeaveCrewMutation,
   useUpdateCrewNameMutation,
   useUpdateCrewIdentifierMutation,
+  usePromoteMemberMutation,
+  useDemoteExecutiveMutation,
 } = authApi;
