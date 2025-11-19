@@ -680,6 +680,16 @@ router.post('/disband', auth, async (req: DisbandCrewRequest, res: Response) => 
       }
     );
 
+    await CrewStatus.updateMany(
+      { appliedCrewId: crewId },
+      {
+        $set: {
+          appliedCrewId: null,
+          appliedCrewIdentifier: null
+        }
+      }
+    );
+
     await Crew.deleteOne({ _id: crewId });
 
     res.json({

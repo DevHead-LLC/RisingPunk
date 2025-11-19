@@ -268,7 +268,6 @@ export class ResearchUnlockService {
         const dbUnlocked = ur.isUnlocked;
         
         const levelMet = user.level >= research.levelRequirement;
-        const balanceMet = user.balance.total >= research.balanceRequirement;
         
         const unlockedDependencies = updatedUserResearch
           .filter(ur2 => research.dependencies.includes((ur2.researchId as any)?.categoryId))
@@ -276,7 +275,7 @@ export class ResearchUnlockService {
         const dependenciesMet = research.dependencies.length === 0 || 
           (unlockedDependencies.length === research.dependencies.length && unlockedDependencies.every(unlocked => unlocked === true));
         
-        const actuallyUnlocked = dbUnlocked && levelMet && balanceMet && dependenciesMet;
+        const actuallyUnlocked = dbUnlocked ? (levelMet && dependenciesMet) : false;
 
         if (!actuallyUnlocked && dbUnlocked) {
           ResearchUser.findOneAndUpdate(
@@ -305,7 +304,6 @@ export class ResearchUnlockService {
       const dbUnlocked = ur.isUnlocked;
       
       const levelMet = user.level >= research.levelRequirement;
-      const balanceMet = user.balance.total >= research.balanceRequirement;
       
       const unlockedDependencies = userResearch
         .filter(ur2 => research.dependencies.includes((ur2.researchId as any)?.categoryId))
@@ -313,7 +311,7 @@ export class ResearchUnlockService {
       const dependenciesMet = research.dependencies.length === 0 || 
         (unlockedDependencies.length === research.dependencies.length && unlockedDependencies.every(unlocked => unlocked === true));
       
-      const actuallyUnlocked = dbUnlocked && levelMet && balanceMet && dependenciesMet;
+      const actuallyUnlocked = dbUnlocked ? (levelMet && dependenciesMet) : false;
 
       if (!actuallyUnlocked && dbUnlocked) {
         ResearchUser.findOneAndUpdate(
