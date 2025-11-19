@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, SafeAreaView, Dimensions } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
@@ -61,6 +61,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [viewingProfileUserId, setViewingProfileUserId] = useState<string | null>(null);
   const [promotingUserId, setPromotingUserId] = useState<string | null>(null);
   const [demotingUserId, setDemotingUserId] = useState<string | null>(null);
+  const [recentlyPromotedUserIds, setRecentlyPromotedUserIds] = useState<Set<string>>(new Set());
   const { data: crewStatus, refetch: refetchCrewStatus } = useGetCrewStatusQuery(undefined, {
     pollingInterval: visible ? 3000 : 0,
   });
@@ -87,7 +88,33 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   
   const activeCrewDetails = crewDetails;
   const executives = activeCrewDetails?.crew?.executives || [];
+  const members = activeCrewDetails?.crew?.members || [];
+  const president = activeCrewDetails?.crew?.president;
   const isExecutive = currentUserId && executives.some((exec: any) => String(exec.userId) === String(currentUserId));
+  
+  const regularMembers = useMemo(() => {
+    if (!members || !executives || !president) return [];
+    return members.filter((member) => {
+      const isExecutive = executives.some((exec: any) => exec.userId === member.userId);
+      const isPresident = president?.userId === member.userId;
+      return !isExecutive && !isPresident;
+    });
+  }, [members, executives, president]);
+
+  useEffect(() => {
+    setRecentlyPromotedUserIds(prev => {
+      if (prev.size === 0) return prev;
+      const memberUserIds = new Set(regularMembers.map(m => m.userId));
+      const next = new Set(prev);
+      prev.forEach(userId => {
+        if (!memberUserIds.has(userId)) {
+          next.delete(userId);
+        }
+      });
+      return next;
+    });
+  }, [regularMembers]);
+
   const styles = createStyles(colors);
 
   const handleCategoryPress = (categoryId: CrewCategory) => {
@@ -250,6 +277,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     }
 
     setPromotingUserId(memberUserId);
+    setRecentlyPromotedUserIds(prev => new Set(prev).add(memberUserId));
     try {
       await promoteMember({
         crewId: crewStatus.crewId,
@@ -259,6 +287,11 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       await refetchCrewStatus();
     } catch (error: any) {
       console.error('Error promoting member:', error);
+      setRecentlyPromotedUserIds(prev => {
+        const next = new Set(prev);
+        next.delete(memberUserId);
+        return next;
+      });
     } finally {
       setPromotingUserId(null);
     }
@@ -490,9 +523,6 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       );
     }
 
-    const president = activeCrewDetails.crew.president;
-    const executives = activeCrewDetails.crew.executives || [];
-    const members = activeCrewDetails.crew.members || [];
     const loggedInUserId = currentUser?._id;
 
     if (!loggedInUserId) {
@@ -506,11 +536,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     }
 
     const executiveSlots = Array.from({ length: 4 }, (_, index) => executives[index] || null);
-    const regularMembers = members.filter((member) => {
-      const isExecutive = executives.some((exec) => exec.userId === member.userId);
-      const isPresident = president?.userId === member.userId;
-      return !isExecutive && !isPresident;
-    });
+    const effectiveExecutivesCount = executives.length + recentlyPromotedUserIds.size;
 
     const isLoggedInUser = (memberUserId: string): boolean => {
       if (!memberUserId) {
@@ -646,18 +672,18 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                         Lv {member.level || 1}
                       </Text>
                     </View>
-                    {userRole === 'president' && executives.length < 4 && (
+                    {userRole === 'president' && effectiveExecutivesCount < 4 && (
                       <TouchableOpacity
                         style={[
                           styles.memberActionButton,
                           { borderColor: '#4CAF50', backgroundColor: '#4CAF50' }
                         ]}
                         onPress={() => handlePromoteMember(member.userId)}
-                        disabled={promotingUserId === member.userId}
+                        disabled={promotingUserId === member.userId || recentlyPromotedUserIds.has(member.userId)}
                         activeOpacity={0.7}
                       >
                         <Text style={[styles.memberActionButtonText, { color: '#FFFFFF' }]}>
-                          {promotingUserId === member.userId ? 'Promoting...' : 'Promote'}
+                          {promotingUserId === member.userId || recentlyPromotedUserIds.has(member.userId) ? 'Promoting...' : 'Promote'}
                         </Text>
                       </TouchableOpacity>
                     )}
