@@ -309,7 +309,7 @@ export class ResearchFeatureService {
           isResearching: userFeature?.isResearching ?? false,
           researchStartedAt: userFeature?.researchStartedAt ?? null,
           researchCompletesAt: userFeature?.researchCompletesAt ?? null,
-          researchTimeHours: feature.researchTimeHours ?? 4
+          researchTimeHours: userFeature?.researchTimeHours ?? feature.researchTimeHours ?? 4
         };
       });
 
@@ -348,7 +348,7 @@ export class ResearchFeatureService {
         isResearching: userFeature.isResearching,
         researchStartedAt: userFeature.researchStartedAt,
         researchCompletesAt: userFeature.researchCompletesAt,
-        researchTimeHours: baseFeature.researchTimeHours ?? 4
+        researchTimeHours: userFeature.researchTimeHours ?? baseFeature.researchTimeHours ?? 4
       };
     } catch (error) {
       console.error('Error getting user feature status:', error);
