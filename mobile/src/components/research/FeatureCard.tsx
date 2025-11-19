@@ -147,7 +147,7 @@ export function FeatureCard({
       shadowRadius: isLightMode ? 4 : 4,
       elevation: isLightMode ? 2 : 3,
       opacity: 0.8,
-      overflow: 'hidden'
+      overflow: 'hidden' as const
     } : {
       backgroundColor: isLightMode ? '#FFFFFF' : colors.surface,
       borderColor: isLightMode ? '#3B82F6' : '#00FF00',

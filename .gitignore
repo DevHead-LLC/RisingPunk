@@ -25,6 +25,8 @@ jest.setup.js
 
 *.md
 **/*.md
+mobile/current-task.md
+current-task.md
 
 # IDE configuration files
 .idea/

@@ -11,7 +11,6 @@ export interface ICrew extends Document {
   crewIdentifier: string;
   nativeLanguage: string;
   presidentId: mongoose.Types.ObjectId;
-  President: mongoose.Types.ObjectId;
   members: mongoose.Types.ObjectId[];
   executives: mongoose.Types.ObjectId[];
   applicants: ICrewApplicant[];
@@ -50,11 +49,6 @@ const crewSchema = new Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   }],
-  President: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
   applicants: [{
     userId: {
       type: mongoose.Schema.Types.ObjectId,

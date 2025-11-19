@@ -208,29 +208,11 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
     };
     
     try {
-
-      console.log('🔵 Google Sign In Configuration:', {
-        platform: Platform.OS,
-        webClientId: webClientId,
-        androidWebClientId: GOOGLE_AUTH_CONFIG.androidWebClientId,
-        iosClientId: GOOGLE_AUTH_CONFIG.iosClientId,
-        usingFallback: !GOOGLE_AUTH_CONFIG.androidWebClientId && Platform.OS === 'android'
-      });
-      
-      console.log('🔵 Step 1: Configuring Google Sign In...');
       GoogleSignin.configure(config);
-      console.log('🔵 Step 1: Configuration complete');
       
-      console.log('🔵 Step 2: Checking Google Play Services...');
       try {
-        const hasPlayServices = await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-        console.log('🔵 Step 2: Google Play Services available:', hasPlayServices);
+        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       } catch (playServicesError: any) {
-        console.error('🔴 Step 2 FAILED: Google Play Services Error:', {
-          code: playServicesError?.code,
-          message: playServicesError?.message,
-          error: playServicesError
-        });
         showCustomAlert(
           'Google Play Services Required',
           'Google Play Services is required for Google Sign In. Please update Google Play Services and try again.'
@@ -238,19 +220,12 @@ export const SocialSignInButtons = memo(function SocialSignInButtons({
         return;
       }
       
-      console.log('🔵 Step 3: Signing out any existing sessions...');
-      // Sign out first to clear any cached credentials and force account selection
       try {
         await GoogleSignin.signOut();
-        console.log('🔵 Step 3: Sign out complete (or no previous session)');
       } catch (error: any) {
-        console.log('🔵 Step 3: Sign out skipped (no previous session):', error?.message);
       }
       
-      console.log('🔵 Step 4: Attempting Google Sign In...');
-      console.log('🔵 Step 4: Config used:', JSON.stringify(config, null, 2));
       const userInfo = await GoogleSignin.signIn();
-      console.log('🔵 Step 4: Google Sign In successful, userInfo type:', userInfo.type);
       
       if (userInfo.type === 'cancelled' || userInfo.data === null) {
         return;

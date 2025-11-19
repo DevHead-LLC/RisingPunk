@@ -80,7 +80,6 @@ router.post('/create', auth, async (req: CreateCrewRequest, res: Response) => {
       crewIdentifier: normalizedCrewIdentifier,
       nativeLanguage,
       presidentId: userId,
-      President: userId,
       members: [],
       executives: []
     });
@@ -193,7 +192,7 @@ router.get('/search', auth, async (req: Request, res: Response) => {
       ]
     })
       .select('crewName crewIdentifier nativeLanguage createdAt')
-      .populate('President', 'handle')
+      .populate('presidentId', 'handle')
       .limit(5)
       .sort({ createdAt: -1 })
       .lean();
@@ -232,7 +231,7 @@ router.get('/suggested', auth, async (req: Request, res: Response) => {
 
     const crews = await Crew.find({})
       .select('crewName crewIdentifier nativeLanguage createdAt')
-      .populate('President', 'handle')
+      .populate('presidentId', 'handle')
       .limit(10)
       .sort({ createdAt: -1 })
       .lean();
@@ -352,7 +351,7 @@ router.get('/:crewId', auth, async (req: Request, res: Response) => {
 
     const { crewId } = req.params;
     const crew = await Crew.findById(crewId)
-      .populate('President', 'handle level')
+      .populate('presidentId', 'handle level')
       .populate('executives', 'handle level')
       .populate('members', 'handle level')
       .lean();
@@ -362,7 +361,7 @@ router.get('/:crewId', auth, async (req: Request, res: Response) => {
       return;
     }
 
-    const president = crew.President as any;
+    const president = crew.presidentId as any;
     const executives = (crew.executives || []) as any[];
     const members = (crew.members || []) as any[];
 
@@ -903,7 +902,7 @@ router.post('/update-identifier', auth, async (req: UpdateCrewIdentifierRequest,
 
     const normalizedCrewIdentifier = crewIdentifier.trim().toUpperCase();
 
-    if (normalizedCrewIdentifier === crew.crewIdentifier.toUpperCase()) {
+    if (crew.crewIdentifier && normalizedCrewIdentifier === crew.crewIdentifier.toUpperCase()) {
       res.json({
         success: true,
         message: 'Crew identifier unchanged',
