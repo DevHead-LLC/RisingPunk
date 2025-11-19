@@ -130,6 +130,15 @@ export function FeatureModal({
             ${feature.unlockCost.toLocaleString()}
           </Text>
         </View>
+        
+        <View style={styles.requirementRow}>
+          <Text style={[styles.requirementLabel, { color: colors.text.secondary }]}>
+            Research Time:
+          </Text>
+          <Text style={[styles.requirementValue, { color: colors.text.primary }]}>
+            {researchTimeHours} hours
+          </Text>
+        </View>
       </View>
       
       {/* Show research button if conditions are met, or disabled button if conditions not met */}
