@@ -59,6 +59,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [showEditCrewNameModal, setShowEditCrewNameModal] = useState(false);
   const [showEditCrewIdentifierModal, setShowEditCrewIdentifierModal] = useState(false);
   const [viewingProfileUserId, setViewingProfileUserId] = useState<string | null>(null);
+  const [promotingUserId, setPromotingUserId] = useState<string | null>(null);
+  const [demotingUserId, setDemotingUserId] = useState<string | null>(null);
   const { data: crewStatus, refetch: refetchCrewStatus } = useGetCrewStatusQuery(undefined, {
     pollingInterval: visible ? 3000 : 0,
   });
@@ -68,8 +70,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [leaveCrew, { isLoading: isLeaving }] = useLeaveCrewMutation();
   const [updateCrewName, { isLoading: isUpdatingCrewName }] = useUpdateCrewNameMutation();
   const [updateCrewIdentifier, { isLoading: isUpdatingCrewIdentifier }] = useUpdateCrewIdentifierMutation();
-  const [promoteMember, { isLoading: isPromoting }] = usePromoteMemberMutation();
-  const [demoteExecutive, { isLoading: isDemoting }] = useDemoteExecutiveMutation();
+  const [promoteMember] = usePromoteMemberMutation();
+  const [demoteExecutive] = useDemoteExecutiveMutation();
   const currentUser = useAppSelector((state) => state.auth.user);
   
   const userRole = crewStatus?.role;
@@ -247,6 +249,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       return;
     }
 
+    setPromotingUserId(memberUserId);
     try {
       await promoteMember({
         crewId: crewStatus.crewId,
@@ -256,6 +259,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       await refetchCrewStatus();
     } catch (error: any) {
       console.error('Error promoting member:', error);
+    } finally {
+      setPromotingUserId(null);
     }
   }, [promoteMember, crewStatus?.crewId, refetchCrewDetails, refetchCrewStatus]);
 
@@ -264,6 +269,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       return;
     }
 
+    setDemotingUserId(executiveUserId);
     try {
       await demoteExecutive({
         crewId: crewStatus.crewId,
@@ -273,6 +279,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       await refetchCrewStatus();
     } catch (error: any) {
       console.error('Error demoting executive:', error);
+    } finally {
+      setDemotingUserId(null);
     }
   }, [demoteExecutive, crewStatus?.crewId, refetchCrewDetails, refetchCrewStatus]);
 
@@ -588,11 +596,11 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                             { borderColor: colors.error, backgroundColor: colors.error }
                           ]}
                           onPress={() => handleDemoteExecutive(executive.userId)}
-                          disabled={isDemoting}
+                          disabled={demotingUserId === executive.userId}
                           activeOpacity={0.7}
                         >
                           <Text style={[styles.memberActionButtonText, { color: '#FFFFFF' }]}>
-                            {isDemoting ? 'Demoting...' : 'Demote'}
+                            {demotingUserId === executive.userId ? 'Demoting...' : 'Demote'}
                           </Text>
                         </TouchableOpacity>
                       )}
@@ -645,11 +653,11 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                           { borderColor: '#4CAF50', backgroundColor: '#4CAF50' }
                         ]}
                         onPress={() => handlePromoteMember(member.userId)}
-                        disabled={isPromoting}
+                        disabled={promotingUserId === member.userId}
                         activeOpacity={0.7}
                       >
                         <Text style={[styles.memberActionButtonText, { color: '#FFFFFF' }]}>
-                          {isPromoting ? 'Promoting...' : 'Promote'}
+                          {promotingUserId === member.userId ? 'Promoting...' : 'Promote'}
                         </Text>
                       </TouchableOpacity>
                     )}
