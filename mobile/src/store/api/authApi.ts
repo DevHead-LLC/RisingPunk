@@ -54,6 +54,13 @@ export interface ProfileResponse {
   profileGender: 'male' | 'female';
 }
 
+export interface UserProfileResponse {
+  userId: string;
+  handle: string;
+  level: number;
+  profileGender: 'male' | 'female';
+}
+
 export interface UnlockResearchCenterResponse {
   success: boolean;
   balance: {
@@ -186,6 +193,13 @@ export const authApi = createApi({
       providesTags: ['User'],
     }),
 
+    getUserProfile: builder.query<UserProfileResponse, string>({
+      query: (userId) => `/api/users/profile/${userId}`,
+      providesTags: (result, error, userId) => [
+        { type: 'User', id: `profile-${userId}` }
+      ],
+    }),
+
     unlockHackRig: builder.mutation<void, void>({
       query: () => ({
         url: '/api/users/unlock-hack-rig',
@@ -256,6 +270,107 @@ export const authApi = createApi({
         body: data,
       }),
     }),
+
+    createCrew: builder.mutation<{ success: boolean; crew: { id: string; crewName: string; crewIdentifier: string; nativeLanguage: string } }, { crewName: string; crewIdentifier: string; nativeLanguage: string }>({
+      query: (data) => ({
+        url: '/api/crew/create',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
+
+    getCrewStatus: builder.query<{ isInCrew: boolean; crewId: string | null; crewIdentifier: string | null; role: 'president' | 'member' | null; appliedCrewId: string | null; appliedCrewIdentifier: string | null }, void>({
+      query: () => '/api/crew/status',
+      providesTags: ['User'],
+      refetchOnMountOrArgChange: true,
+    }),
+
+    applyToCrew: builder.mutation<{ success: boolean; message: string }, { crewId: string }>({
+      query: (data) => ({
+        url: '/api/crew/apply',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
+
+    withdrawApplication: builder.mutation<{ success: boolean; message: string }, void>({
+      query: () => ({
+        url: '/api/crew/withdraw-application',
+        method: 'POST',
+      }),
+      invalidatesTags: ['User'],
+    }),
+
+    disbandCrew: builder.mutation<{ success: boolean; message: string }, { crewIdentifier: string }>({
+      query: (data) => ({
+        url: '/api/crew/disband',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
+
+    searchCrews: builder.query<{ crews: Array<{ id: string; crewName: string; crewIdentifier: string; nativeLanguage: string; memberCount: number; createdAt: string }> }, string>({
+      query: (query) => `/api/crew/search?q=${encodeURIComponent(query)}`,
+      providesTags: ['User'],
+    }),
+
+    getSuggestedCrews: builder.query<{ crews: Array<{ id: string; crewName: string; crewIdentifier: string; nativeLanguage: string; memberCount: number; createdAt: string }> }, void>({
+      query: () => '/api/crew/suggested',
+      providesTags: ['User'],
+    }),
+
+    getCrewDetails: builder.query<{ success: boolean; crew: { id: string; crewName: string; crewIdentifier: string; nativeLanguage: string; createdAt: string | null; memberCount: number; applicants: Array<{ userId: string; handle: string; appliedAt: string }>; president: { userId: string; handle: string; level: number } | null; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }> } }, string>({
+      query: (crewId) => `/api/crew/${crewId}`,
+      providesTags: ['User'],
+      refetchOnMountOrArgChange: true,
+    }),
+
+    acceptApplicant: builder.mutation<{ success: boolean; message: string }, { crewId: string; applicantUserId: string }>({
+      query: (data) => ({
+        url: '/api/crew/accept-applicant',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
+
+    denyApplicant: builder.mutation<{ success: boolean; message: string }, { crewId: string; applicantUserId: string }>({
+      query: (data) => ({
+        url: '/api/crew/deny-applicant',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
+
+    leaveCrew: builder.mutation<{ success: boolean; message: string }, void>({
+      query: () => ({
+        url: '/api/crew/leave',
+        method: 'POST',
+      }),
+      invalidatesTags: ['User'],
+    }),
+
+    updateCrewName: builder.mutation<{ success: boolean; message: string; crew: { id: string; crewName: string; crewIdentifier: string } }, { crewName: string }>({
+      query: (data) => ({
+        url: '/api/crew/update-name',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
+
+    updateCrewIdentifier: builder.mutation<{ success: boolean; message: string; crew: { id: string; crewName: string; crewIdentifier: string } }, { crewIdentifier: string }>({
+      query: (data) => ({
+        url: '/api/crew/update-identifier',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
   }),
 });
 
@@ -264,6 +379,7 @@ export const {
   useRegisterMutation,
   useGoogleSignInMutation,
   useGetProfileQuery,
+  useGetUserProfileQuery,
   useUnlockHackRigMutation,
   useUnlockResearchCenterMutation,
   useGetResearchCenterStatusQuery,
@@ -273,4 +389,17 @@ export const {
   useCompleteOnboardingMutation,
   useDeleteAccountMutation,
   useForgotPasswordMutation,
+  useCreateCrewMutation,
+  useGetCrewStatusQuery,
+  useDisbandCrewMutation,
+  useSearchCrewsQuery,
+  useGetSuggestedCrewsQuery,
+  useApplyToCrewMutation,
+  useWithdrawApplicationMutation,
+  useGetCrewDetailsQuery,
+  useAcceptApplicantMutation,
+  useDenyApplicantMutation,
+  useLeaveCrewMutation,
+  useUpdateCrewNameMutation,
+  useUpdateCrewIdentifierMutation,
 } = authApi;

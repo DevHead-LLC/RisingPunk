@@ -6,6 +6,7 @@ import { CustomButton } from '../common/CustomButton';
 import { LockedFeatureModal } from '../turf/LockedFeatureModal';
 import { API_URL } from '../../config';
 import { useAppSelector } from '../../store/hooks';
+import { getCurrentBalance } from '../../store/slices/balanceSlice';
 
 interface ResearchRequirements {
   categoryId: string;
@@ -44,8 +45,8 @@ export function ResearchLockedModal({
   onClose,
   onUnlockSuccess,
   requirements,
-  currentLevel,
-  currentBalance,
+  currentLevel: propCurrentLevel,
+  currentBalance: propCurrentBalance,
   researchStatus,
 }: ResearchLockedModalProps): React.JSX.Element | null {
   const [isUnlocking, setIsUnlocking] = useState(false);
@@ -55,6 +56,8 @@ export function ResearchLockedModal({
   const [showRequirementsNotMet, setShowRequirementsNotMet] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const token = useAppSelector(state => state.auth.token);
+  const currentLevel = useAppSelector(state => state.auth.user?.level || propCurrentLevel || 1);
+  const currentBalance = useAppSelector(state => getCurrentBalance(state) || propCurrentBalance || 0);
   
   const colors = useThemeColors();
   const styles = createStyles(colors);
