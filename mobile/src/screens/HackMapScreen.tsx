@@ -6,11 +6,14 @@ import { CloseButton } from '../components/common/CloseButton';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { CollapsibleToolbar } from '../components/hackMap/CollapsibleToolbar';
 import { AntivirusModal } from '../components/hackMap/AntivirusModal';
+import { CrewOnboardingModal } from '../components/hackMap/CrewOnboardingModal';
+import { CrewModal } from '../components/hackMap/CrewModal';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { setGrid, setLoading } from '../store/slices/mapSlice';
 import { useFetchMapQuery } from '../store/api/mapApi';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
+import { useGetCrewStatusQuery } from '../store/api/authApi';
 import { API_URL } from '../config';
 import { computePanBounds } from '../utils/mapPanBounds';
 import { CellData, TerrainType, EntityType } from '../types/map';
@@ -234,6 +237,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
   const [selectedCell, setSelectedCell] = useState<{x: number, y: number, info: CellData} | null>(null);
   const [showAntivirusModal, setShowAntivirusModal] = useState(false);
+  const [showCrewModal, setShowCrewModal] = useState(false);
+  const [showCrewOnboardingModal, setShowCrewOnboardingModal] = useState(false);
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
   const startX = useSharedValue(0);
@@ -525,9 +530,14 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   
   // Get research features data (same as ResearchFeaturesList)
   const { data: researchFeatures } = useGetUserFeaturesQuery('home-defense');
+  const { data: hackCrewFeatures } = useGetUserFeaturesQuery('hack-crew');
+  const { data: crewStatus } = useGetCrewStatusQuery();
   
   // Find the antivirus feature from the research features
   const antivirusFeature = researchFeatures?.find(f => f.id === 'antivirus');
+  
+  // Find the crew-system-unlock feature from hack-crew features
+  const hackCrewFeature = hackCrewFeatures?.find(f => f.id === 'crew-system-unlock');
   
   // Use local timer logic to determine if actually unlocked (same as ResearchFeaturesList)
   // Calculate remaining time to match ResearchFeaturesList logic
@@ -536,6 +546,12 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const remaining = Math.max(0, researchCompletesAt - now);
   const isActuallyUnlocked = antivirusFeature?.isUnlocked || 
     (antivirusFeature?.isResearching && remaining === 0);
+  
+  // Check hack crew unlock status
+  const hackCrewResearchCompletesAt = hackCrewFeature?.researchCompletesAt ? new Date(hackCrewFeature.researchCompletesAt).getTime() : 0;
+  const hackCrewRemaining = Math.max(0, hackCrewResearchCompletesAt - now);
+  const isHackCrewUnlocked = hackCrewFeature?.isUnlocked || 
+    (hackCrewFeature?.isResearching && hackCrewRemaining === 0);
   
   // Debug logging - REMOVED to fix infinite loop
   
@@ -1050,6 +1066,38 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     setShowAntivirusModal(false);
   }, []);
 
+  const isInCrew = crewStatus?.isInCrew || false;
+
+  useEffect(() => {
+    if (isInCrew && showCrewOnboardingModal) {
+      setShowCrewOnboardingModal(false);
+      setShowCrewModal(true);
+    } else if (!isInCrew && showCrewModal) {
+      setShowCrewModal(false);
+      setShowCrewOnboardingModal(false);
+    }
+  }, [isInCrew, showCrewOnboardingModal, showCrewModal]);
+
+  const handleHackCrewPress = useCallback(() => {
+    if (isHackCrewUnlocked) {
+      if (isInCrew) {
+        setShowCrewOnboardingModal(false);
+        setShowCrewModal(true);
+      } else {
+        setShowCrewModal(false);
+        setShowCrewOnboardingModal(true);
+      }
+    }
+  }, [isHackCrewUnlocked, isInCrew]);
+
+  const handleCrewClose = useCallback(() => {
+    setShowCrewModal(false);
+  }, []);
+
+  const handleCrewOnboardingClose = useCallback(() => {
+    setShowCrewOnboardingModal(false);
+  }, []);
+
   const renderInfoPanel = useCallback(() => {
     if (!selectedCell) {return null;}
 
@@ -1158,11 +1206,24 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         <CollapsibleToolbar
           onAntivirusPress={handleAntivirusPress}
           isAntivirusUnlocked={isActuallyUnlocked}
+          onHackCrewPress={handleHackCrewPress}
+          isHackCrewUnlocked={isHackCrewUnlocked}
+          isInCrew={isInCrew}
         />
 
       <AntivirusModal
         visible={showAntivirusModal}
         onClose={handleAntivirusClose}
+      />
+
+      <CrewModal
+        visible={showCrewModal}
+        onClose={handleCrewClose}
+      />
+
+      <CrewOnboardingModal
+        visible={showCrewOnboardingModal}
+        onClose={handleCrewOnboardingClose}
       />
 
       {renderInfoPanel()}

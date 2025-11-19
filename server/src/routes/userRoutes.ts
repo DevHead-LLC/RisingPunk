@@ -47,6 +47,34 @@ router.get('/profile', auth, async (req: Request, res: Response) => {
   }
 });
 
+router.get('/profile/:userId', auth, async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    
+    if (!userId) {
+      res.status(400).json({ error: 'User ID is required' });
+      return;
+    }
+
+    const user = await User.findById(userId).select('handle level profileGender');
+    
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    res.json({
+      userId: String(user._id),
+      handle: user.handle,
+      level: user.level,
+      profileGender: user.profileGender || 'male'
+    });
+  } catch (error) {
+    console.error('Server error:', error);
+    res.status(500).json({ error: 'Error fetching user profile' });
+  }
+});
+
 router.get('/shield-status/:userId', auth, async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
