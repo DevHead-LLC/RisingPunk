@@ -22,6 +22,7 @@ import documentsRoutes from './src/routes/documents';
 import { deleteAccountHandler } from './src/routes/documents';
 import testRoutes from './src/routes/test';
 import botsRoutes from './src/routes/bots';
+import crewRoutes from './src/routes/crew';
 
 declare global {
   namespace Express {
@@ -499,6 +500,7 @@ app.use('/api/map', mapRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/battle', battleRoutes);
 app.use('/api/research', researchRoutes);
+app.use('/api/crew', crewRoutes);
 app.use('/documents', documentsRoutes);
 
 // Test routes for privacy policy compliance verification

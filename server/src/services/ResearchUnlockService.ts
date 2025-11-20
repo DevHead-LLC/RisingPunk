@@ -23,7 +23,7 @@ export class ResearchUnlockService {
     'home-defense': 10000,
     'hack-ability': 20000,
     'financial': 20000,
-    'hack-crew': 50000,
+    'hack-crew': 100000,
     'npc': 50000,
     'cash-flow': 50000,
     'construction': 50000,
@@ -230,20 +230,108 @@ export class ResearchUnlockService {
   }
 
   static async getUserResearchStatus(userId: string): Promise<any[]> {
+    const user = await User.findById(userId);
+    if (!user) return [];
+
+    const allResearch = await Research.find();
     const userResearch = await ResearchUser.find({ userId })
       .populate('researchId')
       .sort({ 'researchId.categoryId': 1 });
 
-    return userResearch.map(ur => ({
-      categoryId: (ur.researchId as any).categoryId,
-      name: (ur.researchId as any).name,
-      isUnlocked: ur.isUnlocked,
-      unlockedAt: ur.unlockedAt,
-      unlockCost: this.getUnlockCost((ur.researchId as any).categoryId),
-      levelRequirement: (ur.researchId as any).levelRequirement,
-      balanceRequirement: (ur.researchId as any).balanceRequirement,
-      dependencies: (ur.researchId as any).dependencies,
-      image: (ur.researchId as any).image
-    }));
+    const existingResearchIds = new Set(
+      userResearch.map(ur => (ur.researchId as any)?._id?.toString())
+    );
+
+    const missingResearch = allResearch.filter(
+      research => !existingResearchIds.has((research._id as mongoose.Types.ObjectId).toString())
+    );
+
+    if (missingResearch.length > 0) {
+      const newResearchUserEntries = missingResearch.map(research => ({
+        userId,
+        researchId: research._id,
+        isUnlocked: false,
+        unlockedAt: null,
+        unlockCost: 0,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }));
+
+      await ResearchUser.insertMany(newResearchUserEntries);
+
+      const updatedUserResearch = await ResearchUser.find({ userId })
+        .populate('researchId')
+        .sort({ 'researchId.categoryId': 1 });
+
+      return updatedUserResearch.map(ur => {
+        const research = ur.researchId as any;
+        const dbUnlocked = ur.isUnlocked;
+        
+        const levelMet = user.level >= research.levelRequirement;
+        
+        const unlockedDependencies = updatedUserResearch
+          .filter(ur2 => research.dependencies.includes((ur2.researchId as any)?.categoryId))
+          .map(ur2 => ur2.isUnlocked);
+        const dependenciesMet = research.dependencies.length === 0 || 
+          (unlockedDependencies.length === research.dependencies.length && unlockedDependencies.every(unlocked => unlocked === true));
+        
+        const actuallyUnlocked = dbUnlocked ? (levelMet && dependenciesMet) : false;
+
+        if (!actuallyUnlocked && dbUnlocked) {
+          ResearchUser.findOneAndUpdate(
+            { userId, researchId: research._id },
+            { isUnlocked: false, unlockedAt: null },
+            { new: false }
+          ).catch(err => console.error('Error correcting unlock status:', err));
+        }
+
+        return {
+          categoryId: research.categoryId,
+          name: research.name,
+          isUnlocked: actuallyUnlocked,
+          unlockedAt: actuallyUnlocked ? ur.unlockedAt : null,
+          unlockCost: this.getUnlockCost(research.categoryId),
+          levelRequirement: research.levelRequirement,
+          balanceRequirement: research.balanceRequirement,
+          dependencies: research.dependencies,
+          image: research.image
+        };
+      });
+    }
+
+    return userResearch.map(ur => {
+      const research = ur.researchId as any;
+      const dbUnlocked = ur.isUnlocked;
+      
+      const levelMet = user.level >= research.levelRequirement;
+      
+      const unlockedDependencies = userResearch
+        .filter(ur2 => research.dependencies.includes((ur2.researchId as any)?.categoryId))
+        .map(ur2 => ur2.isUnlocked);
+      const dependenciesMet = research.dependencies.length === 0 || 
+        (unlockedDependencies.length === research.dependencies.length && unlockedDependencies.every(unlocked => unlocked === true));
+      
+      const actuallyUnlocked = dbUnlocked ? (levelMet && dependenciesMet) : false;
+
+      if (!actuallyUnlocked && dbUnlocked) {
+        ResearchUser.findOneAndUpdate(
+          { userId, researchId: research._id },
+          { isUnlocked: false, unlockedAt: null },
+          { new: false }
+        ).catch(err => console.error('Error correcting unlock status:', err));
+      }
+
+      return {
+        categoryId: research.categoryId,
+        name: research.name,
+        isUnlocked: actuallyUnlocked,
+        unlockedAt: actuallyUnlocked ? ur.unlockedAt : null,
+        unlockCost: this.getUnlockCost(research.categoryId),
+        levelRequirement: research.levelRequirement,
+        balanceRequirement: research.balanceRequirement,
+        dependencies: research.dependencies,
+        image: research.image
+      };
+    });
   }
 }

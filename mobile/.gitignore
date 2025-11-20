@@ -78,3 +78,6 @@ yarn-error.log
 android/local.properties
 # Windows-specific Android develop script
 android-dev.ps1
+
+mobile/current-task.md
+current-task.md
