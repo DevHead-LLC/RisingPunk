@@ -532,16 +532,6 @@ export const CrewModal: React.FC<CrewModalProps> = ({
 
     const loggedInUserId = currentUser?._id;
 
-    if (!loggedInUserId) {
-      return (
-        <View style={styles.categoryContent}>
-          <Text style={[styles.placeholderText, { color: colors.text.secondary }]}>
-            Loading user information...
-          </Text>
-        </View>
-      );
-    }
-
     const executiveSlots = Array.from({ length: 4 }, (_, index) => executives[index] || null);
     const executiveUserIds = new Set(executives.map((exec: any) => exec.userId));
     const pendingPromotedCount = Array.from(recentlyPromotedUserIds).filter(
@@ -550,7 +540,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     const effectiveExecutivesCount = executives.length + pendingPromotedCount;
 
     const isLoggedInUser = (memberUserId: string): boolean => {
-      if (!memberUserId) {
+      if (!memberUserId || !loggedInUserId) {
         return false;
       }
       const loggedInUserIdString = String(loggedInUserId).trim();
@@ -796,16 +786,6 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     const members = activeCrewDetails?.crew?.members || [];
     const loggedInUserId = currentUser?._id;
 
-    if (!loggedInUserId) {
-      return (
-        <View style={styles.categoryContent}>
-          <Text style={[styles.placeholderText, { color: colors.text.secondary }]}>
-            Loading user information...
-          </Text>
-        </View>
-      );
-    }
-
     const sortedExecutives = [...executives].sort((a, b) => (b.level || 1) - (a.level || 1));
     const regularMembers = members.filter((member) => {
       const isExecutive = executives.some((exec) => exec.userId === member.userId);
@@ -815,7 +795,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     const sortedMembers = [...regularMembers].sort((a, b) => (b.level || 1) - (a.level || 1));
 
     const isLoggedInUser = (memberUserId: string): boolean => {
-      if (!memberUserId) {
+      if (!memberUserId || !loggedInUserId) {
         return false;
       }
       const loggedInUserIdString = String(loggedInUserId).trim();
