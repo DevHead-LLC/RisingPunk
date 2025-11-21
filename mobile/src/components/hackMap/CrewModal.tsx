@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, SafeAreaView, Dimensions } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
@@ -8,7 +8,7 @@ import { VisitingProfileModal } from './VisitingProfileModal';
 import { LeaveCrewModal } from './LeaveCrewModal';
 import { EditCrewNameModal } from './EditCrewNameModal';
 import { EditCrewIdentifierModal } from './EditCrewIdentifierModal';
-import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation } from '../../store/api/authApi';
+import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, usePromoteMemberMutation, useDemoteExecutiveMutation } from '../../store/api/authApi';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CREW_MODAL_PADDING = SIZING.spacing.md * 2;
@@ -59,6 +59,9 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [showEditCrewNameModal, setShowEditCrewNameModal] = useState(false);
   const [showEditCrewIdentifierModal, setShowEditCrewIdentifierModal] = useState(false);
   const [viewingProfileUserId, setViewingProfileUserId] = useState<string | null>(null);
+  const [promotingUserId, setPromotingUserId] = useState<string | null>(null);
+  const [demotingUserId, setDemotingUserId] = useState<string | null>(null);
+  const [recentlyPromotedUserIds, setRecentlyPromotedUserIds] = useState<Set<string>>(new Set());
   const { data: crewStatus, refetch: refetchCrewStatus } = useGetCrewStatusQuery(undefined, {
     pollingInterval: visible ? 3000 : 0,
   });
@@ -68,6 +71,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [leaveCrew, { isLoading: isLeaving }] = useLeaveCrewMutation();
   const [updateCrewName, { isLoading: isUpdatingCrewName }] = useUpdateCrewNameMutation();
   const [updateCrewIdentifier, { isLoading: isUpdatingCrewIdentifier }] = useUpdateCrewIdentifierMutation();
+  const [promoteMember] = usePromoteMemberMutation();
+  const [demoteExecutive] = useDemoteExecutiveMutation();
   const currentUser = useAppSelector((state) => state.auth.user);
   
   const userRole = crewStatus?.role;
@@ -83,7 +88,36 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   
   const activeCrewDetails = crewDetails;
   const executives = activeCrewDetails?.crew?.executives || [];
+  const members = activeCrewDetails?.crew?.members || [];
+  const president = activeCrewDetails?.crew?.president;
   const isExecutive = currentUserId && executives.some((exec: any) => String(exec.userId) === String(currentUserId));
+  
+  const regularMembers = useMemo(() => {
+    if (!members || !executives || !president) return [];
+    return members.filter((member) => {
+      const isExecutive = executives.some((exec: any) => exec.userId === member.userId);
+      const isPresident = president?.userId === member.userId;
+      return !isExecutive && !isPresident;
+    });
+  }, [members, executives, president]);
+
+  useEffect(() => {
+    setRecentlyPromotedUserIds(prev => {
+      if (prev.size === 0) return prev;
+      const memberUserIds = new Set(regularMembers.map(m => m.userId));
+      const executiveUserIds = new Set(executives.map((exec: any) => exec.userId));
+      let hasChanges = false;
+      const next = new Set(prev);
+      prev.forEach(userId => {
+        if (!memberUserIds.has(userId) || executiveUserIds.has(userId)) {
+          next.delete(userId);
+          hasChanges = true;
+        }
+      });
+      return hasChanges ? next : prev;
+    });
+  }, [regularMembers, executives]);
+
   const styles = createStyles(colors);
 
   const handleCategoryPress = (categoryId: CrewCategory) => {
@@ -100,6 +134,10 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     setShowLeaveCrewModal(false);
     setShowEditCrewNameModal(false);
     setShowEditCrewIdentifierModal(false);
+    setViewingProfileUserId(null);
+    setPromotingUserId(null);
+    setDemotingUserId(null);
+    setRecentlyPromotedUserIds(new Set());
     onClose();
   };
 
@@ -239,6 +277,52 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       throw new Error(error?.data?.error || error?.error || 'Failed to update crew identifier');
     }
   }, [updateCrewIdentifier, refetchCrewDetails, refetchCrewStatus]);
+
+  const handlePromoteMember = useCallback(async (memberUserId: string) => {
+    if (!crewStatus?.crewId) {
+      return;
+    }
+
+    setPromotingUserId(memberUserId);
+    setRecentlyPromotedUserIds(prev => new Set(prev).add(memberUserId));
+    try {
+      await promoteMember({
+        crewId: crewStatus.crewId,
+        memberUserId,
+      }).unwrap();
+      await refetchCrewDetails();
+      await refetchCrewStatus();
+    } catch (error: any) {
+      console.error('Error promoting member:', error);
+      setRecentlyPromotedUserIds(prev => {
+        const next = new Set(prev);
+        next.delete(memberUserId);
+        return next;
+      });
+    } finally {
+      setPromotingUserId(null);
+    }
+  }, [promoteMember, crewStatus?.crewId, refetchCrewDetails, refetchCrewStatus]);
+
+  const handleDemoteExecutive = useCallback(async (executiveUserId: string) => {
+    if (!crewStatus?.crewId) {
+      return;
+    }
+
+    setDemotingUserId(executiveUserId);
+    try {
+      await demoteExecutive({
+        crewId: crewStatus.crewId,
+        executiveUserId,
+      }).unwrap();
+      await refetchCrewDetails();
+      await refetchCrewStatus();
+    } catch (error: any) {
+      console.error('Error demoting executive:', error);
+    } finally {
+      setDemotingUserId(null);
+    }
+  }, [demoteExecutive, crewStatus?.crewId, refetchCrewDetails, refetchCrewStatus]);
 
   const renderCategoryList = () => {
     if (!crewStatus?.isInCrew || !activeCrewDetails?.crew) {
@@ -446,30 +530,17 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       );
     }
 
-    const president = activeCrewDetails.crew.president;
-    const executives = activeCrewDetails.crew.executives || [];
-    const members = activeCrewDetails.crew.members || [];
     const loggedInUserId = currentUser?._id;
 
-    if (!loggedInUserId) {
-      return (
-        <View style={styles.categoryContent}>
-          <Text style={[styles.placeholderText, { color: colors.text.secondary }]}>
-            Loading user information...
-          </Text>
-        </View>
-      );
-    }
-
     const executiveSlots = Array.from({ length: 4 }, (_, index) => executives[index] || null);
-    const regularMembers = members.filter((member) => {
-      const isExecutive = executives.some((exec) => exec.userId === member.userId);
-      const isPresident = president?.userId === member.userId;
-      return !isExecutive && !isPresident;
-    });
+    const executiveUserIds = new Set(executives.map((exec: any) => exec.userId));
+    const pendingPromotedCount = Array.from(recentlyPromotedUserIds).filter(
+      userId => !executiveUserIds.has(userId)
+    ).length;
+    const effectiveExecutivesCount = executives.length + pendingPromotedCount;
 
     const isLoggedInUser = (memberUserId: string): boolean => {
-      if (!memberUserId) {
+      if (!memberUserId || !loggedInUserId) {
         return false;
       }
       const loggedInUserIdString = String(loggedInUserId).trim();
@@ -531,18 +602,35 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                 >
                   {executive ? (
                     <>
-                      <Text style={[
-                        styles.memberHandle,
-                        { color: isLoggedInUser(executive.userId) ? colors.primary : colors.text.primary, fontWeight: isLoggedInUser(executive.userId) ? 'bold' : '600' }
-                      ]}>
-                        {executive.handle}
-                        {isLoggedInUser(executive.userId) && (
-                          <Text style={[styles.youLabel, { color: colors.primary }]}> (You)</Text>
-                        )}
-                      </Text>
-                      <Text style={[styles.memberLevel, { color: colors.text.secondary }]}>
-                        Lv {executive.level || 1}
-                      </Text>
+                      <View style={styles.memberInfoContainer}>
+                        <Text style={[
+                          styles.memberHandle,
+                          { color: isLoggedInUser(executive.userId) ? colors.primary : colors.text.primary, fontWeight: isLoggedInUser(executive.userId) ? 'bold' : '600' }
+                        ]}>
+                          {executive.handle}
+                          {isLoggedInUser(executive.userId) && (
+                            <Text style={[styles.youLabel, { color: colors.primary }]}> (You)</Text>
+                          )}
+                        </Text>
+                        <Text style={[styles.memberLevel, { color: colors.text.secondary }]}>
+                          Lv {executive.level || 1}
+                        </Text>
+                      </View>
+                      {userRole === 'president' && (
+                        <TouchableOpacity
+                          style={[
+                            styles.memberActionButton,
+                            { borderColor: colors.error, backgroundColor: colors.error }
+                          ]}
+                          onPress={() => handleDemoteExecutive(executive.userId)}
+                          disabled={demotingUserId === executive.userId}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.memberActionButtonText, { color: '#FFFFFF' }]}>
+                            {demotingUserId === executive.userId ? 'Demoting...' : 'Demote'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
                     </>
                   ) : null}
                 </View>
@@ -571,18 +659,35 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                     <Text style={[styles.memberNumber, { color: colors.text.primary }]}>
                       {index + 1}.
                     </Text>
-                    <Text style={[
-                      styles.memberHandle,
-                      { color: isLoggedInUser(member.userId) ? colors.primary : colors.text.primary, fontWeight: isLoggedInUser(member.userId) ? 'bold' : '600' }
-                    ]}>
-                      {member.handle}
-                      {isLoggedInUser(member.userId) && (
-                        <Text style={[styles.youLabel, { color: colors.primary }]}> (You)</Text>
-                      )}
-                    </Text>
-                    <Text style={[styles.memberLevel, { color: colors.text.secondary }]}>
-                      Lv {member.level || 1}
-                    </Text>
+                    <View style={styles.memberInfoContainer}>
+                      <Text style={[
+                        styles.memberHandle,
+                        { color: isLoggedInUser(member.userId) ? colors.primary : colors.text.primary, fontWeight: isLoggedInUser(member.userId) ? 'bold' : '600' }
+                      ]}>
+                        {member.handle}
+                        {isLoggedInUser(member.userId) && (
+                          <Text style={[styles.youLabel, { color: colors.primary }]}> (You)</Text>
+                        )}
+                      </Text>
+                      <Text style={[styles.memberLevel, { color: colors.text.secondary }]}>
+                        Lv {member.level || 1}
+                      </Text>
+                    </View>
+                    {userRole === 'president' && effectiveExecutivesCount < 4 && (
+                      <TouchableOpacity
+                        style={[
+                          styles.memberActionButton,
+                          { borderColor: '#4CAF50', backgroundColor: '#4CAF50' }
+                        ]}
+                        onPress={() => handlePromoteMember(member.userId)}
+                        disabled={promotingUserId === member.userId || recentlyPromotedUserIds.has(member.userId)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.memberActionButtonText, { color: '#FFFFFF' }]}>
+                          {promotingUserId === member.userId || recentlyPromotedUserIds.has(member.userId) ? 'Promoting...' : 'Promote'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 ))}
               </View>
@@ -681,16 +786,6 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     const members = activeCrewDetails?.crew?.members || [];
     const loggedInUserId = currentUser?._id;
 
-    if (!loggedInUserId) {
-      return (
-        <View style={styles.categoryContent}>
-          <Text style={[styles.placeholderText, { color: colors.text.secondary }]}>
-            Loading user information...
-          </Text>
-        </View>
-      );
-    }
-
     const sortedExecutives = [...executives].sort((a, b) => (b.level || 1) - (a.level || 1));
     const regularMembers = members.filter((member) => {
       const isExecutive = executives.some((exec) => exec.userId === member.userId);
@@ -700,7 +795,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     const sortedMembers = [...regularMembers].sort((a, b) => (b.level || 1) - (a.level || 1));
 
     const isLoggedInUser = (memberUserId: string): boolean => {
-      if (!memberUserId) {
+      if (!memberUserId || !loggedInUserId) {
         return false;
       }
       const loggedInUserIdString = String(loggedInUserId).trim();
@@ -1283,6 +1378,25 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: SIZING.font.small,
     fontWeight: '500',
     marginLeft: SIZING.spacing.sm,
+  },
+  memberInfoContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  memberActionButton: {
+    paddingVertical: SIZING.spacing.xs,
+    paddingHorizontal: SIZING.spacing.md,
+    borderRadius: 6,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 70,
+    marginLeft: SIZING.spacing.sm,
+  },
+  memberActionButtonText: {
+    fontSize: SIZING.font.small,
+    fontWeight: '600',
   },
   youLabel: {
     fontSize: SIZING.font.body,
