@@ -5,7 +5,7 @@ export interface ICrewStatus extends Document {
   isInCrew: boolean;
   crewId: mongoose.Types.ObjectId | null;
   crewIdentifier: string | null;
-  role: 'president' | 'member' | null;
+  role: 'president' | 'member' | 'executive' | null;
   appliedCrewId: mongoose.Types.ObjectId | null;
   appliedCrewIdentifier: string | null;
   createdAt: Date;
@@ -34,7 +34,7 @@ const crewStatusSchema = new Schema({
   },
   role: {
     type: String,
-    enum: ['president', 'member', null],
+    enum: ['president', 'member', 'executive', null],
     default: null
   },
   appliedCrewId: {
