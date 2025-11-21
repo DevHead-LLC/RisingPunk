@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, SafeAreaView, TextInput, ScrollView, FlatList } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
@@ -42,6 +42,7 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
   onClose,
 }) => {
   const colors = useThemeColors();
+  const isProcessingRef = useRef(false);
   const [createCrew, { isLoading: isCreatingCrew }] = useCreateCrewMutation();
   const { data: crewStatus, refetch: refetchCrewStatus } = useGetCrewStatusQuery(undefined, {
     pollingInterval: visible ? 3000 : 0,
@@ -85,6 +86,26 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
 
   const searchCrews = useMemo(() => searchResults?.crews || [], [searchResults]);
   const suggestedCrews = useMemo(() => suggestedCrewsData?.crews || [], [suggestedCrewsData]);
+
+  const handleApplyToggle = useCallback(async (crewId: string) => {
+    if (isProcessingRef.current) {
+      return;
+    }
+    
+    isProcessingRef.current = true;
+    try {
+      if (crewStatus?.appliedCrewId === crewId) {
+        await withdrawApplication().unwrap();
+      } else {
+        await applyToCrew({ crewId }).unwrap();
+      }
+      await refetchCrewStatus();
+    } catch (error: any) {
+      console.error('Error toggling application:', error);
+    } finally {
+      isProcessingRef.current = false;
+    }
+  }, [crewStatus?.appliedCrewId, applyToCrew, withdrawApplication, refetchCrewStatus]);
 
   const validateCrewName = useCallback((value: string): string => {
     if (!value.trim()) {
@@ -314,19 +335,8 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
                                     backgroundColor: crewStatus?.appliedCrewId === crew.id ? '#4CAF50' : colors.primary
                                   }
                                 ]}
-                                onPress={async () => {
-                                  try {
-                                    if (crewStatus?.appliedCrewId === crew.id) {
-                                      await withdrawApplication().unwrap();
-                                    } else {
-                                      await applyToCrew({ crewId: crew.id }).unwrap();
-                                    }
-                                    await refetchCrewStatus();
-                                  } catch (error: any) {
-                                    console.error('Error toggling application:', error);
-                                  }
-                                }}
-                                disabled={isApplying || isWithdrawing}
+                                onPress={() => handleApplyToggle(crew.id)}
+                                disabled={isApplying || isWithdrawing || isProcessingRef.current}
                                 activeOpacity={0.7}
                               >
                                 <Text style={[styles.crewResultButtonText, { color: '#FFFFFF' }]}>
@@ -412,19 +422,8 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
                                     backgroundColor: crewStatus?.appliedCrewId === crew.id ? '#4CAF50' : colors.primary
                                   }
                                 ]}
-                                onPress={async () => {
-                                  try {
-                                    if (crewStatus?.appliedCrewId === crew.id) {
-                                      await withdrawApplication().unwrap();
-                                    } else {
-                                      await applyToCrew({ crewId: crew.id }).unwrap();
-                                    }
-                                    await refetchCrewStatus();
-                                  } catch (error: any) {
-                                    console.error('Error toggling application:', error);
-                                  }
-                                }}
-                                disabled={isApplying || isWithdrawing}
+                                onPress={() => handleApplyToggle(crew.id)}
+                                disabled={isApplying || isWithdrawing || isProcessingRef.current}
                                 activeOpacity={0.7}
                               >
                                 <Text style={[styles.suggestedCrewButtonText, { color: '#FFFFFF' }]}>

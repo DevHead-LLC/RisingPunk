@@ -31,6 +31,11 @@ export interface CompleteResearchResult {
 }
 
 export class ResearchFeatureService {
+  private static isValidResearchTimeHours(hours: number | null | undefined): boolean {
+    if (hours == null) return false;
+    return hours >= 0.1;
+  }
+
   static async validateFeatureRequirements(
     userId: string,
     categoryId: string,
@@ -302,6 +307,11 @@ export class ResearchFeatureService {
       const featuresWithStatus = baseFeatures.map(feature => {
         const userFeature = userFeatures.find(uf => uf.featureId === feature.id);
 
+        const userResearchTimeHours = userFeature?.researchTimeHours;
+        const validUserResearchTime = ResearchFeatureService.isValidResearchTimeHours(userResearchTimeHours) 
+          ? userResearchTimeHours 
+          : null;
+
         return {
           ...feature,
           isUnlocked: userFeature?.isUnlocked ?? false,
@@ -309,7 +319,7 @@ export class ResearchFeatureService {
           isResearching: userFeature?.isResearching ?? false,
           researchStartedAt: userFeature?.researchStartedAt ?? null,
           researchCompletesAt: userFeature?.researchCompletesAt ?? null,
-          researchTimeHours: userFeature?.researchTimeHours ?? feature.researchTimeHours ?? 4
+          researchTimeHours: validUserResearchTime ?? feature.researchTimeHours ?? 4
         };
       });
 
@@ -341,6 +351,11 @@ export class ResearchFeatureService {
         return null;
       }
 
+      const userResearchTimeHours = userFeature.researchTimeHours;
+      const validUserResearchTime = ResearchFeatureService.isValidResearchTimeHours(userResearchTimeHours)
+        ? userResearchTimeHours
+        : null;
+
       return {
         ...baseFeature,
         isUnlocked: userFeature.isUnlocked,
@@ -348,7 +363,7 @@ export class ResearchFeatureService {
         isResearching: userFeature.isResearching,
         researchStartedAt: userFeature.researchStartedAt,
         researchCompletesAt: userFeature.researchCompletesAt,
-        researchTimeHours: userFeature.researchTimeHours ?? baseFeature.researchTimeHours ?? 4
+        researchTimeHours: validUserResearchTime ?? baseFeature.researchTimeHours ?? 4
       };
     } catch (error) {
       console.error('Error getting user feature status:', error);

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, SafeAreaView, Dimensions } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
@@ -39,6 +39,7 @@ export const VisitCrewModal: React.FC<VisitCrewModalProps> = ({
 }) => {
   const colors = useThemeColors();
   const [currentCategory, setCurrentCategory] = useState<VisitCrewCategory>(null);
+  const isProcessingRef = useRef(false);
   const { data: crewStatus, refetch: refetchCrewStatus } = useGetCrewStatusQuery(undefined, {
     pollingInterval: visible ? 3000 : 0,
   });
@@ -82,6 +83,11 @@ export const VisitCrewModal: React.FC<VisitCrewModalProps> = ({
   };
 
   const handleApplyToggle = useCallback(async () => {
+    if (isProcessingRef.current) {
+      return;
+    }
+    
+    isProcessingRef.current = true;
     try {
       if (isApplied) {
         await withdrawApplication().unwrap();
@@ -91,6 +97,8 @@ export const VisitCrewModal: React.FC<VisitCrewModalProps> = ({
       await refetchCrewStatus();
     } catch (error: any) {
       console.error('Error toggling application:', error);
+    } finally {
+      isProcessingRef.current = false;
     }
   }, [isApplied, crewId, applyToCrew, withdrawApplication, refetchCrewStatus]);
 
@@ -328,7 +336,7 @@ export const VisitCrewModal: React.FC<VisitCrewModalProps> = ({
                   }
                 ]}
                 onPress={handleApplyToggle}
-                disabled={isApplying || isWithdrawing}
+                disabled={isApplying || isWithdrawing || isProcessingRef.current}
                 activeOpacity={0.7}
               >
                 <Text style={[styles.applyButtonText, { color: '#FFFFFF' }]}>
