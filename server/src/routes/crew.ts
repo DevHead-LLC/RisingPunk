@@ -267,32 +267,43 @@ interface ApplyToCrewRequest extends Request {
 }
 
 router.post('/apply', auth, async (req: ApplyToCrewRequest, res: Response) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
   try {
     const userId = req.user?._id;
     if (!userId) {
+      await session.abortTransaction();
+      session.endSession();
       res.status(401).json({ error: 'User not authenticated' });
       return;
     }
 
     const { crewId } = req.body;
     if (!crewId) {
+      await session.abortTransaction();
+      session.endSession();
       res.status(400).json({ error: 'Crew ID is required' });
       return;
     }
 
-    const crew = await Crew.findById(crewId);
+    const crew = await Crew.findById(crewId).session(session);
     if (!crew) {
+      await session.abortTransaction();
+      session.endSession();
       res.status(404).json({ error: 'Crew not found' });
       return;
     }
 
-    const user = await User.findById(userId);
+    const user = await User.findById(userId).session(session);
     if (!user) {
+      await session.abortTransaction();
+      session.endSession();
       res.status(404).json({ error: 'User not found' });
       return;
     }
 
-    let crewStatus = await CrewStatus.findOne({ userId });
+    let crewStatus = await CrewStatus.findOne({ userId }).session(session);
     if (!crewStatus) {
       crewStatus = new CrewStatus({
         userId,
@@ -306,36 +317,47 @@ router.post('/apply', auth, async (req: ApplyToCrewRequest, res: Response) => {
     }
 
     if (crewStatus.isInCrew) {
+      await session.abortTransaction();
+      session.endSession();
       res.status(400).json({ error: 'User is already in a crew' });
       return;
     }
 
     if (crewStatus.appliedCrewId) {
+      await session.abortTransaction();
+      session.endSession();
       res.status(400).json({ error: 'User has already applied to a crew' });
       return;
     }
 
     if (crew.applicants.some((app: any) => app.userId.toString() === userId.toString())) {
+      await session.abortTransaction();
+      session.endSession();
       res.status(400).json({ error: 'User has already applied to this crew' });
       return;
     }
 
     crewStatus.appliedCrewId = crew._id as mongoose.Types.ObjectId;
     crewStatus.appliedCrewIdentifier = crew.crewIdentifier;
-    await crewStatus.save();
+    await crewStatus.save({ session });
 
     crew.applicants.push({
       userId: new mongoose.Types.ObjectId(userId),
       handle: user.handle,
       appliedAt: new Date()
     });
-    await crew.save();
+    await crew.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
 
     res.json({
       success: true,
       message: 'Application submitted successfully'
     });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.error('Error applying to crew:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -584,11 +606,11 @@ router.post('/deny-applicant', auth, async (req: DenyApplicantRequest, res: Resp
     }
 
     const applicantObjectId = new mongoose.Types.ObjectId(applicantUserId);
-    const applicantIndex = crew.applicants.findIndex((app: any) => 
+    const initialApplicantCount = crew.applicants.filter((app: any) => 
       app.userId.toString() === applicantUserId
-    );
+    ).length;
 
-    if (applicantIndex === -1) {
+    if (initialApplicantCount === 0) {
       res.status(404).json({ error: 'Applicant not found in crew applicants list' });
       return;
     }
@@ -604,7 +626,9 @@ router.post('/deny-applicant', auth, async (req: DenyApplicantRequest, res: Resp
       return;
     }
 
-    crew.applicants.splice(applicantIndex, 1);
+    crew.applicants = crew.applicants.filter(
+      (app: any) => app.userId.toString() !== applicantUserId
+    );
     await crew.save();
 
     applicantStatus.appliedCrewId = null;
