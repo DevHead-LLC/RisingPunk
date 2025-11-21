@@ -993,6 +993,8 @@ router.post('/promote-member', auth, async (req: PromoteMemberRequest, res: Resp
   const session = await mongoose.startSession();
   session.startTransaction();
   
+  let updatedCrew: any = null;
+  
   try {
     const userId = req.user?._id;
     if (!userId) {
@@ -1064,7 +1066,7 @@ router.post('/promote-member', auth, async (req: PromoteMemberRequest, res: Resp
       return;
     }
 
-    const updatedCrew = await Crew.findOneAndUpdate(
+    updatedCrew = await Crew.findOneAndUpdate(
       {
         _id: crewId,
         $expr: { $lt: [{ $size: '$executives' }, 4] },
@@ -1125,6 +1127,19 @@ router.post('/promote-member', auth, async (req: PromoteMemberRequest, res: Resp
 
     await session.commitTransaction();
     session.endSession();
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Error promoting member:', error);
+    res.status(500).json({ error: 'Internal server error' });
+    return;
+  }
+
+  try {
+    if (!updatedCrew) {
+      res.status(500).json({ error: 'Internal server error' });
+      return;
+    }
 
     const populatedCrew = await Crew.findById(updatedCrew._id)
       .populate('presidentId', 'handle level')
@@ -1154,9 +1169,7 @@ router.post('/promote-member', auth, async (req: PromoteMemberRequest, res: Resp
       }
     });
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-    console.error('Error promoting member:', error);
+    console.error('Error fetching crew after promotion:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1172,6 +1185,8 @@ router.post('/demote-executive', auth, async (req: DemoteExecutiveRequest, res: 
   const session = await mongoose.startSession();
   session.startTransaction();
   
+  let crewId: string | undefined;
+  
   try {
     const userId = req.user?._id;
     if (!userId) {
@@ -1181,7 +1196,9 @@ router.post('/demote-executive', auth, async (req: DemoteExecutiveRequest, res: 
       return;
     }
 
-    const { crewId, executiveUserId } = req.body;
+    const bodyData = req.body;
+    crewId = bodyData.crewId;
+    const executiveUserId = bodyData.executiveUserId;
     if (!crewId || !executiveUserId) {
       await session.abortTransaction();
       session.endSession();
@@ -1296,6 +1313,19 @@ router.post('/demote-executive', auth, async (req: DemoteExecutiveRequest, res: 
 
     await session.commitTransaction();
     session.endSession();
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Error demoting executive:', error);
+    res.status(500).json({ error: 'Internal server error' });
+    return;
+  }
+
+  try {
+    if (!crewId) {
+      res.status(500).json({ error: 'Internal server error' });
+      return;
+    }
 
     const updatedCrew = await Crew.findById(crewId)
       .populate('presidentId', 'handle level')
@@ -1325,9 +1355,7 @@ router.post('/demote-executive', auth, async (req: DemoteExecutiveRequest, res: 
       }
     });
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-    console.error('Error demoting executive:', error);
+    console.error('Error fetching crew after demotion:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
