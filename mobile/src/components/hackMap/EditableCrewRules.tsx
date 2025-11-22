@@ -27,18 +27,59 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
   const [updateCrewRules, { isLoading: isSaving }] = useUpdateCrewRulesMutation();
   const initialRulesLengthRef = useRef<number | null>(null);
   const lastSyncedRulesRef = useRef<string[]>(initialCrewRules || []);
+  const pendingSaveRef = useRef<string[] | null>(null);
+  const initialCrewRulesRef = useRef<string[]>(initialCrewRules || []);
 
   useEffect(() => {
-    const currentRules = initialCrewRules || [];
-    const lastSyncedRules = lastSyncedRulesRef.current;
-    
-    const rulesChanged = JSON.stringify(currentRules) !== JSON.stringify(lastSyncedRules);
-    
-    if (!isEditing && rulesChanged) {
-      setLocalRules(currentRules);
-      lastSyncedRulesRef.current = currentRules;
-      initialRulesLengthRef.current = null;
-    } else if (!isEditing && !rulesChanged) {
+    initialCrewRulesRef.current = initialCrewRules || [];
+  }, [initialCrewRules]);
+
+  useEffect(() => {
+    if (!isEditing) {
+      const currentRules = initialCrewRules || [];
+      const lastSyncedRules = lastSyncedRulesRef.current;
+      const localRulesString = JSON.stringify(localRules);
+      const lastSyncedRulesString = JSON.stringify(lastSyncedRules);
+      const currentRulesString = JSON.stringify(currentRules);
+      const pendingSaveString = pendingSaveRef.current ? JSON.stringify(pendingSaveRef.current) : null;
+      
+      const hasLocalEdits = localRulesString !== lastSyncedRulesString;
+      const rulesChanged = currentRulesString !== lastSyncedRulesString;
+      const localMatchesCurrent = localRulesString === currentRulesString;
+      const pendingSaveMatchesCurrent = pendingSaveString === currentRulesString;
+      const localMatchesPendingSave = pendingSaveString ? localRulesString === pendingSaveString : false;
+      
+      if (rulesChanged && pendingSaveRef.current && !pendingSaveMatchesCurrent) {
+        if (!localMatchesPendingSave) {
+          if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+            saveTimeoutRef.current = null;
+          }
+          pendingSaveRef.current = null;
+        }
+      }
+      
+      if (rulesChanged) {
+        if (!hasLocalEdits) {
+          if (localMatchesCurrent) {
+            lastSyncedRulesRef.current = currentRules;
+          } else {
+            const justSaved = localRulesString === lastSyncedRulesString;
+            if (justSaved && pendingSaveRef.current) {
+              lastSyncedRulesRef.current = currentRules;
+            } else {
+              setLocalRules(currentRules);
+              lastSyncedRulesRef.current = currentRules;
+            }
+          }
+        } else {
+          if (localMatchesCurrent) {
+            lastSyncedRulesRef.current = currentRules;
+          }
+        }
+      } else {
+        lastSyncedRulesRef.current = currentRules;
+      }
       initialRulesLengthRef.current = null;
     }
   }, [initialCrewRules, isEditing]);
@@ -98,15 +139,44 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
       clearTimeout(saveTimeoutRef.current);
     }
 
+    const filteredRules = rulesToSave.filter(rule => rule.trim().length > 0);
+    const currentRulesString = JSON.stringify(initialCrewRulesRef.current || []);
+    const rulesToSaveString = JSON.stringify(filteredRules);
+    
+    if (currentRulesString === rulesToSaveString) {
+      lastSyncedRulesRef.current = filteredRules;
+      pendingSaveRef.current = null;
+      return;
+    }
+
+    pendingSaveRef.current = filteredRules;
     saveTimeoutRef.current = setTimeout(async () => {
+      const currentPendingSave = pendingSaveRef.current;
+      if (!currentPendingSave) {
+        return;
+      }
+      
       try {
-        const filteredRules = rulesToSave.filter(rule => rule.trim().length > 0);
-        await updateCrewRules({
-          crewId,
-          crewRules: filteredRules,
-        }).unwrap();
+        const serverRulesString = JSON.stringify(initialCrewRulesRef.current || []);
+        const pendingSaveString = JSON.stringify(currentPendingSave);
+        
+        if (serverRulesString !== pendingSaveString) {
+          await updateCrewRules({
+            crewId,
+            crewRules: currentPendingSave,
+          }).unwrap();
+          lastSyncedRulesRef.current = currentPendingSave;
+        } else {
+          lastSyncedRulesRef.current = currentPendingSave;
+        }
+        if (pendingSaveRef.current === currentPendingSave) {
+          pendingSaveRef.current = null;
+        }
       } catch (error) {
         console.error('Error saving crew rules:', error);
+        if (pendingSaveRef.current === currentPendingSave) {
+          pendingSaveRef.current = null;
+        }
       }
     }, 2000);
   }, [crewId, updateCrewRules]);
@@ -123,6 +193,8 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
     setEditingIndex(index);
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+      pendingSaveRef.current = null;
     }
   }, []);
 
