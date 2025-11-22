@@ -60,7 +60,7 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
             lastSyncedRulesRef.current = currentRules;
           } else {
             const justSaved = localRulesString === lastSyncedRulesString;
-            if (justSaved) {
+            if (justSaved && pendingSaveRef.current) {
               lastSyncedRulesRef.current = currentRules;
             } else {
               setLocalRules(currentRules);
