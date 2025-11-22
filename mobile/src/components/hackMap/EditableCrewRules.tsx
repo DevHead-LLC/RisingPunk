@@ -21,16 +21,55 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
   const [localRules, setLocalRules] = useState<string[]>(initialCrewRules || []);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveTimeoutRef = useRef<number | null>(null);
   const inputRefs = useRef<{ [key: number]: TextInput | null }>({});
   const isCreatingNewCardRef = useRef<boolean>(false);
   const [updateCrewRules, { isLoading: isSaving }] = useUpdateCrewRulesMutation();
   const initialRulesLengthRef = useRef<number | null>(null);
+  const lastSyncedRulesRef = useRef<string[]>(initialCrewRules || []);
+  const pendingSaveRef = useRef<string[] | null>(null);
 
   useEffect(() => {
-    setLocalRules(initialCrewRules || []);
-    initialRulesLengthRef.current = null;
-  }, [initialCrewRules]);
+    if (!isEditing) {
+      const currentRules = initialCrewRules || [];
+      const lastSyncedRules = lastSyncedRulesRef.current;
+      const localRulesString = JSON.stringify(localRules);
+      const lastSyncedRulesString = JSON.stringify(lastSyncedRules);
+      const currentRulesString = JSON.stringify(currentRules);
+      const pendingSaveString = pendingSaveRef.current ? JSON.stringify(pendingSaveRef.current) : null;
+      
+      const hasLocalEdits = localRulesString !== lastSyncedRulesString;
+      const rulesChanged = currentRulesString !== lastSyncedRulesString;
+      const localMatchesCurrent = localRulesString === currentRulesString;
+      const pendingSaveMatchesCurrent = pendingSaveString === currentRulesString;
+      
+      if (rulesChanged && pendingSaveRef.current && !pendingSaveMatchesCurrent) {
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+          saveTimeoutRef.current = null;
+        }
+        pendingSaveRef.current = null;
+      }
+      
+      if (rulesChanged) {
+        if (!hasLocalEdits) {
+          if (localMatchesCurrent) {
+            lastSyncedRulesRef.current = currentRules;
+          } else {
+            setLocalRules(currentRules);
+            lastSyncedRulesRef.current = currentRules;
+          }
+        } else {
+          if (localMatchesCurrent) {
+            lastSyncedRulesRef.current = currentRules;
+          }
+        }
+      } else {
+        lastSyncedRulesRef.current = currentRules;
+      }
+      initialRulesLengthRef.current = null;
+    }
+  }, [initialCrewRules, isEditing, localRules]);
 
   useEffect(() => {
     if (!isEditing) {
@@ -87,18 +126,43 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
       clearTimeout(saveTimeoutRef.current);
     }
 
+    const filteredRules = rulesToSave.filter(rule => rule.trim().length > 0);
+    const currentRulesString = JSON.stringify(initialCrewRules || []);
+    const rulesToSaveString = JSON.stringify(filteredRules);
+    
+    if (currentRulesString === rulesToSaveString) {
+      lastSyncedRulesRef.current = filteredRules;
+      pendingSaveRef.current = null;
+      return;
+    }
+
+    pendingSaveRef.current = filteredRules;
     saveTimeoutRef.current = setTimeout(async () => {
       try {
-        const filteredRules = rulesToSave.filter(rule => rule.trim().length > 0);
-        await updateCrewRules({
-          crewId,
-          crewRules: filteredRules,
-        }).unwrap();
+        const currentPendingSave = pendingSaveRef.current;
+        if (!currentPendingSave) {
+          return;
+        }
+        
+        const serverRulesString = JSON.stringify(initialCrewRules || []);
+        const pendingSaveString = JSON.stringify(currentPendingSave);
+        
+        if (serverRulesString !== pendingSaveString) {
+          await updateCrewRules({
+            crewId,
+            crewRules: currentPendingSave,
+          }).unwrap();
+          lastSyncedRulesRef.current = currentPendingSave;
+        } else {
+          lastSyncedRulesRef.current = currentPendingSave;
+        }
+        pendingSaveRef.current = null;
       } catch (error) {
         console.error('Error saving crew rules:', error);
+        pendingSaveRef.current = null;
       }
     }, 2000);
-  }, [crewId, updateCrewRules]);
+  }, [crewId, updateCrewRules, initialCrewRules]);
 
   const handleRuleChange = useCallback((index: number, value: string) => {
     const newRules = [...localRules];
