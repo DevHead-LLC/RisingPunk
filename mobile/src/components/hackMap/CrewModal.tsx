@@ -944,7 +944,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     const crewRules = activeCrewDetails?.crew?.crewRules || [];
     const crewId = crewStatus?.crewId;
 
-    if (!crewId || crewId.trim() === '') {
+    if (!crewId || typeof crewId !== 'string' || crewId.trim() === '') {
       return (
         <View style={styles.categoryContent}>
           <Text style={[styles.errorText, { color: colors.error }]}>
