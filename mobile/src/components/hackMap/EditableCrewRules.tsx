@@ -42,13 +42,16 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
       const rulesChanged = currentRulesString !== lastSyncedRulesString;
       const localMatchesCurrent = localRulesString === currentRulesString;
       const pendingSaveMatchesCurrent = pendingSaveString === currentRulesString;
+      const localMatchesPendingSave = pendingSaveString ? localRulesString === pendingSaveString : false;
       
       if (rulesChanged && pendingSaveRef.current && !pendingSaveMatchesCurrent) {
-        if (saveTimeoutRef.current) {
-          clearTimeout(saveTimeoutRef.current);
-          saveTimeoutRef.current = null;
+        if (!localMatchesPendingSave) {
+          if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+            saveTimeoutRef.current = null;
+          }
+          pendingSaveRef.current = null;
         }
-        pendingSaveRef.current = null;
       }
       
       if (rulesChanged) {
@@ -56,8 +59,13 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
           if (localMatchesCurrent) {
             lastSyncedRulesRef.current = currentRules;
           } else {
-            setLocalRules(currentRules);
-            lastSyncedRulesRef.current = currentRules;
+            const justSaved = localRulesString === lastSyncedRulesString;
+            if (justSaved) {
+              lastSyncedRulesRef.current = currentRules;
+            } else {
+              setLocalRules(currentRules);
+              lastSyncedRulesRef.current = currentRules;
+            }
           }
         } else {
           if (localMatchesCurrent) {
