@@ -40,7 +40,6 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
       
       const hasLocalEdits = localRulesString !== lastSyncedRulesString;
       const rulesChanged = currentRulesString !== lastSyncedRulesString;
-      const localMatchesSaved = localRulesString === lastSyncedRulesString;
       const localMatchesCurrent = localRulesString === currentRulesString;
       const pendingSaveMatchesCurrent = pendingSaveString === currentRulesString;
       
@@ -52,23 +51,21 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
         pendingSaveRef.current = null;
       }
       
-      if (rulesChanged && !hasLocalEdits) {
-        if (localMatchesCurrent) {
-          lastSyncedRulesRef.current = currentRules;
-        } else if (!localMatchesSaved) {
-          setLocalRules(currentRules);
-          lastSyncedRulesRef.current = currentRules;
+      if (rulesChanged) {
+        if (!hasLocalEdits) {
+          if (localMatchesCurrent) {
+            lastSyncedRulesRef.current = currentRules;
+          } else {
+            setLocalRules(currentRules);
+            lastSyncedRulesRef.current = currentRules;
+          }
+        } else {
+          if (localMatchesCurrent) {
+            lastSyncedRulesRef.current = currentRules;
+          }
         }
-      } else if (rulesChanged && hasLocalEdits) {
-        if (localMatchesCurrent) {
-          lastSyncedRulesRef.current = currentRules;
-        }
-      } else if (!rulesChanged) {
-        if (hasLocalEdits && localMatchesSaved && localMatchesCurrent) {
-          lastSyncedRulesRef.current = currentRules;
-        } else if (!hasLocalEdits) {
-          lastSyncedRulesRef.current = currentRules;
-        }
+      } else {
+        lastSyncedRulesRef.current = currentRules;
       }
       initialRulesLengthRef.current = null;
     }
