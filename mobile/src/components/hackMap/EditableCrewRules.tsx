@@ -26,13 +26,22 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
   const isCreatingNewCardRef = useRef<boolean>(false);
   const [updateCrewRules, { isLoading: isSaving }] = useUpdateCrewRulesMutation();
   const initialRulesLengthRef = useRef<number | null>(null);
+  const lastSyncedRulesRef = useRef<string[]>(initialCrewRules || []);
 
   useEffect(() => {
-    if (!isEditing) {
-      setLocalRules(initialCrewRules || []);
+    const currentRules = initialCrewRules || [];
+    const lastSyncedRules = lastSyncedRulesRef.current;
+    
+    const rulesChanged = JSON.stringify(currentRules) !== JSON.stringify(lastSyncedRules);
+    
+    if (!isEditing && rulesChanged) {
+      setLocalRules(currentRules);
+      lastSyncedRulesRef.current = currentRules;
+      initialRulesLengthRef.current = null;
+    } else if (!isEditing && !rulesChanged) {
       initialRulesLengthRef.current = null;
     }
-  }, [initialCrewRules]);
+  }, [initialCrewRules, isEditing]);
 
   useEffect(() => {
     if (!isEditing) {
