@@ -8,6 +8,7 @@ import { VisitingProfileModal } from './VisitingProfileModal';
 import { LeaveCrewModal } from './LeaveCrewModal';
 import { EditCrewNameModal } from './EditCrewNameModal';
 import { EditCrewIdentifierModal } from './EditCrewIdentifierModal';
+import { EditableCrewRules } from './EditableCrewRules';
 import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, usePromoteMemberMutation, useDemoteExecutiveMutation } from '../../store/api/authApi';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -62,6 +63,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [promotingUserId, setPromotingUserId] = useState<string | null>(null);
   const [demotingUserId, setDemotingUserId] = useState<string | null>(null);
   const [recentlyPromotedUserIds, setRecentlyPromotedUserIds] = useState<Set<string>>(new Set());
+  const [isEditingCrewRules, setIsEditingCrewRules] = useState(false);
   const { data: crewStatus, refetch: refetchCrewStatus } = useGetCrewStatusQuery(undefined, {
     pollingInterval: visible ? 3000 : 0,
   });
@@ -138,6 +140,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     setPromotingUserId(null);
     setDemotingUserId(null);
     setRecentlyPromotedUserIds(new Set());
+    setIsEditingCrewRules(false);
     onClose();
   };
 
@@ -936,16 +939,48 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     );
   };
 
+  const renderCrewRules = () => {
+    const isPresident = userRole === 'president';
+    const crewRules = activeCrewDetails?.crew?.crewRules || [];
+
+    return (
+      <View style={styles.categoryContent}>
+        {isPresident && (
+          <View style={styles.crewRulesEditContainer}>
+            <TouchableOpacity
+              style={[
+                styles.crewRulesEditButton,
+                { 
+                  borderColor: isEditingCrewRules ? colors.error : colors.primary, 
+                  backgroundColor: isEditingCrewRules ? colors.error : colors.primary 
+                }
+              ]}
+              onPress={() => {
+                setIsEditingCrewRules(!isEditingCrewRules);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.crewRulesEditButtonText, { color: colors.background }]}>
+                {isEditingCrewRules ? 'Done' : 'Edit'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        <EditableCrewRules
+          crewId={crewStatus?.crewId || ''}
+          crewRules={crewRules}
+          isEditing={isEditingCrewRules}
+          onEditingChange={setIsEditingCrewRules}
+        />
+      </View>
+    );
+  };
+
   const renderCrewSettings = () => {
     const settingsButtons = [
       'Edit Crew Name',
       'Edit Crew Identifier',
-      'Edit Crew Rules',
-      'Update Internal Message Board',
-      'Update External Message Board',
-      'Manage Members',
       'Change Language',
-      'Assign Executives',
       'Gift All Members',
       'Declare War',
       'Terminate War Declaration',
@@ -966,8 +1001,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         <View style={styles.settingsButtonGrid}>
           {settingsButtons.map((buttonText, index) => {
             const isLeftButton = index % 2 === 0;
-            const isLastThree = index >= 14;
-            const isDisbandCrew = index === 16;
+            const isLastThree = index >= 9;
+            const isDisbandCrew = index === 11;
             return (
               <TouchableOpacity
                 key={index}
@@ -1032,7 +1067,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
          currentCategory === 'members' ? renderMembers() :
          currentCategory === 'guild-information' ? renderCrewInformation() :
          currentCategory === 'awards' ? renderAwards() :
-         currentCategory === 'ranking' ? renderRanking() : (
+         currentCategory === 'ranking' ? renderRanking() :
+         currentCategory === 'crew-rules' ? renderCrewRules() : (
           <View style={styles.categoryContent}>
             <Text style={styles.placeholderText}>
               {getCategoryLabel(currentCategory)} content will be implemented here.
@@ -1469,6 +1505,39 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: SIZING.font.small,
     fontWeight: '500',
     marginLeft: SIZING.spacing.sm,
+  },
+  crewRulesScrollContent: {
+    paddingBottom: SIZING.spacing.lg,
+  },
+  crewRulesEditContainer: {
+    alignItems: 'flex-end',
+    marginBottom: SIZING.spacing.md,
+  },
+  crewRulesEditButton: {
+    paddingVertical: SIZING.spacing.sm,
+    paddingHorizontal: SIZING.spacing.lg,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 100,
+  },
+  crewRulesEditButtonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
+  },
+  crewRulesContent: {
+    flex: 1,
+  },
+  crewRulesEmptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  crewRulesEmptyText: {
+    fontSize: SIZING.font.body,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   leaveCrewButtonContainer: {
     marginBottom: SIZING.spacing.lg,
