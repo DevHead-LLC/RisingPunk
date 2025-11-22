@@ -21,16 +21,27 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
   const [localRules, setLocalRules] = useState<string[]>(initialCrewRules || []);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveTimeoutRef = useRef<number | null>(null);
   const inputRefs = useRef<{ [key: number]: TextInput | null }>({});
   const isCreatingNewCardRef = useRef<boolean>(false);
   const [updateCrewRules, { isLoading: isSaving }] = useUpdateCrewRulesMutation();
   const initialRulesLengthRef = useRef<number | null>(null);
+  const lastSyncedRulesRef = useRef<string[]>(initialCrewRules || []);
 
   useEffect(() => {
-    setLocalRules(initialCrewRules || []);
-    initialRulesLengthRef.current = null;
-  }, [initialCrewRules]);
+    const currentRules = initialCrewRules || [];
+    const lastSyncedRules = lastSyncedRulesRef.current;
+    
+    const rulesChanged = JSON.stringify(currentRules) !== JSON.stringify(lastSyncedRules);
+    
+    if (!isEditing && rulesChanged) {
+      setLocalRules(currentRules);
+      lastSyncedRulesRef.current = currentRules;
+      initialRulesLengthRef.current = null;
+    } else if (!isEditing && !rulesChanged) {
+      initialRulesLengthRef.current = null;
+    }
+  }, [initialCrewRules, isEditing]);
 
   useEffect(() => {
     if (!isEditing) {
