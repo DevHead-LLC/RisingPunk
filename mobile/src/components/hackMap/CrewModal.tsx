@@ -942,6 +942,17 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const renderCrewRules = () => {
     const isPresident = userRole === 'president';
     const crewRules = activeCrewDetails?.crew?.crewRules || [];
+    const crewId = crewStatus?.crewId;
+
+    if (!crewId || crewId.trim() === '') {
+      return (
+        <View style={styles.categoryContent}>
+          <Text style={[styles.errorText, { color: colors.error }]}>
+            Unable to load crew rules: Invalid crew ID
+          </Text>
+        </View>
+      );
+    }
 
     return (
       <View style={styles.categoryContent}>
@@ -967,7 +978,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
           </View>
         )}
         <EditableCrewRules
-          crewId={crewStatus?.crewId || ''}
+          crewId={crewId}
           crewRules={crewRules}
           isEditing={isEditingCrewRules}
           onEditingChange={setIsEditingCrewRules}
@@ -1469,6 +1480,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: SIZING.font.body,
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  errorText: {
+    fontSize: SIZING.font.body,
+    textAlign: 'center',
+    fontWeight: '600',
+    padding: SIZING.spacing.lg,
   },
   rankingScrollContent: {
     paddingBottom: SIZING.spacing.lg,

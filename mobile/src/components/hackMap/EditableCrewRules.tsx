@@ -37,6 +37,15 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
   }, [initialCrewRules]);
 
   useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isEditing) {
       const currentRules = initialCrewRules || [];
       const lastSyncedRules = lastSyncedRulesRef.current;
