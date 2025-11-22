@@ -156,9 +156,7 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
       pendingSaveRef.current = null;
     } catch (error) {
       console.error('Error saving crew rules:', error);
-      if (isMountedRef.current) {
-        pendingSaveRef.current = null;
-      }
+      pendingSaveRef.current = null;
     }
   }, [crewId, updateCrewRules]);
 
