@@ -322,10 +322,19 @@ export const authApi = createApi({
       providesTags: ['User'],
     }),
 
-    getCrewDetails: builder.query<{ success: boolean; crew: { id: string; crewName: string; crewIdentifier: string; nativeLanguage: string; createdAt: string | null; memberCount: number; applicants: Array<{ userId: string; handle: string; appliedAt: string }>; president: { userId: string; handle: string; level: number } | null; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }> } }, string>({
+    getCrewDetails: builder.query<{ success: boolean; crew: { id: string; crewName: string; crewIdentifier: string; nativeLanguage: string; createdAt: string | null; memberCount: number; applicants: Array<{ userId: string; handle: string; appliedAt: string }>; crewRules: string[]; president: { userId: string; handle: string; level: number } | null; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }> } }, string>({
       query: (crewId) => `/api/crew/${crewId}`,
       providesTags: ['User'],
       refetchOnMountOrArgChange: true,
+    }),
+
+    updateCrewRules: builder.mutation<{ success: boolean; crewRules: string[] }, { crewId: string; crewRules: string[] }>({
+      query: (data) => ({
+        url: `/api/crew/${data.crewId}/rules`,
+        method: 'PUT',
+        body: { crewRules: data.crewRules },
+      }),
+      invalidatesTags: ['User'],
     }),
 
     acceptApplicant: builder.mutation<{ success: boolean; message: string }, { crewId: string; applicantUserId: string }>({
@@ -422,4 +431,5 @@ export const {
   useUpdateCrewIdentifierMutation,
   usePromoteMemberMutation,
   useDemoteExecutiveMutation,
+  useUpdateCrewRulesMutation,
 } = authApi;
