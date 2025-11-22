@@ -580,11 +580,14 @@ export const unlockHackRig = createAsyncThunk(
 export const logoutUser = createAsyncThunk(
   'auth/logout',
   async (_, { dispatch }) => {
+    console.log('🟢 CLIENT: logoutUser thunk started', { timestamp: Date.now() });
+    console.log('🟢 CLIENT: Removing token from AsyncStorage');
     await AsyncStorage.removeItem('token');
+    console.log('🟢 CLIENT: Removing user from AsyncStorage');
     await AsyncStorage.removeItem('user');
-    
-    // Clear RTK Query cache to prevent data leakage between users
+    console.log('🟢 CLIENT: Clearing RTK Query caches');
     resetAllApiCaches({ dispatch } as any);
+    console.log('🟢 CLIENT: logoutUser thunk completed');
   }
 );
 
