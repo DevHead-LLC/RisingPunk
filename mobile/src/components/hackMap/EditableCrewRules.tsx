@@ -29,6 +29,7 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
   const lastSyncedRulesRef = useRef<string[]>(initialCrewRules || []);
   const pendingSaveRef = useRef<string[] | null>(null);
   const initialCrewRulesRef = useRef<string[]>(initialCrewRules || []);
+  const prevIsEditingRef = useRef<boolean>(isEditing);
 
   useEffect(() => {
     initialCrewRulesRef.current = initialCrewRules || [];
@@ -85,20 +86,24 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
   }, [initialCrewRules, isEditing]);
 
   useEffect(() => {
-    if (!isEditing) {
+    const wasEditing = prevIsEditingRef.current;
+    prevIsEditingRef.current = isEditing;
+    
+    if (!isEditing && wasEditing) {
       const filteredRules = localRules.filter(rule => rule.trim().length > 0);
       if (filteredRules.length !== localRules.length) {
         setLocalRules(filteredRules);
-        if (filteredRules.length > 0) {
-          saveRules(filteredRules);
-        } else {
-          saveRules([]);
+        saveRules(filteredRules);
+      } else {
+        const currentServerRules = initialCrewRulesRef.current || [];
+        const localRulesString = JSON.stringify(localRules);
+        const serverRulesString = JSON.stringify(currentServerRules);
+        if (localRulesString !== serverRulesString) {
+          saveRules(localRules);
         }
-      } else if (localRules.length > 0) {
-        saveRules(localRules);
       }
     }
-  }, [isEditing]);
+  }, [isEditing, localRules, saveRules]);
 
   useEffect(() => {
     if (isEditing) {
