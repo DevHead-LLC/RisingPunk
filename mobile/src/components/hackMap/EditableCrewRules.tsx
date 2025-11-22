@@ -32,7 +32,7 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
       setLocalRules(initialCrewRules || []);
       initialRulesLengthRef.current = null;
     }
-  }, [initialCrewRules, isEditing]);
+  }, [initialCrewRules]);
 
   useEffect(() => {
     if (!isEditing) {
