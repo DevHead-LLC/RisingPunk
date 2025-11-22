@@ -140,7 +140,7 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
     }
 
     const filteredRules = rulesToSave.filter(rule => rule.trim().length > 0);
-    const currentRulesString = JSON.stringify(initialCrewRules || []);
+    const currentRulesString = JSON.stringify(initialCrewRulesRef.current || []);
     const rulesToSaveString = JSON.stringify(filteredRules);
     
     if (currentRulesString === rulesToSaveString) {
