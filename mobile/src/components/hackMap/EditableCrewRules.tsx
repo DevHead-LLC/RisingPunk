@@ -21,16 +21,18 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
   const [localRules, setLocalRules] = useState<string[]>(initialCrewRules || []);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveTimeoutRef = useRef<number | null>(null);
   const inputRefs = useRef<{ [key: number]: TextInput | null }>({});
   const isCreatingNewCardRef = useRef<boolean>(false);
   const [updateCrewRules, { isLoading: isSaving }] = useUpdateCrewRulesMutation();
   const initialRulesLengthRef = useRef<number | null>(null);
 
   useEffect(() => {
-    setLocalRules(initialCrewRules || []);
-    initialRulesLengthRef.current = null;
-  }, [initialCrewRules]);
+    if (!isEditing) {
+      setLocalRules(initialCrewRules || []);
+      initialRulesLengthRef.current = null;
+    }
+  }, [initialCrewRules, isEditing]);
 
   useEffect(() => {
     if (!isEditing) {
