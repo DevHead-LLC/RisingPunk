@@ -30,6 +30,7 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
   const pendingSaveRef = useRef<string[] | null>(null);
   const initialCrewRulesRef = useRef<string[]>(initialCrewRules || []);
   const prevIsEditingRef = useRef<boolean>(isEditing);
+  const hasMountedRef = useRef<boolean>(false);
 
   useEffect(() => {
     initialCrewRulesRef.current = initialCrewRules || [];
@@ -168,14 +169,21 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
 
   useEffect(() => {
     const wasEditing = prevIsEditingRef.current;
+    const isMount = !hasMountedRef.current;
+    hasMountedRef.current = true;
     prevIsEditingRef.current = isEditing;
     
-    if (!isEditing && wasEditing) {
+    if (!isEditing && (wasEditing || isMount)) {
       const filteredRules = localRules.filter(rule => rule.trim().length > 0);
       if (filteredRules.length !== localRules.length) {
         setLocalRules(filteredRules);
-        saveRules(filteredRules);
-      } else {
+        const currentServerRules = initialCrewRulesRef.current || [];
+        const filteredRulesString = JSON.stringify(filteredRules);
+        const serverRulesString = JSON.stringify(currentServerRules);
+        if (filteredRulesString !== serverRulesString) {
+          saveRules(filteredRules);
+        }
+      } else if (!isMount) {
         const currentServerRules = initialCrewRulesRef.current || [];
         const localRulesString = JSON.stringify(localRules);
         const serverRulesString = JSON.stringify(currentServerRules);
