@@ -363,6 +363,84 @@ router.post('/apply', auth, async (req: ApplyToCrewRequest, res: Response) => {
   }
 });
 
+router.get('/:crewId/rules', auth, async (req: Request, res: Response) => {
+  try {
+    const { crewId } = req.params;
+    const userId = req.user?._id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const crew = await Crew.findById(crewId);
+    if (!crew) {
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    const crewStatus = await CrewStatus.findOne({ userId, crewId });
+    if (!crewStatus || !crewStatus.isInCrew) {
+      res.status(403).json({ error: 'You are not a member of this crew' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      crewRules: crew.crewRules || []
+    });
+  } catch (error) {
+    console.error('Error fetching crew rules:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.put('/:crewId/rules', auth, async (req: Request, res: Response) => {
+  try {
+    const { crewId } = req.params;
+    const { crewRules } = req.body;
+    const userId = req.user?._id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    if (!Array.isArray(crewRules)) {
+      res.status(400).json({ error: 'crewRules must be an array' });
+      return;
+    }
+
+    const crew = await Crew.findById(crewId);
+    if (!crew) {
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    const crewStatus = await CrewStatus.findOne({ userId, crewId });
+    if (!crewStatus || !crewStatus.isInCrew) {
+      res.status(403).json({ error: 'You are not a member of this crew' });
+      return;
+    }
+
+    if (crewStatus.role !== 'president') {
+      res.status(403).json({ error: 'Only the president can update crew rules' });
+      return;
+    }
+
+    crew.crewRules = crewRules.filter((rule: string) => typeof rule === 'string' && rule.trim().length > 0);
+    await crew.save();
+
+    res.json({
+      success: true,
+      crewRules: crew.crewRules
+    });
+  } catch (error) {
+    console.error('Error updating crew rules:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.get('/:crewId', auth, async (req: Request, res: Response) => {
   try {
     const userId = req.user?._id;
@@ -399,6 +477,7 @@ router.get('/:crewId', auth, async (req: Request, res: Response) => {
         createdAt: crew.createdAt ? crew.createdAt.toISOString() : null,
         memberCount: memberCount,
         applicants: crew.applicants || [],
+        crewRules: crew.crewRules || [],
         president: president ? { userId: president._id.toString(), handle: president.handle, level: president.level || 1 } : null,
         executives: executives.map((exec: any) => ({
           userId: exec._id.toString(),
