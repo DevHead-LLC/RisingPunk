@@ -32,6 +32,7 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
   const prevIsEditingRef = useRef<boolean>(isEditing);
   const hasMountedRef = useRef<boolean>(false);
   const isMountedRef = useRef<boolean>(true);
+  const flushPendingSaveRef = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
     initialCrewRulesRef.current = initialCrewRules || [];
@@ -160,6 +161,10 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
     }
   }, [crewId, updateCrewRules]);
 
+  useEffect(() => {
+    flushPendingSaveRef.current = flushPendingSave;
+  }, [flushPendingSave]);
+
   const saveRules = useCallback(async (rulesToSave: string[], immediate = false) => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
@@ -201,19 +206,13 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
         
         if (isMountedRef.current) {
           lastSyncedRulesRef.current = currentPendingSave;
-          if (pendingSaveRef.current === currentPendingSave) {
-            pendingSaveRef.current = null;
-          }
-        } else {
-          if (pendingSaveRef.current === currentPendingSave) {
-            pendingSaveRef.current = null;
-          }
+        }
+        if (pendingSaveRef.current === currentPendingSave) {
+          pendingSaveRef.current = null;
         }
       } catch (error) {
         console.error('Error saving crew rules:', error);
-        if (isMountedRef.current && pendingSaveRef.current === currentPendingSave) {
-          pendingSaveRef.current = null;
-        } else if (pendingSaveRef.current === currentPendingSave) {
+        if (pendingSaveRef.current === currentPendingSave) {
           pendingSaveRef.current = null;
         }
       }
@@ -249,11 +248,13 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
 
   useEffect(() => {
     return () => {
-      if (pendingSaveRef.current) {
-        flushPendingSave();
+      if (pendingSaveRef.current && flushPendingSaveRef.current) {
+        flushPendingSaveRef.current().catch((error) => {
+          console.error('Error flushing pending save on unmount:', error);
+        });
       }
     };
-  }, [flushPendingSave]);
+  }, []);
 
   const handleRuleChange = useCallback((index: number, value: string) => {
     const newRules = [...localRules];
