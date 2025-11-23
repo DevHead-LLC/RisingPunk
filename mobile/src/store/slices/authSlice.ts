@@ -48,13 +48,22 @@ export const loginUser = createAsyncThunk(
   'auth/login',
   async (credentials: { handle: string; accessKey: string }, { rejectWithValue, dispatch }) => {
     try {
-      const response = await fetch(`${API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(credentials),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      let response;
+      try {
+        response = await fetch(`${API_URL}/api/auth/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(credentials),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: 'Login failed' }));
@@ -112,8 +121,27 @@ export const loginUser = createAsyncThunk(
 
       return data;
     } catch (error) {
-      if (error instanceof TypeError && error.message.includes('Network request failed')) {
+      if (error instanceof Error && error.name === 'AbortError') {
         return rejectWithValue('Network error: Cannot connect to server');
+      }
+      if (error instanceof TypeError) {
+        if (error.message.includes('Network request failed') || 
+            error.message.includes('Failed to fetch') ||
+            error.message.includes('NetworkError') ||
+            error.message.includes('aborted')) {
+          return rejectWithValue('Network error: Cannot connect to server');
+        }
+      }
+      if (error && typeof error === 'object' && 'message' in error) {
+        const errorMessage = (error as any).message;
+        if (typeof errorMessage === 'string' && (
+          errorMessage.includes('Network request failed') ||
+          errorMessage.includes('Failed to fetch') ||
+          errorMessage.includes('NetworkError') ||
+          errorMessage.includes('aborted')
+        )) {
+          return rejectWithValue('Network error: Cannot connect to server');
+        }
       }
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
     }
@@ -598,12 +626,21 @@ export const loadStoredAuth = createAsyncThunk(
       }
 
       // Verify token and get fresh user data from database
-      const response = await fetch(`${API_URL}/api/auth/verify-token`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${storedToken}`,
-        },
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      let response;
+      try {
+        response = await fetch(`${API_URL}/api/auth/verify-token`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${storedToken}`,
+          },
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!response.ok) {
         // Token is invalid, clear stored data
@@ -622,7 +659,7 @@ export const loadStoredAuth = createAsyncThunk(
       };
     } catch (error) {
       console.error('🔴 LOAD STORED AUTH: Error verifying token:', error);
-      // On error, clear stored data to force re-authentication
+      // On error (including network errors), clear stored data to force re-authentication
       await AsyncStorage.multiRemove(['token', 'user']);
       return null;
     }
@@ -918,6 +955,9 @@ export const authSlice = createSlice({
       .addCase(loginUser.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
+        state.token = null;
+        state.user = null;
+        state.isInitialized = false;
       });
 
     // Register
@@ -938,6 +978,9 @@ export const authSlice = createSlice({
       .addCase(registerUser.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
+        state.token = null;
+        state.user = null;
+        state.isInitialized = false;
       });
 
     // Google Sign-In
@@ -1073,6 +1116,7 @@ export const authSlice = createSlice({
         state.token = null;
         state.user = null;
         state.error = null;
+        state.isLoading = false;
         state.showOnboarding = false;
         state.showTurfIntro = false;
         state.showHandleSelection = false;

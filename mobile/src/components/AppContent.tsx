@@ -259,7 +259,7 @@ const AppContent = memo(() => {
         onClose={() => dispatch(setShowEmailVerificationBanner(false))}
       />
       <GlobalErrorModal
-        visible={showGlobalError}
+        visible={showGlobalError && !!token}
         onLogOut={handleGlobalErrorLogOut}
       />
       <AccountSwitchedModal
