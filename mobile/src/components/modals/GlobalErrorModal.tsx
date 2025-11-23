@@ -2,7 +2,7 @@ import React from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
+  Pressable,
   StyleSheet,
   Modal,
   TouchableWithoutFeedback,
@@ -24,16 +24,13 @@ export const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
   const colors = useThemeColors();
 
   const handleButtonPress = () => {
-    console.log('🟢 CLIENT: GlobalErrorModal button onPress fired', { platform: Platform.OS, timestamp: Date.now() });
     onLogOut();
   };
 
-  const handleButtonPressIn = () => {
-    console.log('🟢 CLIENT: GlobalErrorModal button onPressIn (press down)', { platform: Platform.OS, timestamp: Date.now() });
-  };
-
   const handleButtonPressOut = () => {
-    console.log('🟢 CLIENT: GlobalErrorModal button onPressOut (press release)', { platform: Platform.OS, timestamp: Date.now() });
+    if (Platform.OS === 'android') {
+      handleButtonPress();
+    }
   };
 
   return (
@@ -58,17 +55,19 @@ export const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
                 Please Sign In
               </Text>
 
-              <TouchableOpacity
-                style={[styles.button, { backgroundColor: colors.secondary }]}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.button,
+                  { backgroundColor: colors.secondary },
+                  pressed && { opacity: 0.8 }
+                ]}
                 onPress={handleButtonPress}
-                onPressIn={handleButtonPressIn}
                 onPressOut={handleButtonPressOut}
-                activeOpacity={0.8}
               >
                 <Text style={[styles.buttonText, { color: colors.background }]}>
                   Log Out
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
           </View>
         </View>
