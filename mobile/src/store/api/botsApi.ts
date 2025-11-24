@@ -10,6 +10,7 @@ import { resetAllApiCaches } from './resetApiCaches';
 const botsBaseQuery = async (args: any, api: any, extraOptions: any) => {
   const result = await fetchBaseQuery({
     baseUrl: API_URL,
+    timeout: 5000,
     prepareHeaders: (headers, { getState }) => {
       const token = (getState() as any)?.auth?.token;
       if (token) {headers.set('Authorization', `Bearer ${token}`);}

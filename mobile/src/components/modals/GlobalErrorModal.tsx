@@ -2,10 +2,11 @@ import React from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
+  Pressable,
   StyleSheet,
   Modal,
   TouchableWithoutFeedback,
+  Dimensions,
 } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING, styleGuide } from '../../styles/theme';
@@ -20,6 +21,10 @@ export const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
   onLogOut,
 }) => {
   const colors = useThemeColors();
+
+  const handleButtonPress = () => {
+    onLogOut();
+  };
 
   return (
     <Modal
@@ -43,15 +48,18 @@ export const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
                 Please Sign In
               </Text>
 
-              <TouchableOpacity
-                style={[styles.button, { backgroundColor: colors.secondary }]}
-                onPress={onLogOut}
-                activeOpacity={0.8}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.button,
+                  { backgroundColor: colors.secondary },
+                  pressed && { opacity: 0.8 }
+                ]}
+                onPress={handleButtonPress}
               >
                 <Text style={[styles.buttonText, { color: colors.background }]}>
                   Log Out
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
           </View>
         </View>
@@ -60,19 +68,24 @@ export const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
   );
 };
 
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContainer: {
-    width: '90%',
-    maxWidth: 500,
+    width: SIZING.screen.width * 0.4,
+    maxWidth: 400,
     borderRadius: 12,
-    padding: 0,
-    elevation: 10,
+    padding: SIZING.spacing.lg,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -80,40 +93,35 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.3,
     shadowRadius: 8,
+    elevation: 8,
   },
   modalContent: {
-    padding: SIZING.spacing.lg,
-    borderWidth: 2,
-    borderRadius: 12,
     alignItems: 'center',
-    minHeight: 120,
-    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: SIZING.spacing.md,
   },
   title: {
-    fontSize: SIZING.font.h2,
+    fontSize: SIZING.font.large,
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: SIZING.spacing.md,
-    ...styleGuide.matrixGlow,
   },
   message: {
-    fontSize: SIZING.font.large,
+    fontSize: SIZING.font.body,
     textAlign: 'center',
+    lineHeight: 20,
     marginBottom: SIZING.spacing.lg,
-    ...styleGuide.matrixGlow,
   },
   button: {
     paddingHorizontal: SIZING.spacing.lg,
     paddingVertical: SIZING.spacing.md,
     borderRadius: 8,
-    minWidth: 140,
-    minHeight: 44,
+    minWidth: 100,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   buttonText: {
-    fontSize: SIZING.font.large,
-    fontWeight: 'bold',
-    ...styleGuide.matrixGlow,
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
   },
 });
