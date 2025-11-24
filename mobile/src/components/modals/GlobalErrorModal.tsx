@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Modal,
   TouchableWithoutFeedback,
-  Platform,
   Dimensions,
 } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -25,12 +24,6 @@ export const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
 
   const handleButtonPress = () => {
     onLogOut();
-  };
-
-  const handleButtonPressOut = () => {
-    if (Platform.OS === 'android') {
-      handleButtonPress();
-    }
   };
 
   return (
@@ -62,7 +55,6 @@ export const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
                   pressed && { opacity: 0.8 }
                 ]}
                 onPress={handleButtonPress}
-                onPressOut={handleButtonPressOut}
               >
                 <Text style={[styles.buttonText, { color: colors.background }]}>
                   Log Out
