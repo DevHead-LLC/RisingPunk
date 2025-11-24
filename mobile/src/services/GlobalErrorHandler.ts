@@ -79,6 +79,10 @@ export class GlobalErrorHandler {
       return true;
     }
 
+    if (error.status === 'TIMEOUT_ERROR' || status === 'TIMEOUT_ERROR') {
+      return true;
+    }
+
     if (error.message && typeof error.message === 'string') {
       const message = error.message.toLowerCase();
       return (
@@ -86,7 +90,8 @@ export class GlobalErrorHandler {
         message.includes('connection') ||
         message.includes('timeout') ||
         message.includes('network') ||
-        message.includes('fetch')
+        message.includes('fetch') ||
+        message.includes('abort')
       );
     }
 
@@ -97,7 +102,8 @@ export class GlobalErrorHandler {
         errorText.includes('connection') ||
         errorText.includes('timeout') ||
         errorText.includes('network') ||
-        errorText.includes('fetch')
+        errorText.includes('fetch') ||
+        errorText.includes('abort')
       );
     }
 
