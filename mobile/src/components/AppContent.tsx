@@ -28,6 +28,7 @@ const AppContent = memo(() => {
   const { token, isLoading, showHandleSelection, showEmailVerification, showEmailVerificationBanner, showAccountSwitched, showAccountSwitchedBanner, user } = useAppSelector((state) => state.auth);
   const balanceDisplayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const turfScreenRef = useRef<any>(null);
+  const previousTokenRef = useRef<string | null>(null);
   const { isConnected, isInternetReachable } = useNetworkConnectivity();
 
   // Function to center the turf view to home/digital barracks position
@@ -91,6 +92,23 @@ const AppContent = memo(() => {
       return currentState;
     });
   }, [dispatch, token]);
+
+  // Clear global error modal on logout or new session
+  useEffect(() => {
+    const previousToken = previousTokenRef.current;
+    
+    // Clear error state when token becomes null (logout)
+    if (!token && showGlobalError) {
+      dispatch(setGlobalErrorModal(false));
+    }
+    
+    // Clear error state when transitioning from null to a value (new session/login)
+    if (token && !previousToken && showGlobalError) {
+      dispatch(setGlobalErrorModal(false));
+    }
+    
+    previousTokenRef.current = token;
+  }, [token, showGlobalError, dispatch]);
 
   // Sync preferences after auth is loaded
   useEffect(() => {
@@ -259,7 +277,7 @@ const AppContent = memo(() => {
         onClose={() => dispatch(setShowEmailVerificationBanner(false))}
       />
       <GlobalErrorModal
-        visible={showGlobalError}
+        visible={showGlobalError && !!token}
         onLogOut={handleGlobalErrorLogOut}
       />
       <AccountSwitchedModal
