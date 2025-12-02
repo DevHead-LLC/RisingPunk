@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
@@ -23,15 +23,15 @@ export const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
 }) => {
   const colors = useThemeColors();
 
-  const handleButtonPress = () => {
+  const handleButtonPress = useCallback(() => {
     onLogOut();
-  };
+  }, [onLogOut]);
 
-  const handleButtonPressOut = () => {
+  const handleButtonPressOut = useCallback(() => {
     if (Platform.OS === 'android') {
       handleButtonPress();
     }
-  };
+  }, [handleButtonPress]);
 
   return (
     <Modal
