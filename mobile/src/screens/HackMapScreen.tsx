@@ -466,6 +466,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   );
 
   const panGesture = Gesture.Pan()
+    .enabled(!showAntivirusModal && !showCrewModal && !showCrewOnboardingModal) // Disable pan gesture when any modal is open
     .onStart(() => {
       startX.value = offsetX.value;
       startY.value = offsetY.value;
@@ -1228,7 +1229,44 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
       {renderInfoPanel()}
 
-      <GestureDetector gesture={panGesture}>
+      {/* Conditionally render GestureDetector - only when modals are closed */}
+      {!showAntivirusModal && !showCrewModal && !showCrewOnboardingModal ? (
+        <GestureDetector gesture={panGesture}>
+          <Animated.View
+            style={[
+              styles.marginWrapper,
+              { width: totalSize + (MARGIN_SIZE * 2), height: totalSize + (MARGIN_SIZE * 2) },
+              animatedMapStyle as any,
+            ]}
+          >
+            <View style={[styles.gridArea, { width: totalSize, height: totalSize }]}>
+              {visibleCells.map((assignment, i) => {
+                const { x, y, cell } = assignment;
+                const selected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
+                return (
+                  <PoolTile
+                    key={`${x}-${y}`}
+                    x={x}
+                    y={y}
+                    cell={cell}
+                    selected={selected}
+                    onPress={handleCellPress}
+                    xStyle={xPosStyles[x]}
+                    yStyle={yPosStyles[y]}
+                    terrainStyleMap={terrainStyleMap}
+                    currentUserHandle={currentUserHandle}
+                    colors={colors}
+                    themeMode={themeMode}
+                    styles={styles}
+                    dynamicEntityData={dynamicEntityData}
+                    isShieldActive={isShieldActive}
+                  />
+                );
+              })}
+            </View>
+          </Animated.View>
+        </GestureDetector>
+      ) : (
         <Animated.View
           style={[
             styles.marginWrapper,
@@ -1262,7 +1300,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             })}
           </View>
         </Animated.View>
-      </GestureDetector>
+      )}
     </View>
   );
 };
