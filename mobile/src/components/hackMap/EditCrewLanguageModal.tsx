@@ -58,6 +58,8 @@ export const EditCrewLanguageModal: React.FC<EditCrewLanguageModalProps> = ({
       setSelectedLanguage(currentLanguage);
       setError('');
       setShowLanguagePicker(false);
+    } else {
+      setShowLanguagePicker(false);
     }
   }, [visible, currentLanguage]);
 
@@ -182,7 +184,7 @@ export const EditCrewLanguageModal: React.FC<EditCrewLanguageModalProps> = ({
       </Modal>
 
       <Modal
-        visible={showLanguagePicker}
+        visible={visible && showLanguagePicker}
         transparent={true}
         animationType="fade"
         onRequestClose={() => setShowLanguagePicker(false)}
