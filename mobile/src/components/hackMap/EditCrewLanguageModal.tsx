@@ -58,6 +58,7 @@ export const EditCrewLanguageModal: React.FC<EditCrewLanguageModalProps> = ({
       setSelectedLanguage(currentLanguage);
       setError('');
       setShowLanguagePicker(false);
+      setIsUpdating(false);
     } else {
       setShowLanguagePicker(false);
     }
