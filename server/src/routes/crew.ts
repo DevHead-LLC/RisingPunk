@@ -1137,9 +1137,10 @@ router.post('/gift-all-members', auth, async (req: GiftAllMembersRequest, res: R
         return;
       }
 
-      const amountPerMember = Math.floor(giftAmount / memberUsersForTransaction.length);
+      const baseAmountPerMember = Math.floor(giftAmount / memberUsersForTransaction.length);
+      const remainder = giftAmount % memberUsersForTransaction.length;
 
-      if (amountPerMember <= 0) {
+      if (baseAmountPerMember <= 0) {
         await session.abortTransaction();
         session.endSession();
         res.status(400).json({ error: 'Gift amount is too small to distribute among members' });
@@ -1151,14 +1152,17 @@ router.post('/gift-all-members', auth, async (req: GiftAllMembersRequest, res: R
       president.balance.lastUpdated = new Date(president.balance.lastUpdated.getTime() + (roundedSecondsElapsed * 1000));
       await president.save({ session });
       
-      for (const member of memberUsersForTransaction) {
+      for (let i = 0; i < memberUsersForTransaction.length; i++) {
+        const member = memberUsersForTransaction[i];
         const memberSecondsElapsed = (now.getTime() - member.balance.lastUpdated.getTime()) / 1000;
         const memberRoundedSeconds = Math.floor(memberSecondsElapsed / 10) * 10;
         const memberFullPrecisionIncome = memberRoundedSeconds * member.balance.ratePerSecond;
         const memberTotalWithRemainder = (member.balance.fractionalRemainder || 0) + memberFullPrecisionIncome;
         const memberWholeDollarsToAdd = Math.floor(memberTotalWithRemainder);
         
-        member.balance.total += memberWholeDollarsToAdd + amountPerMember;
+        const giftAmountForThisMember = baseAmountPerMember + (i < remainder ? 1 : 0);
+        
+        member.balance.total += memberWholeDollarsToAdd + giftAmountForThisMember;
         member.balance.fractionalRemainder = memberTotalWithRemainder - memberWholeDollarsToAdd;
         member.balance.lastUpdated = new Date(member.balance.lastUpdated.getTime() + (memberRoundedSeconds * 1000));
         await member.save({ session });
@@ -1173,9 +1177,12 @@ router.post('/gift-all-members', auth, async (req: GiftAllMembersRequest, res: R
         giftAmount,
         transactionFee,
         totalCost,
-        amountPerMember,
+        baseAmountPerMember: baseAmountPerMember,
+        remainder: remainder,
         memberCount: memberUsersForTransaction.length,
-        newBalance: president.balance.total
+        newBalance: president.balance.total,
+        lastUpdated: president.balance.lastUpdated,
+        fractionalRemainder: president.balance.fractionalRemainder || 0
       });
     } catch (transactionError: any) {
       await session.abortTransaction();
