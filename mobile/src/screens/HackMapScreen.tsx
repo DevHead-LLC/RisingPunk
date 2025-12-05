@@ -242,6 +242,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [showCrewOnboardingModal, setShowCrewOnboardingModal] = useState(false);
   const [showVisitingProfileModal, setShowVisitingProfileModal] = useState(false);
   const [visitingProfileUserId, setVisitingProfileUserId] = useState<string | null>(null);
+  const visitingProfileCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
   const startX = useSharedValue(0);
@@ -1103,9 +1104,22 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
   const handleVisitingProfileClose = useCallback(() => {
     setShowVisitingProfileModal(false);
-    setTimeout(() => {
+    if (visitingProfileCloseTimeoutRef.current) {
+      clearTimeout(visitingProfileCloseTimeoutRef.current);
+    }
+    visitingProfileCloseTimeoutRef.current = setTimeout(() => {
       setVisitingProfileUserId(null);
+      visitingProfileCloseTimeoutRef.current = null;
     }, 300);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (visitingProfileCloseTimeoutRef.current) {
+        clearTimeout(visitingProfileCloseTimeoutRef.current);
+        visitingProfileCloseTimeoutRef.current = null;
+      }
+    };
   }, []);
 
   const renderInfoPanel = useCallback(() => {
@@ -1200,6 +1214,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
               <Pressable
                 style={styles.hackButton}
                 onPress={() => {
+                  if (visitingProfileCloseTimeoutRef.current) {
+                    clearTimeout(visitingProfileCloseTimeoutRef.current);
+                    visitingProfileCloseTimeoutRef.current = null;
+                  }
                   setVisitingProfileUserId(selectedCell.info.userId);
                   setShowVisitingProfileModal(true);
                 }}
