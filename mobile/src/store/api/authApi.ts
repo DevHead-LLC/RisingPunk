@@ -390,7 +390,7 @@ export const authApi = createApi({
       invalidatesTags: ['User'],
     }),
 
-    giftAllMembers: builder.mutation<{ success: boolean; message: string; giftAmount: number; transactionFee: number; totalCost: number; amountPerMember: number; memberCount: number; newBalance: number }, { giftAmount: number }>({
+    giftAllMembers: builder.mutation<{ success: boolean; message: string; giftAmount: number; transactionFee: number; totalCost: number; baseAmountPerMember: number; remainder: number; memberCount: number; newBalance: number; lastUpdated: string | Date; fractionalRemainder: number }, { giftAmount: number }>({
       query: (data) => ({
         url: '/api/crew/gift-all-members',
         method: 'POST',
