@@ -2,15 +2,17 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, SafeAreaView, Dimensions } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
-import { useAppSelector } from '../../store/hooks';
+import { useAppSelector, useAppDispatch } from '../../store/hooks';
+import { updateBalance } from '../../store/slices/balanceSlice';
 import { DisbandCrewModal } from './DisbandCrewModal';
 import { VisitingProfileModal } from './VisitingProfileModal';
 import { LeaveCrewModal } from './LeaveCrewModal';
 import { EditCrewNameModal } from './EditCrewNameModal';
 import { EditCrewIdentifierModal } from './EditCrewIdentifierModal';
 import { EditCrewLanguageModal } from './EditCrewLanguageModal';
+import { GiftAllMembersModal } from './GiftAllMembersModal';
 import { EditableCrewRules } from './EditableCrewRules';
-import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, useUpdateCrewLanguageMutation, usePromoteMemberMutation, useDemoteExecutiveMutation } from '../../store/api/authApi';
+import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, useUpdateCrewLanguageMutation, useGiftAllMembersMutation, usePromoteMemberMutation, useDemoteExecutiveMutation } from '../../store/api/authApi';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CREW_MODAL_PADDING = SIZING.spacing.md * 2;
@@ -61,6 +63,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [showEditCrewNameModal, setShowEditCrewNameModal] = useState(false);
   const [showEditCrewIdentifierModal, setShowEditCrewIdentifierModal] = useState(false);
   const [showEditCrewLanguageModal, setShowEditCrewLanguageModal] = useState(false);
+  const [showGiftAllMembersModal, setShowGiftAllMembersModal] = useState(false);
   const [viewingProfileUserId, setViewingProfileUserId] = useState<string | null>(null);
   const [promotingUserId, setPromotingUserId] = useState<string | null>(null);
   const [demotingUserId, setDemotingUserId] = useState<string | null>(null);
@@ -76,9 +79,12 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [updateCrewName, { isLoading: isUpdatingCrewName }] = useUpdateCrewNameMutation();
   const [updateCrewIdentifier, { isLoading: isUpdatingCrewIdentifier }] = useUpdateCrewIdentifierMutation();
   const [updateCrewLanguage, { isLoading: isUpdatingCrewLanguage }] = useUpdateCrewLanguageMutation();
+  const [giftAllMembers, { isLoading: isGiftingMembers }] = useGiftAllMembersMutation();
   const [promoteMember] = usePromoteMemberMutation();
   const [demoteExecutive] = useDemoteExecutiveMutation();
+  const dispatch = useAppDispatch();
   const currentUser = useAppSelector((state) => state.auth.user);
+  const currentBalanceState = useAppSelector((state) => state.balance);
   
   const userRole = crewStatus?.role;
   const currentUserId = currentUser?._id;
@@ -105,6 +111,14 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       return !isExecutive && !isPresident;
     });
   }, [members, executives, president]);
+
+  const giftRecipientCount = useMemo(() => {
+    if (!members || !executives || !president || !currentUserId) return 0;
+    const presidentUserId = president.userId;
+    const executivesExcludingPresident = executives.filter((exec: any) => String(exec.userId) !== String(presidentUserId));
+    const membersExcludingPresident = members.filter((member: any) => String(member.userId) !== String(presidentUserId));
+    return executivesExcludingPresident.length + membersExcludingPresident.length;
+  }, [members, executives, president, currentUserId]);
 
   useEffect(() => {
     setRecentlyPromotedUserIds(prev => {
@@ -140,6 +154,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     setShowEditCrewNameModal(false);
     setShowEditCrewIdentifierModal(false);
     setShowEditCrewLanguageModal(false);
+    setShowGiftAllMembersModal(false);
     setViewingProfileUserId(null);
     setPromotingUserId(null);
     setDemotingUserId(null);
@@ -299,6 +314,39 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       throw new Error(error?.data?.error || error?.error || 'Failed to update crew language');
     }
   }, [updateCrewLanguage, refetchCrewDetails, refetchCrewStatus]);
+
+  const handleGiftAllMembersPress = useCallback(() => {
+    setShowGiftAllMembersModal(true);
+  }, []);
+
+  const handleGiftAllMembers = useCallback(async (giftAmount: number) => {
+    try {
+      const result = await giftAllMembers({ giftAmount }).unwrap();
+      
+      if (result.newBalance !== undefined) {
+        dispatch(updateBalance({ 
+          total: result.newBalance, 
+          ratePerSecond: currentBalanceState.ratePerSecond, 
+          lastUpdated: currentBalanceState.lastUpdated ? new Date(currentBalanceState.lastUpdated) : null,
+          fractionalRemainder: currentBalanceState.fractionalRemainder
+        }));
+      }
+
+      try {
+        await refetchCrewDetails();
+      } catch (refetchError) {
+        console.warn('Failed to refetch crew details after gift:', refetchError);
+      }
+
+      try {
+        await refetchCrewStatus();
+      } catch (refetchError) {
+        console.warn('Failed to refetch crew status after gift:', refetchError);
+      }
+    } catch (error: any) {
+      throw new Error(error?.data?.error || error?.error || 'Failed to gift members');
+    }
+  }, [giftAllMembers, refetchCrewDetails, refetchCrewStatus, dispatch, currentBalanceState]);
 
   const handlePromoteMember = useCallback(async (memberUserId: string) => {
     if (!crewStatus?.crewId) {
@@ -1049,6 +1097,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                     handleEditCrewIdentifierPress();
                   } else if (buttonText === 'Change Language') {
                     handleEditCrewLanguagePress();
+                  } else if (buttonText === 'Gift All Members') {
+                    handleGiftAllMembersPress();
                   } else if (isDisbandCrew) {
                     handleDisbandCrewPress();
                   } else {
@@ -1177,6 +1227,15 @@ export const CrewModal: React.FC<CrewModalProps> = ({
           onClose={() => setShowEditCrewLanguageModal(false)}
           onUpdate={handleUpdateCrewLanguage}
           currentLanguage={activeCrewDetails.crew.nativeLanguage}
+        />
+      )}
+
+      {activeCrewDetails?.crew && (
+        <GiftAllMembersModal
+          visible={showGiftAllMembersModal}
+          onClose={() => setShowGiftAllMembersModal(false)}
+          onGift={handleGiftAllMembers}
+          memberCount={giftRecipientCount}
         />
       )}
     </Modal>
