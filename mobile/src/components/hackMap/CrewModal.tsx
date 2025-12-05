@@ -327,8 +327,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         dispatch(updateBalance({ 
           total: result.newBalance, 
           ratePerSecond: currentBalanceState.ratePerSecond, 
-          lastUpdated: currentBalanceState.lastUpdated ? new Date(currentBalanceState.lastUpdated) : null,
-          fractionalRemainder: currentBalanceState.fractionalRemainder
+          lastUpdated: result.lastUpdated || new Date(),
+          fractionalRemainder: result.fractionalRemainder !== undefined ? result.fractionalRemainder : 0
         }));
       }
 

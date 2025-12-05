@@ -54,7 +54,9 @@ export const GiftAllMembersModal: React.FC<GiftAllMembersModalProps> = ({
 
   const transactionFee = Math.floor(giftAmount * TRANSACTION_FEE_PERCENT);
   const totalCost = giftAmount + transactionFee;
-  const amountPerMember = memberCount > 0 ? Math.floor(giftAmount / memberCount) : 0;
+  const baseAmountPerMember = memberCount > 0 ? Math.floor(giftAmount / memberCount) : 0;
+  const remainder = memberCount > 0 ? giftAmount % memberCount : 0;
+  const amountPerMember = baseAmountPerMember;
 
   const canDecrement = giftAmount > MIN_GIFT;
   const canIncrement = giftAmount < MAX_GIFT;
@@ -118,9 +120,9 @@ export const GiftAllMembersModal: React.FC<GiftAllMembersModalProps> = ({
           >
             <Text style={styles.title}>GIFT ALL MEMBERS</Text>
             
-            <Text style={styles.descriptionText}>
-              Gift money to all crew members (excluding yourself). The gift amount will be distributed evenly among all {memberCount} member{memberCount !== 1 ? 's' : ''}.
-            </Text>
+          <Text style={styles.descriptionText}>
+            Gift money to all crew members (excluding yourself). The gift amount will be distributed as evenly as possible among all {memberCount} member{memberCount !== 1 ? 's' : ''}. Due to rounding, some members may receive $1 more than others.
+          </Text>
 
             {memberCount === 0 && (
               <Text style={styles.warningText}>
@@ -188,12 +190,25 @@ export const GiftAllMembersModal: React.FC<GiftAllMembersModalProps> = ({
                   {formatCurrency(totalCost)}
                 </Text>
               </View>
-              {memberCount > 0 && (
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Per Member:</Text>
-                  <Text style={styles.summaryValue}>{formatCurrency(amountPerMember)}</Text>
-                </View>
-              )}
+            {memberCount > 0 && (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Per Member:</Text>
+                <Text style={styles.summaryValue}>
+                  {remainder > 0 
+                    ? `${formatCurrency(baseAmountPerMember)} - ${formatCurrency(baseAmountPerMember + 1)}`
+                    : formatCurrency(amountPerMember)
+                  }
+                </Text>
+              </View>
+            )}
+            {memberCount > 0 && remainder > 0 && (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Distribution:</Text>
+                <Text style={styles.summaryValue}>
+                  {remainder} member{remainder !== 1 ? 's' : ''} receive {formatCurrency(baseAmountPerMember + 1)}, {memberCount - remainder} receive {formatCurrency(baseAmountPerMember)}
+                </Text>
+              </View>
+            )}
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Your Balance:</Text>
                 <Text style={[
