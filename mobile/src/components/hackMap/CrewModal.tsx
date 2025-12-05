@@ -2,7 +2,8 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, SafeAreaView, Dimensions } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
-import { useAppSelector } from '../../store/hooks';
+import { useAppSelector, useAppDispatch } from '../../store/hooks';
+import { updateBalance } from '../../store/slices/balanceSlice';
 import { DisbandCrewModal } from './DisbandCrewModal';
 import { VisitingProfileModal } from './VisitingProfileModal';
 import { LeaveCrewModal } from './LeaveCrewModal';
@@ -81,7 +82,9 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [giftAllMembers, { isLoading: isGiftingMembers }] = useGiftAllMembersMutation();
   const [promoteMember] = usePromoteMemberMutation();
   const [demoteExecutive] = useDemoteExecutiveMutation();
+  const dispatch = useAppDispatch();
   const currentUser = useAppSelector((state) => state.auth.user);
+  const currentBalanceState = useAppSelector((state) => state.balance);
   
   const userRole = crewStatus?.role;
   const currentUserId = currentUser?._id;
@@ -318,13 +321,32 @@ export const CrewModal: React.FC<CrewModalProps> = ({
 
   const handleGiftAllMembers = useCallback(async (giftAmount: number) => {
     try {
-      await giftAllMembers({ giftAmount }).unwrap();
-      await refetchCrewDetails();
-      await refetchCrewStatus();
+      const result = await giftAllMembers({ giftAmount }).unwrap();
+      
+      if (result.newBalance !== undefined) {
+        dispatch(updateBalance({ 
+          total: result.newBalance, 
+          ratePerSecond: currentBalanceState.ratePerSecond, 
+          lastUpdated: currentBalanceState.lastUpdated ? new Date(currentBalanceState.lastUpdated) : null,
+          fractionalRemainder: currentBalanceState.fractionalRemainder
+        }));
+      }
+
+      try {
+        await refetchCrewDetails();
+      } catch (refetchError) {
+        console.warn('Failed to refetch crew details after gift:', refetchError);
+      }
+
+      try {
+        await refetchCrewStatus();
+      } catch (refetchError) {
+        console.warn('Failed to refetch crew status after gift:', refetchError);
+      }
     } catch (error: any) {
       throw new Error(error?.data?.error || error?.error || 'Failed to gift members');
     }
-  }, [giftAllMembers, refetchCrewDetails, refetchCrewStatus]);
+  }, [giftAllMembers, refetchCrewDetails, refetchCrewStatus, dispatch, currentBalanceState]);
 
   const handlePromoteMember = useCallback(async (memberUserId: string) => {
     if (!crewStatus?.crewId) {
