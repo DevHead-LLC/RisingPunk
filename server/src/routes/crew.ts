@@ -1080,7 +1080,11 @@ router.post('/gift-all-members', auth, async (req: GiftAllMembersRequest, res: R
     const allMemberIds = [
       ...(crew.executives || []),
       ...(crew.members || [])
-    ].filter(memberId => !memberId.equals(userId));
+    ]
+      .filter(memberId => !memberId.equals(userId))
+      .filter((memberId, index, self) => 
+        index === self.findIndex((id) => id.equals(memberId))
+      );
 
     if (allMemberIds.length === 0) {
       res.status(400).json({ error: 'No members to gift' });
