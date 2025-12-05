@@ -1103,7 +1103,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
   const handleVisitingProfileClose = useCallback(() => {
     setShowVisitingProfileModal(false);
-    setVisitingProfileUserId(null);
+    setTimeout(() => {
+      setVisitingProfileUserId(null);
+    }, 300);
   }, []);
 
   const renderInfoPanel = useCallback(() => {
