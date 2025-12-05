@@ -1077,30 +1077,6 @@ router.post('/gift-all-members', auth, async (req: GiftAllMembersRequest, res: R
       return;
     }
 
-    const president = await User.findById(userId);
-    if (!president) {
-      res.status(404).json({ error: 'President not found' });
-      return;
-    }
-
-    const transactionFee = Math.floor(giftAmount * TRANSACTION_FEE_PERCENT);
-    const totalCost = giftAmount + transactionFee;
-
-    const now = new Date();
-    const secondsElapsed = (now.getTime() - president.balance.lastUpdated.getTime()) / 1000;
-    const roundedSecondsElapsed = Math.floor(secondsElapsed / 10) * 10;
-    const fullPrecisionIncome = roundedSecondsElapsed * president.balance.ratePerSecond;
-    const totalWithRemainder = (president.balance.fractionalRemainder || 0) + fullPrecisionIncome;
-    const wholeDollarsToAdd = Math.floor(totalWithRemainder);
-    const currentBalance = president.balance.total + wholeDollarsToAdd;
-
-    if (currentBalance < totalCost) {
-      res.status(400).json({ 
-        error: `Insufficient balance. You need $${totalCost.toLocaleString()} but only have $${currentBalance.toLocaleString()}` 
-      });
-      return;
-    }
-
     const allMemberIds = [
       ...(crew.executives || []),
       ...(crew.members || [])
@@ -1111,25 +1087,67 @@ router.post('/gift-all-members', auth, async (req: GiftAllMembersRequest, res: R
       return;
     }
 
-    const amountPerMember = Math.floor(giftAmount / allMemberIds.length);
+    const memberUsers = await User.find({ _id: { $in: allMemberIds } });
+
+    if (memberUsers.length !== allMemberIds.length) {
+      res.status(400).json({ 
+        error: `Data inconsistency detected: ${allMemberIds.length} members expected but only ${memberUsers.length} found. Please contact support.` 
+      });
+      return;
+    }
+
+    if (memberUsers.length === 0) {
+      res.status(400).json({ error: 'No valid members to gift' });
+      return;
+    }
+
+    const amountPerMember = Math.floor(giftAmount / memberUsers.length);
 
     if (amountPerMember <= 0) {
       res.status(400).json({ error: 'Gift amount is too small to distribute among members' });
       return;
     }
 
+    const transactionFee = Math.floor(giftAmount * TRANSACTION_FEE_PERCENT);
+    const totalCost = giftAmount + transactionFee;
+
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
+      const president = await User.findById(userId).session(session);
+      if (!president) {
+        await session.abortTransaction();
+        session.endSession();
+        res.status(404).json({ error: 'President not found' });
+        return;
+      }
+
+      const now = new Date();
+      const secondsElapsed = (now.getTime() - president.balance.lastUpdated.getTime()) / 1000;
+      const roundedSecondsElapsed = Math.floor(secondsElapsed / 10) * 10;
+      const fullPrecisionIncome = roundedSecondsElapsed * president.balance.ratePerSecond;
+      const totalWithRemainder = (president.balance.fractionalRemainder || 0) + fullPrecisionIncome;
+      const wholeDollarsToAdd = Math.floor(totalWithRemainder);
+      const currentBalance = president.balance.total + wholeDollarsToAdd;
+
+      if (currentBalance < totalCost) {
+        await session.abortTransaction();
+        session.endSession();
+        res.status(400).json({ 
+          error: `Insufficient balance. You need $${totalCost.toLocaleString()} but only have $${currentBalance.toLocaleString()}` 
+        });
+        return;
+      }
+
       president.balance.total = currentBalance - totalCost;
       president.balance.fractionalRemainder = totalWithRemainder - wholeDollarsToAdd;
       president.balance.lastUpdated = new Date(president.balance.lastUpdated.getTime() + (roundedSecondsElapsed * 1000));
       await president.save({ session });
 
-      const memberUsers = await User.find({ _id: { $in: allMemberIds } }).session(session);
+      const memberUsersForTransaction = await User.find({ _id: { $in: allMemberIds } }).session(session);
       
-      for (const member of memberUsers) {
+      for (const member of memberUsersForTransaction) {
         const memberSecondsElapsed = (now.getTime() - member.balance.lastUpdated.getTime()) / 1000;
         const memberRoundedSeconds = Math.floor(memberSecondsElapsed / 10) * 10;
         const memberFullPrecisionIncome = memberRoundedSeconds * member.balance.ratePerSecond;
@@ -1147,12 +1165,12 @@ router.post('/gift-all-members', auth, async (req: GiftAllMembersRequest, res: R
 
       res.json({
         success: true,
-        message: `Successfully gifted $${giftAmount.toLocaleString()} to ${allMemberIds.length} member${allMemberIds.length !== 1 ? 's' : ''}`,
+        message: `Successfully gifted $${giftAmount.toLocaleString()} to ${memberUsers.length} member${memberUsers.length !== 1 ? 's' : ''}`,
         giftAmount,
         transactionFee,
         totalCost,
         amountPerMember,
-        memberCount: allMemberIds.length,
+        memberCount: memberUsers.length,
         newBalance: president.balance.total
       });
     } catch (transactionError: any) {
