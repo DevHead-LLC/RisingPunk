@@ -390,6 +390,15 @@ export const authApi = createApi({
       invalidatesTags: ['User'],
     }),
 
+    giftAllMembers: builder.mutation<{ success: boolean; message: string; giftAmount: number; transactionFee: number; totalCost: number; baseAmountPerMember: number; remainder: number; memberCount: number; newBalance: number; lastUpdated: string | Date; fractionalRemainder: number }, { giftAmount: number }>({
+      query: (data) => ({
+        url: '/api/crew/gift-all-members',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
+
     promoteMember: builder.mutation<{ success: boolean; message: string; crew: { id: string; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }> } }, { crewId: string; memberUserId: string }>({
       query: (data) => ({
         url: '/api/crew/promote-member',
@@ -439,6 +448,7 @@ export const {
   useUpdateCrewNameMutation,
   useUpdateCrewIdentifierMutation,
   useUpdateCrewLanguageMutation,
+  useGiftAllMembersMutation,
   usePromoteMemberMutation,
   useDemoteExecutiveMutation,
   useUpdateCrewRulesMutation,

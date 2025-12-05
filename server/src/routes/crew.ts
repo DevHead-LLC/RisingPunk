@@ -1025,6 +1025,180 @@ router.post('/update-language', auth, async (req: UpdateCrewLanguageRequest, res
   }
 });
 
+interface GiftAllMembersRequest extends Request {
+  body: {
+    giftAmount: number;
+  }
+}
+
+router.post('/gift-all-members', auth, async (req: GiftAllMembersRequest, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const { giftAmount } = req.body;
+    if (!giftAmount || typeof giftAmount !== 'number') {
+      res.status(400).json({ error: 'Gift amount is required' });
+      return;
+    }
+
+    const MIN_GIFT = 10000;
+    const MAX_GIFT = 1000000;
+    const INCREMENT = 10000;
+    const TRANSACTION_FEE_PERCENT = 0.1;
+
+    if (giftAmount < MIN_GIFT || giftAmount > MAX_GIFT) {
+      res.status(400).json({ error: `Gift amount must be between $${MIN_GIFT.toLocaleString()} and $${MAX_GIFT.toLocaleString()}` });
+      return;
+    }
+
+    if (giftAmount % INCREMENT !== 0) {
+      res.status(400).json({ error: `Gift amount must be in $${INCREMENT.toLocaleString()} increments` });
+      return;
+    }
+
+    const crewStatus = await CrewStatus.findOne({ userId });
+    if (!crewStatus || !crewStatus.isInCrew || !crewStatus.crewId) {
+      res.status(400).json({ error: 'User is not in a crew' });
+      return;
+    }
+
+    if (crewStatus.role !== 'president') {
+      res.status(403).json({ error: 'Only the president can gift members' });
+      return;
+    }
+
+    const crew = await Crew.findById(crewStatus.crewId);
+    if (!crew) {
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    const allMemberIds = [
+      ...(crew.executives || []),
+      ...(crew.members || [])
+    ]
+      .filter(memberId => !memberId.equals(userId))
+      .filter((memberId, index, self) => 
+        index === self.findIndex((id) => id.equals(memberId))
+      );
+
+    if (allMemberIds.length === 0) {
+      res.status(400).json({ error: 'No members to gift' });
+      return;
+    }
+
+    const transactionFee = Math.floor(giftAmount * TRANSACTION_FEE_PERCENT);
+    const totalCost = giftAmount + transactionFee;
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const president = await User.findById(userId).session(session);
+      if (!president) {
+        await session.abortTransaction();
+        session.endSession();
+        res.status(404).json({ error: 'President not found' });
+        return;
+      }
+
+      const now = new Date();
+      const secondsElapsed = (now.getTime() - president.balance.lastUpdated.getTime()) / 1000;
+      const roundedSecondsElapsed = Math.floor(secondsElapsed / 10) * 10;
+      const fullPrecisionIncome = roundedSecondsElapsed * president.balance.ratePerSecond;
+      const totalWithRemainder = (president.balance.fractionalRemainder || 0) + fullPrecisionIncome;
+      const wholeDollarsToAdd = Math.floor(totalWithRemainder);
+      const currentBalance = president.balance.total + wholeDollarsToAdd;
+
+      if (currentBalance < totalCost) {
+        await session.abortTransaction();
+        session.endSession();
+        res.status(400).json({ 
+          error: `Insufficient balance. You need $${totalCost.toLocaleString()} but only have $${currentBalance.toLocaleString()}` 
+        });
+        return;
+      }
+
+      const memberUsersForTransaction = await User.find({ _id: { $in: allMemberIds } }).session(session);
+
+      if (memberUsersForTransaction.length !== allMemberIds.length) {
+        await session.abortTransaction();
+        session.endSession();
+        res.status(400).json({ 
+          error: `Data inconsistency detected: ${allMemberIds.length} members expected but only ${memberUsersForTransaction.length} found. Please try again.` 
+        });
+        return;
+      }
+
+      if (memberUsersForTransaction.length === 0) {
+        await session.abortTransaction();
+        session.endSession();
+        res.status(400).json({ error: 'No valid members to gift' });
+        return;
+      }
+
+      const baseAmountPerMember = Math.floor(giftAmount / memberUsersForTransaction.length);
+      const remainder = giftAmount % memberUsersForTransaction.length;
+
+      if (baseAmountPerMember <= 0) {
+        await session.abortTransaction();
+        session.endSession();
+        res.status(400).json({ error: 'Gift amount is too small to distribute among members' });
+        return;
+      }
+
+      president.balance.total = currentBalance - totalCost;
+      president.balance.fractionalRemainder = totalWithRemainder - wholeDollarsToAdd;
+      president.balance.lastUpdated = new Date(president.balance.lastUpdated.getTime() + (roundedSecondsElapsed * 1000));
+      await president.save({ session });
+      
+      for (let i = 0; i < memberUsersForTransaction.length; i++) {
+        const member = memberUsersForTransaction[i];
+        const memberSecondsElapsed = (now.getTime() - member.balance.lastUpdated.getTime()) / 1000;
+        const memberRoundedSeconds = Math.floor(memberSecondsElapsed / 10) * 10;
+        const memberFullPrecisionIncome = memberRoundedSeconds * member.balance.ratePerSecond;
+        const memberTotalWithRemainder = (member.balance.fractionalRemainder || 0) + memberFullPrecisionIncome;
+        const memberWholeDollarsToAdd = Math.floor(memberTotalWithRemainder);
+        
+        const giftAmountForThisMember = baseAmountPerMember + (i < remainder ? 1 : 0);
+        
+        member.balance.total += memberWholeDollarsToAdd + giftAmountForThisMember;
+        member.balance.fractionalRemainder = memberTotalWithRemainder - memberWholeDollarsToAdd;
+        member.balance.lastUpdated = new Date(member.balance.lastUpdated.getTime() + (memberRoundedSeconds * 1000));
+        await member.save({ session });
+      }
+
+      await session.commitTransaction();
+      session.endSession();
+
+      res.json({
+        success: true,
+        message: `Successfully gifted $${giftAmount.toLocaleString()} to ${memberUsersForTransaction.length} member${memberUsersForTransaction.length !== 1 ? 's' : ''}`,
+        giftAmount,
+        transactionFee,
+        totalCost,
+        baseAmountPerMember: baseAmountPerMember,
+        remainder: remainder,
+        memberCount: memberUsersForTransaction.length,
+        newBalance: president.balance.total,
+        lastUpdated: president.balance.lastUpdated,
+        fractionalRemainder: president.balance.fractionalRemainder || 0
+      });
+    } catch (transactionError: any) {
+      await session.abortTransaction();
+      session.endSession();
+      throw transactionError;
+    }
+  } catch (error: any) {
+    console.error('Error gifting members:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 interface UpdateCrewIdentifierRequest extends Request {
   body: {
     crewIdentifier: string;
