@@ -8,6 +8,7 @@ import { CollapsibleToolbar } from '../components/hackMap/CollapsibleToolbar';
 import { AntivirusModal } from '../components/hackMap/AntivirusModal';
 import { CrewOnboardingModal } from '../components/hackMap/CrewOnboardingModal';
 import { CrewModal } from '../components/hackMap/CrewModal';
+import { VisitingProfileModal } from '../components/hackMap/VisitingProfileModal';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { setGrid, setLoading } from '../store/slices/mapSlice';
 import { useFetchMapQuery } from '../store/api/mapApi';
@@ -239,6 +240,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [showAntivirusModal, setShowAntivirusModal] = useState(false);
   const [showCrewModal, setShowCrewModal] = useState(false);
   const [showCrewOnboardingModal, setShowCrewOnboardingModal] = useState(false);
+  const [showVisitingProfileModal, setShowVisitingProfileModal] = useState(false);
+  const [visitingProfileUserId, setVisitingProfileUserId] = useState<string | null>(null);
+  const visitingProfileCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
   const startX = useSharedValue(0);
@@ -1098,6 +1102,26 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     setShowCrewOnboardingModal(false);
   }, []);
 
+  const handleVisitingProfileClose = useCallback(() => {
+    setShowVisitingProfileModal(false);
+    if (visitingProfileCloseTimeoutRef.current) {
+      clearTimeout(visitingProfileCloseTimeoutRef.current);
+    }
+    visitingProfileCloseTimeoutRef.current = setTimeout(() => {
+      setVisitingProfileUserId(null);
+      visitingProfileCloseTimeoutRef.current = null;
+    }, 300);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (visitingProfileCloseTimeoutRef.current) {
+        clearTimeout(visitingProfileCloseTimeoutRef.current);
+        visitingProfileCloseTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
   const renderInfoPanel = useCallback(() => {
     if (!selectedCell) {return null;}
 
@@ -1185,11 +1209,27 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                 </Text>
               </Pressable>
             )}
+            {selectedCell.info.owner === 'player' && 
+             selectedCell.info.userId && (
+              <Pressable
+                style={styles.hackButton}
+                onPress={() => {
+                  if (visitingProfileCloseTimeoutRef.current) {
+                    clearTimeout(visitingProfileCloseTimeoutRef.current);
+                    visitingProfileCloseTimeoutRef.current = null;
+                  }
+                  setVisitingProfileUserId(selectedCell.info.userId);
+                  setShowVisitingProfileModal(true);
+                }}
+              >
+                <Text style={styles.hackButtonText}>View Profile</Text>
+              </Pressable>
+            )}
           </>
         )}
       </View>
     );
-  }, [selectedCell, styles]);
+  }, [selectedCell, styles, currentUserHandle, onClose]);
 
   if (loading || !isMapReady || !terrainDataLoaded) {
     return <View style={styles.container}><LoadingSpinner /></View>;
@@ -1225,6 +1265,14 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         visible={showCrewOnboardingModal}
         onClose={handleCrewOnboardingClose}
       />
+
+      {visitingProfileUserId && (
+        <VisitingProfileModal
+          visible={showVisitingProfileModal}
+          onClose={handleVisitingProfileClose}
+          userId={visitingProfileUserId}
+        />
+      )}
 
       {renderInfoPanel()}
 
