@@ -955,6 +955,76 @@ router.post('/update-name', auth, async (req: UpdateCrewNameRequest, res: Respon
   }
 });
 
+interface UpdateCrewLanguageRequest extends Request {
+  body: {
+    nativeLanguage: string;
+  }
+}
+
+router.post('/update-language', auth, async (req: UpdateCrewLanguageRequest, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const { nativeLanguage } = req.body;
+    if (!nativeLanguage) {
+      res.status(400).json({ error: 'Native language is required' });
+      return;
+    }
+
+    const crewStatus = await CrewStatus.findOne({ userId });
+    if (!crewStatus || !crewStatus.isInCrew || !crewStatus.crewId) {
+      res.status(400).json({ error: 'User is not in a crew' });
+      return;
+    }
+
+    if (crewStatus.role !== 'president') {
+      res.status(403).json({ error: 'Only the president can update the crew language' });
+      return;
+    }
+
+    const crew = await Crew.findById(crewStatus.crewId);
+    if (!crew) {
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    if (crew.nativeLanguage === nativeLanguage) {
+      res.json({
+        success: true,
+        message: 'Crew language unchanged',
+        crew: {
+          id: (crew._id as mongoose.Types.ObjectId).toString(),
+          crewName: crew.crewName,
+          crewIdentifier: crew.crewIdentifier,
+          nativeLanguage: crew.nativeLanguage
+        }
+      });
+      return;
+    }
+
+    crew.nativeLanguage = nativeLanguage;
+    await crew.save();
+
+    res.json({
+      success: true,
+      message: 'Crew language updated successfully',
+      crew: {
+        id: (crew._id as mongoose.Types.ObjectId).toString(),
+        crewName: crew.crewName,
+        crewIdentifier: crew.crewIdentifier,
+        nativeLanguage: crew.nativeLanguage
+      }
+    });
+  } catch (error: any) {
+    console.error('Error updating crew language:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 interface UpdateCrewIdentifierRequest extends Request {
   body: {
     crewIdentifier: string;

@@ -381,6 +381,15 @@ export const authApi = createApi({
       invalidatesTags: ['User'],
     }),
 
+    updateCrewLanguage: builder.mutation<{ success: boolean; message: string; crew: { id: string; crewName: string; crewIdentifier: string; nativeLanguage: string } }, { nativeLanguage: string }>({
+      query: (data) => ({
+        url: '/api/crew/update-language',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
+
     promoteMember: builder.mutation<{ success: boolean; message: string; crew: { id: string; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }> } }, { crewId: string; memberUserId: string }>({
       query: (data) => ({
         url: '/api/crew/promote-member',
@@ -429,6 +438,7 @@ export const {
   useLeaveCrewMutation,
   useUpdateCrewNameMutation,
   useUpdateCrewIdentifierMutation,
+  useUpdateCrewLanguageMutation,
   usePromoteMemberMutation,
   useDemoteExecutiveMutation,
   useUpdateCrewRulesMutation,

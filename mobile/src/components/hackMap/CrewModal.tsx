@@ -8,8 +8,9 @@ import { VisitingProfileModal } from './VisitingProfileModal';
 import { LeaveCrewModal } from './LeaveCrewModal';
 import { EditCrewNameModal } from './EditCrewNameModal';
 import { EditCrewIdentifierModal } from './EditCrewIdentifierModal';
+import { EditCrewLanguageModal } from './EditCrewLanguageModal';
 import { EditableCrewRules } from './EditableCrewRules';
-import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, usePromoteMemberMutation, useDemoteExecutiveMutation } from '../../store/api/authApi';
+import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, useUpdateCrewLanguageMutation, usePromoteMemberMutation, useDemoteExecutiveMutation } from '../../store/api/authApi';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CREW_MODAL_PADDING = SIZING.spacing.md * 2;
@@ -59,6 +60,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [showLeaveCrewModal, setShowLeaveCrewModal] = useState(false);
   const [showEditCrewNameModal, setShowEditCrewNameModal] = useState(false);
   const [showEditCrewIdentifierModal, setShowEditCrewIdentifierModal] = useState(false);
+  const [showEditCrewLanguageModal, setShowEditCrewLanguageModal] = useState(false);
   const [viewingProfileUserId, setViewingProfileUserId] = useState<string | null>(null);
   const [promotingUserId, setPromotingUserId] = useState<string | null>(null);
   const [demotingUserId, setDemotingUserId] = useState<string | null>(null);
@@ -73,6 +75,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [leaveCrew, { isLoading: isLeaving }] = useLeaveCrewMutation();
   const [updateCrewName, { isLoading: isUpdatingCrewName }] = useUpdateCrewNameMutation();
   const [updateCrewIdentifier, { isLoading: isUpdatingCrewIdentifier }] = useUpdateCrewIdentifierMutation();
+  const [updateCrewLanguage, { isLoading: isUpdatingCrewLanguage }] = useUpdateCrewLanguageMutation();
   const [promoteMember] = usePromoteMemberMutation();
   const [demoteExecutive] = useDemoteExecutiveMutation();
   const currentUser = useAppSelector((state) => state.auth.user);
@@ -136,6 +139,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     setShowLeaveCrewModal(false);
     setShowEditCrewNameModal(false);
     setShowEditCrewIdentifierModal(false);
+    setShowEditCrewLanguageModal(false);
     setViewingProfileUserId(null);
     setPromotingUserId(null);
     setDemotingUserId(null);
@@ -280,6 +284,21 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       throw new Error(error?.data?.error || error?.error || 'Failed to update crew identifier');
     }
   }, [updateCrewIdentifier, refetchCrewDetails, refetchCrewStatus]);
+
+  const handleEditCrewLanguagePress = useCallback(() => {
+    setShowEditCrewLanguageModal(true);
+  }, []);
+
+  const handleUpdateCrewLanguage = useCallback(async (nativeLanguage: string) => {
+    try {
+      await updateCrewLanguage({ nativeLanguage }).unwrap();
+      await refetchCrewDetails();
+      await refetchCrewStatus();
+      setShowEditCrewLanguageModal(false);
+    } catch (error: any) {
+      throw new Error(error?.data?.error || error?.error || 'Failed to update crew language');
+    }
+  }, [updateCrewLanguage, refetchCrewDetails, refetchCrewStatus]);
 
   const handlePromoteMember = useCallback(async (memberUserId: string) => {
     if (!crewStatus?.crewId) {
@@ -1028,6 +1047,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                     handleEditCrewNamePress();
                   } else if (buttonText === 'Edit Crew Identifier') {
                     handleEditCrewIdentifierPress();
+                  } else if (buttonText === 'Change Language') {
+                    handleEditCrewLanguagePress();
                   } else if (isDisbandCrew) {
                     handleDisbandCrewPress();
                   } else {
@@ -1147,6 +1168,15 @@ export const CrewModal: React.FC<CrewModalProps> = ({
           onClose={() => setShowEditCrewIdentifierModal(false)}
           onUpdate={handleUpdateCrewIdentifier}
           currentCrewIdentifier={crewStatus.crewIdentifier}
+        />
+      )}
+
+      {activeCrewDetails?.crew?.nativeLanguage && (
+        <EditCrewLanguageModal
+          visible={showEditCrewLanguageModal}
+          onClose={() => setShowEditCrewLanguageModal(false)}
+          onUpdate={handleUpdateCrewLanguage}
+          currentLanguage={activeCrewDetails.crew.nativeLanguage}
         />
       )}
     </Modal>
