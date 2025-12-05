@@ -109,6 +109,14 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     });
   }, [members, executives, president]);
 
+  const giftRecipientCount = useMemo(() => {
+    if (!members || !executives || !president || !currentUserId) return 0;
+    const presidentUserId = president.userId;
+    const executivesExcludingPresident = executives.filter((exec: any) => String(exec.userId) !== String(presidentUserId));
+    const membersExcludingPresident = members.filter((member: any) => String(member.userId) !== String(presidentUserId));
+    return executivesExcludingPresident.length + membersExcludingPresident.length;
+  }, [members, executives, president, currentUserId]);
+
   useEffect(() => {
     setRecentlyPromotedUserIds(prev => {
       if (prev.size === 0) return prev;
@@ -1205,7 +1213,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
           visible={showGiftAllMembersModal}
           onClose={() => setShowGiftAllMembersModal(false)}
           onGift={handleGiftAllMembers}
-          memberCount={executives.length + members.length}
+          memberCount={giftRecipientCount}
         />
       )}
     </Modal>

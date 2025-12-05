@@ -1087,27 +1087,6 @@ router.post('/gift-all-members', auth, async (req: GiftAllMembersRequest, res: R
       return;
     }
 
-    const memberUsers = await User.find({ _id: { $in: allMemberIds } });
-
-    if (memberUsers.length !== allMemberIds.length) {
-      res.status(400).json({ 
-        error: `Data inconsistency detected: ${allMemberIds.length} members expected but only ${memberUsers.length} found. Please contact support.` 
-      });
-      return;
-    }
-
-    if (memberUsers.length === 0) {
-      res.status(400).json({ error: 'No valid members to gift' });
-      return;
-    }
-
-    const amountPerMember = Math.floor(giftAmount / memberUsers.length);
-
-    if (amountPerMember <= 0) {
-      res.status(400).json({ error: 'Gift amount is too small to distribute among members' });
-      return;
-    }
-
     const transactionFee = Math.floor(giftAmount * TRANSACTION_FEE_PERCENT);
     const totalCost = giftAmount + transactionFee;
 
@@ -1140,12 +1119,37 @@ router.post('/gift-all-members', auth, async (req: GiftAllMembersRequest, res: R
         return;
       }
 
+      const memberUsersForTransaction = await User.find({ _id: { $in: allMemberIds } }).session(session);
+
+      if (memberUsersForTransaction.length !== allMemberIds.length) {
+        await session.abortTransaction();
+        session.endSession();
+        res.status(400).json({ 
+          error: `Data inconsistency detected: ${allMemberIds.length} members expected but only ${memberUsersForTransaction.length} found. Please try again.` 
+        });
+        return;
+      }
+
+      if (memberUsersForTransaction.length === 0) {
+        await session.abortTransaction();
+        session.endSession();
+        res.status(400).json({ error: 'No valid members to gift' });
+        return;
+      }
+
+      const amountPerMember = Math.floor(giftAmount / memberUsersForTransaction.length);
+
+      if (amountPerMember <= 0) {
+        await session.abortTransaction();
+        session.endSession();
+        res.status(400).json({ error: 'Gift amount is too small to distribute among members' });
+        return;
+      }
+
       president.balance.total = currentBalance - totalCost;
       president.balance.fractionalRemainder = totalWithRemainder - wholeDollarsToAdd;
       president.balance.lastUpdated = new Date(president.balance.lastUpdated.getTime() + (roundedSecondsElapsed * 1000));
       await president.save({ session });
-
-      const memberUsersForTransaction = await User.find({ _id: { $in: allMemberIds } }).session(session);
       
       for (const member of memberUsersForTransaction) {
         const memberSecondsElapsed = (now.getTime() - member.balance.lastUpdated.getTime()) / 1000;
@@ -1165,12 +1169,12 @@ router.post('/gift-all-members', auth, async (req: GiftAllMembersRequest, res: R
 
       res.json({
         success: true,
-        message: `Successfully gifted $${giftAmount.toLocaleString()} to ${memberUsers.length} member${memberUsers.length !== 1 ? 's' : ''}`,
+        message: `Successfully gifted $${giftAmount.toLocaleString()} to ${memberUsersForTransaction.length} member${memberUsersForTransaction.length !== 1 ? 's' : ''}`,
         giftAmount,
         transactionFee,
         totalCost,
         amountPerMember,
-        memberCount: memberUsers.length,
+        memberCount: memberUsersForTransaction.length,
         newBalance: president.balance.total
       });
     } catch (transactionError: any) {
