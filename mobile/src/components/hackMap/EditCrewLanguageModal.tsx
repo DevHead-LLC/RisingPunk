@@ -63,6 +63,12 @@ export const EditCrewLanguageModal: React.FC<EditCrewLanguageModalProps> = ({
     }
   }, [visible, currentLanguage]);
 
+  useEffect(() => {
+    if (visible) {
+      setIsUpdating(false);
+    }
+  }, [visible]);
+
   const handleLanguageSelect = useCallback((language: string) => {
     setSelectedLanguage(language);
     setShowLanguagePicker(false);
@@ -201,7 +207,6 @@ export const EditCrewLanguageModal: React.FC<EditCrewLanguageModalProps> = ({
           <View 
             style={[styles.languagePickerContainer, { backgroundColor: colors.surface, borderColor: colors.secondary }]}
             onStartShouldSetResponder={() => true}
-            onMoveShouldSetResponder={() => true}
           >
             <View style={[styles.languagePickerHeader, { borderBottomColor: colors.secondary }]}>
               <Text style={[styles.languagePickerTitle, { color: colors.text.primary }]}>
@@ -220,6 +225,8 @@ export const EditCrewLanguageModal: React.FC<EditCrewLanguageModalProps> = ({
             <FlatList
               data={LANGUAGES}
               keyExtractor={(item) => item}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled={true}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[
@@ -401,5 +408,3 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginLeft: SIZING.spacing.sm,
   },
 });
-
-
