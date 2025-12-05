@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, SafeAreaVi
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
-import { subtractFromBalance } from '../../store/slices/balanceSlice';
+import { updateBalance } from '../../store/slices/balanceSlice';
 import { DisbandCrewModal } from './DisbandCrewModal';
 import { VisitingProfileModal } from './VisitingProfileModal';
 import { LeaveCrewModal } from './LeaveCrewModal';
@@ -84,6 +84,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [demoteExecutive] = useDemoteExecutiveMutation();
   const dispatch = useAppDispatch();
   const currentUser = useAppSelector((state) => state.auth.user);
+  const currentBalanceState = useAppSelector((state) => state.balance);
   
   const userRole = crewStatus?.role;
   const currentUserId = currentUser?._id;
@@ -323,9 +324,12 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       const result = await giftAllMembers({ giftAmount }).unwrap();
       
       if (result.newBalance !== undefined) {
-        const transactionFee = Math.floor(giftAmount * 0.1);
-        const totalCost = giftAmount + transactionFee;
-        dispatch(subtractFromBalance(totalCost));
+        dispatch(updateBalance({ 
+          total: result.newBalance, 
+          ratePerSecond: currentBalanceState.ratePerSecond, 
+          lastUpdated: currentBalanceState.lastUpdated ? new Date(currentBalanceState.lastUpdated) : null,
+          fractionalRemainder: currentBalanceState.fractionalRemainder
+        }));
       }
 
       try {
@@ -342,7 +346,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     } catch (error: any) {
       throw new Error(error?.data?.error || error?.error || 'Failed to gift members');
     }
-  }, [giftAllMembers, refetchCrewDetails, refetchCrewStatus, dispatch]);
+  }, [giftAllMembers, refetchCrewDetails, refetchCrewStatus, dispatch, currentBalanceState]);
 
   const handlePromoteMember = useCallback(async (memberUserId: string) => {
     if (!crewStatus?.crewId) {
