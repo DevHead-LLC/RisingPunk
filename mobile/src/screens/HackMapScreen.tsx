@@ -627,8 +627,12 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         return false;
       }
       
-      if (crewMemberUserIds.size === 0 && !selectedUserCrewStatus) {
+      if (crewMemberUserIds.size === 0 && selectedUserCrewStatus === undefined) {
         return false;
+      }
+      
+      if (selectedUserCrewStatus && selectedUserCrewStatus.isInCrew === false) {
+        return true;
       }
     }
     
