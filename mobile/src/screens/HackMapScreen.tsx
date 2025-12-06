@@ -606,13 +606,13 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       if (isLoadingCrewDetails) {
         return false;
       }
-      if (crewMemberUserIds.size > 0) {
-        return !crewMemberUserIds.has(String(selectedCell.info.userId));
+      if (isSameCrewMember) {
+        return false;
       }
     }
     
     return true;
-  }, [selectedCell, currentUserHandle, crewStatus, isLoadingCrewDetails, crewMemberUserIds]);
+  }, [selectedCell, currentUserHandle, crewStatus, isLoadingCrewDetails, isSameCrewMember]);
   
   // Find the antivirus feature from the research features
   const antivirusFeature = researchFeatures?.find(f => f.id === 'antivirus');
