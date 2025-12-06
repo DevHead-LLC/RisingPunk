@@ -59,6 +59,12 @@ export const VisitCrewModal: React.FC<VisitCrewModalProps> = ({
     }
   }, [isInCrew, currentUserCrewId, crewId, visible, onClose]);
 
+  useEffect(() => {
+    if (currentCategory === 'apply-to-crew' && isInCrew && visible) {
+      setCurrentCategory(null);
+    }
+  }, [currentCategory, isInCrew, visible]);
+
   if (isInCrew && currentUserCrewId && crewId && currentUserCrewId === crewId) {
     return null;
   }
@@ -308,10 +314,6 @@ export const VisitCrewModal: React.FC<VisitCrewModalProps> = ({
 
   const renderCategoryView = () => {
     if (!currentCategory) return null;
-
-    if (currentCategory === 'apply-to-crew' && isInCrew) {
-      return null;
-    }
 
     return (
       <SafeAreaView style={styles.visitCrewModalContainer}>
