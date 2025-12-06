@@ -29,7 +29,10 @@
     "android:build:release:mac": "cd android && ./gradlew assembleRelease",
     "android:build:bundle": "node -e \"process.platform==='win32'?process.exit(require('child_process').spawnSync('npm.cmd',['run','android:build:bundle:win'],{stdio:'inherit'}).status):process.exit(require('child_process').spawnSync('npm',['run','android:build:bundle:mac'],{stdio:'inherit'}).status)\"",
     "android:build:bundle:win": "cd android && gradlew.bat bundleRelease",
-    "android:build:bundle:mac": "cd android && ./gradlew bundleRelease"
+    "android:build:bundle:mac": "cd android && ./gradlew bundleRelease",
+    "android:build:bundle:staging": "node -e \"process.platform==='win32'?process.exit(require('child_process').spawnSync('npm.cmd',['run','android:build:bundle:staging:win'],{stdio:'inherit'}).status):process.exit(require('child_process').spawnSync('npm',['run','android:build:bundle:staging:mac'],{stdio:'inherit'}).status)\"",
+    "android:build:bundle:staging:win": "cross-env ENVFILE=.env.staging cd android && gradlew.bat bundleRelease",
+    "android:build:bundle:staging:mac": "ENVFILE=.env.staging cd android && ./gradlew bundleRelease"
   },
   "dependencies": {
     "@invertase/react-native-apple-authentication": "^2.4.1",
