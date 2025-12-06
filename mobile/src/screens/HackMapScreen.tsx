@@ -15,7 +15,7 @@ import { setGrid, setLoading } from '../store/slices/mapSlice';
 import { useFetchMapQuery } from '../store/api/mapApi';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
-import { useGetCrewStatusQuery, useGetUserCrewStatusQuery } from '../store/api/authApi';
+import { useGetCrewStatusQuery, useGetUserCrewStatusQuery, useGetCrewDetailsQuery } from '../store/api/authApi';
 import { API_URL } from '../config';
 import { computePanBounds } from '../utils/mapPanBounds';
 import { CellData, TerrainType, EntityType } from '../types/map';
@@ -86,7 +86,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
   };
 
-  const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive }) => {
+  const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember }) => {
     const houseBgStyle = cell.entity === 'house'
       ? (cell.owner === 'player'
           ? (cell.name === currentUserHandle ? styles.userHouseBg : styles.otherUserHouseBg)
@@ -103,6 +103,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           styles.cell,
           xStyle,
           selected && styles.selectedCell,
+          isCrewMember && styles.crewMemberCell,
         ]}
         onPress={() => onPress(x, y, cell)}
       >
@@ -164,16 +165,17 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       prevProps.cell === nextProps.cell &&
       prevProps.currentUserHandle === nextProps.currentUserHandle &&
       prevProps.isShieldActive === nextProps.isShieldActive &&
+      prevProps.isCrewMember === nextProps.isCrewMember &&
       // Only check dynamicEntityData for this specific tile
       prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
       nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
     );
   });
 
-  const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive }) => {
+  const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember }) => {
     return (
       <View style={[yStyle]}>
-        <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} />
+        <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} isCrewMember={isCrewMember} />
       </View>
     );
   }, (prevProps, nextProps) => {
@@ -185,6 +187,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       prevProps.cell === nextProps.cell &&
       prevProps.currentUserHandle === nextProps.currentUserHandle &&
       prevProps.isShieldActive === nextProps.isShieldActive &&
+      prevProps.isCrewMember === nextProps.isCrewMember &&
       // Only check dynamicEntityData for this specific tile
       prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
       nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
@@ -542,7 +545,30 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   // Get research features data (same as ResearchFeaturesList)
   const { data: researchFeatures } = useGetUserFeaturesQuery('home-defense');
   const { data: hackCrewFeatures } = useGetUserFeaturesQuery('hack-crew');
-  const { data: crewStatus } = useGetCrewStatusQuery();
+  const { data: crewStatus, isLoading: isLoadingCrewStatus } = useGetCrewStatusQuery();
+  
+  const { data: crewDetails, isLoading: isLoadingCrewDetails } = useGetCrewDetailsQuery(crewStatus?.crewId || '', {
+    skip: !crewStatus?.crewId || !crewStatus?.isInCrew,
+  });
+  
+  const crewMemberUserIds = useMemo(() => {
+    if (!crewDetails?.crew) return new Set<string>();
+    const memberIds = new Set<string>();
+    if (crewDetails.crew.president?.userId) {
+      memberIds.add(String(crewDetails.crew.president.userId));
+    }
+    (crewDetails.crew.executives || []).forEach((exec: any) => {
+      if (exec.userId) {
+        memberIds.add(String(exec.userId));
+      }
+    });
+    (crewDetails.crew.members || []).forEach((member: any) => {
+      if (member.userId) {
+        memberIds.add(String(member.userId));
+      }
+    });
+    return memberIds;
+  }, [crewDetails]);
   
   const selectedUserId = selectedCell?.info.owner === 'player' && 
     selectedCell.info.userId && 
@@ -550,9 +576,61 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     ? selectedCell.info.userId 
     : null;
   
-  const { data: selectedUserCrewStatus } = useGetUserCrewStatusQuery(selectedUserId ?? '', {
+  const { data: selectedUserCrewStatus, isLoading: isLoadingSelectedUserCrewStatus } = useGetUserCrewStatusQuery(selectedUserId ?? '', {
     skip: !selectedUserId,
   });
+  
+  const isSameCrewMember = useMemo(() => {
+    if (!crewStatus?.isInCrew) return false;
+    if (!selectedCell?.info.userId) return false;
+    
+    const selectedUserIdString = String(selectedCell.info.userId);
+    
+    if (crewMemberUserIds.has(selectedUserIdString)) {
+      return true;
+    }
+    
+    if (selectedUserCrewStatus?.isInCrew && crewStatus?.crewId && selectedUserCrewStatus?.crewId) {
+      return String(crewStatus.crewId) === String(selectedUserCrewStatus.crewId);
+    }
+    
+    return false;
+  }, [crewStatus, selectedUserCrewStatus, selectedCell, crewMemberUserIds]);
+  
+  const shouldShowHackButton = useMemo(() => {
+    if (selectedCell?.info.owner !== 'player' || !selectedCell.info.userId || selectedCell.info.name === currentUserHandle) {
+      return false;
+    }
+    
+    if (isLoadingCrewStatus) {
+      return false;
+    }
+    
+    if (crewStatus?.isInCrew) {
+      if (isLoadingCrewDetails) {
+        return false;
+      }
+      
+      const selectedUserIdString = String(selectedCell.info.userId);
+      
+      if (crewMemberUserIds.size > 0) {
+        if (crewMemberUserIds.has(selectedUserIdString)) {
+          return false;
+        }
+        return true;
+      }
+      
+      if (isLoadingSelectedUserCrewStatus) {
+        return false;
+      }
+      
+      if (isSameCrewMember) {
+        return false;
+      }
+    }
+    
+    return true;
+  }, [selectedCell, currentUserHandle, crewStatus, isLoadingCrewStatus, isLoadingCrewDetails, isLoadingSelectedUserCrewStatus, crewMemberUserIds, isSameCrewMember]);
   
   // Find the antivirus feature from the research features
   const antivirusFeature = researchFeatures?.find(f => f.id === 'antivirus');
@@ -1275,9 +1353,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                     </TouchableOpacity>
                   )}
                   
-                  {selectedCell.info.owner === 'player' && 
-                   selectedCell.info.userId && 
-                   selectedCell.info.name !== currentUserHandle && (
+                  {shouldShowHackButton && (
                     <TouchableOpacity
                       style={[
                         styles.actionButton,
@@ -1356,7 +1432,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         </TouchableOpacity>
       </TouchableOpacity>
     );
-  }, [selectedCell, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress]);
+  }, [selectedCell, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton]);
 
   if (loading || !isMapReady || !terrainDataLoaded) {
     return <View style={styles.container}><LoadingSpinner /></View>;
@@ -1424,6 +1500,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             {visibleCells.map((assignment, i) => {
               const { x, y, cell } = assignment;
               const selected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
+              const isCrewMember = cell.owner === 'player' && 
+                                   cell.userId && 
+                                   crewMemberUserIds.has(String(cell.userId));
               return (
                 <PoolTile
                   key={`${x}-${y}`}
@@ -1441,6 +1520,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                   styles={styles}
                   dynamicEntityData={dynamicEntityData}
                   isShieldActive={isShieldActive}
+                  isCrewMember={isCrewMember}
                 />
               );
             })}
@@ -1465,6 +1545,7 @@ type TileProps = {
   styles: any;
   dynamicEntityData: Record<string, any>;
   isShieldActive: boolean;
+  isCrewMember?: boolean;
 };
 
 type PoolTileProps = {
@@ -1482,6 +1563,7 @@ type PoolTileProps = {
   styles: any;
   dynamicEntityData: Record<string, any>;
   isShieldActive: boolean;
+  isCrewMember?: boolean;
 };const getStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light' | 'dark') => StyleSheet.create({
   container: {
     flex: 1,
@@ -1509,6 +1591,10 @@ type PoolTileProps = {
   selectedCell: {
     backgroundColor: themeMode === 'light' ? 'rgba(0, 100, 0, 0.15)' : 'rgba(0, 255, 65, 0.1)',
     borderColor: themeMode === 'light' ? 'rgba(0, 100, 0, 0.4)' : 'rgba(0, 255, 65, 0.3)',
+  },
+  crewMemberCell: {
+    borderWidth: 3,
+    borderColor: 'white',
   },
   cellContent: {
     width: '100%',
