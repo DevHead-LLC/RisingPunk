@@ -59,6 +59,12 @@ export const VisitCrewModal: React.FC<VisitCrewModalProps> = ({
     }
   }, [isInCrew, currentUserCrewId, crewId, visible, onClose]);
 
+  useEffect(() => {
+    if (currentCategory === 'apply-to-crew' && isInCrew && visible) {
+      setCurrentCategory(null);
+    }
+  }, [currentCategory, isInCrew, visible]);
+
   if (isInCrew && currentUserCrewId && crewId && currentUserCrewId === crewId) {
     return null;
   }
@@ -257,6 +263,10 @@ export const VisitCrewModal: React.FC<VisitCrewModalProps> = ({
   };
 
   const renderCategoryList = () => {
+    const visibleCategories = isInCrew 
+      ? CATEGORIES.filter(category => category.id !== 'apply-to-crew')
+      : CATEGORIES;
+
     return (
       <SafeAreaView style={styles.visitCrewModalContainer}>
         <View style={styles.visitCrewHeader}>
@@ -274,7 +284,7 @@ export const VisitCrewModal: React.FC<VisitCrewModalProps> = ({
 
         <ScrollView style={styles.visitCrewContent} showsVerticalScrollIndicator={false}>
           <View style={styles.visitCrewGridContainer}>
-            {CATEGORIES.map((category, index) => {
+            {visibleCategories.map((category, index) => {
               const isApplyToCrew = category.id === 'apply-to-crew';
               const isLastInRow = !isApplyToCrew && (index + 1) % 3 === 0;
               const fullWidth = (CREW_CARD_WIDTH * 3) + (CREW_CARD_GAP * 2);
