@@ -51,14 +51,15 @@ export const VisitCrewModal: React.FC<VisitCrewModalProps> = ({
   });
   const styles = createStyles(colors);
   const isInCrew = crewStatus?.isInCrew || false;
+  const currentUserCrewId = crewStatus?.crewId;
 
   useEffect(() => {
-    if (isInCrew && visible) {
+    if (isInCrew && currentUserCrewId && crewId && currentUserCrewId === crewId && visible) {
       onClose();
     }
-  }, [isInCrew, visible, onClose]);
+  }, [isInCrew, currentUserCrewId, crewId, visible, onClose]);
 
-  if (isInCrew) {
+  if (isInCrew && currentUserCrewId && crewId && currentUserCrewId === crewId) {
     return null;
   }
 

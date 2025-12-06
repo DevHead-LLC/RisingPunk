@@ -162,6 +162,44 @@ router.get('/status', auth, async (req: Request, res: Response) => {
   }
 });
 
+router.get('/status/:userId', auth, async (req: Request, res: Response) => {
+  try {
+    const requestingUserId = req.user?._id;
+    if (!requestingUserId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const { userId } = req.params;
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      res.status(400).json({ error: 'Invalid user ID' });
+      return;
+    }
+
+    const crewStatus = await CrewStatus.findOne({ userId });
+    
+    if (!crewStatus) {
+      res.json({
+        isInCrew: false,
+        crewId: null,
+        crewIdentifier: null,
+        role: null
+      });
+      return;
+    }
+
+    res.json({
+      isInCrew: crewStatus.isInCrew,
+      crewId: crewStatus.crewId ? crewStatus.crewId.toString() : null,
+      crewIdentifier: crewStatus.crewIdentifier,
+      role: crewStatus.role
+    });
+  } catch (error) {
+    console.error('Error fetching user crew status:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 interface DisbandCrewRequest extends Request {
   body: {
     crewIdentifier: string;

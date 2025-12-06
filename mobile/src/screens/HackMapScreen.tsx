@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import { View, Text, StyleSheet, LayoutChangeEvent, Pressable, Image, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, LayoutChangeEvent, Pressable, Image, Dimensions, TouchableOpacity, ScrollView } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withDecay, runOnJS, useAnimatedReaction } from 'react-native-reanimated';
 import { CloseButton } from '../components/common/CloseButton';
@@ -9,17 +9,19 @@ import { AntivirusModal } from '../components/hackMap/AntivirusModal';
 import { CrewOnboardingModal } from '../components/hackMap/CrewOnboardingModal';
 import { CrewModal } from '../components/hackMap/CrewModal';
 import { VisitingProfileModal } from '../components/hackMap/VisitingProfileModal';
+import { VisitCrewModal } from '../components/hackMap/VisitCrewModal';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { setGrid, setLoading } from '../store/slices/mapSlice';
 import { useFetchMapQuery } from '../store/api/mapApi';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
-import { useGetCrewStatusQuery } from '../store/api/authApi';
+import { useGetCrewStatusQuery, useGetUserCrewStatusQuery } from '../store/api/authApi';
 import { API_URL } from '../config';
 import { computePanBounds } from '../utils/mapPanBounds';
 import { CellData, TerrainType, EntityType } from '../types/map';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useTheme } from '../context/ThemeContext';
+import { SIZING } from '../styles/theme';
 
 const CELL_SIZE = 55;
 const MARGIN_SIZE = 80;
@@ -243,6 +245,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [showVisitingProfileModal, setShowVisitingProfileModal] = useState(false);
   const [visitingProfileUserId, setVisitingProfileUserId] = useState<string | null>(null);
   const visitingProfileCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [showVisitCrewModal, setShowVisitCrewModal] = useState(false);
+  const [visitCrewId, setVisitCrewId] = useState<string | null>(null);
+  const [visitCrewName, setVisitCrewName] = useState<string | null>(null);
+  const [showCrewModalFromUser, setShowCrewModalFromUser] = useState(false);
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
   const startX = useSharedValue(0);
@@ -536,6 +542,16 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const { data: researchFeatures } = useGetUserFeaturesQuery('home-defense');
   const { data: hackCrewFeatures } = useGetUserFeaturesQuery('hack-crew');
   const { data: crewStatus } = useGetCrewStatusQuery();
+  
+  const selectedUserId = selectedCell?.info.owner === 'player' && 
+    selectedCell.info.userId && 
+    selectedCell.info.name !== currentUserHandle 
+    ? selectedCell.info.userId 
+    : null;
+  
+  const { data: selectedUserCrewStatus } = useGetUserCrewStatusQuery(selectedUserId ?? '', {
+    skip: !selectedUserId,
+  });
   
   // Find the antivirus feature from the research features
   const antivirusFeature = researchFeatures?.find(f => f.id === 'antivirus');
@@ -1096,7 +1112,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
   const handleCrewClose = useCallback(() => {
     setShowCrewModal(false);
-  }, []);
+    if (showCrewModalFromUser) {
+      setShowCrewModalFromUser(false);
+    }
+  }, [showCrewModalFromUser]);
 
   const handleCrewOnboardingClose = useCallback(() => {
     setShowCrewOnboardingModal(false);
@@ -1122,114 +1141,206 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     };
   }, []);
 
+  const handleViewCrewPress = useCallback(() => {
+    if (!selectedUserCrewStatus?.isInCrew || !selectedUserCrewStatus.crewId) {
+      return;
+    }
+
+    const selectedUserCrewId = selectedUserCrewStatus.crewId;
+    const currentUserCrewId = crewStatus?.crewId;
+
+    if (currentUserCrewId && selectedUserCrewId === currentUserCrewId) {
+      setShowCrewModalFromUser(true);
+      setShowCrewModal(true);
+    } else {
+      setVisitCrewId(selectedUserCrewStatus.crewId);
+      setVisitCrewName(null);
+      setShowVisitCrewModal(true);
+    }
+  }, [selectedUserCrewStatus, crewStatus]);
+
+  const handleVisitCrewClose = useCallback(() => {
+    setShowVisitCrewModal(false);
+    setVisitCrewId(null);
+    setVisitCrewName(null);
+  }, []);
+
   const renderInfoPanel = useCallback(() => {
     if (!selectedCell) {return null;}
 
     return (
-      <View style={styles.infoPanel}>
-        <Pressable
-          style={styles.infoPanelClose}
-          onPress={() => setSelectedCell(null)}
+      <TouchableOpacity
+        style={styles.infoPanelOverlay}
+        activeOpacity={1}
+        onPress={() => setSelectedCell(null)}
+      >
+        <TouchableOpacity
+          style={[styles.infoPanel, { backgroundColor: colors.background, borderColor: colors.matrix }]}
+          activeOpacity={1}
+          onPress={(e) => e.stopPropagation()}
         >
-          <Text style={styles.closeSymbol}>×</Text>
-        </Pressable>
-        <Text style={styles.coordsText}>
-          GRID: ({selectedCell.x}, {selectedCell.y})
-        </Text>
-        <Text style={styles.terrainText}>
-          TERRAIN: {selectedCell.info.terrain.toUpperCase()}
-        </Text>
-        {selectedCell.info.entity !== 'empty' && (
-          <>
-            <Text style={styles.entityText}>
-              ENTITY: {selectedCell.info.name || 'UNKNOWN'}
+          <ScrollView
+            style={styles.infoPanelScrollView}
+            contentContainerStyle={styles.infoPanelContent}
+            showsVerticalScrollIndicator={true}
+          >
+            <Text style={[styles.infoPanelTitle, { color: colors.secondary }]}>
+              Cell Information
             </Text>
-            {selectedCell.info.owner !== 'player' && selectedCell.info.npcLevel && (
-              <Text style={styles.npcLevelModalText}>
-                LEVEL: {selectedCell.info.npcLevel}
+            
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: colors.text.secondary }]}>Grid:</Text>
+              <Text style={[styles.infoValue, { color: colors.text.primary }]}>
+                ({selectedCell.x}, {selectedCell.y})
               </Text>
-            )}
-            <Text style={[
-              styles.statusText,
-              selectedCell.info.owner === 'player' && selectedCell.info.name !== currentUserHandle ? styles.hostileText : 
-              selectedCell.info.owner === 'player' ? styles.friendlyText : styles.hostileText,
-            ]}>
-              STATUS: {selectedCell.info.owner === 'player' && selectedCell.info.name !== currentUserHandle ? 'HOSTILE' : 
-              selectedCell.info.owner === 'player' ? 'FRIENDLY' : 'HOSTILE'}
-            </Text>
-            {selectedCell.info.owner === 'player' && selectedCell.info.isShielded && (
-              <Text style={[styles.statusText, styles.shieldedText]}>
-                SHIELD: ACTIVE
+            </View>
+            
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: colors.text.secondary }]}>Terrain:</Text>
+              <Text style={[styles.infoValue, { color: colors.text.primary }]}>
+                {selectedCell.info.terrain.toUpperCase()}
               </Text>
+            </View>
+            
+            {selectedCell.info.entity !== 'empty' && (
+              <>
+                <View style={styles.infoRow}>
+                  <Text style={[styles.infoLabel, { color: colors.text.secondary }]}>Entity:</Text>
+                  <Text style={[styles.infoValue, { color: colors.matrix }]}>
+                    {selectedCell.info.name || 'UNKNOWN'}
+                  </Text>
+                </View>
+                
+                {selectedCell.info.owner !== 'player' && selectedCell.info.npcLevel && (
+                  <View style={styles.infoRow}>
+                    <Text style={[styles.infoLabel, { color: colors.text.secondary }]}>Level:</Text>
+                    <Text style={[styles.infoValue, { color: colors.text.primary }]}>
+                      {selectedCell.info.npcLevel}
+                    </Text>
+                  </View>
+                )}
+                
+                <View style={styles.infoRow}>
+                  <Text style={[styles.infoLabel, { color: colors.text.secondary }]}>Status:</Text>
+                  <Text style={[
+                    styles.infoValue,
+                    { color: selectedCell.info.owner === 'player' && selectedCell.info.name !== currentUserHandle ? colors.error : 
+                      selectedCell.info.owner === 'player' ? colors.success : colors.error }
+                  ]}>
+                    {selectedCell.info.owner === 'player' && selectedCell.info.name !== currentUserHandle ? 'HOSTILE' : 
+                    selectedCell.info.owner === 'player' ? 'FRIENDLY' : 'HOSTILE'}
+                  </Text>
+                </View>
+                
+                {selectedCell.info.owner === 'player' && selectedCell.info.isShielded && (
+                  <View style={styles.infoRow}>
+                    <Text style={[styles.infoLabel, { color: colors.text.secondary }]}>Shield:</Text>
+                    <Text style={[styles.infoValue, { color: colors.success }]}>ACTIVE</Text>
+                  </View>
+                )}
+                
+                <View style={styles.buttonContainer}>
+                  {selectedCell.info.owner !== 'player' && selectedCell.info.npcSlug && (
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: colors.matrix, borderColor: colors.matrix }]}
+                      onPress={() => {
+                        (globalThis as any).pendingNpcSlug = selectedCell.info.npcSlug;
+                        (globalThis as any).pendingNpcInstanceId = selectedCell.info.npcInstanceId;
+                        (globalThis as any).pendingMapPan = {
+                          x: selectedCell.x,
+                          y: selectedCell.y,
+                        };
+                        onClose();
+                      }}
+                    >
+                      <Text style={[styles.actionButtonText, { color: colors.background }]}>
+                        Hack Entity
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  
+                  {selectedCell.info.owner === 'player' && 
+                   selectedCell.info.userId && 
+                   selectedCell.info.name !== currentUserHandle && (
+                    <TouchableOpacity
+                      style={[
+                        styles.actionButton,
+                        { 
+                          backgroundColor: selectedCell.info.isShielded ? colors.buttonDisabled : colors.matrix,
+                          borderColor: colors.matrix,
+                          opacity: selectedCell.info.isShielded ? 0.6 : 1
+                        }
+                      ]}
+                      onPress={() => {
+                        if (selectedCell.info.isShielded) {
+                          return;
+                        }
+                        (globalThis as any).pendingDefenderUserId = selectedCell.info.userId;
+                        (globalThis as any).pendingMapPan = {
+                          x: selectedCell.x,
+                          y: selectedCell.y,
+                        };
+                        onClose();
+                      }}
+                      disabled={selectedCell.info.isShielded}
+                    >
+                      <Text style={[
+                        styles.actionButtonText,
+                        { color: selectedCell.info.isShielded ? colors.text.secondary : colors.background }
+                      ]}>
+                        {selectedCell.info.isShielded ? 'Shielded User' : 'Hack User'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  
+                  {selectedCell.info.owner === 'player' && 
+                   selectedCell.info.userId && (
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: colors.matrix, borderColor: colors.matrix }]}
+                      onPress={() => {
+                        if (visitingProfileCloseTimeoutRef.current) {
+                          clearTimeout(visitingProfileCloseTimeoutRef.current);
+                          visitingProfileCloseTimeoutRef.current = null;
+                        }
+                        setVisitingProfileUserId(selectedCell.info.userId);
+                        setShowVisitingProfileModal(true);
+                      }}
+                    >
+                      <Text style={[styles.actionButtonText, { color: colors.background }]}>
+                        View Profile
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  
+                  {selectedCell.info.owner === 'player' && 
+                   selectedCell.info.userId && 
+                   selectedCell.info.name !== currentUserHandle &&
+                   selectedUserCrewStatus?.isInCrew && 
+                   selectedUserCrewStatus.crewId && (
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: colors.matrix, borderColor: colors.matrix }]}
+                      onPress={handleViewCrewPress}
+                    >
+                      <Text style={[styles.actionButtonText, { color: colors.background }]}>
+                        View Crew
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </>
             )}
-              {selectedCell.info.owner !== 'player' && selectedCell.info.npcSlug && (
-              <Pressable
-                style={[styles.hackButton]}
-                onPress={() => {
-                  (globalThis as any).pendingNpcSlug = selectedCell.info.npcSlug;
-                    (globalThis as any).pendingNpcInstanceId = selectedCell.info.npcInstanceId;
-                  // Store the grid coordinates of the selected cell, not the pan coordinates
-                  (globalThis as any).pendingMapPan = {
-                    x: selectedCell.x,
-                    y: selectedCell.y,
-                  };
-                  onClose();
-                }}
-              >
-                <Text style={styles.hackButtonText}>Hack Entity</Text>
-              </Pressable>
-            )}
-            {selectedCell.info.owner === 'player' && 
-             selectedCell.info.userId && 
-             selectedCell.info.name !== currentUserHandle && (
-              <Pressable
-                style={[
-                  styles.hackButton,
-                  selectedCell.info.isShielded && styles.hackButtonDisabled
-                ]}
-                onPress={() => {
-                  if (selectedCell.info.isShielded) {
-                    return; // Don't allow hacking shielded users
-                  }
-                  (globalThis as any).pendingDefenderUserId = selectedCell.info.userId;
-                  // Store the grid coordinates of the selected cell, not the pan coordinates
-                  (globalThis as any).pendingMapPan = {
-                    x: selectedCell.x,
-                    y: selectedCell.y,
-                  };
-                  onClose();
-                }}
-                disabled={selectedCell.info.isShielded}
-              >
-                <Text style={[
-                  styles.hackButtonText,
-                  selectedCell.info.isShielded && styles.hackButtonTextDisabled
-                ]}>
-                  {selectedCell.info.isShielded ? 'Shielded User' : 'Hack User'}
-                </Text>
-              </Pressable>
-            )}
-            {selectedCell.info.owner === 'player' && 
-             selectedCell.info.userId && (
-              <Pressable
-                style={styles.hackButton}
-                onPress={() => {
-                  if (visitingProfileCloseTimeoutRef.current) {
-                    clearTimeout(visitingProfileCloseTimeoutRef.current);
-                    visitingProfileCloseTimeoutRef.current = null;
-                  }
-                  setVisitingProfileUserId(selectedCell.info.userId);
-                  setShowVisitingProfileModal(true);
-                }}
-              >
-                <Text style={styles.hackButtonText}>View Profile</Text>
-              </Pressable>
-            )}
-          </>
-        )}
-      </View>
+            
+            <TouchableOpacity
+              style={[styles.closeButton, { borderColor: colors.matrix }]}
+              onPress={() => setSelectedCell(null)}
+            >
+              <Text style={[styles.closeButtonText, { color: colors.secondary }]}>Close</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </TouchableOpacity>
+      </TouchableOpacity>
     );
-  }, [selectedCell, styles, currentUserHandle, onClose]);
+  }, [selectedCell, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress]);
 
   if (loading || !isMapReady || !terrainDataLoaded) {
     return <View style={styles.container}><LoadingSpinner /></View>;
@@ -1271,6 +1382,15 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           visible={showVisitingProfileModal}
           onClose={handleVisitingProfileClose}
           userId={visitingProfileUserId}
+        />
+      )}
+
+      {visitCrewId && (
+        <VisitCrewModal
+          visible={showVisitCrewModal}
+          onClose={handleVisitCrewClose}
+          crewId={visitCrewId}
+          crewName={visitCrewName || undefined}
         />
       )}
 
@@ -1545,19 +1665,95 @@ type PoolTileProps = {
   enemyEntity: {
     backgroundColor: themeMode === 'light' ? 'rgba(255, 65, 65, 0.15)' : 'rgba(255, 65, 65, 0.1)',
   },
-  infoPanel: {
+  infoPanelOverlay: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -100 }, { translateY: -50 }],
-    backgroundColor: themeMode === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(0, 0, 0, 0.9)',
-    padding: 15,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  infoPanel: {
+    padding: SIZING.spacing.md,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.matrix,
-    zIndex: 2,
-    minWidth: 200,
-    paddingTop: 30,
+    alignItems: 'center',
+    minWidth: 380,
+    maxWidth: 450,
+    maxHeight: '85%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  infoPanelScrollView: {
+    width: '100%',
+  },
+  infoPanelContent: {
+    width: '100%',
+    alignItems: 'center',
+    paddingBottom: SIZING.spacing.xs,
+  },
+  infoPanelTitle: {
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.sm,
+    textAlign: 'center',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: SIZING.spacing.xs,
+    paddingHorizontal: SIZING.spacing.xs,
+  },
+  infoLabel: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
+  },
+  infoValue: {
+    fontSize: SIZING.font.body,
+    fontWeight: '500',
+  },
+  buttonContainer: {
+    width: '100%',
+    marginTop: SIZING.spacing.sm,
+    marginBottom: SIZING.spacing.sm,
+    gap: SIZING.spacing.xs,
+  },
+  actionButton: {
+    paddingHorizontal: SIZING.spacing.md,
+    paddingVertical: SIZING.spacing.sm,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    marginBottom: SIZING.spacing.xs,
+    minWidth: 180,
+  },
+  actionButtonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
+  },
+  closeButton: {
+    paddingHorizontal: SIZING.spacing.md,
+    paddingVertical: SIZING.spacing.xs,
+    borderRadius: 6,
+    borderWidth: 1,
+    minWidth: 100,
+    alignItems: 'center',
+    marginTop: SIZING.spacing.xs,
+  },
+  closeButtonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
   },
   terrainText: {
     color: themeMode === 'light' ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.8)',

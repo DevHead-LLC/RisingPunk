@@ -286,6 +286,11 @@ export const authApi = createApi({
       refetchOnMountOrArgChange: true,
     }),
 
+    getUserCrewStatus: builder.query<{ isInCrew: boolean; crewId: string | null; crewIdentifier: string | null; role: 'president' | 'member' | 'executive' | null }, string>({
+      query: (userId) => `/api/crew/status/${userId}`,
+      providesTags: ['User'],
+    }),
+
     applyToCrew: builder.mutation<{ success: boolean; message: string }, { crewId: string }>({
       query: (data) => ({
         url: '/api/crew/apply',
@@ -436,6 +441,7 @@ export const {
   useForgotPasswordMutation,
   useCreateCrewMutation,
   useGetCrewStatusQuery,
+  useGetUserCrewStatusQuery,
   useDisbandCrewMutation,
   useSearchCrewsQuery,
   useGetSuggestedCrewsQuery,
