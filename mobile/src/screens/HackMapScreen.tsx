@@ -245,6 +245,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [showVisitingProfileModal, setShowVisitingProfileModal] = useState(false);
   const [visitingProfileUserId, setVisitingProfileUserId] = useState<string | null>(null);
   const visitingProfileCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const visitCrewCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [showVisitCrewModal, setShowVisitCrewModal] = useState(false);
   const [visitCrewId, setVisitCrewId] = useState<string | null>(null);
   const [visitCrewName, setVisitCrewName] = useState<string | null>(null);
@@ -1138,12 +1139,21 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         clearTimeout(visitingProfileCloseTimeoutRef.current);
         visitingProfileCloseTimeoutRef.current = null;
       }
+      if (visitCrewCloseTimeoutRef.current) {
+        clearTimeout(visitCrewCloseTimeoutRef.current);
+        visitCrewCloseTimeoutRef.current = null;
+      }
     };
   }, []);
 
   const handleViewCrewPress = useCallback(() => {
     if (!selectedUserCrewStatus?.isInCrew || !selectedUserCrewStatus.crewId) {
       return;
+    }
+
+    if (visitCrewCloseTimeoutRef.current) {
+      clearTimeout(visitCrewCloseTimeoutRef.current);
+      visitCrewCloseTimeoutRef.current = null;
     }
 
     const selectedUserCrewId = selectedUserCrewStatus.crewId;
@@ -1161,8 +1171,14 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
   const handleVisitCrewClose = useCallback(() => {
     setShowVisitCrewModal(false);
-    setVisitCrewId(null);
-    setVisitCrewName(null);
+    if (visitCrewCloseTimeoutRef.current) {
+      clearTimeout(visitCrewCloseTimeoutRef.current);
+    }
+    visitCrewCloseTimeoutRef.current = setTimeout(() => {
+      setVisitCrewId(null);
+      setVisitCrewName(null);
+      visitCrewCloseTimeoutRef.current = null;
+    }, 300);
   }, []);
 
   const renderInfoPanel = useCallback(() => {
