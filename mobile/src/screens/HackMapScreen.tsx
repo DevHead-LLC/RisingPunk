@@ -545,7 +545,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   // Get research features data (same as ResearchFeaturesList)
   const { data: researchFeatures } = useGetUserFeaturesQuery('home-defense');
   const { data: hackCrewFeatures } = useGetUserFeaturesQuery('hack-crew');
-  const { data: crewStatus } = useGetCrewStatusQuery();
+  const { data: crewStatus, isLoading: isLoadingCrewStatus } = useGetCrewStatusQuery();
   
   const { data: crewDetails, isLoading: isLoadingCrewDetails } = useGetCrewDetailsQuery(crewStatus?.crewId || '', {
     skip: !crewStatus?.crewId || !crewStatus?.isInCrew,
@@ -602,6 +602,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       return false;
     }
     
+    if (isLoadingCrewStatus) {
+      return false;
+    }
+    
     if (crewStatus?.isInCrew) {
       if (isLoadingCrewDetails) {
         return false;
@@ -612,7 +616,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
     
     return true;
-  }, [selectedCell, currentUserHandle, crewStatus, isLoadingCrewDetails, isSameCrewMember]);
+  }, [selectedCell, currentUserHandle, crewStatus, isLoadingCrewStatus, isLoadingCrewDetails, isSameCrewMember]);
   
   // Find the antivirus feature from the research features
   const antivirusFeature = researchFeatures?.find(f => f.id === 'antivirus');
