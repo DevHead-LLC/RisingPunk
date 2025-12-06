@@ -617,7 +617,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         if (crewMemberUserIds.has(selectedUserIdString)) {
           return false;
         }
-        return true;
       }
       
       if (isLoadingSelectedUserCrewStatus) {
