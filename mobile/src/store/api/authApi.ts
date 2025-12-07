@@ -327,7 +327,7 @@ export const authApi = createApi({
       providesTags: ['User'],
     }),
 
-    getCrewDetails: builder.query<{ success: boolean; crew: { id: string; crewName: string; crewIdentifier: string; nativeLanguage: string; createdAt: string | null; memberCount: number; applicants: Array<{ userId: string; handle: string; appliedAt: string }>; crewRules: string[]; internalMessage: string; president: { userId: string; handle: string; level: number } | null; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }> } }, string>({
+    getCrewDetails: builder.query<{ success: boolean; crew: { id: string; crewName: string; crewIdentifier: string; nativeLanguage: string; createdAt: string | null; memberCount: number; applicants: Array<{ userId: string; handle: string; appliedAt: string }>; crewRules: string[]; internalMessage: string; externalMessage: string; president: { userId: string; handle: string; level: number } | null; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }> } }, string>({
       query: (crewId) => `/api/crew/${crewId}`,
       providesTags: ['User'],
       refetchOnMountOrArgChange: true,
@@ -404,6 +404,15 @@ export const authApi = createApi({
       invalidatesTags: ['User'],
     }),
 
+    updateExternalMessage: builder.mutation<{ success: boolean; message: string; crew: { id: string; externalMessage: string } }, { externalMessage: string }>({
+      query: (data) => ({
+        url: '/api/crew/update-external-message',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
+
     giftAllMembers: builder.mutation<{ success: boolean; message: string; giftAmount: number; transactionFee: number; totalCost: number; baseAmountPerMember: number; remainder: number; memberCount: number; newBalance: number; lastUpdated: string | Date; fractionalRemainder: number }, { giftAmount: number }>({
       query: (data) => ({
         url: '/api/crew/gift-all-members',
@@ -464,6 +473,7 @@ export const {
   useUpdateCrewIdentifierMutation,
   useUpdateCrewLanguageMutation,
   useUpdateInternalMessageMutation,
+  useUpdateExternalMessageMutation,
   useGiftAllMembersMutation,
   usePromoteMemberMutation,
   useDemoteExecutiveMutation,
