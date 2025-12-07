@@ -516,6 +516,7 @@ router.get('/:crewId', auth, async (req: Request, res: Response) => {
         memberCount: memberCount,
         applicants: crew.applicants || [],
         crewRules: crew.crewRules || [],
+        internalMessage: crew.internalMessage || '',
         president: president ? { userId: president._id.toString(), handle: president.handle, level: president.level || 1 } : null,
         executives: executives.map((exec: any) => ({
           userId: exec._id.toString(),
@@ -1059,6 +1060,66 @@ router.post('/update-language', auth, async (req: UpdateCrewLanguageRequest, res
     });
   } catch (error: any) {
     console.error('Error updating crew language:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+interface UpdateInternalMessageRequest extends Request {
+  body: {
+    internalMessage: string;
+  }
+}
+
+router.post('/update-internal-message', auth, async (req: UpdateInternalMessageRequest, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const { internalMessage } = req.body;
+    if (typeof internalMessage !== 'string') {
+      res.status(400).json({ error: 'Internal message must be a string' });
+      return;
+    }
+
+    if (internalMessage.length > 1500) {
+      res.status(400).json({ error: 'Internal message must be 1500 characters or less' });
+      return;
+    }
+
+    const crewStatus = await CrewStatus.findOne({ userId });
+    if (!crewStatus || !crewStatus.isInCrew || !crewStatus.crewId) {
+      res.status(400).json({ error: 'User is not in a crew' });
+      return;
+    }
+
+    if (crewStatus.role !== 'president') {
+      res.status(403).json({ error: 'Only the president can update the internal message' });
+      return;
+    }
+
+    const crew = await Crew.findById(crewStatus.crewId);
+    if (!crew) {
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    const trimmedMessage = internalMessage.trim();
+    crew.internalMessage = trimmedMessage;
+    await crew.save();
+
+    res.json({
+      success: true,
+      message: 'Internal message updated successfully',
+      crew: {
+        id: (crew._id as mongoose.Types.ObjectId).toString(),
+        internalMessage: crew.internalMessage
+      }
+    });
+  } catch (error: any) {
+    console.error('Error updating internal message:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

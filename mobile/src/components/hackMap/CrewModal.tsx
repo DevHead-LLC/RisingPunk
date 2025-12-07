@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, SafeAreaView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, SafeAreaView, Dimensions, TextInput } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
@@ -12,7 +12,7 @@ import { EditCrewIdentifierModal } from './EditCrewIdentifierModal';
 import { EditCrewLanguageModal } from './EditCrewLanguageModal';
 import { GiftAllMembersModal } from './GiftAllMembersModal';
 import { EditableCrewRules } from './EditableCrewRules';
-import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, useUpdateCrewLanguageMutation, useGiftAllMembersMutation, usePromoteMemberMutation, useDemoteExecutiveMutation } from '../../store/api/authApi';
+import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, useUpdateCrewLanguageMutation, useUpdateInternalMessageMutation, useGiftAllMembersMutation, usePromoteMemberMutation, useDemoteExecutiveMutation } from '../../store/api/authApi';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CREW_MODAL_PADDING = SIZING.spacing.md * 2;
@@ -69,6 +69,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [demotingUserId, setDemotingUserId] = useState<string | null>(null);
   const [recentlyPromotedUserIds, setRecentlyPromotedUserIds] = useState<Set<string>>(new Set());
   const [isEditingCrewRules, setIsEditingCrewRules] = useState(false);
+  const [isEditingInternalMessage, setIsEditingInternalMessage] = useState(false);
+  const [internalMessageText, setInternalMessageText] = useState('');
   const { data: crewStatus, refetch: refetchCrewStatus } = useGetCrewStatusQuery(undefined, {
     pollingInterval: visible ? 3000 : 0,
   });
@@ -79,6 +81,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [updateCrewName, { isLoading: isUpdatingCrewName }] = useUpdateCrewNameMutation();
   const [updateCrewIdentifier, { isLoading: isUpdatingCrewIdentifier }] = useUpdateCrewIdentifierMutation();
   const [updateCrewLanguage, { isLoading: isUpdatingCrewLanguage }] = useUpdateCrewLanguageMutation();
+  const [updateInternalMessage, { isLoading: isUpdatingInternalMessage }] = useUpdateInternalMessageMutation();
   const [giftAllMembers, { isLoading: isGiftingMembers }] = useGiftAllMembersMutation();
   const [promoteMember] = usePromoteMemberMutation();
   const [demoteExecutive] = useDemoteExecutiveMutation();
@@ -1068,6 +1071,166 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     );
   };
 
+  useEffect(() => {
+    if (!isEditingInternalMessage && activeCrewDetails?.crew?.internalMessage !== undefined) {
+      setInternalMessageText(activeCrewDetails.crew.internalMessage || '');
+    }
+  }, [isEditingInternalMessage, activeCrewDetails?.crew?.internalMessage]);
+
+  const handleStartEditingInternalMessage = () => {
+    setInternalMessageText(activeCrewDetails?.crew?.internalMessage || '');
+    setIsEditingInternalMessage(true);
+  };
+
+  const handleCancelEditingInternalMessage = () => {
+    setInternalMessageText(activeCrewDetails?.crew?.internalMessage || '');
+    setIsEditingInternalMessage(false);
+  };
+
+  const handleSaveInternalMessage = async () => {
+    if (isUpdatingInternalMessage) return;
+
+    const trimmedMessage = internalMessageText.trim();
+    const currentMessage = activeCrewDetails?.crew?.internalMessage || '';
+
+    if (trimmedMessage === currentMessage) {
+      setIsEditingInternalMessage(false);
+      return;
+    }
+
+    if (trimmedMessage.length > 1500) {
+      return;
+    }
+
+    try {
+      await updateInternalMessage({ internalMessage: trimmedMessage }).unwrap();
+      setIsEditingInternalMessage(false);
+      refetchCrewDetails();
+    } catch (error: any) {
+      console.error('Error updating internal message:', error);
+    }
+  };
+
+  const renderInternalMessageBoard = () => {
+    const isPresident = userRole === 'president';
+    const currentMessage = activeCrewDetails?.crew?.internalMessage || '';
+    const displayMessage = isEditingInternalMessage ? internalMessageText : currentMessage;
+    const characterCount = displayMessage.length;
+    const maxCharacters = 1500;
+
+    return (
+      <ScrollView
+        style={styles.categoryContent}
+        contentContainerStyle={styles.internalMessageScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {isPresident && !isEditingInternalMessage && (
+          <View style={styles.internalMessageEditContainer}>
+            <TouchableOpacity
+              style={[
+                styles.internalMessageEditButton,
+                { 
+                  borderColor: colors.primary, 
+                  backgroundColor: colors.primary 
+                }
+              ]}
+              onPress={handleStartEditingInternalMessage}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.internalMessageEditButtonText, { color: colors.background }]}>
+                Edit
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {isEditingInternalMessage ? (
+          <View style={styles.internalMessageEditView}>
+            <Text style={[styles.internalMessageInfoText, { color: colors.text.secondary }]}>
+              This is internal messaging only to your crew members.
+            </Text>
+            
+            <View style={styles.internalMessageInputContainer}>
+              <TextInput
+                style={[
+                  styles.internalMessageInput,
+                  {
+                    borderColor: characterCount > maxCharacters ? colors.error : colors.secondary,
+                    backgroundColor: colors.inputBg || colors.surface,
+                    color: colors.text.primary,
+                  }
+                ]}
+                value={internalMessageText}
+                onChangeText={setInternalMessageText}
+                placeholder="Enter internal message for your crew members..."
+                placeholderTextColor={colors.text.placeholder}
+                multiline
+                maxLength={maxCharacters}
+                editable={!isUpdatingInternalMessage}
+                textAlignVertical="top"
+              />
+              <Text style={[styles.internalMessageCharCount, { color: colors.text.secondary }]}>
+                {characterCount} / {maxCharacters}
+              </Text>
+            </View>
+
+            <View style={styles.internalMessageButtonContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.internalMessageCancelButton,
+                  {
+                    borderColor: colors.secondary,
+                    backgroundColor: colors.surface,
+                  }
+                ]}
+                onPress={handleCancelEditingInternalMessage}
+                disabled={isUpdatingInternalMessage}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.internalMessageButtonText, { color: colors.text.secondary }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.internalMessageSaveButton,
+                  {
+                    borderColor: colors.primary,
+                    backgroundColor: colors.primary,
+                  },
+                  (isUpdatingInternalMessage || characterCount > maxCharacters) && {
+                    backgroundColor: colors.buttonDisabled,
+                    borderColor: colors.buttonDisabled,
+                  }
+                ]}
+                onPress={handleSaveInternalMessage}
+                disabled={isUpdatingInternalMessage || characterCount > maxCharacters}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.internalMessageButtonText, { color: colors.background }]}>
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.internalMessageView}>
+            {currentMessage ? (
+              <Text style={[styles.internalMessageText, { color: colors.text.primary }]}>
+                {currentMessage}
+              </Text>
+            ) : (
+              <Text style={[styles.internalMessagePlaceholder, { color: colors.text.secondary }]}>
+                No internal message has been set yet.
+              </Text>
+            )}
+          </View>
+        )}
+      </ScrollView>
+    );
+  };
+
   const renderCrewSettings = () => {
     const settingsButtons = [
       'Edit Crew Name',
@@ -1164,7 +1327,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
          currentCategory === 'guild-information' ? renderCrewInformation() :
          currentCategory === 'awards' ? renderAwards() :
          currentCategory === 'ranking' ? renderRanking() :
-         currentCategory === 'crew-rules' ? renderCrewRules() : (
+         currentCategory === 'crew-rules' ? renderCrewRules() :
+         currentCategory === 'internal-message-board' ? renderInternalMessageBoard() : (
           <View style={styles.categoryContent}>
             <Text style={styles.placeholderText}>
               {getCategoryLabel(currentCategory)} content will be implemented here.
@@ -1675,6 +1839,95 @@ const createStyles = (colors: any) => StyleSheet.create({
   leaveCrewButtonText: {
     fontSize: SIZING.font.body,
     fontWeight: 'bold',
+  },
+  internalMessageScrollContent: {
+    paddingBottom: SIZING.spacing.lg,
+  },
+  internalMessageEditContainer: {
+    alignItems: 'flex-end',
+    marginBottom: SIZING.spacing.md,
+  },
+  internalMessageEditButton: {
+    paddingVertical: SIZING.spacing.sm,
+    paddingHorizontal: SIZING.spacing.lg,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 100,
+  },
+  internalMessageEditButtonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
+  },
+  internalMessageView: {
+    flex: 1,
+    padding: SIZING.spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.secondary,
+  },
+  internalMessageText: {
+    fontSize: SIZING.font.body,
+    lineHeight: SIZING.font.body * 1.5,
+  },
+  internalMessagePlaceholder: {
+    fontSize: SIZING.font.body,
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
+  internalMessageEditView: {
+    flex: 1,
+  },
+  internalMessageInfoText: {
+    fontSize: SIZING.font.body,
+    marginBottom: SIZING.spacing.md,
+    padding: SIZING.spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.secondary,
+  },
+  internalMessageInputContainer: {
+    marginBottom: SIZING.spacing.md,
+  },
+  internalMessageInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: SIZING.spacing.md,
+    fontSize: SIZING.font.body,
+    minHeight: 200,
+    maxHeight: 400,
+  },
+  internalMessageCharCount: {
+    fontSize: SIZING.font.small,
+    textAlign: 'right',
+    marginTop: SIZING.spacing.xs,
+  },
+  internalMessageButtonContainer: {
+    flexDirection: 'row',
+    gap: SIZING.spacing.md,
+  },
+  internalMessageCancelButton: {
+    flex: 1,
+    paddingVertical: SIZING.spacing.md,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  internalMessageSaveButton: {
+    flex: 1,
+    paddingVertical: SIZING.spacing.md,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  internalMessageButtonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
   },
 });
 
