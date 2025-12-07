@@ -177,6 +177,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     setDemotingUserId(null);
     setRecentlyPromotedUserIds(new Set());
     setIsEditingCrewRules(false);
+    setIsEditingInternalMessage(false);
+    setInternalMessageText('');
     onClose();
   };
 
