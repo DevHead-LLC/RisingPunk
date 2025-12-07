@@ -161,6 +161,10 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   };
 
   const handleBack = () => {
+    if (currentCategory === 'internal-message-board') {
+      setIsEditingInternalMessage(false);
+      setInternalMessageText('');
+    }
     setCurrentCategory(null);
   };
 
