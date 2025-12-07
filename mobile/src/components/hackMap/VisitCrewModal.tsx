@@ -251,14 +251,26 @@ export const VisitCrewModal: React.FC<VisitCrewModalProps> = ({
   };
 
   const renderExternalMessageBoard = () => {
+    const currentMessage = crewDetails?.crew?.externalMessage || '';
+
     return (
-      <View style={styles.categoryContent}>
-        <View style={styles.awardsEmptyContainer}>
-          <Text style={[styles.awardsEmptyText, { color: colors.text.secondary }]}>
-            External Message Board content will be displayed here.
-          </Text>
+      <ScrollView
+        style={styles.categoryContent}
+        contentContainerStyle={styles.externalMessageScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.externalMessageView}>
+          {currentMessage ? (
+            <Text style={[styles.externalMessageText, { color: colors.text.primary }]}>
+              {currentMessage}
+            </Text>
+          ) : (
+            <Text style={[styles.externalMessagePlaceholder, { color: colors.text.secondary }]}>
+              No external message has been set yet.
+            </Text>
+          )}
         </View>
-      </View>
+      </ScrollView>
     );
   };
 
@@ -602,6 +614,26 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: SIZING.font.h2,
     fontWeight: 'bold',
     marginBottom: SIZING.spacing.md,
+  },
+  externalMessageScrollContent: {
+    paddingBottom: SIZING.spacing.lg,
+  },
+  externalMessageView: {
+    flex: 1,
+    padding: SIZING.spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.secondary,
+  },
+  externalMessageText: {
+    fontSize: SIZING.font.body,
+    lineHeight: SIZING.font.body * 1.5,
+  },
+  externalMessagePlaceholder: {
+    fontSize: SIZING.font.body,
+    fontStyle: 'italic',
+    textAlign: 'center',
   },
 });
 
