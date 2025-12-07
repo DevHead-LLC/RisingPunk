@@ -12,7 +12,7 @@ import { EditCrewIdentifierModal } from './EditCrewIdentifierModal';
 import { EditCrewLanguageModal } from './EditCrewLanguageModal';
 import { GiftAllMembersModal } from './GiftAllMembersModal';
 import { EditableCrewRules } from './EditableCrewRules';
-import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, useUpdateCrewLanguageMutation, useUpdateInternalMessageMutation, useGiftAllMembersMutation, usePromoteMemberMutation, useDemoteExecutiveMutation } from '../../store/api/authApi';
+import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, useUpdateCrewLanguageMutation, useUpdateInternalMessageMutation, useUpdateExternalMessageMutation, useGiftAllMembersMutation, usePromoteMemberMutation, useDemoteExecutiveMutation } from '../../store/api/authApi';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CREW_MODAL_PADDING = SIZING.spacing.md * 2;
@@ -71,6 +71,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [isEditingCrewRules, setIsEditingCrewRules] = useState(false);
   const [isEditingInternalMessage, setIsEditingInternalMessage] = useState(false);
   const [internalMessageText, setInternalMessageText] = useState('');
+  const [isEditingExternalMessage, setIsEditingExternalMessage] = useState(false);
+  const [externalMessageText, setExternalMessageText] = useState('');
   const { data: crewStatus, refetch: refetchCrewStatus } = useGetCrewStatusQuery(undefined, {
     pollingInterval: visible ? 3000 : 0,
   });
@@ -82,6 +84,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [updateCrewIdentifier, { isLoading: isUpdatingCrewIdentifier }] = useUpdateCrewIdentifierMutation();
   const [updateCrewLanguage, { isLoading: isUpdatingCrewLanguage }] = useUpdateCrewLanguageMutation();
   const [updateInternalMessage, { isLoading: isUpdatingInternalMessage }] = useUpdateInternalMessageMutation();
+  const [updateExternalMessage, { isLoading: isUpdatingExternalMessage }] = useUpdateExternalMessageMutation();
   const [giftAllMembers, { isLoading: isGiftingMembers }] = useGiftAllMembersMutation();
   const [promoteMember] = usePromoteMemberMutation();
   const [demoteExecutive] = useDemoteExecutiveMutation();
@@ -165,6 +168,10 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       setIsEditingInternalMessage(false);
       setInternalMessageText('');
     }
+    if (currentCategory === 'external-message-board') {
+      setIsEditingExternalMessage(false);
+      setExternalMessageText('');
+    }
     setCurrentCategory(null);
   };
 
@@ -183,6 +190,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     setIsEditingCrewRules(false);
     setIsEditingInternalMessage(false);
     setInternalMessageText('');
+    setIsEditingExternalMessage(false);
+    setExternalMessageText('');
     onClose();
   };
 
@@ -1083,6 +1092,12 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     }
   }, [isEditingInternalMessage, activeCrewDetails?.crew?.internalMessage]);
 
+  useEffect(() => {
+    if (!isEditingExternalMessage && activeCrewDetails?.crew?.externalMessage !== undefined) {
+      setExternalMessageText(activeCrewDetails.crew.externalMessage || '');
+    }
+  }, [isEditingExternalMessage, activeCrewDetails?.crew?.externalMessage]);
+
   const handleStartEditingInternalMessage = () => {
     setInternalMessageText(activeCrewDetails?.crew?.internalMessage || '');
     setIsEditingInternalMessage(true);
@@ -1110,10 +1125,44 @@ export const CrewModal: React.FC<CrewModalProps> = ({
 
     try {
       await updateInternalMessage({ internalMessage: trimmedMessage }).unwrap();
+      await refetchCrewDetails();
       setIsEditingInternalMessage(false);
-      refetchCrewDetails();
     } catch (error: any) {
       console.error('Error updating internal message:', error);
+    }
+  };
+
+  const handleStartEditingExternalMessage = () => {
+    setExternalMessageText(activeCrewDetails?.crew?.externalMessage || '');
+    setIsEditingExternalMessage(true);
+  };
+
+  const handleCancelEditingExternalMessage = () => {
+    setExternalMessageText(activeCrewDetails?.crew?.externalMessage || '');
+    setIsEditingExternalMessage(false);
+  };
+
+  const handleSaveExternalMessage = async () => {
+    if (isUpdatingExternalMessage) return;
+
+    const trimmedMessage = externalMessageText.trim();
+    const currentMessage = activeCrewDetails?.crew?.externalMessage || '';
+
+    if (trimmedMessage === currentMessage) {
+      setIsEditingExternalMessage(false);
+      return;
+    }
+
+    if (trimmedMessage.length > 1500) {
+      return;
+    }
+
+    try {
+      await updateExternalMessage({ externalMessage: trimmedMessage }).unwrap();
+      await refetchCrewDetails();
+      setIsEditingExternalMessage(false);
+    } catch (error: any) {
+      console.error('Error updating external message:', error);
     }
   };
 
@@ -1237,6 +1286,126 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     );
   };
 
+  const renderExternalMessageBoard = () => {
+    const isPresident = userRole === 'president';
+    const currentMessage = activeCrewDetails?.crew?.externalMessage || '';
+    const displayMessage = isEditingExternalMessage ? externalMessageText : currentMessage;
+    const characterCount = displayMessage.length;
+    const maxCharacters = 1500;
+
+    return (
+      <ScrollView
+        style={styles.categoryContent}
+        contentContainerStyle={styles.externalMessageScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {isPresident && !isEditingExternalMessage && (
+          <View style={styles.externalMessageEditContainer}>
+            <TouchableOpacity
+              style={[
+                styles.externalMessageEditButton,
+                { 
+                  borderColor: colors.primary, 
+                  backgroundColor: colors.primary 
+                }
+              ]}
+              onPress={handleStartEditingExternalMessage}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.externalMessageEditButtonText, { color: colors.background }]}>
+                Edit
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {isEditingExternalMessage ? (
+          <View style={styles.externalMessageEditView}>
+            <Text style={[styles.externalMessageInfoText, { color: colors.text.secondary }]}>
+              This is external messaging visible to everyone viewing your crew.
+            </Text>
+            
+            <View style={styles.externalMessageInputContainer}>
+              <TextInput
+                style={[
+                  styles.externalMessageInput,
+                  {
+                    borderColor: characterCount > maxCharacters ? colors.error : colors.secondary,
+                    backgroundColor: colors.inputBg || colors.surface,
+                    color: colors.text.primary,
+                  }
+                ]}
+                value={externalMessageText}
+                onChangeText={setExternalMessageText}
+                placeholder="Enter external message for everyone viewing your crew..."
+                placeholderTextColor={colors.text.placeholder}
+                multiline
+                maxLength={maxCharacters}
+                editable={!isUpdatingExternalMessage}
+                textAlignVertical="top"
+              />
+              <Text style={[styles.externalMessageCharCount, { color: colors.text.secondary }]}>
+                {characterCount} / {maxCharacters}
+              </Text>
+            </View>
+
+            <View style={styles.externalMessageButtonContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.externalMessageCancelButton,
+                  {
+                    borderColor: colors.secondary,
+                    backgroundColor: colors.surface,
+                  }
+                ]}
+                onPress={handleCancelEditingExternalMessage}
+                disabled={isUpdatingExternalMessage}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.externalMessageButtonText, { color: colors.text.secondary }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.externalMessageSaveButton,
+                  {
+                    borderColor: colors.primary,
+                    backgroundColor: colors.primary,
+                  },
+                  (isUpdatingExternalMessage || characterCount > maxCharacters) && {
+                    backgroundColor: colors.buttonDisabled,
+                    borderColor: colors.buttonDisabled,
+                  }
+                ]}
+                onPress={handleSaveExternalMessage}
+                disabled={isUpdatingExternalMessage || characterCount > maxCharacters}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.externalMessageButtonText, { color: colors.background }]}>
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.externalMessageView}>
+            {currentMessage ? (
+              <Text style={[styles.externalMessageText, { color: colors.text.primary }]}>
+                {currentMessage}
+              </Text>
+            ) : (
+              <Text style={[styles.externalMessagePlaceholder, { color: colors.text.secondary }]}>
+                No external message has been set yet.
+              </Text>
+            )}
+          </View>
+        )}
+      </ScrollView>
+    );
+  };
+
   const renderCrewSettings = () => {
     const settingsButtons = [
       'Edit Crew Name',
@@ -1334,7 +1503,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
          currentCategory === 'awards' ? renderAwards() :
          currentCategory === 'ranking' ? renderRanking() :
          currentCategory === 'crew-rules' ? renderCrewRules() :
-         currentCategory === 'internal-message-board' ? renderInternalMessageBoard() : (
+         currentCategory === 'internal-message-board' ? renderInternalMessageBoard() :
+         currentCategory === 'external-message-board' ? renderExternalMessageBoard() : (
           <View style={styles.categoryContent}>
             <Text style={styles.placeholderText}>
               {getCategoryLabel(currentCategory)} content will be implemented here.
@@ -1932,6 +2102,95 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
   },
   internalMessageButtonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
+  },
+  externalMessageScrollContent: {
+    paddingBottom: SIZING.spacing.lg,
+  },
+  externalMessageEditContainer: {
+    alignItems: 'flex-end',
+    marginBottom: SIZING.spacing.md,
+  },
+  externalMessageEditButton: {
+    paddingVertical: SIZING.spacing.sm,
+    paddingHorizontal: SIZING.spacing.lg,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 100,
+  },
+  externalMessageEditButtonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
+  },
+  externalMessageView: {
+    flex: 1,
+    padding: SIZING.spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.secondary,
+  },
+  externalMessageText: {
+    fontSize: SIZING.font.body,
+    lineHeight: SIZING.font.body * 1.5,
+  },
+  externalMessagePlaceholder: {
+    fontSize: SIZING.font.body,
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
+  externalMessageEditView: {
+    flex: 1,
+  },
+  externalMessageInfoText: {
+    fontSize: SIZING.font.body,
+    marginBottom: SIZING.spacing.md,
+    padding: SIZING.spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.secondary,
+  },
+  externalMessageInputContainer: {
+    marginBottom: SIZING.spacing.md,
+  },
+  externalMessageInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: SIZING.spacing.md,
+    fontSize: SIZING.font.body,
+    minHeight: 200,
+    maxHeight: 400,
+  },
+  externalMessageCharCount: {
+    fontSize: SIZING.font.small,
+    textAlign: 'right',
+    marginTop: SIZING.spacing.xs,
+  },
+  externalMessageButtonContainer: {
+    flexDirection: 'row',
+    gap: SIZING.spacing.md,
+  },
+  externalMessageCancelButton: {
+    flex: 1,
+    paddingVertical: SIZING.spacing.md,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  externalMessageSaveButton: {
+    flex: 1,
+    paddingVertical: SIZING.spacing.md,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  externalMessageButtonText: {
     fontSize: SIZING.font.body,
     fontWeight: '600',
   },

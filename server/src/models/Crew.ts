@@ -16,6 +16,7 @@ export interface ICrew extends Document {
   applicants: ICrewApplicant[];
   crewRules: string[];
   internalMessage: string;
+  externalMessage: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -71,6 +72,12 @@ const crewSchema = new Schema({
     default: []
   },
   internalMessage: {
+    type: String,
+    maxlength: 1500,
+    default: '',
+    trim: true
+  },
+  externalMessage: {
     type: String,
     maxlength: 1500,
     default: '',
