@@ -15,6 +15,7 @@ export interface ICrew extends Document {
   executives: mongoose.Types.ObjectId[];
   applicants: ICrewApplicant[];
   crewRules: string[];
+  internalMessage: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -68,6 +69,12 @@ const crewSchema = new Schema({
   crewRules: {
     type: [String],
     default: []
+  },
+  internalMessage: {
+    type: String,
+    maxlength: 1500,
+    default: '',
+    trim: true
   }
 }, {
   collection: 'crews',
