@@ -499,6 +499,9 @@ router.get('/:crewId', auth, async (req: Request, res: Response) => {
       return;
     }
 
+    const crewStatus = await CrewStatus.findOne({ userId, crewId });
+    const isCrewMember = crewStatus?.isInCrew && crewStatus?.crewId?.toString() === crewId;
+
     const president = crew.presidentId as any;
     const executives = (crew.executives || []) as any[];
     const members = (crew.members || []) as any[];
@@ -516,7 +519,7 @@ router.get('/:crewId', auth, async (req: Request, res: Response) => {
         memberCount: memberCount,
         applicants: crew.applicants || [],
         crewRules: crew.crewRules || [],
-        internalMessage: crew.internalMessage || '',
+        internalMessage: isCrewMember ? (crew.internalMessage || '') : '',
         president: president ? { userId: president._id.toString(), handle: president.handle, level: president.level || 1 } : null,
         executives: executives.map((exec: any) => ({
           userId: exec._id.toString(),
