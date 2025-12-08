@@ -1977,14 +1977,14 @@ router.post('/choose-successor', auth, async (req: ChooseSuccessorRequest, res: 
     }
 
     if (executivesToPull.length > 0) {
-      updateOperations.$pull = { ...updateOperations.$pull, executives: { $in: executivesToPull } };
+      updateOperations.$pull = { executives: { $in: executivesToPull } };
     }
     if (membersToPull.length > 0) {
-      updateOperations.$pull = { ...updateOperations.$pull, members: { $in: membersToPull } };
-    }
-
-    if (!isOldPresidentInMembers) {
-      updateOperations.$addToSet = { members: oldPresidentId };
+      if (updateOperations.$pull) {
+        updateOperations.$pull.members = { $in: membersToPull };
+      } else {
+        updateOperations.$pull = { members: { $in: membersToPull } };
+      }
     }
 
     updatedCrew = await Crew.findByIdAndUpdate(
@@ -1998,6 +1998,15 @@ router.post('/choose-successor', auth, async (req: ChooseSuccessorRequest, res: 
       session.endSession();
       res.status(500).json({ error: 'Failed to update crew' });
       return;
+    }
+
+    if (!isOldPresidentInMembers) {
+      await Crew.findByIdAndUpdate(
+        crewId,
+        { $addToSet: { members: oldPresidentId } },
+        { session }
+      );
+      updatedCrew = await Crew.findById(crewId).session(session);
     }
 
     requesterStatus.role = 'member';
