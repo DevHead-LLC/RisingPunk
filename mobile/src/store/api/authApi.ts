@@ -439,6 +439,24 @@ export const authApi = createApi({
       }),
       invalidatesTags: ['User'],
     }),
+
+    chooseSuccessor: builder.mutation<{ success: boolean; message: string; crew: { id: string; president: { userId: string; handle: string; level: number } | null; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }> } }, { crewId: string; successorUserId: string }>({
+      query: (data) => ({
+        url: '/api/crew/choose-successor',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
+
+    resign: builder.mutation<{ success: boolean; message: string; crew: { id: string; president: { userId: string; handle: string; level: number } | null; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }> } }, { crewId: string }>({
+      query: (data) => ({
+        url: '/api/crew/resign',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
   }),
 });
 
@@ -477,5 +495,7 @@ export const {
   useGiftAllMembersMutation,
   usePromoteMemberMutation,
   useDemoteExecutiveMutation,
+  useChooseSuccessorMutation,
+  useResignMutation,
   useUpdateCrewRulesMutation,
 } = authApi;
