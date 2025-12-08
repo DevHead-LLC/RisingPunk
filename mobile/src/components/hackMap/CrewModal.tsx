@@ -403,10 +403,6 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         successorUserId,
       }).unwrap();
       
-      setShowChooseSuccessorModal(false);
-      setCurrentCategory(null);
-      onClose();
-
       try {
         await refetchCrewDetails();
       } catch (refetchError) {
@@ -418,6 +414,10 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       } catch (refetchError) {
         console.warn('Failed to refetch crew status after choosing successor:', refetchError);
       }
+
+      setShowChooseSuccessorModal(false);
+      setCurrentCategory(null);
+      onClose();
     } catch (error: any) {
       throw new Error(error?.data?.error || error?.error || 'Failed to choose successor');
     }
@@ -437,10 +437,6 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         crewId: crewStatus.crewId,
       }).unwrap();
       
-      setShowResignModal(false);
-      setCurrentCategory(null);
-      onClose();
-
       try {
         await refetchCrewDetails();
       } catch (refetchError) {
@@ -452,6 +448,10 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       } catch (refetchError) {
         console.warn('Failed to refetch crew status after resigning:', refetchError);
       }
+
+      setShowResignModal(false);
+      setCurrentCategory(null);
+      onClose();
     } catch (error: any) {
       throw new Error(error?.data?.error || error?.error || 'Failed to resign');
     }
