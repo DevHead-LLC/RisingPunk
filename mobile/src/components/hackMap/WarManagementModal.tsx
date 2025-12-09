@@ -36,7 +36,7 @@ export const WarManagementModal: React.FC<WarManagementModalProps> = ({
   const [error, setError] = useState('');
   const [declaringWarCrewId, setDeclaringWarCrewId] = useState<string | null>(null);
 
-  const { data: warStatusData, isLoading: isLoadingWarStatus, error: warStatusError, refetch: refetchWarStatus } = useGetWarStatusQuery(undefined, {
+  const { data: warStatusData, isLoading: isLoadingWarStatus, isFetching: isFetchingWarStatus, error: warStatusError, refetch: refetchWarStatus } = useGetWarStatusQuery(undefined, {
     skip: !visible,
     pollingInterval: visible ? 3000 : 0,
   });
@@ -259,7 +259,8 @@ export const WarManagementModal: React.FC<WarManagementModalProps> = ({
                       {availableCrews.map((crew) => {
                         const isDeclaring = declaringWarCrewId === crew.id;
                         // Only disable if we've declared war (not if war is declared on us)
-                        const isDisabled = hasDeclaredWar || isDeclaringWar || isTerminatingWar || isDeclaring;
+                        // Also disable if war status has an error (unknown state) or is being refetched (during polling)
+                        const isDisabled = hasDeclaredWar || isDeclaringWar || isTerminatingWar || isDeclaring || !!warStatusError || isFetchingWarStatus;
                         return (
                           <View
                             key={crew.id}
