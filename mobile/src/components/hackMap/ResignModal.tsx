@@ -37,7 +37,6 @@ export const ResignModal: React.FC<ResignModalProps> = ({
     setIsResigning(true);
     try {
       await onResign();
-      onClose();
     } catch (error: any) {
       setError(error?.message || error?.data?.error || 'Failed to resign. Please try again.');
     } finally {
