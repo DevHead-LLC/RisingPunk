@@ -329,7 +329,7 @@ export const authApi = createApi({
 
     getCrewDetails: builder.query<{ success: boolean; crew: { id: string; crewName: string; crewIdentifier: string; nativeLanguage: string; createdAt: string | null; memberCount: number; applicants: Array<{ userId: string; handle: string; appliedAt: string }>; crewRules: string[]; internalMessage: string; externalMessage: string; president: { userId: string; handle: string; level: number } | null; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }> } }, string>({
       query: (crewId) => `/api/crew/${crewId}`,
-      providesTags: ['User'],
+      providesTags: ['User', 'Crew'],
       refetchOnMountOrArgChange: true,
     }),
 
@@ -457,6 +457,35 @@ export const authApi = createApi({
       }),
       invalidatesTags: ['User'],
     }),
+
+    getWarStatus: builder.query<{ success: boolean; isAtWar: boolean; warsWeDeclared: Array<{ enemyCrewId: string; enemyCrewName: string; enemyCrewIdentifier: string; warDeclaredAt: string | null }>; warsDeclaredOnUs: Array<{ enemyCrewId: string; enemyCrewName: string; enemyCrewIdentifier: string; warDeclaredAt: string | null }> }, void>({
+      query: () => '/api/crew/war-status',
+      providesTags: ['User', 'Crew'],
+      refetchOnMountOrArgChange: true,
+      keepUnusedDataFor: 0, // Don't keep unused data to ensure fresh data after mutations
+    }),
+
+    getWarManagementCrews: builder.query<{ success: boolean; crews: Array<{ id: string; crewName: string; crewIdentifier: string; memberCount: number; createdAt: string | null }> }, void>({
+      query: () => '/api/crew/war-management/crews',
+      providesTags: ['User', 'Crew'],
+    }),
+
+    declareWar: builder.mutation<{ success: boolean; message: string; warStatus: { enemyCrewId: string; enemyCrewName: string; enemyCrewIdentifier: string; warDeclaredAt: string | null } }, { targetCrewId: string }>({
+      query: (data) => ({
+        url: '/api/crew/war-management/declare',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User', 'Crew'],
+    }),
+
+    terminateWar: builder.mutation<{ success: boolean; message: string }, void>({
+      query: () => ({
+        url: '/api/crew/war-management/terminate',
+        method: 'POST',
+      }),
+      invalidatesTags: ['User', 'Crew'],
+    }),
   }),
 });
 
@@ -498,4 +527,8 @@ export const {
   useChooseSuccessorMutation,
   useResignMutation,
   useUpdateCrewRulesMutation,
+  useGetWarStatusQuery,
+  useGetWarManagementCrewsQuery,
+  useDeclareWarMutation,
+  useTerminateWarMutation,
 } = authApi;
