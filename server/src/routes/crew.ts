@@ -929,45 +929,60 @@ router.post('/disband', auth, async (req: DisbandCrewRequest, res: Response) => 
 
     const crewId = crew._id;
 
-    // Clear war references from crews that declared war on this crew
-    await Crew.updateMany(
-      { warWithCrewId: crewId },
-      {
-        $set: {
-          warWithCrewId: null,
-          warDeclaredAt: null
-        }
-      }
-    );
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    await CrewStatus.updateMany(
-      { crewId: crewId },
-      {
-        $set: {
-          isInCrew: false,
-          crewId: null,
-          crewIdentifier: null,
-          role: null
-        }
-      }
-    );
+    try {
+      // Clear war references from crews that declared war on this crew
+      await Crew.updateMany(
+        { warWithCrewId: crewId },
+        {
+          $set: {
+            warWithCrewId: null,
+            warDeclaredAt: null
+          }
+        },
+        { session }
+      );
 
-    await CrewStatus.updateMany(
-      { appliedCrewId: crewId },
-      {
-        $set: {
-          appliedCrewId: null,
-          appliedCrewIdentifier: null
-        }
-      }
-    );
+      await CrewStatus.updateMany(
+        { crewId: crewId },
+        {
+          $set: {
+            isInCrew: false,
+            crewId: null,
+            crewIdentifier: null,
+            role: null
+          }
+        },
+        { session }
+      );
 
-    await Crew.deleteOne({ _id: crewId });
+      await CrewStatus.updateMany(
+        { appliedCrewId: crewId },
+        {
+          $set: {
+            appliedCrewId: null,
+            appliedCrewIdentifier: null
+          }
+        },
+        { session }
+      );
 
-    res.json({
-      success: true,
-      message: 'Crew disbanded successfully'
-    });
+      await Crew.deleteOne({ _id: crewId }, { session });
+
+      await session.commitTransaction();
+      session.endSession();
+
+      res.json({
+        success: true,
+        message: 'Crew disbanded successfully'
+      });
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      throw error;
+    }
   } catch (error) {
     console.error('Error disbanding crew:', error);
     res.status(500).json({ error: 'Internal server error' });
