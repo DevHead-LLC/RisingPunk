@@ -11,8 +11,10 @@ import { EditCrewNameModal } from './EditCrewNameModal';
 import { EditCrewIdentifierModal } from './EditCrewIdentifierModal';
 import { EditCrewLanguageModal } from './EditCrewLanguageModal';
 import { GiftAllMembersModal } from './GiftAllMembersModal';
+import { ChooseSuccessorModal } from './ChooseSuccessorModal';
+import { ResignModal } from './ResignModal';
 import { EditableCrewRules } from './EditableCrewRules';
-import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, useUpdateCrewLanguageMutation, useUpdateInternalMessageMutation, useUpdateExternalMessageMutation, useGiftAllMembersMutation, usePromoteMemberMutation, useDemoteExecutiveMutation } from '../../store/api/authApi';
+import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, useUpdateCrewLanguageMutation, useUpdateInternalMessageMutation, useUpdateExternalMessageMutation, useGiftAllMembersMutation, usePromoteMemberMutation, useDemoteExecutiveMutation, useChooseSuccessorMutation, useResignMutation } from '../../store/api/authApi';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CREW_MODAL_PADDING = SIZING.spacing.md * 2;
@@ -64,6 +66,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [showEditCrewIdentifierModal, setShowEditCrewIdentifierModal] = useState(false);
   const [showEditCrewLanguageModal, setShowEditCrewLanguageModal] = useState(false);
   const [showGiftAllMembersModal, setShowGiftAllMembersModal] = useState(false);
+  const [showChooseSuccessorModal, setShowChooseSuccessorModal] = useState(false);
+  const [showResignModal, setShowResignModal] = useState(false);
   const [viewingProfileUserId, setViewingProfileUserId] = useState<string | null>(null);
   const [promotingUserId, setPromotingUserId] = useState<string | null>(null);
   const [demotingUserId, setDemotingUserId] = useState<string | null>(null);
@@ -88,6 +92,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [giftAllMembers, { isLoading: isGiftingMembers }] = useGiftAllMembersMutation();
   const [promoteMember] = usePromoteMemberMutation();
   const [demoteExecutive] = useDemoteExecutiveMutation();
+  const [chooseSuccessor] = useChooseSuccessorMutation();
+  const [resign] = useResignMutation();
   const dispatch = useAppDispatch();
   const currentUser = useAppSelector((state) => state.auth.user);
   const currentBalanceState = useAppSelector((state) => state.balance);
@@ -183,6 +189,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     setShowEditCrewIdentifierModal(false);
     setShowEditCrewLanguageModal(false);
     setShowGiftAllMembersModal(false);
+    setShowChooseSuccessorModal(false);
+    setShowResignModal(false);
     setViewingProfileUserId(null);
     setPromotingUserId(null);
     setDemotingUserId(null);
@@ -379,6 +387,75 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       throw new Error(error?.data?.error || error?.error || 'Failed to gift members');
     }
   }, [giftAllMembers, refetchCrewDetails, refetchCrewStatus, dispatch, currentBalanceState]);
+
+  const handleChooseSuccessorPress = useCallback(() => {
+    setShowChooseSuccessorModal(true);
+  }, []);
+
+  const handleChooseSuccessor = useCallback(async (successorUserId: string) => {
+    if (!crewStatus?.crewId) {
+      throw new Error('Crew ID not found');
+    }
+
+    try {
+      await chooseSuccessor({
+        crewId: crewStatus.crewId,
+        successorUserId,
+      }).unwrap();
+      
+      try {
+        await refetchCrewDetails();
+      } catch (refetchError) {
+        console.warn('Failed to refetch crew details after choosing successor:', refetchError);
+      }
+
+      try {
+        await refetchCrewStatus();
+      } catch (refetchError) {
+        console.warn('Failed to refetch crew status after choosing successor:', refetchError);
+      }
+
+      setShowChooseSuccessorModal(false);
+      setCurrentCategory(null);
+      onClose();
+    } catch (error: any) {
+      throw new Error(error?.data?.error || error?.error || 'Failed to choose successor');
+    }
+  }, [chooseSuccessor, crewStatus?.crewId, refetchCrewDetails, refetchCrewStatus, onClose]);
+
+  const handleResignPress = useCallback(() => {
+    setShowResignModal(true);
+  }, []);
+
+  const handleResign = useCallback(async () => {
+    if (!crewStatus?.crewId) {
+      throw new Error('Crew ID not found');
+    }
+
+    try {
+      await resign({
+        crewId: crewStatus.crewId,
+      }).unwrap();
+      
+      try {
+        await refetchCrewDetails();
+      } catch (refetchError) {
+        console.warn('Failed to refetch crew details after resigning:', refetchError);
+      }
+
+      try {
+        await refetchCrewStatus();
+      } catch (refetchError) {
+        console.warn('Failed to refetch crew status after resigning:', refetchError);
+      }
+
+      setShowResignModal(false);
+      setCurrentCategory(null);
+      onClose();
+    } catch (error: any) {
+      throw new Error(error?.data?.error || error?.error || 'Failed to resign');
+    }
+  }, [resign, crewStatus?.crewId, refetchCrewDetails, refetchCrewStatus, onClose]);
 
   const handlePromoteMember = useCallback(async (memberUserId: string) => {
     if (!crewStatus?.crewId) {
@@ -1451,6 +1528,10 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                     handleEditCrewLanguagePress();
                   } else if (buttonText === 'Gift All Members') {
                     handleGiftAllMembersPress();
+                  } else if (buttonText === 'Choose Successor') {
+                    handleChooseSuccessorPress();
+                  } else if (buttonText === 'Resign') {
+                    handleResignPress();
                   } else if (isDisbandCrew) {
                     handleDisbandCrewPress();
                   } else {
@@ -1590,6 +1671,25 @@ export const CrewModal: React.FC<CrewModalProps> = ({
           onClose={() => setShowGiftAllMembersModal(false)}
           onGift={handleGiftAllMembers}
           memberCount={giftRecipientCount}
+        />
+      )}
+
+      {activeCrewDetails?.crew && president && (
+        <ChooseSuccessorModal
+          visible={showChooseSuccessorModal}
+          onClose={() => setShowChooseSuccessorModal(false)}
+          onChooseSuccessor={handleChooseSuccessor}
+          executives={executives}
+          members={members}
+          currentPresidentUserId={president.userId}
+        />
+      )}
+
+      {crewStatus?.crewId && (
+        <ResignModal
+          visible={showResignModal}
+          onClose={() => setShowResignModal(false)}
+          onResign={handleResign}
         />
       )}
     </Modal>
