@@ -929,6 +929,17 @@ router.post('/disband', auth, async (req: DisbandCrewRequest, res: Response) => 
 
     const crewId = crew._id;
 
+    // Clear war references from crews that declared war on this crew
+    await Crew.updateMany(
+      { warWithCrewId: crewId },
+      {
+        $set: {
+          warWithCrewId: null,
+          warDeclaredAt: null
+        }
+      }
+    );
+
     await CrewStatus.updateMany(
       { crewId: crewId },
       {

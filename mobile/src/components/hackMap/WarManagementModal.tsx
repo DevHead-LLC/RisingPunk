@@ -184,8 +184,8 @@ export const WarManagementModal: React.FC<WarManagementModalProps> = ({
                   {warsWeDeclared.length > 0 && (
                     <View style={styles.warSubsection}>
                       <Text style={[styles.warSubsectionTitle, { color: colors.text.primary }]}>Wars We Declared</Text>
-                      {warsWeDeclared.map((war, index) => (
-                        <View key={index} style={[styles.warStatusCard, { backgroundColor: colors.error + '20', borderColor: colors.error }]}>
+                      {warsWeDeclared.map((war) => (
+                        <View key={war.enemyCrewId} style={[styles.warStatusCard, { backgroundColor: colors.error + '20', borderColor: colors.error }]}>
                           <Text style={[styles.warStatusLabel, { color: colors.text.secondary }]}>At War With:</Text>
                           <Text style={[styles.warStatusValue, { color: colors.text.primary }]}>
                             {war.enemyCrewName} ({war.enemyCrewIdentifier})
@@ -216,8 +216,8 @@ export const WarManagementModal: React.FC<WarManagementModalProps> = ({
                   {warsDeclaredOnUs.length > 0 && (
                     <View style={styles.warSubsection}>
                       <Text style={[styles.warSubsectionTitle, { color: colors.text.primary }]}>Wars Declared On Us</Text>
-                      {warsDeclaredOnUs.map((war, index) => (
-                        <View key={index} style={[styles.warStatusCard, { backgroundColor: colors.error + '20', borderColor: colors.error }]}>
+                      {warsDeclaredOnUs.map((war) => (
+                        <View key={war.enemyCrewId} style={[styles.warStatusCard, { backgroundColor: colors.error + '20', borderColor: colors.error }]}>
                           <Text style={[styles.warStatusLabel, { color: colors.text.secondary }]}>War Declared By:</Text>
                           <Text style={[styles.warStatusValue, { color: colors.text.primary }]}>
                             {war.enemyCrewName} ({war.enemyCrewIdentifier})
