@@ -2510,6 +2510,15 @@ router.post('/war-management/declare', auth, async (req: DeclareWarRequest, res:
       return;
     }
 
+    // Check if any other crew has declared war on the user's crew
+    const crewsWhoDeclaredWarOnUser = await Crew.findOne({ warWithCrewId: userCrewId }).session(session);
+    if (crewsWhoDeclaredWarOnUser) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Your crew already has war declared on it by another crew' });
+      return;
+    }
+
     const targetCrew = await Crew.findById(targetCrewId).session(session);
     if (!targetCrew) {
       await session.abortTransaction();
@@ -2522,6 +2531,15 @@ router.post('/war-management/declare', auth, async (req: DeclareWarRequest, res:
       await session.abortTransaction();
       session.endSession();
       res.status(400).json({ error: 'This crew is already at war with another crew' });
+      return;
+    }
+
+    // Check if any other crew has declared war on the target crew
+    const crewsWhoDeclaredWarOnTarget = await Crew.findOne({ warWithCrewId: targetCrewId }).session(session);
+    if (crewsWhoDeclaredWarOnTarget) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'This crew already has war declared on it by another crew' });
       return;
     }
 
