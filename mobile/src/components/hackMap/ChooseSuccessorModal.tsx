@@ -71,7 +71,6 @@ export const ChooseSuccessorModal: React.FC<ChooseSuccessorModalProps> = ({
     setIsChoosing(true);
     try {
       await onChooseSuccessor(selectedUserId);
-      onClose();
     } catch (error: any) {
       setError(error?.message || error?.data?.error || 'Failed to choose successor. Please try again.');
     } finally {
