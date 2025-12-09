@@ -17,6 +17,8 @@ export interface ICrew extends Document {
   crewRules: string[];
   internalMessage: string;
   externalMessage: string;
+  warWithCrewId: mongoose.Types.ObjectId | null;
+  warDeclaredAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -82,6 +84,17 @@ const crewSchema = new Schema({
     maxlength: 1500,
     default: '',
     trim: true
+  },
+  warWithCrewId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Crew',
+    required: false,
+    default: null
+  },
+  warDeclaredAt: {
+    type: Date,
+    required: false,
+    default: null
   }
 }, {
   collection: 'crews',
@@ -92,6 +105,7 @@ crewSchema.index({ crewName: 1 }, { unique: true });
 crewSchema.index({ crewIdentifier: 1 }, { unique: true });
 crewSchema.index({ presidentId: 1 });
 crewSchema.index({ members: 1 });
+crewSchema.index({ warWithCrewId: 1 });
 
 export const Crew = mongoose.model<ICrew>('Crew', crewSchema);
 
