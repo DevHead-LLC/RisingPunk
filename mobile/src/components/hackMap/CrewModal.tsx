@@ -1276,14 +1276,14 @@ export const CrewModal: React.FC<CrewModalProps> = ({
             {isAtWar ? (
               <View style={[styles.warStatusInternalCard, { backgroundColor: colors.error + '20', borderColor: colors.error }]}>
                 {warsWeDeclared.length > 0 && warsWeDeclared.map((war) => (
-                  <View key={war.enemyCrewId} style={styles.warStatusInternalItem}>
+                  <View key={`declared-${war.enemyCrewId}`} style={styles.warStatusInternalItem}>
                     <Text style={[styles.warStatusInternalText, { color: colors.text.primary }]}>
                       At war with: {war.enemyCrewName} ({war.enemyCrewIdentifier})
                     </Text>
                   </View>
                 ))}
                 {warsDeclaredOnUs.length > 0 && warsDeclaredOnUs.map((war) => (
-                  <View key={war.enemyCrewId} style={styles.warStatusInternalItem}>
+                  <View key={`received-${war.enemyCrewId}`} style={styles.warStatusInternalItem}>
                     <Text style={[styles.warStatusInternalText, { color: colors.text.primary }]}>
                       War declared on us by: {war.enemyCrewName} ({war.enemyCrewIdentifier})
                     </Text>
