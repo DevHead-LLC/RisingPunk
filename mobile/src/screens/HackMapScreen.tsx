@@ -15,7 +15,7 @@ import { setGrid, setLoading } from '../store/slices/mapSlice';
 import { useFetchMapQuery } from '../store/api/mapApi';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
-import { useGetCrewStatusQuery, useGetUserCrewStatusQuery, useGetCrewDetailsQuery } from '../store/api/authApi';
+import { useGetCrewStatusQuery, useGetUserCrewStatusQuery, useGetCrewDetailsQuery, useGetWarStatusQuery } from '../store/api/authApi';
 import { API_URL } from '../config';
 import { computePanBounds } from '../utils/mapPanBounds';
 import { CellData, TerrainType, EntityType } from '../types/map';
@@ -86,7 +86,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
   };
 
-  const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember }) => {
+  const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember }) => {
     const houseBgStyle = cell.entity === 'house'
       ? (cell.owner === 'player'
           ? (cell.name === currentUserHandle ? styles.userHouseBg : styles.otherUserHouseBg)
@@ -104,6 +104,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           xStyle,
           selected && styles.selectedCell,
           isCrewMember && styles.crewMemberCell,
+          isWarCrewMember && styles.warCrewMemberCell,
         ]}
         onPress={() => onPress(x, y, cell)}
       >
@@ -166,16 +167,17 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       prevProps.currentUserHandle === nextProps.currentUserHandle &&
       prevProps.isShieldActive === nextProps.isShieldActive &&
       prevProps.isCrewMember === nextProps.isCrewMember &&
+      prevProps.isWarCrewMember === nextProps.isWarCrewMember &&
       // Only check dynamicEntityData for this specific tile
       prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
       nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
     );
   });
 
-  const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember }) => {
+  const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember }) => {
     return (
       <View style={[yStyle]}>
-        <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} isCrewMember={isCrewMember} />
+        <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} isCrewMember={isCrewMember} isWarCrewMember={isWarCrewMember} />
       </View>
     );
   }, (prevProps, nextProps) => {
@@ -188,6 +190,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       prevProps.currentUserHandle === nextProps.currentUserHandle &&
       prevProps.isShieldActive === nextProps.isShieldActive &&
       prevProps.isCrewMember === nextProps.isCrewMember &&
+      prevProps.isWarCrewMember === nextProps.isWarCrewMember &&
       // Only check dynamicEntityData for this specific tile
       prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
       nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
@@ -550,6 +553,46 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const { data: crewDetails, isLoading: isLoadingCrewDetails } = useGetCrewDetailsQuery(crewStatus?.crewId || '', {
     skip: !crewStatus?.crewId || !crewStatus?.isInCrew,
   });
+
+  const { data: warStatusData, refetch: refetchWarStatus } = useGetWarStatusQuery(undefined, {
+    skip: !crewStatus?.isInCrew,
+    pollingInterval: 3000,
+    refetchOnMountOrArgChange: true,
+  });
+
+  const warsWeDeclared = warStatusData?.warsWeDeclared || [];
+  const warsDeclaredOnUs = warStatusData?.warsDeclaredOnUs || [];
+  const primaryWarCrewId = warsWeDeclared[0]?.enemyCrewId || warsDeclaredOnUs[0]?.enemyCrewId || null;
+
+  const { data: primaryWarCrewDetails } = useGetCrewDetailsQuery(primaryWarCrewId || '', {
+    skip: !primaryWarCrewId,
+  });
+
+  const warCrewMemberUserIds = useMemo(() => {
+    // Return empty set if no war crew ID
+    if (!primaryWarCrewId) {
+      return new Set<string>();
+    }
+    // Only use crew details if they match the current war crew ID
+    if (!primaryWarCrewDetails?.crew || primaryWarCrewDetails.crew.id !== primaryWarCrewId) {
+      return new Set<string>();
+    }
+    const memberIds = new Set<string>();
+    if (primaryWarCrewDetails.crew.president?.userId) {
+      memberIds.add(String(primaryWarCrewDetails.crew.president.userId));
+    }
+    (primaryWarCrewDetails.crew.executives || []).forEach((exec: any) => {
+      if (exec.userId) {
+        memberIds.add(String(exec.userId));
+      }
+    });
+    (primaryWarCrewDetails.crew.members || []).forEach((member: any) => {
+      if (member.userId) {
+        memberIds.add(String(member.userId));
+      }
+    });
+    return memberIds;
+  }, [primaryWarCrewId, primaryWarCrewDetails]);
   
   const crewMemberUserIds = useMemo(() => {
     if (!crewDetails?.crew) return new Set<string>();
@@ -1510,6 +1553,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
               const isCrewMember = cell.owner === 'player' && 
                                    cell.userId && 
                                    crewMemberUserIds.has(String(cell.userId));
+              const isWarCrewMember = cell.owner === 'player' && 
+                                      cell.userId && 
+                                      warCrewMemberUserIds.has(String(cell.userId));
               return (
                 <PoolTile
                   key={`${x}-${y}`}
@@ -1528,6 +1574,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                   dynamicEntityData={dynamicEntityData}
                   isShieldActive={isShieldActive}
                   isCrewMember={isCrewMember}
+                  isWarCrewMember={isWarCrewMember}
                 />
               );
             })}
@@ -1553,6 +1600,7 @@ type TileProps = {
   dynamicEntityData: Record<string, any>;
   isShieldActive: boolean;
   isCrewMember?: boolean;
+  isWarCrewMember?: boolean;
 };
 
 type PoolTileProps = {
@@ -1571,6 +1619,7 @@ type PoolTileProps = {
   dynamicEntityData: Record<string, any>;
   isShieldActive: boolean;
   isCrewMember?: boolean;
+  isWarCrewMember?: boolean;
 };const getStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light' | 'dark') => StyleSheet.create({
   container: {
     flex: 1,
@@ -1602,6 +1651,10 @@ type PoolTileProps = {
   crewMemberCell: {
     borderWidth: 3,
     borderColor: 'white',
+  },
+  warCrewMemberCell: {
+    borderWidth: 3,
+    borderColor: 'red',
   },
   cellContent: {
     width: '100%',
