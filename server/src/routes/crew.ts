@@ -1633,15 +1633,20 @@ router.post('/promote-member', auth, async (req: PromoteMemberRequest, res: Resp
       .populate('members', 'handle level')
       .lean();
 
-    const president = populatedCrew?.presidentId as any;
-    const executives = (populatedCrew?.executives || []) as any[];
-    const members = (populatedCrew?.members || []) as any[];
+    if (!populatedCrew || !populatedCrew._id) {
+      res.status(500).json({ error: 'Internal server error' });
+      return;
+    }
+
+    const president = populatedCrew.presidentId as any;
+    const executives = (populatedCrew.executives || []) as any[];
+    const members = (populatedCrew.members || []) as any[];
 
     res.json({
       success: true,
       message: 'Member promoted to executive successfully',
       crew: {
-        id: populatedCrew?._id.toString(),
+        id: populatedCrew._id.toString(),
         executives: executives.map((exec: any) => ({
           userId: exec._id.toString(),
           handle: exec.handle,
@@ -2037,15 +2042,20 @@ router.post('/choose-successor', auth, async (req: ChooseSuccessorRequest, res: 
       .populate('members', 'handle level')
       .lean();
 
-    const president = populatedCrew?.presidentId as any;
-    const executives = (populatedCrew?.executives || []) as any[];
-    const members = (populatedCrew?.members || []) as any[];
+    if (!populatedCrew || !populatedCrew._id) {
+      res.status(500).json({ error: 'Internal server error' });
+      return;
+    }
+
+    const president = populatedCrew.presidentId as any;
+    const executives = (populatedCrew.executives || []) as any[];
+    const members = (populatedCrew.members || []) as any[];
 
     res.json({
       success: true,
       message: 'Successor chosen and leadership transferred successfully',
       crew: {
-        id: populatedCrew?._id.toString(),
+        id: populatedCrew._id.toString(),
         president: president ? { userId: president._id.toString(), handle: president.handle, level: president.level || 1 } : null,
         executives: executives.map((exec: any) => ({
           userId: exec._id.toString(),
@@ -2275,15 +2285,20 @@ router.post('/resign', auth, async (req: ResignRequest, res: Response) => {
       .populate('members', 'handle level')
       .lean();
 
-    const president = populatedCrew?.presidentId as any;
-    const executives = (populatedCrew?.executives || []) as any[];
-    const members = (populatedCrew?.members || []) as any[];
+    if (!populatedCrew || !populatedCrew._id) {
+      res.status(500).json({ error: 'Internal server error' });
+      return;
+    }
+
+    const president = populatedCrew.presidentId as any;
+    const executives = (populatedCrew.executives || []) as any[];
+    const members = (populatedCrew.members || []) as any[];
 
     res.json({
       success: true,
       message: 'Resigned successfully. Leadership transferred to next in line.',
       crew: {
-        id: populatedCrew?._id.toString(),
+        id: populatedCrew._id.toString(),
         president: president ? { userId: president._id.toString(), handle: president.handle, level: president.level || 1 } : null,
         executives: executives.map((exec: any) => ({
           userId: exec._id.toString(),
