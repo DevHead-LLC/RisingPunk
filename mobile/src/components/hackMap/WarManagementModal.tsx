@@ -52,6 +52,7 @@ export const WarManagementModal: React.FC<WarManagementModalProps> = ({
   const warsWeDeclared = warStatusData?.warsWeDeclared || [];
   const warsDeclaredOnUs = warStatusData?.warsDeclaredOnUs || [];
   const isAtWar = warStatusData?.isAtWar || false;
+  const hasDeclaredWar = warsWeDeclared.length > 0; // Only check if we've declared war, not if war is declared on us
   const availableCrews = crewsData?.crews || [];
 
   useEffect(() => {
@@ -257,7 +258,8 @@ export const WarManagementModal: React.FC<WarManagementModalProps> = ({
                     <View style={styles.crewsList}>
                       {availableCrews.map((crew) => {
                         const isDeclaring = declaringWarCrewId === crew.id;
-                        const isDisabled = isAtWar || isDeclaringWar || isTerminatingWar || isDeclaring;
+                        // Only disable if we've declared war (not if war is declared on us)
+                        const isDisabled = hasDeclaredWar || isDeclaringWar || isTerminatingWar || isDeclaring;
                         return (
                           <View
                             key={crew.id}

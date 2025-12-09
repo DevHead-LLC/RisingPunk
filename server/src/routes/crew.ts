@@ -2518,19 +2518,11 @@ router.post('/war-management/declare', auth, async (req: DeclareWarRequest, res:
       return;
     }
 
+    // A crew can only declare war on ONE other crew at a time
     if (userCrew.warWithCrewId) {
       await session.abortTransaction();
       session.endSession();
       res.status(400).json({ error: 'You are already at war with another crew' });
-      return;
-    }
-
-    // Check if any other crew has declared war on the user's crew
-    const crewsWhoDeclaredWarOnUser = await Crew.findOne({ warWithCrewId: userCrewId }).session(session);
-    if (crewsWhoDeclaredWarOnUser) {
-      await session.abortTransaction();
-      session.endSession();
-      res.status(400).json({ error: 'Your crew already has war declared on it by another crew' });
       return;
     }
 
@@ -2542,21 +2534,12 @@ router.post('/war-management/declare', auth, async (req: DeclareWarRequest, res:
       return;
     }
 
-    if (targetCrew.warWithCrewId) {
-      await session.abortTransaction();
-      session.endSession();
-      res.status(400).json({ error: 'This crew is already at war with another crew' });
-      return;
-    }
-
-    // Check if any other crew has declared war on the target crew
-    const crewsWhoDeclaredWarOnTarget = await Crew.findOne({ warWithCrewId: targetCrewId }).session(session);
-    if (crewsWhoDeclaredWarOnTarget) {
-      await session.abortTransaction();
-      session.endSession();
-      res.status(400).json({ error: 'This crew already has war declared on it by another crew' });
-      return;
-    }
+    // Note: We intentionally allow:
+    // 1. Multiple crews to declare war on the same target crew
+    // 2. Mutual wars (if crew A declares war on crew B, crew B can declare war back on crew A)
+    // 3. A crew to declare war on a crew that has declared war on them
+    // The only restriction is: a crew can only declare war on ONE other crew at a time (enforced above by checking userCrew.warWithCrewId)
+    // This is the intended behavior - a crew can be targeted by multiple crews simultaneously.
 
     userCrew.warWithCrewId = new mongoose.Types.ObjectId(targetCrewId);
     userCrew.warDeclaredAt = new Date();

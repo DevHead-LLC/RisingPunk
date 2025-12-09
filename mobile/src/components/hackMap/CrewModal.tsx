@@ -1272,28 +1272,34 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       >
         {!isEditingInternalMessage && (
           <View style={styles.warStatusInternalSection}>
+            {warsDeclaredOnUs.length > 0 && (
+              <View style={styles.warNotificationSection}>
+                <Text style={[styles.warNotificationTitle, { color: colors.error }]}>WAR ALERT</Text>
+                {warsDeclaredOnUs.map((war) => (
+                  <View key={`received-${war.enemyCrewId}`} style={[styles.warNotificationCard, { backgroundColor: colors.error + '30', borderColor: colors.error }]}>
+                    <Text style={[styles.warNotificationText, { color: colors.text.primary }]}>
+                      BE AWARE: '{war.enemyCrewName}' ({war.enemyCrewIdentifier}) has declared war on our crew
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
             <Text style={[styles.warStatusInternalTitle, { color: colors.text.primary }]}>WAR STATUS</Text>
-            {isAtWar ? (
+            {warsWeDeclared.length > 0 ? (
               <View style={[styles.warStatusInternalCard, { backgroundColor: colors.error + '20', borderColor: colors.error }]}>
-                {warsWeDeclared.length > 0 && warsWeDeclared.map((war) => (
+                {warsWeDeclared.map((war) => (
                   <View key={`declared-${war.enemyCrewId}`} style={styles.warStatusInternalItem}>
                     <Text style={[styles.warStatusInternalText, { color: colors.text.primary }]}>
                       At war with: {war.enemyCrewName} ({war.enemyCrewIdentifier})
                     </Text>
                   </View>
                 ))}
-                {warsDeclaredOnUs.length > 0 && warsDeclaredOnUs.map((war) => (
-                  <View key={`received-${war.enemyCrewId}`} style={styles.warStatusInternalItem}>
-                    <Text style={[styles.warStatusInternalText, { color: colors.text.primary }]}>
-                      War declared on us by: {war.enemyCrewName} ({war.enemyCrewIdentifier})
-                    </Text>
-                  </View>
-                ))}
               </View>
             ) : (
-              <View style={[styles.warStatusInternalCard, { backgroundColor: colors.surface, borderColor: colors.secondary }]}>
+              <View style={[styles.warStatusInternalCard, { backgroundColor: colors.surface, borderColor: colors.primary }]}>
                 <Text style={[styles.warStatusInternalText, { color: colors.text.secondary }]}>
-                  Not currently at war
+                  No war declarations
                 </Text>
               </View>
             )}
@@ -2260,6 +2266,27 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   warStatusInternalSection: {
     marginBottom: SIZING.spacing.lg,
+  },
+  warNotificationSection: {
+    marginBottom: SIZING.spacing.lg,
+  },
+  warNotificationTitle: {
+    fontSize: SIZING.font.h3,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.sm,
+    textAlign: 'center',
+  },
+  warNotificationCard: {
+    padding: SIZING.spacing.md,
+    borderRadius: 8,
+    borderWidth: 3,
+    marginBottom: SIZING.spacing.sm,
+  },
+  warNotificationText: {
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    lineHeight: SIZING.font.body * 1.4,
   },
   warStatusInternalTitle: {
     fontSize: SIZING.font.h4,
