@@ -1846,5 +1846,462 @@ router.post('/demote-executive', auth, async (req: DemoteExecutiveRequest, res: 
   }
 });
 
+interface ChooseSuccessorRequest extends Request {
+  body: {
+    crewId: string;
+    successorUserId: string;
+  }
+}
+
+router.post('/choose-successor', auth, async (req: ChooseSuccessorRequest, res: Response) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
+  let updatedCrew: any = null;
+  
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const { crewId, successorUserId } = req.body;
+    if (!crewId || !successorUserId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Crew ID and successor user ID are required' });
+      return;
+    }
+
+    const crew = await Crew.findById(crewId).session(session);
+    if (!crew) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    const requesterStatus = await CrewStatus.findOne({ userId }).session(session);
+    if (!requesterStatus || !requesterStatus.isInCrew || !requesterStatus.crewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Requester is not in a crew' });
+      return;
+    }
+
+    if (requesterStatus.crewId.toString() !== crewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(403).json({ error: 'Requester is not a member of this crew' });
+      return;
+    }
+
+    if (requesterStatus.role !== 'president') {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(403).json({ error: 'Only the president can choose a successor' });
+      return;
+    }
+
+    if (crew.presidentId.toString() !== userId.toString()) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(403).json({ error: 'Only the current president can choose a successor' });
+      return;
+    }
+
+    const successorObjectId = new mongoose.Types.ObjectId(successorUserId);
+    
+    if (crew.presidentId.toString() === successorUserId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Cannot choose yourself as successor' });
+      return;
+    }
+
+    const successorStatus = await CrewStatus.findOne({ userId: successorObjectId }).session(session);
+    if (!successorStatus) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(404).json({ error: 'Successor crew status not found' });
+      return;
+    }
+
+    if (successorStatus.crewId?.toString() !== crewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Successor is not a member of this crew' });
+      return;
+    }
+
+    const oldPresidentId = crew.presidentId;
+    const isSuccessorExecutive = crew.executives.some((execId: mongoose.Types.ObjectId) => 
+      execId.toString() === successorUserId
+    );
+    const isSuccessorMember = crew.members.some((memberId: mongoose.Types.ObjectId) => 
+      memberId.toString() === successorUserId
+    );
+
+    if (!isSuccessorExecutive && !isSuccessorMember) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Successor must be an executive or member of this crew' });
+      return;
+    }
+
+    const updateOperations: any = {
+      presidentId: successorObjectId
+    };
+
+    const isOldPresidentInExecutives = crew.executives.some((execId: mongoose.Types.ObjectId) => 
+      execId.toString() === oldPresidentId.toString()
+    );
+    const isOldPresidentInMembers = crew.members.some((memberId: mongoose.Types.ObjectId) => 
+      memberId.toString() === oldPresidentId.toString()
+    );
+
+    const executivesToPull: mongoose.Types.ObjectId[] = [];
+    const membersToPull: mongoose.Types.ObjectId[] = [];
+
+    if (isSuccessorExecutive) {
+      executivesToPull.push(successorObjectId);
+    } else if (isSuccessorMember) {
+      membersToPull.push(successorObjectId);
+    }
+
+    if (isOldPresidentInExecutives) {
+      executivesToPull.push(oldPresidentId);
+    }
+
+    if (executivesToPull.length > 0) {
+      updateOperations.$pull = { executives: { $in: executivesToPull } };
+    }
+    if (membersToPull.length > 0) {
+      if (updateOperations.$pull) {
+        updateOperations.$pull.members = { $in: membersToPull };
+      } else {
+        updateOperations.$pull = { members: { $in: membersToPull } };
+      }
+    }
+
+    updatedCrew = await Crew.findByIdAndUpdate(
+      crewId,
+      updateOperations,
+      { new: true, session }
+    );
+
+    if (!updatedCrew) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(500).json({ error: 'Failed to update crew' });
+      return;
+    }
+
+    if (!isOldPresidentInMembers) {
+      await Crew.findByIdAndUpdate(
+        crewId,
+        { $addToSet: { members: oldPresidentId } },
+        { session }
+      );
+      updatedCrew = await Crew.findById(crewId).session(session);
+    }
+
+    requesterStatus.role = 'member';
+    await requesterStatus.save({ session });
+
+    successorStatus.role = 'president';
+    await successorStatus.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Error choosing successor:', error);
+    res.status(500).json({ error: 'Internal server error' });
+    return;
+  }
+
+  try {
+    if (!updatedCrew) {
+      res.status(500).json({ error: 'Internal server error' });
+      return;
+    }
+
+    const populatedCrew = await Crew.findById(updatedCrew._id)
+      .populate('presidentId', 'handle level')
+      .populate('executives', 'handle level')
+      .populate('members', 'handle level')
+      .lean();
+
+    const president = populatedCrew?.presidentId as any;
+    const executives = (populatedCrew?.executives || []) as any[];
+    const members = (populatedCrew?.members || []) as any[];
+
+    res.json({
+      success: true,
+      message: 'Successor chosen and leadership transferred successfully',
+      crew: {
+        id: populatedCrew?._id.toString(),
+        president: president ? { userId: president._id.toString(), handle: president.handle, level: president.level || 1 } : null,
+        executives: executives.map((exec: any) => ({
+          userId: exec._id.toString(),
+          handle: exec.handle,
+          level: exec.level || 1
+        })),
+        members: members.map((member: any) => ({
+          userId: member._id.toString(),
+          handle: member.handle,
+          level: member.level || 1
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching crew after choosing successor:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+interface ResignRequest extends Request {
+  body: {
+    crewId: string;
+  }
+}
+
+router.post('/resign', auth, async (req: ResignRequest, res: Response) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
+  let updatedCrew: any = null;
+  
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const { crewId } = req.body;
+    if (!crewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Crew ID is required' });
+      return;
+    }
+
+    const crew = await Crew.findById(crewId)
+      .populate('presidentId', 'handle level')
+      .populate('executives', 'handle level')
+      .populate('members', 'handle level')
+      .session(session);
+    
+    if (!crew) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    const requesterStatus = await CrewStatus.findOne({ userId }).session(session);
+    if (!requesterStatus || !requesterStatus.isInCrew || !requesterStatus.crewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Requester is not in a crew' });
+      return;
+    }
+
+    if (requesterStatus.crewId.toString() !== crewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(403).json({ error: 'Requester is not a member of this crew' });
+      return;
+    }
+
+    if (requesterStatus.role !== 'president') {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(403).json({ error: 'Only the president can resign' });
+      return;
+    }
+
+    const presidentId = (crew.presidentId as any)?._id || crew.presidentId;
+    if (presidentId.toString() !== userId.toString()) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(403).json({ error: 'Only the current president can resign' });
+      return;
+    }
+
+    const oldPresidentId = (crew.presidentId as any)?._id || crew.presidentId;
+    const oldPresidentIdString = oldPresidentId.toString();
+    const executives = (crew.executives || []) as any[];
+    const members = (crew.members || []) as any[];
+
+    const eligibleExecutives = executives
+      .filter((exec: any) => exec._id.toString() !== oldPresidentIdString)
+      .sort((a: any, b: any) => (b.level || 1) - (a.level || 1));
+
+    const eligibleMembers = members
+      .filter((member: any) => member._id.toString() !== oldPresidentIdString)
+      .sort((a: any, b: any) => (b.level || 1) - (a.level || 1));
+
+    let successorObjectId: mongoose.Types.ObjectId | null = null;
+    let isSuccessorExecutive = false;
+    let isSuccessorMember = false;
+
+    if (eligibleExecutives.length > 0) {
+      successorObjectId = eligibleExecutives[0]._id;
+      isSuccessorExecutive = true;
+    } else if (eligibleMembers.length > 0) {
+      successorObjectId = eligibleMembers[0]._id;
+      isSuccessorMember = true;
+    } else {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Cannot resign. No eligible executives or members available to take over.' });
+      return;
+    }
+
+    if (!successorObjectId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'No eligible successor found' });
+      return;
+    }
+
+    const successorStatus = await CrewStatus.findOne({ userId: successorObjectId }).session(session);
+    if (!successorStatus) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(404).json({ error: 'Successor crew status not found' });
+      return;
+    }
+
+    if (successorStatus.crewId?.toString() !== crewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Successor is not a member of this crew' });
+      return;
+    }
+
+    const isOldPresidentInExecutives = executives.some((exec: any) => 
+      exec._id.toString() === oldPresidentIdString
+    );
+    const isOldPresidentInMembers = members.some((member: any) => 
+      member._id.toString() === oldPresidentIdString
+    );
+
+    const executivesToPull: mongoose.Types.ObjectId[] = [];
+    const membersToPull: mongoose.Types.ObjectId[] = [];
+
+    if (isSuccessorExecutive) {
+      executivesToPull.push(successorObjectId);
+    } else if (isSuccessorMember) {
+      membersToPull.push(successorObjectId);
+    }
+
+    const oldPresidentObjectId = new mongoose.Types.ObjectId(oldPresidentIdString);
+    if (isOldPresidentInExecutives) {
+      executivesToPull.push(oldPresidentObjectId);
+    }
+
+    const updateOperations: any = {
+      presidentId: successorObjectId
+    };
+
+    if (executivesToPull.length > 0) {
+      updateOperations.$pull = { executives: { $in: executivesToPull } };
+    }
+    if (membersToPull.length > 0) {
+      if (updateOperations.$pull) {
+        updateOperations.$pull.members = { $in: membersToPull };
+      } else {
+        updateOperations.$pull = { members: { $in: membersToPull } };
+      }
+    }
+
+    updatedCrew = await Crew.findByIdAndUpdate(
+      crewId,
+      updateOperations,
+      { new: true, session }
+    );
+
+    if (!updatedCrew) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(500).json({ error: 'Failed to update crew' });
+      return;
+    }
+
+    if (!isOldPresidentInMembers) {
+      await Crew.findByIdAndUpdate(
+        crewId,
+        { $addToSet: { members: oldPresidentObjectId } },
+        { session }
+      );
+      updatedCrew = await Crew.findById(crewId).session(session);
+    }
+
+    requesterStatus.role = 'member';
+    await requesterStatus.save({ session });
+
+    successorStatus.role = 'president';
+    await successorStatus.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Error resigning:', error);
+    res.status(500).json({ error: 'Internal server error' });
+    return;
+  }
+
+  try {
+    if (!updatedCrew) {
+      res.status(500).json({ error: 'Internal server error' });
+      return;
+    }
+
+    const populatedCrew = await Crew.findById(updatedCrew._id)
+      .populate('presidentId', 'handle level')
+      .populate('executives', 'handle level')
+      .populate('members', 'handle level')
+      .lean();
+
+    const president = populatedCrew?.presidentId as any;
+    const executives = (populatedCrew?.executives || []) as any[];
+    const members = (populatedCrew?.members || []) as any[];
+
+    res.json({
+      success: true,
+      message: 'Resigned successfully. Leadership transferred to next in line.',
+      crew: {
+        id: populatedCrew?._id.toString(),
+        president: president ? { userId: president._id.toString(), handle: president.handle, level: president.level || 1 } : null,
+        executives: executives.map((exec: any) => ({
+          userId: exec._id.toString(),
+          handle: exec.handle,
+          level: exec.level || 1
+        })),
+        members: members.map((member: any) => ({
+          userId: member._id.toString(),
+          handle: member.handle,
+          level: member.level || 1
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching crew after resigning:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;
 
