@@ -479,6 +479,122 @@ router.put('/:crewId/rules', auth, async (req: Request, res: Response) => {
   }
 });
 
+router.get('/war-status', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const crewStatus = await CrewStatus.findOne({ userId });
+    if (!crewStatus || !crewStatus.isInCrew || !crewStatus.crewId) {
+      res.status(400).json({ error: 'User is not in a crew' });
+      return;
+    }
+
+    const crewId = crewStatus.crewId;
+    const crew = await Crew.findById(crewId)
+      .populate('warWithCrewId', 'crewName crewIdentifier')
+      .lean();
+
+    if (!crew) {
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    const warsWeDeclared = [];
+    if (crew.warWithCrewId) {
+      const enemyCrew = crew.warWithCrewId as any;
+      warsWeDeclared.push({
+        enemyCrewId: enemyCrew._id.toString(),
+        enemyCrewName: enemyCrew.crewName,
+        enemyCrewIdentifier: enemyCrew.crewIdentifier,
+        warDeclaredAt: crew.warDeclaredAt ? crew.warDeclaredAt.toISOString() : null
+      });
+    }
+
+    const crewsWhoDeclaredWarOnUs = await Crew.find({
+      warWithCrewId: crewId
+    })
+      .select('crewName crewIdentifier warDeclaredAt')
+      .lean();
+
+    const warsDeclaredOnUs = crewsWhoDeclaredWarOnUs.map((enemyCrew: any) => ({
+      enemyCrewId: enemyCrew._id.toString(),
+      enemyCrewName: enemyCrew.crewName,
+      enemyCrewIdentifier: enemyCrew.crewIdentifier,
+      warDeclaredAt: enemyCrew.warDeclaredAt ? enemyCrew.warDeclaredAt.toISOString() : null
+    }));
+
+    const isAtWar = warsWeDeclared.length > 0 || warsDeclaredOnUs.length > 0;
+
+    res.json({
+      success: true,
+      isAtWar,
+      warsWeDeclared,
+      warsDeclaredOnUs
+    });
+  } catch (error) {
+    console.error('Error fetching war status:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/war-management/crews', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const crewStatus = await CrewStatus.findOne({ userId });
+    if (!crewStatus || !crewStatus.isInCrew || !crewStatus.crewId) {
+      res.status(400).json({ error: 'User is not in a crew' });
+      return;
+    }
+
+    if (crewStatus.role !== 'president') {
+      res.status(403).json({ error: 'Only the president can manage wars' });
+      return;
+    }
+
+    const userCrewId = crewStatus.crewId;
+    const crews = await Crew.find({
+      _id: { $ne: userCrewId }
+    })
+      .select('crewName crewIdentifier createdAt')
+      .limit(100)
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const crewsWithMemberCount = await Promise.all(
+      crews.map(async (crew) => {
+        const memberCount = await CrewStatus.countDocuments({ 
+          crewId: crew._id, 
+          isInCrew: true 
+        });
+        return {
+          id: crew._id.toString(),
+          crewName: crew.crewName,
+          crewIdentifier: crew.crewIdentifier,
+          memberCount,
+          createdAt: crew.createdAt ? crew.createdAt.toISOString() : null
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      crews: crewsWithMemberCount
+    });
+  } catch (error) {
+    console.error('Error fetching crews for war management:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.get('/:crewId', auth, async (req: Request, res: Response) => {
   try {
     const userId = req.user?._id;
@@ -813,34 +929,60 @@ router.post('/disband', auth, async (req: DisbandCrewRequest, res: Response) => 
 
     const crewId = crew._id;
 
-    await CrewStatus.updateMany(
-      { crewId: crewId },
-      {
-        $set: {
-          isInCrew: false,
-          crewId: null,
-          crewIdentifier: null,
-          role: null
-        }
-      }
-    );
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    await CrewStatus.updateMany(
-      { appliedCrewId: crewId },
-      {
-        $set: {
-          appliedCrewId: null,
-          appliedCrewIdentifier: null
-        }
-      }
-    );
+    try {
+      // Clear war references from crews that declared war on this crew
+      await Crew.updateMany(
+        { warWithCrewId: crewId },
+        {
+          $set: {
+            warWithCrewId: null,
+            warDeclaredAt: null
+          }
+        },
+        { session }
+      );
 
-    await Crew.deleteOne({ _id: crewId });
+      await CrewStatus.updateMany(
+        { crewId: crewId },
+        {
+          $set: {
+            isInCrew: false,
+            crewId: null,
+            crewIdentifier: null,
+            role: null
+          }
+        },
+        { session }
+      );
 
-    res.json({
-      success: true,
-      message: 'Crew disbanded successfully'
-    });
+      await CrewStatus.updateMany(
+        { appliedCrewId: crewId },
+        {
+          $set: {
+            appliedCrewId: null,
+            appliedCrewIdentifier: null
+          }
+        },
+        { session }
+      );
+
+      await Crew.deleteOne({ _id: crewId }, { session });
+
+      await session.commitTransaction();
+      session.endSession();
+
+      res.json({
+        success: true,
+        message: 'Crew disbanded successfully'
+      });
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      throw error;
+    }
   } catch (error) {
     console.error('Error disbanding crew:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -2314,6 +2456,212 @@ router.post('/resign', auth, async (req: ResignRequest, res: Response) => {
     });
   } catch (error) {
     console.error('Error fetching crew after resigning:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+interface DeclareWarRequest extends Request {
+  body: {
+    targetCrewId: string;
+  }
+}
+
+router.post('/war-management/declare', auth, async (req: DeclareWarRequest, res: Response) => {
+  const userId = req.user?._id;
+  if (!userId) {
+    res.status(401).json({ error: 'User not authenticated' });
+    return;
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  let userCrewId: mongoose.Types.ObjectId | null = null;
+
+  try {
+    const { targetCrewId } = req.body;
+    if (!targetCrewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Target crew ID is required' });
+      return;
+    }
+
+    const crewStatus = await CrewStatus.findOne({ userId }).session(session);
+    if (!crewStatus || !crewStatus.isInCrew || !crewStatus.crewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'User is not in a crew' });
+      return;
+    }
+
+    if (crewStatus.role !== 'president') {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(403).json({ error: 'Only the president can declare war' });
+      return;
+    }
+
+    userCrewId = crewStatus.crewId;
+    if (userCrewId.toString() === targetCrewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Cannot declare war on your own crew' });
+      return;
+    }
+
+    const userCrew = await Crew.findById(userCrewId).session(session);
+    if (!userCrew) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    if (userCrew.warWithCrewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'You are already at war with another crew' });
+      return;
+    }
+
+    // Check if any other crew has declared war on the user's crew
+    const crewsWhoDeclaredWarOnUser = await Crew.findOne({ warWithCrewId: userCrewId }).session(session);
+    if (crewsWhoDeclaredWarOnUser) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Your crew already has war declared on it by another crew' });
+      return;
+    }
+
+    const targetCrew = await Crew.findById(targetCrewId).session(session);
+    if (!targetCrew) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(404).json({ error: 'Target crew not found' });
+      return;
+    }
+
+    if (targetCrew.warWithCrewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'This crew is already at war with another crew' });
+      return;
+    }
+
+    // Check if any other crew has declared war on the target crew
+    const crewsWhoDeclaredWarOnTarget = await Crew.findOne({ warWithCrewId: targetCrewId }).session(session);
+    if (crewsWhoDeclaredWarOnTarget) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'This crew already has war declared on it by another crew' });
+      return;
+    }
+
+    userCrew.warWithCrewId = new mongoose.Types.ObjectId(targetCrewId);
+    userCrew.warDeclaredAt = new Date();
+    await userCrew.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Error declaring war:', error);
+    res.status(500).json({ error: 'Internal server error' });
+    return;
+  }
+
+  try {
+    if (!userCrewId) {
+      res.status(500).json({ error: 'Internal server error' });
+      return;
+    }
+
+    const updatedCrew = await Crew.findById(userCrewId)
+      .populate('warWithCrewId', 'crewName crewIdentifier')
+      .lean();
+
+    if (!updatedCrew || !updatedCrew.warWithCrewId) {
+      res.status(500).json({ error: 'Internal server error' });
+      return;
+    }
+
+    const enemyCrew = updatedCrew.warWithCrewId as any;
+    res.json({
+      success: true,
+      message: 'War declared successfully',
+      warStatus: {
+        enemyCrewId: enemyCrew._id.toString(),
+        enemyCrewName: enemyCrew.crewName,
+        enemyCrewIdentifier: enemyCrew.crewIdentifier,
+        warDeclaredAt: updatedCrew.warDeclaredAt ? updatedCrew.warDeclaredAt.toISOString() : null
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching crew after declaring war:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/war-management/terminate', auth, async (req: Request, res: Response) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const crewStatus = await CrewStatus.findOne({ userId }).session(session);
+    if (!crewStatus || !crewStatus.isInCrew || !crewStatus.crewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'User is not in a crew' });
+      return;
+    }
+
+    if (crewStatus.role !== 'president') {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(403).json({ error: 'Only the president can terminate war' });
+      return;
+    }
+
+    const crew = await Crew.findById(crewStatus.crewId).session(session);
+    if (!crew) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    if (!crew.warWithCrewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Crew is not currently at war' });
+      return;
+    }
+
+    crew.warWithCrewId = null;
+    crew.warDeclaredAt = null;
+    await crew.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.json({
+      success: true,
+      message: 'War declaration terminated successfully'
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Error terminating war:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

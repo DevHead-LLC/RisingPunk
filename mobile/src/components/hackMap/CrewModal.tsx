@@ -13,8 +13,9 @@ import { EditCrewLanguageModal } from './EditCrewLanguageModal';
 import { GiftAllMembersModal } from './GiftAllMembersModal';
 import { ChooseSuccessorModal } from './ChooseSuccessorModal';
 import { ResignModal } from './ResignModal';
+import { WarManagementModal } from './WarManagementModal';
 import { EditableCrewRules } from './EditableCrewRules';
-import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, useUpdateCrewLanguageMutation, useUpdateInternalMessageMutation, useUpdateExternalMessageMutation, useGiftAllMembersMutation, usePromoteMemberMutation, useDemoteExecutiveMutation, useChooseSuccessorMutation, useResignMutation } from '../../store/api/authApi';
+import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, useUpdateCrewLanguageMutation, useUpdateInternalMessageMutation, useUpdateExternalMessageMutation, useGiftAllMembersMutation, usePromoteMemberMutation, useDemoteExecutiveMutation, useChooseSuccessorMutation, useResignMutation, useGetWarStatusQuery } from '../../store/api/authApi';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CREW_MODAL_PADDING = SIZING.spacing.md * 2;
@@ -68,6 +69,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [showGiftAllMembersModal, setShowGiftAllMembersModal] = useState(false);
   const [showChooseSuccessorModal, setShowChooseSuccessorModal] = useState(false);
   const [showResignModal, setShowResignModal] = useState(false);
+  const [showWarManagementModal, setShowWarManagementModal] = useState(false);
   const [viewingProfileUserId, setViewingProfileUserId] = useState<string | null>(null);
   const [promotingUserId, setPromotingUserId] = useState<string | null>(null);
   const [demotingUserId, setDemotingUserId] = useState<string | null>(null);
@@ -79,6 +81,10 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [externalMessageText, setExternalMessageText] = useState('');
   const { data: crewStatus, refetch: refetchCrewStatus } = useGetCrewStatusQuery(undefined, {
     pollingInterval: visible ? 3000 : 0,
+  });
+  const { data: warStatusData } = useGetWarStatusQuery(undefined, {
+    skip: !visible || !crewStatus?.isInCrew,
+    pollingInterval: visible && crewStatus?.isInCrew ? 3000 : 0,
   });
   const [disbandCrew, { isLoading: isDisbanding }] = useDisbandCrewMutation();
   const [acceptApplicant, { isLoading: isAccepting }] = useAcceptApplicantMutation();
@@ -191,6 +197,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     setShowGiftAllMembersModal(false);
     setShowChooseSuccessorModal(false);
     setShowResignModal(false);
+    setShowWarManagementModal(false);
     setViewingProfileUserId(null);
     setPromotingUserId(null);
     setDemotingUserId(null);
@@ -456,6 +463,10 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       throw new Error(error?.data?.error || error?.error || 'Failed to resign');
     }
   }, [resign, crewStatus?.crewId, refetchCrewDetails, refetchCrewStatus, onClose]);
+
+  const handleWarManagementPress = useCallback(() => {
+    setShowWarManagementModal(true);
+  }, []);
 
   const handlePromoteMember = useCallback(async (memberUserId: string) => {
     if (!crewStatus?.crewId) {
@@ -1249,6 +1260,9 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     const displayMessage = isEditingInternalMessage ? internalMessageText : currentMessage;
     const characterCount = displayMessage.length;
     const maxCharacters = 1500;
+    const warsWeDeclared = warStatusData?.warsWeDeclared || [];
+    const warsDeclaredOnUs = warStatusData?.warsDeclaredOnUs || [];
+    const isAtWar = warStatusData?.isAtWar || false;
 
     return (
       <ScrollView
@@ -1256,6 +1270,36 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         contentContainerStyle={styles.internalMessageScrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {!isEditingInternalMessage && (
+          <View style={styles.warStatusInternalSection}>
+            <Text style={[styles.warStatusInternalTitle, { color: colors.text.primary }]}>WAR STATUS</Text>
+            {isAtWar ? (
+              <View style={[styles.warStatusInternalCard, { backgroundColor: colors.error + '20', borderColor: colors.error }]}>
+                {warsWeDeclared.length > 0 && warsWeDeclared.map((war) => (
+                  <View key={war.enemyCrewId} style={styles.warStatusInternalItem}>
+                    <Text style={[styles.warStatusInternalText, { color: colors.text.primary }]}>
+                      At war with: {war.enemyCrewName} ({war.enemyCrewIdentifier})
+                    </Text>
+                  </View>
+                ))}
+                {warsDeclaredOnUs.length > 0 && warsDeclaredOnUs.map((war) => (
+                  <View key={war.enemyCrewId} style={styles.warStatusInternalItem}>
+                    <Text style={[styles.warStatusInternalText, { color: colors.text.primary }]}>
+                      War declared on us by: {war.enemyCrewName} ({war.enemyCrewIdentifier})
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={[styles.warStatusInternalCard, { backgroundColor: colors.surface, borderColor: colors.secondary }]}>
+                <Text style={[styles.warStatusInternalText, { color: colors.text.secondary }]}>
+                  Not currently at war
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
         {isPresident && !isEditingInternalMessage && (
           <View style={styles.internalMessageEditContainer}>
             <TouchableOpacity
@@ -1489,8 +1533,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       'Edit Crew Identifier',
       'Change Language',
       'Gift All Members',
-      'Declare War',
-      'Terminate War Declaration',
+      'War Management',
       'Request Alliance',
       'Accept Alliance',
       'Terminate Alliance',
@@ -1508,8 +1551,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         <View style={styles.settingsButtonGrid}>
           {settingsButtons.map((buttonText, index) => {
             const isLeftButton = index % 2 === 0;
-            const isLastThree = index >= 9;
-            const isDisbandCrew = index === 11;
+            const isLastThree = index >= 8;
+            const isDisbandCrew = index === 10;
             return (
               <TouchableOpacity
                 key={index}
@@ -1528,6 +1571,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                     handleEditCrewLanguagePress();
                   } else if (buttonText === 'Gift All Members') {
                     handleGiftAllMembersPress();
+                  } else if (buttonText === 'War Management') {
+                    handleWarManagementPress();
                   } else if (buttonText === 'Choose Successor') {
                     handleChooseSuccessorPress();
                   } else if (buttonText === 'Resign') {
@@ -1690,6 +1735,14 @@ export const CrewModal: React.FC<CrewModalProps> = ({
           visible={showResignModal}
           onClose={() => setShowResignModal(false)}
           onResign={handleResign}
+        />
+      )}
+
+      {crewStatus?.crewId && (
+        <WarManagementModal
+          visible={showWarManagementModal}
+          onClose={() => setShowWarManagementModal(false)}
+          crewId={crewStatus.crewId}
         />
       )}
     </Modal>
@@ -2202,6 +2255,27 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
   },
   internalMessageButtonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
+  },
+  warStatusInternalSection: {
+    marginBottom: SIZING.spacing.lg,
+  },
+  warStatusInternalTitle: {
+    fontSize: SIZING.font.h4,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.sm,
+  },
+  warStatusInternalCard: {
+    padding: SIZING.spacing.md,
+    borderRadius: 8,
+    borderWidth: 2,
+    marginBottom: SIZING.spacing.md,
+  },
+  warStatusInternalItem: {
+    marginBottom: SIZING.spacing.xs,
+  },
+  warStatusInternalText: {
     fontSize: SIZING.font.body,
     fontWeight: '600',
   },
