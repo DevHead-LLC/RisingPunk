@@ -159,7 +159,7 @@ const authBaseQuery = async (args: any, api: any, extraOptions: any) => {
 export const authApi = createApi({
   reducerPath: 'authApi',
   baseQuery: authBaseQuery,
-  tagTypes: ['User'],
+  tagTypes: ['User', 'Crew'],
   endpoints: (builder) => ({
     login: builder.mutation<AuthResponse, LoginRequest>({
       query: (credentials) => ({
@@ -486,6 +486,45 @@ export const authApi = createApi({
       }),
       invalidatesTags: ['User', 'Crew'],
     }),
+
+    getAllianceStatus: builder.query<{ success: boolean; alliances: Array<{ alliedCrewId: string; alliedCrewName: string; alliedCrewIdentifier: string }>; requestsWeSent: Array<{ requestedCrewId: string; requestedCrewName: string; requestedCrewIdentifier: string }>; requestsWeReceived: Array<{ requestingCrewId: string; requestingCrewName: string; requestingCrewIdentifier: string }> }, void>({
+      query: () => '/api/crew/alliance-status',
+      providesTags: ['User', 'Crew'],
+      refetchOnMountOrArgChange: true,
+      keepUnusedDataFor: 0,
+    }),
+
+    getAllianceManagementCrews: builder.query<{ success: boolean; crews: Array<{ id: string; crewName: string; crewIdentifier: string; memberCount: number; status: string; createdAt: string | null }> }, void>({
+      query: () => '/api/crew/alliance-management/crews',
+      providesTags: ['User', 'Crew'],
+    }),
+
+    requestAlliance: builder.mutation<{ success: boolean; message: string }, { targetCrewId: string }>({
+      query: (data) => ({
+        url: '/api/crew/alliance-management/request',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User', 'Crew'],
+    }),
+
+    acceptAlliance: builder.mutation<{ success: boolean; message: string; alliances: Array<{ alliedCrewId: string; alliedCrewName: string; alliedCrewIdentifier: string }> }, { targetCrewId: string }>({
+      query: (data) => ({
+        url: '/api/crew/alliance-management/accept',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User', 'Crew'],
+    }),
+
+    terminateAlliance: builder.mutation<{ success: boolean; message: string }, { targetCrewId: string }>({
+      query: (data) => ({
+        url: '/api/crew/alliance-management/terminate',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User', 'Crew'],
+    }),
   }),
 });
 
@@ -531,4 +570,9 @@ export const {
   useGetWarManagementCrewsQuery,
   useDeclareWarMutation,
   useTerminateWarMutation,
+  useGetAllianceStatusQuery,
+  useGetAllianceManagementCrewsQuery,
+  useRequestAllianceMutation,
+  useAcceptAllianceMutation,
+  useTerminateAllianceMutation,
 } = authApi;
