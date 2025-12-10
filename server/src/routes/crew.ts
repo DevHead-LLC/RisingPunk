@@ -715,8 +715,22 @@ router.get('/alliance-management/crews', auth, async (req: Request, res: Respons
     const allianceRequestedToCrewIds = (userCrew.allianceRequestedToCrewIds || []).map((id: any) => id.toString());
     const allianceRequestedFromCrewIds = (userCrew.allianceRequestedFromCrewIds || []).map((id: any) => id.toString());
 
+    // Get crews we're at war with (both directions)
+    const warCrewIds: mongoose.Types.ObjectId[] = [];
+    // 1. Crew we declared war on (max 1 possible)
+    if (userCrew.warWithCrewId) {
+      warCrewIds.push(userCrew.warWithCrewId);
+    }
+    // 2. All crews that declared war on us (no limits on number)
+    const crewsWhoDeclaredWarOnUs = await Crew.find({
+      warWithCrewId: userCrewId
+    }).select('_id').lean();
+    crewsWhoDeclaredWarOnUs.forEach((crew: any) => {
+      warCrewIds.push(crew._id);
+    });
+
     const crews = await Crew.find({
-      _id: { $ne: userCrewId }
+      _id: { $ne: userCrewId, $nin: warCrewIds }
     })
       .select('crewName crewIdentifier createdAt')
       .limit(100)
@@ -825,7 +839,11 @@ router.post('/alliance-management/request', auth, async (req: RequestAllianceReq
     const crewsWhoAlliedWithUs = await Crew.find({
       allianceWithCrewIds: userCrewId
     }).session(session);
-    const bidirectionalAllianceCount = crewsWhoAlliedWithUs.length;
+    // Deduplicate: filter out crews already in our allianceWithCrewIds to avoid double-counting
+    const uniqueBidirectionalAlliances = crewsWhoAlliedWithUs.filter(
+      (crew: any) => !allianceWithCrewIds.includes(crew._id.toString())
+    );
+    const bidirectionalAllianceCount = uniqueBidirectionalAlliances.length;
     const totalAllianceCount = allianceWithCrewIds.length + bidirectionalAllianceCount;
 
     // Maximum of 2 alliances allowed
@@ -857,11 +875,28 @@ router.post('/alliance-management/request', auth, async (req: RequestAllianceReq
       return;
     }
 
+    // Check if we're at war with the target crew (both directions)
+    // 1. Check if we declared war on the target crew (max 1 possible)
+    if (userCrew.warWithCrewId && userCrew.warWithCrewId.toString() === targetCrewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Cannot request alliance with a crew you are at war with. Please terminate the war first.' });
+      return;
+    }
+
     const targetCrew = await Crew.findById(targetCrewId).session(session);
     if (!targetCrew) {
       await session.abortTransaction();
       session.endSession();
       res.status(404).json({ error: 'Target crew not found' });
+      return;
+    }
+
+    // 2. Check if target crew has declared war on us (no limits on number of crews that can declare war on us)
+    if (targetCrew.warWithCrewId && targetCrew.warWithCrewId.toString() === userCrewId.toString()) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Cannot request alliance with a crew that has declared war on you. Please wait for them to terminate the war first.' });
       return;
     }
 
@@ -968,7 +1003,11 @@ router.post('/alliance-management/accept', auth, async (req: AcceptAllianceReque
     const crewsWhoAlliedWithUs = await Crew.find({
       allianceWithCrewIds: userCrewId
     }).session(session);
-    const bidirectionalAllianceCount = crewsWhoAlliedWithUs.length;
+    // Deduplicate: filter out crews already in our allianceWithCrewIds to avoid double-counting
+    const uniqueBidirectionalAlliances = crewsWhoAlliedWithUs.filter(
+      (crew: any) => !allianceWithCrewIds.includes(crew._id.toString())
+    );
+    const bidirectionalAllianceCount = uniqueBidirectionalAlliances.length;
     const totalAllianceCount = allianceWithCrewIds.length + bidirectionalAllianceCount;
 
     // Maximum of 2 alliances allowed
@@ -1008,7 +1047,7 @@ router.post('/alliance-management/accept', auth, async (req: AcceptAllianceReque
     targetCrew.allianceRequestedToCrewIds = (targetCrew.allianceRequestedToCrewIds || []).filter(
       (id: any) => id.toString() !== userCrewIdString
     );
-    targetCrew.allianceWithCrewIds = [...(targetCrew.allianceWithCrewIds || []), targetCrewObjectId];
+    targetCrew.allianceWithCrewIds = [...(targetCrew.allianceWithCrewIds || []), userCrewObjectId];
     await targetCrew.save({ session });
 
     await session.commitTransaction();
@@ -1131,15 +1170,18 @@ router.post('/alliance-management/terminate', auth, async (req: TerminateAllianc
     const targetCrewObjectId = new mongoose.Types.ObjectId(targetCrewId);
     const userCrewObjectId = new mongoose.Types.ObjectId(crewId);
 
-    crew.allianceWithCrewIds = (crew.allianceWithCrewIds || []).filter(
-      (id: any) => id.toString() !== targetCrewId
+    // Use atomic $pull operations to avoid version conflicts
+    await Crew.findByIdAndUpdate(
+      crewId,
+      { $pull: { allianceWithCrewIds: targetCrewObjectId } },
+      { session }
     );
-    await crew.save({ session });
 
-    targetCrew.allianceWithCrewIds = (targetCrew.allianceWithCrewIds || []).filter(
-      (id: any) => id.toString() !== crewId.toString()
+    await Crew.findByIdAndUpdate(
+      targetCrewId,
+      { $pull: { allianceWithCrewIds: userCrewObjectId } },
+      { session }
     );
-    await targetCrew.save({ session });
 
     await session.commitTransaction();
     session.endSession();
@@ -3346,8 +3388,22 @@ router.get('/alliance-management/crews', auth, async (req: Request, res: Respons
     const allianceRequestedToCrewIds = (userCrew.allianceRequestedToCrewIds || []).map((id: any) => id.toString());
     const allianceRequestedFromCrewIds = (userCrew.allianceRequestedFromCrewIds || []).map((id: any) => id.toString());
 
+    // Get crews we're at war with (both directions)
+    const warCrewIds: mongoose.Types.ObjectId[] = [];
+    // 1. Crew we declared war on (max 1 possible)
+    if (userCrew.warWithCrewId) {
+      warCrewIds.push(userCrew.warWithCrewId);
+    }
+    // 2. All crews that declared war on us (no limits on number)
+    const crewsWhoDeclaredWarOnUs = await Crew.find({
+      warWithCrewId: userCrewId
+    }).select('_id').lean();
+    crewsWhoDeclaredWarOnUs.forEach((crew: any) => {
+      warCrewIds.push(crew._id);
+    });
+
     const crews = await Crew.find({
-      _id: { $ne: userCrewId }
+      _id: { $ne: userCrewId, $nin: warCrewIds }
     })
       .select('crewName crewIdentifier createdAt')
       .limit(100)
@@ -3456,7 +3512,11 @@ router.post('/alliance-management/request', auth, async (req: RequestAllianceReq
     const crewsWhoAlliedWithUs = await Crew.find({
       allianceWithCrewIds: userCrewId
     }).session(session);
-    const bidirectionalAllianceCount = crewsWhoAlliedWithUs.length;
+    // Deduplicate: filter out crews already in our allianceWithCrewIds to avoid double-counting
+    const uniqueBidirectionalAlliances = crewsWhoAlliedWithUs.filter(
+      (crew: any) => !allianceWithCrewIds.includes(crew._id.toString())
+    );
+    const bidirectionalAllianceCount = uniqueBidirectionalAlliances.length;
     const totalAllianceCount = allianceWithCrewIds.length + bidirectionalAllianceCount;
 
     // Maximum of 2 alliances allowed
@@ -3488,11 +3548,28 @@ router.post('/alliance-management/request', auth, async (req: RequestAllianceReq
       return;
     }
 
+    // Check if we're at war with the target crew (both directions)
+    // 1. Check if we declared war on the target crew (max 1 possible)
+    if (userCrew.warWithCrewId && userCrew.warWithCrewId.toString() === targetCrewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Cannot request alliance with a crew you are at war with. Please terminate the war first.' });
+      return;
+    }
+
     const targetCrew = await Crew.findById(targetCrewId).session(session);
     if (!targetCrew) {
       await session.abortTransaction();
       session.endSession();
       res.status(404).json({ error: 'Target crew not found' });
+      return;
+    }
+
+    // 2. Check if target crew has declared war on us (no limits on number of crews that can declare war on us)
+    if (targetCrew.warWithCrewId && targetCrew.warWithCrewId.toString() === userCrewId.toString()) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Cannot request alliance with a crew that has declared war on you. Please wait for them to terminate the war first.' });
       return;
     }
 
@@ -3599,7 +3676,11 @@ router.post('/alliance-management/accept', auth, async (req: AcceptAllianceReque
     const crewsWhoAlliedWithUs = await Crew.find({
       allianceWithCrewIds: userCrewId
     }).session(session);
-    const bidirectionalAllianceCount = crewsWhoAlliedWithUs.length;
+    // Deduplicate: filter out crews already in our allianceWithCrewIds to avoid double-counting
+    const uniqueBidirectionalAlliances = crewsWhoAlliedWithUs.filter(
+      (crew: any) => !allianceWithCrewIds.includes(crew._id.toString())
+    );
+    const bidirectionalAllianceCount = uniqueBidirectionalAlliances.length;
     const totalAllianceCount = allianceWithCrewIds.length + bidirectionalAllianceCount;
 
     // Maximum of 2 alliances allowed
@@ -3639,7 +3720,7 @@ router.post('/alliance-management/accept', auth, async (req: AcceptAllianceReque
     targetCrew.allianceRequestedToCrewIds = (targetCrew.allianceRequestedToCrewIds || []).filter(
       (id: any) => id.toString() !== userCrewIdString
     );
-    targetCrew.allianceWithCrewIds = [...(targetCrew.allianceWithCrewIds || []), targetCrewObjectId];
+    targetCrew.allianceWithCrewIds = [...(targetCrew.allianceWithCrewIds || []), userCrewObjectId];
     await targetCrew.save({ session });
 
     await session.commitTransaction();
@@ -3762,15 +3843,18 @@ router.post('/alliance-management/terminate', auth, async (req: TerminateAllianc
     const targetCrewObjectId = new mongoose.Types.ObjectId(targetCrewId);
     const userCrewObjectId = new mongoose.Types.ObjectId(crewId);
 
-    crew.allianceWithCrewIds = (crew.allianceWithCrewIds || []).filter(
-      (id: any) => id.toString() !== targetCrewId
+    // Use atomic $pull operations to avoid version conflicts
+    await Crew.findByIdAndUpdate(
+      crewId,
+      { $pull: { allianceWithCrewIds: targetCrewObjectId } },
+      { session }
     );
-    await crew.save({ session });
 
-    targetCrew.allianceWithCrewIds = (targetCrew.allianceWithCrewIds || []).filter(
-      (id: any) => id.toString() !== crewId.toString()
+    await Crew.findByIdAndUpdate(
+      targetCrewId,
+      { $pull: { allianceWithCrewIds: userCrewObjectId } },
+      { session }
     );
-    await targetCrew.save({ session });
 
     await session.commitTransaction();
     session.endSession();
