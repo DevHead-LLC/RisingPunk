@@ -103,9 +103,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           styles.cell,
           xStyle,
           selected && styles.selectedCell,
-          isAllianceCrewMember && styles.allianceCrewMemberCell,
-          !isAllianceCrewMember && isWarCrewMember && styles.warCrewMemberCell,
-          !isAllianceCrewMember && !isWarCrewMember && isCrewMember && styles.crewMemberCell,
+          // War takes precedence over alliance (war is more critical to display)
+          isWarCrewMember && styles.warCrewMemberCell,
+          !isWarCrewMember && isAllianceCrewMember && styles.allianceCrewMemberCell,
+          !isWarCrewMember && !isAllianceCrewMember && isCrewMember && styles.crewMemberCell,
         ]}
         onPress={() => onPress(x, y, cell)}
       >
