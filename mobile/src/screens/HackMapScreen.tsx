@@ -605,7 +605,14 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   }, [primaryWarCrewId, primaryWarCrewDetails]);
 
   const alliances = allianceStatusData?.alliances || [];
-  const allianceCrewIds = alliances.map(a => a.alliedCrewId).slice(0, 10);
+  // Memoize allianceCrewIds to prevent unnecessary recalculations in dependent useMemos
+  // Create a stable dependency key from alliance IDs
+  const allianceCrewIdsKey = useMemo(() => {
+    return (alliances || []).map(a => a.alliedCrewId).join(',');
+  }, [alliances]);
+  const allianceCrewIds = useMemo(() => {
+    return (alliances || []).map(a => a.alliedCrewId).slice(0, 10);
+  }, [allianceCrewIdsKey]);
   
   const allianceCrewDetails1 = useGetCrewDetailsQuery(allianceCrewIds[0] || '', { skip: !allianceCrewIds[0] });
   const allianceCrewDetails2 = useGetCrewDetailsQuery(allianceCrewIds[1] || '', { skip: !allianceCrewIds[1] });
