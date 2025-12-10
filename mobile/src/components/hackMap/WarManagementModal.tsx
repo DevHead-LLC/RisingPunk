@@ -259,8 +259,9 @@ export const WarManagementModal: React.FC<WarManagementModalProps> = ({
                       {availableCrews.map((crew) => {
                         const isDeclaring = declaringWarCrewId === crew.id;
                         // Only disable if we've declared war (not if war is declared on us)
-                        // Also disable if war status has an error (unknown state) or is being refetched (during polling)
-                        const isDisabled = hasDeclaredWar || isDeclaringWar || isTerminatingWar || isDeclaring || !!warStatusError || isFetchingWarStatus;
+                        // Also disable if war status has an error (unknown state)
+                        // Note: We don't disable during isFetchingWarStatus as that's just background polling
+                        const isDisabled = hasDeclaredWar || isDeclaringWar || isTerminatingWar || isDeclaring || !!warStatusError;
                         return (
                           <View
                             key={crew.id}

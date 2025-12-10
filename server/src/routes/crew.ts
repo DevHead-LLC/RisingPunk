@@ -561,8 +561,23 @@ router.get('/war-management/crews', auth, async (req: Request, res: Response) =>
     }
 
     const userCrewId = crewStatus.crewId;
+    const userCrew = await Crew.findById(userCrewId).lean();
+    if (!userCrew) {
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    // Get all allied crew IDs (both directions)
+    const allianceWithCrewIds = (userCrew.allianceWithCrewIds || []).map((id: any) => id.toString());
+    const crewsWhoAlliedWithUs = await Crew.find({
+      allianceWithCrewIds: userCrewId
+    }).select('_id').lean();
+    const bidirectionalAllianceIds = crewsWhoAlliedWithUs.map((crew: any) => crew._id.toString());
+    const allAlliedCrewIds = [...new Set([...allianceWithCrewIds, ...bidirectionalAllianceIds])];
+
+    // Exclude own crew and all allied crews
     const crews = await Crew.find({
-      _id: { $ne: userCrewId }
+      _id: { $ne: userCrewId, $nin: allAlliedCrewIds.map(id => new mongoose.Types.ObjectId(id)) }
     })
       .select('crewName crewIdentifier createdAt')
       .limit(100)
@@ -591,6 +606,552 @@ router.get('/war-management/crews', auth, async (req: Request, res: Response) =>
     });
   } catch (error) {
     console.error('Error fetching crews for war management:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/alliance-status', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const crewStatus = await CrewStatus.findOne({ userId });
+    if (!crewStatus || !crewStatus.isInCrew || !crewStatus.crewId) {
+      res.status(400).json({ error: 'User is not in a crew' });
+      return;
+    }
+
+    const crewId = crewStatus.crewId;
+    const crew = await Crew.findById(crewId)
+      .populate('allianceWithCrewIds', 'crewName crewIdentifier')
+      .populate('allianceRequestedToCrewIds', 'crewName crewIdentifier')
+      .populate('allianceRequestedFromCrewIds', 'crewName crewIdentifier')
+      .lean();
+
+    if (!crew) {
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    const alliances = (crew.allianceWithCrewIds || []).map((alliedCrew: any) => ({
+      alliedCrewId: alliedCrew._id.toString(),
+      alliedCrewName: alliedCrew.crewName,
+      alliedCrewIdentifier: alliedCrew.crewIdentifier
+    }));
+
+    const crewsWhoAlliedWithUs = await Crew.find({
+      allianceWithCrewIds: crewId
+    })
+      .select('crewName crewIdentifier')
+      .lean();
+
+    const bidirectionalAlliances = crewsWhoAlliedWithUs
+      .filter((alliedCrew: any) => {
+        const alliedCrewId = alliedCrew._id.toString();
+        return !alliances.some(a => a.alliedCrewId === alliedCrewId);
+      })
+      .map((alliedCrew: any) => ({
+        alliedCrewId: alliedCrew._id.toString(),
+        alliedCrewName: alliedCrew.crewName,
+        alliedCrewIdentifier: alliedCrew.crewIdentifier
+      }));
+
+    const allAlliances = [...alliances, ...bidirectionalAlliances];
+
+    const requestsWeSent = (crew.allianceRequestedToCrewIds || []).map((requestedCrew: any) => ({
+      requestedCrewId: requestedCrew._id.toString(),
+      requestedCrewName: requestedCrew.crewName,
+      requestedCrewIdentifier: requestedCrew.crewIdentifier
+    }));
+
+    const requestsWeReceived = (crew.allianceRequestedFromCrewIds || []).map((requestingCrew: any) => ({
+      requestingCrewId: requestingCrew._id.toString(),
+      requestingCrewName: requestingCrew.crewName,
+      requestingCrewIdentifier: requestingCrew.crewIdentifier
+    }));
+
+    res.json({
+      success: true,
+      alliances: allAlliances,
+      requestsWeSent,
+      requestsWeReceived
+    });
+  } catch (error) {
+    console.error('Error fetching alliance status:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/alliance-management/crews', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const crewStatus = await CrewStatus.findOne({ userId });
+    if (!crewStatus || !crewStatus.isInCrew || !crewStatus.crewId) {
+      res.status(400).json({ error: 'User is not in a crew' });
+      return;
+    }
+
+    if (crewStatus.role !== 'president') {
+      res.status(403).json({ error: 'Only the president can manage alliances' });
+      return;
+    }
+
+    const userCrewId = crewStatus.crewId;
+    const userCrew = await Crew.findById(userCrewId).lean();
+    if (!userCrew) {
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    const allianceWithCrewIds = (userCrew.allianceWithCrewIds || []).map((id: any) => id.toString());
+    const allianceRequestedToCrewIds = (userCrew.allianceRequestedToCrewIds || []).map((id: any) => id.toString());
+    const allianceRequestedFromCrewIds = (userCrew.allianceRequestedFromCrewIds || []).map((id: any) => id.toString());
+
+    const crews = await Crew.find({
+      _id: { $ne: userCrewId }
+    })
+      .select('crewName crewIdentifier createdAt')
+      .limit(100)
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const crewsWithMemberCount = await Promise.all(
+      crews.map(async (crew) => {
+        const memberCount = await CrewStatus.countDocuments({ 
+          crewId: crew._id, 
+          isInCrew: true 
+        });
+        const crewIdString = crew._id.toString();
+        let status = 'available';
+        if (allianceWithCrewIds.includes(crewIdString)) {
+          status = 'allied';
+        } else if (allianceRequestedToCrewIds.includes(crewIdString)) {
+          status = 'request_sent';
+        } else if (allianceRequestedFromCrewIds.includes(crewIdString)) {
+          status = 'request_received';
+        }
+        return {
+          id: crewIdString,
+          crewName: crew.crewName,
+          crewIdentifier: crew.crewIdentifier,
+          memberCount,
+          status,
+          createdAt: crew.createdAt ? crew.createdAt.toISOString() : null
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      crews: crewsWithMemberCount
+    });
+  } catch (error) {
+    console.error('Error fetching crews for alliance management:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+interface RequestAllianceRequest extends Request {
+  body: {
+    targetCrewId: string;
+  }
+}
+
+router.post('/alliance-management/request', auth, async (req: RequestAllianceRequest, res: Response) => {
+  const userId = req.user?._id;
+  if (!userId) {
+    res.status(401).json({ error: 'User not authenticated' });
+    return;
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  let userCrewId: mongoose.Types.ObjectId | null = null;
+
+  try {
+    const { targetCrewId } = req.body;
+    if (!targetCrewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Target crew ID is required' });
+      return;
+    }
+
+    const crewStatus = await CrewStatus.findOne({ userId }).session(session);
+    if (!crewStatus || !crewStatus.isInCrew || !crewStatus.crewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'User is not in a crew' });
+      return;
+    }
+
+    if (crewStatus.role !== 'president') {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(403).json({ error: 'Only the president can request alliances' });
+      return;
+    }
+
+    userCrewId = crewStatus.crewId;
+    if (userCrewId.toString() === targetCrewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Cannot request alliance with your own crew' });
+      return;
+    }
+
+    const userCrew = await Crew.findById(userCrewId).session(session);
+    if (!userCrew) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    const allianceWithCrewIds = (userCrew.allianceWithCrewIds || []).map((id: any) => id.toString());
+    const allianceRequestedToCrewIds = (userCrew.allianceRequestedToCrewIds || []).map((id: any) => id.toString());
+    const allianceRequestedFromCrewIds = (userCrew.allianceRequestedFromCrewIds || []).map((id: any) => id.toString());
+
+    // Check for bidirectional alliances (crews that have us in their allianceWithCrewIds)
+    const crewsWhoAlliedWithUs = await Crew.find({
+      allianceWithCrewIds: userCrewId
+    }).session(session);
+    const bidirectionalAllianceCount = crewsWhoAlliedWithUs.length;
+    const totalAllianceCount = allianceWithCrewIds.length + bidirectionalAllianceCount;
+
+    // Maximum of 2 alliances allowed
+    if (totalAllianceCount >= 2) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'You have reached the maximum limit of 2 alliances. Please terminate an existing alliance before requesting a new one.' });
+      return;
+    }
+
+    if (allianceWithCrewIds.includes(targetCrewId)) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'You already have an alliance with this crew' });
+      return;
+    }
+
+    if (allianceRequestedToCrewIds.includes(targetCrewId)) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Alliance request already sent to this crew' });
+      return;
+    }
+
+    if (allianceRequestedFromCrewIds.includes(targetCrewId)) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'This crew has already sent you an alliance request. Please accept it instead.' });
+      return;
+    }
+
+    const targetCrew = await Crew.findById(targetCrewId).session(session);
+    if (!targetCrew) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(404).json({ error: 'Target crew not found' });
+      return;
+    }
+
+    const targetAllianceWithCrewIds = (targetCrew.allianceWithCrewIds || []).map((id: any) => id.toString());
+    if (targetAllianceWithCrewIds.includes(userCrewId.toString())) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'You already have an alliance with this crew' });
+      return;
+    }
+
+    const targetCrewObjectId = new mongoose.Types.ObjectId(targetCrewId);
+    const userCrewObjectId = new mongoose.Types.ObjectId(userCrewId);
+
+    userCrew.allianceRequestedToCrewIds = [...(userCrew.allianceRequestedToCrewIds || []), targetCrewObjectId];
+    await userCrew.save({ session });
+
+    targetCrew.allianceRequestedFromCrewIds = [...(targetCrew.allianceRequestedFromCrewIds || []), userCrewObjectId];
+    await targetCrew.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.json({
+      success: true,
+      message: 'Alliance request sent successfully'
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Error requesting alliance:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+interface AcceptAllianceRequest extends Request {
+  body: {
+    targetCrewId: string;
+  }
+}
+
+router.post('/alliance-management/accept', auth, async (req: AcceptAllianceRequest, res: Response) => {
+  const userId = req.user?._id;
+  if (!userId) {
+    res.status(401).json({ error: 'User not authenticated' });
+    return;
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  let userCrewId: mongoose.Types.ObjectId | null = null;
+
+  try {
+    const { targetCrewId } = req.body;
+    if (!targetCrewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Target crew ID is required' });
+      return;
+    }
+
+    const crewStatus = await CrewStatus.findOne({ userId }).session(session);
+    if (!crewStatus || !crewStatus.isInCrew || !crewStatus.crewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'User is not in a crew' });
+      return;
+    }
+
+    if (crewStatus.role !== 'president') {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(403).json({ error: 'Only the president can accept alliances' });
+      return;
+    }
+
+    userCrewId = crewStatus.crewId;
+    const userCrew = await Crew.findById(userCrewId).session(session);
+    if (!userCrew) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    const allianceRequestedFromCrewIds = (userCrew.allianceRequestedFromCrewIds || []).map((id: any) => id.toString());
+    if (!allianceRequestedFromCrewIds.includes(targetCrewId)) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Alliance request not found' });
+      return;
+    }
+
+    const allianceWithCrewIds = (userCrew.allianceWithCrewIds || []).map((id: any) => id.toString());
+    if (allianceWithCrewIds.includes(targetCrewId)) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'You already have an alliance with this crew' });
+      return;
+    }
+
+    // Check for bidirectional alliances (crews that have us in their allianceWithCrewIds)
+    const crewsWhoAlliedWithUs = await Crew.find({
+      allianceWithCrewIds: userCrewId
+    }).session(session);
+    const bidirectionalAllianceCount = crewsWhoAlliedWithUs.length;
+    const totalAllianceCount = allianceWithCrewIds.length + bidirectionalAllianceCount;
+
+    // Maximum of 2 alliances allowed
+    if (totalAllianceCount >= 2) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'You have reached the maximum limit of 2 alliances. Please terminate an existing alliance before accepting a new one.' });
+      return;
+    }
+
+    const targetCrew = await Crew.findById(targetCrewId).session(session);
+    if (!targetCrew) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(404).json({ error: 'Target crew not found' });
+      return;
+    }
+
+    const targetAllianceRequestedToCrewIds = (targetCrew.allianceRequestedToCrewIds || []).map((id: any) => id.toString());
+    if (!targetAllianceRequestedToCrewIds.includes(userCrewId.toString())) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Alliance request mismatch' });
+      return;
+    }
+
+    const targetCrewObjectId = new mongoose.Types.ObjectId(targetCrewId);
+    const userCrewObjectId = new mongoose.Types.ObjectId(userCrewId);
+    const userCrewIdString = userCrewId.toString();
+
+    userCrew.allianceRequestedFromCrewIds = (userCrew.allianceRequestedFromCrewIds || []).filter(
+      (id: any) => id.toString() !== targetCrewId
+    );
+    userCrew.allianceWithCrewIds = [...(userCrew.allianceWithCrewIds || []), targetCrewObjectId];
+    await userCrew.save({ session });
+
+    targetCrew.allianceRequestedToCrewIds = (targetCrew.allianceRequestedToCrewIds || []).filter(
+      (id: any) => id.toString() !== userCrewIdString
+    );
+    targetCrew.allianceWithCrewIds = [...(targetCrew.allianceWithCrewIds || []), targetCrewObjectId];
+    await targetCrew.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Error accepting alliance:', error);
+    res.status(500).json({ error: 'Internal server error' });
+    return;
+  }
+
+  try {
+    if (!userCrewId) {
+      res.status(500).json({ error: 'Internal server error' });
+      return;
+    }
+
+    const updatedCrew = await Crew.findById(userCrewId)
+      .populate('allianceWithCrewIds', 'crewName crewIdentifier')
+      .lean();
+
+    if (!updatedCrew) {
+      res.status(500).json({ error: 'Internal server error' });
+      return;
+    }
+
+    const alliances = (updatedCrew.allianceWithCrewIds || []).map((alliedCrew: any) => ({
+      alliedCrewId: alliedCrew._id.toString(),
+      alliedCrewName: alliedCrew.crewName,
+      alliedCrewIdentifier: alliedCrew.crewIdentifier
+    }));
+
+    res.json({
+      success: true,
+      message: 'Alliance accepted successfully',
+      alliances
+    });
+  } catch (error) {
+    console.error('Error fetching crew after accepting alliance:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+interface TerminateAllianceRequest extends Request {
+  body: {
+    targetCrewId: string;
+  }
+}
+
+router.post('/alliance-management/terminate', auth, async (req: TerminateAllianceRequest, res: Response) => {
+  const userId = req.user?._id;
+  if (!userId) {
+    res.status(401).json({ error: 'User not authenticated' });
+    return;
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { targetCrewId } = req.body;
+    if (!targetCrewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Target crew ID is required' });
+      return;
+    }
+
+    const crewStatus = await CrewStatus.findOne({ userId }).session(session);
+    if (!crewStatus || !crewStatus.isInCrew || !crewStatus.crewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'User is not in a crew' });
+      return;
+    }
+
+    if (crewStatus.role !== 'president') {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(403).json({ error: 'Only the president can terminate alliances' });
+      return;
+    }
+
+    const crewId = crewStatus.crewId;
+    const crew = await Crew.findById(crewId).session(session);
+    if (!crew) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    const allianceWithCrewIds = (crew.allianceWithCrewIds || []).map((id: any) => id.toString());
+    if (!allianceWithCrewIds.includes(targetCrewId)) {
+      const crewsWhoAlliedWithUs = await Crew.find({
+        allianceWithCrewIds: crewId
+      }).session(session);
+
+      const hasBidirectionalAlliance = crewsWhoAlliedWithUs.some(
+        (alliedCrew: any) => alliedCrew._id.toString() === targetCrewId
+      );
+
+      if (!hasBidirectionalAlliance) {
+        await session.abortTransaction();
+        session.endSession();
+        res.status(400).json({ error: 'Alliance not found' });
+        return;
+      }
+    }
+
+    const targetCrew = await Crew.findById(targetCrewId).session(session);
+    if (!targetCrew) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(404).json({ error: 'Target crew not found' });
+      return;
+    }
+
+    const targetCrewObjectId = new mongoose.Types.ObjectId(targetCrewId);
+    const userCrewObjectId = new mongoose.Types.ObjectId(crewId);
+
+    crew.allianceWithCrewIds = (crew.allianceWithCrewIds || []).filter(
+      (id: any) => id.toString() !== targetCrewId
+    );
+    await crew.save({ session });
+
+    targetCrew.allianceWithCrewIds = (targetCrew.allianceWithCrewIds || []).filter(
+      (id: any) => id.toString() !== crewId.toString()
+    );
+    await targetCrew.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.json({
+      success: true,
+      message: 'Alliance terminated successfully'
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Error terminating alliance:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -940,6 +1501,37 @@ router.post('/disband', auth, async (req: DisbandCrewRequest, res: Response) => 
           $set: {
             warWithCrewId: null,
             warDeclaredAt: null
+          }
+        },
+        { session }
+      );
+
+      // Clear alliance references from all related crews
+      await Crew.updateMany(
+        { allianceWithCrewIds: crewId },
+        {
+          $pull: {
+            allianceWithCrewIds: crewId
+          }
+        },
+        { session }
+      );
+
+      await Crew.updateMany(
+        { allianceRequestedToCrewIds: crewId },
+        {
+          $pull: {
+            allianceRequestedToCrewIds: crewId
+          }
+        },
+        { session }
+      );
+
+      await Crew.updateMany(
+        { allianceRequestedFromCrewIds: crewId },
+        {
+          $pull: {
+            allianceRequestedFromCrewIds: crewId
           }
         },
         { session }
@@ -2645,6 +3237,552 @@ router.post('/war-management/terminate', auth, async (req: Request, res: Respons
     await session.abortTransaction();
     session.endSession();
     console.error('Error terminating war:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/alliance-status', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const crewStatus = await CrewStatus.findOne({ userId });
+    if (!crewStatus || !crewStatus.isInCrew || !crewStatus.crewId) {
+      res.status(400).json({ error: 'User is not in a crew' });
+      return;
+    }
+
+    const crewId = crewStatus.crewId;
+    const crew = await Crew.findById(crewId)
+      .populate('allianceWithCrewIds', 'crewName crewIdentifier')
+      .populate('allianceRequestedToCrewIds', 'crewName crewIdentifier')
+      .populate('allianceRequestedFromCrewIds', 'crewName crewIdentifier')
+      .lean();
+
+    if (!crew) {
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    const alliances = (crew.allianceWithCrewIds || []).map((alliedCrew: any) => ({
+      alliedCrewId: alliedCrew._id.toString(),
+      alliedCrewName: alliedCrew.crewName,
+      alliedCrewIdentifier: alliedCrew.crewIdentifier
+    }));
+
+    const crewsWhoAlliedWithUs = await Crew.find({
+      allianceWithCrewIds: crewId
+    })
+      .select('crewName crewIdentifier')
+      .lean();
+
+    const bidirectionalAlliances = crewsWhoAlliedWithUs
+      .filter((alliedCrew: any) => {
+        const alliedCrewId = alliedCrew._id.toString();
+        return !alliances.some(a => a.alliedCrewId === alliedCrewId);
+      })
+      .map((alliedCrew: any) => ({
+        alliedCrewId: alliedCrew._id.toString(),
+        alliedCrewName: alliedCrew.crewName,
+        alliedCrewIdentifier: alliedCrew.crewIdentifier
+      }));
+
+    const allAlliances = [...alliances, ...bidirectionalAlliances];
+
+    const requestsWeSent = (crew.allianceRequestedToCrewIds || []).map((requestedCrew: any) => ({
+      requestedCrewId: requestedCrew._id.toString(),
+      requestedCrewName: requestedCrew.crewName,
+      requestedCrewIdentifier: requestedCrew.crewIdentifier
+    }));
+
+    const requestsWeReceived = (crew.allianceRequestedFromCrewIds || []).map((requestingCrew: any) => ({
+      requestingCrewId: requestingCrew._id.toString(),
+      requestingCrewName: requestingCrew.crewName,
+      requestingCrewIdentifier: requestingCrew.crewIdentifier
+    }));
+
+    res.json({
+      success: true,
+      alliances: allAlliances,
+      requestsWeSent,
+      requestsWeReceived
+    });
+  } catch (error) {
+    console.error('Error fetching alliance status:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/alliance-management/crews', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const crewStatus = await CrewStatus.findOne({ userId });
+    if (!crewStatus || !crewStatus.isInCrew || !crewStatus.crewId) {
+      res.status(400).json({ error: 'User is not in a crew' });
+      return;
+    }
+
+    if (crewStatus.role !== 'president') {
+      res.status(403).json({ error: 'Only the president can manage alliances' });
+      return;
+    }
+
+    const userCrewId = crewStatus.crewId;
+    const userCrew = await Crew.findById(userCrewId).lean();
+    if (!userCrew) {
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    const allianceWithCrewIds = (userCrew.allianceWithCrewIds || []).map((id: any) => id.toString());
+    const allianceRequestedToCrewIds = (userCrew.allianceRequestedToCrewIds || []).map((id: any) => id.toString());
+    const allianceRequestedFromCrewIds = (userCrew.allianceRequestedFromCrewIds || []).map((id: any) => id.toString());
+
+    const crews = await Crew.find({
+      _id: { $ne: userCrewId }
+    })
+      .select('crewName crewIdentifier createdAt')
+      .limit(100)
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const crewsWithMemberCount = await Promise.all(
+      crews.map(async (crew) => {
+        const memberCount = await CrewStatus.countDocuments({ 
+          crewId: crew._id, 
+          isInCrew: true 
+        });
+        const crewIdString = crew._id.toString();
+        let status = 'available';
+        if (allianceWithCrewIds.includes(crewIdString)) {
+          status = 'allied';
+        } else if (allianceRequestedToCrewIds.includes(crewIdString)) {
+          status = 'request_sent';
+        } else if (allianceRequestedFromCrewIds.includes(crewIdString)) {
+          status = 'request_received';
+        }
+        return {
+          id: crewIdString,
+          crewName: crew.crewName,
+          crewIdentifier: crew.crewIdentifier,
+          memberCount,
+          status,
+          createdAt: crew.createdAt ? crew.createdAt.toISOString() : null
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      crews: crewsWithMemberCount
+    });
+  } catch (error) {
+    console.error('Error fetching crews for alliance management:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+interface RequestAllianceRequest extends Request {
+  body: {
+    targetCrewId: string;
+  }
+}
+
+router.post('/alliance-management/request', auth, async (req: RequestAllianceRequest, res: Response) => {
+  const userId = req.user?._id;
+  if (!userId) {
+    res.status(401).json({ error: 'User not authenticated' });
+    return;
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  let userCrewId: mongoose.Types.ObjectId | null = null;
+
+  try {
+    const { targetCrewId } = req.body;
+    if (!targetCrewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Target crew ID is required' });
+      return;
+    }
+
+    const crewStatus = await CrewStatus.findOne({ userId }).session(session);
+    if (!crewStatus || !crewStatus.isInCrew || !crewStatus.crewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'User is not in a crew' });
+      return;
+    }
+
+    if (crewStatus.role !== 'president') {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(403).json({ error: 'Only the president can request alliances' });
+      return;
+    }
+
+    userCrewId = crewStatus.crewId;
+    if (userCrewId.toString() === targetCrewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Cannot request alliance with your own crew' });
+      return;
+    }
+
+    const userCrew = await Crew.findById(userCrewId).session(session);
+    if (!userCrew) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    const allianceWithCrewIds = (userCrew.allianceWithCrewIds || []).map((id: any) => id.toString());
+    const allianceRequestedToCrewIds = (userCrew.allianceRequestedToCrewIds || []).map((id: any) => id.toString());
+    const allianceRequestedFromCrewIds = (userCrew.allianceRequestedFromCrewIds || []).map((id: any) => id.toString());
+
+    // Check for bidirectional alliances (crews that have us in their allianceWithCrewIds)
+    const crewsWhoAlliedWithUs = await Crew.find({
+      allianceWithCrewIds: userCrewId
+    }).session(session);
+    const bidirectionalAllianceCount = crewsWhoAlliedWithUs.length;
+    const totalAllianceCount = allianceWithCrewIds.length + bidirectionalAllianceCount;
+
+    // Maximum of 2 alliances allowed
+    if (totalAllianceCount >= 2) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'You have reached the maximum limit of 2 alliances. Please terminate an existing alliance before requesting a new one.' });
+      return;
+    }
+
+    if (allianceWithCrewIds.includes(targetCrewId)) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'You already have an alliance with this crew' });
+      return;
+    }
+
+    if (allianceRequestedToCrewIds.includes(targetCrewId)) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Alliance request already sent to this crew' });
+      return;
+    }
+
+    if (allianceRequestedFromCrewIds.includes(targetCrewId)) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'This crew has already sent you an alliance request. Please accept it instead.' });
+      return;
+    }
+
+    const targetCrew = await Crew.findById(targetCrewId).session(session);
+    if (!targetCrew) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(404).json({ error: 'Target crew not found' });
+      return;
+    }
+
+    const targetAllianceWithCrewIds = (targetCrew.allianceWithCrewIds || []).map((id: any) => id.toString());
+    if (targetAllianceWithCrewIds.includes(userCrewId.toString())) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'You already have an alliance with this crew' });
+      return;
+    }
+
+    const targetCrewObjectId = new mongoose.Types.ObjectId(targetCrewId);
+    const userCrewObjectId = new mongoose.Types.ObjectId(userCrewId);
+
+    userCrew.allianceRequestedToCrewIds = [...(userCrew.allianceRequestedToCrewIds || []), targetCrewObjectId];
+    await userCrew.save({ session });
+
+    targetCrew.allianceRequestedFromCrewIds = [...(targetCrew.allianceRequestedFromCrewIds || []), userCrewObjectId];
+    await targetCrew.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.json({
+      success: true,
+      message: 'Alliance request sent successfully'
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Error requesting alliance:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+interface AcceptAllianceRequest extends Request {
+  body: {
+    targetCrewId: string;
+  }
+}
+
+router.post('/alliance-management/accept', auth, async (req: AcceptAllianceRequest, res: Response) => {
+  const userId = req.user?._id;
+  if (!userId) {
+    res.status(401).json({ error: 'User not authenticated' });
+    return;
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  let userCrewId: mongoose.Types.ObjectId | null = null;
+
+  try {
+    const { targetCrewId } = req.body;
+    if (!targetCrewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Target crew ID is required' });
+      return;
+    }
+
+    const crewStatus = await CrewStatus.findOne({ userId }).session(session);
+    if (!crewStatus || !crewStatus.isInCrew || !crewStatus.crewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'User is not in a crew' });
+      return;
+    }
+
+    if (crewStatus.role !== 'president') {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(403).json({ error: 'Only the president can accept alliances' });
+      return;
+    }
+
+    userCrewId = crewStatus.crewId;
+    const userCrew = await Crew.findById(userCrewId).session(session);
+    if (!userCrew) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    const allianceRequestedFromCrewIds = (userCrew.allianceRequestedFromCrewIds || []).map((id: any) => id.toString());
+    if (!allianceRequestedFromCrewIds.includes(targetCrewId)) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Alliance request not found' });
+      return;
+    }
+
+    const allianceWithCrewIds = (userCrew.allianceWithCrewIds || []).map((id: any) => id.toString());
+    if (allianceWithCrewIds.includes(targetCrewId)) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'You already have an alliance with this crew' });
+      return;
+    }
+
+    // Check for bidirectional alliances (crews that have us in their allianceWithCrewIds)
+    const crewsWhoAlliedWithUs = await Crew.find({
+      allianceWithCrewIds: userCrewId
+    }).session(session);
+    const bidirectionalAllianceCount = crewsWhoAlliedWithUs.length;
+    const totalAllianceCount = allianceWithCrewIds.length + bidirectionalAllianceCount;
+
+    // Maximum of 2 alliances allowed
+    if (totalAllianceCount >= 2) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'You have reached the maximum limit of 2 alliances. Please terminate an existing alliance before accepting a new one.' });
+      return;
+    }
+
+    const targetCrew = await Crew.findById(targetCrewId).session(session);
+    if (!targetCrew) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(404).json({ error: 'Target crew not found' });
+      return;
+    }
+
+    const targetAllianceRequestedToCrewIds = (targetCrew.allianceRequestedToCrewIds || []).map((id: any) => id.toString());
+    if (!targetAllianceRequestedToCrewIds.includes(userCrewId.toString())) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Alliance request mismatch' });
+      return;
+    }
+
+    const targetCrewObjectId = new mongoose.Types.ObjectId(targetCrewId);
+    const userCrewObjectId = new mongoose.Types.ObjectId(userCrewId);
+    const userCrewIdString = userCrewId.toString();
+
+    userCrew.allianceRequestedFromCrewIds = (userCrew.allianceRequestedFromCrewIds || []).filter(
+      (id: any) => id.toString() !== targetCrewId
+    );
+    userCrew.allianceWithCrewIds = [...(userCrew.allianceWithCrewIds || []), targetCrewObjectId];
+    await userCrew.save({ session });
+
+    targetCrew.allianceRequestedToCrewIds = (targetCrew.allianceRequestedToCrewIds || []).filter(
+      (id: any) => id.toString() !== userCrewIdString
+    );
+    targetCrew.allianceWithCrewIds = [...(targetCrew.allianceWithCrewIds || []), targetCrewObjectId];
+    await targetCrew.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Error accepting alliance:', error);
+    res.status(500).json({ error: 'Internal server error' });
+    return;
+  }
+
+  try {
+    if (!userCrewId) {
+      res.status(500).json({ error: 'Internal server error' });
+      return;
+    }
+
+    const updatedCrew = await Crew.findById(userCrewId)
+      .populate('allianceWithCrewIds', 'crewName crewIdentifier')
+      .lean();
+
+    if (!updatedCrew) {
+      res.status(500).json({ error: 'Internal server error' });
+      return;
+    }
+
+    const alliances = (updatedCrew.allianceWithCrewIds || []).map((alliedCrew: any) => ({
+      alliedCrewId: alliedCrew._id.toString(),
+      alliedCrewName: alliedCrew.crewName,
+      alliedCrewIdentifier: alliedCrew.crewIdentifier
+    }));
+
+    res.json({
+      success: true,
+      message: 'Alliance accepted successfully',
+      alliances
+    });
+  } catch (error) {
+    console.error('Error fetching crew after accepting alliance:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+interface TerminateAllianceRequest extends Request {
+  body: {
+    targetCrewId: string;
+  }
+}
+
+router.post('/alliance-management/terminate', auth, async (req: TerminateAllianceRequest, res: Response) => {
+  const userId = req.user?._id;
+  if (!userId) {
+    res.status(401).json({ error: 'User not authenticated' });
+    return;
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { targetCrewId } = req.body;
+    if (!targetCrewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'Target crew ID is required' });
+      return;
+    }
+
+    const crewStatus = await CrewStatus.findOne({ userId }).session(session);
+    if (!crewStatus || !crewStatus.isInCrew || !crewStatus.crewId) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(400).json({ error: 'User is not in a crew' });
+      return;
+    }
+
+    if (crewStatus.role !== 'president') {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(403).json({ error: 'Only the president can terminate alliances' });
+      return;
+    }
+
+    const crewId = crewStatus.crewId;
+    const crew = await Crew.findById(crewId).session(session);
+    if (!crew) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(404).json({ error: 'Crew not found' });
+      return;
+    }
+
+    const allianceWithCrewIds = (crew.allianceWithCrewIds || []).map((id: any) => id.toString());
+    if (!allianceWithCrewIds.includes(targetCrewId)) {
+      const crewsWhoAlliedWithUs = await Crew.find({
+        allianceWithCrewIds: crewId
+      }).session(session);
+
+      const hasBidirectionalAlliance = crewsWhoAlliedWithUs.some(
+        (alliedCrew: any) => alliedCrew._id.toString() === targetCrewId
+      );
+
+      if (!hasBidirectionalAlliance) {
+        await session.abortTransaction();
+        session.endSession();
+        res.status(400).json({ error: 'Alliance not found' });
+        return;
+      }
+    }
+
+    const targetCrew = await Crew.findById(targetCrewId).session(session);
+    if (!targetCrew) {
+      await session.abortTransaction();
+      session.endSession();
+      res.status(404).json({ error: 'Target crew not found' });
+      return;
+    }
+
+    const targetCrewObjectId = new mongoose.Types.ObjectId(targetCrewId);
+    const userCrewObjectId = new mongoose.Types.ObjectId(crewId);
+
+    crew.allianceWithCrewIds = (crew.allianceWithCrewIds || []).filter(
+      (id: any) => id.toString() !== targetCrewId
+    );
+    await crew.save({ session });
+
+    targetCrew.allianceWithCrewIds = (targetCrew.allianceWithCrewIds || []).filter(
+      (id: any) => id.toString() !== crewId.toString()
+    );
+    await targetCrew.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.json({
+      success: true,
+      message: 'Alliance terminated successfully'
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Error terminating alliance:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
