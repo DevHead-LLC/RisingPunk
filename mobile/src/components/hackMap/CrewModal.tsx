@@ -14,6 +14,7 @@ import { GiftAllMembersModal } from './GiftAllMembersModal';
 import { ChooseSuccessorModal } from './ChooseSuccessorModal';
 import { ResignModal } from './ResignModal';
 import { WarManagementModal } from './WarManagementModal';
+import { AllianceManagementModal } from './AllianceManagementModal';
 import { EditableCrewRules } from './EditableCrewRules';
 import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, useUpdateCrewLanguageMutation, useUpdateInternalMessageMutation, useUpdateExternalMessageMutation, useGiftAllMembersMutation, usePromoteMemberMutation, useDemoteExecutiveMutation, useChooseSuccessorMutation, useResignMutation, useGetWarStatusQuery } from '../../store/api/authApi';
 
@@ -70,6 +71,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [showChooseSuccessorModal, setShowChooseSuccessorModal] = useState(false);
   const [showResignModal, setShowResignModal] = useState(false);
   const [showWarManagementModal, setShowWarManagementModal] = useState(false);
+  const [showAllianceManagementModal, setShowAllianceManagementModal] = useState(false);
   const [viewingProfileUserId, setViewingProfileUserId] = useState<string | null>(null);
   const [promotingUserId, setPromotingUserId] = useState<string | null>(null);
   const [demotingUserId, setDemotingUserId] = useState<string | null>(null);
@@ -198,6 +200,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     setShowChooseSuccessorModal(false);
     setShowResignModal(false);
     setShowWarManagementModal(false);
+    setShowAllianceManagementModal(false);
     setViewingProfileUserId(null);
     setPromotingUserId(null);
     setDemotingUserId(null);
@@ -466,6 +469,10 @@ export const CrewModal: React.FC<CrewModalProps> = ({
 
   const handleWarManagementPress = useCallback(() => {
     setShowWarManagementModal(true);
+  }, []);
+
+  const handleAllianceManagementPress = useCallback(() => {
+    setShowAllianceManagementModal(true);
   }, []);
 
   const handlePromoteMember = useCallback(async (memberUserId: string) => {
@@ -1540,9 +1547,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       'Change Language',
       'Gift All Members',
       'War Management',
-      'Request Alliance',
-      'Accept Alliance',
-      'Terminate Alliance',
+      'Alliance Management',
       'Choose Successor',
       'Resign',
       'Disband Crew',
@@ -1557,8 +1562,9 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         <View style={styles.settingsButtonGrid}>
           {settingsButtons.map((buttonText, index) => {
             const isLeftButton = index % 2 === 0;
-            const isLastThree = index >= 8;
-            const isDisbandCrew = index === 10;
+            // Last three buttons are: 'Choose Successor' (6), 'Resign' (7), 'Disband Crew' (8)
+            const isLastThree = index >= 6;
+            const isDisbandCrew = index === 8;
             return (
               <TouchableOpacity
                 key={index}
@@ -1579,6 +1585,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                     handleGiftAllMembersPress();
                   } else if (buttonText === 'War Management') {
                     handleWarManagementPress();
+                  } else if (buttonText === 'Alliance Management') {
+                    handleAllianceManagementPress();
                   } else if (buttonText === 'Choose Successor') {
                     handleChooseSuccessorPress();
                   } else if (buttonText === 'Resign') {
@@ -1748,6 +1756,14 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         <WarManagementModal
           visible={showWarManagementModal}
           onClose={() => setShowWarManagementModal(false)}
+          crewId={crewStatus.crewId}
+        />
+      )}
+
+      {crewStatus?.crewId && (
+        <AllianceManagementModal
+          visible={showAllianceManagementModal}
+          onClose={() => setShowAllianceManagementModal(false)}
           crewId={crewStatus.crewId}
         />
       )}
