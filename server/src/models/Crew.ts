@@ -19,6 +19,9 @@ export interface ICrew extends Document {
   externalMessage: string;
   warWithCrewId: mongoose.Types.ObjectId | null;
   warDeclaredAt: Date | null;
+  allianceWithCrewIds: mongoose.Types.ObjectId[];
+  allianceRequestedToCrewIds: mongoose.Types.ObjectId[];
+  allianceRequestedFromCrewIds: mongoose.Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -95,6 +98,24 @@ const crewSchema = new Schema({
     type: Date,
     required: false,
     default: null
+  },
+  allianceWithCrewIds: {
+    type: [mongoose.Schema.Types.ObjectId],
+    ref: 'Crew',
+    required: false,
+    default: []
+  },
+  allianceRequestedToCrewIds: {
+    type: [mongoose.Schema.Types.ObjectId],
+    ref: 'Crew',
+    required: false,
+    default: []
+  },
+  allianceRequestedFromCrewIds: {
+    type: [mongoose.Schema.Types.ObjectId],
+    ref: 'Crew',
+    required: false,
+    default: []
   }
 }, {
   collection: 'crews',
@@ -106,6 +127,7 @@ crewSchema.index({ crewIdentifier: 1 }, { unique: true });
 crewSchema.index({ presidentId: 1 });
 crewSchema.index({ members: 1 });
 crewSchema.index({ warWithCrewId: 1 });
+crewSchema.index({ allianceWithCrewIds: 1 });
 
 export const Crew = mongoose.model<ICrew>('Crew', crewSchema);
 

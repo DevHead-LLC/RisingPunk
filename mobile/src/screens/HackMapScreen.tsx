@@ -15,7 +15,7 @@ import { setGrid, setLoading } from '../store/slices/mapSlice';
 import { useFetchMapQuery } from '../store/api/mapApi';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
-import { useGetCrewStatusQuery, useGetUserCrewStatusQuery, useGetCrewDetailsQuery, useGetWarStatusQuery } from '../store/api/authApi';
+import { useGetCrewStatusQuery, useGetUserCrewStatusQuery, useGetCrewDetailsQuery, useGetWarStatusQuery, useGetAllianceStatusQuery } from '../store/api/authApi';
 import { API_URL } from '../config';
 import { computePanBounds } from '../utils/mapPanBounds';
 import { CellData, TerrainType, EntityType } from '../types/map';
@@ -86,7 +86,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
   };
 
-  const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember }) => {
+  const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember }) => {
     const houseBgStyle = cell.entity === 'house'
       ? (cell.owner === 'player'
           ? (cell.name === currentUserHandle ? styles.userHouseBg : styles.otherUserHouseBg)
@@ -103,8 +103,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           styles.cell,
           xStyle,
           selected && styles.selectedCell,
-          isCrewMember && styles.crewMemberCell,
+          // War takes precedence over alliance (war is more critical to display)
           isWarCrewMember && styles.warCrewMemberCell,
+          !isWarCrewMember && isAllianceCrewMember && styles.allianceCrewMemberCell,
+          !isWarCrewMember && !isAllianceCrewMember && isCrewMember && styles.crewMemberCell,
         ]}
         onPress={() => onPress(x, y, cell)}
       >
@@ -168,16 +170,17 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       prevProps.isShieldActive === nextProps.isShieldActive &&
       prevProps.isCrewMember === nextProps.isCrewMember &&
       prevProps.isWarCrewMember === nextProps.isWarCrewMember &&
+      prevProps.isAllianceCrewMember === nextProps.isAllianceCrewMember &&
       // Only check dynamicEntityData for this specific tile
       prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
       nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
     );
   });
 
-  const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember }) => {
+  const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember }) => {
     return (
       <View style={[yStyle]}>
-        <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} isCrewMember={isCrewMember} isWarCrewMember={isWarCrewMember} />
+        <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} isCrewMember={isCrewMember} isWarCrewMember={isWarCrewMember} isAllianceCrewMember={isAllianceCrewMember} />
       </View>
     );
   }, (prevProps, nextProps) => {
@@ -191,6 +194,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       prevProps.isShieldActive === nextProps.isShieldActive &&
       prevProps.isCrewMember === nextProps.isCrewMember &&
       prevProps.isWarCrewMember === nextProps.isWarCrewMember &&
+      prevProps.isAllianceCrewMember === nextProps.isAllianceCrewMember &&
       // Only check dynamicEntityData for this specific tile
       prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
       nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
@@ -560,6 +564,12 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     refetchOnMountOrArgChange: true,
   });
 
+  const { data: allianceStatusData, refetch: refetchAllianceStatus } = useGetAllianceStatusQuery(undefined, {
+    skip: !crewStatus?.isInCrew,
+    pollingInterval: 3000,
+    refetchOnMountOrArgChange: true,
+  });
+
   const warsWeDeclared = warStatusData?.warsWeDeclared || [];
   const warsDeclaredOnUs = warStatusData?.warsDeclaredOnUs || [];
   const primaryWarCrewId = warsWeDeclared[0]?.enemyCrewId || warsDeclaredOnUs[0]?.enemyCrewId || null;
@@ -593,6 +603,78 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     });
     return memberIds;
   }, [primaryWarCrewId, primaryWarCrewDetails]);
+
+  const alliances = allianceStatusData?.alliances || [];
+  // Memoize allianceCrewIds to prevent unnecessary recalculations in dependent useMemos
+  // Create a stable dependency key from alliance IDs
+  const allianceCrewIdsKey = useMemo(() => {
+    return (alliances || []).map(a => a.alliedCrewId).join(',');
+  }, [alliances]);
+  const allianceCrewIds = useMemo(() => {
+    return (alliances || []).map(a => a.alliedCrewId).slice(0, 10);
+  }, [allianceCrewIdsKey]);
+  
+  const allianceCrewDetails1 = useGetCrewDetailsQuery(allianceCrewIds[0] || '', { skip: !allianceCrewIds[0] });
+  const allianceCrewDetails2 = useGetCrewDetailsQuery(allianceCrewIds[1] || '', { skip: !allianceCrewIds[1] });
+  const allianceCrewDetails3 = useGetCrewDetailsQuery(allianceCrewIds[2] || '', { skip: !allianceCrewIds[2] });
+  const allianceCrewDetails4 = useGetCrewDetailsQuery(allianceCrewIds[3] || '', { skip: !allianceCrewIds[3] });
+  const allianceCrewDetails5 = useGetCrewDetailsQuery(allianceCrewIds[4] || '', { skip: !allianceCrewIds[4] });
+  const allianceCrewDetails6 = useGetCrewDetailsQuery(allianceCrewIds[5] || '', { skip: !allianceCrewIds[5] });
+  const allianceCrewDetails7 = useGetCrewDetailsQuery(allianceCrewIds[6] || '', { skip: !allianceCrewIds[6] });
+  const allianceCrewDetails8 = useGetCrewDetailsQuery(allianceCrewIds[7] || '', { skip: !allianceCrewIds[7] });
+  const allianceCrewDetails9 = useGetCrewDetailsQuery(allianceCrewIds[8] || '', { skip: !allianceCrewIds[8] });
+  const allianceCrewDetails10 = useGetCrewDetailsQuery(allianceCrewIds[9] || '', { skip: !allianceCrewIds[9] });
+
+  // Memoize the array to prevent unnecessary recalculations
+  const allianceCrewDetailsArray = useMemo(() => [
+    allianceCrewDetails1.data,
+    allianceCrewDetails2.data,
+    allianceCrewDetails3.data,
+    allianceCrewDetails4.data,
+    allianceCrewDetails5.data,
+    allianceCrewDetails6.data,
+    allianceCrewDetails7.data,
+    allianceCrewDetails8.data,
+    allianceCrewDetails9.data,
+    allianceCrewDetails10.data,
+  ], [
+    allianceCrewDetails1.data,
+    allianceCrewDetails2.data,
+    allianceCrewDetails3.data,
+    allianceCrewDetails4.data,
+    allianceCrewDetails5.data,
+    allianceCrewDetails6.data,
+    allianceCrewDetails7.data,
+    allianceCrewDetails8.data,
+    allianceCrewDetails9.data,
+    allianceCrewDetails10.data,
+  ]);
+
+  const allianceCrewMemberUserIds = useMemo(() => {
+    if (!allianceCrewIds || allianceCrewIds.length === 0) {
+      return new Set<string>();
+    }
+    const allMemberIds = new Set<string>();
+    allianceCrewDetailsArray.forEach((allianceCrewDetails, index) => {
+      const alliedCrewId = allianceCrewIds[index];
+      if (allianceCrewDetails?.crew && allianceCrewDetails.crew.id === alliedCrewId) {
+        if (allianceCrewDetails.crew.president?.userId) {
+          allMemberIds.add(String(allianceCrewDetails.crew.president.userId));
+        }
+        (allianceCrewDetails.crew.executives || []).forEach((exec: any) => {
+          if (exec.userId) {
+            allMemberIds.add(String(exec.userId));
+          }
+        });
+        (allianceCrewDetails.crew.members || []).forEach((member: any) => {
+          if (member.userId) {
+            allMemberIds.add(String(member.userId));
+          }
+        });
+      }
+    });
+    return allMemberIds;
+  }, [allianceCrewIds, allianceCrewDetailsArray]);
   
   const crewMemberUserIds = useMemo(() => {
     if (!crewDetails?.crew) return new Set<string>();
@@ -1554,8 +1636,13 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                                    cell.userId && 
                                    crewMemberUserIds.has(String(cell.userId));
               const isWarCrewMember = cell.owner === 'player' && 
-                                      cell.userId && 
-                                      warCrewMemberUserIds.has(String(cell.userId));
+                                     cell.userId && 
+                                     warCrewMemberUserIds.has(String(cell.userId));
+              // Only show yellow border for allies, not our own crew members
+              const isAllianceCrewMember = cell.owner === 'player' && 
+                                           cell.userId && 
+                                           !isCrewMember && // Exclude our own crew members
+                                           allianceCrewMemberUserIds.has(String(cell.userId));
               return (
                 <PoolTile
                   key={`${x}-${y}`}
@@ -1575,6 +1662,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                   isShieldActive={isShieldActive}
                   isCrewMember={isCrewMember}
                   isWarCrewMember={isWarCrewMember}
+                  isAllianceCrewMember={isAllianceCrewMember}
                 />
               );
             })}
@@ -1601,6 +1689,7 @@ type TileProps = {
   isShieldActive: boolean;
   isCrewMember?: boolean;
   isWarCrewMember?: boolean;
+  isAllianceCrewMember?: boolean;
 };
 
 type PoolTileProps = {
@@ -1620,6 +1709,7 @@ type PoolTileProps = {
   isShieldActive: boolean;
   isCrewMember?: boolean;
   isWarCrewMember?: boolean;
+  isAllianceCrewMember?: boolean;
 };const getStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light' | 'dark') => StyleSheet.create({
   container: {
     flex: 1,
@@ -1655,6 +1745,10 @@ type PoolTileProps = {
   warCrewMemberCell: {
     borderWidth: 3,
     borderColor: 'red',
+  },
+  allianceCrewMemberCell: {
+    borderWidth: 3,
+    borderColor: '#FFD700',
   },
   cellContent: {
     width: '100%',
