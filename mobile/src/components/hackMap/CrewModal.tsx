@@ -1562,8 +1562,9 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         <View style={styles.settingsButtonGrid}>
           {settingsButtons.map((buttonText, index) => {
             const isLeftButton = index % 2 === 0;
-            const isLastThree = index >= 8;
-            const isDisbandCrew = index === 10;
+            // Last three buttons are: 'Choose Successor' (6), 'Resign' (7), 'Disband Crew' (8)
+            const isLastThree = index >= 6;
+            const isDisbandCrew = index === 8;
             return (
               <TouchableOpacity
                 key={index}
