@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import { View, Text, StyleSheet, LayoutChangeEvent, Pressable, Image, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, LayoutChangeEvent, Pressable, Image, Dimensions, TouchableOpacity, ScrollView } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withDecay, runOnJS, useAnimatedReaction } from 'react-native-reanimated';
 import { CloseButton } from '../components/common/CloseButton';
@@ -8,17 +8,20 @@ import { CollapsibleToolbar } from '../components/hackMap/CollapsibleToolbar';
 import { AntivirusModal } from '../components/hackMap/AntivirusModal';
 import { CrewOnboardingModal } from '../components/hackMap/CrewOnboardingModal';
 import { CrewModal } from '../components/hackMap/CrewModal';
+import { VisitingProfileModal } from '../components/hackMap/VisitingProfileModal';
+import { VisitCrewModal } from '../components/hackMap/VisitCrewModal';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { setGrid, setLoading } from '../store/slices/mapSlice';
 import { useFetchMapQuery } from '../store/api/mapApi';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
-import { useGetCrewStatusQuery } from '../store/api/authApi';
+import { useGetCrewStatusQuery, useGetUserCrewStatusQuery, useGetCrewDetailsQuery, useGetWarStatusQuery, useGetAllianceStatusQuery } from '../store/api/authApi';
 import { API_URL } from '../config';
 import { computePanBounds } from '../utils/mapPanBounds';
 import { CellData, TerrainType, EntityType } from '../types/map';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useTheme } from '../context/ThemeContext';
+import { SIZING } from '../styles/theme';
 
 const CELL_SIZE = 55;
 const MARGIN_SIZE = 80;
@@ -83,7 +86,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
   };
 
-  const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive }) => {
+  const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember }) => {
     const houseBgStyle = cell.entity === 'house'
       ? (cell.owner === 'player'
           ? (cell.name === currentUserHandle ? styles.userHouseBg : styles.otherUserHouseBg)
@@ -100,6 +103,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           styles.cell,
           xStyle,
           selected && styles.selectedCell,
+          // War takes precedence over alliance (war is more critical to display)
+          isWarCrewMember && styles.warCrewMemberCell,
+          !isWarCrewMember && isAllianceCrewMember && styles.allianceCrewMemberCell,
+          !isWarCrewMember && !isAllianceCrewMember && isCrewMember && styles.crewMemberCell,
         ]}
         onPress={() => onPress(x, y, cell)}
       >
@@ -161,16 +168,19 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       prevProps.cell === nextProps.cell &&
       prevProps.currentUserHandle === nextProps.currentUserHandle &&
       prevProps.isShieldActive === nextProps.isShieldActive &&
+      prevProps.isCrewMember === nextProps.isCrewMember &&
+      prevProps.isWarCrewMember === nextProps.isWarCrewMember &&
+      prevProps.isAllianceCrewMember === nextProps.isAllianceCrewMember &&
       // Only check dynamicEntityData for this specific tile
       prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
       nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
     );
   });
 
-  const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive }) => {
+  const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember }) => {
     return (
       <View style={[yStyle]}>
-        <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} />
+        <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} isCrewMember={isCrewMember} isWarCrewMember={isWarCrewMember} isAllianceCrewMember={isAllianceCrewMember} />
       </View>
     );
   }, (prevProps, nextProps) => {
@@ -182,6 +192,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       prevProps.cell === nextProps.cell &&
       prevProps.currentUserHandle === nextProps.currentUserHandle &&
       prevProps.isShieldActive === nextProps.isShieldActive &&
+      prevProps.isCrewMember === nextProps.isCrewMember &&
+      prevProps.isWarCrewMember === nextProps.isWarCrewMember &&
+      prevProps.isAllianceCrewMember === nextProps.isAllianceCrewMember &&
       // Only check dynamicEntityData for this specific tile
       prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
       nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
@@ -239,6 +252,14 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [showAntivirusModal, setShowAntivirusModal] = useState(false);
   const [showCrewModal, setShowCrewModal] = useState(false);
   const [showCrewOnboardingModal, setShowCrewOnboardingModal] = useState(false);
+  const [showVisitingProfileModal, setShowVisitingProfileModal] = useState(false);
+  const [visitingProfileUserId, setVisitingProfileUserId] = useState<string | null>(null);
+  const visitingProfileCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const visitCrewCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [showVisitCrewModal, setShowVisitCrewModal] = useState(false);
+  const [visitCrewId, setVisitCrewId] = useState<string | null>(null);
+  const [visitCrewName, setVisitCrewName] = useState<string | null>(null);
+  const [showCrewModalFromUser, setShowCrewModalFromUser] = useState(false);
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
   const startX = useSharedValue(0);
@@ -532,7 +553,217 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   // Get research features data (same as ResearchFeaturesList)
   const { data: researchFeatures } = useGetUserFeaturesQuery('home-defense');
   const { data: hackCrewFeatures } = useGetUserFeaturesQuery('hack-crew');
-  const { data: crewStatus } = useGetCrewStatusQuery();
+  const { data: crewStatus, isLoading: isLoadingCrewStatus } = useGetCrewStatusQuery();
+  
+  const { data: crewDetails, isLoading: isLoadingCrewDetails } = useGetCrewDetailsQuery(crewStatus?.crewId || '', {
+    skip: !crewStatus?.crewId || !crewStatus?.isInCrew,
+  });
+
+  const { data: warStatusData, refetch: refetchWarStatus } = useGetWarStatusQuery(undefined, {
+    skip: !crewStatus?.isInCrew,
+    pollingInterval: 3000,
+    refetchOnMountOrArgChange: true,
+  });
+
+  const { data: allianceStatusData, refetch: refetchAllianceStatus } = useGetAllianceStatusQuery(undefined, {
+    skip: !crewStatus?.isInCrew,
+    pollingInterval: 3000,
+    refetchOnMountOrArgChange: true,
+  });
+
+  const warsWeDeclared = warStatusData?.warsWeDeclared || [];
+  const warsDeclaredOnUs = warStatusData?.warsDeclaredOnUs || [];
+  const primaryWarCrewId = warsWeDeclared[0]?.enemyCrewId || warsDeclaredOnUs[0]?.enemyCrewId || null;
+
+  const { data: primaryWarCrewDetails } = useGetCrewDetailsQuery(primaryWarCrewId || '', {
+    skip: !primaryWarCrewId,
+  });
+
+  const warCrewMemberUserIds = useMemo(() => {
+    // Return empty set if no war crew ID
+    if (!primaryWarCrewId) {
+      return new Set<string>();
+    }
+    // Only use crew details if they match the current war crew ID
+    if (!primaryWarCrewDetails?.crew || primaryWarCrewDetails.crew.id !== primaryWarCrewId) {
+      return new Set<string>();
+    }
+    const memberIds = new Set<string>();
+    if (primaryWarCrewDetails.crew.president?.userId) {
+      memberIds.add(String(primaryWarCrewDetails.crew.president.userId));
+    }
+    (primaryWarCrewDetails.crew.executives || []).forEach((exec: any) => {
+      if (exec.userId) {
+        memberIds.add(String(exec.userId));
+      }
+    });
+    (primaryWarCrewDetails.crew.members || []).forEach((member: any) => {
+      if (member.userId) {
+        memberIds.add(String(member.userId));
+      }
+    });
+    return memberIds;
+  }, [primaryWarCrewId, primaryWarCrewDetails]);
+
+  const alliances = allianceStatusData?.alliances || [];
+  // Memoize allianceCrewIds to prevent unnecessary recalculations in dependent useMemos
+  // Create a stable dependency key from alliance IDs
+  const allianceCrewIdsKey = useMemo(() => {
+    return (alliances || []).map(a => a.alliedCrewId).join(',');
+  }, [alliances]);
+  const allianceCrewIds = useMemo(() => {
+    return (alliances || []).map(a => a.alliedCrewId).slice(0, 10);
+  }, [allianceCrewIdsKey]);
+  
+  const allianceCrewDetails1 = useGetCrewDetailsQuery(allianceCrewIds[0] || '', { skip: !allianceCrewIds[0] });
+  const allianceCrewDetails2 = useGetCrewDetailsQuery(allianceCrewIds[1] || '', { skip: !allianceCrewIds[1] });
+  const allianceCrewDetails3 = useGetCrewDetailsQuery(allianceCrewIds[2] || '', { skip: !allianceCrewIds[2] });
+  const allianceCrewDetails4 = useGetCrewDetailsQuery(allianceCrewIds[3] || '', { skip: !allianceCrewIds[3] });
+  const allianceCrewDetails5 = useGetCrewDetailsQuery(allianceCrewIds[4] || '', { skip: !allianceCrewIds[4] });
+  const allianceCrewDetails6 = useGetCrewDetailsQuery(allianceCrewIds[5] || '', { skip: !allianceCrewIds[5] });
+  const allianceCrewDetails7 = useGetCrewDetailsQuery(allianceCrewIds[6] || '', { skip: !allianceCrewIds[6] });
+  const allianceCrewDetails8 = useGetCrewDetailsQuery(allianceCrewIds[7] || '', { skip: !allianceCrewIds[7] });
+  const allianceCrewDetails9 = useGetCrewDetailsQuery(allianceCrewIds[8] || '', { skip: !allianceCrewIds[8] });
+  const allianceCrewDetails10 = useGetCrewDetailsQuery(allianceCrewIds[9] || '', { skip: !allianceCrewIds[9] });
+
+  // Memoize the array to prevent unnecessary recalculations
+  const allianceCrewDetailsArray = useMemo(() => [
+    allianceCrewDetails1.data,
+    allianceCrewDetails2.data,
+    allianceCrewDetails3.data,
+    allianceCrewDetails4.data,
+    allianceCrewDetails5.data,
+    allianceCrewDetails6.data,
+    allianceCrewDetails7.data,
+    allianceCrewDetails8.data,
+    allianceCrewDetails9.data,
+    allianceCrewDetails10.data,
+  ], [
+    allianceCrewDetails1.data,
+    allianceCrewDetails2.data,
+    allianceCrewDetails3.data,
+    allianceCrewDetails4.data,
+    allianceCrewDetails5.data,
+    allianceCrewDetails6.data,
+    allianceCrewDetails7.data,
+    allianceCrewDetails8.data,
+    allianceCrewDetails9.data,
+    allianceCrewDetails10.data,
+  ]);
+
+  const allianceCrewMemberUserIds = useMemo(() => {
+    if (!allianceCrewIds || allianceCrewIds.length === 0) {
+      return new Set<string>();
+    }
+    const allMemberIds = new Set<string>();
+    allianceCrewDetailsArray.forEach((allianceCrewDetails, index) => {
+      const alliedCrewId = allianceCrewIds[index];
+      if (allianceCrewDetails?.crew && allianceCrewDetails.crew.id === alliedCrewId) {
+        if (allianceCrewDetails.crew.president?.userId) {
+          allMemberIds.add(String(allianceCrewDetails.crew.president.userId));
+        }
+        (allianceCrewDetails.crew.executives || []).forEach((exec: any) => {
+          if (exec.userId) {
+            allMemberIds.add(String(exec.userId));
+          }
+        });
+        (allianceCrewDetails.crew.members || []).forEach((member: any) => {
+          if (member.userId) {
+            allMemberIds.add(String(member.userId));
+          }
+        });
+      }
+    });
+    return allMemberIds;
+  }, [allianceCrewIds, allianceCrewDetailsArray]);
+  
+  const crewMemberUserIds = useMemo(() => {
+    if (!crewDetails?.crew) return new Set<string>();
+    const memberIds = new Set<string>();
+    if (crewDetails.crew.president?.userId) {
+      memberIds.add(String(crewDetails.crew.president.userId));
+    }
+    (crewDetails.crew.executives || []).forEach((exec: any) => {
+      if (exec.userId) {
+        memberIds.add(String(exec.userId));
+      }
+    });
+    (crewDetails.crew.members || []).forEach((member: any) => {
+      if (member.userId) {
+        memberIds.add(String(member.userId));
+      }
+    });
+    return memberIds;
+  }, [crewDetails]);
+  
+  const selectedUserId = selectedCell?.info.owner === 'player' && 
+    selectedCell.info.userId && 
+    selectedCell.info.name !== currentUserHandle 
+    ? selectedCell.info.userId 
+    : null;
+  
+  const { data: selectedUserCrewStatus, isLoading: isLoadingSelectedUserCrewStatus } = useGetUserCrewStatusQuery(selectedUserId ?? '', {
+    skip: !selectedUserId,
+  });
+  
+  const isSameCrewMember = useMemo(() => {
+    if (!crewStatus?.isInCrew) return false;
+    if (!selectedCell?.info.userId) return false;
+    
+    const selectedUserIdString = String(selectedCell.info.userId);
+    
+    if (crewMemberUserIds.has(selectedUserIdString)) {
+      return true;
+    }
+    
+    if (selectedUserCrewStatus?.isInCrew && crewStatus?.crewId && selectedUserCrewStatus?.crewId) {
+      return String(crewStatus.crewId) === String(selectedUserCrewStatus.crewId);
+    }
+    
+    return false;
+  }, [crewStatus, selectedUserCrewStatus, selectedCell, crewMemberUserIds]);
+  
+  const shouldShowHackButton = useMemo(() => {
+    if (selectedCell?.info.owner !== 'player' || !selectedCell.info.userId || selectedCell.info.name === currentUserHandle) {
+      return false;
+    }
+    
+    if (isLoadingCrewStatus) {
+      return false;
+    }
+    
+    if (crewStatus?.isInCrew) {
+      if (isLoadingCrewDetails) {
+        return false;
+      }
+      
+      const selectedUserIdString = String(selectedCell.info.userId);
+      
+      if (crewMemberUserIds.size > 0) {
+        if (crewMemberUserIds.has(selectedUserIdString)) {
+          return false;
+        }
+      }
+      
+      if (isLoadingSelectedUserCrewStatus) {
+        return false;
+      }
+      
+      if (isSameCrewMember) {
+        return false;
+      }
+      
+      if (crewMemberUserIds.size === 0 && selectedUserCrewStatus === undefined) {
+        return false;
+      }
+      
+      if (selectedUserCrewStatus && selectedUserCrewStatus.isInCrew === false) {
+        return true;
+      }
+    }
+    
+    return true;
+  }, [selectedCell, currentUserHandle, crewStatus, isLoadingCrewStatus, isLoadingCrewDetails, isLoadingSelectedUserCrewStatus, crewMemberUserIds, isSameCrewMember, selectedUserCrewStatus]);
   
   // Find the antivirus feature from the research features
   const antivirusFeature = researchFeatures?.find(f => f.id === 'antivirus');
@@ -1093,104 +1324,248 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
   const handleCrewClose = useCallback(() => {
     setShowCrewModal(false);
-  }, []);
+    if (showCrewModalFromUser) {
+      setShowCrewModalFromUser(false);
+    }
+  }, [showCrewModalFromUser]);
 
   const handleCrewOnboardingClose = useCallback(() => {
     setShowCrewOnboardingModal(false);
+  }, []);
+
+  const handleVisitingProfileClose = useCallback(() => {
+    setShowVisitingProfileModal(false);
+    if (visitingProfileCloseTimeoutRef.current) {
+      clearTimeout(visitingProfileCloseTimeoutRef.current);
+    }
+    visitingProfileCloseTimeoutRef.current = setTimeout(() => {
+      setVisitingProfileUserId(null);
+      visitingProfileCloseTimeoutRef.current = null;
+    }, 300);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (visitingProfileCloseTimeoutRef.current) {
+        clearTimeout(visitingProfileCloseTimeoutRef.current);
+        visitingProfileCloseTimeoutRef.current = null;
+      }
+      if (visitCrewCloseTimeoutRef.current) {
+        clearTimeout(visitCrewCloseTimeoutRef.current);
+        visitCrewCloseTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleViewCrewPress = useCallback(() => {
+    if (!selectedUserCrewStatus?.isInCrew || !selectedUserCrewStatus.crewId) {
+      return;
+    }
+
+    if (visitCrewCloseTimeoutRef.current) {
+      clearTimeout(visitCrewCloseTimeoutRef.current);
+      visitCrewCloseTimeoutRef.current = null;
+    }
+
+    const selectedUserCrewId = selectedUserCrewStatus.crewId;
+    const currentUserCrewId = crewStatus?.crewId;
+
+    if (currentUserCrewId && selectedUserCrewId === currentUserCrewId) {
+      setShowCrewModalFromUser(true);
+      setShowCrewModal(true);
+    } else {
+      setVisitCrewId(selectedUserCrewStatus.crewId);
+      setVisitCrewName(null);
+      setShowVisitCrewModal(true);
+    }
+  }, [selectedUserCrewStatus, crewStatus]);
+
+  const handleVisitCrewClose = useCallback(() => {
+    setShowVisitCrewModal(false);
+    if (visitCrewCloseTimeoutRef.current) {
+      clearTimeout(visitCrewCloseTimeoutRef.current);
+    }
+    visitCrewCloseTimeoutRef.current = setTimeout(() => {
+      setVisitCrewId(null);
+      setVisitCrewName(null);
+      visitCrewCloseTimeoutRef.current = null;
+    }, 300);
   }, []);
 
   const renderInfoPanel = useCallback(() => {
     if (!selectedCell) {return null;}
 
     return (
-      <View style={styles.infoPanel}>
-        <Pressable
-          style={styles.infoPanelClose}
-          onPress={() => setSelectedCell(null)}
+      <TouchableOpacity
+        style={styles.infoPanelOverlay}
+        activeOpacity={1}
+        onPress={() => setSelectedCell(null)}
+      >
+        <TouchableOpacity
+          style={[styles.infoPanel, { backgroundColor: colors.background, borderColor: colors.matrix }]}
+          activeOpacity={1}
+          onPress={(e) => e.stopPropagation()}
         >
-          <Text style={styles.closeSymbol}>×</Text>
-        </Pressable>
-        <Text style={styles.coordsText}>
-          GRID: ({selectedCell.x}, {selectedCell.y})
-        </Text>
-        <Text style={styles.terrainText}>
-          TERRAIN: {selectedCell.info.terrain.toUpperCase()}
-        </Text>
-        {selectedCell.info.entity !== 'empty' && (
-          <>
-            <Text style={styles.entityText}>
-              ENTITY: {selectedCell.info.name || 'UNKNOWN'}
+          <ScrollView
+            style={styles.infoPanelScrollView}
+            contentContainerStyle={styles.infoPanelContent}
+            showsVerticalScrollIndicator={true}
+          >
+            <Text style={[styles.infoPanelTitle, { color: colors.secondary }]}>
+              Cell Information
             </Text>
-            {selectedCell.info.owner !== 'player' && selectedCell.info.npcLevel && (
-              <Text style={styles.npcLevelModalText}>
-                LEVEL: {selectedCell.info.npcLevel}
+            
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: colors.text.secondary }]}>Grid:</Text>
+              <Text style={[styles.infoValue, { color: colors.text.primary }]}>
+                ({selectedCell.x}, {selectedCell.y})
               </Text>
-            )}
-            <Text style={[
-              styles.statusText,
-              selectedCell.info.owner === 'player' && selectedCell.info.name !== currentUserHandle ? styles.hostileText : 
-              selectedCell.info.owner === 'player' ? styles.friendlyText : styles.hostileText,
-            ]}>
-              STATUS: {selectedCell.info.owner === 'player' && selectedCell.info.name !== currentUserHandle ? 'HOSTILE' : 
-              selectedCell.info.owner === 'player' ? 'FRIENDLY' : 'HOSTILE'}
-            </Text>
-            {selectedCell.info.owner === 'player' && selectedCell.info.isShielded && (
-              <Text style={[styles.statusText, styles.shieldedText]}>
-                SHIELD: ACTIVE
+            </View>
+            
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: colors.text.secondary }]}>Terrain:</Text>
+              <Text style={[styles.infoValue, { color: colors.text.primary }]}>
+                {selectedCell.info.terrain.toUpperCase()}
               </Text>
+            </View>
+            
+            {selectedCell.info.entity !== 'empty' && (
+              <>
+                <View style={styles.infoRow}>
+                  <Text style={[styles.infoLabel, { color: colors.text.secondary }]}>Entity:</Text>
+                  <Text style={[styles.infoValue, { color: colors.matrix }]}>
+                    {selectedCell.info.name || 'UNKNOWN'}
+                  </Text>
+                </View>
+                
+                {selectedCell.info.owner !== 'player' && selectedCell.info.npcLevel && (
+                  <View style={styles.infoRow}>
+                    <Text style={[styles.infoLabel, { color: colors.text.secondary }]}>Level:</Text>
+                    <Text style={[styles.infoValue, { color: colors.text.primary }]}>
+                      {selectedCell.info.npcLevel}
+                    </Text>
+                  </View>
+                )}
+                
+                <View style={styles.infoRow}>
+                  <Text style={[styles.infoLabel, { color: colors.text.secondary }]}>Status:</Text>
+                  <Text style={[
+                    styles.infoValue,
+                    { color: selectedCell.info.owner === 'player' && selectedCell.info.name !== currentUserHandle ? colors.error : 
+                      selectedCell.info.owner === 'player' ? colors.success : colors.error }
+                  ]}>
+                    {selectedCell.info.owner === 'player' && selectedCell.info.name !== currentUserHandle ? 'HOSTILE' : 
+                    selectedCell.info.owner === 'player' ? 'FRIENDLY' : 'HOSTILE'}
+                  </Text>
+                </View>
+                
+                {selectedCell.info.owner === 'player' && selectedCell.info.isShielded && (
+                  <View style={styles.infoRow}>
+                    <Text style={[styles.infoLabel, { color: colors.text.secondary }]}>Shield:</Text>
+                    <Text style={[styles.infoValue, { color: colors.success }]}>ACTIVE</Text>
+                  </View>
+                )}
+                
+                <View style={styles.buttonContainer}>
+                  {selectedCell.info.owner !== 'player' && selectedCell.info.npcSlug && (
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: colors.matrix, borderColor: colors.matrix }]}
+                      onPress={() => {
+                        (globalThis as any).pendingNpcSlug = selectedCell.info.npcSlug;
+                        (globalThis as any).pendingNpcInstanceId = selectedCell.info.npcInstanceId;
+                        (globalThis as any).pendingMapPan = {
+                          x: selectedCell.x,
+                          y: selectedCell.y,
+                        };
+                        onClose();
+                      }}
+                    >
+                      <Text style={[styles.actionButtonText, { color: colors.background }]}>
+                        Hack Entity
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  
+                  {shouldShowHackButton && (
+                    <TouchableOpacity
+                      style={[
+                        styles.actionButton,
+                        { 
+                          backgroundColor: selectedCell.info.isShielded ? colors.buttonDisabled : colors.matrix,
+                          borderColor: colors.matrix,
+                          opacity: selectedCell.info.isShielded ? 0.6 : 1
+                        }
+                      ]}
+                      onPress={() => {
+                        if (selectedCell.info.isShielded) {
+                          return;
+                        }
+                        (globalThis as any).pendingDefenderUserId = selectedCell.info.userId;
+                        (globalThis as any).pendingMapPan = {
+                          x: selectedCell.x,
+                          y: selectedCell.y,
+                        };
+                        onClose();
+                      }}
+                      disabled={selectedCell.info.isShielded}
+                    >
+                      <Text style={[
+                        styles.actionButtonText,
+                        { color: selectedCell.info.isShielded ? colors.text.secondary : colors.background }
+                      ]}>
+                        {selectedCell.info.isShielded ? 'Shielded User' : 'Hack User'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  
+                  {selectedCell.info.owner === 'player' && 
+                   selectedCell.info.userId && (
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: colors.matrix, borderColor: colors.matrix }]}
+                      onPress={() => {
+                        if (visitingProfileCloseTimeoutRef.current) {
+                          clearTimeout(visitingProfileCloseTimeoutRef.current);
+                          visitingProfileCloseTimeoutRef.current = null;
+                        }
+                        setVisitingProfileUserId(selectedCell.info.userId);
+                        setShowVisitingProfileModal(true);
+                      }}
+                    >
+                      <Text style={[styles.actionButtonText, { color: colors.background }]}>
+                        View Profile
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  
+                  {selectedCell.info.owner === 'player' && 
+                   selectedCell.info.userId && 
+                   selectedCell.info.name !== currentUserHandle &&
+                   selectedUserCrewStatus?.isInCrew && 
+                   selectedUserCrewStatus.crewId && (
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: colors.matrix, borderColor: colors.matrix }]}
+                      onPress={handleViewCrewPress}
+                    >
+                      <Text style={[styles.actionButtonText, { color: colors.background }]}>
+                        View Crew
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </>
             )}
-              {selectedCell.info.owner !== 'player' && selectedCell.info.npcSlug && (
-              <Pressable
-                style={[styles.hackButton]}
-                onPress={() => {
-                  (globalThis as any).pendingNpcSlug = selectedCell.info.npcSlug;
-                    (globalThis as any).pendingNpcInstanceId = selectedCell.info.npcInstanceId;
-                  // Store the grid coordinates of the selected cell, not the pan coordinates
-                  (globalThis as any).pendingMapPan = {
-                    x: selectedCell.x,
-                    y: selectedCell.y,
-                  };
-                  onClose();
-                }}
-              >
-                <Text style={styles.hackButtonText}>Hack Entity</Text>
-              </Pressable>
-            )}
-            {selectedCell.info.owner === 'player' && 
-             selectedCell.info.userId && 
-             selectedCell.info.name !== currentUserHandle && (
-              <Pressable
-                style={[
-                  styles.hackButton,
-                  selectedCell.info.isShielded && styles.hackButtonDisabled
-                ]}
-                onPress={() => {
-                  if (selectedCell.info.isShielded) {
-                    return; // Don't allow hacking shielded users
-                  }
-                  (globalThis as any).pendingDefenderUserId = selectedCell.info.userId;
-                  // Store the grid coordinates of the selected cell, not the pan coordinates
-                  (globalThis as any).pendingMapPan = {
-                    x: selectedCell.x,
-                    y: selectedCell.y,
-                  };
-                  onClose();
-                }}
-                disabled={selectedCell.info.isShielded}
-              >
-                <Text style={[
-                  styles.hackButtonText,
-                  selectedCell.info.isShielded && styles.hackButtonTextDisabled
-                ]}>
-                  {selectedCell.info.isShielded ? 'Shielded User' : 'Hack User'}
-                </Text>
-              </Pressable>
-            )}
-          </>
-        )}
-      </View>
+            
+            <TouchableOpacity
+              style={[styles.closeButton, { borderColor: colors.matrix }]}
+              onPress={() => setSelectedCell(null)}
+            >
+              <Text style={[styles.closeButtonText, { color: colors.secondary }]}>Close</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </TouchableOpacity>
+      </TouchableOpacity>
     );
-  }, [selectedCell, styles]);
+  }, [selectedCell, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton]);
 
   if (loading || !isMapReady || !terrainDataLoaded) {
     return <View style={styles.container}><LoadingSpinner /></View>;
@@ -1226,6 +1601,23 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         visible={showCrewOnboardingModal}
         onClose={handleCrewOnboardingClose}
       />
+
+      {visitingProfileUserId && (
+        <VisitingProfileModal
+          visible={showVisitingProfileModal}
+          onClose={handleVisitingProfileClose}
+          userId={visitingProfileUserId}
+        />
+      )}
+
+      {visitCrewId && (
+        <VisitCrewModal
+          visible={showVisitCrewModal}
+          onClose={handleVisitCrewClose}
+          crewId={visitCrewId}
+          crewName={visitCrewName || undefined}
+        />
+      )}
 
       {renderInfoPanel()}
 
@@ -1278,6 +1670,17 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             {visibleCells.map((assignment, i) => {
               const { x, y, cell } = assignment;
               const selected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
+              const isCrewMember = cell.owner === 'player' && 
+                                   cell.userId && 
+                                   crewMemberUserIds.has(String(cell.userId));
+              const isWarCrewMember = cell.owner === 'player' && 
+                                     cell.userId && 
+                                     warCrewMemberUserIds.has(String(cell.userId));
+              // Only show yellow border for allies, not our own crew members
+              const isAllianceCrewMember = cell.owner === 'player' && 
+                                           cell.userId && 
+                                           !isCrewMember && // Exclude our own crew members
+                                           allianceCrewMemberUserIds.has(String(cell.userId));
               return (
                 <PoolTile
                   key={`${x}-${y}`}
@@ -1295,6 +1698,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                   styles={styles}
                   dynamicEntityData={dynamicEntityData}
                   isShieldActive={isShieldActive}
+                  isCrewMember={isCrewMember}
+                  isWarCrewMember={isWarCrewMember}
+                  isAllianceCrewMember={isAllianceCrewMember}
                 />
               );
             })}
@@ -1319,6 +1725,9 @@ type TileProps = {
   styles: any;
   dynamicEntityData: Record<string, any>;
   isShieldActive: boolean;
+  isCrewMember?: boolean;
+  isWarCrewMember?: boolean;
+  isAllianceCrewMember?: boolean;
 };
 
 type PoolTileProps = {
@@ -1336,6 +1745,9 @@ type PoolTileProps = {
   styles: any;
   dynamicEntityData: Record<string, any>;
   isShieldActive: boolean;
+  isCrewMember?: boolean;
+  isWarCrewMember?: boolean;
+  isAllianceCrewMember?: boolean;
 };const getStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light' | 'dark') => StyleSheet.create({
   container: {
     flex: 1,
@@ -1363,6 +1775,18 @@ type PoolTileProps = {
   selectedCell: {
     backgroundColor: themeMode === 'light' ? 'rgba(0, 100, 0, 0.15)' : 'rgba(0, 255, 65, 0.1)',
     borderColor: themeMode === 'light' ? 'rgba(0, 100, 0, 0.4)' : 'rgba(0, 255, 65, 0.3)',
+  },
+  crewMemberCell: {
+    borderWidth: 3,
+    borderColor: 'white',
+  },
+  warCrewMemberCell: {
+    borderWidth: 3,
+    borderColor: 'red',
+  },
+  allianceCrewMemberCell: {
+    borderWidth: 3,
+    borderColor: '#FFD700',
   },
   cellContent: {
     width: '100%',
@@ -1535,19 +1959,95 @@ type PoolTileProps = {
   enemyEntity: {
     backgroundColor: themeMode === 'light' ? 'rgba(255, 65, 65, 0.15)' : 'rgba(255, 65, 65, 0.1)',
   },
-  infoPanel: {
+  infoPanelOverlay: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -100 }, { translateY: -50 }],
-    backgroundColor: themeMode === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(0, 0, 0, 0.9)',
-    padding: 15,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  infoPanel: {
+    padding: SIZING.spacing.md,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.matrix,
-    zIndex: 2,
-    minWidth: 200,
-    paddingTop: 30,
+    alignItems: 'center',
+    minWidth: 380,
+    maxWidth: 450,
+    maxHeight: '85%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  infoPanelScrollView: {
+    width: '100%',
+  },
+  infoPanelContent: {
+    width: '100%',
+    alignItems: 'center',
+    paddingBottom: SIZING.spacing.xs,
+  },
+  infoPanelTitle: {
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.sm,
+    textAlign: 'center',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: SIZING.spacing.xs,
+    paddingHorizontal: SIZING.spacing.xs,
+  },
+  infoLabel: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
+  },
+  infoValue: {
+    fontSize: SIZING.font.body,
+    fontWeight: '500',
+  },
+  buttonContainer: {
+    width: '100%',
+    marginTop: SIZING.spacing.sm,
+    marginBottom: SIZING.spacing.sm,
+    gap: SIZING.spacing.xs,
+  },
+  actionButton: {
+    paddingHorizontal: SIZING.spacing.md,
+    paddingVertical: SIZING.spacing.sm,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    marginBottom: SIZING.spacing.xs,
+    minWidth: 180,
+  },
+  actionButtonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
+  },
+  closeButton: {
+    paddingHorizontal: SIZING.spacing.md,
+    paddingVertical: SIZING.spacing.xs,
+    borderRadius: 6,
+    borderWidth: 1,
+    minWidth: 100,
+    alignItems: 'center',
+    marginTop: SIZING.spacing.xs,
+  },
+  closeButtonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
   },
   terrainText: {
     color: themeMode === 'light' ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.8)',

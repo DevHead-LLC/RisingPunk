@@ -1,15 +1,22 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, SafeAreaView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, SafeAreaView, Dimensions, TextInput } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
-import { useAppSelector } from '../../store/hooks';
+import { useAppSelector, useAppDispatch } from '../../store/hooks';
+import { updateBalance } from '../../store/slices/balanceSlice';
 import { DisbandCrewModal } from './DisbandCrewModal';
 import { VisitingProfileModal } from './VisitingProfileModal';
 import { LeaveCrewModal } from './LeaveCrewModal';
 import { EditCrewNameModal } from './EditCrewNameModal';
 import { EditCrewIdentifierModal } from './EditCrewIdentifierModal';
+import { EditCrewLanguageModal } from './EditCrewLanguageModal';
+import { GiftAllMembersModal } from './GiftAllMembersModal';
+import { ChooseSuccessorModal } from './ChooseSuccessorModal';
+import { ResignModal } from './ResignModal';
+import { WarManagementModal } from './WarManagementModal';
+import { AllianceManagementModal } from './AllianceManagementModal';
 import { EditableCrewRules } from './EditableCrewRules';
-import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, usePromoteMemberMutation, useDemoteExecutiveMutation } from '../../store/api/authApi';
+import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, useUpdateCrewLanguageMutation, useUpdateInternalMessageMutation, useUpdateExternalMessageMutation, useGiftAllMembersMutation, usePromoteMemberMutation, useDemoteExecutiveMutation, useChooseSuccessorMutation, useResignMutation, useGetWarStatusQuery } from '../../store/api/authApi';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CREW_MODAL_PADDING = SIZING.spacing.md * 2;
@@ -59,13 +66,27 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [showLeaveCrewModal, setShowLeaveCrewModal] = useState(false);
   const [showEditCrewNameModal, setShowEditCrewNameModal] = useState(false);
   const [showEditCrewIdentifierModal, setShowEditCrewIdentifierModal] = useState(false);
+  const [showEditCrewLanguageModal, setShowEditCrewLanguageModal] = useState(false);
+  const [showGiftAllMembersModal, setShowGiftAllMembersModal] = useState(false);
+  const [showChooseSuccessorModal, setShowChooseSuccessorModal] = useState(false);
+  const [showResignModal, setShowResignModal] = useState(false);
+  const [showWarManagementModal, setShowWarManagementModal] = useState(false);
+  const [showAllianceManagementModal, setShowAllianceManagementModal] = useState(false);
   const [viewingProfileUserId, setViewingProfileUserId] = useState<string | null>(null);
   const [promotingUserId, setPromotingUserId] = useState<string | null>(null);
   const [demotingUserId, setDemotingUserId] = useState<string | null>(null);
   const [recentlyPromotedUserIds, setRecentlyPromotedUserIds] = useState<Set<string>>(new Set());
   const [isEditingCrewRules, setIsEditingCrewRules] = useState(false);
+  const [isEditingInternalMessage, setIsEditingInternalMessage] = useState(false);
+  const [internalMessageText, setInternalMessageText] = useState('');
+  const [isEditingExternalMessage, setIsEditingExternalMessage] = useState(false);
+  const [externalMessageText, setExternalMessageText] = useState('');
   const { data: crewStatus, refetch: refetchCrewStatus } = useGetCrewStatusQuery(undefined, {
     pollingInterval: visible ? 3000 : 0,
+  });
+  const { data: warStatusData } = useGetWarStatusQuery(undefined, {
+    skip: !visible || !crewStatus?.isInCrew,
+    pollingInterval: visible && crewStatus?.isInCrew ? 3000 : 0,
   });
   const [disbandCrew, { isLoading: isDisbanding }] = useDisbandCrewMutation();
   const [acceptApplicant, { isLoading: isAccepting }] = useAcceptApplicantMutation();
@@ -73,9 +94,17 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [leaveCrew, { isLoading: isLeaving }] = useLeaveCrewMutation();
   const [updateCrewName, { isLoading: isUpdatingCrewName }] = useUpdateCrewNameMutation();
   const [updateCrewIdentifier, { isLoading: isUpdatingCrewIdentifier }] = useUpdateCrewIdentifierMutation();
+  const [updateCrewLanguage, { isLoading: isUpdatingCrewLanguage }] = useUpdateCrewLanguageMutation();
+  const [updateInternalMessage, { isLoading: isUpdatingInternalMessage }] = useUpdateInternalMessageMutation();
+  const [updateExternalMessage, { isLoading: isUpdatingExternalMessage }] = useUpdateExternalMessageMutation();
+  const [giftAllMembers, { isLoading: isGiftingMembers }] = useGiftAllMembersMutation();
   const [promoteMember] = usePromoteMemberMutation();
   const [demoteExecutive] = useDemoteExecutiveMutation();
+  const [chooseSuccessor] = useChooseSuccessorMutation();
+  const [resign] = useResignMutation();
+  const dispatch = useAppDispatch();
   const currentUser = useAppSelector((state) => state.auth.user);
+  const currentBalanceState = useAppSelector((state) => state.balance);
   
   const userRole = crewStatus?.role;
   const currentUserId = currentUser?._id;
@@ -103,6 +132,28 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     });
   }, [members, executives, president]);
 
+  const giftRecipientCount = useMemo(() => {
+    if (!members || !executives || !president || !currentUserId) return 0;
+    const presidentUserId = String(president.userId);
+    const allRecipientIds = new Set<string>();
+    
+    executives.forEach((exec: any) => {
+      const execUserId = String(exec.userId);
+      if (execUserId !== presidentUserId) {
+        allRecipientIds.add(execUserId);
+      }
+    });
+    
+    members.forEach((member: any) => {
+      const memberUserId = String(member.userId);
+      if (memberUserId !== presidentUserId) {
+        allRecipientIds.add(memberUserId);
+      }
+    });
+    
+    return allRecipientIds.size;
+  }, [members, executives, president, currentUserId]);
+
   useEffect(() => {
     setRecentlyPromotedUserIds(prev => {
       if (prev.size === 0) return prev;
@@ -127,6 +178,14 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   };
 
   const handleBack = () => {
+    if (currentCategory === 'internal-message-board') {
+      setIsEditingInternalMessage(false);
+      setInternalMessageText('');
+    }
+    if (currentCategory === 'external-message-board') {
+      setIsEditingExternalMessage(false);
+      setExternalMessageText('');
+    }
     setCurrentCategory(null);
   };
 
@@ -136,11 +195,21 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     setShowLeaveCrewModal(false);
     setShowEditCrewNameModal(false);
     setShowEditCrewIdentifierModal(false);
+    setShowEditCrewLanguageModal(false);
+    setShowGiftAllMembersModal(false);
+    setShowChooseSuccessorModal(false);
+    setShowResignModal(false);
+    setShowWarManagementModal(false);
+    setShowAllianceManagementModal(false);
     setViewingProfileUserId(null);
     setPromotingUserId(null);
     setDemotingUserId(null);
     setRecentlyPromotedUserIds(new Set());
     setIsEditingCrewRules(false);
+    setIsEditingInternalMessage(false);
+    setInternalMessageText('');
+    setIsEditingExternalMessage(false);
+    setExternalMessageText('');
     onClose();
   };
 
@@ -280,6 +349,131 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       throw new Error(error?.data?.error || error?.error || 'Failed to update crew identifier');
     }
   }, [updateCrewIdentifier, refetchCrewDetails, refetchCrewStatus]);
+
+  const handleEditCrewLanguagePress = useCallback(() => {
+    setShowEditCrewLanguageModal(true);
+  }, []);
+
+  const handleUpdateCrewLanguage = useCallback(async (nativeLanguage: string) => {
+    try {
+      await updateCrewLanguage({ nativeLanguage }).unwrap();
+      await refetchCrewDetails();
+      await refetchCrewStatus();
+      setShowEditCrewLanguageModal(false);
+    } catch (error: any) {
+      throw new Error(error?.data?.error || error?.error || 'Failed to update crew language');
+    }
+  }, [updateCrewLanguage, refetchCrewDetails, refetchCrewStatus]);
+
+  const handleGiftAllMembersPress = useCallback(() => {
+    setShowGiftAllMembersModal(true);
+  }, []);
+
+  const handleGiftAllMembers = useCallback(async (giftAmount: number) => {
+    try {
+      const result = await giftAllMembers({ giftAmount }).unwrap();
+      
+      if (result.newBalance !== undefined) {
+        dispatch(updateBalance({ 
+          total: result.newBalance, 
+          ratePerSecond: currentBalanceState.ratePerSecond, 
+          lastUpdated: result.lastUpdated || new Date(),
+          fractionalRemainder: result.fractionalRemainder !== undefined ? result.fractionalRemainder : 0
+        }));
+      }
+
+      try {
+        await refetchCrewDetails();
+      } catch (refetchError) {
+        console.warn('Failed to refetch crew details after gift:', refetchError);
+      }
+
+      try {
+        await refetchCrewStatus();
+      } catch (refetchError) {
+        console.warn('Failed to refetch crew status after gift:', refetchError);
+      }
+    } catch (error: any) {
+      throw new Error(error?.data?.error || error?.error || 'Failed to gift members');
+    }
+  }, [giftAllMembers, refetchCrewDetails, refetchCrewStatus, dispatch, currentBalanceState]);
+
+  const handleChooseSuccessorPress = useCallback(() => {
+    setShowChooseSuccessorModal(true);
+  }, []);
+
+  const handleChooseSuccessor = useCallback(async (successorUserId: string) => {
+    if (!crewStatus?.crewId) {
+      throw new Error('Crew ID not found');
+    }
+
+    try {
+      await chooseSuccessor({
+        crewId: crewStatus.crewId,
+        successorUserId,
+      }).unwrap();
+      
+      try {
+        await refetchCrewDetails();
+      } catch (refetchError) {
+        console.warn('Failed to refetch crew details after choosing successor:', refetchError);
+      }
+
+      try {
+        await refetchCrewStatus();
+      } catch (refetchError) {
+        console.warn('Failed to refetch crew status after choosing successor:', refetchError);
+      }
+
+      setShowChooseSuccessorModal(false);
+      setCurrentCategory(null);
+      onClose();
+    } catch (error: any) {
+      throw new Error(error?.data?.error || error?.error || 'Failed to choose successor');
+    }
+  }, [chooseSuccessor, crewStatus?.crewId, refetchCrewDetails, refetchCrewStatus, onClose]);
+
+  const handleResignPress = useCallback(() => {
+    setShowResignModal(true);
+  }, []);
+
+  const handleResign = useCallback(async () => {
+    if (!crewStatus?.crewId) {
+      throw new Error('Crew ID not found');
+    }
+
+    try {
+      await resign({
+        crewId: crewStatus.crewId,
+      }).unwrap();
+      
+      try {
+        await refetchCrewDetails();
+      } catch (refetchError) {
+        console.warn('Failed to refetch crew details after resigning:', refetchError);
+      }
+
+      try {
+        await refetchCrewStatus();
+      } catch (refetchError) {
+        console.warn('Failed to refetch crew status after resigning:', refetchError);
+      }
+
+      setShowResignModal(false);
+      setCurrentCategory(null);
+      onClose();
+    } catch (error: any) {
+      throw new Error(error?.data?.error || error?.error || 'Failed to resign');
+    }
+  }, [resign, crewStatus?.crewId, refetchCrewDetails, refetchCrewStatus, onClose]);
+
+  const handleWarManagementPress = useCallback(() => {
+    setShowWarManagementModal(true);
+  }, []);
+
+  const handleAllianceManagementPress = useCallback(() => {
+    setShowAllianceManagementModal(true);
+  }, []);
 
   const handlePromoteMember = useCallback(async (memberUserId: string) => {
     if (!crewStatus?.crewId) {
@@ -987,17 +1181,373 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     );
   };
 
+  useEffect(() => {
+    if (!isEditingInternalMessage && activeCrewDetails?.crew?.internalMessage !== undefined) {
+      setInternalMessageText(activeCrewDetails.crew.internalMessage || '');
+    }
+  }, [isEditingInternalMessage, activeCrewDetails?.crew?.internalMessage]);
+
+  useEffect(() => {
+    if (!isEditingExternalMessage && activeCrewDetails?.crew?.externalMessage !== undefined) {
+      setExternalMessageText(activeCrewDetails.crew.externalMessage || '');
+    }
+  }, [isEditingExternalMessage, activeCrewDetails?.crew?.externalMessage]);
+
+  const handleStartEditingInternalMessage = () => {
+    setInternalMessageText(activeCrewDetails?.crew?.internalMessage || '');
+    setIsEditingInternalMessage(true);
+  };
+
+  const handleCancelEditingInternalMessage = () => {
+    setInternalMessageText(activeCrewDetails?.crew?.internalMessage || '');
+    setIsEditingInternalMessage(false);
+  };
+
+  const handleSaveInternalMessage = async () => {
+    if (isUpdatingInternalMessage) return;
+
+    const trimmedMessage = internalMessageText.trim();
+    const currentMessage = activeCrewDetails?.crew?.internalMessage || '';
+
+    if (trimmedMessage === currentMessage) {
+      setIsEditingInternalMessage(false);
+      return;
+    }
+
+    if (trimmedMessage.length > 1500) {
+      return;
+    }
+
+    try {
+      await updateInternalMessage({ internalMessage: trimmedMessage }).unwrap();
+      await refetchCrewDetails();
+      setIsEditingInternalMessage(false);
+    } catch (error: any) {
+      console.error('Error updating internal message:', error);
+    }
+  };
+
+  const handleStartEditingExternalMessage = () => {
+    setExternalMessageText(activeCrewDetails?.crew?.externalMessage || '');
+    setIsEditingExternalMessage(true);
+  };
+
+  const handleCancelEditingExternalMessage = () => {
+    setExternalMessageText(activeCrewDetails?.crew?.externalMessage || '');
+    setIsEditingExternalMessage(false);
+  };
+
+  const handleSaveExternalMessage = async () => {
+    if (isUpdatingExternalMessage) return;
+
+    const trimmedMessage = externalMessageText.trim();
+    const currentMessage = activeCrewDetails?.crew?.externalMessage || '';
+
+    if (trimmedMessage === currentMessage) {
+      setIsEditingExternalMessage(false);
+      return;
+    }
+
+    if (trimmedMessage.length > 1500) {
+      return;
+    }
+
+    try {
+      await updateExternalMessage({ externalMessage: trimmedMessage }).unwrap();
+      await refetchCrewDetails();
+      setIsEditingExternalMessage(false);
+    } catch (error: any) {
+      console.error('Error updating external message:', error);
+    }
+  };
+
+  const renderInternalMessageBoard = () => {
+    const isPresident = userRole === 'president';
+    const currentMessage = activeCrewDetails?.crew?.internalMessage || '';
+    const displayMessage = isEditingInternalMessage ? internalMessageText : currentMessage;
+    const characterCount = displayMessage.length;
+    const maxCharacters = 1500;
+    const warsWeDeclared = warStatusData?.warsWeDeclared || [];
+    const warsDeclaredOnUs = warStatusData?.warsDeclaredOnUs || [];
+    const isAtWar = warStatusData?.isAtWar || false;
+
+    return (
+      <ScrollView
+        style={styles.categoryContent}
+        contentContainerStyle={styles.internalMessageScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {!isEditingInternalMessage && (
+          <View style={styles.warStatusInternalSection}>
+            {warsDeclaredOnUs.length > 0 && (
+              <View style={styles.warNotificationSection}>
+                <Text style={[styles.warNotificationTitle, { color: colors.error }]}>WAR ALERT</Text>
+                {warsDeclaredOnUs.map((war) => (
+                  <View key={`received-${war.enemyCrewId}`} style={[styles.warNotificationCard, { backgroundColor: colors.error + '30', borderColor: colors.error }]}>
+                    <Text style={[styles.warNotificationText, { color: colors.text.primary }]}>
+                      BE AWARE: '{war.enemyCrewName}' ({war.enemyCrewIdentifier}) has declared war on our crew
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            <Text style={[styles.warStatusInternalTitle, { color: colors.text.primary }]}>WAR STATUS</Text>
+            {warsWeDeclared.length > 0 ? (
+              <View style={[styles.warStatusInternalCard, { backgroundColor: colors.error + '20', borderColor: colors.error }]}>
+                {warsWeDeclared.map((war) => (
+                  <View key={`declared-${war.enemyCrewId}`} style={styles.warStatusInternalItem}>
+                    <Text style={[styles.warStatusInternalText, { color: colors.text.primary }]}>
+                      At war with: {war.enemyCrewName} ({war.enemyCrewIdentifier})
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={[styles.warStatusInternalCard, { backgroundColor: colors.surface, borderColor: colors.primary }]}>
+                <Text style={[styles.warStatusInternalText, { color: colors.text.secondary }]}>
+                  No war declarations
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {isPresident && !isEditingInternalMessage && (
+          <View style={styles.internalMessageEditContainer}>
+            <TouchableOpacity
+              style={[
+                styles.internalMessageEditButton,
+                { 
+                  borderColor: colors.primary, 
+                  backgroundColor: colors.primary 
+                }
+              ]}
+              onPress={handleStartEditingInternalMessage}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.internalMessageEditButtonText, { color: colors.background }]}>
+                Edit
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {isEditingInternalMessage ? (
+          <View style={styles.internalMessageEditView}>
+            <Text style={[styles.internalMessageInfoText, { color: colors.text.secondary }]}>
+              This is internal messaging only to your crew members.
+            </Text>
+            
+            <View style={styles.internalMessageInputContainer}>
+              <TextInput
+                style={[
+                  styles.internalMessageInput,
+                  {
+                    borderColor: characterCount > maxCharacters ? colors.error : colors.secondary,
+                    backgroundColor: colors.inputBg || colors.surface,
+                    color: colors.text.primary,
+                  }
+                ]}
+                value={internalMessageText}
+                onChangeText={setInternalMessageText}
+                placeholder="Enter internal message for your crew members..."
+                placeholderTextColor={colors.text.placeholder}
+                multiline
+                maxLength={maxCharacters}
+                editable={!isUpdatingInternalMessage}
+                textAlignVertical="top"
+              />
+              <Text style={[styles.internalMessageCharCount, { color: colors.text.secondary }]}>
+                {characterCount} / {maxCharacters}
+              </Text>
+            </View>
+
+            <View style={styles.internalMessageButtonContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.internalMessageCancelButton,
+                  {
+                    borderColor: colors.secondary,
+                    backgroundColor: colors.surface,
+                  }
+                ]}
+                onPress={handleCancelEditingInternalMessage}
+                disabled={isUpdatingInternalMessage}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.internalMessageButtonText, { color: colors.text.secondary }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.internalMessageSaveButton,
+                  {
+                    borderColor: colors.primary,
+                    backgroundColor: colors.primary,
+                  },
+                  (isUpdatingInternalMessage || characterCount > maxCharacters) && {
+                    backgroundColor: colors.buttonDisabled,
+                    borderColor: colors.buttonDisabled,
+                  }
+                ]}
+                onPress={handleSaveInternalMessage}
+                disabled={isUpdatingInternalMessage || characterCount > maxCharacters}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.internalMessageButtonText, { color: colors.background }]}>
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.internalMessageView}>
+            {currentMessage ? (
+              <Text style={[styles.internalMessageText, { color: colors.text.primary }]}>
+                {currentMessage}
+              </Text>
+            ) : (
+              <Text style={[styles.internalMessagePlaceholder, { color: colors.text.secondary }]}>
+                No internal message has been set yet.
+              </Text>
+            )}
+          </View>
+        )}
+      </ScrollView>
+    );
+  };
+
+  const renderExternalMessageBoard = () => {
+    const isPresident = userRole === 'president';
+    const currentMessage = activeCrewDetails?.crew?.externalMessage || '';
+    const displayMessage = isEditingExternalMessage ? externalMessageText : currentMessage;
+    const characterCount = displayMessage.length;
+    const maxCharacters = 1500;
+
+    return (
+      <ScrollView
+        style={styles.categoryContent}
+        contentContainerStyle={styles.externalMessageScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {isPresident && !isEditingExternalMessage && (
+          <View style={styles.externalMessageEditContainer}>
+            <TouchableOpacity
+              style={[
+                styles.externalMessageEditButton,
+                { 
+                  borderColor: colors.primary, 
+                  backgroundColor: colors.primary 
+                }
+              ]}
+              onPress={handleStartEditingExternalMessage}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.externalMessageEditButtonText, { color: colors.background }]}>
+                Edit
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {isEditingExternalMessage ? (
+          <View style={styles.externalMessageEditView}>
+            <Text style={[styles.externalMessageInfoText, { color: colors.text.secondary }]}>
+              This is external messaging visible to everyone viewing your crew.
+            </Text>
+            
+            <View style={styles.externalMessageInputContainer}>
+              <TextInput
+                style={[
+                  styles.externalMessageInput,
+                  {
+                    borderColor: characterCount > maxCharacters ? colors.error : colors.secondary,
+                    backgroundColor: colors.inputBg || colors.surface,
+                    color: colors.text.primary,
+                  }
+                ]}
+                value={externalMessageText}
+                onChangeText={setExternalMessageText}
+                placeholder="Enter external message for everyone viewing your crew..."
+                placeholderTextColor={colors.text.placeholder}
+                multiline
+                maxLength={maxCharacters}
+                editable={!isUpdatingExternalMessage}
+                textAlignVertical="top"
+              />
+              <Text style={[styles.externalMessageCharCount, { color: colors.text.secondary }]}>
+                {characterCount} / {maxCharacters}
+              </Text>
+            </View>
+
+            <View style={styles.externalMessageButtonContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.externalMessageCancelButton,
+                  {
+                    borderColor: colors.secondary,
+                    backgroundColor: colors.surface,
+                  }
+                ]}
+                onPress={handleCancelEditingExternalMessage}
+                disabled={isUpdatingExternalMessage}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.externalMessageButtonText, { color: colors.text.secondary }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.externalMessageSaveButton,
+                  {
+                    borderColor: colors.primary,
+                    backgroundColor: colors.primary,
+                  },
+                  (isUpdatingExternalMessage || characterCount > maxCharacters) && {
+                    backgroundColor: colors.buttonDisabled,
+                    borderColor: colors.buttonDisabled,
+                  }
+                ]}
+                onPress={handleSaveExternalMessage}
+                disabled={isUpdatingExternalMessage || characterCount > maxCharacters}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.externalMessageButtonText, { color: colors.background }]}>
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.externalMessageView}>
+            {currentMessage ? (
+              <Text style={[styles.externalMessageText, { color: colors.text.primary }]}>
+                {currentMessage}
+              </Text>
+            ) : (
+              <Text style={[styles.externalMessagePlaceholder, { color: colors.text.secondary }]}>
+                No external message has been set yet.
+              </Text>
+            )}
+          </View>
+        )}
+      </ScrollView>
+    );
+  };
+
   const renderCrewSettings = () => {
     const settingsButtons = [
       'Edit Crew Name',
       'Edit Crew Identifier',
       'Change Language',
       'Gift All Members',
-      'Declare War',
-      'Terminate War Declaration',
-      'Request Alliance',
-      'Accept Alliance',
-      'Terminate Alliance',
+      'War Management',
+      'Alliance Management',
       'Choose Successor',
       'Resign',
       'Disband Crew',
@@ -1012,8 +1562,9 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         <View style={styles.settingsButtonGrid}>
           {settingsButtons.map((buttonText, index) => {
             const isLeftButton = index % 2 === 0;
-            const isLastThree = index >= 9;
-            const isDisbandCrew = index === 11;
+            // Last three buttons are: 'Choose Successor' (6), 'Resign' (7), 'Disband Crew' (8)
+            const isLastThree = index >= 6;
+            const isDisbandCrew = index === 8;
             return (
               <TouchableOpacity
                 key={index}
@@ -1028,6 +1579,18 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                     handleEditCrewNamePress();
                   } else if (buttonText === 'Edit Crew Identifier') {
                     handleEditCrewIdentifierPress();
+                  } else if (buttonText === 'Change Language') {
+                    handleEditCrewLanguagePress();
+                  } else if (buttonText === 'Gift All Members') {
+                    handleGiftAllMembersPress();
+                  } else if (buttonText === 'War Management') {
+                    handleWarManagementPress();
+                  } else if (buttonText === 'Alliance Management') {
+                    handleAllianceManagementPress();
+                  } else if (buttonText === 'Choose Successor') {
+                    handleChooseSuccessorPress();
+                  } else if (buttonText === 'Resign') {
+                    handleResignPress();
                   } else if (isDisbandCrew) {
                     handleDisbandCrewPress();
                   } else {
@@ -1079,7 +1642,9 @@ export const CrewModal: React.FC<CrewModalProps> = ({
          currentCategory === 'guild-information' ? renderCrewInformation() :
          currentCategory === 'awards' ? renderAwards() :
          currentCategory === 'ranking' ? renderRanking() :
-         currentCategory === 'crew-rules' ? renderCrewRules() : (
+         currentCategory === 'crew-rules' ? renderCrewRules() :
+         currentCategory === 'internal-message-board' ? renderInternalMessageBoard() :
+         currentCategory === 'external-message-board' ? renderExternalMessageBoard() : (
           <View style={styles.categoryContent}>
             <Text style={styles.placeholderText}>
               {getCategoryLabel(currentCategory)} content will be implemented here.
@@ -1147,6 +1712,59 @@ export const CrewModal: React.FC<CrewModalProps> = ({
           onClose={() => setShowEditCrewIdentifierModal(false)}
           onUpdate={handleUpdateCrewIdentifier}
           currentCrewIdentifier={crewStatus.crewIdentifier}
+        />
+      )}
+
+      {activeCrewDetails?.crew?.nativeLanguage && (
+        <EditCrewLanguageModal
+          visible={showEditCrewLanguageModal}
+          onClose={() => setShowEditCrewLanguageModal(false)}
+          onUpdate={handleUpdateCrewLanguage}
+          currentLanguage={activeCrewDetails.crew.nativeLanguage}
+        />
+      )}
+
+      {activeCrewDetails?.crew && (
+        <GiftAllMembersModal
+          visible={showGiftAllMembersModal}
+          onClose={() => setShowGiftAllMembersModal(false)}
+          onGift={handleGiftAllMembers}
+          memberCount={giftRecipientCount}
+        />
+      )}
+
+      {activeCrewDetails?.crew && president && (
+        <ChooseSuccessorModal
+          visible={showChooseSuccessorModal}
+          onClose={() => setShowChooseSuccessorModal(false)}
+          onChooseSuccessor={handleChooseSuccessor}
+          executives={executives}
+          members={members}
+          currentPresidentUserId={president.userId}
+        />
+      )}
+
+      {crewStatus?.crewId && (
+        <ResignModal
+          visible={showResignModal}
+          onClose={() => setShowResignModal(false)}
+          onResign={handleResign}
+        />
+      )}
+
+      {crewStatus?.crewId && (
+        <WarManagementModal
+          visible={showWarManagementModal}
+          onClose={() => setShowWarManagementModal(false)}
+          crewId={crewStatus.crewId}
+        />
+      )}
+
+      {crewStatus?.crewId && (
+        <AllianceManagementModal
+          visible={showAllianceManagementModal}
+          onClose={() => setShowAllianceManagementModal(false)}
+          crewId={crewStatus.crewId}
         />
       )}
     </Modal>
@@ -1572,6 +2190,226 @@ const createStyles = (colors: any) => StyleSheet.create({
   leaveCrewButtonText: {
     fontSize: SIZING.font.body,
     fontWeight: 'bold',
+  },
+  internalMessageScrollContent: {
+    paddingBottom: SIZING.spacing.lg,
+  },
+  internalMessageEditContainer: {
+    alignItems: 'flex-end',
+    marginBottom: SIZING.spacing.md,
+  },
+  internalMessageEditButton: {
+    paddingVertical: SIZING.spacing.sm,
+    paddingHorizontal: SIZING.spacing.lg,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 100,
+  },
+  internalMessageEditButtonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
+  },
+  internalMessageView: {
+    flex: 1,
+    padding: SIZING.spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.secondary,
+  },
+  internalMessageText: {
+    fontSize: SIZING.font.body,
+    lineHeight: SIZING.font.body * 1.5,
+  },
+  internalMessagePlaceholder: {
+    fontSize: SIZING.font.body,
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
+  internalMessageEditView: {
+    flex: 1,
+  },
+  internalMessageInfoText: {
+    fontSize: SIZING.font.body,
+    marginBottom: SIZING.spacing.md,
+    padding: SIZING.spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.secondary,
+  },
+  internalMessageInputContainer: {
+    marginBottom: SIZING.spacing.md,
+  },
+  internalMessageInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: SIZING.spacing.md,
+    fontSize: SIZING.font.body,
+    minHeight: 200,
+    maxHeight: 400,
+  },
+  internalMessageCharCount: {
+    fontSize: SIZING.font.small,
+    textAlign: 'right',
+    marginTop: SIZING.spacing.xs,
+  },
+  internalMessageButtonContainer: {
+    flexDirection: 'row',
+    gap: SIZING.spacing.md,
+  },
+  internalMessageCancelButton: {
+    flex: 1,
+    paddingVertical: SIZING.spacing.md,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  internalMessageSaveButton: {
+    flex: 1,
+    paddingVertical: SIZING.spacing.md,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  internalMessageButtonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
+  },
+  warStatusInternalSection: {
+    marginBottom: SIZING.spacing.lg,
+  },
+  warNotificationSection: {
+    marginBottom: SIZING.spacing.lg,
+  },
+  warNotificationTitle: {
+    fontSize: SIZING.font.h3,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.sm,
+    textAlign: 'center',
+  },
+  warNotificationCard: {
+    padding: SIZING.spacing.md,
+    borderRadius: 8,
+    borderWidth: 3,
+    marginBottom: SIZING.spacing.sm,
+  },
+  warNotificationText: {
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    lineHeight: SIZING.font.body * 1.4,
+  },
+  warStatusInternalTitle: {
+    fontSize: SIZING.font.h4,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.sm,
+  },
+  warStatusInternalCard: {
+    padding: SIZING.spacing.md,
+    borderRadius: 8,
+    borderWidth: 2,
+    marginBottom: SIZING.spacing.md,
+  },
+  warStatusInternalItem: {
+    marginBottom: SIZING.spacing.xs,
+  },
+  warStatusInternalText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
+  },
+  externalMessageScrollContent: {
+    paddingBottom: SIZING.spacing.lg,
+  },
+  externalMessageEditContainer: {
+    alignItems: 'flex-end',
+    marginBottom: SIZING.spacing.md,
+  },
+  externalMessageEditButton: {
+    paddingVertical: SIZING.spacing.sm,
+    paddingHorizontal: SIZING.spacing.lg,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 100,
+  },
+  externalMessageEditButtonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
+  },
+  externalMessageView: {
+    flex: 1,
+    padding: SIZING.spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.secondary,
+  },
+  externalMessageText: {
+    fontSize: SIZING.font.body,
+    lineHeight: SIZING.font.body * 1.5,
+  },
+  externalMessagePlaceholder: {
+    fontSize: SIZING.font.body,
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
+  externalMessageEditView: {
+    flex: 1,
+  },
+  externalMessageInfoText: {
+    fontSize: SIZING.font.body,
+    marginBottom: SIZING.spacing.md,
+    padding: SIZING.spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.secondary,
+  },
+  externalMessageInputContainer: {
+    marginBottom: SIZING.spacing.md,
+  },
+  externalMessageInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: SIZING.spacing.md,
+    fontSize: SIZING.font.body,
+    minHeight: 200,
+    maxHeight: 400,
+  },
+  externalMessageCharCount: {
+    fontSize: SIZING.font.small,
+    textAlign: 'right',
+    marginTop: SIZING.spacing.xs,
+  },
+  externalMessageButtonContainer: {
+    flexDirection: 'row',
+    gap: SIZING.spacing.md,
+  },
+  externalMessageCancelButton: {
+    flex: 1,
+    paddingVertical: SIZING.spacing.md,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  externalMessageSaveButton: {
+    flex: 1,
+    paddingVertical: SIZING.spacing.md,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  externalMessageButtonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
   },
 });
 

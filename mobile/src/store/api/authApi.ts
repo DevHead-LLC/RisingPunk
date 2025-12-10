@@ -159,7 +159,7 @@ const authBaseQuery = async (args: any, api: any, extraOptions: any) => {
 export const authApi = createApi({
   reducerPath: 'authApi',
   baseQuery: authBaseQuery,
-  tagTypes: ['User'],
+  tagTypes: ['User', 'Crew'],
   endpoints: (builder) => ({
     login: builder.mutation<AuthResponse, LoginRequest>({
       query: (credentials) => ({
@@ -286,6 +286,11 @@ export const authApi = createApi({
       refetchOnMountOrArgChange: true,
     }),
 
+    getUserCrewStatus: builder.query<{ isInCrew: boolean; crewId: string | null; crewIdentifier: string | null; role: 'president' | 'member' | 'executive' | null }, string>({
+      query: (userId) => `/api/crew/status/${userId}`,
+      providesTags: ['User'],
+    }),
+
     applyToCrew: builder.mutation<{ success: boolean; message: string }, { crewId: string }>({
       query: (data) => ({
         url: '/api/crew/apply',
@@ -322,9 +327,9 @@ export const authApi = createApi({
       providesTags: ['User'],
     }),
 
-    getCrewDetails: builder.query<{ success: boolean; crew: { id: string; crewName: string; crewIdentifier: string; nativeLanguage: string; createdAt: string | null; memberCount: number; applicants: Array<{ userId: string; handle: string; appliedAt: string }>; crewRules: string[]; president: { userId: string; handle: string; level: number } | null; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }> } }, string>({
+    getCrewDetails: builder.query<{ success: boolean; crew: { id: string; crewName: string; crewIdentifier: string; nativeLanguage: string; createdAt: string | null; memberCount: number; applicants: Array<{ userId: string; handle: string; appliedAt: string }>; crewRules: string[]; internalMessage: string; externalMessage: string; president: { userId: string; handle: string; level: number } | null; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }> } }, string>({
       query: (crewId) => `/api/crew/${crewId}`,
-      providesTags: ['User'],
+      providesTags: ['User', 'Crew'],
       refetchOnMountOrArgChange: true,
     }),
 
@@ -381,6 +386,42 @@ export const authApi = createApi({
       invalidatesTags: ['User'],
     }),
 
+    updateCrewLanguage: builder.mutation<{ success: boolean; message: string; crew: { id: string; crewName: string; crewIdentifier: string; nativeLanguage: string } }, { nativeLanguage: string }>({
+      query: (data) => ({
+        url: '/api/crew/update-language',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
+
+    updateInternalMessage: builder.mutation<{ success: boolean; message: string; crew: { id: string; internalMessage: string } }, { internalMessage: string }>({
+      query: (data) => ({
+        url: '/api/crew/update-internal-message',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
+
+    updateExternalMessage: builder.mutation<{ success: boolean; message: string; crew: { id: string; externalMessage: string } }, { externalMessage: string }>({
+      query: (data) => ({
+        url: '/api/crew/update-external-message',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
+
+    giftAllMembers: builder.mutation<{ success: boolean; message: string; giftAmount: number; transactionFee: number; totalCost: number; baseAmountPerMember: number; remainder: number; memberCount: number; newBalance: number; lastUpdated: string | Date; fractionalRemainder: number }, { giftAmount: number }>({
+      query: (data) => ({
+        url: '/api/crew/gift-all-members',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
+
     promoteMember: builder.mutation<{ success: boolean; message: string; crew: { id: string; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }> } }, { crewId: string; memberUserId: string }>({
       query: (data) => ({
         url: '/api/crew/promote-member',
@@ -397,6 +438,92 @@ export const authApi = createApi({
         body: data,
       }),
       invalidatesTags: ['User'],
+    }),
+
+    chooseSuccessor: builder.mutation<{ success: boolean; message: string; crew: { id: string; president: { userId: string; handle: string; level: number } | null; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }> } }, { crewId: string; successorUserId: string }>({
+      query: (data) => ({
+        url: '/api/crew/choose-successor',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
+
+    resign: builder.mutation<{ success: boolean; message: string; crew: { id: string; president: { userId: string; handle: string; level: number } | null; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }> } }, { crewId: string }>({
+      query: (data) => ({
+        url: '/api/crew/resign',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
+
+    getWarStatus: builder.query<{ success: boolean; isAtWar: boolean; warsWeDeclared: Array<{ enemyCrewId: string; enemyCrewName: string; enemyCrewIdentifier: string; warDeclaredAt: string | null }>; warsDeclaredOnUs: Array<{ enemyCrewId: string; enemyCrewName: string; enemyCrewIdentifier: string; warDeclaredAt: string | null }> }, void>({
+      query: () => '/api/crew/war-status',
+      providesTags: ['User', 'Crew'],
+      refetchOnMountOrArgChange: true,
+      keepUnusedDataFor: 0, // Don't keep unused data to ensure fresh data after mutations
+    }),
+
+    getWarManagementCrews: builder.query<{ success: boolean; crews: Array<{ id: string; crewName: string; crewIdentifier: string; memberCount: number; createdAt: string | null }> }, void>({
+      query: () => '/api/crew/war-management/crews',
+      providesTags: ['User', 'Crew'],
+    }),
+
+    declareWar: builder.mutation<{ success: boolean; message: string; warStatus: { enemyCrewId: string; enemyCrewName: string; enemyCrewIdentifier: string; warDeclaredAt: string | null } }, { targetCrewId: string }>({
+      query: (data) => ({
+        url: '/api/crew/war-management/declare',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User', 'Crew'],
+    }),
+
+    terminateWar: builder.mutation<{ success: boolean; message: string }, void>({
+      query: () => ({
+        url: '/api/crew/war-management/terminate',
+        method: 'POST',
+      }),
+      invalidatesTags: ['User', 'Crew'],
+    }),
+
+    getAllianceStatus: builder.query<{ success: boolean; alliances: Array<{ alliedCrewId: string; alliedCrewName: string; alliedCrewIdentifier: string }>; requestsWeSent: Array<{ requestedCrewId: string; requestedCrewName: string; requestedCrewIdentifier: string }>; requestsWeReceived: Array<{ requestingCrewId: string; requestingCrewName: string; requestingCrewIdentifier: string }> }, void>({
+      query: () => '/api/crew/alliance-status',
+      providesTags: ['User', 'Crew'],
+      refetchOnMountOrArgChange: true,
+      keepUnusedDataFor: 0,
+    }),
+
+    getAllianceManagementCrews: builder.query<{ success: boolean; crews: Array<{ id: string; crewName: string; crewIdentifier: string; memberCount: number; status: string; createdAt: string | null }> }, void>({
+      query: () => '/api/crew/alliance-management/crews',
+      providesTags: ['User', 'Crew'],
+    }),
+
+    requestAlliance: builder.mutation<{ success: boolean; message: string }, { targetCrewId: string }>({
+      query: (data) => ({
+        url: '/api/crew/alliance-management/request',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User', 'Crew'],
+    }),
+
+    acceptAlliance: builder.mutation<{ success: boolean; message: string; alliances: Array<{ alliedCrewId: string; alliedCrewName: string; alliedCrewIdentifier: string }> }, { targetCrewId: string }>({
+      query: (data) => ({
+        url: '/api/crew/alliance-management/accept',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User', 'Crew'],
+    }),
+
+    terminateAlliance: builder.mutation<{ success: boolean; message: string }, { targetCrewId: string }>({
+      query: (data) => ({
+        url: '/api/crew/alliance-management/terminate',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User', 'Crew'],
     }),
   }),
 });
@@ -418,6 +545,7 @@ export const {
   useForgotPasswordMutation,
   useCreateCrewMutation,
   useGetCrewStatusQuery,
+  useGetUserCrewStatusQuery,
   useDisbandCrewMutation,
   useSearchCrewsQuery,
   useGetSuggestedCrewsQuery,
@@ -429,7 +557,22 @@ export const {
   useLeaveCrewMutation,
   useUpdateCrewNameMutation,
   useUpdateCrewIdentifierMutation,
+  useUpdateCrewLanguageMutation,
+  useUpdateInternalMessageMutation,
+  useUpdateExternalMessageMutation,
+  useGiftAllMembersMutation,
   usePromoteMemberMutation,
   useDemoteExecutiveMutation,
+  useChooseSuccessorMutation,
+  useResignMutation,
   useUpdateCrewRulesMutation,
+  useGetWarStatusQuery,
+  useGetWarManagementCrewsQuery,
+  useDeclareWarMutation,
+  useTerminateWarMutation,
+  useGetAllianceStatusQuery,
+  useGetAllianceManagementCrewsQuery,
+  useRequestAllianceMutation,
+  useAcceptAllianceMutation,
+  useTerminateAllianceMutation,
 } = authApi;

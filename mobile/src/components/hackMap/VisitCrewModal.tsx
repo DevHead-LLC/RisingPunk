@@ -51,14 +51,21 @@ export const VisitCrewModal: React.FC<VisitCrewModalProps> = ({
   });
   const styles = createStyles(colors);
   const isInCrew = crewStatus?.isInCrew || false;
+  const currentUserCrewId = crewStatus?.crewId;
 
   useEffect(() => {
-    if (isInCrew && visible) {
+    if (isInCrew && currentUserCrewId && crewId && currentUserCrewId === crewId && visible) {
       onClose();
     }
-  }, [isInCrew, visible, onClose]);
+  }, [isInCrew, currentUserCrewId, crewId, visible, onClose]);
 
-  if (isInCrew) {
+  useEffect(() => {
+    if (currentCategory === 'apply-to-crew' && isInCrew && visible) {
+      setCurrentCategory(null);
+    }
+  }, [currentCategory, isInCrew, visible]);
+
+  if (isInCrew && currentUserCrewId && crewId && currentUserCrewId === crewId) {
     return null;
   }
 
@@ -244,18 +251,34 @@ export const VisitCrewModal: React.FC<VisitCrewModalProps> = ({
   };
 
   const renderExternalMessageBoard = () => {
+    const currentMessage = crewDetails?.crew?.externalMessage || '';
+
     return (
-      <View style={styles.categoryContent}>
-        <View style={styles.awardsEmptyContainer}>
-          <Text style={[styles.awardsEmptyText, { color: colors.text.secondary }]}>
-            External Message Board content will be displayed here.
-          </Text>
+      <ScrollView
+        style={styles.categoryContent}
+        contentContainerStyle={styles.externalMessageScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.externalMessageView}>
+          {currentMessage ? (
+            <Text style={[styles.externalMessageText, { color: colors.text.primary }]}>
+              {currentMessage}
+            </Text>
+          ) : (
+            <Text style={[styles.externalMessagePlaceholder, { color: colors.text.secondary }]}>
+              No external message has been set yet.
+            </Text>
+          )}
         </View>
-      </View>
+      </ScrollView>
     );
   };
 
   const renderCategoryList = () => {
+    const visibleCategories = isInCrew 
+      ? CATEGORIES.filter(category => category.id !== 'apply-to-crew')
+      : CATEGORIES;
+
     return (
       <SafeAreaView style={styles.visitCrewModalContainer}>
         <View style={styles.visitCrewHeader}>
@@ -273,7 +296,7 @@ export const VisitCrewModal: React.FC<VisitCrewModalProps> = ({
 
         <ScrollView style={styles.visitCrewContent} showsVerticalScrollIndicator={false}>
           <View style={styles.visitCrewGridContainer}>
-            {CATEGORIES.map((category, index) => {
+            {visibleCategories.map((category, index) => {
               const isApplyToCrew = category.id === 'apply-to-crew';
               const isLastInRow = !isApplyToCrew && (index + 1) % 3 === 0;
               const fullWidth = (CREW_CARD_WIDTH * 3) + (CREW_CARD_GAP * 2);
@@ -591,6 +614,26 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: SIZING.font.h2,
     fontWeight: 'bold',
     marginBottom: SIZING.spacing.md,
+  },
+  externalMessageScrollContent: {
+    paddingBottom: SIZING.spacing.lg,
+  },
+  externalMessageView: {
+    flex: 1,
+    padding: SIZING.spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.secondary,
+  },
+  externalMessageText: {
+    fontSize: SIZING.font.body,
+    lineHeight: SIZING.font.body * 1.5,
+  },
+  externalMessagePlaceholder: {
+    fontSize: SIZING.font.body,
+    fontStyle: 'italic',
+    textAlign: 'center',
   },
 });
 
