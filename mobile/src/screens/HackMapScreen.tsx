@@ -617,7 +617,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const allianceCrewDetails9 = useGetCrewDetailsQuery(allianceCrewIds[8] || '', { skip: !allianceCrewIds[8] });
   const allianceCrewDetails10 = useGetCrewDetailsQuery(allianceCrewIds[9] || '', { skip: !allianceCrewIds[9] });
 
-  const allianceCrewDetailsArray = [
+  // Memoize the array to prevent unnecessary recalculations
+  const allianceCrewDetailsArray = useMemo(() => [
     allianceCrewDetails1.data,
     allianceCrewDetails2.data,
     allianceCrewDetails3.data,
@@ -628,7 +629,18 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     allianceCrewDetails8.data,
     allianceCrewDetails9.data,
     allianceCrewDetails10.data,
-  ];
+  ], [
+    allianceCrewDetails1.data,
+    allianceCrewDetails2.data,
+    allianceCrewDetails3.data,
+    allianceCrewDetails4.data,
+    allianceCrewDetails5.data,
+    allianceCrewDetails6.data,
+    allianceCrewDetails7.data,
+    allianceCrewDetails8.data,
+    allianceCrewDetails9.data,
+    allianceCrewDetails10.data,
+  ]);
 
   const allianceCrewMemberUserIds = useMemo(() => {
     if (!allianceCrewIds || allianceCrewIds.length === 0) {
