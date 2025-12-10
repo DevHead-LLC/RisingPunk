@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, SafeAreaView, Image } from 'react-native';
+import React, { useCallback } from 'react';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, Dimensions, Platform, Pressable } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { useGetUserProfileQuery } from '../../store/api/authApi';
@@ -25,12 +25,22 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
     ? require('../../assets/images/profile-female.png')
     : require('../../assets/images/profile.png');
 
+  const handleClose = useCallback(() => {
+    onClose();
+  }, [onClose]);
+
+  const handleClosePressOut = useCallback(() => {
+    if (Platform.OS === 'android') {
+      onClose();
+    }
+  }, [onClose]);
+
   return (
     <Modal
       visible={visible}
       transparent={true}
       animationType="fade"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
       statusBarTranslucent={true}
       hardwareAccelerated={true}
       supportedOrientations={['landscape']}
@@ -39,25 +49,28 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
       <TouchableOpacity
         style={styles.overlay}
         activeOpacity={1}
-        onPress={onClose}
+        onPress={handleClose}
       >
-        <TouchableOpacity
+        <View
           style={[styles.modalContainer, { backgroundColor: colors.background, borderColor: colors.secondary }]}
-          activeOpacity={1}
-          onPress={(e) => e.stopPropagation()}
         >
-          <SafeAreaView style={styles.content}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.closeButton,
+              { backgroundColor: colors.primary, borderColor: colors.secondary },
+              pressed && { opacity: 0.7 }
+            ]}
+            onPress={handleClose}
+            onPressOut={handleClosePressOut}
+          >
+            <Text style={[styles.closeButtonText, { color: colors.background }]}>×</Text>
+          </Pressable>
+
+          <View style={styles.content}>
             <View style={styles.header}>
               <Text style={[styles.title, { color: colors.text.primary }]}>
                 Profile
               </Text>
-              <TouchableOpacity
-                style={[styles.closeButton, { backgroundColor: colors.primary, borderColor: colors.secondary }]}
-                onPress={onClose}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.closeButtonText, { color: colors.background }]}>×</Text>
-              </TouchableOpacity>
             </View>
 
             <View style={styles.profileContent}>
@@ -92,40 +105,50 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
                 </>
               ) : null}
             </View>
-          </SafeAreaView>
-        </TouchableOpacity>
+          </View>
+        </View>
       </TouchableOpacity>
     </Modal>
   );
 };
 
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
 const createStyles = (colors: any) => StyleSheet.create({
   overlay: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: SIZING.spacing.lg,
   },
   modalContainer: {
     width: '80%',
     maxWidth: 500,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 2,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 8,
     },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowRadius: 12,
+    elevation: 12,
+    overflow: 'visible',
+    position: 'relative',
+    flexDirection: 'column',
   },
   content: {
     padding: SIZING.spacing.lg,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SIZING.spacing.lg,
     paddingBottom: SIZING.spacing.md,
@@ -135,20 +158,27 @@ const createStyles = (colors: any) => StyleSheet.create({
   title: {
     fontSize: SIZING.font.h2,
     fontWeight: 'bold',
-    flex: 1,
     textAlign: 'center',
   },
   closeButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    position: 'absolute',
+    top: -20,
+    right: -20,
+    width: 40,
+    height: 40,
+    borderRadius: 24,
     borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 1000,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   closeButtonText: {
-    fontSize: 28,
-    marginTop: -2,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   profileContent: {
