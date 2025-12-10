@@ -312,17 +312,17 @@ export const AllianceManagementModal: React.FC<AllianceManagementModalProps> = (
                       <ActivityIndicator size="large" color={colors.primary} />
                       <Text style={[styles.loadingText, { color: colors.text.secondary }]}>Loading crews...</Text>
                     </View>
-                  ) : availableCrews.length === 0 ? (
-                    <View style={[styles.emptyContainer, { backgroundColor: colors.surface, borderColor: colors.secondary }]}>
-                      <Text style={[styles.emptyText, { color: colors.text.secondary }]}>
-                        No other crews available
-                      </Text>
-                    </View>
-                  ) : (
-                    <View style={styles.crewsList}>
-                      {availableCrews
-                        .filter(crew => crew.status === 'available')
-                        .map((crew) => {
+                  ) : (() => {
+                    const availableCrewsFiltered = availableCrews.filter(crew => crew.status === 'available');
+                    return availableCrewsFiltered.length === 0 ? (
+                      <View style={[styles.emptyContainer, { backgroundColor: colors.surface, borderColor: colors.secondary }]}>
+                        <Text style={[styles.emptyText, { color: colors.text.secondary }]}>
+                          No other crews available
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={styles.crewsList}>
+                        {availableCrewsFiltered.map((crew) => {
                           const isRequesting = processingCrewId === crew.id && processingAction === 'request';
                           const isDisabled = isProcessing || isRequesting || !!allianceStatusError || hasReachedAllianceLimit;
                           return (
@@ -370,8 +370,9 @@ export const AllianceManagementModal: React.FC<AllianceManagementModalProps> = (
                             </View>
                           );
                         })}
-                    </View>
-                  )}
+                      </View>
+                    );
+                  })()}
                 </View>
               </>
             )}
