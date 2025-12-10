@@ -215,28 +215,38 @@ export const AllianceManagementModal: React.FC<AllianceManagementModalProps> = (
                   
                   {alliances.length > 0 ? (
                     <View style={styles.alliancesList}>
-                      {alliances.map((alliance) => (
-                        <View key={alliance.alliedCrewId} style={[styles.allianceCard, { backgroundColor: yellowColor + '20', borderColor: yellowColor }]}>
-                          <Text style={[styles.allianceLabel, { color: colors.text.secondary }]}>Allied With:</Text>
-                          <Text style={[styles.allianceValue, { color: colors.text.primary }]}>
-                            {alliance.alliedCrewName} ({alliance.alliedCrewIdentifier})
-                          </Text>
-                          <TouchableOpacity
-                            style={[styles.terminateAllianceButton, { backgroundColor: colors.error, borderColor: colors.error }]}
-                            onPress={() => handleTerminateAlliance(alliance.alliedCrewId)}
-                            disabled={isProcessing || (processingCrewId === alliance.alliedCrewId && processingAction === 'terminate')}
-                            activeOpacity={0.7}
-                          >
-                            {processingCrewId === alliance.alliedCrewId && processingAction === 'terminate' ? (
-                              <ActivityIndicator size="small" color={colors.background} />
-                            ) : (
-                              <Text style={[styles.terminateAllianceButtonText, { color: colors.background }]}>
-                                TERMINATE ALLIANCE
-                              </Text>
-                            )}
-                          </TouchableOpacity>
-                        </View>
-                      ))}
+                      {alliances.map((alliance) => {
+                        const isTerminating = processingCrewId === alliance.alliedCrewId && processingAction === 'terminate';
+                        const isTerminateDisabled = isProcessing || isTerminating;
+                        return (
+                          <View key={alliance.alliedCrewId} style={[styles.allianceCard, { backgroundColor: yellowColor + '20', borderColor: yellowColor }]}>
+                            <Text style={[styles.allianceLabel, { color: colors.text.secondary }]}>Allied With:</Text>
+                            <Text style={[styles.allianceValue, { color: colors.text.primary }]}>
+                              {alliance.alliedCrewName} ({alliance.alliedCrewIdentifier})
+                            </Text>
+                            <TouchableOpacity
+                              style={[
+                                styles.terminateAllianceButton,
+                                {
+                                  backgroundColor: isTerminateDisabled ? colors.buttonDisabled : colors.error,
+                                  borderColor: isTerminateDisabled ? colors.buttonDisabled : colors.error,
+                                }
+                              ]}
+                              onPress={() => handleTerminateAlliance(alliance.alliedCrewId)}
+                              disabled={isTerminateDisabled}
+                              activeOpacity={0.7}
+                            >
+                              {isTerminating ? (
+                                <ActivityIndicator size="small" color={colors.background} />
+                              ) : (
+                                <Text style={[styles.terminateAllianceButtonText, { color: colors.background }]}>
+                                  TERMINATE ALLIANCE
+                                </Text>
+                              )}
+                            </TouchableOpacity>
+                          </View>
+                        );
+                      })}
                     </View>
                   ) : (
                     <View style={[styles.allianceCard, { backgroundColor: colors.surface, borderColor: colors.secondary }]}>
@@ -254,28 +264,38 @@ export const AllianceManagementModal: React.FC<AllianceManagementModalProps> = (
                     {requestsWeReceived.length > 0 && (
                       <View style={styles.proposalsSubsection}>
                         <Text style={[styles.proposalsSubsectionTitle, { color: colors.text.primary }]}>Requests We Received</Text>
-                        {requestsWeReceived.map((request) => (
-                          <View key={request.requestingCrewId} style={[styles.proposalCard, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}>
-                            <Text style={[styles.proposalLabel, { color: colors.text.secondary }]}>Request From:</Text>
-                            <Text style={[styles.proposalValue, { color: colors.text.primary }]}>
-                              {request.requestingCrewName} ({request.requestingCrewIdentifier})
-                            </Text>
-                            <TouchableOpacity
-                              style={[styles.acceptAllianceButton, { backgroundColor: colors.primary, borderColor: colors.primary }]}
-                              onPress={() => handleAcceptAlliance(request.requestingCrewId)}
-                              disabled={isProcessing || (processingCrewId === request.requestingCrewId && processingAction === 'accept') || hasReachedAllianceLimit}
-                              activeOpacity={0.7}
-                            >
-                              {processingCrewId === request.requestingCrewId && processingAction === 'accept' ? (
-                                <ActivityIndicator size="small" color={colors.background} />
-                              ) : (
-                                <Text style={[styles.acceptAllianceButtonText, { color: colors.background }]}>
-                                  ACCEPT ALLIANCE
-                                </Text>
-                              )}
-                            </TouchableOpacity>
-                          </View>
-                        ))}
+                        {requestsWeReceived.map((request) => {
+                          const isAccepting = processingCrewId === request.requestingCrewId && processingAction === 'accept';
+                          const isAcceptDisabled = isProcessing || isAccepting || hasReachedAllianceLimit;
+                          return (
+                            <View key={request.requestingCrewId} style={[styles.proposalCard, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}>
+                              <Text style={[styles.proposalLabel, { color: colors.text.secondary }]}>Request From:</Text>
+                              <Text style={[styles.proposalValue, { color: colors.text.primary }]}>
+                                {request.requestingCrewName} ({request.requestingCrewIdentifier})
+                              </Text>
+                              <TouchableOpacity
+                                style={[
+                                  styles.acceptAllianceButton,
+                                  {
+                                    backgroundColor: isAcceptDisabled ? colors.buttonDisabled : colors.primary,
+                                    borderColor: isAcceptDisabled ? colors.buttonDisabled : colors.primary,
+                                  }
+                                ]}
+                                onPress={() => handleAcceptAlliance(request.requestingCrewId)}
+                                disabled={isAcceptDisabled}
+                                activeOpacity={0.7}
+                              >
+                                {isAccepting ? (
+                                  <ActivityIndicator size="small" color={colors.background} />
+                                ) : (
+                                  <Text style={[styles.acceptAllianceButtonText, { color: colors.background }]}>
+                                    ACCEPT ALLIANCE
+                                  </Text>
+                                )}
+                              </TouchableOpacity>
+                            </View>
+                          );
+                        })}
                       </View>
                     )}
 
