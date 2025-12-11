@@ -358,6 +358,59 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
         userInTransaction.balance.total -= cost;
         await userInTransaction.save({ session });
       });
+    } catch (error: any) {
+      if (error.message === 'User not found') {
+        res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+        return;
+      }
+      if (error.message === 'Research feature not found') {
+        res.status(400).json({
+          success: false,
+          message: 'Research feature not found'
+        });
+        return;
+      }
+      if (error.message === 'No research in progress for this feature') {
+        res.status(400).json({
+          success: false,
+          message: 'No research in progress for this feature'
+        });
+        return;
+      }
+      if (error.message === 'Feature already unlocked') {
+        res.status(400).json({
+          success: false,
+          message: 'Feature already unlocked'
+        });
+        return;
+      }
+      if (error.message === 'Research completion time not found') {
+        res.status(400).json({
+          success: false,
+          message: 'Research completion time not found'
+        });
+        return;
+      }
+      if (error.message === 'Research is already complete') {
+        res.status(400).json({
+          success: false,
+          message: 'Research is already complete'
+        });
+        return;
+      }
+      if (error.message === 'Insufficient funds') {
+        res.status(400).json({
+          success: false,
+          message: 'Insufficient funds'
+        });
+        return;
+      }
+      
+      // Re-throw unexpected errors to be caught by outer catch
+      throw error;
     } finally {
       await session.endSession();
     }
