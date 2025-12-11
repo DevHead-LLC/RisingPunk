@@ -31,7 +31,7 @@
     "android:build:bundle:win": "cd android && gradlew.bat bundleRelease",
     "android:build:bundle:mac": "cd android && ./gradlew bundleRelease",
     "android:build:bundle:staging": "node -e \"process.platform==='win32'?process.exit(require('child_process').spawnSync('npm.cmd',['run','android:build:bundle:staging:win'],{stdio:'inherit'}).status):process.exit(require('child_process').spawnSync('npm',['run','android:build:bundle:staging:mac'],{stdio:'inherit'}).status)\"",
-    "android:build:bundle:staging:win": "cross-env ENVFILE=.env.staging cd android && gradlew.bat bundleRelease",
+    "android:build:bundle:staging:win": "cross-env ENVFILE=.env.staging npm run android:build:bundle:win",
     "android:build:bundle:staging:mac": "ENVFILE=.env.staging cd android && ./gradlew bundleRelease"
   },
   "dependencies": {

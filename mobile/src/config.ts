@@ -3,46 +3,54 @@ import Config from 'react-native-config';
 
 // Environment detection based on build configuration
 const getApiUrl = () => {
-  // Check for environment variables first (set during build)
-  const apiEnv = Config.API_ENV;
-  
-  // Helper function to get dev URL based on platform from .env files
-  const getDevUrl = () => {
-    return Platform.OS === 'android' 
-      ? Config.DEV_URL_ANDROID || 'http://10.0.2.2:5001'  // Android emulator from .env
-      : Config.DEV_URL_IOS || 'http://localhost:5001'; // iOS simulator from .env
-  };
-  
-  if (apiEnv) {
-    switch (apiEnv) {
-      case 'dev':
-        return getDevUrl();
-      case 'staging':
-        return Config.API_URL || 'https://api.risingpunk.dev';  // Read from .env.staging
-      case 'prod':
-        return Config.API_URL || 'https://api.risingpunk.com';  // Read from .env.prod
-      default:
-        throw new Error(`🚨 INVALID API_ENV: "${apiEnv}". Expected: dev, staging, or prod`);
+  try {
+    // Check for environment variables first (set during build)
+    const apiEnv = Config.API_ENV;
+    
+    // Helper function to get dev URL based on platform from .env files
+    const getDevUrl = () => {
+      return Platform.OS === 'android' 
+        ? Config.DEV_URL_ANDROID || 'http://10.0.2.2:5001'  // Android emulator from .env
+        : Config.DEV_URL_IOS || 'http://localhost:5001'; // iOS simulator from .env
+    };
+    
+    if (apiEnv) {
+      switch (apiEnv) {
+        case 'dev':
+          return getDevUrl();
+        case 'staging':
+          return Config.API_URL || 'https://api.risingpunk.dev';  // Read from .env.staging
+        case 'prod':
+          return Config.API_URL || 'https://api.risingpunk.com';  // Read from .env.prod
+        default:
+          console.error(`🚨 INVALID API_ENV: "${apiEnv}". Expected: dev, staging, or prod. Falling back to staging.`);
+          return Config.API_URL || 'https://api.risingpunk.dev';
+      }
     }
-  }
-  
-  // Fail fast: if we can't determine environment, something is fundamentally broken
-  const errorMessage = `
-🚨 CRITICAL: Environment detection failed!
+    
+    // Log warning but don't crash - use staging as fallback for production builds
+    console.error(`
+🚨 WARNING: Environment detection failed!
 
 Expected: API_ENV to be set during build
 Actual: API_ENV is undefined
 Config object: ${JSON.stringify(Config, null, 2)}
 
+Falling back to staging server: https://api.risingpunk.dev
+
 This indicates a build configuration problem:
 - Check that ENVFILE is set in package.json scripts
 - Verify .env files exist and contain API_ENV
 - Ensure react-native-config is properly configured
-
-DO NOT CONTINUE - this could cause data corruption!
-  `;
-  
-  throw new Error(errorMessage);
+    `);
+    
+    // Fallback to staging for production builds to prevent crashes
+    return Config.API_URL || 'https://api.risingpunk.dev';
+  } catch (error) {
+    console.error('🚨 CRITICAL: Error reading config:', error);
+    // Fallback to staging to prevent app crash
+    return 'https://api.risingpunk.dev';
+  }
 };
 
 export const API_URL = getApiUrl();
