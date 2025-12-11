@@ -82,7 +82,8 @@ export const BuildSection = React.memo(function BuildSection({
       }
     } catch (error: any) {
       console.error('Error speeding up bot build:', error);
-      // Silently fail - user can try again if needed
+      // Re-throw error so modal can handle it and stay open
+      throw error;
     }
   }, [speedupBotBuild, dispatch, currentBalanceState]);
 

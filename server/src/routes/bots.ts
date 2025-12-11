@@ -2,6 +2,7 @@ import express from 'express';
 const Bot = require('../models/Bot');
 import auth from '../middleware/auth';
 import { User } from '../models/User';
+import mongoose from 'mongoose';
 
 const router = express.Router();
 
@@ -244,26 +245,71 @@ router.post('/speedup-build', auth, async (req, res) => {
     // Calculate remaining bots to add
     const remainingBots = bot.buildQueue.quantity - (bot.buildQueue.botsBuilt || 0);
     
-    // Add remaining bots to inventory
-    bot.bots[bot.buildQueue.type] += remainingBots;
+    // Use transaction to ensure atomicity
+    const session = await mongoose.startSession();
     
-    // Clear build queue
-    bot.buildQueue = null;
-    
-    // Deduct balance
-    user.balance.total -= cost;
-    
-    // Save both in transaction
-    await Promise.all([
-      bot.save(),
-      user.save()
-    ]);
+    try {
+      await session.withTransaction(async () => {
+        // Reload bot and user within transaction to ensure we have latest state
+        const botInTransaction = await Bot.findOne({ userId: req.user._id }).session(session);
+        const userInTransaction = await User.findById(req.user._id).session(session);
+        
+        if (!botInTransaction || !botInTransaction.buildQueue) {
+          throw new Error('No active build found');
+        }
+
+        if (!userInTransaction) {
+          throw new Error('User not found');
+        }
+
+        // Verify build is still in progress (double-check to prevent race conditions)
+        const now = new Date();
+        const completesAt = new Date(botInTransaction.buildQueue.completesAt);
+        const remainingMs = Math.max(0, completesAt.getTime() - now.getTime());
+        
+        if (remainingMs <= 0) {
+          throw new Error('Build is already complete');
+        }
+
+        // Verify sufficient balance
+        if (userInTransaction.balance.total < cost) {
+          throw new Error('Insufficient funds');
+        }
+
+        // Calculate remaining bots to add
+        const remainingBotsToAdd = botInTransaction.buildQueue.quantity - (botInTransaction.buildQueue.botsBuilt || 0);
+        
+        // Add remaining bots to inventory
+        botInTransaction.bots[botInTransaction.buildQueue.type] += remainingBotsToAdd;
+        
+        // Clear build queue
+        botInTransaction.buildQueue = null;
+        
+        // Deduct balance
+        userInTransaction.balance.total -= cost;
+        
+        // Save both atomically
+        await botInTransaction.save({ session });
+        await userInTransaction.save({ session });
+      });
+    } finally {
+      await session.endSession();
+    }
+
+    // Reload bot and user to get updated values
+    const updatedBot = await Bot.findOne({ userId: req.user._id });
+    const updatedUser = await User.findById(req.user._id);
+
+    if (!updatedBot || !updatedUser) {
+      res.status(500).json({ error: 'Error retrieving updated data' });
+      return;
+    }
 
     res.json({
       success: true,
       message: 'Bot build completed successfully',
-      newBalance: user.balance.total,
-      bots: bot.bots
+      newBalance: updatedUser.balance.total,
+      bots: updatedBot.bots
     });
   } catch (error: any) {
     console.error('Error speeding up bot build:', error);

@@ -35,6 +35,7 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
   const { data: balanceData, isLoading: balanceLoading } = useFetchBalanceQuery();
   const dispatch = useAppDispatch();
   const reduxBalance = useAppSelector((state) => state.balance.total);
+  const currentBalanceState = useAppSelector((state) => state.balance);
   
   // Use both sources to ensure we have the most up-to-date balance
   const currentBalance = balanceData?.total ?? reduxBalance;
@@ -99,13 +100,13 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
     try {
       const result = await unlockResearchCenter().unwrap();
       
-      // Update balance in Redux store
+      // Update balance in Redux store - preserve existing fractionalRemainder
       if (result.balance) {
         dispatch(updateBalance({
           total: result.balance.total,
           ratePerSecond: result.balance.ratePerSecond,
-          lastUpdated: result.balance.lastUpdated,
-          fractionalRemainder: result.balance.fractionalRemainder
+          lastUpdated: result.balance.lastUpdated ? new Date(result.balance.lastUpdated) : null,
+          fractionalRemainder: currentBalanceState.fractionalRemainder
         }));
       }
       
@@ -128,13 +129,13 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
       const result = await speedupResearchCenterConstruction().unwrap();
       
       if (result.success) {
-        // Update balance in Redux store
+        // Update balance in Redux store - preserve existing ratePerSecond, lastUpdated, and fractionalRemainder
         if (result.balance) {
           dispatch(updateBalance({
             total: result.balance.total,
-            ratePerSecond: result.balance.ratePerSecond,
-            lastUpdated: result.balance.lastUpdated,
-            fractionalRemainder: result.balance.fractionalRemainder
+            ratePerSecond: currentBalanceState.ratePerSecond,
+            lastUpdated: result.balance.lastUpdated ? new Date(result.balance.lastUpdated) : null,
+            fractionalRemainder: currentBalanceState.fractionalRemainder
           }));
         }
         
