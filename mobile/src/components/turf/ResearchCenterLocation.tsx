@@ -2,12 +2,13 @@ import React, {memo, useState, useEffect} from 'react';
 import {TouchableOpacity, View, Text, Image, StyleSheet, Modal, Animated} from 'react-native';
 import {SIZING} from '../../styles/theme';
 import {useThemeColors} from '../../hooks/useThemeColors';
-import { useUnlockResearchCenterMutation, useGetProfileQuery, useGetResearchCenterStatusQuery } from '../../store/api/authApi';
+import { useUnlockResearchCenterMutation, useGetProfileQuery, useGetResearchCenterStatusQuery, useSpeedupResearchCenterConstructionMutation } from '../../store/api/authApi';
 import { useFetchBalanceQuery } from '../../store/api/balanceApi';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { updateBalance } from '../../store/slices/balanceSlice';
 import { BuildCountdownTimer } from './BuildCountdownTimer';
 import { LockedFeatureModal } from './index';
+import { SpeedupModal } from '../common/SpeedupModal';
 
 type ResearchCenterLocationProps = {
   onPress?: () => void;
@@ -22,16 +23,19 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
   const [showInsufficientFundsModal, setShowInsufficientFundsModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [showSpeedupModal, setShowSpeedupModal] = useState(false);
   const [currentColorIndex, setCurrentColorIndex] = useState(0);
   const animatedBorderColor = useState(new Animated.Value(0))[0];
   
   const introColors = [colors.primary, colors.secondary, colors.matrix];
   const [unlockResearchCenter] = useUnlockResearchCenterMutation();
+  const [speedupResearchCenterConstruction] = useSpeedupResearchCenterConstructionMutation();
   const { data: profile, isLoading } = useGetProfileQuery();
   const { data: buildStatus, isLoading: buildStatusLoading, refetch: refetchBuildStatus } = useGetResearchCenterStatusQuery();
   const { data: balanceData, isLoading: balanceLoading } = useFetchBalanceQuery();
   const dispatch = useAppDispatch();
   const reduxBalance = useAppSelector((state) => state.balance.total);
+  const currentBalanceState = useAppSelector((state) => state.balance);
   
   // Use both sources to ensure we have the most up-to-date balance
   const currentBalance = balanceData?.total ?? reduxBalance;
@@ -72,7 +76,8 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
 
   const handlePress = () => {
     if (isBuilding) {
-      // Do nothing during build - disabled
+      // Show speedup modal during build
+      setShowSpeedupModal(true);
       return;
     } else if (isUnlocked) {
       if (onNavigateToResearch) onNavigateToResearch();
@@ -95,13 +100,13 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
     try {
       const result = await unlockResearchCenter().unwrap();
       
-      // Update balance in Redux store
+      // Update balance in Redux store - preserve existing fractionalRemainder
       if (result.balance) {
         dispatch(updateBalance({
           total: result.balance.total,
           ratePerSecond: result.balance.ratePerSecond,
-          lastUpdated: result.balance.lastUpdated,
-          fractionalRemainder: result.balance.fractionalRemainder
+          lastUpdated: result.balance.lastUpdated ? new Date(result.balance.lastUpdated) : null,
+          fractionalRemainder: currentBalanceState.fractionalRemainder
         }));
       }
       
@@ -117,6 +122,43 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
 
   const handleClose = () => {
     setShowPopup(false);
+  };
+
+  const handleSpeedup = async () => {
+    try {
+      const result = await speedupResearchCenterConstruction().unwrap();
+      
+      if (result.success) {
+        // Update balance in Redux store - preserve existing ratePerSecond, lastUpdated, and fractionalRemainder
+        if (result.balance) {
+          dispatch(updateBalance({
+            total: result.balance.total,
+            ratePerSecond: currentBalanceState.ratePerSecond,
+            lastUpdated: result.balance.lastUpdated ? new Date(result.balance.lastUpdated) : null,
+            fractionalRemainder: currentBalanceState.fractionalRemainder
+          }));
+        }
+        
+        // Refetch build status to update UI
+        await refetchBuildStatus();
+      }
+    } catch (error: any) {
+      console.error('Error speeding up research center construction:', error);
+      const errorMsg = error?.data?.message || error?.data?.error || 'Failed to speed up research center construction';
+      setErrorMessage(errorMsg);
+      setShowErrorModal(true);
+      throw error; // Re-throw so modal can handle it
+    }
+  };
+
+  // Calculate seconds remaining for speedup modal
+  const getSecondsRemaining = (): number => {
+    if (!buildStatus?.buildStatus?.completesAt) {
+      return 0;
+    }
+    const now = new Date().getTime();
+    const completesAt = new Date(buildStatus.buildStatus.completesAt).getTime();
+    return Math.max(0, completesAt - now);
   };
 
   return (
@@ -232,6 +274,17 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
         onClose={() => setShowErrorModal(false)}
         closeButtonText="CLOSE"
       />
+
+      {isBuilding && buildStatus?.buildStatus?.completesAt && (
+        <SpeedupModal
+          visible={showSpeedupModal}
+          secondsRemaining={getSecondsRemaining()}
+          currentBalance={numericBalance || 0}
+          itemType="construction"
+          onSpeedup={handleSpeedup}
+          onClose={() => setShowSpeedupModal(false)}
+        />
+      )}
     </View>
   );
 });

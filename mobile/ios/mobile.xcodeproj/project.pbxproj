@@ -196,6 +196,7 @@
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* Set ENVFILE for react-native-config */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				FFAD31B18A7726B7CA7AD866 /* [CP] Embed Pods Frameworks */,
 				3F01983DA5B8C785BEAED527 /* [CP] Copy Pods Resources */,
@@ -267,6 +268,20 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* Set ENVFILE for react-native-config */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Set ENVFILE for react-native-config";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Set ENVFILE based on API_ENV build setting\n# This ensures react-native-config loads the correct .env file during archive builds\n\nif [ -z \"$API_ENV\" ]; then\n  echo \"Warning: API_ENV is not set, defaulting to .env\"\n  export ENVFILE=\".env\"\nelse\n  case \"$API_ENV\" in\n    dev)\n      export ENVFILE=\".env.dev\"\n      ;;\n    staging)\n      export ENVFILE=\".env.staging\"\n      ;;\n    prod)\n      export ENVFILE=\".env.prod\"\n      ;;\n    *)\n      echo \"Warning: Unknown API_ENV value: $API_ENV, defaulting to .env\"\n      export ENVFILE=\".env\"\n      ;;\n  esac\nfi\n\necho \"Setting ENVFILE=$ENVFILE for API_ENV=$API_ENV\"\n";
+		};
 		00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -281,7 +296,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\n\nWITH_ENVIRONMENT=\"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\nREACT_NATIVE_XCODE=\"$REACT_NATIVE_PATH/scripts/react-native-xcode.sh\"\n\n/bin/sh -c \"$WITH_ENVIRONMENT $REACT_NATIVE_XCODE\"\n";
+			shellScript = "set -e\n\n# Set ENVFILE based on API_ENV build setting for react-native-config\n# react-native-config reads from /tmp/envfile first, then ENV['ENVFILE']\nif [ -z \"$API_ENV\" ]; then\n  echo \"Warning: API_ENV is not set, defaulting to .env\"\n  ENVFILE_VALUE=\".env\"\nelse\n  case \"$API_ENV\" in\n    dev)\n      ENVFILE_VALUE=\".env.dev\"\n      ;;\n    staging)\n      ENVFILE_VALUE=\".env.staging\"\n      ;;\n    prod)\n      ENVFILE_VALUE=\".env.prod\"\n      ;;\n    *)\n      echo \"Warning: Unknown API_ENV value: $API_ENV, defaulting to .env\"\n      ENVFILE_VALUE=\".env\"\n      ;;\n  esac\nfi\n\n# Write to /tmp/envfile (react-native-config checks this first)\necho \"$ENVFILE_VALUE\" > /tmp/envfile\n\n# Also export as environment variable (fallback)\nexport ENVFILE=\"$ENVFILE_VALUE\"\n\necho \"[React Native Bundle] Setting ENVFILE=$ENVFILE_VALUE for API_ENV=$API_ENV\"\necho \"[React Native Bundle] Written to /tmp/envfile: $(cat /tmp/envfile)\"\n\nWITH_ENVIRONMENT=\"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\nREACT_NATIVE_XCODE=\"$REACT_NATIVE_PATH/scripts/react-native-xcode.sh\"\n\n/bin/sh -c \"$WITH_ENVIRONMENT $REACT_NATIVE_XCODE\"\n";
 		};
 		3891D4C06E52BD72996D991C /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -291,9 +306,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile-mobileTests/Pods-mobile-mobileTests-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile-mobileTests/Pods-mobile-mobileTests-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -308,9 +327,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile/Pods-mobile-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile/Pods-mobile-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -325,9 +348,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile-mobileTests/Pods-mobile-mobileTests-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile-mobileTests/Pods-mobile-mobileTests-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -386,9 +413,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile/Pods-mobile-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile/Pods-mobile-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -488,7 +519,8 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = mobile/mobile.entitlements;
-				CURRENT_PROJECT_VERSION = 23;
+				CURRENT_PROJECT_VERSION = 29;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 26522YLRG2;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = mobile/Info.plist;
@@ -499,7 +531,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 2.0.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -524,7 +556,8 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = mobile/mobile.entitlements;
-				CURRENT_PROJECT_VERSION = 23;
+				CURRENT_PROJECT_VERSION = 29;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 26522YLRG2;
 				INFOPLIST_FILE = mobile/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = RisingPunk;
@@ -534,7 +567,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 2.0.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -617,10 +650,7 @@
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
 				);
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
@@ -689,10 +719,7 @@
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
 				);
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				USE_HERMES = true;
