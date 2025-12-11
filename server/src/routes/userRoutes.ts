@@ -286,8 +286,6 @@ router.post('/speedup-research-center-construction', auth, async (req: Request, 
       await userInTransaction.save({ session });
     });
   } catch (error: any) {
-    await session.endSession();
-    
     if (error.message === 'User not found') {
       res.status(404).json({ error: 'User not found' });
       return;
@@ -634,8 +632,6 @@ router.post('/speedup-property-construction/:propertyId', auth, async (req, res)
       await userInTransaction.save({ session });
     });
   } catch (error: any) {
-    await session.endSession();
-    
     if (error.message === 'User not found') {
       res.status(404).json({ error: 'User not found' });
       return;

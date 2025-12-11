@@ -111,7 +111,16 @@ export const botsApi = createApi({
         url: '/api/bots/speedup-build',
         method: 'POST',
       }),
-      invalidatesTags: ['Bots', 'Balance'],
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Invalidate Balance tag from balanceApi to ensure fresh balance data
+          dispatch(balanceApi.util.invalidateTags(['Balance']));
+        } catch {
+          // Error handling is done by the mutation itself
+        }
+      },
+      invalidatesTags: ['Bots'],
     }),
   }),
 });

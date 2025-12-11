@@ -1,6 +1,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
 import { RootState } from '../index';
+import { balanceApi } from './balanceApi';
 
 export interface ResearchFeatureStatus {
   featureId: string;
@@ -94,9 +95,17 @@ export const researchFeaturesApi = createApi({
           newBalance: response.newBalance
         };
       },
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Invalidate Balance tag from balanceApi to ensure fresh balance data
+          dispatch(balanceApi.util.invalidateTags(['Balance']));
+        } catch {
+          // Error handling is done by the mutation itself
+        }
+      },
       invalidatesTags: (result, error, { categoryId }) => [
-        { type: 'ResearchFeatures', id: categoryId },
-        'Balance'
+        { type: 'ResearchFeatures', id: categoryId }
       ],
     }),
   }),

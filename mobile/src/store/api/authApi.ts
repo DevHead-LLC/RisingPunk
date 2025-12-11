@@ -3,6 +3,7 @@ import type { RootState } from '../index';
 import { API_URL } from '../../config';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 import { resetAllApiCaches } from './resetApiCaches';
+import { balanceApi } from './balanceApi';
 
 export interface LoginRequest {
   handle: string;
@@ -248,7 +249,16 @@ export const authApi = createApi({
         url: '/api/users/speedup-research-center-construction',
         method: 'POST',
       }),
-      invalidatesTags: ['User', 'Balance'],
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Invalidate Balance tag from balanceApi to ensure fresh balance data
+          dispatch(balanceApi.util.invalidateTags(['Balance']));
+        } catch {
+          // Error handling is done by the mutation itself
+        }
+      },
+      invalidatesTags: ['User'],
     }),
 
     getRentalHousingStatus: builder.query<RentalHousingStatusResponse, number>({
@@ -281,9 +291,17 @@ export const authApi = createApi({
         url: `/api/users/speedup-property-construction/${propertyId}`,
         method: 'POST',
       }),
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Invalidate Balance tag from balanceApi to ensure fresh balance data
+          dispatch(balanceApi.util.invalidateTags(['Balance']));
+        } catch {
+          // Error handling is done by the mutation itself
+        }
+      },
       invalidatesTags: (result, error, propertyId) => [
-        { type: 'User', id: `rentalHousingStatus-${propertyId}` },
-        'Balance'
+        { type: 'User', id: `rentalHousingStatus-${propertyId}` }
       ],
     }),
 
