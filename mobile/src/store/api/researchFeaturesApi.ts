@@ -23,6 +23,12 @@ export interface CompleteResearchResponse {
   unlockedAt: string;
 }
 
+export interface SpeedupFeatureResearchResponse {
+  success: boolean;
+  message: string;
+  newBalance: number;
+}
+
 export const researchFeaturesApi = createApi({
   reducerPath: 'researchFeaturesApi',
   baseQuery: fetchBaseQuery({
@@ -74,6 +80,25 @@ export const researchFeaturesApi = createApi({
         { type: 'ResearchFeatures', id: categoryId }
       ],
     }),
+    speedupFeatureResearch: builder.mutation<SpeedupFeatureResearchResponse, { categoryId: string; featureId: string }>({
+      query: ({ categoryId, featureId }) => ({
+        url: `/speedup-feature-research`,
+        method: 'POST',
+        body: { categoryId, featureId },
+      }),
+      transformResponse: (response: { success: boolean; message: string; newBalance: number }) => {
+        // Server returns response directly, not wrapped in data
+        return {
+          success: response.success,
+          message: response.message,
+          newBalance: response.newBalance
+        };
+      },
+      invalidatesTags: (result, error, { categoryId }) => [
+        { type: 'ResearchFeatures', id: categoryId },
+        'Balance'
+      ],
+    }),
   }),
 });
 
@@ -82,5 +107,6 @@ export const {
   useGetFeaturesQuery,
   useGetUserFeaturesQuery,
   useStartResearchMutation, 
-  useCompleteResearchMutation 
+  useCompleteResearchMutation,
+  useSpeedupFeatureResearchMutation
 } = researchFeaturesApi;

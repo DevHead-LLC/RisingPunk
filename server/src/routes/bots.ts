@@ -196,12 +196,77 @@ router.get('/build-state', auth, async (req, res) => {
         ...bot.buildQueue.toObject(),
         progress,
         type: bot.buildQueue.type,
-        totalCost: bot.buildQueue.totalCost  // Explicitly include totalCost
+        totalCost: bot.buildQueue.totalCost,  // Explicitly include totalCost
+        botsBuilt: bot.buildQueue.botsBuilt  // Include botsBuilt
       },
       bots: bot.bots
     });
   } catch (error: any) {
     console.error('Build state check error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Speedup bot build
+router.post('/speedup-build', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    const bot = await Bot.findOne({ userId: req.user._id });
+    if (!bot || !bot.buildQueue) {
+      res.status(400).json({ error: 'No active build found' });
+      return;
+    }
+
+    // Calculate cost: $5 per second remaining
+    const now = new Date();
+    const completesAt = new Date(bot.buildQueue.completesAt);
+    const remainingMs = Math.max(0, completesAt.getTime() - now.getTime());
+    const remainingSeconds = Math.ceil(remainingMs / 1000);
+    const cost = remainingSeconds * 5;
+
+    // Check if build is already complete
+    if (remainingSeconds <= 0) {
+      res.status(400).json({ error: 'Build is already complete' });
+      return;
+    }
+
+    // Verify sufficient balance
+    if (user.balance.total < cost) {
+      res.status(400).json({ error: 'Insufficient funds' });
+      return;
+    }
+
+    // Calculate remaining bots to add
+    const remainingBots = bot.buildQueue.quantity - (bot.buildQueue.botsBuilt || 0);
+    
+    // Add remaining bots to inventory
+    bot.bots[bot.buildQueue.type] += remainingBots;
+    
+    // Clear build queue
+    bot.buildQueue = null;
+    
+    // Deduct balance
+    user.balance.total -= cost;
+    
+    // Save both in transaction
+    await Promise.all([
+      bot.save(),
+      user.save()
+    ]);
+
+    res.json({
+      success: true,
+      message: 'Bot build completed successfully',
+      newBalance: user.balance.total,
+      bots: bot.bots
+    });
+  } catch (error: any) {
+    console.error('Error speeding up bot build:', error);
     res.status(500).json({ error: error.message });
   }
 });

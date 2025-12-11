@@ -116,6 +116,28 @@ export interface CompleteRentalHousingResponse {
   isUnlocked: boolean;
 }
 
+export interface SpeedupPropertyConstructionResponse {
+  success: boolean;
+  message: string;
+  propertyId: number;
+  isUnlocked: boolean;
+  newBalance: number;
+}
+
+export interface SpeedupResearchCenterConstructionResponse {
+  success: boolean;
+  message: string;
+  balance: {
+    total: number;
+    ratePerSecond: number;
+    lastUpdated: string;
+  };
+  unlockedFeatures: {
+    hackRig: boolean;
+    researchCenter: boolean;
+  };
+}
+
 // Custom base query with error handling for authApi
 const authBaseQuery = async (args: any, api: any, extraOptions: any) => {
   const result = await fetchBaseQuery({
@@ -221,6 +243,14 @@ export const authApi = createApi({
       providesTags: ['User'],
     }),
 
+    speedupResearchCenterConstruction: builder.mutation<SpeedupResearchCenterConstructionResponse, void>({
+      query: () => ({
+        url: '/api/users/speedup-research-center-construction',
+        method: 'POST',
+      }),
+      invalidatesTags: ['User', 'Balance'],
+    }),
+
     getRentalHousingStatus: builder.query<RentalHousingStatusResponse, number>({
       query: (propertyId) => `/api/users/rental-housing-status/${propertyId}`,
       providesTags: (result, error, propertyId) => [
@@ -243,6 +273,17 @@ export const authApi = createApi({
       }),
       invalidatesTags: (result, error, propertyId) => [
         { type: 'User', id: `rentalHousingStatus-${propertyId}` }
+      ],
+    }),
+
+    speedupPropertyConstruction: builder.mutation<SpeedupPropertyConstructionResponse, number>({
+      query: (propertyId) => ({
+        url: `/api/users/speedup-property-construction/${propertyId}`,
+        method: 'POST',
+      }),
+      invalidatesTags: (result, error, propertyId) => [
+        { type: 'User', id: `rentalHousingStatus-${propertyId}` },
+        'Balance'
       ],
     }),
 
@@ -537,9 +578,11 @@ export const {
   useUnlockHackRigMutation,
   useUnlockResearchCenterMutation,
   useGetResearchCenterStatusQuery,
+  useSpeedupResearchCenterConstructionMutation,
   useGetRentalHousingStatusQuery,
   useUnlockRentalHousingMutation,
   useCompleteRentalHousingMutation,
+  useSpeedupPropertyConstructionMutation,
   useCompleteOnboardingMutation,
   useDeleteAccountMutation,
   useForgotPasswordMutation,
