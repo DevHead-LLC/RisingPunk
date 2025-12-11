@@ -223,28 +223,6 @@ router.post('/speedup-build', auth, async (req, res) => {
       return;
     }
 
-    // Calculate cost: $5 per second remaining
-    const now = new Date();
-    const completesAt = new Date(bot.buildQueue.completesAt);
-    const remainingMs = Math.max(0, completesAt.getTime() - now.getTime());
-    const remainingSeconds = Math.ceil(remainingMs / 1000);
-    const cost = remainingSeconds * 5;
-
-    // Check if build is already complete
-    if (remainingSeconds <= 0) {
-      res.status(400).json({ error: 'Build is already complete' });
-      return;
-    }
-
-    // Verify sufficient balance
-    if (user.balance.total < cost) {
-      res.status(400).json({ error: 'Insufficient funds' });
-      return;
-    }
-
-    // Calculate remaining bots to add
-    const remainingBots = bot.buildQueue.quantity - (bot.buildQueue.botsBuilt || 0);
-    
     // Use transaction to ensure atomicity
     const session = await mongoose.startSession();
     
@@ -262,14 +240,18 @@ router.post('/speedup-build', auth, async (req, res) => {
           throw new Error('User not found');
         }
 
-        // Verify build is still in progress (double-check to prevent race conditions)
+        // Calculate cost inside transaction based on current time to prevent overcharging
         const now = new Date();
         const completesAt = new Date(botInTransaction.buildQueue.completesAt);
         const remainingMs = Math.max(0, completesAt.getTime() - now.getTime());
+        const remainingSeconds = Math.ceil(remainingMs / 1000);
         
-        if (remainingMs <= 0) {
+        if (remainingSeconds <= 0) {
           throw new Error('Build is already complete');
         }
+
+        // Calculate cost based on actual remaining time at transaction execution
+        const cost = remainingSeconds * 5;
 
         // Verify sufficient balance
         if (userInTransaction.balance.total < cost) {

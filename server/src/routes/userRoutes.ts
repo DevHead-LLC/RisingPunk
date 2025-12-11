@@ -5,6 +5,7 @@ import auth from '../middleware/auth';
 import { Request, Response } from 'express';
 import { FinanceTier } from '../models/Finance';
 import { FinanceTemplate } from '../models/FinanceTemplate';
+import mongoose from 'mongoose';
 
 interface UpdatePreferencesRequest extends Request {
   body: {
@@ -240,81 +241,97 @@ router.post('/unlock-research-center', auth, async (req: Request, res: Response)
 });
 
 router.post('/speedup-research-center-construction', auth, async (req: Request, res: Response) => {
+  const session = await mongoose.startSession();
+  
   try {
-    const user = await User.findById(req.user._id);
-    if (!user) {
+    await session.withTransaction(async () => {
+      // Reload user within transaction to ensure we have latest state
+      const userInTransaction = await User.findById(req.user._id).session(session);
+      if (!userInTransaction) {
+        throw new Error('User not found');
+      }
+
+      const buildStatus = userInTransaction.researchCenterBuild;
+      
+      if (!buildStatus?.startedAt || !buildStatus?.completesAt) {
+        throw new Error('No active build found for research center');
+      }
+
+      // Calculate cost inside transaction based on current time to prevent overcharging
+      const now = new Date();
+      const completesAt = new Date(buildStatus.completesAt);
+      const remainingMs = Math.max(0, completesAt.getTime() - now.getTime());
+      const remainingSeconds = Math.ceil(remainingMs / 1000);
+      
+      if (remainingSeconds <= 0) {
+        throw new Error('Build is already complete');
+      }
+
+      // Calculate cost based on actual remaining time at transaction execution
+      const cost = remainingSeconds * 5;
+
+      // Verify sufficient balance inside transaction to prevent race conditions
+      if (userInTransaction.balance.total < cost) {
+        throw new Error('Insufficient funds');
+      }
+
+      // Mark research center as unlocked and clear build status, deduct balance atomically
+      userInTransaction.unlockedFeatures.researchCenter = true;
+      userInTransaction.researchCenterBuild = {
+        startedAt: null,
+        completesAt: null
+      };
+      userInTransaction.balance.total -= cost;
+
+      await userInTransaction.save({ session });
+    });
+  } catch (error: any) {
+    await session.endSession();
+    
+    if (error.message === 'User not found') {
       res.status(404).json({ error: 'User not found' });
       return;
     }
-
-    const buildStatus = user.researchCenterBuild;
-    
-    if (!buildStatus?.startedAt || !buildStatus?.completesAt) {
+    if (error.message === 'No active build found for research center') {
       res.status(400).json({ error: 'No active build found for research center' });
       return;
     }
-
-    // Calculate cost: $5 per second remaining
-    const now = new Date();
-    const completesAt = new Date(buildStatus.completesAt);
-    const remainingMs = Math.max(0, completesAt.getTime() - now.getTime());
-    const remainingSeconds = Math.ceil(remainingMs / 1000);
-    const cost = remainingSeconds * 5;
-
-    // Check if build is already complete
-    if (remainingSeconds <= 0) {
+    if (error.message === 'Build is already complete') {
       res.status(400).json({ error: 'Build is already complete' });
       return;
     }
-
-    // Verify sufficient balance
-    if (user.balance.total < cost) {
+    if (error.message === 'Insufficient funds') {
       res.status(400).json({ error: 'Insufficient funds' });
       return;
     }
-
-    // Mark research center as unlocked and clear build status, deduct balance
-    user.unlockedFeatures.researchCenter = true;
-    user.researchCenterBuild = {
-      startedAt: null,
-      completesAt: null
-    };
-
-    await User.findByIdAndUpdate(req.user._id, { 
-      $set: {
-        'unlockedFeatures.researchCenter': true,
-        'researchCenterBuild': {
-          startedAt: null,
-          completesAt: null
-        }
-      },
-      $inc: { 'balance.total': -cost }
-    });
-
-    // Reload user to get updated balance
-    const updatedUser = await User.findById(req.user._id);
-    if (!updatedUser) {
-      res.status(500).json({ error: 'Error updating user' });
-      return;
-    }
-
-    res.json({
-      success: true,
-      message: 'Research center construction completed',
-      balance: {
-        total: updatedUser.balance.total,
-        ratePerSecond: updatedUser.balance.ratePerSecond,
-        lastUpdated: updatedUser.balance.lastUpdated.toISOString()
-      },
-      unlockedFeatures: {
-        hackRig: updatedUser.unlockedFeatures?.hackRig || false,
-        researchCenter: true
-      }
-    });
-  } catch (error) {
+    
     console.error('Error speeding up research center construction:', error);
     res.status(500).json({ error: 'Internal server error' });
+    return;
+  } finally {
+    await session.endSession();
   }
+
+  // Reload user to get updated balance after transaction
+  const updatedUser = await User.findById(req.user._id);
+  if (!updatedUser) {
+    res.status(500).json({ error: 'Error retrieving updated user data' });
+    return;
+  }
+
+  res.json({
+    success: true,
+    message: 'Research center construction completed',
+    balance: {
+      total: updatedUser.balance.total,
+      ratePerSecond: updatedUser.balance.ratePerSecond,
+      lastUpdated: updatedUser.balance.lastUpdated.toISOString()
+    },
+    unlockedFeatures: {
+      hackRig: updatedUser.unlockedFeatures?.hackRig || false,
+      researchCenter: true
+    }
+  });
 });
 
 router.post('/experience/add', auth, async (req: Request, res: Response) => {
@@ -561,88 +578,111 @@ router.post('/complete-rental-housing/:propertyId', auth, async (req, res): Prom
 });
 
 router.post('/speedup-property-construction/:propertyId', auth, async (req, res): Promise<void> => {
-  try {
-    const userId = req.user?._id;
-    const propertyId = parseInt(req.params.propertyId);
-    
-    if (!userId || propertyId < 1 || propertyId > 4) {
-      res.status(400).json({ error: 'Invalid property ID' });
-      return;
-    }
+  const userId = req.user?._id;
+  const propertyId = parseInt(req.params.propertyId);
+  
+  if (!userId || propertyId < 1 || propertyId > 4) {
+    res.status(400).json({ error: 'Invalid property ID' });
+    return;
+  }
 
-    const user = await User.findById(userId);
-    if (!user) {
+  const session = await mongoose.startSession();
+  
+  try {
+    await session.withTransaction(async () => {
+      // Reload user within transaction to ensure we have latest state
+      const userInTransaction = await User.findById(userId).session(session);
+      if (!userInTransaction) {
+        throw new Error('User not found');
+      }
+
+      const propertyKey = `property${propertyId}` as keyof typeof userInTransaction.rentalHousingBuilds;
+      const rentalHousingKey = `rentalHousing${propertyId}` as keyof typeof userInTransaction.unlockedFeatures;
+      
+      const buildStatus = userInTransaction.rentalHousingBuilds?.[propertyKey] as { startedAt: Date | null; completesAt: Date | null } | undefined;
+      
+      if (!buildStatus?.startedAt || !buildStatus?.completesAt) {
+        throw new Error('No active build found for this property');
+      }
+
+      // Calculate cost inside transaction based on current time to prevent overcharging
+      const now = new Date();
+      const completesAt = new Date(buildStatus.completesAt);
+      const remainingMs = Math.max(0, completesAt.getTime() - now.getTime());
+      const remainingSeconds = Math.ceil(remainingMs / 1000);
+      
+      if (remainingSeconds <= 0) {
+        throw new Error('Build is already complete');
+      }
+
+      // Calculate cost based on actual remaining time at transaction execution
+      const cost = remainingSeconds * 5;
+
+      // Verify sufficient balance inside transaction to prevent race conditions
+      if (userInTransaction.balance.total < cost) {
+        throw new Error('Insufficient funds');
+      }
+
+      // Mark property as unlocked and clear build status, deduct balance atomically
+      (userInTransaction.unlockedFeatures as any)[rentalHousingKey] = true;
+      (userInTransaction.rentalHousingBuilds as any)[propertyKey] = {
+        startedAt: null,
+        completesAt: null
+      };
+      userInTransaction.balance.total -= cost;
+
+      await userInTransaction.save({ session });
+    });
+  } catch (error: any) {
+    await session.endSession();
+    
+    if (error.message === 'User not found') {
       res.status(404).json({ error: 'User not found' });
       return;
     }
-
-    const propertyKey = `property${propertyId}` as keyof typeof user.rentalHousingBuilds;
-    const rentalHousingKey = `rentalHousing${propertyId}` as keyof typeof user.unlockedFeatures;
-    
-    const buildStatus = user.rentalHousingBuilds?.[propertyKey] as { startedAt: Date | null; completesAt: Date | null } | undefined;
-    
-    if (!buildStatus?.startedAt || !buildStatus?.completesAt) {
+    if (error.message === 'No active build found for this property') {
       res.status(400).json({ error: 'No active build found for this property' });
       return;
     }
-
-    // Calculate cost: $5 per second remaining
-    const now = new Date();
-    const completesAt = new Date(buildStatus.completesAt);
-    const remainingMs = Math.max(0, completesAt.getTime() - now.getTime());
-    const remainingSeconds = Math.ceil(remainingMs / 1000);
-    const cost = remainingSeconds * 5;
-
-    // Check if build is already complete
-    if (remainingSeconds <= 0) {
+    if (error.message === 'Build is already complete') {
       res.status(400).json({ error: 'Build is already complete' });
       return;
     }
-
-    // Verify sufficient balance
-    if (user.balance.total < cost) {
+    if (error.message === 'Insufficient funds') {
       res.status(400).json({ error: 'Insufficient funds' });
       return;
     }
-
-    // Mark property as unlocked and clear build status, deduct balance
-    const updateData: any = {
-      [`unlockedFeatures.${rentalHousingKey}`]: true,
-      [`rentalHousingBuilds.${propertyKey}`]: {
-        startedAt: null,
-        completesAt: null
-      }
-    };
-
-    await User.findByIdAndUpdate(userId, { 
-      $set: updateData,
-      $inc: { 'balance.total': -cost }
-    });
-
-    // Reload user to get updated balance
-    const updatedUser = await User.findById(userId);
-    if (!updatedUser) {
-      res.status(500).json({ error: 'Error updating user' });
-      return;
-    }
-
-    // Trigger a sync to ensure rental housing income is properly calculated
-    if (updatedUser) {
-      const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
-      await RentalHousingSyncService.performSync(updatedUser);
-    }
-
-    res.json({
-      success: true,
-      message: 'Property construction completed',
-      propertyId,
-      isUnlocked: true,
-      newBalance: updatedUser.balance.total
-    });
-  } catch (error) {
+    
     console.error('Error speeding up property construction:', error);
     res.status(500).json({ error: 'Internal server error' });
+    return;
+  } finally {
+    await session.endSession();
   }
+
+  // Reload user to get updated balance after transaction
+  const updatedUser = await User.findById(userId);
+  if (!updatedUser) {
+    res.status(500).json({ error: 'Error retrieving updated user data' });
+    return;
+  }
+
+  // Trigger a sync to ensure rental housing income is properly calculated
+  try {
+    const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
+    await RentalHousingSyncService.performSync(updatedUser);
+  } catch (syncError) {
+    console.error('Error syncing rental housing:', syncError);
+    // Don't fail the request if sync fails, but log it
+  }
+
+  res.json({
+    success: true,
+    message: 'Property construction completed',
+    propertyId,
+    isUnlocked: true,
+    newBalance: updatedUser.balance.total
+  });
 });
 
 // Update user preferences

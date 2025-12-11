@@ -45,6 +45,13 @@ export const SpeedupModal: React.FC<SpeedupModalProps> = ({
     return () => clearInterval(interval);
   }, [visible, localSecondsRemaining]);
 
+  // Close modal when timer expires to prevent stale state
+  useEffect(() => {
+    if (visible && localSecondsRemaining <= 0) {
+      onClose();
+    }
+  }, [visible, localSecondsRemaining, onClose]);
+
   // Calculate cost: seconds * 5
   const cost = useMemo(() => {
     const seconds = Math.ceil(localSecondsRemaining / 1000);

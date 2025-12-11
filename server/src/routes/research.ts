@@ -287,39 +287,6 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
       return;
     }
 
-    // Calculate cost: $5 per second remaining
-    const now = new Date();
-    const completesAt = userResearchFeature.researchCompletesAt;
-    if (!completesAt) {
-      res.status(400).json({
-        success: false,
-        message: 'Research completion time not found'
-      });
-      return;
-    }
-
-    const remainingMs = Math.max(0, completesAt.getTime() - now.getTime());
-    const remainingSeconds = Math.ceil(remainingMs / 1000);
-    const cost = remainingSeconds * 5;
-
-    // Check if research is already complete
-    if (remainingSeconds <= 0) {
-      res.status(400).json({
-        success: false,
-        message: 'Research is already complete'
-      });
-      return;
-    }
-
-    // Verify sufficient balance
-    if (user.balance.total < cost) {
-      res.status(400).json({
-        success: false,
-        message: 'Insufficient funds'
-      });
-      return;
-    }
-
     // Complete research immediately (bypass time check for speedup)
     // Use transaction to ensure atomicity and prevent race conditions with auto-completion
     const session = await mongoose.startSession();
@@ -345,6 +312,34 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
           throw new Error('Feature already unlocked');
         }
 
+        if (!currentResearch.researchCompletesAt) {
+          throw new Error('Research completion time not found');
+        }
+
+        // Calculate cost inside transaction based on current time to prevent overcharging
+        const now = new Date();
+        const completesAt = currentResearch.researchCompletesAt;
+        const remainingMs = Math.max(0, completesAt.getTime() - now.getTime());
+        const remainingSeconds = Math.ceil(remainingMs / 1000);
+        
+        if (remainingSeconds <= 0) {
+          throw new Error('Research is already complete');
+        }
+
+        // Calculate cost based on actual remaining time at transaction execution
+        const cost = remainingSeconds * 5;
+
+        // Reload user within transaction to ensure we have latest balance
+        const userInTransaction = await User.findById(userId).session(session);
+        if (!userInTransaction) {
+          throw new Error('User not found');
+        }
+
+        // Verify sufficient balance
+        if (userInTransaction.balance.total < cost) {
+          throw new Error('Insufficient funds');
+        }
+
         // Mark as unlocked and clear research status atomically
         const unlockedAt = new Date();
         await UserResearchFeature.findByIdAndUpdate(
@@ -360,17 +355,27 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
         );
 
         // Deduct balance atomically
-        user.balance.total -= cost;
-        await user.save({ session });
+        userInTransaction.balance.total -= cost;
+        await userInTransaction.save({ session });
       });
     } finally {
       await session.endSession();
     }
 
+    // Reload user to get updated balance
+    const updatedUser = await User.findById(userId);
+    if (!updatedUser) {
+      res.status(500).json({
+        success: false,
+        message: 'Error retrieving updated user data'
+      });
+      return;
+    }
+
     res.json({
       success: true,
       message: 'Research completed successfully',
-      newBalance: user.balance.total
+      newBalance: updatedUser.balance.total
     });
   } catch (error) {
     console.error('Error speeding up feature research:', error);
