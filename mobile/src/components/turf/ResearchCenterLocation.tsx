@@ -44,7 +44,7 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
   const numericBalance = typeof currentBalance === 'string' ? parseFloat(currentBalance) : currentBalance;
 
   const isUnlocked = buildStatus?.isUnlocked || false;
-  const isBuilding = buildStatus?.buildStatus !== null;
+  const isBuilding = buildStatus?.buildStatus != null;
   const RESEARCH_CENTER_COST = 50000;
   
   const hasSufficientFunds = numericBalance !== null && !isNaN(numericBalance as number) && numericBalance >= RESEARCH_CENTER_COST;
