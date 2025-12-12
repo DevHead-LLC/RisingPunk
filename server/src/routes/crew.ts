@@ -529,14 +529,18 @@ router.post('/chat-messages', auth, async (req: SendChatMessageRequest, res: Res
         .select('createdAt')
         .lean();
       
-      // Get the timestamp of the 100th message (oldest in our keep list)
-      const oldestKeptTimestamp = messages[messages.length - 1].createdAt;
-      
-      // Delete all messages older than the 100th most recent
-      await CrewChatMessage.deleteMany({
-        crewId,
-        createdAt: { $lt: oldestKeptTimestamp }
-      });
+      // Safety check: ensure we have messages before accessing (race condition protection)
+      if (messages.length > 0) {
+        // Get the timestamp of the 100th message (oldest in our keep list)
+        const oldestKeptTimestamp = messages[messages.length - 1].createdAt;
+        
+        // Delete all messages older than the 100th most recent
+        await CrewChatMessage.deleteMany({
+          crewId,
+          createdAt: { $lt: oldestKeptTimestamp }
+        });
+      }
+      // If messages.length === 0, all messages were deleted in a race condition, skip pruning
     }
 
     res.json({
