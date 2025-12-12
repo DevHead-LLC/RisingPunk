@@ -144,7 +144,8 @@ export function FeatureModal({
     } catch (error: any) {
       console.error('Error speeding up research:', error);
       // Show error modal with appropriate message
-      if (error?.data?.error === 'Insufficient funds') {
+      // Note: speedup-feature-research endpoint returns { success: false, message: '...' }
+      if (error?.data?.message === 'Insufficient funds') {
         setErrorMessage('You do not have sufficient funds to speed up this research.');
       } else {
         const errorMsg = error?.data?.message || error?.data?.error || 'Failed to speed up research. Please try again.';
