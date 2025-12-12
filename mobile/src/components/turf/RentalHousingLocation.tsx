@@ -6,7 +6,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useFetchBalanceQuery } from '../../store/api/balanceApi';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { updateBalance, getCurrentBalance } from '../../store/slices/balanceSlice';
-import { useGetRentalHousingStatusQuery, useUnlockRentalHousingMutation, useCompleteRentalHousingMutation } from '../../store/api/authApi';
+import { useGetRentalHousingStatusQuery, useUnlockRentalHousingMutation, useCompleteRentalHousingMutation, useSpeedupPropertyConstructionMutation } from '../../store/api/authApi';
 import {
   DevelopmentIcon,
   DevelopmentLabel,
@@ -14,6 +14,7 @@ import {
   BuildModal,
   LockedFeatureModal
 } from './index';
+import { SpeedupModal } from '../common/SpeedupModal';
 
 type RentalHousingLocationProps = {
   propertyId: number;
@@ -41,12 +42,14 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
   const [showBuildStartedModal, setShowBuildStartedModal] = useState(false);
   const [showBuildErrorModal, setShowBuildErrorModal] = useState(false);
   const [showCompletionErrorModal, setShowCompletionErrorModal] = useState(false);
+  const [showSpeedupModal, setShowSpeedupModal] = useState(false);
   const [forceUpdate, setForceUpdate] = useState(0);
   
   const { data: balanceData, isLoading: balanceLoading } = useFetchBalanceQuery();
   const { data: rentalHousingStatus, isLoading: statusLoading, refetch } = useGetRentalHousingStatusQuery(propertyId);
   const [unlockRentalHousing, { isLoading: isUnlocking }] = useUnlockRentalHousingMutation();
   const [completeRentalHousing, { isLoading: isCompleting }] = useCompleteRentalHousingMutation();
+  const [speedupPropertyConstruction] = useSpeedupPropertyConstructionMutation();
   
   const dispatch = useAppDispatch();
   
@@ -79,7 +82,8 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
 
   const handlePress = () => {
     if (isBuilding) {
-      // Do nothing during build - disabled
+      // Show speedup modal during build
+      setShowSpeedupModal(true);
       return;
     } else if (isUnlocked) {
       if (onNavigateToFloorPlan) {
@@ -157,6 +161,47 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
       setShowCompletionErrorModal(true);
     }
   }, [propertyId, completeRentalHousing, refetch]);
+
+  const handleSpeedup = useCallback(async () => {
+    try {
+      const result = await speedupPropertyConstruction(propertyId).unwrap();
+      
+      if (result.success) {
+        // Update balance
+        dispatch(updateBalance({ 
+          total: result.newBalance, 
+          ratePerSecond: currentBalanceState.ratePerSecond, 
+          lastUpdated: currentBalanceState.lastUpdated ? new Date(currentBalanceState.lastUpdated) : null,
+          fractionalRemainder: currentBalanceState.fractionalRemainder
+        }));
+        
+        // Force a re-render to update the UI
+        setForceUpdate(prev => prev + 1);
+        await refetch();
+        // Close speedup modal on success
+        setShowSpeedupModal(false);
+      }
+    } catch (error: any) {
+      console.error('Error speeding up property construction:', error);
+      // Close speedup modal and show error modal instead
+      setShowSpeedupModal(false);
+      if (error?.data?.error === 'Insufficient funds') {
+        setShowInsufficientFundsModal(true);
+      } else {
+        setShowBuildErrorModal(true);
+      }
+    }
+  }, [propertyId, speedupPropertyConstruction, dispatch, currentBalanceState, refetch]);
+
+  // Calculate seconds remaining for speedup modal
+  const getSecondsRemaining = (): number => {
+    if (!buildStatus?.completesAt) {
+      return 0;
+    }
+    const now = new Date().getTime();
+    const completesAt = new Date(buildStatus.completesAt).getTime();
+    return Math.max(0, completesAt - now);
+  };
 
   // Show loading state while fetching status
   if (statusLoading) {
@@ -258,6 +303,17 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
         onClose={() => setShowCompletionErrorModal(false)}
         closeButtonText="CLOSE"
       />
+
+      {isBuilding && buildStatus?.completesAt && (
+        <SpeedupModal
+          visible={showSpeedupModal}
+          secondsRemaining={getSecondsRemaining()}
+          currentBalance={numericBalance || 0}
+          itemType="construction"
+          onSpeedup={handleSpeedup}
+          onClose={() => setShowSpeedupModal(false)}
+        />
+      )}
     </View>
   );
 });

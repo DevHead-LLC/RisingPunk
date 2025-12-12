@@ -3,6 +3,7 @@ import type { RootState } from '../index';
 import { API_URL } from '../../config';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 import { resetAllApiCaches } from './resetApiCaches';
+import { balanceApi } from './balanceApi';
 
 export interface LoginRequest {
   handle: string;
@@ -116,6 +117,28 @@ export interface CompleteRentalHousingResponse {
   isUnlocked: boolean;
 }
 
+export interface SpeedupPropertyConstructionResponse {
+  success: boolean;
+  message: string;
+  propertyId: number;
+  isUnlocked: boolean;
+  newBalance: number;
+}
+
+export interface SpeedupResearchCenterConstructionResponse {
+  success: boolean;
+  message: string;
+  balance: {
+    total: number;
+    ratePerSecond: number;
+    lastUpdated: string;
+  };
+  unlockedFeatures: {
+    hackRig: boolean;
+    researchCenter: boolean;
+  };
+}
+
 // Custom base query with error handling for authApi
 const authBaseQuery = async (args: any, api: any, extraOptions: any) => {
   const result = await fetchBaseQuery({
@@ -159,7 +182,7 @@ const authBaseQuery = async (args: any, api: any, extraOptions: any) => {
 export const authApi = createApi({
   reducerPath: 'authApi',
   baseQuery: authBaseQuery,
-  tagTypes: ['User', 'Crew'],
+  tagTypes: ['User', 'Crew', 'CrewChat'],
   endpoints: (builder) => ({
     login: builder.mutation<AuthResponse, LoginRequest>({
       query: (credentials) => ({
@@ -221,6 +244,23 @@ export const authApi = createApi({
       providesTags: ['User'],
     }),
 
+    speedupResearchCenterConstruction: builder.mutation<SpeedupResearchCenterConstructionResponse, void>({
+      query: () => ({
+        url: '/api/users/speedup-research-center-construction',
+        method: 'POST',
+      }),
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Invalidate Balance tag from balanceApi to ensure fresh balance data
+          dispatch(balanceApi.util.invalidateTags(['Balance']));
+        } catch {
+          // Error handling is done by the mutation itself
+        }
+      },
+      invalidatesTags: ['User'],
+    }),
+
     getRentalHousingStatus: builder.query<RentalHousingStatusResponse, number>({
       query: (propertyId) => `/api/users/rental-housing-status/${propertyId}`,
       providesTags: (result, error, propertyId) => [
@@ -241,6 +281,25 @@ export const authApi = createApi({
         url: `/api/users/complete-rental-housing/${propertyId}`,
         method: 'POST',
       }),
+      invalidatesTags: (result, error, propertyId) => [
+        { type: 'User', id: `rentalHousingStatus-${propertyId}` }
+      ],
+    }),
+
+    speedupPropertyConstruction: builder.mutation<SpeedupPropertyConstructionResponse, number>({
+      query: (propertyId) => ({
+        url: `/api/users/speedup-property-construction/${propertyId}`,
+        method: 'POST',
+      }),
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Invalidate Balance tag from balanceApi to ensure fresh balance data
+          dispatch(balanceApi.util.invalidateTags(['Balance']));
+        } catch {
+          // Error handling is done by the mutation itself
+        }
+      },
       invalidatesTags: (result, error, propertyId) => [
         { type: 'User', id: `rentalHousingStatus-${propertyId}` }
       ],
@@ -525,6 +584,25 @@ export const authApi = createApi({
       }),
       invalidatesTags: ['User', 'Crew'],
     }),
+
+    getCrewChatMessages: builder.query<{ success: boolean; messages: Array<{ id: string; userId: string; username: string; message: string; timestamp: string }> }, string>({
+      query: (crewId) => ({
+        url: `/api/crew/chat-messages?crewId=${crewId}`,
+        method: 'GET',
+      }),
+      providesTags: (result, error, crewId) => [{ type: 'CrewChat', id: crewId }],
+      // Keep cached data longer to reduce refetches when component remounts
+      keepUnusedDataFor: 30,
+    }),
+
+    sendCrewChatMessage: builder.mutation<{ success: boolean; message: { id: string; userId: string; username: string; message: string; timestamp: string } }, { crewId: string; message: string }>({
+      query: (data) => ({
+        url: '/api/crew/chat-messages',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: (result, error, { crewId }) => [{ type: 'CrewChat', id: crewId }],
+    }),
   }),
 });
 
@@ -537,9 +615,11 @@ export const {
   useUnlockHackRigMutation,
   useUnlockResearchCenterMutation,
   useGetResearchCenterStatusQuery,
+  useSpeedupResearchCenterConstructionMutation,
   useGetRentalHousingStatusQuery,
   useUnlockRentalHousingMutation,
   useCompleteRentalHousingMutation,
+  useSpeedupPropertyConstructionMutation,
   useCompleteOnboardingMutation,
   useDeleteAccountMutation,
   useForgotPasswordMutation,
@@ -575,4 +655,6 @@ export const {
   useRequestAllianceMutation,
   useAcceptAllianceMutation,
   useTerminateAllianceMutation,
+  useGetCrewChatMessagesQuery,
+  useSendCrewChatMessageMutation,
 } = authApi;

@@ -232,6 +232,213 @@ router.post('/complete-feature-research', auth, async (req: Request, res: Respon
   }
 });
 
+// Speedup research for an individual feature
+router.post('/speedup-feature-research', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user._id;
+    const { categoryId, featureId } = req.body;
+    
+    if (!categoryId || !featureId) {
+      res.status(400).json({
+        success: false,
+        message: 'Category ID and Feature ID are required'
+      });
+      return;
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+      return;
+    }
+
+    // Get the research feature to check if research is in progress
+    const { UserResearchFeature } = await import('../models/UserResearchFeature');
+    const userResearchFeature = await UserResearchFeature.findOne({
+      userId,
+      categoryId,
+      featureId
+    });
+
+    if (!userResearchFeature) {
+      res.status(400).json({
+        success: false,
+        message: 'Research feature not found'
+      });
+      return;
+    }
+
+    if (!userResearchFeature.isResearching) {
+      res.status(400).json({
+        success: false,
+        message: 'No research in progress for this feature'
+      });
+      return;
+    }
+
+    if (userResearchFeature.isUnlocked) {
+      res.status(400).json({
+        success: false,
+        message: 'Feature already unlocked'
+      });
+      return;
+    }
+
+    // Complete research immediately (bypass time check for speedup)
+    // Use transaction to ensure atomicity and prevent race conditions with auto-completion
+    const session = await mongoose.startSession();
+    
+    try {
+      await session.withTransaction(async () => {
+        // First, verify the research is still in progress (double-check to prevent race conditions)
+        const currentResearch = await UserResearchFeature.findOne({
+          userId,
+          categoryId,
+          featureId
+        }).session(session);
+
+        if (!currentResearch) {
+          throw new Error('Research feature not found');
+        }
+
+        if (!currentResearch.isResearching) {
+          throw new Error('No research in progress for this feature');
+        }
+
+        if (currentResearch.isUnlocked) {
+          throw new Error('Feature already unlocked');
+        }
+
+        if (!currentResearch.researchCompletesAt) {
+          throw new Error('Research completion time not found');
+        }
+
+        // Calculate cost inside transaction based on current time to prevent overcharging
+        const now = new Date();
+        const completesAt = currentResearch.researchCompletesAt;
+        const remainingMs = Math.max(0, completesAt.getTime() - now.getTime());
+        const remainingSeconds = Math.ceil(remainingMs / 1000);
+        
+        if (remainingSeconds <= 0) {
+          throw new Error('Research is already complete');
+        }
+
+        // Calculate cost based on actual remaining time at transaction execution
+        const cost = remainingSeconds * 5;
+
+        // Reload user within transaction to ensure we have latest balance
+        const userInTransaction = await User.findById(userId).session(session);
+        if (!userInTransaction) {
+          throw new Error('User not found');
+        }
+
+        // Verify sufficient balance
+        if (userInTransaction.balance.total < cost) {
+          throw new Error('Insufficient funds');
+        }
+
+        // Mark as unlocked and clear research status atomically
+        const unlockedAt = new Date();
+        await UserResearchFeature.findByIdAndUpdate(
+          currentResearch._id,
+          {
+            isUnlocked: true,
+            unlockedAt,
+            isResearching: false,  // This prevents client-side auto-completion from running
+            researchStartedAt: null,
+            researchCompletesAt: null
+          },
+          { session }
+        );
+
+        // Deduct balance atomically
+        userInTransaction.balance.total -= cost;
+        await userInTransaction.save({ session });
+      });
+    } catch (error: any) {
+      if (error.message === 'User not found') {
+        res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+        return;
+      }
+      if (error.message === 'Research feature not found') {
+        res.status(400).json({
+          success: false,
+          message: 'Research feature not found'
+        });
+        return;
+      }
+      if (error.message === 'No research in progress for this feature') {
+        res.status(400).json({
+          success: false,
+          message: 'No research in progress for this feature'
+        });
+        return;
+      }
+      if (error.message === 'Feature already unlocked') {
+        res.status(400).json({
+          success: false,
+          message: 'Feature already unlocked'
+        });
+        return;
+      }
+      if (error.message === 'Research completion time not found') {
+        res.status(400).json({
+          success: false,
+          message: 'Research completion time not found'
+        });
+        return;
+      }
+      if (error.message === 'Research is already complete') {
+        res.status(400).json({
+          success: false,
+          message: 'Research is already complete'
+        });
+        return;
+      }
+      if (error.message === 'Insufficient funds') {
+        res.status(400).json({
+          success: false,
+          message: 'Insufficient funds'
+        });
+        return;
+      }
+      
+      // Re-throw unexpected errors to be caught by outer catch
+      throw error;
+    } finally {
+      await session.endSession();
+    }
+
+    // Reload user to get updated balance
+    const updatedUser = await User.findById(userId);
+    if (!updatedUser) {
+      res.status(500).json({
+        success: false,
+        message: 'Error retrieving updated user data'
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: 'Research completed successfully',
+      newBalance: updatedUser.balance.total
+    });
+  } catch (error) {
+    console.error('Error speeding up feature research:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error speeding up feature research'
+    });
+  }
+});
+
 // Get individual feature status
 router.get('/user-feature-status/:categoryId/:featureId', auth, async (req: Request, res: Response) => {
   try {
