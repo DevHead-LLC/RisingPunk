@@ -4,6 +4,7 @@ import auth from '../middleware/auth';
 import { Crew } from '../models/Crew';
 import { CrewStatus } from '../models/CrewStatus';
 import { User } from '../models/User';
+import { CrewChatMessage } from '../models/CrewChatMessage';
 import mongoose from 'mongoose';
 
 const router = express.Router();
@@ -397,6 +398,163 @@ router.post('/apply', auth, async (req: ApplyToCrewRequest, res: Response) => {
     await session.abortTransaction();
     session.endSession();
     console.error('Error applying to crew:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET crew chat messages - MUST be before /:crewId route to avoid route conflict
+router.get('/chat-messages', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const { crewId } = req.query;
+    if (!crewId || typeof crewId !== 'string' || !mongoose.Types.ObjectId.isValid(crewId)) {
+      res.status(400).json({ error: 'Valid crew ID is required' });
+      return;
+    }
+
+    // Verify user is a member of the crew
+    const crewStatus = await CrewStatus.findOne({ userId, crewId });
+    if (!crewStatus || !crewStatus.isInCrew || crewStatus.crewId?.toString() !== crewId) {
+      res.status(403).json({ error: 'You are not a member of this crew' });
+      return;
+    }
+
+    // Fetch the most recent 100 messages for this crew
+    // Sort descending to get newest first, then reverse for chronological display
+    const messages = await CrewChatMessage.find({ crewId })
+      .sort({ createdAt: -1 }) // Get newest messages first
+      .limit(100) // Limit to most recent 100 messages
+      .lean();
+    
+    // Reverse to display oldest first (chronological order for chat)
+    messages.reverse();
+
+    // Format messages for response
+    // Note: lean() returns plain objects, so _id is already a plain object, not ObjectId
+    const formattedMessages = messages.map((msg: any) => ({
+      id: String(msg._id),
+      userId: String(msg.userId),
+      username: msg.username,
+      message: msg.message,
+      timestamp: msg.createdAt,
+    }));
+
+    res.json({
+      success: true,
+      messages: formattedMessages,
+    });
+  } catch (error: any) {
+    console.error('Error fetching crew chat messages:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST send crew chat message - MUST be before /:crewId route to avoid route conflict
+interface SendChatMessageRequest extends Request {
+  body: {
+    crewId: string;
+    message: string;
+  }
+}
+
+router.post('/chat-messages', auth, async (req: SendChatMessageRequest, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const { crewId, message } = req.body;
+    
+    if (!crewId || !mongoose.Types.ObjectId.isValid(crewId)) {
+      res.status(400).json({ error: 'Valid crew ID is required' });
+      return;
+    }
+
+    if (!message || typeof message !== 'string') {
+      res.status(400).json({ error: 'Message is required' });
+      return;
+    }
+
+    const trimmedMessage = message.trim();
+    if (trimmedMessage.length === 0) {
+      res.status(400).json({ error: 'Message cannot be empty' });
+      return;
+    }
+
+    if (trimmedMessage.length > 500) {
+      res.status(400).json({ error: 'Message must be 500 characters or less' });
+      return;
+    }
+
+    // Verify user is a member of the crew
+    const crewStatus = await CrewStatus.findOne({ userId, crewId });
+    if (!crewStatus || !crewStatus.isInCrew || crewStatus.crewId?.toString() !== crewId) {
+      res.status(403).json({ error: 'You are not a member of this crew' });
+      return;
+    }
+
+    // Get user info for username
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Create and save the chat message
+    const chatMessage = new CrewChatMessage({
+      crewId,
+      userId,
+      username: user.handle || 'Unknown',
+      message: trimmedMessage,
+    });
+
+    await chatMessage.save();
+
+    // Keep only the most recent 100 messages per crew
+    // Count total messages for this crew
+    const totalMessages = await CrewChatMessage.countDocuments({ crewId });
+    
+    if (totalMessages > 100) {
+      // Find the 100th most recent message (by createdAt, descending)
+      const messages = await CrewChatMessage.find({ crewId })
+        .sort({ createdAt: -1 })
+        .limit(100)
+        .select('createdAt')
+        .lean();
+      
+      // Safety check: ensure we have messages before accessing (race condition protection)
+      if (messages.length > 0) {
+        // Get the timestamp of the 100th message (oldest in our keep list)
+        const oldestKeptTimestamp = messages[messages.length - 1].createdAt;
+        
+        // Delete all messages older than the 100th most recent
+        await CrewChatMessage.deleteMany({
+          crewId,
+          createdAt: { $lt: oldestKeptTimestamp }
+        });
+      }
+      // If messages.length === 0, all messages were deleted in a race condition, skip pruning
+    }
+
+    res.json({
+      success: true,
+      message: {
+        id: (chatMessage._id as mongoose.Types.ObjectId).toString(),
+        userId: (chatMessage.userId as mongoose.Types.ObjectId).toString(),
+        username: chatMessage.username,
+        message: chatMessage.message,
+        timestamp: chatMessage.createdAt,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error sending crew chat message:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

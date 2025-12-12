@@ -106,7 +106,23 @@ export const botsApi = createApi({
       }),
       invalidatesTags: ['Bots'],
     }),
+    speedupBotBuild: builder.mutation<{ success: boolean; message: string; newBalance: number; bots: Record<BotType, number> }, void>({
+      query: () => ({
+        url: '/api/bots/speedup-build',
+        method: 'POST',
+      }),
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Invalidate Balance tag from balanceApi to ensure fresh balance data
+          dispatch(balanceApi.util.invalidateTags(['Balance']));
+        } catch {
+          // Error handling is done by the mutation itself
+        }
+      },
+      invalidatesTags: ['Bots'],
+    }),
   }),
 });
 
-export const { useFetchBotsQuery, useFetchBuildStateQuery, useFetchBotStatsQuery, useStartBuildMutation, useAssignToBattalionMutation } = botsApi;
+export const { useFetchBotsQuery, useFetchBuildStateQuery, useFetchBotStatsQuery, useStartBuildMutation, useAssignToBattalionMutation, useSpeedupBotBuildMutation } = botsApi;

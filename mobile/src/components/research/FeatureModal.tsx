@@ -11,7 +11,9 @@ import {
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { ResearchFeature } from './ResearchFeaturesList';
-import { useStartResearchMutation, useCompleteResearchMutation } from '../../store/api/researchFeaturesApi';
+import { useStartResearchMutation, useCompleteResearchMutation, useSpeedupFeatureResearchMutation } from '../../store/api/researchFeaturesApi';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { updateBalance } from '../../store/slices/balanceSlice';
 
 interface FeatureModalProps {
   visible: boolean;
@@ -33,10 +35,14 @@ export function FeatureModal({
   onResearchStarted,
 }: FeatureModalProps) {
   const colors = useThemeColors();
+  const dispatch = useAppDispatch();
+  const currentBalanceState = useAppSelector((state) => state.balance);
   const [isResearching, setIsResearching] = useState(false);
   const [researchTimeRemaining, setResearchTimeRemaining] = useState(0);
+  const [isSpeedupLoading, setIsSpeedupLoading] = useState(false);
   const [startResearch, { isLoading: isStartingResearch }] = useStartResearchMutation();
   const [completeResearch, { isLoading: isCompletingResearch }] = useCompleteResearchMutation();
+  const [speedupFeatureResearch] = useSpeedupFeatureResearchMutation();
   const isLightMode = colors.background === '#FAFAFA' || colors.background === '#F5F5DC';
   
   const canAfford = currentBalance >= feature.unlockCost;
@@ -90,6 +96,45 @@ export function FeatureModal({
     const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
     const seconds = Math.floor((milliseconds % (1000 * 60)) / 1000);
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  // Calculate speedup cost: $5 per second remaining
+  const getSpeedupCost = (): number => {
+    const seconds = Math.ceil(researchTimeRemaining / 1000);
+    return seconds * 5;
+  };
+
+  const speedupCost = getSpeedupCost();
+  const canAffordSpeedup = currentBalance >= speedupCost && researchTimeRemaining > 0;
+
+  const handleSpeedup = async () => {
+    if (!canAffordSpeedup || isSpeedupLoading) {
+      return;
+    }
+
+    setIsSpeedupLoading(true);
+    try {
+      const result = await speedupFeatureResearch({ categoryId, featureId: feature.id }).unwrap();
+      
+      // Update balance
+      if (result.newBalance !== undefined) {
+        dispatch(updateBalance({
+          total: result.newBalance,
+          ratePerSecond: currentBalanceState.ratePerSecond,
+          lastUpdated: currentBalanceState.lastUpdated ? new Date(currentBalanceState.lastUpdated) : null,
+          fractionalRemainder: currentBalanceState.fractionalRemainder
+        }));
+      }
+      
+      // Close modal and trigger refresh
+      onResearchStarted?.();
+      onClose();
+    } catch (error: any) {
+      console.error('Error speeding up research:', error);
+      // Silently fail - user can try again if needed
+    } finally {
+      setIsSpeedupLoading(false);
+    }
   };
 
   const renderLockedModal = () => (
@@ -184,25 +229,28 @@ export function FeatureModal({
         {feature.description}
       </Text>
       
-      <View style={styles.researchInfoContainer}>
-        <View style={styles.infoRow}>
-          <Text style={[styles.infoLabel, { color: '#8B5CF6', textDecorationLine: 'underline' }]}>
-            Research Cost:
-          </Text>
-          <Text style={[styles.infoValue, { color: isLightMode ? '#374151' : '#F1F5F9' }]}>
-            ${feature.unlockCost.toLocaleString()}
-          </Text>
+      {/* Only show research cost/time if research is NOT in progress */}
+      {!isCurrentlyResearching && (
+        <View style={styles.researchInfoContainer}>
+          <View style={styles.infoRow}>
+            <Text style={[styles.infoLabel, { color: '#8B5CF6', textDecorationLine: 'underline' }]}>
+              Research Cost:
+            </Text>
+            <Text style={[styles.infoValue, { color: isLightMode ? '#374151' : '#F1F5F9' }]}>
+              ${feature.unlockCost.toLocaleString()}
+            </Text>
+          </View>
+          
+          <View style={styles.infoRow}>
+            <Text style={[styles.infoLabel, { color: '#8B5CF6', textDecorationLine: 'underline' }]}>
+              Research Time:
+            </Text>
+            <Text style={[styles.infoValue, { color: isLightMode ? '#374151' : '#F1F5F9' }]}>
+              {researchTimeHours} hours
+            </Text>
+          </View>
         </View>
-        
-        <View style={styles.infoRow}>
-          <Text style={[styles.infoLabel, { color: '#8B5CF6', textDecorationLine: 'underline' }]}>
-            Research Time:
-          </Text>
-          <Text style={[styles.infoValue, { color: isLightMode ? '#374151' : '#F1F5F9' }]}>
-            {researchTimeHours} hours
-          </Text>
-        </View>
-      </View>
+      )}
       
       {isCurrentlyResearching ? (
         <View style={styles.researchingStatus}>
@@ -215,6 +263,45 @@ export function FeatureModal({
           <Text style={[styles.researchingSubtext, { color: '#9CA3AF' }]}>
             Research will complete automatically
           </Text>
+          
+          {/* Speedup Section */}
+          {researchTimeRemaining > 0 && (
+            <View style={styles.speedupContainer}>
+              <View style={styles.speedupInfo}>
+                <Text style={[styles.speedupLabel, { color: isLightMode ? '#374151' : '#CBD5E1' }]}>
+                  Finish this research now for:
+                </Text>
+                <Text style={[styles.speedupCost, { color: '#8B5CF6' }]}>
+                  ${speedupCost.toLocaleString()}
+                </Text>
+              </View>
+              <View style={styles.balanceInfo}>
+                <Text style={[styles.balanceLabel, { color: isLightMode ? '#374151' : '#9CA3AF' }]}>
+                  Your Balance: ${currentBalance.toLocaleString()}
+                </Text>
+              </View>
+              {!canAffordSpeedup && (
+                <Text style={[styles.insufficientFunds, { color: colors.error }]}>
+                  Insufficient funds
+                </Text>
+              )}
+              <TouchableOpacity
+                style={[
+                  styles.speedupButton,
+                  {
+                    backgroundColor: canAffordSpeedup ? '#8B5CF6' : '#6B7280',
+                    opacity: canAffordSpeedup ? 1 : 0.6
+                  }
+                ]}
+                onPress={handleSpeedup}
+                disabled={!canAffordSpeedup || isSpeedupLoading}
+              >
+                <Text style={[styles.speedupButtonText, { color: '#FFFFFF' }]}>
+                  {isSpeedupLoading ? 'Completing...' : 'Finish Research Now'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       ) : !feature.isUnlocked ? (
         <TouchableOpacity
@@ -308,7 +395,7 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     borderRadius: 12,
     borderWidth: 2,
-    padding: SIZING.spacing.lg,
+    padding: SIZING.spacing.md,
   },
   modalContent: {
     alignItems: 'center',
@@ -316,14 +403,14 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: SIZING.font.h2,
     fontWeight: 'bold',
-    marginBottom: SIZING.spacing.sm,
+    marginBottom: SIZING.spacing.xs,
     textAlign: 'center',
   },
   modalDescription: {
-    fontSize: SIZING.font.body,
+    fontSize: SIZING.font.small,
     textAlign: 'center',
-    marginBottom: SIZING.spacing.lg,
-    lineHeight: 20,
+    marginBottom: SIZING.spacing.sm,
+    lineHeight: 18,
   },
   requirementsContainer: {
     width: '100%',
@@ -379,22 +466,68 @@ const styles = StyleSheet.create({
   },
   researchingStatus: {
     alignItems: 'center',
-    marginBottom: SIZING.spacing.md,
+    marginBottom: SIZING.spacing.sm,
   },
   researchingTitle: {
     fontSize: SIZING.font.body,
     fontWeight: '600',
-    marginBottom: SIZING.spacing.xs,
+    marginBottom: SIZING.spacing.xs / 2,
   },
   researchingTime: {
     fontSize: SIZING.font.large,
     fontWeight: '600',
     fontFamily: 'monospace',
-    marginBottom: SIZING.spacing.xs,
+    marginBottom: SIZING.spacing.xs / 2,
   },
   researchingSubtext: {
     fontSize: SIZING.font.small,
     textAlign: 'center',
+    marginBottom: SIZING.spacing.xs,
+  },
+  speedupContainer: {
+    width: '100%',
+    marginTop: SIZING.spacing.sm,
+    paddingTop: SIZING.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  speedupInfo: {
+    alignItems: 'center',
+    marginBottom: SIZING.spacing.xs,
+  },
+  speedupLabel: {
+    fontSize: SIZING.font.small,
+    marginBottom: SIZING.spacing.xs / 2,
+    textAlign: 'center',
+  },
+  speedupCost: {
+    fontSize: SIZING.font.h2,
+    fontWeight: 'bold',
+  },
+  balanceInfo: {
+    alignItems: 'center',
+    marginBottom: SIZING.spacing.xs / 2,
+  },
+  balanceLabel: {
+    fontSize: SIZING.font.small,
+  },
+  insufficientFunds: {
+    fontSize: SIZING.font.small,
+    textAlign: 'center',
+    marginBottom: SIZING.spacing.xs / 2,
+    fontStyle: 'italic',
+  },
+  speedupButton: {
+    paddingHorizontal: SIZING.spacing.lg,
+    paddingVertical: SIZING.spacing.sm,
+    borderRadius: 8,
+    marginTop: SIZING.spacing.xs,
+    minWidth: 200,
+    alignItems: 'center',
+  },
+  speedupButtonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
   },
   unlockedStatus: {
     alignItems: 'center',
@@ -406,10 +539,11 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     paddingHorizontal: SIZING.spacing.md,
-    paddingVertical: SIZING.spacing.sm,
+    paddingVertical: SIZING.spacing.xs,
     borderRadius: 8,
     minWidth: 100,
     alignItems: 'center',
+    marginTop: SIZING.spacing.xs,
   },
   closeButtonText: {
     fontSize: SIZING.font.body,
