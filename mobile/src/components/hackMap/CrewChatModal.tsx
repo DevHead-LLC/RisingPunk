@@ -155,7 +155,7 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
             contentContainerStyle={styles.messagesContent}
             showsVerticalScrollIndicator={false}
           >
-            {fetchError && (
+            {fetchError ? (
               <View style={styles.errorState}>
                 <Text style={styles.errorStateText}>
                   Error loading messages. Please try again.
@@ -164,8 +164,7 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
                   {('data' in (fetchError || {}) && (fetchError as any)?.data?.error) || ('error' in (fetchError || {}) && (fetchError as any)?.error) || 'Unknown error'}
                 </Text>
               </View>
-            )}
-            {isLoadingMessages && messages.length === 0 ? (
+            ) : isLoadingMessages && messages.length === 0 ? (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyStateText}>
                   Loading messages...
