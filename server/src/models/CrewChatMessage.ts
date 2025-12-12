@@ -41,3 +41,4 @@ const crewChatMessageSchema = new Schema({
 crewChatMessageSchema.index({ crewId: 1, createdAt: -1 });
 
 export const CrewChatMessage = mongoose.model<ICrewChatMessage>('CrewChatMessage', crewChatMessageSchema);
+
