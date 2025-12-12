@@ -424,11 +424,15 @@ router.get('/chat-messages', auth, async (req: Request, res: Response) => {
       return;
     }
 
-    // Fetch messages for this crew, ordered by creation date (oldest first)
+    // Fetch the most recent 100 messages for this crew
+    // Sort descending to get newest first, then reverse for chronological display
     const messages = await CrewChatMessage.find({ crewId })
-      .sort({ createdAt: 1 })
-      .limit(100) // Limit to last 100 messages
+      .sort({ createdAt: -1 }) // Get newest messages first
+      .limit(100) // Limit to most recent 100 messages
       .lean();
+    
+    // Reverse to display oldest first (chronological order for chat)
+    messages.reverse();
 
     // Format messages for response
     // Note: lean() returns plain objects, so _id is already a plain object, not ObjectId
