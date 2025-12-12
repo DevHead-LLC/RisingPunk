@@ -274,6 +274,26 @@ router.post('/speedup-build', auth, async (req, res) => {
         await botInTransaction.save({ session });
         await userInTransaction.save({ session });
       });
+    } catch (error: any) {
+      if (error.message === 'User not found') {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+      if (error.message === 'No active build found') {
+        res.status(400).json({ error: 'No active build found' });
+        return;
+      }
+      if (error.message === 'Build is already complete') {
+        res.status(400).json({ error: 'Build is already complete' });
+        return;
+      }
+      if (error.message === 'Insufficient funds') {
+        res.status(400).json({ error: 'Insufficient funds' });
+        return;
+      }
+      
+      // Re-throw unexpected errors to be caught by outer catch
+      throw error;
     } finally {
       await session.endSession();
     }
@@ -295,7 +315,7 @@ router.post('/speedup-build', auth, async (req, res) => {
     });
   } catch (error: any) {
     console.error('Error speeding up bot build:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

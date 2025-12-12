@@ -196,7 +196,6 @@
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
-				A1B2C3D4E5F6A7B8C9D0E1F2 /* Set ENVFILE for react-native-config */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				FFAD31B18A7726B7CA7AD866 /* [CP] Embed Pods Frameworks */,
 				3F01983DA5B8C785BEAED527 /* [CP] Copy Pods Resources */,
@@ -334,20 +333,6 @@
 			shellPath = /bin/sh;
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-mobile-mobileTests/Pods-mobile-mobileTests-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
-		};
-		A1B2C3D4E5F6A7B8C9D0E1F2 /* Set ENVFILE for react-native-config */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-			);
-			name = "Set ENVFILE for react-native-config";
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "# Set ENVFILE for react-native-config\n# Priority: 1) ENVFILE from npm script (npm run ios:dev), 2) ENVFILE from Xcode scheme, 3) API_ENV build setting, 4) default\n# When running via npm, ENVFILE is already set - we must respect it\nif [ -n \"$ENVFILE\" ]; then\n  # ENVFILE is already set (from npm or scheme) - use it as-is\n  echo \"[Set ENVFILE] Using existing ENVFILE: $ENVFILE\"\nelif [ -n \"$API_ENV\" ]; then\n  # Fall back to API_ENV build setting (for Xcode-only builds)\n  case \"$API_ENV\" in\n    dev)\n      export ENVFILE=\".env.dev\"\n      ;;\n    staging)\n      export ENVFILE=\".env.staging\"\n      ;;\n    prod)\n      export ENVFILE=\".env.prod\"\n      ;;\n    *)\n      echo \"Warning: Unknown API_ENV value: $API_ENV, defaulting to .env\"\n      export ENVFILE=\".env\"\n      ;;\n  esac\n  echo \"[Set ENVFILE] Using ENVFILE from API_ENV build setting: $ENVFILE\"\nelse\n  echo \"Warning: Neither ENVFILE nor API_ENV is set, defaulting to .env\"\n  export ENVFILE=\".env\"\nfi\n\necho \"[Set ENVFILE] Final ENVFILE=$ENVFILE\"\n";
 		};
 		B086C44A33502826309BC1A8 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
