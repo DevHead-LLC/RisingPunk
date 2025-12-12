@@ -14,6 +14,7 @@ import { ResearchFeature } from './ResearchFeaturesList';
 import { useStartResearchMutation, useCompleteResearchMutation, useSpeedupFeatureResearchMutation } from '../../store/api/researchFeaturesApi';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { updateBalance } from '../../store/slices/balanceSlice';
+import { LockedFeatureModal } from '../turf/LockedFeatureModal';
 
 interface FeatureModalProps {
   visible: boolean;
@@ -40,6 +41,8 @@ export function FeatureModal({
   const [isResearching, setIsResearching] = useState(false);
   const [researchTimeRemaining, setResearchTimeRemaining] = useState(0);
   const [isSpeedupLoading, setIsSpeedupLoading] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [startResearch, { isLoading: isStartingResearch }] = useStartResearchMutation();
   const [completeResearch, { isLoading: isCompletingResearch }] = useCompleteResearchMutation();
   const [speedupFeatureResearch] = useSpeedupFeatureResearchMutation();
@@ -51,6 +54,15 @@ export function FeatureModal({
   
   // Check if research is in progress
   const isCurrentlyResearching = feature.isResearching || false;
+  
+  // Reset error state when modal opens or closes
+  useEffect(() => {
+    if (!visible) {
+      // Reset error state when modal closes
+      setShowErrorModal(false);
+      setErrorMessage('');
+    }
+  }, [visible]);
   
   // Calculate time remaining if research is in progress
   useEffect(() => {
@@ -131,7 +143,14 @@ export function FeatureModal({
       onClose();
     } catch (error: any) {
       console.error('Error speeding up research:', error);
-      // Silently fail - user can try again if needed
+      // Show error modal with appropriate message
+      if (error?.data?.error === 'Insufficient funds') {
+        setErrorMessage('You do not have sufficient funds to speed up this research.');
+      } else {
+        const errorMsg = error?.data?.message || error?.data?.error || 'Failed to speed up research. Please try again.';
+        setErrorMessage(errorMsg);
+      }
+      setShowErrorModal(true);
     } finally {
       setIsSpeedupLoading(false);
     }
@@ -359,26 +378,36 @@ export function FeatureModal({
   );
 
   return (
-    <Modal
-      visible={visible}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={onClose}
-      supportedOrientations={['landscape']}
-      statusBarTranslucent={false}
-    >
-      <View style={styles.overlay}>
-        <View style={[
-          styles.modal,
-          {
-            backgroundColor: colors.background,
-            borderColor: colors.primary
-          }
-        ]}>
-          {(feature.isUnlocked || isCurrentlyResearching) ? renderUnlockedModal() : renderLockedModal()}
+    <>
+      <Modal
+        visible={visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={onClose}
+        supportedOrientations={['landscape']}
+        statusBarTranslucent={false}
+      >
+        <View style={styles.overlay}>
+          <View style={[
+            styles.modal,
+            {
+              backgroundColor: colors.background,
+              borderColor: colors.primary
+            }
+          ]}>
+            {(feature.isUnlocked || isCurrentlyResearching) ? renderUnlockedModal() : renderLockedModal()}
+          </View>
         </View>
-      </View>
-    </Modal>
+      </Modal>
+      
+      <LockedFeatureModal
+        visible={showErrorModal}
+        title="SPEEDUP ERROR"
+        message={errorMessage}
+        onClose={() => setShowErrorModal(false)}
+        closeButtonText="CLOSE"
+      />
+    </>
   );
 }
 
