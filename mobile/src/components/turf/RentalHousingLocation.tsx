@@ -178,15 +178,18 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
         // Force a re-render to update the UI
         setForceUpdate(prev => prev + 1);
         await refetch();
+        // Close speedup modal on success
+        setShowSpeedupModal(false);
       }
     } catch (error: any) {
       console.error('Error speeding up property construction:', error);
+      // Close speedup modal and show error modal instead
+      setShowSpeedupModal(false);
       if (error?.data?.error === 'Insufficient funds') {
         setShowInsufficientFundsModal(true);
       } else {
         setShowBuildErrorModal(true);
       }
-      throw error; // Re-throw so modal can handle it
     }
   }, [propertyId, speedupPropertyConstruction, dispatch, currentBalanceState, refetch]);
 

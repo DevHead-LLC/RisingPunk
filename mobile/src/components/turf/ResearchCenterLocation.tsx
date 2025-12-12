@@ -141,13 +141,16 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
         
         // Refetch build status to update UI
         await refetchBuildStatus();
+        // Close speedup modal on success
+        setShowSpeedupModal(false);
       }
     } catch (error: any) {
       console.error('Error speeding up research center construction:', error);
+      // Close speedup modal and show error modal instead
+      setShowSpeedupModal(false);
       const errorMsg = error?.data?.message || error?.data?.error || 'Failed to speed up research center construction';
       setErrorMessage(errorMsg);
       setShowErrorModal(true);
-      throw error; // Re-throw so modal can handle it
     }
   };
 
