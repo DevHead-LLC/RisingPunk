@@ -55,6 +55,15 @@ export function FeatureModal({
   // Check if research is in progress
   const isCurrentlyResearching = feature.isResearching || false;
   
+  // Reset error state when modal opens or closes
+  useEffect(() => {
+    if (!visible) {
+      // Reset error state when modal closes
+      setShowErrorModal(false);
+      setErrorMessage('');
+    }
+  }, [visible]);
+  
   // Calculate time remaining if research is in progress
   useEffect(() => {
     if (isCurrentlyResearching && feature.researchCompletesAt) {
