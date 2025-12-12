@@ -182,7 +182,7 @@ const authBaseQuery = async (args: any, api: any, extraOptions: any) => {
 export const authApi = createApi({
   reducerPath: 'authApi',
   baseQuery: authBaseQuery,
-  tagTypes: ['User', 'Crew'],
+  tagTypes: ['User', 'Crew', 'CrewChat'],
   endpoints: (builder) => ({
     login: builder.mutation<AuthResponse, LoginRequest>({
       query: (credentials) => ({
@@ -584,6 +584,25 @@ export const authApi = createApi({
       }),
       invalidatesTags: ['User', 'Crew'],
     }),
+
+    getCrewChatMessages: builder.query<{ success: boolean; messages: Array<{ id: string; userId: string; username: string; message: string; timestamp: string }> }, string>({
+      query: (crewId) => ({
+        url: `/api/crew/chat-messages?crewId=${crewId}`,
+        method: 'GET',
+      }),
+      providesTags: (result, error, crewId) => [{ type: 'CrewChat', id: crewId }],
+      // Keep cached data longer to reduce refetches when component remounts
+      keepUnusedDataFor: 30,
+    }),
+
+    sendCrewChatMessage: builder.mutation<{ success: boolean; message: { id: string; userId: string; username: string; message: string; timestamp: string } }, { crewId: string; message: string }>({
+      query: (data) => ({
+        url: '/api/crew/chat-messages',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: (result, error, { crewId }) => [{ type: 'CrewChat', id: crewId }],
+    }),
   }),
 });
 
@@ -636,4 +655,6 @@ export const {
   useRequestAllianceMutation,
   useAcceptAllianceMutation,
   useTerminateAllianceMutation,
+  useGetCrewChatMessagesQuery,
+  useSendCrewChatMessageMutation,
 } = authApi;
