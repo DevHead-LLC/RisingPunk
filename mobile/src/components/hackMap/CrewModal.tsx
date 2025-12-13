@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, SafeAreaView, Dimensions, TextInput } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Dimensions, TextInput } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
@@ -524,7 +524,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const renderCategoryList = () => {
     if (!crewStatus?.isInCrew || !activeCrewDetails?.crew) {
       return (
-        <SafeAreaView style={styles.crewModalContainer}>
+        <View style={styles.crewModalContainer}>
           <View style={styles.header}>
             <Text style={styles.title}>Crew System</Text>
             <TouchableOpacity
@@ -540,7 +540,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
               Loading crew information...
             </Text>
           </View>
-        </SafeAreaView>
+        </View>
       );
     }
 
@@ -572,7 +572,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     const totalItems = visibleCategories.length + (showLeaveCrewButton ? 1 : 0);
 
     return (
-      <SafeAreaView style={styles.crewModalContainer}>
+      <View style={styles.crewModalContainer}>
         <View style={styles.header}>
           <Text style={styles.title}>{title}</Text>
           <TouchableOpacity
@@ -629,7 +629,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
             )}
           </View>
         </ScrollView>
-      </SafeAreaView>
+      </View>
     );
   };
 
@@ -1621,7 +1621,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     if (!currentCategory) return null;
 
     return (
-      <SafeAreaView style={styles.crewModalContainer}>
+      <View style={styles.crewModalContainer}>
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
@@ -1655,7 +1655,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
             </Text>
           </View>
         )}
-      </SafeAreaView>
+      </View>
     );
   };
 
@@ -1777,7 +1777,11 @@ export const CrewModal: React.FC<CrewModalProps> = ({
 
 const createStyles = (colors: any) => StyleSheet.create({
   overlay: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     width: '100%',
     height: '100%',
     backgroundColor: colors.background,
@@ -1789,6 +1793,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     width: '100%',
     height: '100%',
     backgroundColor: colors.background,
+    alignSelf: 'stretch',
   },
   header: {
     flexDirection: 'row',
