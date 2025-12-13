@@ -18,7 +18,7 @@ import { AllianceManagementModal } from './AllianceManagementModal';
 import { EditableCrewRules } from './EditableCrewRules';
 import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, useUpdateCrewLanguageMutation, useUpdateInternalMessageMutation, useUpdateExternalMessageMutation, useGiftAllMembersMutation, usePromoteMemberMutation, useDemoteExecutiveMutation, useChooseSuccessorMutation, useResignMutation, useGetWarStatusQuery } from '../../store/api/authApi';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CREW_MODAL_PADDING = SIZING.spacing.md * 2;
 const CREW_CARD_GAP = SIZING.spacing.lg;
 const CREW_CARD_WIDTH = ((SCREEN_WIDTH - CREW_MODAL_PADDING - (CREW_CARD_GAP * 2)) / 3) * 0.8;
@@ -584,7 +584,11 @@ export const CrewModal: React.FC<CrewModalProps> = ({
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          style={styles.content} 
+          contentContainerStyle={styles.scrollContentContainer}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.crewGridContainer}>
             {visibleCategories.map((category, index) => {
               const isLastInRow = (index + 1) % 3 === 0;
@@ -1777,6 +1781,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     width: '100%',
     height: '100%',
     backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   crewModalContainer: {
     flex: 1,
@@ -1834,9 +1840,16 @@ const createStyles = (colors: any) => StyleSheet.create({
     flex: 1,
     padding: SIZING.spacing.md,
   },
+  scrollContentContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   crewGridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   crewCategoryItem: {
     backgroundColor: colors.surface,
