@@ -644,7 +644,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
               )}
             </View>
           </ScrollView>
-          {activeCrewDetails?.crew && (
+          {activeCrewDetails?.crew && currentUser?._id && activeCrewDetails.crew.president?.userId && String(currentUser._id) !== String(activeCrewDetails.crew.president.userId) && (
             <TouchableOpacity
               onPress={() => setShowCrewNameReportModal(true)}
               activeOpacity={0.7}
@@ -1442,15 +1442,17 @@ export const CrewModal: React.FC<CrewModalProps> = ({
               <>
                 <View style={styles.internalMessageHeader}>
                   <View style={styles.internalMessageHeaderSpacer} />
-                  <TouchableOpacity
-                    onPress={() => setShowInternalMessageReportModal(true)}
-                    activeOpacity={0.7}
-                    style={styles.reportButton}
-                  >
-                    <Text style={[styles.reportButtonText, { color: colors.text.secondary }]}>
-                      Report
-                    </Text>
-                  </TouchableOpacity>
+                  {currentUser?._id && activeCrewDetails?.crew?.president?.userId && String(currentUser._id) !== String(activeCrewDetails.crew.president.userId) && (
+                    <TouchableOpacity
+                      onPress={() => setShowInternalMessageReportModal(true)}
+                      activeOpacity={0.7}
+                      style={styles.reportButton}
+                    >
+                      <Text style={[styles.reportButtonText, { color: colors.text.secondary }]}>
+                        Report
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
                 <FilteredText style={[styles.internalMessageText, { color: colors.text.primary }]}>
                   {currentMessage}
@@ -1576,15 +1578,17 @@ export const CrewModal: React.FC<CrewModalProps> = ({
               <>
                 <View style={styles.externalMessageHeader}>
                   <View style={styles.externalMessageHeaderSpacer} />
-                  <TouchableOpacity
-                    onPress={() => setShowExternalMessageReportModal(true)}
-                    activeOpacity={0.7}
-                    style={styles.reportButton}
-                  >
-                    <Text style={[styles.reportButtonText, { color: colors.text.secondary }]}>
-                      Report
-                    </Text>
-                  </TouchableOpacity>
+                  {currentUser?._id && activeCrewDetails?.crew?.president?.userId && String(currentUser._id) !== String(activeCrewDetails.crew.president.userId) && (
+                    <TouchableOpacity
+                      onPress={() => setShowExternalMessageReportModal(true)}
+                      activeOpacity={0.7}
+                      style={styles.reportButton}
+                    >
+                      <Text style={[styles.reportButtonText, { color: colors.text.secondary }]}>
+                        Report
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
                 <FilteredText style={[styles.externalMessageText, { color: colors.text.primary }]}>
                   {currentMessage}

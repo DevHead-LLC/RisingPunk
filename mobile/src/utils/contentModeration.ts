@@ -8,9 +8,9 @@
 // Focus on direct offensive terms, not words that might appear in other contexts
 const BAD_WORDS = [
   // Vulgar/Profanity (direct terms only, not partial words)
-  'asshole', 'bastard', 'bitch', 'bullshit', 'cock', 'cocksucker', 'cunt', 'damn',
+  'asshole', 'bastard', 'bitch', 'bullshit', 'cock', 'cocksucker', 'crap', 'cunt', 'damn',
   'dick', 'dickhead', 'fag', 'faggot', 'fuck', 'fucked', 'fucker', 'fucking', 'goddamn',
-  'motherfucker', 'piss', 'prick', 'shit', 'shitter', 'slut', 'tits', 'whore',
+  'hell', 'motherfucker', 'piss', 'prick', 'shit', 'shitter', 'slut', 'tits', 'whore',
   
   // Racist slurs (direct terms and common variations)
   'nigger', 'nigga', 'n1gger', 'n1gga', 'n!gger', 'n!gga', 'ni99er', 'ni99a',

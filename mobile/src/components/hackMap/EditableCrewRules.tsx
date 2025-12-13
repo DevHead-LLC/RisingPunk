@@ -434,7 +434,7 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
                   {rule}
                 </FilteredText>
               </View>
-              {presidentId && presidentHandle && (
+              {presidentId && presidentHandle && currentUser?._id && String(currentUser._id) !== String(presidentId) && (
                 <TouchableOpacity
                   onPress={() => handleReportRule(index)}
                   activeOpacity={0.7}
@@ -576,7 +576,7 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
               autoFocus={editingIndex === index}
               blurOnSubmit={false}
             />
-            {presidentId && presidentHandle && (
+            {presidentId && presidentHandle && currentUser?._id && String(currentUser._id) !== String(presidentId) && (
               <TouchableOpacity
                 onPress={() => handleReportRule(index)}
                 activeOpacity={0.7}
