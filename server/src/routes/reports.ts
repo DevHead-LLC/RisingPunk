@@ -76,6 +76,21 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
       return;
     }
 
+    // Validate context is valid
+    const validContexts: ReportContext[] = [
+      'username',
+      'crew-name',
+      'crew-identifier',
+      'internal-message-board',
+      'external-message-board',
+      'crew-rules',
+      'chat-message',
+    ];
+    if (!validContexts.includes(context)) {
+      res.status(400).json({ error: 'Invalid context' });
+      return;
+    }
+
     // Validate description length (max 1000 characters)
     if (description.length > 1000) {
       res.status(400).json({ error: 'Description must be 1000 characters or less' });
