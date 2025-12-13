@@ -143,6 +143,8 @@ function createSubstringPattern(word: string): RegExp {
 /**
  * Checks if text contains any bad words as substrings (no word boundaries)
  * Used for crew names/identifiers where words are concatenated without spaces
+ * Excludes very short words (< 4 characters) to avoid false positives
+ * (e.g., "ho" would block "Shore", "Show", "Hotel", etc.)
  * @param text - The text to check
  * @returns true if bad words are detected, false otherwise
  */
@@ -153,8 +155,12 @@ export function containsBadWordsAsSubstring(text: string): boolean {
 
   const normalizedText = normalizeLeetspeak(text.toLowerCase());
 
+  // Filter out short words (< 4 characters) to avoid false positives
+  // Short words like "ho" would incorrectly block legitimate words like "Shore", "Show", "Hotel"
+  const wordsToCheck = BAD_WORDS.filter(word => word.length >= 4);
+
   // Check each bad word as a substring (no word boundaries)
-  for (const badWord of BAD_WORDS) {
+  for (const badWord of wordsToCheck) {
     // Check in normalized text for leetspeak variations
     const normalizedPattern = createSubstringPattern(badWord);
     if (normalizedPattern.test(normalizedText)) {

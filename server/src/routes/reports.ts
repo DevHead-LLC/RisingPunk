@@ -5,6 +5,23 @@ import { ReportContext, ReportReason } from '../types/reports';
 
 const router = express.Router();
 
+/**
+ * Escapes HTML special characters to prevent HTML injection
+ * @param text - The text to escape
+ * @returns The escaped text safe for HTML insertion
+ */
+function escapeHtml(text: string | undefined | null): string {
+  if (!text || typeof text !== 'string') {
+    return '';
+  }
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 interface SubmitReportRequest extends Request {
   body: {
     reportedUserId: string;
@@ -147,41 +164,50 @@ ${contextDataString}
 TIMESTAMP: ${timestamp}
     `.trim();
 
+    // Escape all user-controlled content to prevent HTML injection
+    const escapedDescription = escapeHtml(description);
+    const escapedReportedUsername = escapeHtml(reportedUsername);
+    const escapedReportedUserId = escapeHtml(reportedUserId);
+    const escapedReportingUsername = escapeHtml(reportingUsername);
+    const escapedReportingUserId = escapeHtml(reportingUserId);
+    const escapedCrewId = escapeHtml(String(crewId));
+    const escapedContextDataString = escapeHtml(contextDataString);
+
     const emailHtml = `
       <html>
         <body style="font-family: monospace; line-height: 1.6; color: #333;">
           <h2 style="color: #d32f2f;">USER REPORT SUBMITTED</h2>
           
           <div style="margin-bottom: 20px;">
-            <strong>Report Reason:</strong> ${reasonLabel}<br/>
-            <strong>Description:</strong> ${description.replace(/\n/g, '<br/>')}
+            <strong>Report Reason:</strong> ${escapeHtml(reasonLabel)}<br/>
+            <strong>Description:</strong> ${escapedDescription.replace(/\n/g, '<br/>')}
           </div>
           
           <div style="margin-bottom: 20px; padding: 10px; background-color: #f5f5f5; border-left: 4px solid #d32f2f;">
             <h3 style="margin-top: 0;">REPORTED USER</h3>
-            <strong>Username:</strong> ${reportedUsername}<br/>
-            <strong>User ID:</strong> ${reportedUserId}
+            <strong>Username:</strong> ${escapedReportedUsername}<br/>
+            <strong>User ID:</strong> ${escapedReportedUserId}
           </div>
           
           <div style="margin-bottom: 20px; padding: 10px; background-color: #f5f5f5; border-left: 4px solid #2196f3;">
             <h3 style="margin-top: 0;">REPORTING USER</h3>
-            <strong>Username:</strong> ${reportingUsername}<br/>
-            <strong>User ID:</strong> ${reportingUserId}
+            <strong>Username:</strong> ${escapedReportingUsername}<br/>
+            <strong>User ID:</strong> ${escapedReportingUserId}
           </div>
           
           <div style="margin-bottom: 20px;">
             <h3>CONTEXT</h3>
-            <strong>Type:</strong> ${contextLabel}<br/>
-            <strong>Crew ID:</strong> ${crewId}
+            <strong>Type:</strong> ${escapeHtml(contextLabel)}<br/>
+            <strong>Crew ID:</strong> ${escapedCrewId}
           </div>
           
           <div style="margin-bottom: 20px; padding: 10px; background-color: #fff3cd; border: 1px solid #ffc107;">
             <h3 style="margin-top: 0;">CONTEXT DATA</h3>
-            <pre style="white-space: pre-wrap; word-wrap: break-word;">${contextDataString.replace(/\n/g, '<br/>')}</pre>
+            <pre style="white-space: pre-wrap; word-wrap: break-word;">${escapedContextDataString.replace(/\n/g, '<br/>')}</pre>
           </div>
           
           <div style="margin-top: 20px; padding-top: 10px; border-top: 1px solid #ddd; color: #666; font-size: 12px;">
-            <strong>Timestamp:</strong> ${timestamp}
+            <strong>Timestamp:</strong> ${escapeHtml(timestamp)}
           </div>
         </body>
       </html>
