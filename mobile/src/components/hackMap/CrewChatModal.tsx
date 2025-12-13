@@ -15,6 +15,9 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { useAppSelector } from '../../store/hooks';
 import { useGetCrewChatMessagesQuery, useSendCrewChatMessageMutation } from '../../store/api/authApi';
+import { FilteredTextInput } from '../common/FilteredTextInput';
+import { FilteredText } from '../common/FilteredText';
+import { UserReportModal } from '../modals/UserReportModal';
 
 interface ChatMessage {
   id: string;
@@ -42,6 +45,8 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
 
   const [messageInput, setMessageInput] = useState('');
   const scrollViewRef = useRef<ScrollView>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportedMessage, setReportedMessage] = useState<ChatMessage | null>(null);
 
   const maxCharacters = 500;
   const characterCount = messageInput.length;
@@ -117,6 +122,23 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
     const currentIdStr = String(currentId).trim();
     const messageIdStr = String(userId).trim();
     return currentIdStr === messageIdStr;
+  };
+
+  const handleReportMessage = (message: ChatMessage) => {
+    // Capture message data immediately before potential deletion
+    setReportedMessage({
+      id: message.id,
+      userId: message.userId,
+      username: message.username,
+      message: message.message,
+      timestamp: message.timestamp,
+    });
+    setShowReportModal(true);
+  };
+
+  const handleCloseReportModal = () => {
+    setShowReportModal(false);
+    setReportedMessage(null);
   };
 
   const styles = createStyles(colors);
@@ -195,20 +217,38 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
                     >
                       {isOwnMessage ? 'You' : message.username}
                     </Text>
-                    <View
-                      style={[
-                        styles.messageBubble,
-                        isOwnMessage ? styles.messageBubbleRight : styles.messageBubbleLeft,
-                      ]}
-                    >
-                      <Text
+                    <View style={styles.messageBubbleWrapper}>
+                      <View
                         style={[
-                          styles.messageText,
-                          isOwnMessage ? styles.messageTextRight : styles.messageTextLeft,
+                          styles.messageBubble,
+                          isOwnMessage ? styles.messageBubbleRight : styles.messageBubbleLeft,
                         ]}
                       >
-                        {message.message}
-                      </Text>
+                        <FilteredText
+                          style={[
+                            styles.messageText,
+                            isOwnMessage ? styles.messageTextRight : styles.messageTextLeft,
+                          ]}
+                        >
+                          {message.message}
+                        </FilteredText>
+                      </View>
+                      {!isOwnMessage && (
+                        <TouchableOpacity
+                          onPress={() => handleReportMessage(message)}
+                          activeOpacity={0.7}
+                          style={[
+                            styles.reportButton,
+                            {
+                              backgroundColor: colors.background + 'E6',
+                            }
+                          ]}
+                        >
+                          <Text style={[styles.reportButtonText, { color: colors.text.secondary }]}>
+                            Report
+                          </Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                     <Text
                       style={[
@@ -226,7 +266,7 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
 
           <View style={styles.inputContainer}>
             <View style={styles.inputWrapper}>
-              <TextInput
+              <FilteredTextInput
                 style={[
                   styles.messageInput,
                   {
@@ -271,6 +311,25 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
           </View>
         </SafeAreaView>
       </KeyboardAvoidingView>
+
+      {currentUser && reportedMessage && (
+        <UserReportModal
+          visible={showReportModal}
+          onClose={handleCloseReportModal}
+          reportedUserId={reportedMessage.userId}
+          reportedUsername={reportedMessage.username}
+          reportingUserId={currentUser._id}
+          reportingUsername={currentUser.handle || 'Unknown'}
+          context="chat-message"
+          contextData={{
+            message: reportedMessage.message,
+            messageId: reportedMessage.id,
+            timestamp: reportedMessage.timestamp.toISOString(),
+            crewId: crewId,
+          }}
+          maxDescriptionLength={1000}
+        />
+      )}
     </Modal>
   );
 };
@@ -362,6 +421,9 @@ const createStyles = (colors: any) =>
       alignSelf: 'flex-end',
       paddingLeft: SIZING.spacing.lg,
     },
+    messageBubbleWrapper: {
+      position: 'relative',
+    },
     usernameText: {
       fontSize: SIZING.font.small,
       fontWeight: '600',
@@ -401,6 +463,23 @@ const createStyles = (colors: any) =>
     messageText: {
       fontSize: SIZING.font.body,
       lineHeight: SIZING.font.body + 4,
+    },
+    reportButton: {
+      position: 'absolute',
+      bottom: -3,
+      right: 4,
+      shadowColor: '#000',
+      shadowOffset: {
+        width: 0,
+        height: 1,
+      },
+      shadowOpacity: 0.3,
+      shadowRadius: 2,
+      elevation: 3,
+    },
+    reportButtonText: {
+      fontSize: SIZING.font.small - 5,
+      fontWeight: '500',
     },
     messageTextLeft: {
       color: colors.text.primary,

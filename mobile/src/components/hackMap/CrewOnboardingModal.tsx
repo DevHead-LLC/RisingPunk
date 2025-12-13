@@ -4,6 +4,7 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { useCreateCrewMutation, useGetCrewStatusQuery, useSearchCrewsQuery, useGetSuggestedCrewsQuery, useApplyToCrewMutation, useWithdrawApplicationMutation } from '../../store/api/authApi';
 import { VisitCrewModal } from './VisitCrewModal';
+import { containsBadWordsAsSubstring } from '../../utils/contentModeration';
 
 interface CrewOnboardingModalProps {
   visible: boolean;
@@ -117,6 +118,9 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
     if (!VALID_CHAR_REGEX.test(value)) {
       return 'Only letters, numbers, _, and - are allowed';
     }
+    if (containsBadWordsAsSubstring(value)) {
+      return 'Crew name contains inappropriate language';
+    }
     return '';
   }, []);
 
@@ -129,6 +133,9 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
     }
     if (!VALID_CHAR_REGEX.test(value)) {
       return 'Only letters, numbers, _, and - are allowed';
+    }
+    if (containsBadWordsAsSubstring(value)) {
+      return 'Crew identifier contains inappropriate language';
     }
     return '';
   }, []);
