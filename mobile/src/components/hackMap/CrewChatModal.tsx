@@ -126,12 +126,17 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
 
   const handleReportMessage = (message: ChatMessage) => {
     // Capture message data immediately before potential deletion
+    // Ensure timestamp is a Date object (API returns string, we convert it)
+    const timestamp = message.timestamp instanceof Date 
+      ? message.timestamp 
+      : new Date(message.timestamp);
+    
     setReportedMessage({
       id: message.id,
       userId: message.userId,
       username: message.username,
       message: message.message,
-      timestamp: message.timestamp,
+      timestamp: timestamp,
     });
     setShowReportModal(true);
   };
@@ -324,7 +329,9 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
           contextData={{
             message: reportedMessage.message,
             messageId: reportedMessage.id,
-            timestamp: reportedMessage.timestamp.toISOString(),
+            timestamp: (reportedMessage.timestamp instanceof Date 
+              ? reportedMessage.timestamp 
+              : new Date(reportedMessage.timestamp)).toISOString(),
             crewId: crewId,
           }}
           maxDescriptionLength={1000}
