@@ -281,7 +281,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\n\nWITH_ENVIRONMENT=\"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\nREACT_NATIVE_XCODE=\"$REACT_NATIVE_PATH/scripts/react-native-xcode.sh\"\n\n/bin/sh -c \"$WITH_ENVIRONMENT $REACT_NATIVE_XCODE\"\n";
+			shellScript = "set -e\n\n# Set ENVFILE for react-native-config\n# Priority: 1) ENVFILE from npm script (when running via npm run ios:dev), 2) ENVFILE from Xcode scheme, 3) API_ENV build setting, 4) default\n# When running via npm, ENVFILE is already set, so we respect that\nif [ -n \"$ENVFILE\" ]; then\n  # ENVFILE is already set (from npm script or Xcode scheme) - use it as-is\n  ENVFILE_VALUE=\"$ENVFILE\"\n  echo \"[React Native Bundle] Using existing ENVFILE: $ENVFILE_VALUE\"\nelif [ -n \"$API_ENV\" ]; then\n  # Fall back to API_ENV build setting (for Xcode-only builds without scheme ENVFILE)\n  case \"$API_ENV\" in\n    dev)\n      ENVFILE_VALUE=\".env.dev\"\n      ;;\n    staging)\n      ENVFILE_VALUE=\".env.staging\"\n      ;;\n    prod)\n      ENVFILE_VALUE=\".env.prod\"\n      ;;\n    *)\n      echo \"Warning: Unknown API_ENV value: $API_ENV, defaulting to .env\"\n      ENVFILE_VALUE=\".env\"\n      ;;\n  esac\n  echo \"[React Native Bundle] Using ENVFILE from API_ENV build setting: $ENVFILE_VALUE\"\nelse\n  echo \"Warning: Neither ENVFILE nor API_ENV is set, defaulting to .env\"\n  ENVFILE_VALUE=\".env\"\nfi\n\n# Write to /tmp/envfile (react-native-config checks this first)\necho \"$ENVFILE_VALUE\" > /tmp/envfile\n\n# Also export as environment variable (for react-native-config)\nexport ENVFILE=\"$ENVFILE_VALUE\"\n\necho \"[React Native Bundle] Final ENVFILE=$ENVFILE_VALUE\"\n\nWITH_ENVIRONMENT=\"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\nREACT_NATIVE_XCODE=\"$REACT_NATIVE_PATH/scripts/react-native-xcode.sh\"\n\n/bin/sh -c \"$WITH_ENVIRONMENT $REACT_NATIVE_XCODE\"\n";
 		};
 		3891D4C06E52BD72996D991C /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -483,12 +483,13 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 4489632C5AC26AE933EBB759 /* Pods-mobile.debug.xcconfig */;
 			buildSettings = {
-				API_ENV = staging;
+				API_ENV = dev;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = mobile/mobile.entitlements;
-				CURRENT_PROJECT_VERSION = 23;
+				CURRENT_PROJECT_VERSION = 29;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 26522YLRG2;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = mobile/Info.plist;
@@ -499,7 +500,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 2.0.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -518,13 +519,14 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 285B0F629E022AD14ED188BB /* Pods-mobile.release.xcconfig */;
 			buildSettings = {
-				API_ENV = staging;
-				"API_ENV[arch=*]" = staging;
+				API_ENV = prod;
+				"API_ENV[arch=*]" = prod;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = mobile/mobile.entitlements;
-				CURRENT_PROJECT_VERSION = 23;
+				CURRENT_PROJECT_VERSION = 29;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 26522YLRG2;
 				INFOPLIST_FILE = mobile/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = RisingPunk;
@@ -534,7 +536,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 2.0.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",

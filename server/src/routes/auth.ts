@@ -1153,9 +1153,25 @@ router.get('/verify-token', async (req, res): Promise<void> => {
         }
       }
     });
-  } catch (error) {
-    console.error('Token verification error:', error);
-    res.status(401).json({ error: 'Invalid token' });
+  } catch (error: any) {
+    if (error instanceof jwt.TokenExpiredError) {
+      console.error('Token verification error: Token expired');
+      res.status(401).json({ error: 'Token expired' });
+    } else if (error instanceof jwt.JsonWebTokenError) {
+      if (error.message === 'invalid signature') {
+        console.error('Token verification error: Invalid signature - likely environment mismatch (staging token used on dev server or vice versa)');
+        console.error('User needs to log out and log back in to get a new token for this environment');
+        res.status(401).json({ 
+          error: 'Invalid token signature. Please log out and log back in. This usually happens when switching between dev/staging/prod environments.' 
+        });
+      } else {
+        console.error('Token verification error:', error);
+        res.status(401).json({ error: 'Invalid token' });
+      }
+    } else {
+      console.error('Token verification error:', error);
+      res.status(401).json({ error: 'Invalid token' });
+    }
   }
 });
 

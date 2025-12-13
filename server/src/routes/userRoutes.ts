@@ -5,6 +5,7 @@ import auth from '../middleware/auth';
 import { Request, Response } from 'express';
 import { FinanceTier } from '../models/Finance';
 import { FinanceTemplate } from '../models/FinanceTemplate';
+import mongoose from 'mongoose';
 
 interface UpdatePreferencesRequest extends Request {
   body: {
@@ -237,6 +238,98 @@ router.post('/unlock-research-center', auth, async (req: Request, res: Response)
     console.error('Server error:', error);
     res.status(500).json({ message: 'Error starting research center build' });
   }
+});
+
+router.post('/speedup-research-center-construction', auth, async (req: Request, res: Response) => {
+  const session = await mongoose.startSession();
+  
+  try {
+    await session.withTransaction(async () => {
+      // Reload user within transaction to ensure we have latest state
+      const userInTransaction = await User.findById(req.user._id).session(session);
+      if (!userInTransaction) {
+        throw new Error('User not found');
+      }
+
+      const buildStatus = userInTransaction.researchCenterBuild;
+      
+      if (!buildStatus?.startedAt || !buildStatus?.completesAt) {
+        throw new Error('No active build found for research center');
+      }
+
+      // Calculate cost inside transaction based on current time to prevent overcharging
+      const now = new Date();
+      const completesAt = new Date(buildStatus.completesAt);
+      const remainingMs = Math.max(0, completesAt.getTime() - now.getTime());
+      const remainingSeconds = Math.ceil(remainingMs / 1000);
+      
+      if (remainingSeconds <= 0) {
+        throw new Error('Build is already complete');
+      }
+
+      // Calculate cost based on actual remaining time at transaction execution
+      const cost = remainingSeconds * 5;
+
+      // Verify sufficient balance inside transaction to prevent race conditions
+      if (userInTransaction.balance.total < cost) {
+        throw new Error('Insufficient funds');
+      }
+
+      // Mark research center as unlocked and clear build status, deduct balance atomically
+      userInTransaction.unlockedFeatures.researchCenter = true;
+      userInTransaction.researchCenterBuild = {
+        startedAt: null,
+        completesAt: null
+      };
+      userInTransaction.balance.total -= cost;
+
+      await userInTransaction.save({ session });
+    });
+  } catch (error: any) {
+    if (error.message === 'User not found') {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    if (error.message === 'No active build found for research center') {
+      res.status(400).json({ error: 'No active build found for research center' });
+      return;
+    }
+    if (error.message === 'Build is already complete') {
+      res.status(400).json({ error: 'Build is already complete' });
+      return;
+    }
+    if (error.message === 'Insufficient funds') {
+      res.status(400).json({ error: 'Insufficient funds' });
+      return;
+    }
+    
+    console.error('Error speeding up research center construction:', error);
+    res.status(500).json({ error: 'Internal server error' });
+    return;
+  } finally {
+    await session.endSession();
+  }
+
+  // Reload user to get updated balance after transaction
+  const updatedUser = await User.findById(req.user._id);
+  if (!updatedUser) {
+    res.status(500).json({ error: 'Error retrieving updated user data' });
+    return;
+  }
+
+  res.json({
+    success: true,
+    message: 'Research center construction completed',
+    balance: {
+      total: updatedUser.balance.total,
+      ratePerSecond: updatedUser.balance.ratePerSecond,
+      lastUpdated: updatedUser.balance.lastUpdated.toISOString()
+    },
+    unlockedFeatures: {
+      hackRig: updatedUser.unlockedFeatures?.hackRig || false,
+      researchCenter: true
+    }
+  });
 });
 
 router.post('/experience/add', auth, async (req: Request, res: Response) => {
@@ -480,6 +573,112 @@ router.post('/complete-rental-housing/:propertyId', auth, async (req, res): Prom
     console.error('Error completing rental housing build:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+router.post('/speedup-property-construction/:propertyId', auth, async (req, res): Promise<void> => {
+  const userId = req.user?._id;
+  const propertyId = parseInt(req.params.propertyId);
+  
+  if (!userId || propertyId < 1 || propertyId > 4) {
+    res.status(400).json({ error: 'Invalid property ID' });
+    return;
+  }
+
+  const session = await mongoose.startSession();
+  
+  try {
+    await session.withTransaction(async () => {
+      // Reload user within transaction to ensure we have latest state
+      const userInTransaction = await User.findById(userId).session(session);
+      if (!userInTransaction) {
+        throw new Error('User not found');
+      }
+
+      const propertyKey = `property${propertyId}` as keyof typeof userInTransaction.rentalHousingBuilds;
+      const rentalHousingKey = `rentalHousing${propertyId}` as keyof typeof userInTransaction.unlockedFeatures;
+      
+      const buildStatus = userInTransaction.rentalHousingBuilds?.[propertyKey] as { startedAt: Date | null; completesAt: Date | null } | undefined;
+      
+      if (!buildStatus?.startedAt || !buildStatus?.completesAt) {
+        throw new Error('No active build found for this property');
+      }
+
+      // Calculate cost inside transaction based on current time to prevent overcharging
+      const now = new Date();
+      const completesAt = new Date(buildStatus.completesAt);
+      const remainingMs = Math.max(0, completesAt.getTime() - now.getTime());
+      const remainingSeconds = Math.ceil(remainingMs / 1000);
+      
+      if (remainingSeconds <= 0) {
+        throw new Error('Build is already complete');
+      }
+
+      // Calculate cost based on actual remaining time at transaction execution
+      const cost = remainingSeconds * 5;
+
+      // Verify sufficient balance inside transaction to prevent race conditions
+      if (userInTransaction.balance.total < cost) {
+        throw new Error('Insufficient funds');
+      }
+
+      // Mark property as unlocked and clear build status, deduct balance atomically
+      (userInTransaction.unlockedFeatures as any)[rentalHousingKey] = true;
+      (userInTransaction.rentalHousingBuilds as any)[propertyKey] = {
+        startedAt: null,
+        completesAt: null
+      };
+      userInTransaction.balance.total -= cost;
+
+      await userInTransaction.save({ session });
+    });
+  } catch (error: any) {
+    if (error.message === 'User not found') {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    if (error.message === 'No active build found for this property') {
+      res.status(400).json({ error: 'No active build found for this property' });
+      return;
+    }
+    if (error.message === 'Build is already complete') {
+      res.status(400).json({ error: 'Build is already complete' });
+      return;
+    }
+    if (error.message === 'Insufficient funds') {
+      res.status(400).json({ error: 'Insufficient funds' });
+      return;
+    }
+    
+    console.error('Error speeding up property construction:', error);
+    res.status(500).json({ error: 'Internal server error' });
+    return;
+  } finally {
+    await session.endSession();
+  }
+
+  // Reload user to get updated balance after transaction
+  const updatedUser = await User.findById(userId);
+  if (!updatedUser) {
+    res.status(500).json({ error: 'Error retrieving updated user data' });
+    return;
+  }
+
+  // Trigger a sync to ensure rental housing income is properly calculated
+  try {
+    const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
+    await RentalHousingSyncService.performSync(updatedUser);
+  } catch (syncError) {
+    console.error('Error syncing rental housing:', syncError);
+    // Don't fail the request if sync fails, but log it
+  }
+
+  res.json({
+    success: true,
+    message: 'Property construction completed',
+    propertyId,
+    isUnlocked: true,
+    newBalance: updatedUser.balance.total
+  });
 });
 
 // Update user preferences
