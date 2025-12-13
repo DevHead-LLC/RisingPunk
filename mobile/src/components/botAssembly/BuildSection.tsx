@@ -9,6 +9,7 @@ import { BuildProgressBar } from './BuildProgressBar';
 import { BotDescription } from './BotDescription';
 import { BuildTimer } from './BuildTimer';
 import { SpeedupModal } from '../common/SpeedupModal';
+import { LockedFeatureModal } from '../turf/LockedFeatureModal';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { useSpeedupBotBuildMutation } from '../../store/api/botsApi';
 import { updateBalance } from '../../store/slices/balanceSlice';
@@ -35,6 +36,8 @@ export const BuildSection = React.memo(function BuildSection({
   const colors = useThemeColors();
   const dispatch = useAppDispatch();
   const [showSpeedupModal, setShowSpeedupModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const buildQueue = useAppSelector((state) => state.bots.buildQueue);
   const buildStartTime = useAppSelector((state) => state.bots.buildStartTime);
   const totalBuildQuantity = useAppSelector((state) => state.bots.totalBuildQuantity);
@@ -79,11 +82,25 @@ export const BuildSection = React.memo(function BuildSection({
         
         // Close modal
         setShowSpeedupModal(false);
+      } else {
+        // Handle case where API returns success: false (HTTP 200 but operation failed)
+        setShowSpeedupModal(false);
+        const errorMsg = result.message || result.error || 'Failed to speed up bot build. Please try again.';
+        setErrorMessage(errorMsg);
+        setShowErrorModal(true);
       }
     } catch (error: any) {
       console.error('Error speeding up bot build:', error);
-      // Re-throw error so modal can handle it and stay open
-      throw error;
+      // Close speedup modal and show error modal instead
+      setShowSpeedupModal(false);
+      // Note: speedup-build endpoint returns { error: '...' }
+      if (error?.data?.error === 'Insufficient funds') {
+        setErrorMessage('You do not have sufficient funds to speed up this bot build.');
+      } else {
+        const errorMsg = error?.data?.error || error?.data?.message || 'Failed to speed up bot build. Please try again.';
+        setErrorMessage(errorMsg);
+      }
+      setShowErrorModal(true);
     }
   }, [speedupBotBuild, dispatch, currentBalanceState]);
 
@@ -134,6 +151,14 @@ export const BuildSection = React.memo(function BuildSection({
           onClose={() => setShowSpeedupModal(false)}
         />
       )}
+
+      <LockedFeatureModal
+        visible={showErrorModal}
+        title="SPEEDUP ERROR"
+        message={errorMessage}
+        onClose={() => setShowErrorModal(false)}
+        closeButtonText="CLOSE"
+      />
     </View>
   );
 });
