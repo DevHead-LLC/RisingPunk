@@ -16,6 +16,7 @@ import { ResignModal } from './ResignModal';
 import { WarManagementModal } from './WarManagementModal';
 import { AllianceManagementModal } from './AllianceManagementModal';
 import { EditableCrewRules } from './EditableCrewRules';
+import { CrewChatModal } from './CrewChatModal';
 import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, useUpdateCrewLanguageMutation, useUpdateInternalMessageMutation, useUpdateExternalMessageMutation, useGiftAllMembersMutation, usePromoteMemberMutation, useDemoteExecutiveMutation, useChooseSuccessorMutation, useResignMutation, useGetWarStatusQuery } from '../../store/api/authApi';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -72,6 +73,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [showResignModal, setShowResignModal] = useState(false);
   const [showWarManagementModal, setShowWarManagementModal] = useState(false);
   const [showAllianceManagementModal, setShowAllianceManagementModal] = useState(false);
+  const [showCrewChatModal, setShowCrewChatModal] = useState(false);
   const [viewingProfileUserId, setViewingProfileUserId] = useState<string | null>(null);
   const [promotingUserId, setPromotingUserId] = useState<string | null>(null);
   const [demotingUserId, setDemotingUserId] = useState<string | null>(null);
@@ -201,6 +203,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     setShowResignModal(false);
     setShowWarManagementModal(false);
     setShowAllianceManagementModal(false);
+    setShowCrewChatModal(false);
     setViewingProfileUserId(null);
     setPromotingUserId(null);
     setDemotingUserId(null);
@@ -574,6 +577,15 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     return (
       <View style={styles.crewModalContainer}>
         <View style={styles.header}>
+          {crewStatus?.crewId && (
+            <TouchableOpacity
+              style={styles.chatIconButton}
+              onPress={() => setShowCrewChatModal(true)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.chatIconText}>💬</Text>
+            </TouchableOpacity>
+          )}
           <Text style={styles.title}>{title}</Text>
           <TouchableOpacity
             style={styles.closeButton}
@@ -1630,7 +1642,18 @@ export const CrewModal: React.FC<CrewModalProps> = ({
           >
             <Text style={styles.backButtonText}>← Back</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>{getCategoryLabel(currentCategory)}</Text>
+          <View style={styles.headerCenter}>
+            {crewStatus?.crewId && (
+              <TouchableOpacity
+                style={styles.chatIconButton}
+                onPress={() => setShowCrewChatModal(true)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.chatIconText}>💬</Text>
+              </TouchableOpacity>
+            )}
+            <Text style={styles.title}>{getCategoryLabel(currentCategory)}</Text>
+          </View>
           <TouchableOpacity
             style={styles.closeButton}
             onPress={handleClose}
@@ -1771,6 +1794,14 @@ export const CrewModal: React.FC<CrewModalProps> = ({
           crewId={crewStatus.crewId}
         />
       )}
+
+      {crewStatus?.crewId && (
+        <CrewChatModal
+          visible={showCrewChatModal}
+          onClose={() => setShowCrewChatModal(false)}
+          crewId={crewStatus.crewId}
+        />
+      )}
     </Modal>
   );
 };
@@ -1802,6 +1833,27 @@ const createStyles = (colors: any) => StyleSheet.create({
     padding: SIZING.spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.secondary,
+  },
+  headerCenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    gap: SIZING.spacing.sm,
+  },
+  chatIconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primary,
+    borderColor: colors.secondary,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SIZING.spacing.sm,
+  },
+  chatIconText: {
+    fontSize: 20,
   },
   title: {
     color: colors.text.primary,

@@ -9,6 +9,7 @@ export interface BuildQueue {
   progress: number;
   startedAt: string;
   completesAt: string;
+  botsBuilt?: number;
 }
 
 export interface BotsState {

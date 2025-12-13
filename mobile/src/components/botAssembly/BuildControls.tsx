@@ -12,6 +12,7 @@ type BuildControlsProps = {
   quantity: string;
   onQuantityChange: (value: string) => void;
   onBuild: () => void;
+  onSpeedup?: () => void;
 };
 
 export const BuildControls = React.memo(function BuildControls({
@@ -20,8 +21,31 @@ export const BuildControls = React.memo(function BuildControls({
   quantity,
   onQuantityChange,
   onBuild,
+  onSpeedup,
 }: BuildControlsProps) {
   const colors = useThemeColors();
+
+  // If build is in progress, show speedup button instead of input/build button
+  if (buildingProgress !== null && onSpeedup) {
+    return (
+      <KeyboardDismissView>
+        <TouchableOpacity
+          style={[
+            styles.speedupButton,
+            {
+              backgroundColor: colors.matrix,
+              borderColor: colors.matrix,
+            },
+          ]}
+          onPress={onSpeedup}
+        >
+          <Text style={[styles.speedupButtonText, { color: colors.background }]}>
+            COMPLETE BUILD
+          </Text>
+        </TouchableOpacity>
+      </KeyboardDismissView>
+    );
+  }
 
   return (
     <KeyboardDismissView>
@@ -118,5 +142,22 @@ const styles = StyleSheet.create({
     fontSize: SIZING.font.body,
     fontWeight: 'bold',
     letterSpacing: 1,
+  },
+  speedupButton: {
+    width: '100%',
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 4,
+    borderWidth: 1,
+    marginBottom: SIZING.spacing.xs,
+    ...(Platform.OS === 'android' && {
+      height: 48,
+    }),
+  },
+  speedupButtonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+    letterSpacing: 2,
   },
 });
