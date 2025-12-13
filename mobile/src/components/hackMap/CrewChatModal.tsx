@@ -134,8 +134,9 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
     >
       <KeyboardAvoidingView
         style={styles.overlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        enabled={Platform.OS === 'ios'}
       >
         <SafeAreaView style={styles.chatModalContainer}>
           <View style={styles.header}>
@@ -243,6 +244,12 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
                 multiline
                 maxLength={maxCharacters}
                 textAlignVertical="top"
+                onSubmitEditing={() => {
+                  if (messageInput.trim() && !isSending && characterCount <= maxCharacters) {
+                    handleSendMessage();
+                  }
+                }}
+                blurOnSubmit={false}
               />
               <Text style={styles.characterCount}>
                 {characterCount} / {maxCharacters}
