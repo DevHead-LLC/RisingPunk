@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Platform } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { CloseButton } from '../common/CloseButton';
@@ -105,7 +105,11 @@ export const CollapsibleToolbar: React.FC<CollapsibleToolbarProps> = ({
 const createStyles = (colors: any, toolbarWidth: number) => StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: SIZING.spacing.lg,
+    bottom: Platform.select({
+      ios: SIZING.spacing.lg,
+      android: SIZING.spacing.lg + 20, // Add extra padding for Android safe area
+      default: SIZING.spacing.lg,
+    }),
     right: SIZING.spacing.lg,
     zIndex: 1000,
   },

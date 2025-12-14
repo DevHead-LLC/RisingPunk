@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Dimensions, TextInput } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Dimensions, TextInput, SafeAreaView } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
@@ -651,27 +651,6 @@ export const CrewModal: React.FC<CrewModalProps> = ({
               )}
             </View>
           </ScrollView>
-          {activeCrewDetails?.crew && currentUser?._id && activeCrewDetails.crew.president?.userId && String(currentUser._id) !== String(activeCrewDetails.crew.president.userId) && (
-            <TouchableOpacity
-              onPress={() => {
-                // Capture crew name/identifier data and president info immediately before potential changes
-                setCrewNameReportData({
-                  crewName: activeCrewDetails.crew.crewName,
-                  crewIdentifier: activeCrewDetails.crew.crewIdentifier,
-                  crewId: activeCrewDetails.crew.id,
-                  reportedUserId: activeCrewDetails.crew.president?.userId || '',
-                  reportedUsername: activeCrewDetails.crew.president?.handle || '',
-                });
-                setShowCrewNameReportModal(true);
-              }}
-              activeOpacity={0.7}
-              style={[styles.crewReportButton, { backgroundColor: colors.background + 'E6' }]}
-            >
-              <Text style={[styles.crewReportButtonText, { color: colors.text.secondary }]}>
-                Report
-              </Text>
-            </TouchableOpacity>
-          )}
         </View>
       </View>
     );
@@ -1785,9 +1764,9 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       supportedOrientations={['landscape']}
       presentationStyle="overFullScreen"
     >
-      <View style={styles.overlay}>
+      <SafeAreaView style={styles.overlay}>
         {currentCategory ? renderCategoryView() : renderCategoryList()}
-      </View>
+      </SafeAreaView>
 
       {crewStatus?.crewIdentifier && (
         <DisbandCrewModal
@@ -1959,11 +1938,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
 
 const createStyles = (colors: any) => StyleSheet.create({
   overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    flex: 1,
     width: '100%',
     height: '100%',
     backgroundColor: colors.background,
@@ -1973,7 +1948,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   crewModalContainer: {
     flex: 1,
     width: '100%',
-    height: '100%',
     backgroundColor: colors.background,
     alignSelf: 'stretch',
   },
