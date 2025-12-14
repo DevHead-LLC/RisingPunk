@@ -15,8 +15,11 @@ export interface ICrew extends Document {
   executives: mongoose.Types.ObjectId[];
   applicants: ICrewApplicant[];
   crewRules: string[];
+  originalCrewRules?: string[]; // Original unfiltered content for moderation reports
   internalMessage: string;
+  originalInternalMessage?: string; // Original unfiltered content for moderation reports
   externalMessage: string;
+  originalExternalMessage?: string; // Original unfiltered content for moderation reports
   warWithCrewId: mongoose.Types.ObjectId | null;
   warDeclaredAt: Date | null;
   allianceWithCrewIds: mongoose.Types.ObjectId[];
@@ -76,16 +79,35 @@ const crewSchema = new Schema({
     type: [String],
     default: []
   },
+  originalCrewRules: {
+    type: [String],
+    required: false,
+    default: undefined
+  },
   internalMessage: {
     type: String,
     maxlength: 1500,
     default: '',
     trim: true
   },
+  originalInternalMessage: {
+    type: String,
+    required: false,
+    maxlength: 1500,
+    default: undefined,
+    trim: true
+  },
   externalMessage: {
     type: String,
     maxlength: 1500,
     default: '',
+    trim: true
+  },
+  originalExternalMessage: {
+    type: String,
+    required: false,
+    maxlength: 1500,
+    default: undefined,
     trim: true
   },
   warWithCrewId: {

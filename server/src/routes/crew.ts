@@ -454,6 +454,7 @@ router.get('/chat-messages', auth, async (req: Request, res: Response) => {
       userId: String(msg.userId),
       username: msg.username,
       message: msg.message,
+      originalMessage: msg.originalMessage || msg.message, // Include original for moderation reports
       timestamp: msg.createdAt,
     }));
 
@@ -529,6 +530,7 @@ router.post('/chat-messages', auth, async (req: SendChatMessageRequest, res: Res
       userId,
       username: user.handle || 'Unknown',
       message: filteredMessage,
+      originalMessage: trimmedMessage, // Store original for moderation reports
     });
 
     await chatMessage.save();
@@ -641,10 +643,12 @@ router.put('/:crewId/rules', auth, async (req: Request, res: Response) => {
     }
 
     // Apply content filtering to each rule before saving
-    const filteredRules = crewRules
+    const validRules = crewRules
       .filter((rule: string) => typeof rule === 'string' && rule.trim().length > 0)
-      .map((rule: string) => filterBadWords(rule.trim()));
+      .map((rule: string) => rule.trim());
+    const filteredRules = validRules.map((rule: string) => filterBadWords(rule));
     crew.crewRules = filteredRules;
+    crew.originalCrewRules = validRules; // Store original for moderation reports
     await crew.save();
 
     res.json({
@@ -1416,8 +1420,11 @@ router.get('/:crewId', auth, async (req: Request, res: Response) => {
         memberCount: memberCount,
         applicants: crew.applicants || [],
         crewRules: crew.crewRules || [],
+        originalCrewRules: (crew.originalCrewRules || crew.crewRules || []) as string[], // Include original for moderation reports
         internalMessage: isCrewMember ? (crew.internalMessage || '') : '',
+        originalInternalMessage: isCrewMember ? ((crew.originalInternalMessage || crew.internalMessage || '') as string) : '',
         externalMessage: crew.externalMessage || '',
+        originalExternalMessage: (crew.originalExternalMessage || crew.externalMessage || '') as string,
         president: president ? { userId: president._id.toString(), handle: president.handle, level: president.level || 1 } : null,
         executives: executives.map((exec: any) => ({
           userId: exec._id.toString(),
@@ -2075,6 +2082,7 @@ router.post('/update-internal-message', auth, async (req: UpdateInternalMessageR
     const trimmedMessage = internalMessage.trim();
     const filteredMessage = filterBadWords(trimmedMessage);
     crew.internalMessage = filteredMessage;
+    crew.originalInternalMessage = trimmedMessage; // Store original for moderation reports
     await crew.save();
 
     res.json({
@@ -2137,6 +2145,7 @@ router.post('/update-external-message', auth, async (req: UpdateExternalMessageR
     const trimmedMessage = externalMessage.trim();
     const filteredMessage = filterBadWords(trimmedMessage);
     crew.externalMessage = filteredMessage;
+    crew.originalExternalMessage = trimmedMessage; // Store original for moderation reports
     await crew.save();
 
     res.json({

@@ -1216,6 +1216,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         <EditableCrewRules
           crewId={crewId}
           crewRules={crewRules}
+          originalCrewRules={activeCrewDetails?.crew?.originalCrewRules}
           isEditing={isEditingCrewRules}
           onEditingChange={setIsEditingCrewRules}
           presidentId={president?.userId}
@@ -1456,9 +1457,10 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                   {currentUser?._id && activeCrewDetails?.crew?.president?.userId && String(currentUser._id) !== String(activeCrewDetails.crew.president.userId) && (
                     <TouchableOpacity
                       onPress={() => {
-                        // Capture message data immediately before potential changes
+                        // Capture original message data immediately before potential changes
+                        const originalMessage = activeCrewDetails.crew.originalInternalMessage || currentMessage;
                         setInternalMessageReportData({
-                          message: currentMessage,
+                          message: originalMessage,
                           crewId: activeCrewDetails.crew.id,
                         });
                         setShowInternalMessageReportModal(true);
@@ -1599,9 +1601,10 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                   {currentUser?._id && activeCrewDetails?.crew?.president?.userId && String(currentUser._id) !== String(activeCrewDetails.crew.president.userId) && (
                     <TouchableOpacity
                       onPress={() => {
-                        // Capture message data immediately before potential changes
+                        // Capture original message data immediately before potential changes
+                        const originalMessage = activeCrewDetails.crew.originalExternalMessage || currentMessage;
                         setExternalMessageReportData({
-                          message: currentMessage,
+                          message: originalMessage,
                           crewId: activeCrewDetails.crew.id,
                         });
                         setShowExternalMessageReportModal(true);

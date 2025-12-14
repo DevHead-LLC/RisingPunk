@@ -11,6 +11,7 @@ import { useAppSelector } from '../../store/hooks';
 interface EditableCrewRulesProps {
   crewId: string;
   crewRules: string[];
+  originalCrewRules?: string[]; // Original unfiltered content for moderation reports
   isEditing: boolean;
   onEditingChange: (editing: boolean) => void;
   presidentId?: string;
@@ -20,6 +21,7 @@ interface EditableCrewRulesProps {
 export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
   crewId,
   crewRules: initialCrewRules,
+  originalCrewRules,
   isEditing,
   onEditingChange,
   presidentId,
@@ -395,15 +397,17 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
   }, [localRules]);
 
   const handleReportRule = useCallback((index: number) => {
-    // Capture rule data immediately before potential changes (similar to chat message reporting)
-    const ruleText = localRules[index] || '';
+    // Capture original rule data immediately before potential changes (similar to chat message reporting)
+    // Use original rules if available, otherwise fall back to localRules (filtered)
+    const originalRules = originalCrewRules || localRules;
+    const ruleText = originalRules[index] || localRules[index] || '';
     setReportedRuleData({
       ruleText,
       ruleIndex: index,
-      allRules: [...localRules], // Capture snapshot of all rules
+      allRules: [...originalRules], // Capture snapshot of original rules for reports
     });
     setShowReportModal(true);
-  }, [localRules]);
+  }, [localRules, originalCrewRules]);
 
   const handleCloseReportModal = useCallback(() => {
     setShowReportModal(false);
