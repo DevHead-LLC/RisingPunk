@@ -5,6 +5,7 @@ export interface ICrewChatMessage extends Document {
   userId: mongoose.Types.ObjectId;
   username: string;
   message: string;
+  originalMessage?: string; // Original unfiltered content for moderation reports
   createdAt: Date;
   updatedAt: Date;
 }
@@ -29,6 +30,12 @@ const crewChatMessageSchema = new Schema({
   message: {
     type: String,
     required: true,
+    maxlength: 500,
+    trim: true
+  },
+  originalMessage: {
+    type: String,
+    required: false,
     maxlength: 500,
     trim: true
   }
