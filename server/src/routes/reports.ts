@@ -4,6 +4,7 @@ import { EmailService } from '../services/EmailService';
 import { ReportContext, ReportReason } from '../types/reports';
 import { Crew } from '../models/Crew';
 import { CrewChatMessage } from '../models/CrewChatMessage';
+import { CrewStatus } from '../models/CrewStatus';
 import mongoose from 'mongoose';
 
 const router = express.Router();
@@ -127,17 +128,31 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
     }[context];
 
     // Build context data string, enriching with original content from database when available
+    // IMPORTANT: All lookups are validated to ensure IDs match the reported user and reporting user has access
     let contextDataString = 'N/A';
     if (contextData) {
+      const reportedUserIdObj = new mongoose.Types.ObjectId(reportedUserId);
+      
       switch (context) {
         case 'chat-message': {
-          // Look up original message from database
+          // Look up original message from database with validation
           let originalMessage = contextData.message || 'N/A';
           if (contextData.messageId && mongoose.Types.ObjectId.isValid(contextData.messageId)) {
             try {
               const chatMessage = await CrewChatMessage.findById(contextData.messageId).lean();
-              if (chatMessage && chatMessage.originalMessage) {
-                originalMessage = chatMessage.originalMessage;
+              // Verify the message belongs to the reported user
+              if (chatMessage && chatMessage.userId && chatMessage.userId.toString() === reportedUserId) {
+                // Verify the reporting user has access to this crew (is a member)
+                if (chatMessage.crewId) {
+                  const reportingUserCrewStatus = await CrewStatus.findOne({
+                    userId: userId,
+                    crewId: chatMessage.crewId,
+                    isInCrew: true
+                  }).lean();
+                  if (reportingUserCrewStatus && chatMessage.originalMessage) {
+                    originalMessage = chatMessage.originalMessage;
+                  }
+                }
               }
             } catch (error) {
               // Fall back to provided message if lookup fails
@@ -148,13 +163,22 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
           break;
         }
         case 'internal-message-board': {
-          // Look up original internal message from database
+          // Look up original internal message from database with validation
           let originalMessage = contextData.message || 'N/A';
           if (contextData.crewId && mongoose.Types.ObjectId.isValid(contextData.crewId)) {
             try {
               const crew = await Crew.findById(contextData.crewId).lean();
-              if (crew && crew.originalInternalMessage) {
-                originalMessage = crew.originalInternalMessage;
+              // Verify the reported user is the president of this crew (only presidents can edit internal messages)
+              if (crew && crew.presidentId && crew.presidentId.toString() === reportedUserId) {
+                // Verify the reporting user has access to this crew (is a member)
+                const reportingUserCrewStatus = await CrewStatus.findOne({
+                  userId: userId,
+                  crewId: contextData.crewId,
+                  isInCrew: true
+                }).lean();
+                if (reportingUserCrewStatus && crew.originalInternalMessage) {
+                  originalMessage = crew.originalInternalMessage;
+                }
               }
             } catch (error) {
               // Fall back to provided message if lookup fails
@@ -165,13 +189,19 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
           break;
         }
         case 'external-message-board': {
-          // Look up original external message from database
+          // Look up original external message from database with validation
           let originalMessage = contextData.message || 'N/A';
           if (contextData.crewId && mongoose.Types.ObjectId.isValid(contextData.crewId)) {
             try {
               const crew = await Crew.findById(contextData.crewId).lean();
-              if (crew && crew.originalExternalMessage) {
-                originalMessage = crew.originalExternalMessage;
+              // Verify the reported user is the president of this crew (only presidents can edit external messages)
+              if (crew && crew.presidentId && crew.presidentId.toString() === reportedUserId) {
+                // Verify the reporting user has access to this crew (is a member) OR can view external messages (anyone can view external)
+                // For external messages, we allow lookup if the reported user is the president
+                // (External messages are visible to everyone, so we just verify the reported user owns it)
+                if (crew.originalExternalMessage) {
+                  originalMessage = crew.originalExternalMessage;
+                }
               }
             } catch (error) {
               // Fall back to provided message if lookup fails
@@ -182,16 +212,25 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
           break;
         }
         case 'crew-rules': {
-          // Look up original crew rules from database
+          // Look up original crew rules from database with validation
           let originalRuleText = contextData.ruleText || 'N/A';
           let allOriginalRules = contextData.allRules || [];
           if (contextData.crewId && mongoose.Types.ObjectId.isValid(contextData.crewId) && contextData.ruleIndex !== undefined) {
             try {
               const crew = await Crew.findById(contextData.crewId).lean();
-              if (crew && crew.originalCrewRules && Array.isArray(crew.originalCrewRules)) {
-                allOriginalRules = crew.originalCrewRules;
-                if (crew.originalCrewRules[contextData.ruleIndex]) {
-                  originalRuleText = crew.originalCrewRules[contextData.ruleIndex];
+              // Verify the reported user is the president of this crew (only presidents can edit crew rules)
+              if (crew && crew.presidentId && crew.presidentId.toString() === reportedUserId) {
+                // Verify the reporting user has access to this crew (is a member)
+                const reportingUserCrewStatus = await CrewStatus.findOne({
+                  userId: userId,
+                  crewId: contextData.crewId,
+                  isInCrew: true
+                }).lean();
+                if (reportingUserCrewStatus && crew.originalCrewRules && Array.isArray(crew.originalCrewRules)) {
+                  allOriginalRules = crew.originalCrewRules;
+                  if (crew.originalCrewRules[contextData.ruleIndex]) {
+                    originalRuleText = crew.originalCrewRules[contextData.ruleIndex];
+                  }
                 }
               }
             } catch (error) {
