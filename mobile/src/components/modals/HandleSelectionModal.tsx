@@ -14,6 +14,7 @@ import {
 import { SIZING, styleGuide } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { API_URL } from '../../config';
+import { containsBadWordsForHandle } from '../../utils/contentModeration';
 
 interface HandleSelectionModalProps {
   visible: boolean;
@@ -44,6 +45,7 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
   const [requirements, setRequirements] = useState({
     minLength: false,
     validChars: false,
+    noBadWords: false,
     unique: false
   });
 
@@ -57,8 +59,11 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
     if (value.length > 15) {
       return 'HANDLE_TOO_LONG';
     }
-    if (!/^[a-zA-Z0-9!&%^*]+$/.test(value)) {
+    if (!/^[a-zA-Z0-9!&%^*_]+$/.test(value)) {
       return 'HANDLE_INVALID_CHARS';
+    }
+    if (containsBadWordsForHandle(value)) {
+      return 'HANDLE_CONTAINS_BAD_WORDS';
     }
     return '';
   }, []);
@@ -67,7 +72,8 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
   const checkRequirements = useCallback((value: string) => {
     const newRequirements = {
       minLength: value.length >= 5,
-      validChars: /^[a-zA-Z0-9!&%^*]+$/.test(value),
+      validChars: /^[a-zA-Z0-9!&%^*_]+$/.test(value),
+      noBadWords: !containsBadWordsForHandle(value),
       unique: false // Will be set by availability check
     };
     setRequirements(newRequirements);
@@ -170,7 +176,9 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
       case 'HANDLE_TOO_LONG':
         return 'Handle must be 15 characters or less';
       case 'HANDLE_INVALID_CHARS':
-        return 'Handle can only contain letters, numbers, and !&%^*';
+        return 'Handle can only contain letters, numbers, and !&%^*_';
+      case 'HANDLE_CONTAINS_BAD_WORDS':
+        return 'Handle contains inappropriate language';
       case 'HANDLE_ALREADY_EXISTS':
         return 'This handle is already taken';
       default:
@@ -246,7 +254,14 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
                   <Text style={[styles.requirementText, { 
                     color: requirements.validChars ? colors.success || '#4CAF50' : colors.error 
                   }]}>
-                    {requirements.validChars ? '✓' : '✗'} Only letters, numbers, and !&%^*
+                    {requirements.validChars ? '✓' : '✗'} Only letters, numbers, and !&%^*_
+                  </Text>
+                </View>
+                <View style={styles.requirementItem}>
+                  <Text style={[styles.requirementText, { 
+                    color: requirements.noBadWords ? colors.success || '#4CAF50' : colors.error 
+                  }]}>
+                    {requirements.noBadWords ? '✓' : '✗'} No inappropriate language
                   </Text>
                 </View>
                 <View style={styles.requirementItem}>
@@ -289,7 +304,7 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
                   }
                 ]}
                 onPress={handleSubmit}
-                disabled={isLoading || !!validateHandle(handle) || !isHandleAvailable || isCheckingAvailability || isTyping}
+                disabled={isLoading || !!validateHandle(handle) || !isHandleAvailable || isCheckingAvailability || isTyping || !requirements.noBadWords}
               >
                 <Text style={[styles.submitText, { color: '#FFFFFF' }]}>
                   {isLoading ? 'SETTING_HANDLE...' : 'CONFIRM_HANDLE'}

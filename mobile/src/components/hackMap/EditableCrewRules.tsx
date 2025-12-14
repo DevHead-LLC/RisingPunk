@@ -3,12 +3,18 @@ import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Keyboa
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { useUpdateCrewRulesMutation } from '../../store/api/authApi';
+import { FilteredTextInput } from '../common/FilteredTextInput';
+import { FilteredText } from '../common/FilteredText';
+import { UserReportModal } from '../modals/UserReportModal';
+import { useAppSelector } from '../../store/hooks';
 
 interface EditableCrewRulesProps {
   crewId: string;
   crewRules: string[];
   isEditing: boolean;
   onEditingChange: (editing: boolean) => void;
+  presidentId?: string;
+  presidentHandle?: string;
 }
 
 export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
@@ -16,9 +22,14 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
   crewRules: initialCrewRules,
   isEditing,
   onEditingChange,
+  presidentId,
+  presidentHandle,
 }) => {
   const colors = useThemeColors();
+  const currentUser = useAppSelector((state) => state.auth.user);
   const [localRules, setLocalRules] = useState<string[]>(initialCrewRules || []);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportedRuleData, setReportedRuleData] = useState<{ ruleText: string; ruleIndex: number; allRules: string[] } | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const saveTimeoutRef = useRef<number | null>(null);
@@ -383,6 +394,22 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
     }, 100);
   }, [localRules]);
 
+  const handleReportRule = useCallback((index: number) => {
+    // Capture rule data immediately before potential changes (similar to chat message reporting)
+    const ruleText = localRules[index] || '';
+    setReportedRuleData({
+      ruleText,
+      ruleIndex: index,
+      allRules: [...localRules], // Capture snapshot of all rules
+    });
+    setShowReportModal(true);
+  }, [localRules]);
+
+  const handleCloseReportModal = useCallback(() => {
+    setShowReportModal(false);
+    setReportedRuleData(null);
+  }, []);
+
   const styles = createStyles(colors);
 
   if (!isEditing && localRules.length === 0) {
@@ -397,22 +424,55 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
 
   if (!isEditing) {
     return (
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {localRules.map((rule, index) => (
-          <View key={index} style={[styles.ruleCard, { borderColor: colors.secondary, backgroundColor: colors.surface }]}>
-            <Text style={[styles.ruleNumber, { color: colors.text.secondary }]}>
-              {index + 1}.
-            </Text>
-            <Text style={[styles.ruleText, { color: colors.text.primary }]}>
-              {rule}
-            </Text>
-          </View>
-        ))}
-      </ScrollView>
+      <>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {localRules.map((rule, index) => (
+            <View key={index} style={[styles.ruleCard, { borderColor: colors.secondary, backgroundColor: colors.surface }]}>
+              <View style={styles.ruleCardContent}>
+                <Text style={[styles.ruleNumber, { color: colors.text.secondary }]}>
+                  {index + 1}.
+                </Text>
+                <FilteredText style={[styles.ruleText, { color: colors.text.primary }]}>
+                  {rule}
+                </FilteredText>
+              </View>
+              {presidentId && presidentHandle && currentUser?._id && String(currentUser._id) !== String(presidentId) && (
+                <TouchableOpacity
+                  onPress={() => handleReportRule(index)}
+                  activeOpacity={0.7}
+                  style={[styles.reportButton, { backgroundColor: colors.background + 'E6' }]}
+                >
+                  <Text style={[styles.reportButtonText, { color: colors.text.secondary }]}>
+                    Report
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ))}
+        </ScrollView>
+        {currentUser && presidentId && presidentHandle && reportedRuleIndex !== null && (
+          <UserReportModal
+            visible={showReportModal}
+            onClose={handleCloseReportModal}
+            reportedUserId={presidentId}
+            reportedUsername={presidentHandle}
+            reportingUserId={currentUser._id}
+            reportingUsername={currentUser.handle || 'Unknown'}
+            context="crew-rules"
+            contextData={{
+              ruleText: localRules[reportedRuleIndex],
+              ruleIndex: reportedRuleIndex,
+              crewId: crewId,
+              allRules: localRules,
+            }}
+            maxDescriptionLength={1000}
+          />
+        )}
+      </>
     );
   }
 
@@ -497,30 +557,43 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
               </TouchableOpacity>
             </View>
           </View>
-          <TextInput
-            ref={(ref) => {
-              inputRefs.current[index] = ref;
-            }}
-            style={[styles.crewRuleInput, { color: colors.text.primary }]}
-            value={rule}
-            onChangeText={(value) => {
-              const singleLineValue = value.replace(/\n/g, '');
-              handleRuleChange(index, singleLineValue);
-            }}
-            onFocus={() => handleRuleFocus(index)}
-            onBlur={() => handleRuleBlur(index)}
-            onSubmitEditing={() => handleSaveCard(index)}
-            onKeyPress={({ nativeEvent }) => {
-              if (nativeEvent.key === 'Enter' || nativeEvent.key === '\n') {
-                handleSaveCard(index);
-              }
-            }}
-            returnKeyType={index === localRules.length - 1 ? 'done' : 'done'}
-            placeholder={`Rule ${index + 1}`}
-            placeholderTextColor={colors.text.secondary + '80'}
-            autoFocus={editingIndex === index}
-            blurOnSubmit={false}
-          />
+          <View style={styles.ruleInputContainer}>
+            <FilteredTextInput
+              ref={(ref) => {
+                inputRefs.current[index] = ref;
+              }}
+              style={[styles.crewRuleInput, { color: colors.text.primary }]}
+              value={rule}
+              onChangeText={(value) => {
+                const singleLineValue = value.replace(/\n/g, '');
+                handleRuleChange(index, singleLineValue);
+              }}
+              onFocus={() => handleRuleFocus(index)}
+              onBlur={() => handleRuleBlur(index)}
+              onSubmitEditing={() => handleSaveCard(index)}
+              onKeyPress={({ nativeEvent }) => {
+                if (nativeEvent.key === 'Enter' || nativeEvent.key === '\n') {
+                  handleSaveCard(index);
+                }
+              }}
+              returnKeyType={index === localRules.length - 1 ? 'done' : 'done'}
+              placeholder={`Rule ${index + 1}`}
+              placeholderTextColor={colors.text.secondary + '80'}
+              autoFocus={editingIndex === index}
+              blurOnSubmit={false}
+            />
+            {presidentId && presidentHandle && currentUser?._id && String(currentUser._id) !== String(presidentId) && (
+              <TouchableOpacity
+                onPress={() => handleReportRule(index)}
+                activeOpacity={0.7}
+                style={[styles.reportButton, { backgroundColor: colors.background + 'E6' }]}
+              >
+                <Text style={[styles.reportButtonText, { color: colors.text.secondary }]}>
+                  Report
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       ))}
       <TouchableOpacity
@@ -538,6 +611,24 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
             Saving...
           </Text>
         </View>
+      )}
+      {currentUser && presidentId && presidentHandle && reportedRuleData && (
+        <UserReportModal
+          visible={showReportModal}
+          onClose={handleCloseReportModal}
+          reportedUserId={presidentId}
+          reportedUsername={presidentHandle}
+          reportingUserId={currentUser._id}
+          reportingUsername={currentUser.handle || 'Unknown'}
+          context="crew-rules"
+          contextData={{
+            ruleText: reportedRuleData.ruleText,
+            ruleIndex: reportedRuleData.ruleIndex,
+            crewId: crewId,
+            allRules: reportedRuleData.allRules,
+          }}
+          maxDescriptionLength={1000}
+        />
       )}
     </ScrollView>
   );
@@ -561,12 +652,17 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontStyle: 'italic',
   },
   ruleCard: {
-    flexDirection: 'row',
+    position: 'relative',
     borderWidth: 1,
     borderRadius: 8,
     padding: SIZING.spacing.md,
     marginBottom: SIZING.spacing.md,
+    minHeight: 50,
+  },
+  ruleCardContent: {
+    flexDirection: 'row',
     alignItems: 'flex-start',
+    paddingRight: 60,
   },
   editableRuleCard: {
     borderWidth: 2,
@@ -590,12 +686,36 @@ const createStyles = (colors: any) => StyleSheet.create({
     flex: 1,
     lineHeight: 22,
   },
+  ruleInputContainer: {
+    position: 'relative',
+    paddingRight: 60,
+  },
   crewRuleInput: {
     fontSize: SIZING.font.body,
     height: 40,
     lineHeight: 22,
     paddingVertical: 0,
     paddingHorizontal: 0,
+  },
+  reportButton: {
+    position: 'absolute',
+    bottom: -3,
+    right: 4,
+    paddingVertical: SIZING.spacing.xs / 2,
+    paddingHorizontal: SIZING.spacing.sm,
+    borderRadius: 4,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  reportButtonText: {
+    fontSize: SIZING.font.small - 5,
+    fontWeight: '500',
   },
   ruleActions: {
     flexDirection: 'row',
