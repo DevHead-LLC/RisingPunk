@@ -454,7 +454,7 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
             </View>
           ))}
         </ScrollView>
-        {currentUser && presidentId && presidentHandle && reportedRuleIndex !== null && (
+        {currentUser && presidentId && presidentHandle && reportedRuleData && (
           <UserReportModal
             visible={showReportModal}
             onClose={handleCloseReportModal}
@@ -464,10 +464,10 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
             reportingUsername={currentUser.handle || 'Unknown'}
             context="crew-rules"
             contextData={{
-              ruleText: localRules[reportedRuleIndex],
-              ruleIndex: reportedRuleIndex,
+              ruleText: reportedRuleData.ruleText,
+              ruleIndex: reportedRuleData.ruleIndex,
               crewId: crewId,
-              allRules: localRules,
+              allRules: reportedRuleData.allRules,
             }}
             maxDescriptionLength={1000}
           />
