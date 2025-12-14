@@ -8,6 +8,7 @@ import { GoogleAuthService } from '../services/GoogleAuthService';
 import { AppleAuthService } from '../services/AppleAuthService';
 import { EmailService } from '../services/EmailService';
 import { EncryptionService } from '../services/EncryptionService';
+import { filterBadWords, containsBadWords, containsBadWordsForHandle } from '../utils/contentModeration';
 
 // Helper function to safely escape regex special characters
 function escapeRegexString(str: string): string {
@@ -942,8 +943,14 @@ router.post('/update-handle', async (req, res): Promise<void> => {
       return;
     }
 
-    if (!/^[a-zA-Z0-9!&%^*]+$/.test(handle)) {
-      res.status(400).json({ error: 'Handle can only contain letters, numbers, and !&%^*' });
+    if (!/^[a-zA-Z0-9!&%^*_]+$/.test(handle)) {
+      res.status(400).json({ error: 'Handle can only contain letters, numbers, and !&%^*_' });
+      return;
+    }
+
+    // Check for bad words (treating underscores as word separators to prevent bypasses)
+    if (containsBadWordsForHandle(handle)) {
+      res.status(400).json({ error: 'Handle contains inappropriate language' });
       return;
     }
 
@@ -964,6 +971,8 @@ router.post('/update-handle', async (req, res): Promise<void> => {
       return;
     }
 
+    // Note: Bad words check already done above, so we can save the handle as-is
+    // (No need to filter since we're rejecting handles with bad words)
     user.handle = handle;
     user.needsHandleSelection = false;
     await user.save();
