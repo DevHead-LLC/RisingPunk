@@ -150,7 +150,8 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
       switch (context) {
         case 'chat-message': {
           // Look up original message from database with validation
-          let originalMessage = contextData.message || 'N/A';
+          let messageContent = contextData.message || 'N/A';
+          let hasOriginalContent = false;
           if (contextData.messageId && mongoose.Types.ObjectId.isValid(contextData.messageId)) {
             try {
               const chatMessage = await CrewChatMessage.findById(contextData.messageId).lean();
@@ -166,7 +167,8 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
                     isInCrew: true
                   }).lean();
                   if (reportingUserCrewStatus && chatMessage.originalMessage) {
-                    originalMessage = chatMessage.originalMessage;
+                    messageContent = chatMessage.originalMessage;
+                    hasOriginalContent = true;
                   }
                 }
               }
@@ -175,12 +177,15 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
               console.error('Error looking up original chat message:', error);
             }
           }
-          contextDataString = `Message (Original): ${originalMessage}\nMessage (Filtered): ${contextData.message || 'N/A'}\nMessage ID: ${contextData.messageId || 'N/A'}\nTimestamp: ${contextData.timestamp || 'N/A'}`;
+          const originalLabel = hasOriginalContent ? 'Message (Original)' : 'Message (Content)';
+          const filteredLabel = hasOriginalContent ? 'Message (Filtered)' : 'Message (Filtered - same as content above)';
+          contextDataString = `${originalLabel}: ${messageContent}\n${filteredLabel}: ${contextData.message || 'N/A'}\nMessage ID: ${contextData.messageId || 'N/A'}\nTimestamp: ${contextData.timestamp || 'N/A'}`;
           break;
         }
         case 'internal-message-board': {
           // Look up original internal message from database with validation
-          let originalMessage = contextData.message || 'N/A';
+          let messageContent = contextData.message || 'N/A';
+          let hasOriginalContent = false;
           if (contextData.crewId && mongoose.Types.ObjectId.isValid(contextData.crewId)) {
             try {
               const crew = await Crew.findById(contextData.crewId).lean();
@@ -195,7 +200,8 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
                   isInCrew: true
                 }).lean();
                 if (reportingUserCrewStatus && crew.originalInternalMessage) {
-                  originalMessage = crew.originalInternalMessage;
+                  messageContent = crew.originalInternalMessage;
+                  hasOriginalContent = true;
                 }
               }
             } catch (error) {
@@ -203,12 +209,15 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
               console.error('Error looking up original internal message:', error);
             }
           }
-          contextDataString = `Message (Original): ${originalMessage}\nMessage (Filtered): ${contextData.message || 'N/A'}`;
+          const originalLabel = hasOriginalContent ? 'Message (Original)' : 'Message (Content)';
+          const filteredLabel = hasOriginalContent ? 'Message (Filtered)' : 'Message (Filtered - same as content above)';
+          contextDataString = `${originalLabel}: ${messageContent}\n${filteredLabel}: ${contextData.message || 'N/A'}`;
           break;
         }
         case 'external-message-board': {
           // Look up original external message from database with validation
-          let originalMessage = contextData.message || 'N/A';
+          let messageContent = contextData.message || 'N/A';
+          let hasOriginalContent = false;
           if (contextData.crewId && mongoose.Types.ObjectId.isValid(contextData.crewId)) {
             try {
               const crew = await Crew.findById(contextData.crewId).lean();
@@ -220,7 +229,8 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
                 // For external messages, we allow lookup if the reported user is the president
                 // (External messages are visible to everyone, so we just verify the reported user owns it)
                 if (crew.originalExternalMessage) {
-                  originalMessage = crew.originalExternalMessage;
+                  messageContent = crew.originalExternalMessage;
+                  hasOriginalContent = true;
                 }
               }
             } catch (error) {
@@ -228,13 +238,16 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
               console.error('Error looking up original external message:', error);
             }
           }
-          contextDataString = `Message (Original): ${originalMessage}\nMessage (Filtered): ${contextData.message || 'N/A'}`;
+          const originalLabel = hasOriginalContent ? 'Message (Original)' : 'Message (Content)';
+          const filteredLabel = hasOriginalContent ? 'Message (Filtered)' : 'Message (Filtered - same as content above)';
+          contextDataString = `${originalLabel}: ${messageContent}\n${filteredLabel}: ${contextData.message || 'N/A'}`;
           break;
         }
         case 'crew-rules': {
           // Look up original crew rules from database with validation
-          let originalRuleText = contextData.ruleText || 'N/A';
-          let allOriginalRules = contextData.allRules || [];
+          let ruleText = contextData.ruleText || 'N/A';
+          let allRules = contextData.allRules || [];
+          let hasOriginalContent = false;
           if (contextData.crewId && mongoose.Types.ObjectId.isValid(contextData.crewId) && contextData.ruleIndex !== undefined) {
             try {
               const crew = await Crew.findById(contextData.crewId).lean();
@@ -249,9 +262,10 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
                   isInCrew: true
                 }).lean();
                 if (reportingUserCrewStatus && crew.originalCrewRules && Array.isArray(crew.originalCrewRules)) {
-                  allOriginalRules = crew.originalCrewRules;
+                  allRules = crew.originalCrewRules;
                   if (crew.originalCrewRules[contextData.ruleIndex]) {
-                    originalRuleText = crew.originalCrewRules[contextData.ruleIndex];
+                    ruleText = crew.originalCrewRules[contextData.ruleIndex];
+                    hasOriginalContent = true;
                   }
                 }
               }
@@ -260,7 +274,11 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
               console.error('Error looking up original crew rules:', error);
             }
           }
-          contextDataString = `Rule Text (Original): ${originalRuleText}\nRule Text (Filtered): ${contextData.ruleText || 'N/A'}\nRule Index: ${contextData.ruleIndex !== undefined ? contextData.ruleIndex : 'N/A'}\nAll Rules (Original): ${JSON.stringify(allOriginalRules)}\nAll Rules (Filtered): ${JSON.stringify(contextData.allRules || [])}`;
+          const originalRuleLabel = hasOriginalContent ? 'Rule Text (Original)' : 'Rule Text (Content)';
+          const filteredRuleLabel = hasOriginalContent ? 'Rule Text (Filtered)' : 'Rule Text (Filtered - same as content above)';
+          const originalRulesLabel = hasOriginalContent ? 'All Rules (Original)' : 'All Rules (Content)';
+          const filteredRulesLabel = hasOriginalContent ? 'All Rules (Filtered)' : 'All Rules (Filtered - same as content above)';
+          contextDataString = `${originalRuleLabel}: ${ruleText}\n${filteredRuleLabel}: ${contextData.ruleText || 'N/A'}\nRule Index: ${contextData.ruleIndex !== undefined ? contextData.ruleIndex : 'N/A'}\n${originalRulesLabel}: ${JSON.stringify(allRules)}\n${filteredRulesLabel}: ${JSON.stringify(contextData.allRules || [])}`;
           break;
         }
         case 'username':
