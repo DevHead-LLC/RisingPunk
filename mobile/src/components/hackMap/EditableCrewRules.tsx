@@ -29,7 +29,7 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
   const currentUser = useAppSelector((state) => state.auth.user);
   const [localRules, setLocalRules] = useState<string[]>(initialCrewRules || []);
   const [showReportModal, setShowReportModal] = useState(false);
-  const [reportedRuleIndex, setReportedRuleIndex] = useState<number | null>(null);
+  const [reportedRuleData, setReportedRuleData] = useState<{ ruleText: string; ruleIndex: number; allRules: string[] } | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const saveTimeoutRef = useRef<number | null>(null);
@@ -395,13 +395,19 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
   }, [localRules]);
 
   const handleReportRule = useCallback((index: number) => {
-    setReportedRuleIndex(index);
+    // Capture rule data immediately before potential changes (similar to chat message reporting)
+    const ruleText = localRules[index] || '';
+    setReportedRuleData({
+      ruleText,
+      ruleIndex: index,
+      allRules: [...localRules], // Capture snapshot of all rules
+    });
     setShowReportModal(true);
-  }, []);
+  }, [localRules]);
 
   const handleCloseReportModal = useCallback(() => {
     setShowReportModal(false);
-    setReportedRuleIndex(null);
+    setReportedRuleData(null);
   }, []);
 
   const styles = createStyles(colors);
@@ -606,7 +612,7 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
           </Text>
         </View>
       )}
-      {currentUser && presidentId && presidentHandle && reportedRuleIndex !== null && (
+      {currentUser && presidentId && presidentHandle && reportedRuleData && (
         <UserReportModal
           visible={showReportModal}
           onClose={handleCloseReportModal}
@@ -616,10 +622,10 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
           reportingUsername={currentUser.handle || 'Unknown'}
           context="crew-rules"
           contextData={{
-            ruleText: localRules[reportedRuleIndex],
-            ruleIndex: reportedRuleIndex,
+            ruleText: reportedRuleData.ruleText,
+            ruleIndex: reportedRuleData.ruleIndex,
             crewId: crewId,
-            allRules: localRules,
+            allRules: reportedRuleData.allRules,
           }}
           maxDescriptionLength={1000}
         />

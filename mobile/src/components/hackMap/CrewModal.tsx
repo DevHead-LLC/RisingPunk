@@ -87,8 +87,11 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [isEditingExternalMessage, setIsEditingExternalMessage] = useState(false);
   const [externalMessageText, setExternalMessageText] = useState('');
   const [showExternalMessageReportModal, setShowExternalMessageReportModal] = useState(false);
+  const [externalMessageReportData, setExternalMessageReportData] = useState<{ message: string; crewId: string } | null>(null);
   const [showInternalMessageReportModal, setShowInternalMessageReportModal] = useState(false);
+  const [internalMessageReportData, setInternalMessageReportData] = useState<{ message: string; crewId: string } | null>(null);
   const [showCrewNameReportModal, setShowCrewNameReportModal] = useState(false);
+  const [crewNameReportData, setCrewNameReportData] = useState<{ crewName: string; crewIdentifier: string; crewId: string } | null>(null);
   const { data: crewStatus, refetch: refetchCrewStatus } = useGetCrewStatusQuery(undefined, {
     pollingInterval: visible ? 3000 : 0,
   });
@@ -646,7 +649,15 @@ export const CrewModal: React.FC<CrewModalProps> = ({
           </ScrollView>
           {activeCrewDetails?.crew && currentUser?._id && activeCrewDetails.crew.president?.userId && String(currentUser._id) !== String(activeCrewDetails.crew.president.userId) && (
             <TouchableOpacity
-              onPress={() => setShowCrewNameReportModal(true)}
+              onPress={() => {
+                // Capture crew name/identifier data immediately before potential changes
+                setCrewNameReportData({
+                  crewName: activeCrewDetails.crew.crewName,
+                  crewIdentifier: activeCrewDetails.crew.crewIdentifier,
+                  crewId: activeCrewDetails.crew.id,
+                });
+                setShowCrewNameReportModal(true);
+              }}
               activeOpacity={0.7}
               style={[styles.crewReportButton, { backgroundColor: colors.background + 'E6' }]}
             >
@@ -1444,7 +1455,14 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                   <View style={styles.internalMessageHeaderSpacer} />
                   {currentUser?._id && activeCrewDetails?.crew?.president?.userId && String(currentUser._id) !== String(activeCrewDetails.crew.president.userId) && (
                     <TouchableOpacity
-                      onPress={() => setShowInternalMessageReportModal(true)}
+                      onPress={() => {
+                        // Capture message data immediately before potential changes
+                        setInternalMessageReportData({
+                          message: currentMessage,
+                          crewId: activeCrewDetails.crew.id,
+                        });
+                        setShowInternalMessageReportModal(true);
+                      }}
                       activeOpacity={0.7}
                       style={styles.reportButton}
                     >
@@ -1580,7 +1598,14 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                   <View style={styles.externalMessageHeaderSpacer} />
                   {currentUser?._id && activeCrewDetails?.crew?.president?.userId && String(currentUser._id) !== String(activeCrewDetails.crew.president.userId) && (
                     <TouchableOpacity
-                      onPress={() => setShowExternalMessageReportModal(true)}
+                      onPress={() => {
+                        // Capture message data immediately before potential changes
+                        setExternalMessageReportData({
+                          message: currentMessage,
+                          crewId: activeCrewDetails.crew.id,
+                        });
+                        setShowExternalMessageReportModal(true);
+                      }}
                       activeOpacity={0.7}
                       style={styles.reportButton}
                     >
@@ -1854,49 +1879,54 @@ export const CrewModal: React.FC<CrewModalProps> = ({
 
       {activeCrewDetails?.crew && currentUser && activeCrewDetails.crew.president && (
         <>
-          <UserReportModal
-            visible={showExternalMessageReportModal}
-            onClose={() => setShowExternalMessageReportModal(false)}
-            reportedUserId={activeCrewDetails.crew.president.userId}
-            reportedUsername={activeCrewDetails.crew.president.handle}
-            reportingUserId={currentUser._id}
-            reportingUsername={currentUser.handle || 'Unknown'}
-            context="external-message-board"
-            contextData={{
-              message: activeCrewDetails.crew.externalMessage,
-              crewId: activeCrewDetails.crew.id,
-            }}
-            maxDescriptionLength={200}
-          />
-          <UserReportModal
-            visible={showInternalMessageReportModal}
-            onClose={() => setShowInternalMessageReportModal(false)}
-            reportedUserId={activeCrewDetails.crew.president.userId}
-            reportedUsername={activeCrewDetails.crew.president.handle}
-            reportingUserId={currentUser._id}
-            reportingUsername={currentUser.handle || 'Unknown'}
-            context="internal-message-board"
-            contextData={{
-              message: activeCrewDetails.crew.internalMessage,
-              crewId: activeCrewDetails.crew.id,
-            }}
-            maxDescriptionLength={1000}
-          />
-          <UserReportModal
-            visible={showCrewNameReportModal}
-            onClose={() => setShowCrewNameReportModal(false)}
-            reportedUserId={activeCrewDetails.crew.president.userId}
-            reportedUsername={activeCrewDetails.crew.president.handle}
-            reportingUserId={currentUser._id}
-            reportingUsername={currentUser.handle || 'Unknown'}
-            context="crew-name"
-            contextData={{
-              crewName: activeCrewDetails.crew.crewName,
-              crewIdentifier: activeCrewDetails.crew.crewIdentifier,
-              crewId: activeCrewDetails.crew.id,
-            }}
-            maxDescriptionLength={1000}
-          />
+          {externalMessageReportData && (
+            <UserReportModal
+              visible={showExternalMessageReportModal}
+              onClose={() => {
+                setShowExternalMessageReportModal(false);
+                setExternalMessageReportData(null);
+              }}
+              reportedUserId={activeCrewDetails.crew.president.userId}
+              reportedUsername={activeCrewDetails.crew.president.handle}
+              reportingUserId={currentUser._id}
+              reportingUsername={currentUser.handle || 'Unknown'}
+              context="external-message-board"
+              contextData={externalMessageReportData}
+              maxDescriptionLength={200}
+            />
+          )}
+          {internalMessageReportData && (
+            <UserReportModal
+              visible={showInternalMessageReportModal}
+              onClose={() => {
+                setShowInternalMessageReportModal(false);
+                setInternalMessageReportData(null);
+              }}
+              reportedUserId={activeCrewDetails.crew.president.userId}
+              reportedUsername={activeCrewDetails.crew.president.handle}
+              reportingUserId={currentUser._id}
+              reportingUsername={currentUser.handle || 'Unknown'}
+              context="internal-message-board"
+              contextData={internalMessageReportData}
+              maxDescriptionLength={1000}
+            />
+          )}
+          {crewNameReportData && (
+            <UserReportModal
+              visible={showCrewNameReportModal}
+              onClose={() => {
+                setShowCrewNameReportModal(false);
+                setCrewNameReportData(null);
+              }}
+              reportedUserId={activeCrewDetails.crew.president.userId}
+              reportedUsername={activeCrewDetails.crew.president.handle}
+              reportingUserId={currentUser._id}
+              reportingUsername={currentUser.handle || 'Unknown'}
+              context="crew-name"
+              contextData={crewNameReportData}
+              maxDescriptionLength={1000}
+            />
+          )}
         </>
       )}
     </Modal>
