@@ -247,7 +247,8 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
           // Look up original crew rules from database with validation
           let ruleText = contextData.ruleText || 'N/A';
           let allRules = contextData.allRules || [];
-          let hasOriginalContent = false;
+          let hasOriginalRuleText = false;
+          let hasOriginalRules = false;
           if (contextData.crewId && mongoose.Types.ObjectId.isValid(contextData.crewId) && contextData.ruleIndex !== undefined) {
             try {
               const crew = await Crew.findById(contextData.crewId).lean();
@@ -263,9 +264,10 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
                 }).lean();
                 if (reportingUserCrewStatus && crew.originalCrewRules && Array.isArray(crew.originalCrewRules)) {
                   allRules = crew.originalCrewRules;
+                  hasOriginalRules = true; // We have original rules array from database
                   if (crew.originalCrewRules[contextData.ruleIndex]) {
                     ruleText = crew.originalCrewRules[contextData.ruleIndex];
-                    hasOriginalContent = true;
+                    hasOriginalRuleText = true; // We have original text for the specific rule
                   }
                 }
               }
@@ -274,10 +276,11 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
               console.error('Error looking up original crew rules:', error);
             }
           }
-          const originalRuleLabel = hasOriginalContent ? 'Rule Text (Original)' : 'Rule Text (Content)';
-          const filteredRuleLabel = hasOriginalContent ? 'Rule Text (Filtered)' : 'Rule Text (Filtered - same as content above)';
-          const originalRulesLabel = hasOriginalContent ? 'All Rules (Original)' : 'All Rules (Content)';
-          const filteredRulesLabel = hasOriginalContent ? 'All Rules (Filtered)' : 'All Rules (Filtered - same as content above)';
+          // Use separate labels for rule text vs all rules, since they may have different original status
+          const originalRuleLabel = hasOriginalRuleText ? 'Rule Text (Original)' : 'Rule Text (Content)';
+          const filteredRuleLabel = hasOriginalRuleText ? 'Rule Text (Filtered)' : 'Rule Text (Filtered - same as content above)';
+          const originalRulesLabel = hasOriginalRules ? 'All Rules (Original)' : 'All Rules (Content)';
+          const filteredRulesLabel = hasOriginalRules ? 'All Rules (Filtered)' : 'All Rules (Filtered - same as content above)';
           contextDataString = `${originalRuleLabel}: ${ruleText}\n${filteredRuleLabel}: ${contextData.ruleText || 'N/A'}\nRule Index: ${contextData.ruleIndex !== undefined ? contextData.ruleIndex : 'N/A'}\n${originalRulesLabel}: ${JSON.stringify(allRules)}\n${filteredRulesLabel}: ${JSON.stringify(contextData.allRules || [])}`;
           break;
         }
