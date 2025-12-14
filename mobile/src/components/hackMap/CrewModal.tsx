@@ -87,11 +87,11 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [isEditingExternalMessage, setIsEditingExternalMessage] = useState(false);
   const [externalMessageText, setExternalMessageText] = useState('');
   const [showExternalMessageReportModal, setShowExternalMessageReportModal] = useState(false);
-  const [externalMessageReportData, setExternalMessageReportData] = useState<{ message: string; crewId: string } | null>(null);
+  const [externalMessageReportData, setExternalMessageReportData] = useState<{ message: string; crewId: string; reportedUserId: string; reportedUsername: string } | null>(null);
   const [showInternalMessageReportModal, setShowInternalMessageReportModal] = useState(false);
-  const [internalMessageReportData, setInternalMessageReportData] = useState<{ message: string; crewId: string } | null>(null);
+  const [internalMessageReportData, setInternalMessageReportData] = useState<{ message: string; crewId: string; reportedUserId: string; reportedUsername: string } | null>(null);
   const [showCrewNameReportModal, setShowCrewNameReportModal] = useState(false);
-  const [crewNameReportData, setCrewNameReportData] = useState<{ crewName: string; crewIdentifier: string; crewId: string } | null>(null);
+  const [crewNameReportData, setCrewNameReportData] = useState<{ crewName: string; crewIdentifier: string; crewId: string; reportedUserId: string; reportedUsername: string } | null>(null);
   const { data: crewStatus, refetch: refetchCrewStatus } = useGetCrewStatusQuery(undefined, {
     pollingInterval: visible ? 3000 : 0,
   });
@@ -650,11 +650,13 @@ export const CrewModal: React.FC<CrewModalProps> = ({
           {activeCrewDetails?.crew && currentUser?._id && activeCrewDetails.crew.president?.userId && String(currentUser._id) !== String(activeCrewDetails.crew.president.userId) && (
             <TouchableOpacity
               onPress={() => {
-                // Capture crew name/identifier data immediately before potential changes
+                // Capture crew name/identifier data and president info immediately before potential changes
                 setCrewNameReportData({
                   crewName: activeCrewDetails.crew.crewName,
                   crewIdentifier: activeCrewDetails.crew.crewIdentifier,
                   crewId: activeCrewDetails.crew.id,
+                  reportedUserId: activeCrewDetails.crew.president.userId,
+                  reportedUsername: activeCrewDetails.crew.president.handle,
                 });
                 setShowCrewNameReportModal(true);
               }}
@@ -1456,12 +1458,14 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                   {currentUser?._id && activeCrewDetails?.crew?.president?.userId && String(currentUser._id) !== String(activeCrewDetails.crew.president.userId) && (
                     <TouchableOpacity
                       onPress={() => {
-                        // Capture message data immediately before potential changes
+                        // Capture message data and president info immediately before potential changes
                         // Note: Original content is not exposed in API for security.
                         // Server will look up original content from database when processing report.
                         setInternalMessageReportData({
                           message: currentMessage, // Use filtered content; server will enrich with original
                           crewId: activeCrewDetails.crew.id,
+                          reportedUserId: activeCrewDetails.crew.president.userId,
+                          reportedUsername: activeCrewDetails.crew.president.handle,
                         });
                         setShowInternalMessageReportModal(true);
                       }}
@@ -1601,12 +1605,14 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                   {currentUser?._id && activeCrewDetails?.crew?.president?.userId && String(currentUser._id) !== String(activeCrewDetails.crew.president.userId) && (
                     <TouchableOpacity
                       onPress={() => {
-                        // Capture message data immediately before potential changes
+                        // Capture message data and president info immediately before potential changes
                         // Note: Original content is not exposed in API for security.
                         // Server will look up original content from database when processing report.
                         setExternalMessageReportData({
                           message: currentMessage, // Use filtered content; server will enrich with original
                           crewId: activeCrewDetails.crew.id,
+                          reportedUserId: activeCrewDetails.crew.president.userId,
+                          reportedUsername: activeCrewDetails.crew.president.handle,
                         });
                         setShowExternalMessageReportModal(true);
                       }}
@@ -1890,12 +1896,15 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                 setShowExternalMessageReportModal(false);
                 setExternalMessageReportData(null);
               }}
-              reportedUserId={activeCrewDetails.crew.president.userId}
-              reportedUsername={activeCrewDetails.crew.president.handle}
+              reportedUserId={externalMessageReportData.reportedUserId}
+              reportedUsername={externalMessageReportData.reportedUsername}
               reportingUserId={currentUser._id}
               reportingUsername={currentUser.handle || 'Unknown'}
               context="external-message-board"
-              contextData={externalMessageReportData}
+              contextData={{
+                message: externalMessageReportData.message,
+                crewId: externalMessageReportData.crewId,
+              }}
               maxDescriptionLength={200}
             />
           )}
@@ -1906,12 +1915,15 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                 setShowInternalMessageReportModal(false);
                 setInternalMessageReportData(null);
               }}
-              reportedUserId={activeCrewDetails.crew.president.userId}
-              reportedUsername={activeCrewDetails.crew.president.handle}
+              reportedUserId={internalMessageReportData.reportedUserId}
+              reportedUsername={internalMessageReportData.reportedUsername}
               reportingUserId={currentUser._id}
               reportingUsername={currentUser.handle || 'Unknown'}
               context="internal-message-board"
-              contextData={internalMessageReportData}
+              contextData={{
+                message: internalMessageReportData.message,
+                crewId: internalMessageReportData.crewId,
+              }}
               maxDescriptionLength={1000}
             />
           )}
@@ -1922,12 +1934,16 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                 setShowCrewNameReportModal(false);
                 setCrewNameReportData(null);
               }}
-              reportedUserId={activeCrewDetails.crew.president.userId}
-              reportedUsername={activeCrewDetails.crew.president.handle}
+              reportedUserId={crewNameReportData.reportedUserId}
+              reportedUsername={crewNameReportData.reportedUsername}
               reportingUserId={currentUser._id}
               reportingUsername={currentUser.handle || 'Unknown'}
               context="crew-name"
-              contextData={crewNameReportData}
+              contextData={{
+                crewName: crewNameReportData.crewName,
+                crewIdentifier: crewNameReportData.crewIdentifier,
+                crewId: crewNameReportData.crewId,
+              }}
               maxDescriptionLength={1000}
             />
           )}
