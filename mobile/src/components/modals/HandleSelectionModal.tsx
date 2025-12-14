@@ -14,7 +14,7 @@ import {
 import { SIZING, styleGuide } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { API_URL } from '../../config';
-import { containsBadWords } from '../../utils/contentModeration';
+import { containsBadWordsForHandle } from '../../utils/contentModeration';
 
 interface HandleSelectionModalProps {
   visible: boolean;
@@ -73,7 +73,7 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
     const newRequirements = {
       minLength: value.length >= 5,
       validChars: /^[a-zA-Z0-9!&%^*_]+$/.test(value),
-      noBadWords: !containsBadWords(value),
+      noBadWords: !containsBadWordsForHandle(value),
       unique: false // Will be set by availability check
     };
     setRequirements(newRequirements);

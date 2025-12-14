@@ -129,6 +129,26 @@ export function containsBadWords(text: string): boolean {
 }
 
 /**
+ * Checks if text contains any bad words, treating underscores as word separators
+ * Used for handles where underscores are allowed but should act as word boundaries
+ * This prevents bypasses like "fuck_you" where word boundaries don't match
+ * @param text - The text to check
+ * @returns true if bad words are detected, false otherwise
+ */
+export function containsBadWordsForHandle(text: string): boolean {
+  if (!text || typeof text !== 'string') {
+    return false;
+  }
+
+  // Replace underscores with spaces temporarily to make word boundaries work correctly
+  // Since underscores are word characters (\w), word boundaries don't match when
+  // bad words are adjacent to underscores (e.g., "fuck_you" bypasses \bfuck\b)
+  // By replacing with spaces, "fuck_you" becomes "fuck you" and gets caught
+  const textWithSpaces = text.replace(/_/g, ' ');
+  return containsBadWords(textWithSpaces);
+}
+
+/**
  * Creates a regex pattern for a word WITHOUT word boundaries
  * This allows matching bad words even when they appear inside other words
  * (e.g., "ass" in "class" or "MyAssholeCrew")

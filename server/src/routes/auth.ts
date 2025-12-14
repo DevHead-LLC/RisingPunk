@@ -8,7 +8,7 @@ import { GoogleAuthService } from '../services/GoogleAuthService';
 import { AppleAuthService } from '../services/AppleAuthService';
 import { EmailService } from '../services/EmailService';
 import { EncryptionService } from '../services/EncryptionService';
-import { filterBadWords, containsBadWords } from '../utils/contentModeration';
+import { filterBadWords, containsBadWords, containsBadWordsForHandle } from '../utils/contentModeration';
 
 // Helper function to safely escape regex special characters
 function escapeRegexString(str: string): string {
@@ -948,8 +948,8 @@ router.post('/update-handle', async (req, res): Promise<void> => {
       return;
     }
 
-    // Check for bad words
-    if (containsBadWords(handle)) {
+    // Check for bad words (treating underscores as word separators to prevent bypasses)
+    if (containsBadWordsForHandle(handle)) {
       res.status(400).json({ error: 'Handle contains inappropriate language' });
       return;
     }
