@@ -386,7 +386,7 @@ export const authApi = createApi({
       providesTags: ['User'],
     }),
 
-    getCrewDetails: builder.query<{ success: boolean; crew: { id: string; crewName: string; crewIdentifier: string; nativeLanguage: string; createdAt: string | null; memberCount: number; applicants: Array<{ userId: string; handle: string; appliedAt: string }>; crewRules: string[]; originalCrewRules?: string[]; internalMessage: string; originalInternalMessage?: string; externalMessage: string; originalExternalMessage?: string; president: { userId: string; handle: string; level: number } | null; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }> } }, string>({
+    getCrewDetails: builder.query<{ success: boolean; crew: { id: string; crewName: string; crewIdentifier: string; nativeLanguage: string; createdAt: string | null; memberCount: number; applicants: Array<{ userId: string; handle: string; appliedAt: string }>; crewRules: string[]; internalMessage: string; externalMessage: string; president: { userId: string; handle: string; level: number } | null; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }> } }, string>({
       query: (crewId) => `/api/crew/${crewId}`,
       providesTags: ['User', 'Crew'],
       refetchOnMountOrArgChange: true,
@@ -585,7 +585,7 @@ export const authApi = createApi({
       invalidatesTags: ['User', 'Crew'],
     }),
 
-    getCrewChatMessages: builder.query<{ success: boolean; messages: Array<{ id: string; userId: string; username: string; message: string; originalMessage?: string; timestamp: string }> }, string>({
+    getCrewChatMessages: builder.query<{ success: boolean; messages: Array<{ id: string; userId: string; username: string; message: string; timestamp: string }> }, string>({
       query: (crewId) => ({
         url: `/api/crew/chat-messages?crewId=${crewId}`,
         method: 'GET',

@@ -2,6 +2,9 @@ import express, { Request, Response } from 'express';
 import auth from '../middleware/auth';
 import { EmailService } from '../services/EmailService';
 import { ReportContext, ReportReason } from '../types/reports';
+import { Crew } from '../models/Crew';
+import { CrewChatMessage } from '../models/CrewChatMessage';
+import mongoose from 'mongoose';
 
 const router = express.Router();
 
@@ -123,20 +126,82 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
       'chat-message': 'Chat Message',
     }[context];
 
-    // Build context data string
+    // Build context data string, enriching with original content from database when available
     let contextDataString = 'N/A';
     if (contextData) {
       switch (context) {
-        case 'chat-message':
-          contextDataString = `Message: ${contextData.message || 'N/A'}\nMessage ID: ${contextData.messageId || 'N/A'}\nTimestamp: ${contextData.timestamp || 'N/A'}`;
+        case 'chat-message': {
+          // Look up original message from database
+          let originalMessage = contextData.message || 'N/A';
+          if (contextData.messageId && mongoose.Types.ObjectId.isValid(contextData.messageId)) {
+            try {
+              const chatMessage = await CrewChatMessage.findById(contextData.messageId).lean();
+              if (chatMessage && chatMessage.originalMessage) {
+                originalMessage = chatMessage.originalMessage;
+              }
+            } catch (error) {
+              // Fall back to provided message if lookup fails
+              console.error('Error looking up original chat message:', error);
+            }
+          }
+          contextDataString = `Message (Original): ${originalMessage}\nMessage (Filtered): ${contextData.message || 'N/A'}\nMessage ID: ${contextData.messageId || 'N/A'}\nTimestamp: ${contextData.timestamp || 'N/A'}`;
           break;
-        case 'internal-message-board':
-        case 'external-message-board':
-          contextDataString = `Message: ${contextData.message || 'N/A'}`;
+        }
+        case 'internal-message-board': {
+          // Look up original internal message from database
+          let originalMessage = contextData.message || 'N/A';
+          if (contextData.crewId && mongoose.Types.ObjectId.isValid(contextData.crewId)) {
+            try {
+              const crew = await Crew.findById(contextData.crewId).lean();
+              if (crew && crew.originalInternalMessage) {
+                originalMessage = crew.originalInternalMessage;
+              }
+            } catch (error) {
+              // Fall back to provided message if lookup fails
+              console.error('Error looking up original internal message:', error);
+            }
+          }
+          contextDataString = `Message (Original): ${originalMessage}\nMessage (Filtered): ${contextData.message || 'N/A'}`;
           break;
-        case 'crew-rules':
-          contextDataString = `Rule Text: ${contextData.ruleText || 'N/A'}\nRule Index: ${contextData.ruleIndex !== undefined ? contextData.ruleIndex : 'N/A'}`;
+        }
+        case 'external-message-board': {
+          // Look up original external message from database
+          let originalMessage = contextData.message || 'N/A';
+          if (contextData.crewId && mongoose.Types.ObjectId.isValid(contextData.crewId)) {
+            try {
+              const crew = await Crew.findById(contextData.crewId).lean();
+              if (crew && crew.originalExternalMessage) {
+                originalMessage = crew.originalExternalMessage;
+              }
+            } catch (error) {
+              // Fall back to provided message if lookup fails
+              console.error('Error looking up original external message:', error);
+            }
+          }
+          contextDataString = `Message (Original): ${originalMessage}\nMessage (Filtered): ${contextData.message || 'N/A'}`;
           break;
+        }
+        case 'crew-rules': {
+          // Look up original crew rules from database
+          let originalRuleText = contextData.ruleText || 'N/A';
+          let allOriginalRules = contextData.allRules || [];
+          if (contextData.crewId && mongoose.Types.ObjectId.isValid(contextData.crewId) && contextData.ruleIndex !== undefined) {
+            try {
+              const crew = await Crew.findById(contextData.crewId).lean();
+              if (crew && crew.originalCrewRules && Array.isArray(crew.originalCrewRules)) {
+                allOriginalRules = crew.originalCrewRules;
+                if (crew.originalCrewRules[contextData.ruleIndex]) {
+                  originalRuleText = crew.originalCrewRules[contextData.ruleIndex];
+                }
+              }
+            } catch (error) {
+              // Fall back to provided rules if lookup fails
+              console.error('Error looking up original crew rules:', error);
+            }
+          }
+          contextDataString = `Rule Text (Original): ${originalRuleText}\nRule Text (Filtered): ${contextData.ruleText || 'N/A'}\nRule Index: ${contextData.ruleIndex !== undefined ? contextData.ruleIndex : 'N/A'}\nAll Rules (Original): ${JSON.stringify(allOriginalRules)}\nAll Rules (Filtered): ${JSON.stringify(contextData.allRules || [])}`;
+          break;
+        }
         case 'username':
           contextDataString = `Username: ${contextData.username || reportedUsername}`;
           break;

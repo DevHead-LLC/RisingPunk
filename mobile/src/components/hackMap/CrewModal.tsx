@@ -1216,7 +1216,6 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         <EditableCrewRules
           crewId={crewId}
           crewRules={crewRules}
-          originalCrewRules={activeCrewDetails?.crew?.originalCrewRules}
           isEditing={isEditingCrewRules}
           onEditingChange={setIsEditingCrewRules}
           presidentId={president?.userId}
@@ -1457,10 +1456,11 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                   {currentUser?._id && activeCrewDetails?.crew?.president?.userId && String(currentUser._id) !== String(activeCrewDetails.crew.president.userId) && (
                     <TouchableOpacity
                       onPress={() => {
-                        // Capture original message data immediately before potential changes
-                        const originalMessage = activeCrewDetails.crew.originalInternalMessage || currentMessage;
+                        // Capture message data immediately before potential changes
+                        // Note: Original content is not exposed in API for security.
+                        // Server will look up original content from database when processing report.
                         setInternalMessageReportData({
-                          message: originalMessage,
+                          message: currentMessage, // Use filtered content; server will enrich with original
                           crewId: activeCrewDetails.crew.id,
                         });
                         setShowInternalMessageReportModal(true);
@@ -1601,10 +1601,11 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                   {currentUser?._id && activeCrewDetails?.crew?.president?.userId && String(currentUser._id) !== String(activeCrewDetails.crew.president.userId) && (
                     <TouchableOpacity
                       onPress={() => {
-                        // Capture original message data immediately before potential changes
-                        const originalMessage = activeCrewDetails.crew.originalExternalMessage || currentMessage;
+                        // Capture message data immediately before potential changes
+                        // Note: Original content is not exposed in API for security.
+                        // Server will look up original content from database when processing report.
                         setExternalMessageReportData({
-                          message: originalMessage,
+                          message: currentMessage, // Use filtered content; server will enrich with original
                           crewId: activeCrewDetails.crew.id,
                         });
                         setShowExternalMessageReportModal(true);

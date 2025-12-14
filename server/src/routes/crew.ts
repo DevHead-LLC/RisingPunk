@@ -449,12 +449,13 @@ router.get('/chat-messages', auth, async (req: Request, res: Response) => {
 
     // Format messages for response
     // Note: lean() returns plain objects, so _id is already a plain object, not ObjectId
+    // Note: originalMessage is NOT exposed in API response to prevent bypassing content filters.
+    // Original content is only available server-side when processing reports.
     const formattedMessages = messages.map((msg: any) => ({
       id: String(msg._id),
       userId: String(msg.userId),
       username: msg.username,
       message: msg.message,
-      originalMessage: msg.originalMessage || msg.message, // Include original for moderation reports
       timestamp: msg.createdAt,
     }));
 
@@ -1420,11 +1421,10 @@ router.get('/:crewId', auth, async (req: Request, res: Response) => {
         memberCount: memberCount,
         applicants: crew.applicants || [],
         crewRules: crew.crewRules || [],
-        originalCrewRules: (crew.originalCrewRules || crew.crewRules || []) as string[], // Include original for moderation reports
+        // Note: originalCrewRules, originalInternalMessage, originalExternalMessage are NOT exposed
+        // to prevent bypassing content filters. Original content is only available server-side for reports.
         internalMessage: isCrewMember ? (crew.internalMessage || '') : '',
-        originalInternalMessage: isCrewMember ? ((crew.originalInternalMessage || crew.internalMessage || '') as string) : '',
         externalMessage: crew.externalMessage || '',
-        originalExternalMessage: (crew.originalExternalMessage || crew.externalMessage || '') as string,
         president: president ? { userId: president._id.toString(), handle: president.handle, level: president.level || 1 } : null,
         executives: executives.map((exec: any) => ({
           userId: exec._id.toString(),

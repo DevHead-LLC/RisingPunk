@@ -24,7 +24,8 @@ interface ChatMessage {
   userId: string;
   username: string;
   message: string;
-  originalMessage?: string; // Original unfiltered content for moderation reports
+  // Note: originalMessage removed - not exposed in API for security
+  // Server will look up original content from database when processing reports
   timestamp: Date;
 }
 
@@ -68,7 +69,6 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
     userId: msg.userId,
     username: msg.username,
     message: msg.message,
-    originalMessage: msg.originalMessage, // Include original for reports
     timestamp: new Date(msg.timestamp),
   })) || [];
 
@@ -329,7 +329,7 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
           reportingUsername={currentUser.handle || 'Unknown'}
           context="chat-message"
           contextData={{
-            message: reportedMessage.originalMessage || reportedMessage.message, // Use original for reports
+            message: reportedMessage.message, // Server will look up original content from database
             messageId: reportedMessage.id,
             timestamp: (reportedMessage.timestamp instanceof Date 
               ? reportedMessage.timestamp 

@@ -11,7 +11,8 @@ import { useAppSelector } from '../../store/hooks';
 interface EditableCrewRulesProps {
   crewId: string;
   crewRules: string[];
-  originalCrewRules?: string[]; // Original unfiltered content for moderation reports
+  // Note: originalCrewRules removed - not exposed in API for security
+  // Server will look up original content from database when processing reports
   isEditing: boolean;
   onEditingChange: (editing: boolean) => void;
   presidentId?: string;
@@ -21,7 +22,6 @@ interface EditableCrewRulesProps {
 export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
   crewId,
   crewRules: initialCrewRules,
-  originalCrewRules,
   isEditing,
   onEditingChange,
   presidentId,
@@ -397,17 +397,17 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
   }, [localRules]);
 
   const handleReportRule = useCallback((index: number) => {
-    // Capture original rule data immediately before potential changes (similar to chat message reporting)
-    // Use original rules if available, otherwise fall back to localRules (filtered)
-    const originalRules = originalCrewRules || localRules;
-    const ruleText = originalRules[index] || localRules[index] || '';
+    // Capture rule data immediately before potential changes (similar to chat message reporting)
+    // Note: Original content is not exposed in API for security.
+    // Server will look up original content from database when processing report.
+    const ruleText = localRules[index] || '';
     setReportedRuleData({
-      ruleText,
+      ruleText, // Use filtered content; server will enrich with original
       ruleIndex: index,
-      allRules: [...originalRules], // Capture snapshot of original rules for reports
+      allRules: [...localRules], // Capture snapshot of rules for reports
     });
     setShowReportModal(true);
-  }, [localRules, originalCrewRules]);
+  }, [localRules]);
 
   const handleCloseReportModal = useCallback(() => {
     setShowReportModal(false);
