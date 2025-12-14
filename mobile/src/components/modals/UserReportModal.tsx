@@ -15,22 +15,10 @@ import {
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { useSubmitReportMutation } from '../../store/api/reportsApi';
+import type { ReportContext, ReportReason } from '../../types/reports';
 
-export type ReportContext = 
-  | 'username'
-  | 'crew-name'
-  | 'crew-identifier'
-  | 'internal-message-board'
-  | 'external-message-board'
-  | 'crew-rules'
-  | 'chat-message';
-
-export type ReportReason = 
-  | 'vulgar'
-  | 'hate-speech'
-  | 'harassment'
-  | 'spam'
-  | 'other';
+// Re-export types for backward compatibility (if other files import from here)
+export type { ReportContext, ReportReason };
 
 export interface UserReportModalProps {
   visible: boolean;

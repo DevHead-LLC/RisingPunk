@@ -1457,8 +1457,10 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                     <TouchableOpacity
                       onPress={() => {
                         // Capture message data immediately before potential changes
+                        // Note: Original content is not exposed in API for security.
+                        // Server will look up original content from database when processing report.
                         setInternalMessageReportData({
-                          message: currentMessage,
+                          message: currentMessage, // Use filtered content; server will enrich with original
                           crewId: activeCrewDetails.crew.id,
                         });
                         setShowInternalMessageReportModal(true);
@@ -1600,8 +1602,10 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                     <TouchableOpacity
                       onPress={() => {
                         // Capture message data immediately before potential changes
+                        // Note: Original content is not exposed in API for security.
+                        // Server will look up original content from database when processing report.
                         setExternalMessageReportData({
-                          message: currentMessage,
+                          message: currentMessage, // Use filtered content; server will enrich with original
                           crewId: activeCrewDetails.crew.id,
                         });
                         setShowExternalMessageReportModal(true);
