@@ -143,6 +143,7 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
     // IMPORTANT: All lookups are validated to ensure IDs match the reported user and reporting user has access
     // Note: reportedUserId and reportingUserId are already validated as valid ObjectIds above
     let contextDataString = 'N/A';
+    let resolvedCrewId: string | null = null; // Track crewId extracted from database lookups
     if (contextData) {
       const reportedUserIdObj = new mongoose.Types.ObjectId(reportedUserId); // Safe: validated above
       
@@ -155,8 +156,10 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
               const chatMessage = await CrewChatMessage.findById(contextData.messageId).lean();
               // Verify the message belongs to the reported user
               if (chatMessage && chatMessage.userId && chatMessage.userId.toString() === reportedUserId) {
-                // Verify the reporting user has access to this crew (is a member)
+                // Extract crewId from the fetched message
                 if (chatMessage.crewId) {
+                  resolvedCrewId = chatMessage.crewId.toString();
+                  // Verify the reporting user has access to this crew (is a member)
                   const reportingUserCrewStatus = await CrewStatus.findOne({
                     userId: userId,
                     crewId: chatMessage.crewId,
@@ -183,6 +186,8 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
               const crew = await Crew.findById(contextData.crewId).lean();
               // Verify the reported user is the president of this crew (only presidents can edit internal messages)
               if (crew && crew.presidentId && crew.presidentId.toString() === reportedUserId) {
+                // Extract crewId from the fetched crew
+                resolvedCrewId = contextData.crewId;
                 // Verify the reporting user has access to this crew (is a member)
                 const reportingUserCrewStatus = await CrewStatus.findOne({
                   userId: userId,
@@ -209,6 +214,8 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
               const crew = await Crew.findById(contextData.crewId).lean();
               // Verify the reported user is the president of this crew (only presidents can edit external messages)
               if (crew && crew.presidentId && crew.presidentId.toString() === reportedUserId) {
+                // Extract crewId from the fetched crew
+                resolvedCrewId = contextData.crewId;
                 // Verify the reporting user has access to this crew (is a member) OR can view external messages (anyone can view external)
                 // For external messages, we allow lookup if the reported user is the president
                 // (External messages are visible to everyone, so we just verify the reported user owns it)
@@ -233,6 +240,8 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
               const crew = await Crew.findById(contextData.crewId).lean();
               // Verify the reported user is the president of this crew (only presidents can edit crew rules)
               if (crew && crew.presidentId && crew.presidentId.toString() === reportedUserId) {
+                // Extract crewId from the fetched crew
+                resolvedCrewId = contextData.crewId;
                 // Verify the reporting user has access to this crew (is a member)
                 const reportingUserCrewStatus = await CrewStatus.findOne({
                   userId: userId,
@@ -268,7 +277,9 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
       }
     }
 
-    const crewId = contextData?.crewId || 'N/A';
+    // Use resolved crewId from database lookup if available, otherwise fall back to contextData
+    // This ensures chat-message reports include crewId even if client doesn't send it
+    const crewId = resolvedCrewId || contextData?.crewId || 'N/A';
 
     // Create email content
     const emailSubject = '!!User Report!!';
