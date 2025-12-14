@@ -62,7 +62,7 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
     if (!/^[a-zA-Z0-9!&%^*_]+$/.test(value)) {
       return 'HANDLE_INVALID_CHARS';
     }
-    if (containsBadWords(value)) {
+    if (containsBadWordsForHandle(value)) {
       return 'HANDLE_CONTAINS_BAD_WORDS';
     }
     return '';
