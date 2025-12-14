@@ -2,6 +2,10 @@ import express, { Request, Response } from 'express';
 import auth from '../middleware/auth';
 import { EmailService } from '../services/EmailService';
 import { ReportContext, ReportReason } from '../types/reports';
+import { Crew } from '../models/Crew';
+import { CrewChatMessage } from '../models/CrewChatMessage';
+import { CrewStatus } from '../models/CrewStatus';
+import mongoose from 'mongoose';
 
 const router = express.Router();
 
@@ -103,6 +107,18 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
       return;
     }
 
+    // Validate reportedUserId is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(reportedUserId)) {
+      res.status(400).json({ error: 'Invalid reported user ID format' });
+      return;
+    }
+
+    // Validate reportingUserId is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(reportingUserId)) {
+      res.status(400).json({ error: 'Invalid reporting user ID format' });
+      return;
+    }
+
     // Format email content
     const timestamp = new Date().toISOString();
     const reasonLabel = {
@@ -123,20 +139,148 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
       'chat-message': 'Chat Message',
     }[context];
 
-    // Build context data string
+    // Build context data string, enriching with original content from database when available
+    // IMPORTANT: All lookups are validated to ensure IDs match the reported user and reporting user has access
+    // Note: reportedUserId and reportingUserId are already validated as valid ObjectIds above
     let contextDataString = 'N/A';
+    let resolvedCrewId: string | null = null; // Track crewId extracted from database lookups
     if (contextData) {
+      const reportedUserIdObj = new mongoose.Types.ObjectId(reportedUserId); // Safe: validated above
+      
       switch (context) {
-        case 'chat-message':
-          contextDataString = `Message: ${contextData.message || 'N/A'}\nMessage ID: ${contextData.messageId || 'N/A'}\nTimestamp: ${contextData.timestamp || 'N/A'}`;
+        case 'chat-message': {
+          // Look up original message from database with validation
+          let messageContent = contextData.message || 'N/A';
+          let hasOriginalContent = false;
+          if (contextData.messageId && mongoose.Types.ObjectId.isValid(contextData.messageId)) {
+            try {
+              const chatMessage = await CrewChatMessage.findById(contextData.messageId).lean();
+              // Verify the message belongs to the reported user
+              if (chatMessage && chatMessage.userId && chatMessage.userId.toString() === reportedUserId) {
+                // Extract crewId from the fetched message
+                if (chatMessage.crewId) {
+                  resolvedCrewId = chatMessage.crewId.toString();
+                  // Verify the reporting user has access to this crew (is a member)
+                  const reportingUserCrewStatus = await CrewStatus.findOne({
+                    userId: userId,
+                    crewId: chatMessage.crewId,
+                    isInCrew: true
+                  }).lean();
+                  if (reportingUserCrewStatus && chatMessage.originalMessage) {
+                    messageContent = chatMessage.originalMessage;
+                    hasOriginalContent = true;
+                  }
+                }
+              }
+            } catch (error) {
+              // Fall back to provided message if lookup fails
+              console.error('Error looking up original chat message:', error);
+            }
+          }
+          const originalLabel = hasOriginalContent ? 'Message (Original)' : 'Message (Content)';
+          const filteredLabel = hasOriginalContent ? 'Message (Filtered)' : 'Message (Filtered - same as content above)';
+          contextDataString = `${originalLabel}: ${messageContent}\n${filteredLabel}: ${contextData.message || 'N/A'}\nMessage ID: ${contextData.messageId || 'N/A'}\nTimestamp: ${contextData.timestamp || 'N/A'}`;
           break;
-        case 'internal-message-board':
-        case 'external-message-board':
-          contextDataString = `Message: ${contextData.message || 'N/A'}`;
+        }
+        case 'internal-message-board': {
+          // Look up original internal message from database with validation
+          let messageContent = contextData.message || 'N/A';
+          let hasOriginalContent = false;
+          if (contextData.crewId && mongoose.Types.ObjectId.isValid(contextData.crewId)) {
+            try {
+              const crew = await Crew.findById(contextData.crewId).lean();
+              // Verify the reported user is the president of this crew (only presidents can edit internal messages)
+              if (crew && crew.presidentId && crew.presidentId.toString() === reportedUserId) {
+                // Extract crewId from the fetched crew
+                resolvedCrewId = contextData.crewId;
+                // Verify the reporting user has access to this crew (is a member)
+                const reportingUserCrewStatus = await CrewStatus.findOne({
+                  userId: userId,
+                  crewId: contextData.crewId,
+                  isInCrew: true
+                }).lean();
+                if (reportingUserCrewStatus && crew.originalInternalMessage) {
+                  messageContent = crew.originalInternalMessage;
+                  hasOriginalContent = true;
+                }
+              }
+            } catch (error) {
+              // Fall back to provided message if lookup fails
+              console.error('Error looking up original internal message:', error);
+            }
+          }
+          const originalLabel = hasOriginalContent ? 'Message (Original)' : 'Message (Content)';
+          const filteredLabel = hasOriginalContent ? 'Message (Filtered)' : 'Message (Filtered - same as content above)';
+          contextDataString = `${originalLabel}: ${messageContent}\n${filteredLabel}: ${contextData.message || 'N/A'}`;
           break;
-        case 'crew-rules':
-          contextDataString = `Rule Text: ${contextData.ruleText || 'N/A'}\nRule Index: ${contextData.ruleIndex !== undefined ? contextData.ruleIndex : 'N/A'}`;
+        }
+        case 'external-message-board': {
+          // Look up original external message from database with validation
+          let messageContent = contextData.message || 'N/A';
+          let hasOriginalContent = false;
+          if (contextData.crewId && mongoose.Types.ObjectId.isValid(contextData.crewId)) {
+            try {
+              const crew = await Crew.findById(contextData.crewId).lean();
+              // Verify the reported user is the president of this crew (only presidents can edit external messages)
+              if (crew && crew.presidentId && crew.presidentId.toString() === reportedUserId) {
+                // Extract crewId from the fetched crew
+                resolvedCrewId = contextData.crewId;
+                // Verify the reporting user has access to this crew (is a member) OR can view external messages (anyone can view external)
+                // For external messages, we allow lookup if the reported user is the president
+                // (External messages are visible to everyone, so we just verify the reported user owns it)
+                if (crew.originalExternalMessage) {
+                  messageContent = crew.originalExternalMessage;
+                  hasOriginalContent = true;
+                }
+              }
+            } catch (error) {
+              // Fall back to provided message if lookup fails
+              console.error('Error looking up original external message:', error);
+            }
+          }
+          const originalLabel = hasOriginalContent ? 'Message (Original)' : 'Message (Content)';
+          const filteredLabel = hasOriginalContent ? 'Message (Filtered)' : 'Message (Filtered - same as content above)';
+          contextDataString = `${originalLabel}: ${messageContent}\n${filteredLabel}: ${contextData.message || 'N/A'}`;
           break;
+        }
+        case 'crew-rules': {
+          // Look up original crew rules from database with validation
+          let ruleText = contextData.ruleText || 'N/A';
+          let allRules = contextData.allRules || [];
+          let hasOriginalContent = false;
+          if (contextData.crewId && mongoose.Types.ObjectId.isValid(contextData.crewId) && contextData.ruleIndex !== undefined) {
+            try {
+              const crew = await Crew.findById(contextData.crewId).lean();
+              // Verify the reported user is the president of this crew (only presidents can edit crew rules)
+              if (crew && crew.presidentId && crew.presidentId.toString() === reportedUserId) {
+                // Extract crewId from the fetched crew
+                resolvedCrewId = contextData.crewId;
+                // Verify the reporting user has access to this crew (is a member)
+                const reportingUserCrewStatus = await CrewStatus.findOne({
+                  userId: userId,
+                  crewId: contextData.crewId,
+                  isInCrew: true
+                }).lean();
+                if (reportingUserCrewStatus && crew.originalCrewRules && Array.isArray(crew.originalCrewRules)) {
+                  allRules = crew.originalCrewRules;
+                  if (crew.originalCrewRules[contextData.ruleIndex]) {
+                    ruleText = crew.originalCrewRules[contextData.ruleIndex];
+                    hasOriginalContent = true;
+                  }
+                }
+              }
+            } catch (error) {
+              // Fall back to provided rules if lookup fails
+              console.error('Error looking up original crew rules:', error);
+            }
+          }
+          const originalRuleLabel = hasOriginalContent ? 'Rule Text (Original)' : 'Rule Text (Content)';
+          const filteredRuleLabel = hasOriginalContent ? 'Rule Text (Filtered)' : 'Rule Text (Filtered - same as content above)';
+          const originalRulesLabel = hasOriginalContent ? 'All Rules (Original)' : 'All Rules (Content)';
+          const filteredRulesLabel = hasOriginalContent ? 'All Rules (Filtered)' : 'All Rules (Filtered - same as content above)';
+          contextDataString = `${originalRuleLabel}: ${ruleText}\n${filteredRuleLabel}: ${contextData.ruleText || 'N/A'}\nRule Index: ${contextData.ruleIndex !== undefined ? contextData.ruleIndex : 'N/A'}\n${originalRulesLabel}: ${JSON.stringify(allRules)}\n${filteredRulesLabel}: ${JSON.stringify(contextData.allRules || [])}`;
+          break;
+        }
         case 'username':
           contextDataString = `Username: ${contextData.username || reportedUsername}`;
           break;
@@ -151,7 +295,9 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
       }
     }
 
-    const crewId = contextData?.crewId || 'N/A';
+    // Use resolved crewId from database lookup if available, otherwise fall back to contextData
+    // This ensures chat-message reports include crewId even if client doesn't send it
+    const crewId = resolvedCrewId || contextData?.crewId || 'N/A';
 
     // Create email content
     const emailSubject = '!!User Report!!';

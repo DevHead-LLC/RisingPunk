@@ -1,5 +1,5 @@
 import { baseApi } from './baseApi';
-import { ReportContext, ReportReason } from '../../components/modals/UserReportModal';
+import type { ReportContext, ReportReason } from '../../types/reports';
 
 export interface SubmitReportRequest {
   reportedUserId: string;

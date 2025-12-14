@@ -11,6 +11,8 @@ import { useAppSelector } from '../../store/hooks';
 interface EditableCrewRulesProps {
   crewId: string;
   crewRules: string[];
+  // Note: originalCrewRules removed - not exposed in API for security
+  // Server will look up original content from database when processing reports
   isEditing: boolean;
   onEditingChange: (editing: boolean) => void;
   presidentId?: string;
@@ -396,11 +398,13 @@ export const EditableCrewRules: React.FC<EditableCrewRulesProps> = ({
 
   const handleReportRule = useCallback((index: number) => {
     // Capture rule data immediately before potential changes (similar to chat message reporting)
+    // Note: Original content is not exposed in API for security.
+    // Server will look up original content from database when processing report.
     const ruleText = localRules[index] || '';
     setReportedRuleData({
-      ruleText,
+      ruleText, // Use filtered content; server will enrich with original
       ruleIndex: index,
-      allRules: [...localRules], // Capture snapshot of all rules
+      allRules: [...localRules], // Capture snapshot of rules for reports
     });
     setShowReportModal(true);
   }, [localRules]);
