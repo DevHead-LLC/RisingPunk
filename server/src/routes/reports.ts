@@ -107,6 +107,18 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
       return;
     }
 
+    // Validate reportedUserId is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(reportedUserId)) {
+      res.status(400).json({ error: 'Invalid reported user ID format' });
+      return;
+    }
+
+    // Validate reportingUserId is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(reportingUserId)) {
+      res.status(400).json({ error: 'Invalid reporting user ID format' });
+      return;
+    }
+
     // Format email content
     const timestamp = new Date().toISOString();
     const reasonLabel = {
@@ -129,9 +141,10 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
 
     // Build context data string, enriching with original content from database when available
     // IMPORTANT: All lookups are validated to ensure IDs match the reported user and reporting user has access
+    // Note: reportedUserId and reportingUserId are already validated as valid ObjectIds above
     let contextDataString = 'N/A';
     if (contextData) {
-      const reportedUserIdObj = new mongoose.Types.ObjectId(reportedUserId);
+      const reportedUserIdObj = new mongoose.Types.ObjectId(reportedUserId); // Safe: validated above
       
       switch (context) {
         case 'chat-message': {
