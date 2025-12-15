@@ -29,6 +29,11 @@ function childrenToString(children: React.ReactNode): string {
     return '';
   }
   
+  // Handle boolean values - React treats false, true, null, undefined as rendering nothing
+  if (typeof children === 'boolean') {
+    return '';
+  }
+  
   if (typeof children === 'string') {
     return children;
   }
