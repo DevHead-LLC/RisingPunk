@@ -17,6 +17,9 @@ import { WarManagementModal } from './WarManagementModal';
 import { AllianceManagementModal } from './AllianceManagementModal';
 import { EditableCrewRules } from './EditableCrewRules';
 import { CrewChatModal } from './CrewChatModal';
+import { UserReportModal } from '../modals/UserReportModal';
+import { FilteredTextInput } from '../common/FilteredTextInput';
+import { FilteredText } from '../common/FilteredText';
 import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, useUpdateCrewLanguageMutation, useUpdateInternalMessageMutation, useUpdateExternalMessageMutation, useGiftAllMembersMutation, usePromoteMemberMutation, useDemoteExecutiveMutation, useChooseSuccessorMutation, useResignMutation, useGetWarStatusQuery } from '../../store/api/authApi';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -83,6 +86,12 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [internalMessageText, setInternalMessageText] = useState('');
   const [isEditingExternalMessage, setIsEditingExternalMessage] = useState(false);
   const [externalMessageText, setExternalMessageText] = useState('');
+  const [showExternalMessageReportModal, setShowExternalMessageReportModal] = useState(false);
+  const [externalMessageReportData, setExternalMessageReportData] = useState<{ message: string; crewId: string; reportedUserId: string; reportedUsername: string } | null>(null);
+  const [showInternalMessageReportModal, setShowInternalMessageReportModal] = useState(false);
+  const [internalMessageReportData, setInternalMessageReportData] = useState<{ message: string; crewId: string; reportedUserId: string; reportedUsername: string } | null>(null);
+  const [showCrewNameReportModal, setShowCrewNameReportModal] = useState(false);
+  const [crewNameReportData, setCrewNameReportData] = useState<{ crewName: string; crewIdentifier: string; crewId: string; reportedUserId: string; reportedUsername: string } | null>(null);
   const { data: crewStatus, refetch: refetchCrewStatus } = useGetCrewStatusQuery(undefined, {
     pollingInterval: visible ? 3000 : 0,
   });
@@ -596,47 +605,70 @@ export const CrewModal: React.FC<CrewModalProps> = ({
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.crewGridContainer}>
-            {visibleCategories.map((category, index) => {
-              const isLastInRow = (index + 1) % 3 === 0;
-              const showNotificationDot = category.id === 'recruiting' && hasApplicants;
-              return (
+        <View style={styles.content}>
+          <ScrollView style={styles.scrollViewContent} showsVerticalScrollIndicator={false}>
+            <View style={styles.crewGridContainer}>
+              {visibleCategories.map((category, index) => {
+                const isLastInRow = (index + 1) % 3 === 0;
+                const showNotificationDot = category.id === 'recruiting' && hasApplicants;
+                return (
+                  <TouchableOpacity
+                    key={category.id}
+                    style={[
+                      styles.crewCategoryItem,
+                      !isLastInRow && styles.crewCategoryItemMargin
+                    ]}
+                    onPress={() => handleCategoryPress(category.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.crewCategoryText} numberOfLines={2}>
+                      {category.label}
+                    </Text>
+                    {showNotificationDot && (
+                      <View style={styles.notificationDot} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+              {showLeaveCrewButton && (
                 <TouchableOpacity
-                  key={category.id}
                   style={[
                     styles.crewCategoryItem,
-                    !isLastInRow && styles.crewCategoryItemMargin
+                    styles.leaveCrewCategoryItem,
+                    (totalItems - 1) % 3 !== 0 && styles.crewCategoryItemMargin
                   ]}
-                  onPress={() => handleCategoryPress(category.id)}
+                  onPress={handleLeaveCrewPress}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.crewCategoryText} numberOfLines={2}>
-                    {category.label}
+                  <Text style={[styles.crewCategoryText, styles.leaveCrewCategoryText]} numberOfLines={2}>
+                    Leave Crew
                   </Text>
-                  {showNotificationDot && (
-                    <View style={styles.notificationDot} />
-                  )}
                 </TouchableOpacity>
-              );
-            })}
-            {showLeaveCrewButton && (
-              <TouchableOpacity
-                style={[
-                  styles.crewCategoryItem,
-                  styles.leaveCrewCategoryItem,
-                  (totalItems - 1) % 3 !== 0 && styles.crewCategoryItemMargin
-                ]}
-                onPress={handleLeaveCrewPress}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.crewCategoryText, styles.leaveCrewCategoryText]} numberOfLines={2}>
-                  Leave Crew
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </ScrollView>
+              )}
+            </View>
+          </ScrollView>
+          {activeCrewDetails?.crew && currentUser?._id && activeCrewDetails.crew.president?.userId && String(currentUser._id) !== String(activeCrewDetails.crew.president.userId) && (
+            <TouchableOpacity
+              onPress={() => {
+                // Capture crew name/identifier data and president info immediately before potential changes
+                setCrewNameReportData({
+                  crewName: activeCrewDetails.crew.crewName,
+                  crewIdentifier: activeCrewDetails.crew.crewIdentifier,
+                  crewId: activeCrewDetails.crew.id,
+                  reportedUserId: activeCrewDetails.crew.president.userId,
+                  reportedUsername: activeCrewDetails.crew.president.handle,
+                });
+                setShowCrewNameReportModal(true);
+              }}
+              activeOpacity={0.7}
+              style={[styles.crewReportButton, { backgroundColor: colors.background + 'E6' }]}
+            >
+              <Text style={[styles.crewReportButtonText, { color: colors.text.secondary }]}>
+                Report
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </SafeAreaView>
     );
   };
@@ -1188,6 +1220,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
           crewRules={crewRules}
           isEditing={isEditingCrewRules}
           onEditingChange={setIsEditingCrewRules}
+          presidentId={president?.userId}
+          presidentHandle={president?.handle}
         />
       </View>
     );
@@ -1352,7 +1386,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
             </Text>
             
             <View style={styles.internalMessageInputContainer}>
-              <TextInput
+              <FilteredTextInput
                 style={[
                   styles.internalMessageInput,
                   {
@@ -1418,9 +1452,36 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         ) : (
           <View style={styles.internalMessageView}>
             {currentMessage ? (
-              <Text style={[styles.internalMessageText, { color: colors.text.primary }]}>
-                {currentMessage}
-              </Text>
+              <>
+                <View style={styles.internalMessageHeader}>
+                  <View style={styles.internalMessageHeaderSpacer} />
+                  {currentUser?._id && activeCrewDetails?.crew?.president?.userId && String(currentUser._id) !== String(activeCrewDetails.crew.president.userId) && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        // Capture message data and president info immediately before potential changes
+                        // Note: Original content is not exposed in API for security.
+                        // Server will look up original content from database when processing report.
+                        setInternalMessageReportData({
+                          message: currentMessage, // Use filtered content; server will enrich with original
+                          crewId: activeCrewDetails.crew.id,
+                          reportedUserId: activeCrewDetails.crew.president.userId,
+                          reportedUsername: activeCrewDetails.crew.president.handle,
+                        });
+                        setShowInternalMessageReportModal(true);
+                      }}
+                      activeOpacity={0.7}
+                      style={styles.reportButton}
+                    >
+                      <Text style={[styles.reportButtonText, { color: colors.text.secondary }]}>
+                        Report
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <FilteredText style={[styles.internalMessageText, { color: colors.text.primary }]}>
+                  {currentMessage}
+                </FilteredText>
+              </>
             ) : (
               <Text style={[styles.internalMessagePlaceholder, { color: colors.text.secondary }]}>
                 No internal message has been set yet.
@@ -1472,7 +1533,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
             </Text>
             
             <View style={styles.externalMessageInputContainer}>
-              <TextInput
+              <FilteredTextInput
                 style={[
                   styles.externalMessageInput,
                   {
@@ -1538,9 +1599,36 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         ) : (
           <View style={styles.externalMessageView}>
             {currentMessage ? (
-              <Text style={[styles.externalMessageText, { color: colors.text.primary }]}>
-                {currentMessage}
-              </Text>
+              <>
+                <View style={styles.externalMessageHeader}>
+                  <View style={styles.externalMessageHeaderSpacer} />
+                  {currentUser?._id && activeCrewDetails?.crew?.president?.userId && String(currentUser._id) !== String(activeCrewDetails.crew.president.userId) && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        // Capture message data and president info immediately before potential changes
+                        // Note: Original content is not exposed in API for security.
+                        // Server will look up original content from database when processing report.
+                        setExternalMessageReportData({
+                          message: currentMessage, // Use filtered content; server will enrich with original
+                          crewId: activeCrewDetails.crew.id,
+                          reportedUserId: activeCrewDetails.crew.president.userId,
+                          reportedUsername: activeCrewDetails.crew.president.handle,
+                        });
+                        setShowExternalMessageReportModal(true);
+                      }}
+                      activeOpacity={0.7}
+                      style={styles.reportButton}
+                    >
+                      <Text style={[styles.reportButtonText, { color: colors.text.secondary }]}>
+                        Report
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <FilteredText style={[styles.externalMessageText, { color: colors.text.primary }]}>
+                  {currentMessage}
+                </FilteredText>
+              </>
             ) : (
               <Text style={[styles.externalMessagePlaceholder, { color: colors.text.secondary }]}>
                 No external message has been set yet.
@@ -1798,6 +1886,69 @@ export const CrewModal: React.FC<CrewModalProps> = ({
           crewId={crewStatus.crewId}
         />
       )}
+
+      {activeCrewDetails?.crew && currentUser && activeCrewDetails.crew.president && (
+        <>
+          {externalMessageReportData && (
+            <UserReportModal
+              visible={showExternalMessageReportModal}
+              onClose={() => {
+                setShowExternalMessageReportModal(false);
+                setExternalMessageReportData(null);
+              }}
+              reportedUserId={externalMessageReportData.reportedUserId}
+              reportedUsername={externalMessageReportData.reportedUsername}
+              reportingUserId={currentUser._id}
+              reportingUsername={currentUser.handle || 'Unknown'}
+              context="external-message-board"
+              contextData={{
+                message: externalMessageReportData.message,
+                crewId: externalMessageReportData.crewId,
+              }}
+              maxDescriptionLength={200}
+            />
+          )}
+          {internalMessageReportData && (
+            <UserReportModal
+              visible={showInternalMessageReportModal}
+              onClose={() => {
+                setShowInternalMessageReportModal(false);
+                setInternalMessageReportData(null);
+              }}
+              reportedUserId={internalMessageReportData.reportedUserId}
+              reportedUsername={internalMessageReportData.reportedUsername}
+              reportingUserId={currentUser._id}
+              reportingUsername={currentUser.handle || 'Unknown'}
+              context="internal-message-board"
+              contextData={{
+                message: internalMessageReportData.message,
+                crewId: internalMessageReportData.crewId,
+              }}
+              maxDescriptionLength={1000}
+            />
+          )}
+          {crewNameReportData && (
+            <UserReportModal
+              visible={showCrewNameReportModal}
+              onClose={() => {
+                setShowCrewNameReportModal(false);
+                setCrewNameReportData(null);
+              }}
+              reportedUserId={crewNameReportData.reportedUserId}
+              reportedUsername={crewNameReportData.reportedUsername}
+              reportingUserId={currentUser._id}
+              reportingUsername={currentUser.handle || 'Unknown'}
+              context="crew-name"
+              contextData={{
+                crewName: crewNameReportData.crewName,
+                crewIdentifier: crewNameReportData.crewIdentifier,
+                crewId: crewNameReportData.crewId,
+              }}
+              maxDescriptionLength={1000}
+            />
+          )}
+        </>
+      )}
     </Modal>
   );
 };
@@ -1885,6 +2036,10 @@ const createStyles = (colors: any) => StyleSheet.create({
   content: {
     flex: 1,
     padding: SIZING.spacing.md,
+    position: 'relative',
+  },
+  scrollViewContent: {
+    flex: 1,
   },
   crewGridContainer: {
     flexDirection: 'row',
@@ -1928,6 +2083,26 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.error,
     borderWidth: 1,
     borderColor: colors.background,
+  },
+  crewReportButton: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    paddingVertical: SIZING.spacing.xs / 2,
+    paddingHorizontal: SIZING.spacing.sm,
+    borderRadius: 4,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  crewReportButtonText: {
+    fontSize: SIZING.font.small - 5,
+    fontWeight: '500',
   },
   categoryContent: {
     flex: 1,
@@ -2271,6 +2446,15 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.secondary,
   },
+  internalMessageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SIZING.spacing.xs,
+  },
+  internalMessageHeaderSpacer: {
+    flex: 1,
+  },
   internalMessageText: {
     fontSize: SIZING.font.body,
     lineHeight: SIZING.font.body * 1.5,
@@ -2401,6 +2585,24 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.secondary,
+  },
+  externalMessageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SIZING.spacing.xs,
+  },
+  externalMessageHeaderSpacer: {
+    flex: 1,
+  },
+  reportButton: {
+    paddingVertical: SIZING.spacing.xs / 2,
+    paddingHorizontal: SIZING.spacing.sm,
+  },
+  reportButtonText: {
+    fontSize: SIZING.font.small - 2,
+    opacity: 0.6,
+    textDecorationLine: 'underline',
   },
   externalMessageText: {
     fontSize: SIZING.font.body,

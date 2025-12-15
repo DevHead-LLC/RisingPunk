@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
+import { containsBadWordsAsSubstring } from '../../utils/contentModeration';
 
 const VALID_CHAR_REGEX = /^[a-zA-Z0-9_-]*$/;
 
@@ -47,6 +48,9 @@ export const EditCrewNameModal: React.FC<EditCrewNameModalProps> = ({
     }
     if (!VALID_CHAR_REGEX.test(value)) {
       return 'Only letters, numbers, _, and - are allowed';
+    }
+    if (containsBadWordsAsSubstring(value)) {
+      return 'Crew name contains inappropriate language';
     }
     return '';
   }, []);

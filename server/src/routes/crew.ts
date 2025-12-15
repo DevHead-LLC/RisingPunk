@@ -6,6 +6,7 @@ import { CrewStatus } from '../models/CrewStatus';
 import { User } from '../models/User';
 import { CrewChatMessage } from '../models/CrewChatMessage';
 import mongoose from 'mongoose';
+import { filterBadWords, containsBadWords, containsBadWordsAsSubstring } from '../utils/contentModeration';
 
 const router = express.Router();
 
@@ -53,6 +54,18 @@ router.post('/create', auth, async (req: CreateCrewRequest, res: Response) => {
       return;
     }
 
+    // Check for bad words as substrings (no word boundaries) since crew names don't allow spaces
+    if (containsBadWordsAsSubstring(crewName)) {
+      res.status(400).json({ error: 'Crew name contains inappropriate language' });
+      return;
+    }
+
+    if (containsBadWordsAsSubstring(crewIdentifier)) {
+      res.status(400).json({ error: 'Crew identifier contains inappropriate language' });
+      return;
+    }
+
+    // Note: Bad words check already done above, so we can save as-is
     const normalizedCrewName = crewName.trim();
     const normalizedCrewIdentifier = crewIdentifier.trim().toUpperCase();
 
@@ -436,6 +449,8 @@ router.get('/chat-messages', auth, async (req: Request, res: Response) => {
 
     // Format messages for response
     // Note: lean() returns plain objects, so _id is already a plain object, not ObjectId
+    // Note: originalMessage is NOT exposed in API response to prevent bypassing content filters.
+    // Original content is only available server-side when processing reports.
     const formattedMessages = messages.map((msg: any) => ({
       id: String(msg._id),
       userId: String(msg.userId),
@@ -507,12 +522,16 @@ router.post('/chat-messages', auth, async (req: SendChatMessageRequest, res: Res
       return;
     }
 
+    // Apply content filtering before saving
+    const filteredMessage = filterBadWords(trimmedMessage);
+    
     // Create and save the chat message
     const chatMessage = new CrewChatMessage({
       crewId,
       userId,
       username: user.handle || 'Unknown',
-      message: trimmedMessage,
+      message: filteredMessage,
+      originalMessage: trimmedMessage, // Store original for moderation reports
     });
 
     await chatMessage.save();
@@ -624,7 +643,13 @@ router.put('/:crewId/rules', auth, async (req: Request, res: Response) => {
       return;
     }
 
-    crew.crewRules = crewRules.filter((rule: string) => typeof rule === 'string' && rule.trim().length > 0);
+    // Apply content filtering to each rule before saving
+    const validRules = crewRules
+      .filter((rule: string) => typeof rule === 'string' && rule.trim().length > 0)
+      .map((rule: string) => rule.trim());
+    const filteredRules = validRules.map((rule: string) => filterBadWords(rule));
+    crew.crewRules = filteredRules;
+    crew.originalCrewRules = validRules; // Store original for moderation reports
     await crew.save();
 
     res.json({
@@ -1396,6 +1421,8 @@ router.get('/:crewId', auth, async (req: Request, res: Response) => {
         memberCount: memberCount,
         applicants: crew.applicants || [],
         crewRules: crew.crewRules || [],
+        // Note: originalCrewRules, originalInternalMessage, originalExternalMessage are NOT exposed
+        // to prevent bypassing content filters. Original content is only available server-side for reports.
         internalMessage: isCrewMember ? (crew.internalMessage || '') : '',
         externalMessage: crew.externalMessage || '',
         president: president ? { userId: president._id.toString(), handle: president.handle, level: president.level || 1 } : null,
@@ -1867,6 +1894,12 @@ router.post('/update-name', auth, async (req: UpdateCrewNameRequest, res: Respon
       return;
     }
 
+    // Check for bad words as substrings (no word boundaries) since crew names don't allow spaces
+    if (containsBadWordsAsSubstring(crewName)) {
+      res.status(400).json({ error: 'Crew name contains inappropriate language' });
+      return;
+    }
+
     const crewStatus = await CrewStatus.findOne({ userId });
     if (!crewStatus || !crewStatus.isInCrew || !crewStatus.crewId) {
       res.status(400).json({ error: 'User is not in a crew' });
@@ -1884,6 +1917,7 @@ router.post('/update-name', auth, async (req: UpdateCrewNameRequest, res: Respon
       return;
     }
 
+    // Note: Bad words check already done above, so we can save as-is
     const normalizedCrewName = crewName.trim();
 
     if (normalizedCrewName.toLowerCase() === crew.crewName.toLowerCase()) {
@@ -2044,8 +2078,11 @@ router.post('/update-internal-message', auth, async (req: UpdateInternalMessageR
       return;
     }
 
+    // Apply content filtering before saving
     const trimmedMessage = internalMessage.trim();
-    crew.internalMessage = trimmedMessage;
+    const filteredMessage = filterBadWords(trimmedMessage);
+    crew.internalMessage = filteredMessage;
+    crew.originalInternalMessage = trimmedMessage; // Store original for moderation reports
     await crew.save();
 
     res.json({
@@ -2104,8 +2141,11 @@ router.post('/update-external-message', auth, async (req: UpdateExternalMessageR
       return;
     }
 
+    // Apply content filtering before saving
     const trimmedMessage = externalMessage.trim();
-    crew.externalMessage = trimmedMessage;
+    const filteredMessage = filterBadWords(trimmedMessage);
+    crew.externalMessage = filteredMessage;
+    crew.originalExternalMessage = trimmedMessage; // Store original for moderation reports
     await crew.save();
 
     res.json({
@@ -2327,6 +2367,12 @@ router.post('/update-identifier', auth, async (req: UpdateCrewIdentifierRequest,
       return;
     }
 
+    // Check for bad words as substrings (no word boundaries) since crew identifiers don't allow spaces
+    if (containsBadWordsAsSubstring(crewIdentifier)) {
+      res.status(400).json({ error: 'Crew identifier contains inappropriate language' });
+      return;
+    }
+
     const crewStatus = await CrewStatus.findOne({ userId });
     if (!crewStatus || !crewStatus.isInCrew || !crewStatus.crewId) {
       res.status(400).json({ error: 'User is not in a crew' });
@@ -2344,6 +2390,7 @@ router.post('/update-identifier', auth, async (req: UpdateCrewIdentifierRequest,
       return;
     }
 
+    // Note: Bad words check already done above, so we can save as-is
     const normalizedCrewIdentifier = crewIdentifier.trim().toUpperCase();
 
     if (crew.crewIdentifier && normalizedCrewIdentifier === crew.crewIdentifier.toUpperCase()) {
