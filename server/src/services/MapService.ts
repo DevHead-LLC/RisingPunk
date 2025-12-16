@@ -158,7 +158,7 @@ export class MapService {
       while (tries < 10000) {
         const idx = this.randomInt(0, cells.length - 1);
         const c = cells[idx];
-        if (!c.isOccupied && c.canBeOccupied && c.terrain !== 'water' && c.terrain !== 'mountain') {
+        if (!c.isOccupied && c.canBeOccupied && c.terrain !== 'water' && c.terrain !== 'mountain' && c.terrain !== 'road') {
           return idx;
         }
         tries++;
