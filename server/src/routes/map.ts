@@ -4,45 +4,36 @@ import { MapService } from '../services/MapService';
 import { ShieldService } from '../services/ShieldService';
 import { Map } from '../models/Map';
 import { User } from '../models/User';
+import { NPCService } from '../services/NPCService';
 
 const router: Router = express.Router();
 const mapService = new MapService();
 
-// Function to extract NPC level from npcSlug
-const getNPCLevelFromSlug = (npcSlug: string): number => {
-  // NPC slugs follow pattern: npc-[name]-[name]...
-  // Level is determined by the NPC type, not the slug itself
-  // We need to map specific NPCs to their levels based on the seeding script
-  
-  if (npcSlug.includes('neon-shiv') || npcSlug.includes('chrome-havoc') || 
-      npcSlug.includes('zero-grain') || npcSlug.includes('ash-circuit') || 
-      npcSlug.includes('vanta-razor')) {
-    return 1;
+function getDisplayLevel(userLevelAssociation: number): number {
+  const mapping: { [key: number]: number } = {
+    1: 1,
+    5: 2,
+    10: 3,
+    15: 4,
+    20: 5,
+    25: 6,
+    30: 7,
+    35: 8,
+  };
+  return mapping[userLevelAssociation] || 1;
+}
+
+async function getNPCLevelFromSlug(npcSlug: string): Promise<number> {
+  try {
+    const npc = await NPCService.getNPCBySlug(npcSlug);
+    if (npc && npc.userLevelAssociation) {
+      return getDisplayLevel(npc.userLevelAssociation);
+    }
+  } catch (error) {
+    console.error('Error fetching NPC level from slug:', npcSlug, error);
   }
-  if (npcSlug.includes('pulse-hex') || npcSlug.includes('iris-vex') || 
-      npcSlug.includes('rust-specter') || npcSlug.includes('lume-strike') || 
-      npcSlug.includes('cipher-ash')) {
-    return 5;
-  }
-  if (npcSlug.includes('hollow-syn') || npcSlug.includes('rift-breaker') || 
-      npcSlug.includes('echo-shard') || npcSlug.includes('grim-vector') || 
-      npcSlug.includes('nova-skorn')) {
-    return 10;
-  }
-  if (npcSlug.includes('talon-flux') || npcSlug.includes('oblivion-byte') || 
-      npcSlug.includes('drift-reaver') || npcSlug.includes('static-venom') || 
-      npcSlug.includes('wraith-node')) {
-    return 15;
-  }
-  if (npcSlug.includes('shard-viper') || npcSlug.includes('kryo-jackal') || 
-      npcSlug.includes('spectra-void') || npcSlug.includes('iron-phage') || 
-      npcSlug.includes('neuro-scythe')) {
-    return 20;
-  }
-  
-  // Default fallback
   return 1;
-};
+}
 
 router.get('/:name', async (req: Request, res: Response) => {
   try {
@@ -191,7 +182,7 @@ router.get('/:name', async (req: Request, res: Response) => {
         mutated = true;
       }
       const npcInstanceId = c.occupiedBy === 'npc' ? (c.npcInstanceId || undefined) : undefined;
-      const npcLevel = c.occupiedBy === 'npc' && npcSlug ? getNPCLevelFromSlug(npcSlug) : undefined;
+      const npcLevel = c.occupiedBy === 'npc' && npcSlug ? await getNPCLevelFromSlug(npcSlug) : undefined;
       
       // Get current shield status for player entities (using updated status from ShieldService)
       let isShielded = false;

@@ -1,6 +1,7 @@
 import { Map } from '../models/Map';
 import { User } from '../models/User';
 import seedrandom from 'seedrandom';
+import { NPCService, NPCDocument } from './NPCService';
 
 export class MapService {
   private rng: seedrandom.PRNG;
@@ -152,7 +153,6 @@ export class MapService {
   }
 
   private async addHouses(cells: any[]): Promise<void> {
-    // Place player homes for all users and NPC houses
     const pickValidCellIndex = (): number => {
       let tries = 0;
       while (tries < 10000) {
@@ -165,7 +165,7 @@ export class MapService {
       }
       return -1;
     };
-    // Create player homes for all users
+    
     const users = await User.find({}, { _id: 1, handle: 1 }).lean();
     for (const user of users) {
       const idx = pickValidCellIndex();
@@ -177,30 +177,174 @@ export class MapService {
       (cell as any).userId = (user as any)._id;
     }
 
-    // Eight NPC houses: 4 of level 1, 2 of level 2, 2 of level 3
-    const npcPool = [
-      { name: 'Small Corporation', slug: 'npc-small-corporation' },
-      { name: 'Small Corporation', slug: 'npc-small-corporation' },
-      { name: 'Small Corporation', slug: 'npc-small-corporation' },
-      { name: 'Small Corporation', slug: 'npc-small-corporation' },
-      { name: 'Small Bank', slug: 'npc-small-bank' },
-      { name: 'Small Bank', slug: 'npc-small-bank' },
-      { name: 'Large Corporation', slug: 'npc-large-corporation' },
-      { name: 'Large Corporation', slug: 'npc-large-corporation' },
-    ];
-    let placed = 0;
-    while (placed < npcPool.length) {
-      const idx = pickValidCellIndex();
-      if (idx === -1) break;
-      const cell = cells[idx];
-      const npc = npcPool[placed];
-      cell.isOccupied = true;
-      cell.occupiedBy = 'npc';
-      cell.entityName = npc.name;
-      (cell as any).npcSlug = npc.slug;
-      (cell as any).npcInstanceId = `${npc.slug}-${cell.x}-${cell.y}-${Math.floor(this.rng()*1e6)}`;
-      placed++;
+    await this.placeNPCsOnCells(cells);
+  }
+
+  private async placeNPCsOnCells(cells: any[]): Promise<void> {
+    const distribution: { [key: number]: number } = {
+      1: 20,
+      5: 15,
+      10: 15,
+      15: 15,
+      20: 10,
+      25: 10,
+      30: 5,
+      35: 5,
+    };
+
+    const allNPCs = await NPCService.getAllNPCs();
+    const npcsByLevel: { [key: number]: NPCDocument[] } = {};
+    
+    for (const npc of allNPCs) {
+      const level = npc.userLevelAssociation;
+      if (!npcsByLevel[level]) {
+        npcsByLevel[level] = [];
+      }
+      npcsByLevel[level].push(npc);
     }
+
+    const pickValidCellIndex = (): number => {
+      let tries = 0;
+      while (tries < 10000) {
+        const idx = this.randomInt(0, cells.length - 1);
+        const c = cells[idx];
+        if (!c.isOccupied && c.canBeOccupied && c.terrain !== 'water' && c.terrain !== 'mountain' && c.terrain !== 'road') {
+          return idx;
+        }
+        tries++;
+      }
+      return -1;
+    };
+
+    const levels = [1, 5, 10, 15, 20, 25, 30, 35];
+    for (const level of levels) {
+      let npcs = npcsByLevel[level] || [];
+      if (npcs.length === 0) continue;
+
+      const targetCount = distribution[level] || 0;
+      if (targetCount === 0) continue;
+
+      const shuffled = [...npcs].sort(() => this.rng() - 0.5);
+      const npcsToPlace: NPCDocument[] = [];
+      
+      for (let i = 0; i < Math.min(5, shuffled.length); i++) {
+        npcsToPlace.push(shuffled[i]);
+      }
+
+      const remaining = targetCount - npcsToPlace.length;
+      for (let i = 0; i < remaining; i++) {
+        const randomNPC = shuffled[Math.floor(this.rng() * shuffled.length)];
+        npcsToPlace.push(randomNPC);
+      }
+
+      for (const npc of npcsToPlace) {
+        const idx = pickValidCellIndex();
+        if (idx === -1) break;
+        const cell = cells[idx];
+        cell.isOccupied = true;
+        cell.occupiedBy = 'npc';
+        cell.entityName = npc.name || npc.title || 'NPC';
+        (cell as any).npcSlug = npc.slug;
+        (cell as any).npcInstanceId = `${npc.slug}-${cell.x}-${cell.y}-${Math.floor(this.rng() * 1e6)}`;
+      }
+    }
+  }
+
+  static async updateNPCsOnMap(mapName: string = 'main'): Promise<void> {
+    const mapDoc = await Map.findOne({ name: mapName });
+    if (!mapDoc) {
+      throw new Error(`Map '${mapName}' not found`);
+    }
+
+    const cells: any[] = (mapDoc as any).cells || [];
+    let changed = false;
+
+    for (const cell of cells) {
+      if (cell.isOccupied && cell.occupiedBy === 'npc') {
+        cell.isOccupied = false;
+        cell.occupiedBy = 'none';
+        cell.entityName = '';
+        (cell as any).npcSlug = '';
+        (cell as any).npcInstanceId = '';
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      (mapDoc as any).markModified('cells');
+      await (mapDoc as any).save();
+    }
+
+    const distribution: { [key: number]: number } = {
+      1: 20,
+      5: 15,
+      10: 15,
+      15: 15,
+      20: 10,
+      25: 10,
+      30: 5,
+      35: 5,
+    };
+
+    const allNPCs = await NPCService.getAllNPCs();
+    const npcsByLevel: { [key: number]: NPCDocument[] } = {};
+    
+    for (const npc of allNPCs) {
+      const level = npc.userLevelAssociation;
+      if (!npcsByLevel[level]) {
+        npcsByLevel[level] = [];
+      }
+      npcsByLevel[level].push(npc);
+    }
+
+    const pickValidCell = (): { x: number; y: number; index: number } | null => {
+      let tries = 0;
+      while (tries < 10000) {
+        const idx = Math.floor(Math.random() * cells.length);
+        const c = cells[idx];
+        if (!c.isOccupied && c.canBeOccupied && c.terrain !== 'water' && c.terrain !== 'mountain' && c.terrain !== 'road' && c.occupiedBy !== 'player') {
+          return { x: c.x, y: c.y, index: idx };
+        }
+        tries++;
+      }
+      return null;
+    };
+
+    const levels = [1, 5, 10, 15, 20, 25, 30, 35];
+    for (const level of levels) {
+      let npcs = npcsByLevel[level] || [];
+      if (npcs.length === 0) continue;
+
+      const targetCount = distribution[level] || 0;
+      if (targetCount === 0) continue;
+
+      const shuffled = [...npcs].sort(() => Math.random() - 0.5);
+      const npcsToPlace: NPCDocument[] = [];
+      
+      for (let i = 0; i < Math.min(5, shuffled.length); i++) {
+        npcsToPlace.push(shuffled[i]);
+      }
+
+      const remaining = targetCount - npcsToPlace.length;
+      for (let i = 0; i < remaining; i++) {
+        const randomNPC = shuffled[Math.floor(Math.random() * shuffled.length)];
+        npcsToPlace.push(randomNPC);
+      }
+
+      for (const npc of npcsToPlace) {
+        const validCell = pickValidCell();
+        if (!validCell) break;
+        const cell = cells[validCell.index];
+        cell.isOccupied = true;
+        cell.occupiedBy = 'npc';
+        cell.entityName = npc.name || npc.title || 'NPC';
+        (cell as any).npcSlug = npc.slug;
+        (cell as any).npcInstanceId = `${npc.slug}-${validCell.x}-${validCell.y}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+      }
+    }
+
+    (mapDoc as any).markModified('cells');
+    await (mapDoc as any).save();
   }
 
   private addOpenSpaces(cells: any[]): void {
