@@ -2,55 +2,34 @@ import express, { Request, Response, Router } from 'express';
 import auth from '../middleware/auth';
 import { MapService } from '../services/MapService';
 import { ShieldService } from '../services/ShieldService';
-import { Map } from '../models/Map';
+import { Map as MapModel } from '../models/Map';
 import { User } from '../models/User';
+import { NPCService } from '../services/NPCService';
 
 const router: Router = express.Router();
 const mapService = new MapService();
 
-// Function to extract NPC level from npcSlug
-const getNPCLevelFromSlug = (npcSlug: string): number => {
-  // NPC slugs follow pattern: npc-[name]-[name]...
-  // Level is determined by the NPC type, not the slug itself
-  // We need to map specific NPCs to their levels based on the seeding script
-  
-  if (npcSlug.includes('neon-shiv') || npcSlug.includes('chrome-havoc') || 
-      npcSlug.includes('zero-grain') || npcSlug.includes('ash-circuit') || 
-      npcSlug.includes('vanta-razor')) {
-    return 1;
-  }
-  if (npcSlug.includes('pulse-hex') || npcSlug.includes('iris-vex') || 
-      npcSlug.includes('rust-specter') || npcSlug.includes('lume-strike') || 
-      npcSlug.includes('cipher-ash')) {
-    return 5;
-  }
-  if (npcSlug.includes('hollow-syn') || npcSlug.includes('rift-breaker') || 
-      npcSlug.includes('echo-shard') || npcSlug.includes('grim-vector') || 
-      npcSlug.includes('nova-skorn')) {
-    return 10;
-  }
-  if (npcSlug.includes('talon-flux') || npcSlug.includes('oblivion-byte') || 
-      npcSlug.includes('drift-reaver') || npcSlug.includes('static-venom') || 
-      npcSlug.includes('wraith-node')) {
-    return 15;
-  }
-  if (npcSlug.includes('shard-viper') || npcSlug.includes('kryo-jackal') || 
-      npcSlug.includes('spectra-void') || npcSlug.includes('iron-phage') || 
-      npcSlug.includes('neuro-scythe')) {
-    return 20;
-  }
-  
-  // Default fallback
-  return 1;
-};
+function getDisplayLevel(userLevelAssociation: number): number {
+  const mapping: { [key: number]: number } = {
+    1: 1,
+    5: 2,
+    10: 3,
+    15: 4,
+    20: 5,
+    25: 6,
+    30: 7,
+    35: 8,
+  };
+  return mapping[userLevelAssociation] || 1;
+}
 
 router.get('/:name', async (req: Request, res: Response) => {
   try {
     const name = req.params.name;
-    let mapDoc = await Map.findOne({ name });
+    let mapDoc = await MapModel.findOne({ name });
     if (!mapDoc) {
       const created = await mapService.generateMap(name);
-      mapDoc = (created as any) || await Map.findOne({ name });
+      mapDoc = (created as any) || await MapModel.findOne({ name });
     }
 
     if (!mapDoc) {
@@ -64,9 +43,9 @@ router.get('/:name', async (req: Request, res: Response) => {
     // Migrate old maps: enforce version >=2 and gridSize 50, friendly cleanup, and placement rules
     const docAny = mapDoc as any;
     if (!docAny.version || docAny.version < 2 || docAny.gridSize !== 50) {
-      await Map.deleteOne({ _id: docAny._id });
+      await MapModel.deleteOne({ _id: docAny._id });
       const recreated = await mapService.generateMap(name);
-      mapDoc = (recreated as any) || await Map.findOne({ name });
+      mapDoc = (recreated as any) || await MapModel.findOne({ name });
       if (!mapDoc) {
         res.status(500).json({ error: 'Failed to build map' });
         return;
@@ -74,7 +53,7 @@ router.get('/:name', async (req: Request, res: Response) => {
     } else {
       // Validate and normalize map: ensure per-user homes exist and no blocked occupied cells
       const cells: any[] = (mapDoc as any).cells;
-      const isBlocked = (c: any) => c.terrain === 'water' || c.terrain === 'mountain';
+      const isBlocked = (c: any) => c.terrain === 'water' || c.terrain === 'mountain' || c.terrain === 'road';
       let mutatedForCleanup = false;
       for (const c of cells) {
         if (c.isOccupied && isBlocked(c)) {
@@ -107,7 +86,7 @@ router.get('/:name', async (req: Request, res: Response) => {
         await (mapDoc as any).save();
       }
 
-      const terrainIsValid = (cc: any) => !cc.isOccupied && cc.canBeOccupied && cc.terrain !== 'water' && cc.terrain !== 'mountain';
+      const terrainIsValid = (cc: any) => !cc.isOccupied && cc.canBeOccupied && cc.terrain !== 'water' && cc.terrain !== 'mountain' && cc.terrain !== 'road';
       const pickValidCell = (): { x: number; y: number } | null => {
         let tries = 0;
         while (tries < 10000) {
@@ -126,7 +105,7 @@ router.get('/:name', async (req: Request, res: Response) => {
         while (attempts < 10) {
           const candidate = pickValidCell();
           if (!candidate) break;
-          const result = await Map.findOneAndUpdate(
+          const result = await MapModel.findOneAndUpdate(
             {
               _id: (mapDoc as any)._id,
               // Ensure this user does not already have a permanent home cell (ignore ephemeral 'YOU')
@@ -140,7 +119,7 @@ router.get('/:name', async (req: Request, res: Response) => {
                       y: candidate.y,
                       isOccupied: false,
                       canBeOccupied: true,
-                      terrain: { $nin: ['water', 'mountain'] },
+                      terrain: { $nin: ['water', 'mountain', 'road'] },
                     },
                   },
                 },
@@ -161,7 +140,7 @@ router.get('/:name', async (req: Request, res: Response) => {
         }
       }
 
-      mapDoc = await Map.findOne({ name });
+      mapDoc = await MapModel.findOne({ name });
     }
 
     const gridSize = (mapDoc as any).gridSize || 50;
@@ -179,6 +158,15 @@ router.get('/:name', async (req: Request, res: Response) => {
       userMap.set(String(user._id), user);
     });
     
+    // Load all NPCs once and create a lookup map by slug to avoid N+1 queries
+    const allNPCs = await NPCService.getAllNPCs();
+    const npcLevelMap = new Map<string, number>();
+    for (const npc of allNPCs) {
+      if (npc.slug && npc.userLevelAssociation) {
+        npcLevelMap.set(npc.slug, getDisplayLevel(npc.userLevelAssociation));
+      }
+    }
+    
     for (const c of (mapDoc as any).cells as any[]) {
       const y = c.y;
       const x = c.x;
@@ -191,7 +179,7 @@ router.get('/:name', async (req: Request, res: Response) => {
         mutated = true;
       }
       const npcInstanceId = c.occupiedBy === 'npc' ? (c.npcInstanceId || undefined) : undefined;
-      const npcLevel = c.occupiedBy === 'npc' && npcSlug ? getNPCLevelFromSlug(npcSlug) : undefined;
+      const npcLevel = c.occupiedBy === 'npc' && npcSlug ? (npcLevelMap.get(npcSlug) || 1) : undefined;
       
       // Get current shield status for player entities (using updated status from ShieldService)
       let isShielded = false;
@@ -232,10 +220,10 @@ router.post('/player-position', auth, async (req: Request, res: Response) => {
       return;
     }
 
-    let mapDoc = await Map.findOne({ name: 'main' });
+    let mapDoc = await MapModel.findOne({ name: 'main' });
     if (!mapDoc) {
       const created = await mapService.generateMap('main');
-      mapDoc = await Map.findOne({ name: 'main' });
+      mapDoc = await MapModel.findOne({ name: 'main' });
       if (!mapDoc && created) {
         mapDoc = created as any;
       }
@@ -264,7 +252,7 @@ router.post('/player-position', auth, async (req: Request, res: Response) => {
       res.status(404).json({ error: 'Target cell not found' });
       return;
     }
-    if (!target.canBeOccupied || target.terrain === 'mountain' || target.terrain === 'water') {
+    if (!target.canBeOccupied || target.terrain === 'mountain' || target.terrain === 'water' || target.terrain === 'road') {
       res.status(400).json({ error: 'Cell cannot be occupied' });
       return;
     }

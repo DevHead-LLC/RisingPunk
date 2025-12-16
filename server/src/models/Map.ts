@@ -24,7 +24,7 @@ const CellSchema = new mongoose.Schema({
 
 // Set canBeOccupied based on terrain type
 CellSchema.pre('save', function(next) {
-  if (this.terrain === 'mountain' || this.terrain === 'water') {
+  if (this.terrain === 'mountain' || this.terrain === 'water' || this.terrain === 'road') {
     this.canBeOccupied = false;
   }
   next();
