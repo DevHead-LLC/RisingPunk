@@ -11,7 +11,8 @@
     "test": "jest",
     "seed:map": "node scripts/seedMap.js",
     "seed:database": "node scripts/seedDatabase.js",
-    "backup:guide": "node scripts/backupRestore.js"
+    "backup:guide": "node scripts/backupRestore.js",
+    "update:npc": "ts-node scripts/updateNPCs.ts"
   },
   "keywords": [],
   "author": "",
