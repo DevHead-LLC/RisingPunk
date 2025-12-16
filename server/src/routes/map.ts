@@ -2,7 +2,7 @@ import express, { Request, Response, Router } from 'express';
 import auth from '../middleware/auth';
 import { MapService } from '../services/MapService';
 import { ShieldService } from '../services/ShieldService';
-import { Map } from '../models/Map';
+import { Map as MapModel } from '../models/Map';
 import { User } from '../models/User';
 import { NPCService } from '../services/NPCService';
 
@@ -26,10 +26,10 @@ function getDisplayLevel(userLevelAssociation: number): number {
 router.get('/:name', async (req: Request, res: Response) => {
   try {
     const name = req.params.name;
-    let mapDoc = await Map.findOne({ name });
+    let mapDoc = await MapModel.findOne({ name });
     if (!mapDoc) {
       const created = await mapService.generateMap(name);
-      mapDoc = (created as any) || await Map.findOne({ name });
+      mapDoc = (created as any) || await MapModel.findOne({ name });
     }
 
     if (!mapDoc) {
@@ -43,9 +43,9 @@ router.get('/:name', async (req: Request, res: Response) => {
     // Migrate old maps: enforce version >=2 and gridSize 50, friendly cleanup, and placement rules
     const docAny = mapDoc as any;
     if (!docAny.version || docAny.version < 2 || docAny.gridSize !== 50) {
-      await Map.deleteOne({ _id: docAny._id });
+      await MapModel.deleteOne({ _id: docAny._id });
       const recreated = await mapService.generateMap(name);
-      mapDoc = (recreated as any) || await Map.findOne({ name });
+      mapDoc = (recreated as any) || await MapModel.findOne({ name });
       if (!mapDoc) {
         res.status(500).json({ error: 'Failed to build map' });
         return;
@@ -105,7 +105,7 @@ router.get('/:name', async (req: Request, res: Response) => {
         while (attempts < 10) {
           const candidate = pickValidCell();
           if (!candidate) break;
-          const result = await Map.findOneAndUpdate(
+          const result = await MapModel.findOneAndUpdate(
             {
               _id: (mapDoc as any)._id,
               // Ensure this user does not already have a permanent home cell (ignore ephemeral 'YOU')
@@ -140,7 +140,7 @@ router.get('/:name', async (req: Request, res: Response) => {
         }
       }
 
-      mapDoc = await Map.findOne({ name });
+      mapDoc = await MapModel.findOne({ name });
     }
 
     const gridSize = (mapDoc as any).gridSize || 50;
@@ -220,10 +220,10 @@ router.post('/player-position', auth, async (req: Request, res: Response) => {
       return;
     }
 
-    let mapDoc = await Map.findOne({ name: 'main' });
+    let mapDoc = await MapModel.findOne({ name: 'main' });
     if (!mapDoc) {
       const created = await mapService.generateMap('main');
-      mapDoc = await Map.findOne({ name: 'main' });
+      mapDoc = await MapModel.findOne({ name: 'main' });
       if (!mapDoc && created) {
         mapDoc = created as any;
       }
