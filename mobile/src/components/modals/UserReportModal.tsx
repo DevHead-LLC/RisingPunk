@@ -11,6 +11,7 @@ import {
   Platform,
   Keyboard,
   FlatList,
+  BackHandler,
 } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
@@ -78,6 +79,27 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
       setShowReasonPicker(false);
     }
   }, [visible]);
+
+  // Handle Android back button when picker is open
+  useEffect(() => {
+    if (Platform.OS === 'android' && visible && showReasonPicker) {
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+        setShowReasonPicker(false);
+        return true;
+      });
+
+      return () => backHandler.remove();
+    }
+  }, [visible, showReasonPicker]);
+
+  // Handle Modal's onRequestClose (Android back button)
+  const handleRequestClose = useCallback(() => {
+    if (showReasonPicker) {
+      setShowReasonPicker(false);
+    } else {
+      onClose();
+    }
+  }, [showReasonPicker, onClose]);
 
   const getContextDataDisplay = (): string => {
     if (!contextData) return '';
@@ -151,7 +173,7 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
       visible={visible}
       transparent={true}
       animationType="fade"
-      onRequestClose={onClose}
+      onRequestClose={handleRequestClose}
       statusBarTranslucent={true}
       hardwareAccelerated={true}
       supportedOrientations={['landscape']}
