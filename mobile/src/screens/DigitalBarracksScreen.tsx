@@ -42,26 +42,16 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
       return botStats?.role || 'Unknown';
     };
 
-    const getBotAdvantage = (_type: BotType): string => {
-      if (!botStats || !allBotStats) {
-        return 'Stats not available';
-      }
-
-      const stats = botStats.stats;
-      const maxRange = Math.max(...Object.values(allBotStats).map((bot: any) => bot.stats.range));
-      const maxOffense = Math.max(...Object.values(allBotStats).map((bot: any) => bot.stats.offense));
-      const maxDefense = Math.max(...Object.values(allBotStats).map((bot: any) => bot.stats.defense));
-
-      if (stats.range === maxRange) {
-        return 'Long-range specialist with superior attack distance';
-      } else if (stats.offense === maxOffense) {
-        return 'High damage output for aggressive tactics';
-      } else if (stats.defense === maxDefense) {
-        return 'Tank unit with maximum survivability';
-      } else {
-        return 'Balanced unit with versatile capabilities';
-      }
+    const getTypeMatchups = (botType: BotType): { strongAgainst: string; weakAgainst: string } | null => {
+      const matchups: Record<BotType, { strongAgainst: string; weakAgainst: string }> = {
+        guardian: { strongAgainst: 'Breacher', weakAgainst: 'Phreak' },
+        breacher: { strongAgainst: 'Phreak', weakAgainst: 'Guardian' },
+        phreak: { strongAgainst: 'Guardian', weakAgainst: 'Breacher' },
+      };
+      return matchups[botType] || null;
     };
+
+    const matchups = getTypeMatchups(type);
 
     return (
       <View style={styles.botCard}>
@@ -82,7 +72,14 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
           <View style={styles.infoContainer}>
             <View style={styles.loreContainer}>
               <Text style={styles.hackerLore}>{hackerLore[type]}</Text>
-              <Text style={styles.advantageText}>{getBotAdvantage(type)}</Text>
+              {matchups ? (
+                <>
+                  <Text style={styles.strongText}>Strong vs: {matchups.strongAgainst}</Text>
+                  <Text style={styles.weakText}>Weak vs: {matchups.weakAgainst}</Text>
+                </>
+              ) : (
+                <Text style={styles.lockedText}>Matchup data not available</Text>
+              )}
             </View>
 
             <View style={styles.statsContainer}>
@@ -360,11 +357,17 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'lig
     paddingLeft: SIZING.spacing.xs,
     marginBottom: SIZING.spacing.lg,
   },
-  advantageText: {
-    color: colors.text.secondary,
+  strongText: {
+    color: themeMode === 'light' ? '#006400' : '#00ff41',
     fontSize: SIZING.font.small,
-    fontStyle: 'italic',
-    paddingLeft: SIZING.spacing.xs,
+    fontWeight: 'bold',
+    marginTop: SIZING.spacing.xs,
+  },
+  weakText: {
+    color: themeMode === 'light' ? '#8B0000' : '#ff6b6b',
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+    marginTop: SIZING.spacing.xs,
   },
   statsContainer: {
     flex: 2,
