@@ -545,8 +545,38 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const gridSize = grid.length || 50;
   const totalSize = gridSize * CELL_SIZE;
   const { data: mapData, isLoading, refetch } = useFetchMapQuery();
+  // Phase 5: Optimize shield status polling - increase interval and make viewport-aware
+  // Check if there are any player tiles in the visible viewport
+  const hasVisiblePlayerTiles = useMemo(() => {
+    if (!terrainDataLoaded) return false;
+    
+    // Check visible cells for player tiles
+    if (virtualViewport.visibleTiles.size > 0) {
+      for (const tileKey of virtualViewport.visibleTiles) {
+        const entity = dynamicEntityData[tileKey];
+        if (entity && entity.owner === 'player') {
+          return true;
+        }
+      }
+    } else {
+      // Fallback: check window range
+      for (let y = windowRange.rowStart; y <= windowRange.rowEnd; y++) {
+        for (let x = windowRange.colStart; x <= windowRange.colEnd; x++) {
+          const key = `${x},${y}`;
+          const entity = dynamicEntityData[key];
+          if (entity && entity.owner === 'player') {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }, [terrainDataLoaded, virtualViewport.visibleTiles, dynamicEntityData, windowRange]);
+  
+  // Phase 5: Only poll when player tiles are visible, and increase interval to 5s
   const { data: shieldData } = useGetShieldStatusQuery(undefined, {
-    pollingInterval: 1000, // Poll every second for real-time updates
+    pollingInterval: hasVisiblePlayerTiles ? 5000 : 0, // Poll every 5 seconds when player tiles visible, pause otherwise
+    skip: !hasVisiblePlayerTiles && !currentUserId, // Skip if no player tiles visible and no current user
   });
   
   // Get research features data (same as ResearchFeaturesList)
