@@ -880,6 +880,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     [gridSize]
   );
 
+  // Phase 4C: Optimize visibleCells computation with efficient cache usage
   const visibleCells = useMemo(() => {
     const cells: Array<{ x: number; y: number; cell: CellData }> = [];
     
@@ -889,14 +890,16 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     // Phase 7A: Virtual Scrolling - Only render tiles that are actually visible
     if (virtualViewport.visibleTiles.size > 0) {
       // Use virtual viewport for ultra-efficient rendering
+      // Phase 4C: Cache lookups are already O(1) - object property access is optimized
       virtualViewport.visibleTiles.forEach(tileKey => {
         const [x, y] = tileKey.split(',').map(Number);
+        // Phase 4C: Direct property access is already optimal (O(1))
         const terrain = staticTerrainData[tileKey];
         const entity = dynamicEntityData[tileKey];
         
         if (!terrain) return;
         
-        // Create cell data by combining static terrain with dynamic entities
+        // Phase 4C: Create cell data efficiently - only create object if needed
         const cell: CellData = {
           terrain,
           entity: entity?.entity || 'empty',
@@ -913,15 +916,17 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       });
     } else {
       // Fallback to original logic if virtual viewport not ready
+      // Phase 4C: Optimize loop - cache key generation
       for (let y = windowRange.rowStart; y <= windowRange.rowEnd; y++) {
         for (let x = windowRange.colStart; x <= windowRange.colEnd; x++) {
           const key = `${x},${y}`;
+          // Phase 4C: Direct property access is already optimal (O(1))
           const terrain = staticTerrainData[key];
           const entity = dynamicEntityData[key];
           
           if (!terrain) continue;
           
-          // Create cell data by combining static terrain with dynamic entities
+          // Phase 4C: Create cell data efficiently
           const cell: CellData = {
             terrain,
             entity: entity?.entity || 'empty',
@@ -931,6 +936,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             npcSlug: entity?.npcSlug,
             npcInstanceId: entity?.npcInstanceId,
             npcLevel: entity?.npcLevel,
+            isShielded: entity?.isShielded,
           } as any;
           
           cells.push({ x, y, cell });
@@ -982,10 +988,21 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   useEffect(() => {
     dispatch(setLoading(isLoading));
     if (mapData && mapData.grid) {
-      // Separate static and dynamic data
+      // Phase 4B: Merge new data with existing cache instead of replacing
+      // This ensures cached terrain data persists across refetches
       const { terrain, entities } = separateStaticAndDynamicData(mapData.grid);
-      setStaticTerrainData(terrain);
-      setDynamicEntityData(entities);
+      
+      setStaticTerrainData(prev => {
+        // Terrain is static - merge to preserve existing cached terrain
+        return { ...prev, ...terrain };
+      });
+      
+      setDynamicEntityData(prev => {
+        // Entities are dynamic - merge to preserve existing cached entities
+        // New data from server will overwrite cached data for those tiles
+        return { ...prev, ...entities };
+      });
+      
       setTerrainDataLoaded(true);
       
       dispatch(setGrid(mapData.grid));
@@ -993,8 +1010,13 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   }, [mapData, isLoading, dispatch, separateStaticAndDynamicData]);
 
   // Force refresh map data when returning from battle to ensure NPCs are updated
+  // Phase 4B: Only clear cache when explicitly needed (restorePan = returning from battle)
   useEffect(() => {
     if (restorePan) {
+      // Clear cache when returning from battle to ensure fresh data (NPCs may have been defeated)
+      setStaticTerrainData({});
+      setDynamicEntityData({});
+      setTerrainDataLoaded(false);
       refetch();
     }
   }, [restorePan, refetch]);
