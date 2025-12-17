@@ -38,6 +38,8 @@ router.get('/:name', async (req: Request, res: Response) => {
     }
 
     // Get users data for shield status lookup
+    // Note: We query all users here because migration logic needs all users to place houses
+    // After migration, we'll optimize to only query users with houses (see Phase 3B below)
     const users = await User.find({}, { _id: 1, handle: 1, antivirusShield: 1 });
 
     // Migrate old maps: enforce version >=2 and gridSize 50, friendly cleanup, and placement rules
@@ -144,21 +146,70 @@ router.get('/:name', async (req: Request, res: Response) => {
     }
 
     const gridSize = (mapDoc as any).gridSize || 50;
+    
+    // Phase 3B: After migration, extract cells and userIds for optimized user query
+    const cells = (mapDoc as any).cells as any[];
+    
+    // Extract userIds from all cells (for full map optimization)
+    const userIdsInMap = new Set<string>();
+    cells.forEach((c: any) => {
+      if (c.occupiedBy === 'player' && c.userId) {
+        userIdsInMap.add(String(c.userId));
+      }
+    });
+    
+    const x1 = req.query.x1 ? parseInt(req.query.x1 as string, 10) : undefined;
+    const y1 = req.query.y1 ? parseInt(req.query.y1 as string, 10) : undefined;
+    const x2 = req.query.x2 ? parseInt(req.query.x2 as string, 10) : undefined;
+    const y2 = req.query.y2 ? parseInt(req.query.y2 as string, 10) : undefined;
+    
+    const hasViewport = x1 !== undefined || y1 !== undefined || x2 !== undefined || y2 !== undefined;
+    
+    let viewportX1 = 0;
+    let viewportY1 = 0;
+    let viewportX2 = gridSize - 1;
+    let viewportY2 = gridSize - 1;
+    
+    if (hasViewport) {
+      viewportX1 = Math.max(0, Math.min(x1 ?? 0, x2 ?? gridSize - 1, gridSize - 1));
+      viewportY1 = Math.max(0, Math.min(y1 ?? 0, y2 ?? gridSize - 1, gridSize - 1));
+      viewportX2 = Math.min(gridSize - 1, Math.max(x1 ?? 0, x2 ?? gridSize - 1));
+      viewportY2 = Math.min(gridSize - 1, Math.max(y1 ?? 0, y2 ?? gridSize - 1));
+    }
+    
+    const viewportCells = hasViewport 
+      ? cells.filter((c: any) => 
+          c.x >= viewportX1 && c.x <= viewportX2 && 
+          c.y >= viewportY1 && c.y <= viewportY2
+        )
+      : cells;
+    
+    // Phase 3B: Use optimized user query - only query users with houses
+    // For viewport: filter to users in viewport, for full map: use all users with houses
+    const userIdsInViewport = new Set<string>();
+    viewportCells.forEach((c: any) => {
+      if (c.occupiedBy === 'player' && c.userId) {
+        userIdsInViewport.add(String(c.userId));
+      }
+    });
+    
+    // Only query users who have houses (optimized from querying all users)
+    const usersToQuery = hasViewport
+      ? await User.find({ _id: { $in: Array.from(userIdsInViewport) } }, { _id: 1, handle: 1, antivirusShield: 1 })
+      : await User.find({ _id: { $in: Array.from(userIdsInMap) } }, { _id: 1, handle: 1, antivirusShield: 1 });
+    
     const emptyGrid = Array.from({ length: gridSize }, () =>
       Array.from({ length: gridSize }, () => ({ terrain: 'plain', entity: 'empty' }))
     );
     let mutated = false;
     
-    // Check and update shield statuses for all users to ensure expired shields are deactivated
-    const shieldStatusMap = await ShieldService.checkAndUpdateMultipleShieldStatuses(users);
+    const shieldStatusMap = await ShieldService.checkAndUpdateMultipleShieldStatuses(usersToQuery);
     
-    // Create a map of userId to user data for quick lookup
     const userMap = new Map();
-    users.forEach((user: any) => {
+    usersToQuery.forEach((user: any) => {
       userMap.set(String(user._id), user);
     });
     
-    // Load all NPCs once and create a lookup map by slug to avoid N+1 queries
     const allNPCs = await NPCService.getAllNPCs();
     const npcLevelMap = new Map<string, number>();
     for (const npc of allNPCs) {
@@ -167,7 +218,7 @@ router.get('/:name', async (req: Request, res: Response) => {
       }
     }
     
-    for (const c of (mapDoc as any).cells as any[]) {
+    for (const c of viewportCells) {
       const y = c.y;
       const x = c.x;
       const entity = c.isOccupied ? 'house' : 'empty';
@@ -181,7 +232,6 @@ router.get('/:name', async (req: Request, res: Response) => {
       const npcInstanceId = c.occupiedBy === 'npc' ? (c.npcInstanceId || undefined) : undefined;
       const npcLevel = c.occupiedBy === 'npc' && npcSlug ? (npcLevelMap.get(npcSlug) || 1) : undefined;
       
-      // Get current shield status for player entities (using updated status from ShieldService)
       let isShielded = false;
       if (c.occupiedBy === 'player' && c.userId) {
         isShielded = shieldStatusMap.get(String(c.userId)) || false;
@@ -205,7 +255,14 @@ router.get('/:name', async (req: Request, res: Response) => {
       await (mapDoc as any).save();
     }
 
-    res.json({ grid: emptyGrid });
+    if (hasViewport) {
+      res.json({ 
+        grid: emptyGrid,
+        viewport: { x1: viewportX1, y1: viewportY1, x2: viewportX2, y2: viewportY2 }
+      });
+    } else {
+      res.json({ grid: emptyGrid });
+    }
   } catch (error: any) {
     console.error('Map fetch error:', error);
     res.status(500).json({ error: error.message });

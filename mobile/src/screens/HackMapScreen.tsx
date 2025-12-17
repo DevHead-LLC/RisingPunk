@@ -23,7 +23,7 @@ import { useThemeColors } from '../hooks/useThemeColors';
 import { useTheme } from '../context/ThemeContext';
 import { SIZING } from '../styles/theme';
 
-const CELL_SIZE = 55;
+const CELL_SIZE = 75;
 const MARGIN_SIZE = 80;
 
 
@@ -991,14 +991,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       dispatch(setGrid(mapData.grid));
     }
   }, [mapData, isLoading, dispatch, separateStaticAndDynamicData]);
-
-  // Update only dynamic entity data (NPCs, houses, etc.) without full grid refresh
-  const updateEntityData = useCallback((updates: Record<string, any>) => {
-    setDynamicEntityData(prev => ({
-      ...prev,
-      ...updates
-    }));
-  }, []);
 
   // Force refresh map data when returning from battle to ensure NPCs are updated
   useEffect(() => {
