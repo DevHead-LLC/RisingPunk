@@ -1029,8 +1029,28 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       
       setDynamicEntityData(prev => {
         // Entities are dynamic - merge to preserve existing cached entities
-        // New data from server will overwrite cached data for those tiles
-        return { ...prev, ...entities };
+        // Bug Fix: Also clear entity data for cells that are now empty
+        // When an entity is removed (NPC defeated, house destroyed), we need to delete it from cache
+        const merged = { ...prev, ...entities };
+        
+        // Iterate through all cells in the new grid to find cells that are now empty
+        for (let y = 0; y < mapData.grid.length; y++) {
+          const row = mapData.grid[y];
+          if (!row) continue;
+          for (let x = 0; x < row.length; x++) {
+            const cell = row[x];
+            if (!cell) continue;
+            
+            const key = `${x},${y}`;
+            
+            // If cell is now empty but we have cached entity data, remove it
+            if (cell.entity === 'empty' && merged[key]) {
+              delete merged[key];
+            }
+          }
+        }
+        
+        return merged;
       });
       
       setTerrainDataLoaded(true);
