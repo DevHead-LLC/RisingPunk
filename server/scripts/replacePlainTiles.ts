@@ -127,9 +127,13 @@ async function replacePlainTiles() {
       }
 
       const updates: { x: number; y: number; newTerrain: TerrainType }[] = [];
+      const impassableTerrains = ['mountain', 'water', 'road'];
 
       for (const cell of plainCells) {
-        const newTerrain = getMostCommonNeighborTerrain(cell, cellMap);
+        let newTerrain = getMostCommonNeighborTerrain(cell, cellMap);
+        if (cell.isOccupied && impassableTerrains.includes(newTerrain)) {
+          newTerrain = 'grass';
+        }
         updates.push({ x: cell.x, y: cell.y, newTerrain });
       }
 
