@@ -4,6 +4,7 @@
  */
 
 import { IBattalion, INode, NodeOwner } from '../types/battle';
+import { BotStatsService } from './BotStatsService';
 
 export class CombatService {
   static calculateTugOfWarDamage(attacker: IBattalion): number {
@@ -36,10 +37,10 @@ export class CombatService {
   // ============================================================================
 
   static calculateBattalionDamage(attacker: IBattalion, defender: IBattalion): number {
-    const baseDamage = attacker.stats.offense * attacker.quantity;
+    const typeMultiplier = BotStatsService.getTypeAdvantage(attacker.type, defender.type);
+    const baseDamage = attacker.stats.offense * attacker.quantity * typeMultiplier;
     const defenseReduction = baseDamage * (defender.stats.defense / 100);
     const finalDamage = Math.max(1, baseDamage - defenseReduction);
-    
     
     return finalDamage;
   }
