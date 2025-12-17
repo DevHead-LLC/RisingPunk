@@ -42,13 +42,13 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
       return botStats?.role || 'Unknown';
     };
 
-    const getTypeMatchups = (botType: BotType): { strongAgainst: string; weakAgainst: string } => {
+    const getTypeMatchups = (botType: BotType): { strongAgainst: string; weakAgainst: string } | null => {
       const matchups: Record<BotType, { strongAgainst: string; weakAgainst: string }> = {
         guardian: { strongAgainst: 'Breacher', weakAgainst: 'Phreak' },
         breacher: { strongAgainst: 'Phreak', weakAgainst: 'Guardian' },
         phreak: { strongAgainst: 'Guardian', weakAgainst: 'Breacher' },
       };
-      return matchups[botType];
+      return matchups[botType] || null;
     };
 
     const matchups = getTypeMatchups(type);
@@ -72,8 +72,14 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
           <View style={styles.infoContainer}>
             <View style={styles.loreContainer}>
               <Text style={styles.hackerLore}>{hackerLore[type]}</Text>
-              <Text style={styles.strongText}>Strong vs: {matchups.strongAgainst}</Text>
-              <Text style={styles.weakText}>Weak vs: {matchups.weakAgainst}</Text>
+              {matchups ? (
+                <>
+                  <Text style={styles.strongText}>Strong vs: {matchups.strongAgainst}</Text>
+                  <Text style={styles.weakText}>Weak vs: {matchups.weakAgainst}</Text>
+                </>
+              ) : (
+                <Text style={styles.lockedText}>Matchup data not available</Text>
+              )}
             </View>
 
             <View style={styles.statsContainer}>
