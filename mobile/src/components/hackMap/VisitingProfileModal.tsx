@@ -127,7 +127,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     padding: SIZING.spacing.lg,
   },
   modalContainer: {
-    width: '80%',
+    width: '60%',
+    height: '103%',
     maxWidth: 500,
     borderRadius: 16,
     borderWidth: 2,
