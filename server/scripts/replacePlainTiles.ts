@@ -134,9 +134,10 @@ async function replacePlainTiles() {
       }
 
       for (const update of updates) {
+        const canBeOccupied = !['mountain', 'water', 'road'].includes(update.newTerrain);
         await MapModel.updateOne(
           { _id: map._id, cells: { $elemMatch: { x: update.x, y: update.y } } },
-          { $set: { 'cells.$.terrain': update.newTerrain } }
+          { $set: { 'cells.$.terrain': update.newTerrain, 'cells.$.canBeOccupied': canBeOccupied } }
         );
       }
 
