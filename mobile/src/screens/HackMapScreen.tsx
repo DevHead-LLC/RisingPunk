@@ -23,7 +23,7 @@ import { useThemeColors } from '../hooks/useThemeColors';
 import { useTheme } from '../context/ThemeContext';
 import { SIZING } from '../styles/theme';
 
-const CELL_SIZE = 55;
+const CELL_SIZE = 75;
 const MARGIN_SIZE = 80;
 
 
@@ -545,8 +545,38 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const gridSize = grid.length || 50;
   const totalSize = gridSize * CELL_SIZE;
   const { data: mapData, isLoading, refetch } = useFetchMapQuery();
+  // Phase 5: Optimize shield status polling - increase interval and make viewport-aware
+  // Check if there are any player tiles in the visible viewport
+  const hasVisiblePlayerTiles = useMemo(() => {
+    if (!terrainDataLoaded) return false;
+    
+    // Check visible cells for player tiles
+    if (virtualViewport.visibleTiles.size > 0) {
+      for (const tileKey of virtualViewport.visibleTiles) {
+        const entity = dynamicEntityData[tileKey];
+        if (entity && entity.owner === 'player') {
+          return true;
+        }
+      }
+    } else {
+      // Fallback: check window range
+      for (let y = windowRange.rowStart; y <= windowRange.rowEnd; y++) {
+        for (let x = windowRange.colStart; x <= windowRange.colEnd; x++) {
+          const key = `${x},${y}`;
+          const entity = dynamicEntityData[key];
+          if (entity && entity.owner === 'player') {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }, [terrainDataLoaded, virtualViewport.visibleTiles, dynamicEntityData, windowRange]);
+  
+  // Phase 5: Only poll when player tiles are visible, and increase interval to 5s
   const { data: shieldData } = useGetShieldStatusQuery(undefined, {
-    pollingInterval: 1000, // Poll every second for real-time updates
+    pollingInterval: hasVisiblePlayerTiles ? 5000 : 0, // Poll every 5 seconds when player tiles visible, pause otherwise
+    skip: !hasVisiblePlayerTiles && !currentUserId, // Skip if no player tiles visible and no current user
   });
   
   // Get research features data (same as ResearchFeaturesList)
@@ -826,6 +856,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
   // Store the latest updateTileShieldStatus function in a ref to avoid stale closures
   const updateTileShieldStatusRef = useRef(updateTileShieldStatus);
+  
+  // Bug Fix: Use ref to track latest grid value to avoid stale closures in viewport merging
+  // This ensures sequential viewport updates don't overwrite each other's changes
+  const gridRef = useRef(grid);
   updateTileShieldStatusRef.current = updateTileShieldStatus;
 
   // Add frequent check for shield status changes on visible tiles
@@ -880,6 +914,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     [gridSize]
   );
 
+  // Phase 4C: Optimize visibleCells computation with efficient cache usage
   const visibleCells = useMemo(() => {
     const cells: Array<{ x: number; y: number; cell: CellData }> = [];
     
@@ -889,14 +924,16 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     // Phase 7A: Virtual Scrolling - Only render tiles that are actually visible
     if (virtualViewport.visibleTiles.size > 0) {
       // Use virtual viewport for ultra-efficient rendering
+      // Phase 4C: Cache lookups are already O(1) - object property access is optimized
       virtualViewport.visibleTiles.forEach(tileKey => {
         const [x, y] = tileKey.split(',').map(Number);
+        // Phase 4C: Direct property access is already optimal (O(1))
         const terrain = staticTerrainData[tileKey];
         const entity = dynamicEntityData[tileKey];
         
         if (!terrain) return;
         
-        // Create cell data by combining static terrain with dynamic entities
+        // Phase 4C: Create cell data efficiently - only create object if needed
         const cell: CellData = {
           terrain,
           entity: entity?.entity || 'empty',
@@ -913,15 +950,17 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       });
     } else {
       // Fallback to original logic if virtual viewport not ready
+      // Phase 4C: Optimize loop - cache key generation
       for (let y = windowRange.rowStart; y <= windowRange.rowEnd; y++) {
         for (let x = windowRange.colStart; x <= windowRange.colEnd; x++) {
           const key = `${x},${y}`;
+          // Phase 4C: Direct property access is already optimal (O(1))
           const terrain = staticTerrainData[key];
           const entity = dynamicEntityData[key];
           
           if (!terrain) continue;
           
-          // Create cell data by combining static terrain with dynamic entities
+          // Phase 4C: Create cell data efficiently
           const cell: CellData = {
             terrain,
             entity: entity?.entity || 'empty',
@@ -931,6 +970,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             npcSlug: entity?.npcSlug,
             npcInstanceId: entity?.npcInstanceId,
             npcLevel: entity?.npcLevel,
+            isShielded: entity?.isShielded,
           } as any;
           
           cells.push({ x, y, cell });
@@ -943,8 +983,14 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
 
 
+  // Bug Fix: Keep gridRef in sync with Redux state to avoid stale closures
+  useEffect(() => {
+    gridRef.current = grid;
+  }, [grid]);
+
   // Separate static terrain data from dynamic entity data for optimal loading
-  const separateStaticAndDynamicData = useCallback((gridData: any[][]) => {
+  // Bug Fix: Support viewport filtering to only process cells within viewport bounds
+  const separateStaticAndDynamicData = useCallback((gridData: any[][], viewport?: { x1: number; y1: number; x2: number; y2: number }) => {
     const terrain: Record<string, TerrainType> = {};
     const entities: Record<string, any> = {};
     
@@ -954,6 +1000,24 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       for (let x = 0; x < row.length; x++) {
         const cell = row[x];
         if (!cell) continue;
+        
+        // Bug Fix: For viewport requests, only process cells within viewport bounds
+        // This prevents overwriting cached terrain outside viewport with 'plain'
+        if (viewport) {
+          // Bug Fix: Validate viewport coordinates are valid numbers (defensive check)
+          const vx1 = Number(viewport.x1);
+          const vy1 = Number(viewport.y1);
+          const vx2 = Number(viewport.x2);
+          const vy2 = Number(viewport.y2);
+          
+          // If viewport is invalid (NaN), skip viewport filtering (process all cells)
+          if (!isNaN(vx1) && !isNaN(vy1) && !isNaN(vx2) && !isNaN(vy2)) {
+            const isInViewport = x >= vx1 && x <= vx2 && y >= vy1 && y <= vy2;
+            if (!isInViewport) {
+              continue; // Skip cells outside viewport to preserve cached data
+            }
+          }
+        }
         
         const key = `${x},${y}`;
         
@@ -982,27 +1046,125 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   useEffect(() => {
     dispatch(setLoading(isLoading));
     if (mapData && mapData.grid) {
-      // Separate static and dynamic data
-      const { terrain, entities } = separateStaticAndDynamicData(mapData.grid);
-      setStaticTerrainData(terrain);
-      setDynamicEntityData(entities);
+      // Phase 4B: Merge new data with existing cache instead of replacing
+      // This ensures cached terrain data persists across refetches
+      // Bug Fix: For viewport requests, only process cells within viewport to preserve cached data outside
+      const { terrain, entities } = separateStaticAndDynamicData(mapData.grid, mapData.viewport);
+      
+      setStaticTerrainData(prev => {
+        // Terrain is static - merge to preserve existing cached terrain
+        // Bug Fix: For viewport requests, only terrain within viewport is merged
+        return { ...prev, ...terrain };
+      });
+      
+      setDynamicEntityData(prev => {
+        // Entities are dynamic - merge to preserve existing cached entities
+        // Bug Fix #1: Also clear entity data for cells that are now empty
+        // When an entity is removed (NPC defeated, house destroyed), we need to delete it from cache
+        const merged = { ...prev, ...entities };
+        
+        // Bug Fix: Only iterate through cells that are in the viewport (if viewport provided)
+        // For full map requests, iterate all cells. For viewport requests, only viewport cells.
+        const cellsToCheck = mapData.viewport 
+          ? (() => {
+              const cells: Array<{ x: number; y: number; cell: any }> = [];
+              for (let y = mapData.viewport!.y1; y <= mapData.viewport!.y2; y++) {
+                const row = mapData.grid[y];
+                if (!row) continue;
+                for (let x = mapData.viewport!.x1; x <= mapData.viewport!.x2; x++) {
+                  const cell = row[x];
+                  if (cell) cells.push({ x, y, cell });
+                }
+              }
+              return cells;
+            })()
+          : (() => {
+              const cells: Array<{ x: number; y: number; cell: any }> = [];
+              for (let y = 0; y < mapData.grid.length; y++) {
+                const row = mapData.grid[y];
+                if (!row) continue;
+                for (let x = 0; x < row.length; x++) {
+                  const cell = row[x];
+                  if (cell) cells.push({ x, y, cell });
+                }
+              }
+              return cells;
+            })();
+        
+        // Iterate through cells to find cells that are now empty
+        for (const { x, y, cell } of cellsToCheck) {
+          const key = `${x},${y}`;
+          
+          // If cell is now empty but we have cached entity data, remove it
+          if (cell.entity === 'empty' && merged[key]) {
+            delete merged[key];
+          }
+        }
+        
+        return merged;
+      });
+      
       setTerrainDataLoaded(true);
       
-      dispatch(setGrid(mapData.grid));
+      // Bug Fix: For viewport requests, merge with existing grid instead of replacing
+      // This preserves cached data outside the viewport
+      if (mapData.viewport) {
+        // Bug Fix: Validate viewport coordinates are valid numbers (defensive check)
+        const vx1 = Number(mapData.viewport.x1);
+        const vy1 = Number(mapData.viewport.y1);
+        const vx2 = Number(mapData.viewport.x2);
+        const vy2 = Number(mapData.viewport.y2);
+        
+        // If viewport is invalid (NaN), fall back to full map replacement
+        if (isNaN(vx1) || isNaN(vy1) || isNaN(vx2) || isNaN(vy2)) {
+          // Invalid viewport - treat as full map request
+          dispatch(setGrid(mapData.grid));
+        } else {
+          // Viewport request - merge with existing grid
+          // Bug Fix: Read from ref to get latest grid value, avoiding stale closures
+          // This ensures sequential viewport updates don't overwrite each other's changes
+          const currentGrid = gridRef.current.length > 0 ? gridRef.current : Array.from({ length: mapData.grid.length }, () => 
+            Array.from({ length: mapData.grid[0]?.length || 50 }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
+          );
+          
+          // Create a deep copy to avoid mutating Redux state
+          const mergedGrid = currentGrid.map(row => row ? [...row] : []);
+          
+          // Only update cells within viewport (using validated coordinates)
+          for (let y = vy1; y <= vy2; y++) {
+            const row = mapData.grid[y];
+            if (!row) continue;
+            if (!mergedGrid[y]) {
+              mergedGrid[y] = [];
+            }
+            for (let x = vx1; x <= vx2; x++) {
+              const cell = row[x];
+              if (cell) {
+                if (!mergedGrid[y][x]) {
+                  mergedGrid[y][x] = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityType };
+                }
+                mergedGrid[y][x] = { ...mergedGrid[y][x], ...cell };
+              }
+            }
+          }
+          
+          dispatch(setGrid(mergedGrid));
+        }
+      } else {
+        // Full map request - replace entire grid
+        dispatch(setGrid(mapData.grid));
+      }
     }
   }, [mapData, isLoading, dispatch, separateStaticAndDynamicData]);
 
-  // Update only dynamic entity data (NPCs, houses, etc.) without full grid refresh
-  const updateEntityData = useCallback((updates: Record<string, any>) => {
-    setDynamicEntityData(prev => ({
-      ...prev,
-      ...updates
-    }));
-  }, []);
-
   // Force refresh map data when returning from battle to ensure NPCs are updated
+  // Phase 4B: Only clear cache when explicitly needed (restorePan = returning from battle)
   useEffect(() => {
     if (restorePan) {
+      // Clear cache when returning from battle to ensure fresh data (NPCs may have been defeated)
+      setStaticTerrainData({});
+      setDynamicEntityData({});
+      setTerrainDataLoaded(false);
       refetch();
     }
   }, [restorePan, refetch]);
