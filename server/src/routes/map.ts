@@ -158,12 +158,24 @@ router.get('/:name', async (req: Request, res: Response) => {
       }
     });
     
-    const x1 = req.query.x1 ? parseInt(req.query.x1 as string, 10) : undefined;
-    const y1 = req.query.y1 ? parseInt(req.query.y1 as string, 10) : undefined;
-    const x2 = req.query.x2 ? parseInt(req.query.x2 as string, 10) : undefined;
-    const y2 = req.query.y2 ? parseInt(req.query.y2 as string, 10) : undefined;
+    // Bug Fix: Validate viewport parameters to prevent NaN propagation
+    // Parse and validate viewport coordinates
+    const parseViewportParam = (param: any): number | undefined => {
+      if (param === undefined || param === null) return undefined;
+      const parsed = parseInt(param as string, 10);
+      // Check if parsing resulted in a valid number (not NaN)
+      if (isNaN(parsed)) return undefined;
+      return parsed;
+    };
     
-    const hasViewport = x1 !== undefined || y1 !== undefined || x2 !== undefined || y2 !== undefined;
+    const x1 = parseViewportParam(req.query.x1);
+    const y1 = parseViewportParam(req.query.y1);
+    const x2 = parseViewportParam(req.query.x2);
+    const y2 = parseViewportParam(req.query.y2);
+    
+    // Bug Fix: Only consider viewport valid if all required params are valid numbers
+    // If any viewport param is provided but invalid, fall back to full map
+    const hasViewport = x1 !== undefined && y1 !== undefined && x2 !== undefined && y2 !== undefined;
     
     let viewportX1 = 0;
     let viewportY1 = 0;
@@ -171,10 +183,16 @@ router.get('/:name', async (req: Request, res: Response) => {
     let viewportY2 = gridSize - 1;
     
     if (hasViewport) {
-      viewportX1 = Math.max(0, Math.min(x1 ?? 0, x2 ?? gridSize - 1, gridSize - 1));
-      viewportY1 = Math.max(0, Math.min(y1 ?? 0, y2 ?? gridSize - 1, gridSize - 1));
-      viewportX2 = Math.min(gridSize - 1, Math.max(x1 ?? 0, x2 ?? gridSize - 1));
-      viewportY2 = Math.min(gridSize - 1, Math.max(y1 ?? 0, y2 ?? gridSize - 1));
+      // Bug Fix: Ensure valid viewport bounds (x1 <= x2, y1 <= y2) and clamp to grid bounds
+      const minX = Math.min(x1, x2);
+      const maxX = Math.max(x1, x2);
+      const minY = Math.min(y1, y2);
+      const maxY = Math.max(y1, y2);
+      
+      viewportX1 = Math.max(0, Math.min(minX, gridSize - 1));
+      viewportY1 = Math.max(0, Math.min(minY, gridSize - 1));
+      viewportX2 = Math.min(gridSize - 1, Math.max(maxX, 0));
+      viewportY2 = Math.min(gridSize - 1, Math.max(maxY, 0));
     }
     
     const viewportCells = hasViewport 

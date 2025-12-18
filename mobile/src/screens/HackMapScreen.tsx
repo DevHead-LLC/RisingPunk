@@ -995,9 +995,18 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         // Bug Fix: For viewport requests, only process cells within viewport bounds
         // This prevents overwriting cached terrain outside viewport with 'plain'
         if (viewport) {
-          const isInViewport = x >= viewport.x1 && x <= viewport.x2 && y >= viewport.y1 && y <= viewport.y2;
-          if (!isInViewport) {
-            continue; // Skip cells outside viewport to preserve cached data
+          // Bug Fix: Validate viewport coordinates are valid numbers (defensive check)
+          const vx1 = Number(viewport.x1);
+          const vy1 = Number(viewport.y1);
+          const vx2 = Number(viewport.x2);
+          const vy2 = Number(viewport.y2);
+          
+          // If viewport is invalid (NaN), skip viewport filtering (process all cells)
+          if (!isNaN(vx1) && !isNaN(vy1) && !isNaN(vx2) && !isNaN(vy2)) {
+            const isInViewport = x >= vx1 && x <= vx2 && y >= vy1 && y <= vy2;
+            if (!isInViewport) {
+              continue; // Skip cells outside viewport to preserve cached data
+            }
           }
         }
         
@@ -1091,34 +1100,46 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       // Bug Fix: For viewport requests, merge with existing grid instead of replacing
       // This preserves cached data outside the viewport
       if (mapData.viewport) {
-        // Viewport request - merge with existing grid
-        // Read current grid from Redux state (not from dependency to avoid loops)
-        const currentGrid = grid.length > 0 ? grid : Array.from({ length: mapData.grid.length }, () => 
-          Array.from({ length: mapData.grid[0]?.length || 50 }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
-        );
+        // Bug Fix: Validate viewport coordinates are valid numbers (defensive check)
+        const vx1 = Number(mapData.viewport.x1);
+        const vy1 = Number(mapData.viewport.y1);
+        const vx2 = Number(mapData.viewport.x2);
+        const vy2 = Number(mapData.viewport.y2);
         
-        // Create a deep copy to avoid mutating Redux state
-        const mergedGrid = currentGrid.map(row => row ? [...row] : []);
-        
-        // Only update cells within viewport
-        for (let y = mapData.viewport.y1; y <= mapData.viewport.y2; y++) {
-          const row = mapData.grid[y];
-          if (!row) continue;
-          if (!mergedGrid[y]) {
-            mergedGrid[y] = [];
-          }
-          for (let x = mapData.viewport.x1; x <= mapData.viewport.x2; x++) {
-            const cell = row[x];
-            if (cell) {
-              if (!mergedGrid[y][x]) {
-                mergedGrid[y][x] = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityType };
+        // If viewport is invalid (NaN), fall back to full map replacement
+        if (isNaN(vx1) || isNaN(vy1) || isNaN(vx2) || isNaN(vy2)) {
+          // Invalid viewport - treat as full map request
+          dispatch(setGrid(mapData.grid));
+        } else {
+          // Viewport request - merge with existing grid
+          // Read current grid from Redux state (not from dependency to avoid loops)
+          const currentGrid = grid.length > 0 ? grid : Array.from({ length: mapData.grid.length }, () => 
+            Array.from({ length: mapData.grid[0]?.length || 50 }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
+          );
+          
+          // Create a deep copy to avoid mutating Redux state
+          const mergedGrid = currentGrid.map(row => row ? [...row] : []);
+          
+          // Only update cells within viewport (using validated coordinates)
+          for (let y = vy1; y <= vy2; y++) {
+            const row = mapData.grid[y];
+            if (!row) continue;
+            if (!mergedGrid[y]) {
+              mergedGrid[y] = [];
+            }
+            for (let x = vx1; x <= vx2; x++) {
+              const cell = row[x];
+              if (cell) {
+                if (!mergedGrid[y][x]) {
+                  mergedGrid[y][x] = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityType };
+                }
+                mergedGrid[y][x] = { ...mergedGrid[y][x], ...cell };
               }
-              mergedGrid[y][x] = { ...mergedGrid[y][x], ...cell };
             }
           }
+          
+          dispatch(setGrid(mergedGrid));
         }
-        
-        dispatch(setGrid(mergedGrid));
       } else {
         // Full map request - replace entire grid
         dispatch(setGrid(mapData.grid));
