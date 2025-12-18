@@ -46,6 +46,13 @@ export const mapApi = createApi({
       query: () => '/api/map/main',
       providesTags: ['Map'],
     }),
+    fetchMapViewport: builder.query<MapResponse, { x1: number; y1: number; x2: number; y2: number }>({
+      query: ({ x1, y1, x2, y2 }) => ({
+        url: '/api/map/main',
+        params: { x1, y1, x2, y2 },
+      }),
+      providesTags: ['Map'],
+    }),
     updatePlayerPosition: builder.mutation<any, { x: number; y: number }>({
       query: (body) => ({
         url: '/api/map/player-position',
@@ -57,4 +64,4 @@ export const mapApi = createApi({
   }),
 });
 
-export const { useFetchMapQuery, useUpdatePlayerPositionMutation } = mapApi;
+export const { useFetchMapQuery, useFetchMapViewportQuery, useUpdatePlayerPositionMutation } = mapApi;
