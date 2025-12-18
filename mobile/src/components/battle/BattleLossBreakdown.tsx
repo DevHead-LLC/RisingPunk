@@ -21,6 +21,16 @@ export const BattleLossBreakdown: React.FC<Props> = ({ battleEndData }) => {
 
   const isCompleteVictory = losses.userLosses === 0 || losses.enemyLosses === 0;
 
+  const calculateBotQuantityLosses = (battalions: typeof losses.battalionLosses): number => {
+    return battalions.reduce((total, battalion) => {
+      return total + (battalion.startingQuantity - battalion.endingQuantity);
+    }, 0);
+  };
+
+  const attackerBotsDestroyed = calculateBotQuantityLosses(enemyBattalions);
+  const defenderBotsLost = calculateBotQuantityLosses(enemyBattalions);
+  const isUserVsUser = !experienceGained && !hackerRewards;
+
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
@@ -49,6 +59,22 @@ export const BattleLossBreakdown: React.FC<Props> = ({ battleEndData }) => {
           </Text>
         </View>
       </View>
+
+      {isUserVsUser && (
+        <View style={styles.botLossesSection}>
+          <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>Bot Losses</Text>
+          <View style={styles.botLossesContainer}>
+            <View style={[styles.botLossItem, { backgroundColor: colors.accent, borderColor: colors.secondary }]}>
+              <Text style={[styles.botLossLabel, { color: colors.neutral }]}>Bots Destroyed (Attacker)</Text>
+              <Text style={[styles.botLossValue, { color: colors.matrix }]}>{attackerBotsDestroyed}</Text>
+            </View>
+            <View style={[styles.botLossItem, { backgroundColor: colors.accent, borderColor: colors.error }]}>
+              <Text style={[styles.botLossLabel, { color: colors.neutral }]}>Bots Lost (Defender)</Text>
+              <Text style={[styles.botLossValue, { color: colors.matrix }]}>{defenderBotsLost}</Text>
+            </View>
+          </View>
+        </View>
+      )}
 
       {winner === 'user' && (experienceGained || hackerRewards) && (
         <View style={styles.rewardsSection}>
@@ -202,5 +228,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  botLossesSection: {
+    marginBottom: 24,
+    paddingHorizontal: 16,
+  },
+  botLossesContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    gap: 16,
+  },
+  botLossItem: {
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    minWidth: 140,
+    borderWidth: 1,
+    flex: 1,
+  },
+  botLossLabel: {
+    fontSize: 14,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  botLossValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
 }); 
