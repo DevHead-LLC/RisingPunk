@@ -10,7 +10,7 @@ interface Props {
 
 export const BattleLossBreakdown: React.FC<Props> = ({ battleEndData }) => {
   const colors = useThemeColors();
-  const { losses, winner, experienceGained, hackerRewards } = battleEndData;
+  const { losses, winner, experienceGained, hackerRewards, isUserDefender } = battleEndData;
   
   const userBattalions = losses.battalionLosses.filter(b => b.owner === 'user');
   const enemyBattalions = losses.battalionLosses.filter(b => b.owner === 'enemy');
@@ -28,8 +28,8 @@ export const BattleLossBreakdown: React.FC<Props> = ({ battleEndData }) => {
   };
 
   const attackerBotsDestroyed = calculateBotQuantityLosses(enemyBattalions);
-  const defenderBotsLost = calculateBotQuantityLosses(enemyBattalions);
-  const isUserVsUser = !experienceGained && !hackerRewards;
+  const defenderBotsLost = calculateBotQuantityLosses(userBattalions);
+  const isUserVsUser = isUserDefender === true;
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>

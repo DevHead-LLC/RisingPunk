@@ -39,8 +39,8 @@ export class BattleStatisticsService {
         NodeOwner.ENEMY
       );
 
-      const attackerWon = winner === NodeOwner.USER;
-      const defenderWon = winner === NodeOwner.ENEMY;
+      const attackerWon = winner === NodeOwner.ENEMY;
+      const defenderWon = winner === NodeOwner.USER;
 
       await Promise.all([
         this.updateAttackerStats(
