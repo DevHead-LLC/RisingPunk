@@ -856,6 +856,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
   // Store the latest updateTileShieldStatus function in a ref to avoid stale closures
   const updateTileShieldStatusRef = useRef(updateTileShieldStatus);
+  
+  // Bug Fix: Use ref to track latest grid value to avoid stale closures in viewport merging
+  // This ensures sequential viewport updates don't overwrite each other's changes
+  const gridRef = useRef(grid);
   updateTileShieldStatusRef.current = updateTileShieldStatus;
 
   // Add frequent check for shield status changes on visible tiles
@@ -978,6 +982,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   }, [virtualViewport.visibleTiles, virtualViewport.visibleTiles.size, windowRange.rowStart, windowRange.rowEnd, windowRange.colStart, windowRange.colEnd, staticTerrainData, dynamicEntityData, terrainDataLoaded]);
 
 
+
+  // Bug Fix: Keep gridRef in sync with Redux state to avoid stale closures
+  useEffect(() => {
+    gridRef.current = grid;
+  }, [grid]);
 
   // Separate static terrain data from dynamic entity data for optimal loading
   // Bug Fix: Support viewport filtering to only process cells within viewport bounds
@@ -1112,8 +1121,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           dispatch(setGrid(mapData.grid));
         } else {
           // Viewport request - merge with existing grid
-          // Read current grid from Redux state (not from dependency to avoid loops)
-          const currentGrid = grid.length > 0 ? grid : Array.from({ length: mapData.grid.length }, () => 
+          // Bug Fix: Read from ref to get latest grid value, avoiding stale closures
+          // This ensures sequential viewport updates don't overwrite each other's changes
+          const currentGrid = gridRef.current.length > 0 ? gridRef.current : Array.from({ length: mapData.grid.length }, () => 
             Array.from({ length: mapData.grid[0]?.length || 50 }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
           );
           
