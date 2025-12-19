@@ -764,12 +764,14 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
   }, [needsFullMap, refetchFullMap, refetchInitialViewport]);
   
-  // Phase 5 Fix: Viewport fetching during panning
+  // Phase 6: Viewport fetching during panning with minimal data
   // Track the last viewport we fetched to avoid duplicate requests
   const lastFetchedViewportRef = useRef<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
-  const [panningViewportParams, setPanningViewportParams] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const [panningViewportParams, setPanningViewportParams] = useState<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>(null);
+  // Phase 6: Track minimal flag in ref to avoid dependency issues
+  const panningViewportMinimalRef = useRef<boolean>(false);
   
-  // Fetch viewport data during panning when windowRange changes significantly
+  // Phase 6: Fetch viewport data during panning with minimal flag (terrain + images only, skip details)
   const { data: panningViewportData, isLoading: isLoadingPanningViewport } = useFetchMapViewportQuery(
     panningViewportParams!,
     { skip: !panningViewportParams || !terrainDataLoaded }
@@ -1452,12 +1454,26 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
   }, [mapData, isLoading, dispatch, separateStaticAndDynamicData, gridSize]);
   
-  // Phase 5 Fix: Process panning viewport data
+  // Phase 6: Process panning viewport data (minimal: terrain + images only, skip details)
+  // Track processed viewport to prevent infinite loops
+  const processedViewportRef = useRef<string | null>(null);
   useEffect(() => {
     if (panningViewportData && panningViewportData.grid && panningViewportData.viewport) {
+      const viewport = panningViewportData.viewport;
+      const viewportKey = `${viewport.x1},${viewport.y1},${viewport.x2},${viewport.y2}`;
+      
+      // Phase 6: Prevent processing the same viewport twice
+      if (processedViewportRef.current === viewportKey) {
+        return;
+      }
+      processedViewportRef.current = viewportKey;
+      
       const { terrain, entityImages, entityDetails } = separateStaticAndDynamicData(panningViewportData.grid, panningViewportData.viewport);
       
-      // Merge terrain data
+      // Phase 6: Check if this is a minimal request using ref (avoids dependency issues)
+      const isMinimalRequest = panningViewportMinimalRef.current;
+      
+      // Merge terrain data (always needed)
       setStaticTerrainData(prev => {
         const merged = { ...prev };
         Object.entries(terrain).forEach(([key, value]) => {
@@ -1466,7 +1482,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         return merged;
       });
       
-      // Merge entity image data
+      // Merge entity image data (always needed for rendering)
       setEntityImageData(prev => {
         const merged = { ...prev };
         Object.entries(entityImages).forEach(([key, value]) => {
@@ -1475,17 +1491,19 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         return merged;
       });
       
-      // Merge entity details
-      setDynamicEntityData(prev => {
-        const merged = { ...prev };
-        Object.entries(entityDetails).forEach(([key, value]) => {
-          merged[key] = value;
+      // Phase 6: Only merge entity details if NOT a minimal request
+      // During panning, skip entity details (names, levels, shield status) for performance
+      if (!isMinimalRequest) {
+        setDynamicEntityData(prev => {
+          const merged = { ...prev };
+          Object.entries(entityDetails).forEach(([key, value]) => {
+            merged[key] = value;
+          });
+          return merged;
         });
-        return merged;
-      });
+      }
       
       // Merge grid data
-      const viewport = panningViewportData.viewport;
       const mergedGrid = [...grid];
       for (let y = viewport.y1; y <= viewport.y2; y++) {
         const row = panningViewportData.grid[y];
@@ -1505,10 +1523,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       }
       dispatch(setGrid(mergedGrid));
       
-      // Update last fetched viewport
+      // Update last fetched viewport (without minimal flag for comparison)
       lastFetchedViewportRef.current = { x1: viewport.x1, y1: viewport.y1, x2: viewport.x2, y2: viewport.y2 };
       
-      // Clear viewport params to allow next fetch
+      // Clear viewport params and reset minimal flag to allow next fetch
+      panningViewportMinimalRef.current = false;
       setPanningViewportParams(null);
     }
   }, [panningViewportData, separateStaticAndDynamicData, dispatch, grid]);
@@ -1579,13 +1598,14 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         Math.abs(prev.colEnd - endCol) < 1;
       if (smallShift) return prev;
       
-      // Phase 5 Fix: Trigger viewport fetch if we've moved significantly outside the last fetched viewport
-      const newViewport = { x1: startCol, y1: startRow, x2: endCol, y2: endRow };
+      // Phase 6: Trigger viewport fetch with minimal flag if we've moved significantly outside the last fetched viewport
+      const newViewport = { x1: startCol, y1: startRow, x2: endCol, y2: endRow, minimal: true };
       const lastViewport = lastFetchedViewportRef.current;
       if (!lastViewport || 
           startCol < lastViewport.x1 - 5 || endCol > lastViewport.x2 + 5 ||
           startRow < lastViewport.y1 - 5 || endRow > lastViewport.y2 + 5) {
-        // Significant movement - trigger viewport fetch
+        // Phase 6: Significant movement - trigger viewport fetch with minimal flag (terrain + images only)
+        panningViewportMinimalRef.current = true; // Store minimal flag in ref to avoid dependency issues
         setPanningViewportParams(newViewport);
       }
       

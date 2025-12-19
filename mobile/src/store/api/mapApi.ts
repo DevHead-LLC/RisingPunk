@@ -46,10 +46,10 @@ export const mapApi = createApi({
       query: () => '/api/map/main',
       providesTags: ['Map'],
     }),
-    fetchMapViewport: builder.query<MapResponse, { x1: number; y1: number; x2: number; y2: number }>({
-      query: ({ x1, y1, x2, y2 }) => ({
+    fetchMapViewport: builder.query<MapResponse, { x1: number; y1: number; x2: number; y2: number; minimal?: boolean }>({
+      query: ({ x1, y1, x2, y2, minimal }) => ({
         url: '/api/map/main',
-        params: { x1, y1, x2, y2 },
+        params: { x1, y1, x2, y2, minimal: minimal ? 'true' : undefined },
       }),
       providesTags: ['Map'],
     }),
