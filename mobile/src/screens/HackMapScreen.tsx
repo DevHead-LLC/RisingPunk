@@ -805,8 +805,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   }, [terrainDataLoaded, virtualViewport.visibleTiles, dynamicEntityData, windowRange]);
   
   // Phase 5: Only poll when player tiles are visible, and increase interval to 5s
-  const { data: shieldData } = useGetShieldStatusQuery(undefined, {
-    pollingInterval: hasVisiblePlayerTiles ? 5000 : 0, // Poll every 5 seconds when player tiles visible, pause otherwise
+  // Phase 8: Disable RTK Query polling - will use synchronized polling instead
+  const { data: shieldData, refetch: refetchShieldStatus } = useGetShieldStatusQuery(undefined, {
+    pollingInterval: 0, // Phase 8: Disabled - using synchronized polling
     skip: !hasVisiblePlayerTiles && !currentUserId, // Skip if no player tiles visible and no current user
   });
   
@@ -819,15 +820,16 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     skip: !crewStatus?.crewId || !crewStatus?.isInCrew,
   });
 
+  // Phase 8: Disable RTK Query polling - will use synchronized polling instead
   const { data: warStatusData, refetch: refetchWarStatus } = useGetWarStatusQuery(undefined, {
     skip: !crewStatus?.isInCrew,
-    pollingInterval: 3000,
+    pollingInterval: 0, // Phase 8: Disabled - using synchronized polling
     refetchOnMountOrArgChange: true,
   });
 
   const { data: allianceStatusData, refetch: refetchAllianceStatus } = useGetAllianceStatusQuery(undefined, {
     skip: !crewStatus?.isInCrew,
-    pollingInterval: 3000,
+    pollingInterval: 0, // Phase 8: Disabled - using synchronized polling
     refetchOnMountOrArgChange: true,
   });
 
@@ -1093,27 +1095,67 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const gridRef = useRef(grid);
   updateTileShieldStatusRef.current = updateTileShieldStatus;
 
-  // Add frequent check for shield status changes on visible tiles
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (!isRefreshing) {
-        // Get current dynamicEntityData without depending on it in the dependency array
-        setDynamicEntityData(currentData => {
-          if (currentData) {
-            Object.values(currentData).forEach((entity: any) => {
-              if (entity && entity.owner === 'player' && entity.userId) {
-                // Use the ref to get the latest updateTileShieldStatus function
-                updateTileShieldStatusRef.current(entity.userId, entity.isShielded || false);
-              }
-            });
-          }
-          return currentData; // Return unchanged data
-        });
-      }
-    }, 3000); // Check every 3 seconds to reduce re-renders while maintaining responsiveness
+  // Phase 8: Synchronized polling hook
+  const useSynchronizedPolling = (intervalMs: number, callback: () => void, deps: React.DependencyList = []) => {
+    useEffect(() => {
+      const getTimeUntilNextSync = () => {
+        const now = Date.now();
+        const interval = intervalMs;
+        // Calculate time until next sync point (aligned to interval boundaries)
+        const timeSinceLastSync = now % interval;
+        return interval - timeSinceLastSync;
+      };
+      
+      const delay = getTimeUntilNextSync();
+      let intervalId: ReturnType<typeof setInterval> | null = null;
+      
+      const timeout = setTimeout(() => {
+        callback(); // First sync
+        intervalId = setInterval(callback, intervalMs); // Subsequent syncs
+      }, delay);
+      
+      return () => {
+        clearTimeout(timeout);
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
+      };
+    }, [intervalMs, ...deps]); // eslint-disable-line react-hooks/exhaustive-deps
+  };
 
-    return () => clearInterval(interval);
-  }, [isRefreshing]); // Only depend on isRefreshing, use ref for latest function
+  // Phase 8: 3-second polling group (Shield status + Shield interval check)
+  const checkShieldInterval = useCallback(() => {
+    if (!isRefreshing) {
+      // Get current dynamicEntityData without depending on it in the dependency array
+      setDynamicEntityData(currentData => {
+        if (currentData) {
+          Object.values(currentData).forEach((entity: any) => {
+            if (entity && entity.owner === 'player' && entity.userId) {
+              // Use the ref to get the latest updateTileShieldStatus function
+              updateTileShieldStatusRef.current(entity.userId, entity.isShielded || false);
+            }
+          });
+        }
+        return currentData; // Return unchanged data
+      });
+    }
+  }, [isRefreshing]);
+
+  // Phase 8: Synchronized 3-second polling group
+  useSynchronizedPolling(3000, () => {
+    if (hasVisiblePlayerTiles || currentUserId) {
+      refetchShieldStatus();
+    }
+    checkShieldInterval();
+  }, [hasVisiblePlayerTiles, currentUserId]);
+
+  // Phase 8: Synchronized 10-second polling group
+  useSynchronizedPolling(10000, () => {
+    if (crewStatus?.isInCrew) {
+      refetchWarStatus();
+      refetchAllianceStatus();
+    }
+  }, [crewStatus?.isInCrew]);
 
   // Precompute terrain style map and position style caches
   // Memoized with stable references to prevent unnecessary re-renders
