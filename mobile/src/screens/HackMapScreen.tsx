@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import { View, Text, StyleSheet, LayoutChangeEvent, Pressable, Image, Dimensions, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, LayoutChangeEvent, Pressable, Image, Dimensions, TouchableOpacity, ScrollView, unstable_batchedUpdates } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withDecay, runOnJS, useAnimatedReaction } from 'react-native-reanimated';
 import { CloseButton } from '../components/common/CloseButton';
@@ -1225,73 +1225,76 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       
       const { terrain, entityImages, entityDetails } = separateStaticAndDynamicData(entityUpdateViewportData.grid, entityUpdateViewportData.viewport);
       
-      // Update entity data (terrain already loaded, just update entities)
-      setEntityImageData(prev => {
-        const merged = { ...prev };
-        Object.entries(entityImages).forEach(([key, value]) => {
-          merged[key] = value;
+      // Phase 1: Batch state updates to reduce re-renders
+      unstable_batchedUpdates(() => {
+        // Update entity data (terrain already loaded, just update entities)
+        setEntityImageData(prev => {
+          const merged = { ...prev };
+          Object.entries(entityImages).forEach(([key, value]) => {
+            merged[key] = value;
+          });
+          
+          // Clean up entity image cache for cells that are now empty
+          for (let y = viewport.y1; y <= viewport.y2; y++) {
+            const row = entityUpdateViewportData.grid[y];
+            if (!row) continue;
+            for (let x = viewport.x1; x <= viewport.x2; x++) {
+              const cell = row[x];
+              const key = `${x},${y}`;
+              if (cell && cell.entity === 'empty' && merged[key]) {
+                delete merged[key];
+              }
+            }
+          }
+          
+          return merged;
         });
         
-        // Clean up entity image cache for cells that are now empty
+        setDynamicEntityData(prev => {
+          const merged = { ...prev };
+          Object.entries(entityDetails).forEach(([key, value]) => {
+            merged[key] = value;
+          });
+          
+          // Clean up entity details cache for cells that are now empty
+          for (let y = viewport.y1; y <= viewport.y2; y++) {
+            const row = entityUpdateViewportData.grid[y];
+            if (!row) continue;
+            for (let x = viewport.x1; x <= viewport.x2; x++) {
+              const cell = row[x];
+              const key = `${x},${y}`;
+              if (cell && cell.entity === 'empty' && merged[key]) {
+                delete merged[key];
+              }
+            }
+          }
+          
+          return merged;
+        });
+        
+        // Update grid data - use ref to get latest grid value to avoid stale closures
+        const currentGrid = gridRef.current.length > 0 ? gridRef.current : Array.from({ length: gridSize }, () => 
+          Array.from({ length: gridSize }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
+        );
+        const mergedGrid = currentGrid.map(row => row ? [...row] : []);
         for (let y = viewport.y1; y <= viewport.y2; y++) {
           const row = entityUpdateViewportData.grid[y];
           if (!row) continue;
+          if (!mergedGrid[y]) {
+            mergedGrid[y] = [];
+          }
           for (let x = viewport.x1; x <= viewport.x2; x++) {
             const cell = row[x];
-            const key = `${x},${y}`;
-            if (cell && cell.entity === 'empty' && merged[key]) {
-              delete merged[key];
+            if (cell) {
+              if (!mergedGrid[y][x]) {
+                mergedGrid[y][x] = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityType };
+              }
+              mergedGrid[y][x] = { ...mergedGrid[y][x], ...cell };
             }
           }
         }
-        
-        return merged;
+        dispatch(setGrid(mergedGrid));
       });
-      
-      setDynamicEntityData(prev => {
-        const merged = { ...prev };
-        Object.entries(entityDetails).forEach(([key, value]) => {
-          merged[key] = value;
-        });
-        
-        // Clean up entity details cache for cells that are now empty
-        for (let y = viewport.y1; y <= viewport.y2; y++) {
-          const row = entityUpdateViewportData.grid[y];
-          if (!row) continue;
-          for (let x = viewport.x1; x <= viewport.x2; x++) {
-            const cell = row[x];
-            const key = `${x},${y}`;
-            if (cell && cell.entity === 'empty' && merged[key]) {
-              delete merged[key];
-            }
-          }
-        }
-        
-        return merged;
-      });
-      
-      // Update grid data - use ref to get latest grid value to avoid stale closures
-      const currentGrid = gridRef.current.length > 0 ? gridRef.current : Array.from({ length: gridSize }, () => 
-        Array.from({ length: gridSize }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
-      );
-      const mergedGrid = currentGrid.map(row => row ? [...row] : []);
-      for (let y = viewport.y1; y <= viewport.y2; y++) {
-        const row = entityUpdateViewportData.grid[y];
-        if (!row) continue;
-        if (!mergedGrid[y]) {
-          mergedGrid[y] = [];
-        }
-        for (let x = viewport.x1; x <= viewport.x2; x++) {
-          const cell = row[x];
-          if (cell) {
-            if (!mergedGrid[y][x]) {
-              mergedGrid[y][x] = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityType };
-            }
-            mergedGrid[y][x] = { ...mergedGrid[y][x], ...cell };
-          }
-        }
-      }
-      dispatch(setGrid(mergedGrid));
       
       // Clear viewport params to allow next refresh
       setEntityUpdateViewportParams(null);
@@ -1503,159 +1506,162 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       // Phase 2: Now returns three layers: terrain, entityImages, entityDetails
       const { terrain, entityImages, entityDetails } = separateStaticAndDynamicData(mapData.grid, mapData.viewport);
       
-      setStaticTerrainData(prev => {
-        // Terrain is static - merge to preserve existing cached terrain
-        // Bug Fix: For viewport requests, only terrain within viewport is merged
-        return { ...prev, ...terrain };
-      });
-      
-      // Phase 2: Populate entityImageData (minimal info for rendering)
-      setEntityImageData(prev => {
-        const merged = { ...prev, ...entityImages };
+      // Phase 1: Batch state updates to reduce re-renders
+      unstable_batchedUpdates(() => {
+        setStaticTerrainData(prev => {
+          // Terrain is static - merge to preserve existing cached terrain
+          // Bug Fix: For viewport requests, only terrain within viewport is merged
+          return { ...prev, ...terrain };
+        });
         
-        // Phase 2: Also clear entityImageData for cells that are now empty
-        // Bug Fix: Only iterate through cells that are in the viewport (if viewport provided)
-        const cellsToCheck = mapData.viewport 
-          ? (() => {
-              const cells: Array<{ x: number; y: number; cell: any }> = [];
-              for (let y = mapData.viewport!.y1; y <= mapData.viewport!.y2; y++) {
-                const row = mapData.grid[y];
-                if (!row) continue;
-                for (let x = mapData.viewport!.x1; x <= mapData.viewport!.x2; x++) {
-                  const cell = row[x];
-                  if (cell) cells.push({ x, y, cell });
-                }
-              }
-              return cells;
-            })()
-          : (() => {
-              const cells: Array<{ x: number; y: number; cell: any }> = [];
-              for (let y = 0; y < mapData.grid.length; y++) {
-                const row = mapData.grid[y];
-                if (!row) continue;
-                for (let x = 0; x < row.length; x++) {
-                  const cell = row[x];
-                  if (cell) cells.push({ x, y, cell });
-                }
-              }
-              return cells;
-            })();
-        
-        // Iterate through cells to find cells that are now empty
-        for (const { x, y, cell } of cellsToCheck) {
-          const key = `${x},${y}`;
+        // Phase 2: Populate entityImageData (minimal info for rendering)
+        setEntityImageData(prev => {
+          const merged = { ...prev, ...entityImages };
           
-          // If cell is now empty but we have cached entity image data, remove it
-          if (cell.entity === 'empty' && merged[key]) {
-            delete merged[key];
-          }
-        }
-        
-        return merged;
-      });
-      
-      setDynamicEntityData(prev => {
-        // Entities are dynamic - merge to preserve existing cached entities
-        // Bug Fix #1: Also clear entity data for cells that are now empty
-        // When an entity is removed (NPC defeated, house destroyed), we need to delete it from cache
-        // Phase 2: Now using entityDetails instead of entities
-        const merged = { ...prev, ...entityDetails };
-        
-        // Bug Fix: Only iterate through cells that are in the viewport (if viewport provided)
-        // For full map requests, iterate all cells. For viewport requests, only viewport cells.
-        const cellsToCheck = mapData.viewport 
-          ? (() => {
-              const cells: Array<{ x: number; y: number; cell: any }> = [];
-              for (let y = mapData.viewport!.y1; y <= mapData.viewport!.y2; y++) {
-                const row = mapData.grid[y];
-                if (!row) continue;
-                for (let x = mapData.viewport!.x1; x <= mapData.viewport!.x2; x++) {
-                  const cell = row[x];
-                  if (cell) cells.push({ x, y, cell });
+          // Phase 2: Also clear entityImageData for cells that are now empty
+          // Bug Fix: Only iterate through cells that are in the viewport (if viewport provided)
+          const cellsToCheck = mapData.viewport 
+            ? (() => {
+                const cells: Array<{ x: number; y: number; cell: any }> = [];
+                for (let y = mapData.viewport!.y1; y <= mapData.viewport!.y2; y++) {
+                  const row = mapData.grid[y];
+                  if (!row) continue;
+                  for (let x = mapData.viewport!.x1; x <= mapData.viewport!.x2; x++) {
+                    const cell = row[x];
+                    if (cell) cells.push({ x, y, cell });
+                  }
                 }
-              }
-              return cells;
-            })()
-          : (() => {
-              const cells: Array<{ x: number; y: number; cell: any }> = [];
-              for (let y = 0; y < mapData.grid.length; y++) {
-                const row = mapData.grid[y];
-                if (!row) continue;
-                for (let x = 0; x < row.length; x++) {
-                  const cell = row[x];
-                  if (cell) cells.push({ x, y, cell });
+                return cells;
+              })()
+            : (() => {
+                const cells: Array<{ x: number; y: number; cell: any }> = [];
+                for (let y = 0; y < mapData.grid.length; y++) {
+                  const row = mapData.grid[y];
+                  if (!row) continue;
+                  for (let x = 0; x < row.length; x++) {
+                    const cell = row[x];
+                    if (cell) cells.push({ x, y, cell });
+                  }
                 }
-              }
-              return cells;
-            })();
-        
-        // Iterate through cells to find cells that are now empty
-        for (const { x, y, cell } of cellsToCheck) {
-          const key = `${x},${y}`;
+                return cells;
+              })();
           
-          // If cell is now empty but we have cached entity data, remove it
-          if (cell.entity === 'empty' && merged[key]) {
-            delete merged[key];
+          // Iterate through cells to find cells that are now empty
+          for (const { x, y, cell } of cellsToCheck) {
+            const key = `${x},${y}`;
+            
+            // If cell is now empty but we have cached entity image data, remove it
+            if (cell.entity === 'empty' && merged[key]) {
+              delete merged[key];
+            }
           }
-        }
+          
+          return merged;
+        });
         
-        return merged;
-      });
-      
-      setTerrainDataLoaded(true);
-      
-      // Bug Fix: For viewport requests, merge with existing grid instead of replacing
-      // This preserves cached data outside the viewport
-      if (mapData.viewport) {
-        // Bug Fix: Validate viewport coordinates are valid numbers (defensive check)
-        const vx1 = Number(mapData.viewport.x1);
-        const vy1 = Number(mapData.viewport.y1);
-        const vx2 = Number(mapData.viewport.x2);
-        const vy2 = Number(mapData.viewport.y2);
+        setDynamicEntityData(prev => {
+          // Entities are dynamic - merge to preserve existing cached entities
+          // Bug Fix #1: Also clear entity data for cells that are now empty
+          // When an entity is removed (NPC defeated, house destroyed), we need to delete it from cache
+          // Phase 2: Now using entityDetails instead of entities
+          const merged = { ...prev, ...entityDetails };
+          
+          // Bug Fix: Only iterate through cells that are in the viewport (if viewport provided)
+          // For full map requests, iterate all cells. For viewport requests, only viewport cells.
+          const cellsToCheck = mapData.viewport 
+            ? (() => {
+                const cells: Array<{ x: number; y: number; cell: any }> = [];
+                for (let y = mapData.viewport!.y1; y <= mapData.viewport!.y2; y++) {
+                  const row = mapData.grid[y];
+                  if (!row) continue;
+                  for (let x = mapData.viewport!.x1; x <= mapData.viewport!.x2; x++) {
+                    const cell = row[x];
+                    if (cell) cells.push({ x, y, cell });
+                  }
+                }
+                return cells;
+              })()
+            : (() => {
+                const cells: Array<{ x: number; y: number; cell: any }> = [];
+                for (let y = 0; y < mapData.grid.length; y++) {
+                  const row = mapData.grid[y];
+                  if (!row) continue;
+                  for (let x = 0; x < row.length; x++) {
+                    const cell = row[x];
+                    if (cell) cells.push({ x, y, cell });
+                  }
+                }
+                return cells;
+              })();
+          
+          // Iterate through cells to find cells that are now empty
+          for (const { x, y, cell } of cellsToCheck) {
+            const key = `${x},${y}`;
+            
+            // If cell is now empty but we have cached entity data, remove it
+            if (cell.entity === 'empty' && merged[key]) {
+              delete merged[key];
+            }
+          }
+          
+          return merged;
+        });
         
-        // If viewport is invalid (NaN), fall back to full map replacement
-        if (isNaN(vx1) || isNaN(vy1) || isNaN(vx2) || isNaN(vy2)) {
-          // Invalid viewport - treat as full map request
-          dispatch(setGrid(mapData.grid));
+        setTerrainDataLoaded(true);
+        
+        // Bug Fix: For viewport requests, merge with existing grid instead of replacing
+        // This preserves cached data outside the viewport
+        if (mapData.viewport) {
+          // Bug Fix: Validate viewport coordinates are valid numbers (defensive check)
+          const vx1 = Number(mapData.viewport.x1);
+          const vy1 = Number(mapData.viewport.y1);
+          const vx2 = Number(mapData.viewport.x2);
+          const vy2 = Number(mapData.viewport.y2);
+          
+          // If viewport is invalid (NaN), fall back to full map replacement
+          if (isNaN(vx1) || isNaN(vy1) || isNaN(vx2) || isNaN(vy2)) {
+            // Invalid viewport - treat as full map request
+            dispatch(setGrid(mapData.grid));
+          } else {
+            // Viewport request - merge with existing grid
+            // Bug Fix: Read from ref to get latest grid value, avoiding stale closures
+            // This ensures sequential viewport updates don't overwrite each other's changes
+            const currentGrid = gridRef.current.length > 0 ? gridRef.current : Array.from({ length: mapData.grid.length }, () => 
+              Array.from({ length: mapData.grid[0]?.length || 50 }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
+            );
+            
+            // Create a deep copy to avoid mutating Redux state
+            const mergedGrid = currentGrid.map(row => row ? [...row] : []);
+            
+            // Only update cells within viewport (using validated coordinates)
+            for (let y = vy1; y <= vy2; y++) {
+              const row = mapData.grid[y];
+              if (!row) continue;
+              if (!mergedGrid[y]) {
+                mergedGrid[y] = [];
+              }
+              for (let x = vx1; x <= vx2; x++) {
+                const cell = row[x];
+                if (cell) {
+                  if (!mergedGrid[y][x]) {
+                    mergedGrid[y][x] = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityType };
+                  }
+                  mergedGrid[y][x] = { ...mergedGrid[y][x], ...cell };
+                }
+              }
+            }
+            
+            dispatch(setGrid(mergedGrid));
+            // Phase 5 Fix: Initialize last fetched viewport to initial viewport bounds
+            lastFetchedViewportRef.current = { x1: vx1, y1: vy1, x2: vx2, y2: vy2 };
+          }
         } else {
-          // Viewport request - merge with existing grid
-          // Bug Fix: Read from ref to get latest grid value, avoiding stale closures
-          // This ensures sequential viewport updates don't overwrite each other's changes
-          const currentGrid = gridRef.current.length > 0 ? gridRef.current : Array.from({ length: mapData.grid.length }, () => 
-            Array.from({ length: mapData.grid[0]?.length || 50 }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
-          );
-          
-          // Create a deep copy to avoid mutating Redux state
-          const mergedGrid = currentGrid.map(row => row ? [...row] : []);
-          
-          // Only update cells within viewport (using validated coordinates)
-          for (let y = vy1; y <= vy2; y++) {
-            const row = mapData.grid[y];
-            if (!row) continue;
-            if (!mergedGrid[y]) {
-              mergedGrid[y] = [];
-            }
-            for (let x = vx1; x <= vx2; x++) {
-              const cell = row[x];
-              if (cell) {
-                if (!mergedGrid[y][x]) {
-                  mergedGrid[y][x] = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityType };
-                }
-                mergedGrid[y][x] = { ...mergedGrid[y][x], ...cell };
-              }
-            }
-          }
-          
-          dispatch(setGrid(mergedGrid));
-          // Phase 5 Fix: Initialize last fetched viewport to initial viewport bounds
-          lastFetchedViewportRef.current = { x1: vx1, y1: vy1, x2: vx2, y2: vy2 };
+          // Full map request - replace entire grid
+          dispatch(setGrid(mapData.grid));
+          // Phase 5 Fix: Initialize last fetched viewport to full map bounds
+          lastFetchedViewportRef.current = { x1: 0, y1: 0, x2: gridSize - 1, y2: gridSize - 1 };
         }
-      } else {
-        // Full map request - replace entire grid
-        dispatch(setGrid(mapData.grid));
-        // Phase 5 Fix: Initialize last fetched viewport to full map bounds
-        lastFetchedViewportRef.current = { x1: 0, y1: 0, x2: gridSize - 1, y2: gridSize - 1 };
-      }
+      });
     }
   }, [mapData, isLoading, dispatch, separateStaticAndDynamicData, gridSize]);
   
@@ -1678,48 +1684,25 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       // Phase 6: Check if this is a minimal request using ref (avoids dependency issues)
       const isMinimalRequest = panningViewportMinimalRef.current;
       
-      // Merge terrain data (always needed)
-      setStaticTerrainData(prev => {
-        const merged = { ...prev };
-        Object.entries(terrain).forEach(([key, value]) => {
-          merged[key] = value;
-        });
-        return merged;
-      });
-      
-      // Merge entity image data (always needed for rendering)
-      setEntityImageData(prev => {
-        const merged = { ...prev };
-        Object.entries(entityImages).forEach(([key, value]) => {
-          merged[key] = value;
-        });
-        
-        // Clean up entity image cache for cells that are now empty
-        for (let y = viewport.y1; y <= viewport.y2; y++) {
-          const row = panningViewportData.grid[y];
-          if (!row) continue;
-          for (let x = viewport.x1; x <= viewport.x2; x++) {
-            const cell = row[x];
-            const key = `${x},${y}`;
-            if (cell && cell.entity === 'empty' && merged[key]) {
-              delete merged[key];
-            }
-          }
-        }
-        
-        return merged;
-      });
-      
-      // Phase 6: Only merge entity details if NOT a minimal request
-      // During panning, skip entity details (names, levels, shield status) for performance
-      if (!isMinimalRequest) {
-        setDynamicEntityData(prev => {
+      // Phase 1: Batch state updates to reduce re-renders
+      unstable_batchedUpdates(() => {
+        // Merge terrain data (always needed)
+        setStaticTerrainData(prev => {
           const merged = { ...prev };
-          Object.entries(entityDetails).forEach(([key, value]) => {
+          Object.entries(terrain).forEach(([key, value]) => {
+            merged[key] = value;
+          });
+          return merged;
+        });
+        
+        // Merge entity image data (always needed for rendering)
+        setEntityImageData(prev => {
+          const merged = { ...prev };
+          Object.entries(entityImages).forEach(([key, value]) => {
             merged[key] = value;
           });
           
-          // Clean up entity details cache for cells that are now empty
+          // Clean up entity image cache for cells that are now empty
           for (let y = viewport.y1; y <= viewport.y2; y++) {
             const row = panningViewportData.grid[y];
             if (!row) continue;
@@ -1734,32 +1717,59 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           
           return merged;
         });
-      }
-      
-      // Merge grid data - use ref to get latest grid value to avoid stale closures
-      const gridSize = gridRef.current.length > 0 ? gridRef.current.length : 50;
-      const currentGrid = gridRef.current.length > 0 ? gridRef.current : Array.from({ length: gridSize }, () => 
-        Array.from({ length: gridSize }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
-      );
-      // Create a deep copy to avoid mutating Redux state
-      const mergedGrid = currentGrid.map(row => row ? [...row] : []);
-      for (let y = viewport.y1; y <= viewport.y2; y++) {
-        const row = panningViewportData.grid[y];
-        if (!row) continue;
-        if (!mergedGrid[y]) {
-          mergedGrid[y] = [];
-        }
-        for (let x = viewport.x1; x <= viewport.x2; x++) {
-          const cell = row[x];
-          if (cell) {
-            if (!mergedGrid[y][x]) {
-              mergedGrid[y][x] = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityType };
+        
+        // Phase 6: Only merge entity details if NOT a minimal request
+        // During panning, skip entity details (names, levels, shield status) for performance
+        if (!isMinimalRequest) {
+          setDynamicEntityData(prev => {
+            const merged = { ...prev };
+            Object.entries(entityDetails).forEach(([key, value]) => {
+              merged[key] = value;
+            });
+            
+            // Clean up entity details cache for cells that are now empty
+            for (let y = viewport.y1; y <= viewport.y2; y++) {
+              const row = panningViewportData.grid[y];
+              if (!row) continue;
+              for (let x = viewport.x1; x <= viewport.x2; x++) {
+                const cell = row[x];
+                const key = `${x},${y}`;
+                if (cell && cell.entity === 'empty' && merged[key]) {
+                  delete merged[key];
+                }
+              }
             }
-            mergedGrid[y][x] = { ...mergedGrid[y][x], ...cell };
+            
+            return merged;
+          });
+        }
+        
+        // Merge grid data - use ref to get latest grid value to avoid stale closures
+        // Bug #13: Calculate gridSize from ref inside effect (not from outer scope)
+        const gridSize = gridRef.current.length > 0 ? gridRef.current.length : 50;
+        const currentGrid = gridRef.current.length > 0 ? gridRef.current : Array.from({ length: gridSize }, () => 
+          Array.from({ length: gridSize }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
+        );
+        // Create a deep copy to avoid mutating Redux state
+        const mergedGrid = currentGrid.map(row => row ? [...row] : []);
+        for (let y = viewport.y1; y <= viewport.y2; y++) {
+          const row = panningViewportData.grid[y];
+          if (!row) continue;
+          if (!mergedGrid[y]) {
+            mergedGrid[y] = [];
+          }
+          for (let x = viewport.x1; x <= viewport.x2; x++) {
+            const cell = row[x];
+            if (cell) {
+              if (!mergedGrid[y][x]) {
+                mergedGrid[y][x] = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityType };
+              }
+              mergedGrid[y][x] = { ...mergedGrid[y][x], ...cell };
+            }
           }
         }
-      }
-      dispatch(setGrid(mergedGrid));
+        dispatch(setGrid(mergedGrid));
+      });
       
       // Update last fetched viewport (without minimal flag for comparison)
       lastFetchedViewportRef.current = { x1: viewport.x1, y1: viewport.y1, x2: viewport.x2, y2: viewport.y2 };
@@ -1837,38 +1847,41 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       
       const { terrain, entityImages, entityDetails } = separateStaticAndDynamicData(stoppedViewportData.grid, stoppedViewportData.viewport);
       
-      // Phase 7: Only merge entity details (terrain and images already loaded)
-      setDynamicEntityData(prev => {
-        const merged = { ...prev };
-        Object.entries(entityDetails).forEach(([key, value]) => {
-          merged[key] = value;
+      // Phase 1: Batch state updates to reduce re-renders
+      unstable_batchedUpdates(() => {
+        // Phase 7: Only merge entity details (terrain and images already loaded)
+        setDynamicEntityData(prev => {
+          const merged = { ...prev };
+          Object.entries(entityDetails).forEach(([key, value]) => {
+            merged[key] = value;
+          });
+          return merged;
         });
-        return merged;
-      });
-      
-      // Merge grid data (update entity details in grid) - use ref to get latest grid value to avoid stale closures
-      const currentGrid = gridRef.current.length > 0 ? gridRef.current : Array.from({ length: gridSize }, () => 
-        Array.from({ length: gridSize }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
-      );
-      // Create a deep copy to avoid mutating Redux state
-      const mergedGrid = currentGrid.map(row => row ? [...row] : []);
-      for (let y = viewport.y1; y <= viewport.y2; y++) {
-        const row = stoppedViewportData.grid[y];
-        if (!row) continue;
-        if (!mergedGrid[y]) {
-          mergedGrid[y] = [];
-        }
-        for (let x = viewport.x1; x <= viewport.x2; x++) {
-          const cell = row[x];
-          if (cell) {
-            if (!mergedGrid[y][x]) {
-              mergedGrid[y][x] = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityType };
+        
+        // Merge grid data (update entity details in grid) - use ref to get latest grid value to avoid stale closures
+        const currentGrid = gridRef.current.length > 0 ? gridRef.current : Array.from({ length: gridSize }, () => 
+          Array.from({ length: gridSize }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
+        );
+        // Create a deep copy to avoid mutating Redux state
+        const mergedGrid = currentGrid.map(row => row ? [...row] : []);
+        for (let y = viewport.y1; y <= viewport.y2; y++) {
+          const row = stoppedViewportData.grid[y];
+          if (!row) continue;
+          if (!mergedGrid[y]) {
+            mergedGrid[y] = [];
+          }
+          for (let x = viewport.x1; x <= viewport.x2; x++) {
+            const cell = row[x];
+            if (cell) {
+              if (!mergedGrid[y][x]) {
+                mergedGrid[y][x] = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityType };
+              }
+              mergedGrid[y][x] = { ...mergedGrid[y][x], ...cell };
             }
-            mergedGrid[y][x] = { ...mergedGrid[y][x], ...cell };
           }
         }
-      }
-      dispatch(setGrid(mergedGrid));
+        dispatch(setGrid(mergedGrid));
+      });
       
       // Clear stopped viewport params to allow next fetch
       setStoppedViewportParams(null);
