@@ -177,6 +177,121 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     );
   });
 
+  // Phase 3: Simplified tile component for panning (terrain + image only, no labels/levels/indicators)
+  type PanningTileProps = {
+    x: number;
+    y: number;
+    terrain: TerrainType;
+    entityImage?: {
+      entity: EntityType;
+      owner?: string;
+      userId?: string;
+      npcSlug?: string;
+    };
+    xStyle: any;
+    terrainStyleMap: Record<TerrainType, any>;
+    currentUserId?: string | null;
+    isShieldActive: boolean;
+    styles: any;
+  };
+
+  const PanningTile: React.FC<PanningTileProps> = React.memo(({ x, y, terrain, entityImage, xStyle, terrainStyleMap, currentUserId, isShieldActive, styles }) => {
+    const houseBgStyle = entityImage?.entity === 'house'
+      ? (entityImage.owner === 'player'
+          ? (entityImage.userId && entityImage.userId === currentUserId ? styles.userHouseBg : styles.otherUserHouseBg)
+          : styles.enemyHouseBg)
+      : null;
+
+    // For panning tiles, show shield only for current user's house (minimal data)
+    const isCurrentUserHouse = entityImage?.owner === 'player' && entityImage?.userId === currentUserId;
+    const showShield = isCurrentUserHouse && isShieldActive;
+
+    return (
+      <View
+        style={[
+          styles.cell,
+          xStyle,
+        ]}
+        pointerEvents="none"
+      >
+        <View style={[styles.cellContent, terrainStyleMap[terrain], houseBgStyle]}>
+          {entityImage?.entity !== 'house' && getTerrainIcon(terrain)}
+          {entityImage?.entity === 'house' && (
+            <>
+              {entityImage.owner === 'player' ? (
+                <Image 
+                  source={showShield
+                    ? require('../assets/images/hackMap/shielded.png')
+                    : require('../assets/images/home.png')
+                  } 
+                  style={styles.playerHomeIcon} 
+                  resizeMode="contain" 
+                />
+              ) : (
+                <>
+                  {(() => {
+                    const slug = entityImage.npcSlug;
+                    if (slug === 'npc-small-corporation') {
+                      return <Image source={require('../assets/images/fog-building.png')} style={styles.playerHomeIcon} resizeMode="contain" />;
+                    }
+                    return <Image source={require('../assets/images/fog-tall-building.png')} style={styles.playerHomeIcon} resizeMode="contain" />;
+                  })()}
+                </>
+              )}
+            </>
+          )}
+        </View>
+      </View>
+    );
+  }, (prevProps, nextProps) => {
+    return (
+      prevProps.x === nextProps.x &&
+      prevProps.y === nextProps.y &&
+      prevProps.terrain === nextProps.terrain &&
+      prevProps.entityImage?.entity === nextProps.entityImage?.entity &&
+      prevProps.entityImage?.owner === nextProps.entityImage?.owner &&
+      prevProps.entityImage?.userId === nextProps.entityImage?.userId &&
+      prevProps.isShieldActive === nextProps.isShieldActive
+    );
+  });
+
+  // Phase 3: Wrapper for PanningTile (adds yStyle positioning like PoolTile does for Tile)
+  type PanningPoolTileProps = {
+    x: number;
+    y: number;
+    terrain: TerrainType;
+    entityImage?: {
+      entity: EntityType;
+      owner?: string;
+      userId?: string;
+      npcSlug?: string;
+    };
+    xStyle: any;
+    yStyle: any;
+    terrainStyleMap: Record<TerrainType, any>;
+    currentUserId?: string | null;
+    isShieldActive: boolean;
+    styles: any;
+  };
+
+  const PanningPoolTile: React.FC<PanningPoolTileProps> = React.memo(({ x, y, terrain, entityImage, xStyle, yStyle, terrainStyleMap, currentUserId, isShieldActive, styles }) => {
+    return (
+      <View style={[yStyle]}>
+        <PanningTile x={x} y={y} terrain={terrain} entityImage={entityImage} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserId={currentUserId} isShieldActive={isShieldActive} styles={styles} />
+      </View>
+    );
+  }, (prevProps, nextProps) => {
+    return (
+      prevProps.x === nextProps.x &&
+      prevProps.y === nextProps.y &&
+      prevProps.terrain === nextProps.terrain &&
+      prevProps.entityImage?.entity === nextProps.entityImage?.entity &&
+      prevProps.entityImage?.owner === nextProps.entityImage?.owner &&
+      prevProps.entityImage?.userId === nextProps.entityImage?.userId &&
+      prevProps.isShieldActive === nextProps.isShieldActive
+    );
+  });
+
   const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember }) => {
     return (
       <View style={[yStyle]}>
@@ -1888,40 +2003,65 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           <View style={[styles.gridArea, { width: totalSize, height: totalSize }]}>
             {visibleCells.map((assignment, i) => {
               const { x, y, cell } = assignment;
-              const selected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
-              const isCrewMember = cell.owner === 'player' && 
-                                   cell.userId && 
-                                   crewMemberUserIds.has(String(cell.userId));
-              const isWarCrewMember = cell.owner === 'player' && 
+              const key = `${x},${y}`;
+              const terrain = staticTerrainData[key];
+              const entityImage = entityImageData[key];
+              
+              // Phase 3: Conditional rendering based on panning state
+              if (isPanningJS) {
+                // During panning: render simplified tile (terrain + image only, no interactions)
+                return (
+                  <PanningPoolTile
+                    key={`${x}-${y}`}
+                    x={x}
+                    y={y}
+                    terrain={terrain || cell.terrain}
+                    entityImage={entityImage}
+                    xStyle={xPosStyles[x]}
+                    yStyle={yPosStyles[y]}
+                    terrainStyleMap={terrainStyleMap}
+                    currentUserId={currentUserId}
+                    isShieldActive={isShieldActive}
+                    styles={styles}
+                  />
+                );
+              } else {
+                // When not panning: render full tile with all details and interactions
+                const selected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
+                const isCrewMember = cell.owner === 'player' && 
                                      cell.userId && 
-                                     warCrewMemberUserIds.has(String(cell.userId));
-              // Only show yellow border for allies, not our own crew members
-              const isAllianceCrewMember = cell.owner === 'player' && 
-                                           cell.userId && 
-                                           !isCrewMember && // Exclude our own crew members
-                                           allianceCrewMemberUserIds.has(String(cell.userId));
-              return (
-                <PoolTile
-                  key={`${x}-${y}`}
-                  x={x}
-                  y={y}
-                  cell={cell}
-                  selected={selected}
-                  onPress={handleCellPress}
-                  xStyle={xPosStyles[x]}
-                  yStyle={yPosStyles[y]}
-                  terrainStyleMap={terrainStyleMap}
-                  currentUserHandle={currentUserHandle}
-                  colors={colors}
-                  themeMode={themeMode}
-                  styles={styles}
-                  dynamicEntityData={dynamicEntityData}
-                  isShieldActive={isShieldActive}
-                  isCrewMember={isCrewMember}
-                  isWarCrewMember={isWarCrewMember}
-                  isAllianceCrewMember={isAllianceCrewMember}
-                />
-              );
+                                     crewMemberUserIds.has(String(cell.userId));
+                const isWarCrewMember = cell.owner === 'player' && 
+                                       cell.userId && 
+                                       warCrewMemberUserIds.has(String(cell.userId));
+                // Only show yellow border for allies, not our own crew members
+                const isAllianceCrewMember = cell.owner === 'player' && 
+                                             cell.userId && 
+                                             !isCrewMember && // Exclude our own crew members
+                                             allianceCrewMemberUserIds.has(String(cell.userId));
+                return (
+                  <PoolTile
+                    key={`${x}-${y}`}
+                    x={x}
+                    y={y}
+                    cell={cell}
+                    selected={selected}
+                    onPress={handleCellPress}
+                    xStyle={xPosStyles[x]}
+                    yStyle={yPosStyles[y]}
+                    terrainStyleMap={terrainStyleMap}
+                    currentUserHandle={currentUserHandle}
+                    colors={colors}
+                    themeMode={themeMode}
+                    styles={styles}
+                    dynamicEntityData={dynamicEntityData}
+                    isShieldActive={isShieldActive}
+                    isCrewMember={isCrewMember}
+                    isWarCrewMember={isWarCrewMember}
+                    isAllianceCrewMember={isAllianceCrewMember}
+                  />
+                );
+              }
             })}
           </View>
         </Animated.View>
