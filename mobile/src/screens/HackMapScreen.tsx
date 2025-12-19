@@ -85,6 +85,35 @@ const generateVisibleTileKeys = (
   return visibleTiles;
 };
 
+/**
+ * Clean up empty cells from merged cache data
+ * Removes cache entries for cells that are now empty (entity removed)
+ * @param merged - The merged cache object to clean (will be mutated)
+ * @param grid - Grid data to check
+ * @param viewport - Viewport coordinates { x1, y1, x2, y2 }
+ * @returns Array of deleted keys (for tracking purposes, optional)
+ */
+const cleanupEmptyCells = (
+  merged: Record<string, any>,
+  grid: any[][],
+  viewport: { x1: number; y1: number; x2: number; y2: number }
+): string[] => {
+  const deletedKeys: string[] = [];
+  for (let y = viewport.y1; y <= viewport.y2; y++) {
+    const row = grid[y];
+    if (!row) continue;
+    for (let x = viewport.x1; x <= viewport.x2; x++) {
+      const cell = row[x];
+      const key = `${x},${y}`;
+      if (cell && cell.entity === 'empty' && merged[key]) {
+        delete merged[key];
+        deletedKeys.push(key);
+      }
+    }
+  }
+  return deletedKeys;
+};
+
 type Props = {
   onClose: () => void;
   restorePan?: { x: number; y: number };
@@ -1443,19 +1472,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           });
           
           // Clean up entity image cache for cells that are now empty
-          const deletedKeys: string[] = [];
-          for (let y = viewport.y1; y <= viewport.y2; y++) {
-            const row = entityUpdateViewportData.grid[y];
-            if (!row) continue;
-            for (let x = viewport.x1; x <= viewport.x2; x++) {
-              const cell = row[x];
-              const key = `${x},${y}`;
-              if (cell && cell.entity === 'empty' && merged[key]) {
-                delete merged[key];
-                deletedKeys.push(key);
-              }
-            }
-          }
+          const deletedKeys = cleanupEmptyCells(merged, entityUpdateViewportData.grid, viewport);
           
           return merged;
         });
@@ -1467,17 +1484,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           });
           
           // Clean up entity details cache for cells that are now empty
-          for (let y = viewport.y1; y <= viewport.y2; y++) {
-            const row = entityUpdateViewportData.grid[y];
-            if (!row) continue;
-            for (let x = viewport.x1; x <= viewport.x2; x++) {
-              const cell = row[x];
-              const key = `${x},${y}`;
-              if (cell && cell.entity === 'empty' && merged[key]) {
-                delete merged[key];
-              }
-            }
-          }
+          cleanupEmptyCells(merged, entityUpdateViewportData.grid, viewport);
           
           return merged;
         });
@@ -1805,13 +1812,16 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                 return cells;
               })();
           
-          // Iterate through cells to find cells that are now empty
-          for (const { x, y, cell } of cellsToCheck) {
-            const key = `${x},${y}`;
-            
-            // If cell is now empty but we have cached entity image data, remove it
-            if (cell.entity === 'empty' && merged[key]) {
-              delete merged[key];
+          // Clean up entity image cache for cells that are now empty
+          if (mapData.viewport) {
+            cleanupEmptyCells(merged, mapData.grid, mapData.viewport);
+          } else {
+            // For full map, iterate through all cells
+            for (const { x, y, cell } of cellsToCheck) {
+              const key = `${x},${y}`;
+              if (cell.entity === 'empty' && merged[key]) {
+                delete merged[key];
+              }
             }
           }
           
@@ -1853,13 +1863,16 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                 return cells;
               })();
           
-          // Iterate through cells to find cells that are now empty
-          for (const { x, y, cell } of cellsToCheck) {
-            const key = `${x},${y}`;
-            
-            // If cell is now empty but we have cached entity data, remove it
-            if (cell.entity === 'empty' && merged[key]) {
-              delete merged[key];
+          // Clean up entity details cache for cells that are now empty
+          if (mapData.viewport) {
+            cleanupEmptyCells(merged, mapData.grid, mapData.viewport);
+          } else {
+            // For full map, iterate through all cells
+            for (const { x, y, cell } of cellsToCheck) {
+              const key = `${x},${y}`;
+              if (cell.entity === 'empty' && merged[key]) {
+                delete merged[key];
+              }
             }
           }
           
@@ -1962,17 +1975,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           });
           
           // Clean up entity image cache for cells that are now empty
-          for (let y = viewport.y1; y <= viewport.y2; y++) {
-            const row = panningViewportData.grid[y];
-            if (!row) continue;
-            for (let x = viewport.x1; x <= viewport.x2; x++) {
-              const cell = row[x];
-              const key = `${x},${y}`;
-              if (cell && cell.entity === 'empty' && merged[key]) {
-                delete merged[key];
-              }
-            }
-          }
+          cleanupEmptyCells(merged, panningViewportData.grid, viewport);
           
           return merged;
         });
@@ -1987,17 +1990,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             });
             
             // Clean up entity details cache for cells that are now empty
-            for (let y = viewport.y1; y <= viewport.y2; y++) {
-              const row = panningViewportData.grid[y];
-              if (!row) continue;
-              for (let x = viewport.x1; x <= viewport.x2; x++) {
-                const cell = row[x];
-                const key = `${x},${y}`;
-                if (cell && cell.entity === 'empty' && merged[key]) {
-                  delete merged[key];
-                }
-              }
-            }
+            cleanupEmptyCells(merged, panningViewportData.grid, viewport);
             
             return merged;
           });
