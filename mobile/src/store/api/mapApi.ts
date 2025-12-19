@@ -30,6 +30,18 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
       api.dispatch({ type: 'auth/logout' });
       return result;
     } else {
+      const error = result.error as any;
+      const isAbortError = 
+        error?.error === 'AbortError: Aborted' ||
+        (error?.status === 'TIMEOUT_ERROR' && 
+         (typeof error?.error === 'string' && error.error.includes('AbortError')));
+      
+      if (isAbortError) {
+        // RTK Query automatically cancels in-flight requests when new requests are made
+        // This is expected behavior during fast panning - don't treat as an error
+        return result;
+      }
+      
       globalErrorHandler.handleDatabaseError(result.error);
     }
   }
