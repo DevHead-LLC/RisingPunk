@@ -12,7 +12,7 @@ import { VisitingProfileModal } from '../components/hackMap/VisitingProfileModal
 import { VisitCrewModal } from '../components/hackMap/VisitCrewModal';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { setGrid, setLoading } from '../store/slices/mapSlice';
-import { useFetchMapQuery } from '../store/api/mapApi';
+import { useFetchMapQuery, useFetchMapViewportQuery } from '../store/api/mapApi';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { useGetCrewStatusQuery, useGetUserCrewStatusQuery, useGetCrewDetailsQuery, useGetWarStatusQuery, useGetAllianceStatusQuery } from '../store/api/authApi';
@@ -694,7 +694,86 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     });
   const gridSize = grid.length || 50;
   const totalSize = gridSize * CELL_SIZE;
-  const { data: mapData, isLoading, refetch } = useFetchMapQuery();
+  
+  // Phase 5: Two-step approach - fetch initial viewport, then full map if user not found
+  // Step 1: Fetch a reasonable initial viewport (center of map with buffer)
+  const initialViewport = useMemo(() => {
+    const buffer = 15; // Larger buffer (30x30 area) to increase chance of finding user
+    const centerX = Math.floor(gridSize / 2);
+    const centerY = Math.floor(gridSize / 2);
+    return {
+      x1: Math.max(0, centerX - buffer),
+      y1: Math.max(0, centerY - buffer),
+      x2: Math.min(gridSize - 1, centerX + buffer),
+      y2: Math.min(gridSize - 1, centerY + buffer),
+    };
+  }, [gridSize]);
+  
+  const { data: initialViewportData, isLoading: isLoadingInitialViewport, refetch: refetchInitialViewport } = useFetchMapViewportQuery(
+    initialViewport,
+    { skip: containerSize.width === 0 || containerSize.height === 0 }
+  );
+  
+  // Step 2: Check if user's house is in initial viewport, if not, fetch full map
+  const [needsFullMap, setNeedsFullMap] = useState<boolean>(false);
+  const { data: fullMapData, isLoading: isLoadingFullMap, refetch: refetchFullMap } = useFetchMapQuery(undefined, {
+    skip: !needsFullMap,
+  });
+  
+  // Determine which data to use
+  const mapData = needsFullMap ? fullMapData : initialViewportData;
+  const isLoading = isLoadingInitialViewport || (needsFullMap && isLoadingFullMap);
+  
+  // Check if user's house is in initial viewport (only check once)
+  const hasCheckedUserLocationRef = useRef<boolean>(false);
+  useEffect(() => {
+    if (hasCheckedUserLocationRef.current) return; // Only check once
+    if (!initialViewportData || !initialViewportData.grid || !currentUserHandle) return;
+    if (needsFullMap) return; // Already decided we need full map
+    
+    hasCheckedUserLocationRef.current = true; // Mark as checked before doing the check
+    
+    const viewport = initialViewportData.viewport || initialViewport;
+    let foundUser = false;
+    
+    for (let y = viewport.y1; y <= viewport.y2; y++) {
+      const row = initialViewportData.grid[y];
+      if (!row) continue;
+      for (let x = viewport.x1; x <= viewport.x2; x++) {
+        const cell = row[x];
+        if (cell && cell.entity === 'house' && cell.name === currentUserHandle) {
+          foundUser = true;
+          break;
+        }
+      }
+      if (foundUser) break;
+    }
+    
+    if (!foundUser) {
+      // User's house not in initial viewport, need full map
+      setNeedsFullMap(true);
+    }
+  }, [initialViewportData, currentUserHandle, needsFullMap, initialViewport]);
+  
+  // Refetch function - use appropriate query's refetch
+  const refetch = useCallback(() => {
+    if (needsFullMap) {
+      refetchFullMap();
+    } else {
+      refetchInitialViewport();
+    }
+  }, [needsFullMap, refetchFullMap, refetchInitialViewport]);
+  
+  // Phase 5 Fix: Viewport fetching during panning
+  // Track the last viewport we fetched to avoid duplicate requests
+  const lastFetchedViewportRef = useRef<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const [panningViewportParams, setPanningViewportParams] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  
+  // Fetch viewport data during panning when windowRange changes significantly
+  const { data: panningViewportData, isLoading: isLoadingPanningViewport } = useFetchMapViewportQuery(
+    panningViewportParams!,
+    { skip: !panningViewportParams || !terrainDataLoaded }
+  );
   // Phase 5: Optimize shield status polling - increase interval and make viewport-aware
   // Check if there are any player tiles in the visible viewport
   const hasVisiblePlayerTiles = useMemo(() => {
@@ -1367,9 +1446,72 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       } else {
         // Full map request - replace entire grid
         dispatch(setGrid(mapData.grid));
+        // Phase 5 Fix: Initialize last fetched viewport to full map bounds
+        lastFetchedViewportRef.current = { x1: 0, y1: 0, x2: gridSize - 1, y2: gridSize - 1 };
       }
     }
-  }, [mapData, isLoading, dispatch, separateStaticAndDynamicData]);
+  }, [mapData, isLoading, dispatch, separateStaticAndDynamicData, gridSize]);
+  
+  // Phase 5 Fix: Process panning viewport data
+  useEffect(() => {
+    if (panningViewportData && panningViewportData.grid && panningViewportData.viewport) {
+      const { terrain, entityImages, entityDetails } = separateStaticAndDynamicData(panningViewportData.grid, panningViewportData.viewport);
+      
+      // Merge terrain data
+      setStaticTerrainData(prev => {
+        const merged = { ...prev };
+        Object.entries(terrain).forEach(([key, value]) => {
+          merged[key] = value;
+        });
+        return merged;
+      });
+      
+      // Merge entity image data
+      setEntityImageData(prev => {
+        const merged = { ...prev };
+        Object.entries(entityImages).forEach(([key, value]) => {
+          merged[key] = value;
+        });
+        return merged;
+      });
+      
+      // Merge entity details
+      setDynamicEntityData(prev => {
+        const merged = { ...prev };
+        Object.entries(entityDetails).forEach(([key, value]) => {
+          merged[key] = value;
+        });
+        return merged;
+      });
+      
+      // Merge grid data
+      const viewport = panningViewportData.viewport;
+      const mergedGrid = [...grid];
+      for (let y = viewport.y1; y <= viewport.y2; y++) {
+        const row = panningViewportData.grid[y];
+        if (!row) continue;
+        if (!mergedGrid[y]) {
+          mergedGrid[y] = [];
+        }
+        for (let x = viewport.x1; x <= viewport.x2; x++) {
+          const cell = row[x];
+          if (cell) {
+            if (!mergedGrid[y][x]) {
+              mergedGrid[y][x] = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityType };
+            }
+            mergedGrid[y][x] = { ...mergedGrid[y][x], ...cell };
+          }
+        }
+      }
+      dispatch(setGrid(mergedGrid));
+      
+      // Update last fetched viewport
+      lastFetchedViewportRef.current = { x1: viewport.x1, y1: viewport.y1, x2: viewport.x2, y2: viewport.y2 };
+      
+      // Clear viewport params to allow next fetch
+      setPanningViewportParams(null);
+    }
+  }, [panningViewportData, separateStaticAndDynamicData, dispatch, grid]);
 
   // Force refresh map data when returning from battle to ensure NPCs are updated
   // Phase 4B: Only clear cache when explicitly needed (restorePan = returning from battle)
@@ -1436,6 +1578,17 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         Math.abs(prev.colStart - startCol) < 1 &&
         Math.abs(prev.colEnd - endCol) < 1;
       if (smallShift) return prev;
+      
+      // Phase 5 Fix: Trigger viewport fetch if we've moved significantly outside the last fetched viewport
+      const newViewport = { x1: startCol, y1: startRow, x2: endCol, y2: endRow };
+      const lastViewport = lastFetchedViewportRef.current;
+      if (!lastViewport || 
+          startCol < lastViewport.x1 - 5 || endCol > lastViewport.x2 + 5 ||
+          startRow < lastViewport.y1 - 5 || endRow > lastViewport.y2 + 5) {
+        // Significant movement - trigger viewport fetch
+        setPanningViewportParams(newViewport);
+      }
+      
       return { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
     });
   }, [gridSize, calculateVirtualViewport, isPanningJS]);
