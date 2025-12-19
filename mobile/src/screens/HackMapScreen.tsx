@@ -1534,10 +1534,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     isPanningJSRef.current = isPanningJS;
   }, [isPanningJS]);
   
-  // Use key counts to detect when data actually changes (instead of object references)
-  const staticTerrainDataKeys = Object.keys(staticTerrainData).length;
-  const dynamicEntityDataKeys = Object.keys(dynamicEntityData).length;
-  
   const visibleCells = useMemo(() => {
     const cells: Array<{ x: number; y: number; cell: CellData }> = [];
     
@@ -1644,7 +1640,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
     
     return cells;
-  }, [virtualViewport.visibleTiles, windowRange.rowStart, windowRange.rowEnd, windowRange.colStart, windowRange.colEnd, staticTerrainDataKeys, dynamicEntityDataKeys, terrainDataLoaded]);
+  }, [virtualViewport.visibleTiles, windowRange.rowStart, windowRange.rowEnd, windowRange.colStart, windowRange.colEnd, staticTerrainData, dynamicEntityData, entityImageData, terrainDataLoaded]);
 
 
 
