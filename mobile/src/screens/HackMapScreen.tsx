@@ -1202,7 +1202,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [entityUpdateViewportParams, setEntityUpdateViewportParams] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
   const { data: entityUpdateViewportData } = useFetchMapViewportQuery(
     entityUpdateViewportParams!,
-    { skip: !entityUpdateViewportParams || !terrainDataLoaded || !hasVisibleEntities }
+    { 
+      skip: !entityUpdateViewportParams || !terrainDataLoaded || !hasVisibleEntities,
+      refetchOnMountOrArgChange: true
+    }
   );
 
   // Phase 9: Process entity update viewport data
@@ -1364,17 +1367,21 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         // Phase 4C: Direct property access is already optimal (O(1))
         const terrain = staticTerrainData[tileKey];
         const entity = dynamicEntityData[tileKey];
+        // Bug Fix: Use entityImageData as fallback when dynamicEntityData is missing
+        // This prevents entities from disappearing when panning stops before full details are loaded
+        const entityImage = entityImageData[tileKey];
         
         if (!terrain) return;
         
         // Phase 4C: Create cell data efficiently - only create object if needed
+        // Use entityImage as fallback if entity details not yet loaded
         const cell: CellData = {
           terrain,
-          entity: entity?.entity || 'empty',
-          owner: entity?.owner,
+          entity: entity?.entity || entityImage?.entity || 'empty',
+          owner: entity?.owner || entityImage?.owner,
           name: entity?.name,
-          userId: entity?.userId,
-          npcSlug: entity?.npcSlug,
+          userId: entity?.userId || entityImage?.userId,
+          npcSlug: entity?.npcSlug || entityImage?.npcSlug,
           npcInstanceId: entity?.npcInstanceId,
           npcLevel: entity?.npcLevel,
           isShielded: entity?.isShielded,
@@ -1391,17 +1398,21 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           // Phase 4C: Direct property access is already optimal (O(1))
           const terrain = staticTerrainData[key];
           const entity = dynamicEntityData[key];
+          // Bug Fix: Use entityImageData as fallback when dynamicEntityData is missing
+          // This prevents entities from disappearing when panning stops before full details are loaded
+          const entityImage = entityImageData[key];
           
           if (!terrain) continue;
           
           // Phase 4C: Create cell data efficiently
+          // Use entityImage as fallback if entity details not yet loaded
           const cell: CellData = {
             terrain,
-            entity: entity?.entity || 'empty',
-            owner: entity?.owner,
+            entity: entity?.entity || entityImage?.entity || 'empty',
+            owner: entity?.owner || entityImage?.owner,
             name: entity?.name,
-            userId: entity?.userId,
-            npcSlug: entity?.npcSlug,
+            userId: entity?.userId || entityImage?.userId,
+            npcSlug: entity?.npcSlug || entityImage?.npcSlug,
             npcInstanceId: entity?.npcInstanceId,
             npcLevel: entity?.npcLevel,
             isShielded: entity?.isShielded,
@@ -1413,7 +1424,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
     
     return cells;
-  }, [virtualViewport.visibleTiles, virtualViewport.visibleTiles.size, windowRange.rowStart, windowRange.rowEnd, windowRange.colStart, windowRange.colEnd, staticTerrainData, dynamicEntityData, terrainDataLoaded]);
+  }, [virtualViewport.visibleTiles, virtualViewport.visibleTiles.size, windowRange.rowStart, windowRange.rowEnd, windowRange.colStart, windowRange.colEnd, staticTerrainData, dynamicEntityData, entityImageData, terrainDataLoaded]);
 
 
 
