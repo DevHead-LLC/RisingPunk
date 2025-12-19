@@ -26,6 +26,13 @@ import { SIZING } from '../styles/theme';
 const CELL_SIZE = 75;
 const MARGIN_SIZE = 80;
 
+// Constants for viewport fetching and panning
+const VIEWPORT_FETCH_THRESHOLD = 5; // Cells to move before triggering viewport fetch
+const PAN_BUFFER = 8; // Buffer in cells for window range calculation
+const PAN_CHANGE_THRESHOLD = 4; // Minimum pan change in pixels to trigger update
+const MAX_CACHE_SIZE = 1000; // Maximum number of cached cell objects
+const PANNING_STOPPED_DEBOUNCE_MS = 200; // Debounce time for panning stopped detection
+
 /**
  * Convert grid coordinates to pan coordinates (centers the cell on screen)
  * @param gridX - Grid X coordinate (column)
@@ -213,6 +220,29 @@ const mergeGridData = (
 };
 
 /**
+ * Get grid size from grid array with fallback
+ * @param grid - Grid array
+ * @param fallback - Fallback size if grid is empty (default: 50)
+ * @returns Grid size
+ */
+const getGridSize = (grid: any[][] | null | undefined, fallback: number = 50): number => {
+  if (!grid || grid.length === 0) return fallback;
+  return grid.length;
+};
+
+/**
+ * Validate viewport coordinates
+ * @param viewport - Viewport coordinates { x1, y1, x2, y2 }
+ * @returns true if viewport is valid (all coordinates are valid numbers)
+ */
+const isValidViewport = (viewport: { x1: number; y1: number; x2: number; y2: number } | undefined): boolean => {
+  if (!viewport) return false;
+  const { x1, y1, x2, y2 } = viewport;
+  return !isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2) && 
+         x1 >= 0 && y1 >= 0 && x2 >= x1 && y2 >= y1;
+};
+
+/**
  * Check if viewport has moved significantly outside the last fetched viewport
  * @param newViewport - New viewport coordinates { x1, y1, x2, y2 }
  * @param lastViewport - Last fetched viewport coordinates { x1, y1, x2, y2 } or null
@@ -222,7 +252,7 @@ const mergeGridData = (
 const shouldFetchViewport = (
   newViewport: { x1: number; y1: number; x2: number; y2: number },
   lastViewport: { x1: number; y1: number; x2: number; y2: number } | null,
-  threshold: number = 5
+  threshold: number = VIEWPORT_FETCH_THRESHOLD
 ): boolean => {
   if (!lastViewport) return true;
   return (
@@ -636,7 +666,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const boundsReady = useSharedValue(false);
   const initialDims = Dimensions.get('window');
   const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: initialDims.width, height: initialDims.height });
-  const [windowRange, setWindowRange] = useState<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>({ rowStart: 0, rowEnd: Math.min(14, (grid.length || 50) - 1), colStart: 0, colEnd: Math.min(14, (grid.length || 50) - 1) });
+  const [windowRange, setWindowRange] = useState<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>({ rowStart: 0, rowEnd: Math.min(14, getGridSize(grid) - 1), colStart: 0, colEnd: Math.min(14, getGridSize(grid) - 1) });
   
   // Phase 5: Use ref for windowRange during panning to reduce re-renders
   const windowRangeRef = useRef<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>(windowRange);
@@ -833,7 +863,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     if (width <= 0 || height <= 0) return;
     
     // Calculate the exact visible area in grid coordinates (no buffer)
-    const gridSize = grid.length || 50;
+    const gridSize = getGridSize(grid);
     const { startCol: clampedStartCol, endCol: clampedEndCol, startRow: clampedStartRow, endRow: clampedEndRow } = 
       calculateViewportFromPan(panX, panY, width, height, gridSize, 0);
     
@@ -1697,14 +1727,13 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     const currentWindowRange = currentIsPanningJS ? windowRangeRef.current : windowRange;
     
     const cache = cellCacheRef.current;
-    const MAX_CACHE_SIZE = 1000;
     
     // Phase 2: Cell cache to maintain stable object references
     // Bug Fix: Use entityImageData as fallback when dynamicEntityData is missing
     // This prevents entities from disappearing when panning stops before full details are loaded
     const getOrCreateCell = (x: number, y: number, terrain: TerrainType, entity: any, entityImage: any): CellData => {
       // Include entityImage in cache key to ensure proper cache invalidation
-      const cacheKey = `${x},${y}-${terrain}-${entity?.entity || entityImage?.entity || 'empty'}-${entity?.owner || entityImage?.owner || ''}-${entity?.name || ''}-${entity?.userId || entityImage?.userId || ''}-${entity?.npcSlug || entityImage?.npcSlug || ''}-${entity?.npcInstanceId || ''}-${entity?.npcLevel || ''}-${entity?.isShielded || false}`;
+      const cacheKey = `${x},${y}-${terrain}-${entity?.entity || entityImage?.entity || 'empty'}-${entity?.owner || entityImage?.owner || ''}-${entity?.name || ''}-${entity?.userId || entityImage?.userId || ''}-${entity?.npcSlug || entityImage?.npcSlug || ''}-${entity?.npcInstanceId || entityImage?.npcInstanceId || ''}-${entity?.npcLevel || ''}-${entity?.isShielded || false}`;
       
       let cell = cache.get(cacheKey);
       
@@ -1713,6 +1742,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       const currentOwner = entity?.owner || entityImage?.owner;
       const currentUserId = entity?.userId || entityImage?.userId;
       const currentNpcSlug = entity?.npcSlug || entityImage?.npcSlug;
+      const currentNpcInstanceId = entity?.npcInstanceId || entityImage?.npcInstanceId;
       
       if (!cell || 
           cell.terrain !== terrain ||
@@ -1721,7 +1751,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           cell.name !== entity?.name ||
           cell.userId !== currentUserId ||
           cell.npcSlug !== currentNpcSlug ||
-          cell.npcInstanceId !== entity?.npcInstanceId ||
+          cell.npcInstanceId !== currentNpcInstanceId ||
           cell.npcLevel !== entity?.npcLevel ||
           cell.isShielded !== entity?.isShielded) {
         const newCell: CellData = {
@@ -1731,7 +1761,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           name: entity?.name,
           userId: currentUserId,
           npcSlug: currentNpcSlug,
-          npcInstanceId: entity?.npcInstanceId,
+          npcInstanceId: currentNpcInstanceId,
           npcLevel: entity?.npcLevel,
           isShielded: entity?.isShielded,
         } as any;
@@ -1825,14 +1855,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         // This prevents overwriting cached terrain outside viewport with 'plain'
         if (viewport) {
           // Bug Fix: Validate viewport coordinates are valid numbers (defensive check)
-          const vx1 = Number(viewport.x1);
-          const vy1 = Number(viewport.y1);
-          const vx2 = Number(viewport.x2);
-          const vy2 = Number(viewport.y2);
-          
-          // If viewport is invalid (NaN), skip viewport filtering (process all cells)
-          if (!isNaN(vx1) && !isNaN(vy1) && !isNaN(vx2) && !isNaN(vy2)) {
-            const isInViewport = x >= vx1 && x <= vx2 && y >= vy1 && y <= vy2;
+          if (isValidViewport(viewport)) {
+            const isInViewport = x >= viewport.x1 && x <= viewport.x2 && y >= viewport.y1 && y <= viewport.y2;
             if (!isInViewport) {
               continue; // Skip cells outside viewport to preserve cached data
             }
@@ -1945,13 +1969,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         // This preserves cached data outside the viewport
         if (mapData.viewport) {
           // Bug Fix: Validate viewport coordinates are valid numbers (defensive check)
-          const vx1 = Number(mapData.viewport.x1);
-          const vy1 = Number(mapData.viewport.y1);
-          const vx2 = Number(mapData.viewport.x2);
-          const vy2 = Number(mapData.viewport.y2);
-          
-          // If viewport is invalid (NaN), fall back to full map replacement
-          if (isNaN(vx1) || isNaN(vy1) || isNaN(vx2) || isNaN(vy2)) {
+          if (!isValidViewport(mapData.viewport)) {
             // Invalid viewport - treat as full map request
             dispatch(setGrid(mapData.grid));
           } else {
@@ -1961,7 +1979,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             const mergedGrid = mergeGridData(
               gridRef.current,
               mapData.grid,
-              { x1: vx1, y1: vy1, x2: vx2, y2: vy2 },
+              mapData.viewport,
               mapData.grid.length
             );
             
@@ -1970,7 +1988,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             // If multiple effects run in the same cycle, they need to read the updated value
             gridRef.current = mergedGrid;
             // Phase 5 Fix: Initialize last fetched viewport to initial viewport bounds
-            lastFetchedViewportRef.current = { x1: vx1, y1: vy1, x2: vx2, y2: vy2 };
+            lastFetchedViewportRef.current = mapData.viewport;
           }
         } else {
           // Full map request - replace entire grid
@@ -2045,7 +2063,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         
         // Merge grid data - use ref to get latest grid value to avoid stale closures
         // Bug #13: Calculate gridSize from ref inside effect (not from outer scope)
-        const gridSize = gridRef.current.length > 0 ? gridRef.current.length : 50;
+        const gridSize = getGridSize(gridRef.current);
         const mergedGrid = mergeGridData(
           gridRef.current,
           panningViewportData.grid,
@@ -2188,7 +2206,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     // Skip tiny pan changes to reduce churn
     const lx = lastComputedPan.value.x;
     const ly = lastComputedPan.value.y;
-    if (Math.abs(panX - lx) < 4 && Math.abs(panY - ly) < 4) { // Reduced from 8 to 4 for precision
+    if (Math.abs(panX - lx) < PAN_CHANGE_THRESHOLD && Math.abs(panY - ly) < PAN_CHANGE_THRESHOLD) {
       return;
     }
     lastComputedPan.value = { x: panX, y: panY };
@@ -2197,7 +2215,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     calculateVirtualViewport(panX, panY, width, height);
     
     // Simplified buffer calculation - removed complex velocity math
-    const baseBuffer = 8; // Reduced from 12 for better performance
+    const baseBuffer = PAN_BUFFER;
     const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(panX, panY, width, height, gridSize, baseBuffer);
     
     // Phase 5: Use ref for windowRange during panning, state when not panning
@@ -2278,7 +2296,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       }
       
       // Validate grid coordinates are within bounds
-      const gridSize = grid.length || 50;
+      const gridSize = getGridSize(grid);
       if (restorePan.x < 0 || restorePan.x >= gridSize || restorePan.y < 0 || restorePan.y >= gridSize) {
         return;
       }
