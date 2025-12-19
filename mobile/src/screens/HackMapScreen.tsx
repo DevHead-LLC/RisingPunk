@@ -1141,12 +1141,19 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
   }, [isRefreshing]);
 
+  // Store the latest checkShieldInterval function in a ref to avoid stale closures in polling
+  const checkShieldIntervalRef = useRef(checkShieldInterval);
+  useEffect(() => {
+    checkShieldIntervalRef.current = checkShieldInterval;
+  }, [checkShieldInterval]);
+
   // Phase 8: Synchronized 3-second polling group
   useSynchronizedPolling(3000, () => {
     if (hasVisiblePlayerTiles || currentUserId) {
       refetchShieldStatus();
     }
-    checkShieldInterval();
+    // Use ref to get latest checkShieldInterval function (avoids stale closure)
+    checkShieldIntervalRef.current();
   }, [hasVisiblePlayerTiles, currentUserId]);
 
   // Phase 9: Check if NPCs are visible in viewport
@@ -1658,8 +1665,12 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         });
       }
       
-      // Merge grid data
-      const mergedGrid = [...grid];
+      // Merge grid data - use ref to get latest grid value to avoid stale closures
+      const currentGrid = gridRef.current.length > 0 ? gridRef.current : Array.from({ length: gridSize }, () => 
+        Array.from({ length: gridSize }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
+      );
+      // Create a deep copy to avoid mutating Redux state
+      const mergedGrid = currentGrid.map(row => row ? [...row] : []);
       for (let y = viewport.y1; y <= viewport.y2; y++) {
         const row = panningViewportData.grid[y];
         if (!row) continue;
@@ -1739,8 +1750,19 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   }, [panningStopped, terrainDataLoaded, isPanningJS, windowRange, entityImageData, dynamicEntityData]);
   
   // Phase 7: Process stopped viewport data (full details only)
+  // Track processed viewport to prevent infinite loops
+  const processedStoppedViewportRef = useRef<string | null>(null);
   useEffect(() => {
     if (stoppedViewportData && stoppedViewportData.grid && stoppedViewportData.viewport) {
+      const viewport = stoppedViewportData.viewport;
+      const viewportKey = `${viewport.x1},${viewport.y1},${viewport.x2},${viewport.y2}`;
+      
+      // Phase 7: Prevent processing the same viewport twice
+      if (processedStoppedViewportRef.current === viewportKey) {
+        return;
+      }
+      processedStoppedViewportRef.current = viewportKey;
+      
       const { terrain, entityImages, entityDetails } = separateStaticAndDynamicData(stoppedViewportData.grid, stoppedViewportData.viewport);
       
       // Phase 7: Only merge entity details (terrain and images already loaded)
@@ -1752,9 +1774,12 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         return merged;
       });
       
-      // Merge grid data (update entity details in grid)
-      const viewport = stoppedViewportData.viewport;
-      const mergedGrid = [...grid];
+      // Merge grid data (update entity details in grid) - use ref to get latest grid value to avoid stale closures
+      const currentGrid = gridRef.current.length > 0 ? gridRef.current : Array.from({ length: gridSize }, () => 
+        Array.from({ length: gridSize }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
+      );
+      // Create a deep copy to avoid mutating Redux state
+      const mergedGrid = currentGrid.map(row => row ? [...row] : []);
       for (let y = viewport.y1; y <= viewport.y2; y++) {
         const row = stoppedViewportData.grid[y];
         if (!row) continue;
@@ -1776,7 +1801,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       // Clear stopped viewport params to allow next fetch
       setStoppedViewportParams(null);
     }
-  }, [stoppedViewportData, separateStaticAndDynamicData, dispatch, grid]);
+  }, [stoppedViewportData, separateStaticAndDynamicData, dispatch, gridSize]);
 
   // Force refresh map data when returning from battle to ensure NPCs are updated
   // Phase 4B: Only clear cache when explicitly needed (restorePan = returning from battle)
