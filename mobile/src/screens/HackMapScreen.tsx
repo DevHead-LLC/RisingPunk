@@ -277,6 +277,13 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   // Static vs Dynamic Data Separation
   const [staticTerrainData, setStaticTerrainData] = useState<Record<string, TerrainType>>({});
   const [dynamicEntityData, setDynamicEntityData] = useState<Record<string, any>>({});
+  // Phase 2: Separate entity images from entity details
+  const [entityImageData, setEntityImageData] = useState<Record<string, {
+    entity: EntityType;
+    owner?: string;
+    userId?: string;
+    npcSlug?: string;
+  }>>({});
   const [terrainDataLoaded, setTerrainDataLoaded] = useState<boolean>(false);
   
   // Shield status change tracking
@@ -1014,9 +1021,16 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
   // Separate static terrain data from dynamic entity data for optimal loading
   // Bug Fix: Support viewport filtering to only process cells within viewport bounds
+  // Phase 2: Split entities into entityImages (minimal) and entityDetails (full)
   const separateStaticAndDynamicData = useCallback((gridData: any[][], viewport?: { x1: number; y1: number; x2: number; y2: number }) => {
     const terrain: Record<string, TerrainType> = {};
-    const entities: Record<string, any> = {};
+    const entityImages: Record<string, {
+      entity: EntityType;
+      owner?: string;
+      userId?: string;
+      npcSlug?: string;
+    }> = {};
+    const entityDetails: Record<string, any> = {};
     
     for (let y = 0; y < gridData.length; y++) {
       const row = gridData[y];
@@ -1048,23 +1062,33 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         // Terrain is static - load once and cache
         terrain[key] = cell.terrain;
         
-        // Entities are dynamic - only load what's needed
+        // Phase 2: Split entities into images (minimal) and details (full)
         if (cell.entity !== 'empty') {
-          entities[key] = {
+          // EntityImages: minimal info for rendering images
+          entityImages[key] = {
+            entity: cell.entity,
+            owner: cell.owner,
+            userId: cell.userId,
+            npcSlug: cell.npcSlug,
+          };
+          
+          // EntityDetails: full info for interactions
+          // Keep entity and owner in details too for backward compatibility with existing rendering code
+          entityDetails[key] = {
             entity: cell.entity,
             owner: cell.owner,
             name: cell.name,
-            userId: cell.userId,
-            npcSlug: cell.npcSlug,
-            npcInstanceId: cell.npcInstanceId,
             npcLevel: cell.npcLevel,
             isShielded: cell.isShielded,
+            npcInstanceId: cell.npcInstanceId,
+            userId: cell.userId,
+            npcSlug: cell.npcSlug,
           };
         }
       }
     }
     
-    return { terrain, entities };
+    return { terrain, entityImages, entityDetails };
   }, []);
 
   useEffect(() => {
@@ -1073,7 +1097,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       // Phase 4B: Merge new data with existing cache instead of replacing
       // This ensures cached terrain data persists across refetches
       // Bug Fix: For viewport requests, only process cells within viewport to preserve cached data outside
-      const { terrain, entities } = separateStaticAndDynamicData(mapData.grid, mapData.viewport);
+      // Phase 2: Now returns three layers: terrain, entityImages, entityDetails
+      const { terrain, entityImages, entityDetails } = separateStaticAndDynamicData(mapData.grid, mapData.viewport);
       
       setStaticTerrainData(prev => {
         // Terrain is static - merge to preserve existing cached terrain
@@ -1081,11 +1106,57 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         return { ...prev, ...terrain };
       });
       
+      // Phase 2: Populate entityImageData (minimal info for rendering)
+      setEntityImageData(prev => {
+        const merged = { ...prev, ...entityImages };
+        
+        // Phase 2: Also clear entityImageData for cells that are now empty
+        // Bug Fix: Only iterate through cells that are in the viewport (if viewport provided)
+        const cellsToCheck = mapData.viewport 
+          ? (() => {
+              const cells: Array<{ x: number; y: number; cell: any }> = [];
+              for (let y = mapData.viewport!.y1; y <= mapData.viewport!.y2; y++) {
+                const row = mapData.grid[y];
+                if (!row) continue;
+                for (let x = mapData.viewport!.x1; x <= mapData.viewport!.x2; x++) {
+                  const cell = row[x];
+                  if (cell) cells.push({ x, y, cell });
+                }
+              }
+              return cells;
+            })()
+          : (() => {
+              const cells: Array<{ x: number; y: number; cell: any }> = [];
+              for (let y = 0; y < mapData.grid.length; y++) {
+                const row = mapData.grid[y];
+                if (!row) continue;
+                for (let x = 0; x < row.length; x++) {
+                  const cell = row[x];
+                  if (cell) cells.push({ x, y, cell });
+                }
+              }
+              return cells;
+            })();
+        
+        // Iterate through cells to find cells that are now empty
+        for (const { x, y, cell } of cellsToCheck) {
+          const key = `${x},${y}`;
+          
+          // If cell is now empty but we have cached entity image data, remove it
+          if (cell.entity === 'empty' && merged[key]) {
+            delete merged[key];
+          }
+        }
+        
+        return merged;
+      });
+      
       setDynamicEntityData(prev => {
         // Entities are dynamic - merge to preserve existing cached entities
         // Bug Fix #1: Also clear entity data for cells that are now empty
         // When an entity is removed (NPC defeated, house destroyed), we need to delete it from cache
-        const merged = { ...prev, ...entities };
+        // Phase 2: Now using entityDetails instead of entities
+        const merged = { ...prev, ...entityDetails };
         
         // Bug Fix: Only iterate through cells that are in the viewport (if viewport provided)
         // For full map requests, iterate all cells. For viewport requests, only viewport cells.
