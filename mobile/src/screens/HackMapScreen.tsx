@@ -1149,13 +1149,126 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     checkShieldInterval();
   }, [hasVisiblePlayerTiles, currentUserId]);
 
+  // Phase 9: Check if NPCs are visible in viewport
+  const hasVisibleNPCs = useMemo(() => {
+    if (!terrainDataLoaded) return false;
+    
+    // Check visible cells for NPC tiles
+    if (virtualViewport.visibleTiles.size > 0) {
+      for (const tileKey of virtualViewport.visibleTiles) {
+        const entity = dynamicEntityData[tileKey];
+        if (entity && entity.npcSlug) {
+          return true;
+        }
+      }
+    } else {
+      // Fallback: check window range
+      for (let y = windowRange.rowStart; y <= windowRange.rowEnd; y++) {
+        for (let x = windowRange.colStart; x <= windowRange.colEnd; x++) {
+          const key = `${x},${y}`;
+          const entity = dynamicEntityData[key];
+          if (entity && entity.npcSlug) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }, [terrainDataLoaded, virtualViewport.visibleTiles, dynamicEntityData, windowRange]);
+
+  // Phase 9: Check if any entities (NPCs or players) are visible
+  const hasVisibleEntities = useMemo(() => {
+    return hasVisiblePlayerTiles || hasVisibleNPCs;
+  }, [hasVisiblePlayerTiles, hasVisibleNPCs]);
+
+  // Phase 9: Viewport refresh for entity updates (NPCs, player positions, entity changes)
+  // The viewport API already includes all entity data, so we can refresh it to get updates
+  const [entityUpdateViewportParams, setEntityUpdateViewportParams] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const { data: entityUpdateViewportData } = useFetchMapViewportQuery(
+    entityUpdateViewportParams!,
+    { skip: !entityUpdateViewportParams || !terrainDataLoaded || !hasVisibleEntities }
+  );
+
+  // Phase 9: Process entity update viewport data
+  // Track processed viewport to prevent infinite loops
+  const processedEntityUpdateViewportRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (entityUpdateViewportData && entityUpdateViewportData.grid && entityUpdateViewportData.viewport) {
+      const viewport = entityUpdateViewportData.viewport;
+      const viewportKey = `${viewport.x1},${viewport.y1},${viewport.x2},${viewport.y2}`;
+      
+      // Phase 9: Prevent processing the same viewport twice
+      if (processedEntityUpdateViewportRef.current === viewportKey) {
+        return;
+      }
+      processedEntityUpdateViewportRef.current = viewportKey;
+      
+      const { terrain, entityImages, entityDetails } = separateStaticAndDynamicData(entityUpdateViewportData.grid, entityUpdateViewportData.viewport);
+      
+      // Update entity data (terrain already loaded, just update entities)
+      setEntityImageData(prev => {
+        const merged = { ...prev };
+        Object.entries(entityImages).forEach(([key, value]) => {
+          merged[key] = value;
+        });
+        return merged;
+      });
+      
+      setDynamicEntityData(prev => {
+        const merged = { ...prev };
+        Object.entries(entityDetails).forEach(([key, value]) => {
+          merged[key] = value;
+        });
+        return merged;
+      });
+      
+      // Update grid data - use ref to get latest grid value to avoid stale closures
+      const currentGrid = gridRef.current.length > 0 ? gridRef.current : Array.from({ length: gridSize }, () => 
+        Array.from({ length: gridSize }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
+      );
+      const mergedGrid = currentGrid.map(row => row ? [...row] : []);
+      for (let y = viewport.y1; y <= viewport.y2; y++) {
+        const row = entityUpdateViewportData.grid[y];
+        if (!row) continue;
+        if (!mergedGrid[y]) {
+          mergedGrid[y] = [];
+        }
+        for (let x = viewport.x1; x <= viewport.x2; x++) {
+          const cell = row[x];
+          if (cell) {
+            if (!mergedGrid[y][x]) {
+              mergedGrid[y][x] = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityType };
+            }
+            mergedGrid[y][x] = { ...mergedGrid[y][x], ...cell };
+          }
+        }
+      }
+      dispatch(setGrid(mergedGrid));
+      
+      // Clear viewport params to allow next refresh
+      setEntityUpdateViewportParams(null);
+    }
+  }, [entityUpdateViewportData, separateStaticAndDynamicData, dispatch, gridSize]);
+
   // Phase 8: Synchronized 10-second polling group
+  // Phase 9: Added entity updates (NPCs, player positions, entity changes) to 10s group
   useSynchronizedPolling(10000, () => {
     if (crewStatus?.isInCrew) {
       refetchWarStatus();
       refetchAllianceStatus();
     }
-  }, [crewStatus?.isInCrew]);
+    
+    // Phase 9: Refresh viewport data for entity updates if entities are visible
+    if (hasVisibleEntities && terrainDataLoaded) {
+      const currentViewport = {
+        x1: windowRange.colStart,
+        y1: windowRange.rowStart,
+        x2: windowRange.colEnd,
+        y2: windowRange.rowEnd,
+      };
+      setEntityUpdateViewportParams(currentViewport);
+    }
+  }, [crewStatus?.isInCrew, hasVisibleEntities, terrainDataLoaded, windowRange]);
 
   // Precompute terrain style map and position style caches
   // Memoized with stable references to prevent unnecessary re-renders
