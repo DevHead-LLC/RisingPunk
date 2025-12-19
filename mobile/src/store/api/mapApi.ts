@@ -31,10 +31,19 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
       return result;
     } else {
       const error = result.error as any;
+      // Check for AbortError in multiple possible locations and formats
+      // RTK Query cancels in-flight requests when new requests are made (expected during fast panning)
+      const errorString = typeof error?.error === 'string' ? error.error : '';
+      const errorMessage = typeof error?.message === 'string' ? error.message : '';
+      const status = error?.status;
+      
       const isAbortError = 
-        error?.error === 'AbortError: Aborted' ||
-        (error?.status === 'TIMEOUT_ERROR' && 
-         (typeof error?.error === 'string' && error.error.includes('AbortError')));
+        errorString === 'AbortError: Aborted' ||
+        errorString.includes('AbortError') ||
+        errorMessage.includes('AbortError') ||
+        errorMessage.includes('aborted') ||
+        (status === 'TIMEOUT_ERROR' && (errorString.includes('Abort') || errorMessage.includes('Abort'))) ||
+        error?.name === 'AbortError';
       
       if (isAbortError) {
         // RTK Query automatically cancels in-flight requests when new requests are made

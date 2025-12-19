@@ -27,6 +27,25 @@ const CELL_SIZE = 75;
 const MARGIN_SIZE = 80;
 
 /**
+ * Convert grid coordinates to pan coordinates (centers the cell on screen)
+ * @param gridX - Grid X coordinate (column)
+ * @param gridY - Grid Y coordinate (row)
+ * @param width - Container width
+ * @param height - Container height
+ * @returns Pan coordinates { x, y } to center the grid cell on screen
+ */
+const gridToPanCoordinates = (
+  gridX: number,
+  gridY: number,
+  width: number,
+  height: number
+): { x: number; y: number } => {
+  const x = (width / 2) - MARGIN_SIZE - ((gridX + 0.5) * CELL_SIZE);
+  const y = (height / 2) - MARGIN_SIZE - ((gridY + 0.5) * CELL_SIZE);
+  return { x, y };
+};
+
+/**
  * Calculate viewport coordinates from pan position
  * @param panX - Pan X coordinate
  * @param panY - Pan Y coordinate
@@ -193,9 +212,130 @@ const mergeGridData = (
   return mergedGrid;
 };
 
+/**
+ * Check if viewport has moved significantly outside the last fetched viewport
+ * @param newViewport - New viewport coordinates { x1, y1, x2, y2 }
+ * @param lastViewport - Last fetched viewport coordinates { x1, y1, x2, y2 } or null
+ * @param threshold - Movement threshold in cells (default: 5)
+ * @returns true if viewport should be fetched
+ */
+const shouldFetchViewport = (
+  newViewport: { x1: number; y1: number; x2: number; y2: number },
+  lastViewport: { x1: number; y1: number; x2: number; y2: number } | null,
+  threshold: number = 5
+): boolean => {
+  if (!lastViewport) return true;
+  return (
+    newViewport.x1 < lastViewport.x1 - threshold ||
+    newViewport.x2 > lastViewport.x2 + threshold ||
+    newViewport.y1 < lastViewport.y1 - threshold ||
+    newViewport.y2 > lastViewport.y2 + threshold
+  );
+};
+
+/**
+ * Trigger viewport fetch with minimal flag
+ * @param newViewport - New viewport coordinates { x1, y1, x2, y2, minimal?: boolean }
+ * @param panningViewportMinimalRef - Ref to store minimal flag
+ * @param setPanningViewportParams - State setter for viewport params
+ */
+const triggerViewportFetch = (
+  newViewport: { x1: number; y1: number; x2: number; y2: number; minimal?: boolean },
+  panningViewportMinimalRef: React.MutableRefObject<boolean>,
+  setPanningViewportParams: React.Dispatch<React.SetStateAction<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>>
+): void => {
+  panningViewportMinimalRef.current = true;
+  setPanningViewportParams(newViewport);
+};
+
 type Props = {
   onClose: () => void;
   restorePan?: { x: number; y: number };
+};
+
+/**
+ * Shared memo comparison function for Tile and PoolTile components
+ * Uses fast path (cell reference equality) with deep comparison fallback
+ */
+const tileMemoComparison = <T extends { 
+  x: number; 
+  y: number; 
+  cell: CellData; 
+  selected: boolean; 
+  currentUserHandle?: string | null; 
+  isShieldActive: boolean; 
+  isCrewMember?: boolean; 
+  isWarCrewMember?: boolean; 
+  isAllianceCrewMember?: boolean; 
+  dynamicEntityData: Record<string, any> 
+}>(prevProps: T, nextProps: T): boolean => {
+  // Phase 4: Enhanced memo comparison with fast path and deep fallback
+  // Fast path: Phase 2's stable cell references enable efficient reference equality check
+  if (prevProps.cell === nextProps.cell) {
+    // Same cell object reference - check other props that might affect rendering
+    return (
+      prevProps.x === nextProps.x &&
+      prevProps.y === nextProps.y &&
+      prevProps.selected === nextProps.selected &&
+      prevProps.currentUserHandle === nextProps.currentUserHandle &&
+      prevProps.isShieldActive === nextProps.isShieldActive &&
+      prevProps.isCrewMember === nextProps.isCrewMember &&
+      prevProps.isWarCrewMember === nextProps.isWarCrewMember &&
+      prevProps.isAllianceCrewMember === nextProps.isAllianceCrewMember &&
+      prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
+      nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
+    );
+  }
+  
+  // Deep comparison fallback: cell reference changed, check if cell data actually changed
+  return (
+    prevProps.x === nextProps.x &&
+    prevProps.y === nextProps.y &&
+    prevProps.selected === nextProps.selected &&
+    prevProps.cell.terrain === nextProps.cell.terrain &&
+    prevProps.cell.entity === nextProps.cell.entity &&
+    prevProps.cell.owner === nextProps.cell.owner &&
+    prevProps.cell.name === nextProps.cell.name &&
+    prevProps.cell.userId === nextProps.cell.userId &&
+    prevProps.cell.npcSlug === nextProps.cell.npcSlug &&
+    prevProps.cell.npcInstanceId === nextProps.cell.npcInstanceId &&
+    prevProps.cell.npcLevel === nextProps.cell.npcLevel &&
+    prevProps.cell.isShielded === nextProps.cell.isShielded &&
+    prevProps.currentUserHandle === nextProps.currentUserHandle &&
+    prevProps.isShieldActive === nextProps.isShieldActive &&
+    prevProps.isCrewMember === nextProps.isCrewMember &&
+    prevProps.isWarCrewMember === nextProps.isWarCrewMember &&
+    prevProps.isAllianceCrewMember === nextProps.isAllianceCrewMember &&
+    prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
+    nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
+  );
+};
+
+/**
+ * Shared memo comparison function for PanningTile and PanningPoolTile components
+ */
+const panningTileMemoComparison = <T extends {
+  x: number;
+  y: number;
+  terrain: TerrainType;
+  entityImage?: {
+    entity: EntityType;
+    owner?: string;
+    userId?: string;
+    npcSlug?: string;
+  };
+  isShieldActive: boolean;
+}>(prevProps: T, nextProps: T): boolean => {
+  return (
+    prevProps.x === nextProps.x &&
+    prevProps.y === nextProps.y &&
+    prevProps.terrain === nextProps.terrain &&
+    prevProps.entityImage?.entity === nextProps.entityImage?.entity &&
+    prevProps.entityImage?.owner === nextProps.entityImage?.owner &&
+    prevProps.entityImage?.userId === nextProps.entityImage?.userId &&
+    prevProps.entityImage?.npcSlug === nextProps.entityImage?.npcSlug &&
+    prevProps.isShieldActive === nextProps.isShieldActive
+  );
 };
 
 export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
@@ -321,48 +461,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         </View>
       </Pressable>
     );
-  }, (prevProps, nextProps) => {
-    // Phase 4: Enhanced memo comparison with fast path and deep fallback
-    // Fast path: Phase 2's stable cell references enable efficient reference equality check
-    if (prevProps.cell === nextProps.cell) {
-      // Same cell object reference - check other props that might affect rendering
-      return (
-        prevProps.x === nextProps.x &&
-        prevProps.y === nextProps.y &&
-        prevProps.selected === nextProps.selected &&
-        prevProps.currentUserHandle === nextProps.currentUserHandle &&
-        prevProps.isShieldActive === nextProps.isShieldActive &&
-        prevProps.isCrewMember === nextProps.isCrewMember &&
-        prevProps.isWarCrewMember === nextProps.isWarCrewMember &&
-        prevProps.isAllianceCrewMember === nextProps.isAllianceCrewMember &&
-        prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
-        nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
-      );
-    }
-    
-    // Deep comparison fallback: cell reference changed, check if cell data actually changed
-    return (
-      prevProps.x === nextProps.x &&
-      prevProps.y === nextProps.y &&
-      prevProps.selected === nextProps.selected &&
-      prevProps.cell.terrain === nextProps.cell.terrain &&
-      prevProps.cell.entity === nextProps.cell.entity &&
-      prevProps.cell.owner === nextProps.cell.owner &&
-      prevProps.cell.name === nextProps.cell.name &&
-      prevProps.cell.userId === nextProps.cell.userId &&
-      prevProps.cell.npcSlug === nextProps.cell.npcSlug &&
-      prevProps.cell.npcInstanceId === nextProps.cell.npcInstanceId &&
-      prevProps.cell.npcLevel === nextProps.cell.npcLevel &&
-      prevProps.cell.isShielded === nextProps.cell.isShielded &&
-      prevProps.currentUserHandle === nextProps.currentUserHandle &&
-      prevProps.isShieldActive === nextProps.isShieldActive &&
-      prevProps.isCrewMember === nextProps.isCrewMember &&
-      prevProps.isWarCrewMember === nextProps.isWarCrewMember &&
-      prevProps.isAllianceCrewMember === nextProps.isAllianceCrewMember &&
-      prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
-      nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
-    );
-  });
+  }, tileMemoComparison);
 
   // Phase 3: Simplified tile component for panning (terrain + image only, no labels/levels/indicators)
   type PanningTileProps = {
@@ -430,18 +529,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         </View>
       </View>
     );
-  }, (prevProps, nextProps) => {
-    return (
-      prevProps.x === nextProps.x &&
-      prevProps.y === nextProps.y &&
-      prevProps.terrain === nextProps.terrain &&
-      prevProps.entityImage?.entity === nextProps.entityImage?.entity &&
-      prevProps.entityImage?.owner === nextProps.entityImage?.owner &&
-      prevProps.entityImage?.userId === nextProps.entityImage?.userId &&
-      prevProps.entityImage?.npcSlug === nextProps.entityImage?.npcSlug &&
-      prevProps.isShieldActive === nextProps.isShieldActive
-    );
-  });
+  }, panningTileMemoComparison);
 
   // Phase 3: Wrapper for PanningTile (adds yStyle positioning like PoolTile does for Tile)
   type PanningPoolTileProps = {
@@ -468,18 +556,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         <PanningTile x={x} y={y} terrain={terrain} entityImage={entityImage} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserId={currentUserId} isShieldActive={isShieldActive} styles={styles} />
       </View>
     );
-  }, (prevProps, nextProps) => {
-    return (
-      prevProps.x === nextProps.x &&
-      prevProps.y === nextProps.y &&
-      prevProps.terrain === nextProps.terrain &&
-      prevProps.entityImage?.entity === nextProps.entityImage?.entity &&
-      prevProps.entityImage?.owner === nextProps.entityImage?.owner &&
-      prevProps.entityImage?.userId === nextProps.entityImage?.userId &&
-      prevProps.entityImage?.npcSlug === nextProps.entityImage?.npcSlug &&
-      prevProps.isShieldActive === nextProps.isShieldActive
-    );
-  });
+  }, panningTileMemoComparison);
 
   const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember }) => {
     return (
@@ -487,48 +564,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} isCrewMember={isCrewMember} isWarCrewMember={isWarCrewMember} isAllianceCrewMember={isAllianceCrewMember} />
       </View>
     );
-  }, (prevProps, nextProps) => {
-    // Phase 4: Enhanced memo comparison with fast path and deep fallback
-    // Fast path: Phase 2's stable cell references enable efficient reference equality check
-    if (prevProps.cell === nextProps.cell) {
-      // Same cell object reference - check other props that might affect rendering
-      return (
-        prevProps.x === nextProps.x &&
-        prevProps.y === nextProps.y &&
-        prevProps.selected === nextProps.selected &&
-        prevProps.currentUserHandle === nextProps.currentUserHandle &&
-        prevProps.isShieldActive === nextProps.isShieldActive &&
-        prevProps.isCrewMember === nextProps.isCrewMember &&
-        prevProps.isWarCrewMember === nextProps.isWarCrewMember &&
-        prevProps.isAllianceCrewMember === nextProps.isAllianceCrewMember &&
-        prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
-        nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
-      );
-    }
-    
-    // Deep comparison fallback: cell reference changed, check if cell data actually changed
-    return (
-      prevProps.x === nextProps.x &&
-      prevProps.y === nextProps.y &&
-      prevProps.selected === nextProps.selected &&
-      prevProps.cell.terrain === nextProps.cell.terrain &&
-      prevProps.cell.entity === nextProps.cell.entity &&
-      prevProps.cell.owner === nextProps.cell.owner &&
-      prevProps.cell.name === nextProps.cell.name &&
-      prevProps.cell.userId === nextProps.cell.userId &&
-      prevProps.cell.npcSlug === nextProps.cell.npcSlug &&
-      prevProps.cell.npcInstanceId === nextProps.cell.npcInstanceId &&
-      prevProps.cell.npcLevel === nextProps.cell.npcLevel &&
-      prevProps.cell.isShielded === nextProps.cell.isShielded &&
-      prevProps.currentUserHandle === nextProps.currentUserHandle &&
-      prevProps.isShieldActive === nextProps.isShieldActive &&
-      prevProps.isCrewMember === nextProps.isCrewMember &&
-      prevProps.isWarCrewMember === nextProps.isWarCrewMember &&
-      prevProps.isAllianceCrewMember === nextProps.isAllianceCrewMember &&
-      prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
-      nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
-    );
-  });
+  }, tileMemoComparison);
 
   type RowProps = {
     y: number;
@@ -629,24 +665,24 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   
   // Phase 5: Sync ref to state when panning stops
   useEffect(() => {
-    if (panningStopped && !isPanningJS) {
-      // Panning stopped - sync ref to state to ensure consistency
-      setWindowRange(prev => {
-        const refRange = windowRangeRef.current;
-        // Only update if ref differs from state (avoid unnecessary update)
-        if (prev.rowStart !== refRange.rowStart || prev.rowEnd !== refRange.rowEnd ||
-            prev.colStart !== refRange.colStart || prev.colEnd !== refRange.colEnd) {
-          return refRange;
-        }
-        return prev;
-      });
-    }
-    
-    // Keep ref in sync with state when not panning and panning has stopped
-    // Only sync when panningStopped is true to avoid overwriting ref during 200ms transition window
-    // During transition: isPanningJS=false but panningStopped=false, ref still has latest panning data
     if (!isPanningJS && panningStopped) {
-      windowRangeRef.current = windowRange;
+      const refRange = windowRangeRef.current;
+      const stateRange = windowRange;
+      
+      // Check if state and ref differ
+      const differs = stateRange.rowStart !== refRange.rowStart || stateRange.rowEnd !== refRange.rowEnd ||
+                      stateRange.colStart !== refRange.colStart || stateRange.colEnd !== refRange.colEnd;
+      
+      if (differs) {
+        // State and ref differ - sync state to ref (ref has latest panning data)
+        setWindowRange(refRange);
+        // Don't sync ref to state here - wait for state update to complete
+        // The next render will have state == ref, and we can safely sync if needed
+      } else {
+        // State and ref are equal - safe to keep ref in sync with state
+        // This handles cases where state is updated externally (not through this effect)
+        windowRangeRef.current = stateRange;
+      }
     }
   }, [panningStopped, isPanningJS, windowRange]);
 
@@ -2183,13 +2219,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           
           // Phase 6: Trigger viewport fetch with minimal flag if we've moved significantly outside the last fetched viewport
           const newViewport = { x1: startCol, y1: startRow, x2: endCol, y2: endRow, minimal: true };
-          const lastViewport = lastFetchedViewportRef.current;
-          if (!lastViewport || 
-              startCol < lastViewport.x1 - 5 || endCol > lastViewport.x2 + 5 ||
-              startRow < lastViewport.y1 - 5 || endRow > lastViewport.y2 + 5) {
-            // Phase 6: Significant movement - trigger viewport fetch with minimal flag (terrain + images only)
-            panningViewportMinimalRef.current = true; // Store minimal flag in ref to avoid dependency issues
-            setPanningViewportParams(newViewport);
+          if (shouldFetchViewport(newViewport, lastFetchedViewportRef.current)) {
+            triggerViewportFetch(newViewport, panningViewportMinimalRef, setPanningViewportParams);
           }
         }
       }
@@ -2211,13 +2242,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         
         // Phase 6: Trigger viewport fetch with minimal flag if we've moved significantly outside the last fetched viewport
         const newViewport = { x1: startCol, y1: startRow, x2: endCol, y2: endRow, minimal: true };
-        const lastViewport = lastFetchedViewportRef.current;
-        if (!lastViewport || 
-            startCol < lastViewport.x1 - 5 || endCol > lastViewport.x2 + 5 ||
-            startRow < lastViewport.y1 - 5 || endRow > lastViewport.y2 + 5) {
-          // Phase 6: Significant movement - trigger viewport fetch with minimal flag (terrain + images only)
-          panningViewportMinimalRef.current = true; // Store minimal flag in ref to avoid dependency issues
-          setPanningViewportParams(newViewport);
+        if (shouldFetchViewport(newViewport, lastFetchedViewportRef.current)) {
+          triggerViewportFetch(newViewport, panningViewportMinimalRef, setPanningViewportParams);
         }
         
         return newWindowRange;
@@ -2258,8 +2284,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       }
       
       // Convert grid coordinates to pan coordinates (center the cell on screen)
-      const targetX = (containerSize.width / 2) - MARGIN_SIZE - ((restorePan.x + 0.5) * CELL_SIZE);
-      const targetY = (containerSize.height / 2) - MARGIN_SIZE - ((restorePan.y + 0.5) * CELL_SIZE);
+      const { x: targetX, y: targetY } = gridToPanCoordinates(restorePan.x, restorePan.y, containerSize.width, containerSize.height);
       
       // Clamp to valid pan bounds (read SharedValues directly)
       const clampedX = Math.min(maxX.value, Math.max(minX.value, targetX));
@@ -2379,8 +2404,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             if (homeX != null) break;
           }
           if (homeX != null && homeY != null) {
-            const targetX = (containerSize.width / 2) - MARGIN_SIZE - ((homeX + 0.5) * CELL_SIZE);
-            const targetY = (containerSize.height / 2) - MARGIN_SIZE - ((homeY + 0.5) * CELL_SIZE);
+            const { x: targetX, y: targetY } = gridToPanCoordinates(homeX, homeY, containerSize.width, containerSize.height);
             const cx = Math.min(maxX.value, Math.max(minX.value, targetX));
             const cy = Math.min(maxY.value, Math.max(minY.value, targetY));
             offsetX.value = cx;
