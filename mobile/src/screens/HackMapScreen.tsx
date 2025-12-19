@@ -251,6 +251,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       prevProps.entityImage?.entity === nextProps.entityImage?.entity &&
       prevProps.entityImage?.owner === nextProps.entityImage?.owner &&
       prevProps.entityImage?.userId === nextProps.entityImage?.userId &&
+      prevProps.entityImage?.npcSlug === nextProps.entityImage?.npcSlug &&
       prevProps.isShieldActive === nextProps.isShieldActive
     );
   });
@@ -288,6 +289,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       prevProps.entityImage?.entity === nextProps.entityImage?.entity &&
       prevProps.entityImage?.owner === nextProps.entityImage?.owner &&
       prevProps.entityImage?.userId === nextProps.entityImage?.userId &&
+      prevProps.entityImage?.npcSlug === nextProps.entityImage?.npcSlug &&
       prevProps.isShieldActive === nextProps.isShieldActive
     );
   });
@@ -1810,6 +1812,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       // Clear cache when returning from battle to ensure fresh data (NPCs may have been defeated)
       setStaticTerrainData({});
       setDynamicEntityData({});
+      setEntityImageData({});
       setTerrainDataLoaded(false);
       refetch();
     }
