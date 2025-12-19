@@ -486,10 +486,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
   }, [panningStopped, isPanningJS, windowRange]);
 
-  // Phase 4: Throttle re-renders during panning
-  const lastWindowRangeUpdateRef = useRef<number>(0);
-  const renderThrottleMs = 33; // 30fps during panning
-
   // Use ref for lastUpdateTime to avoid circular dependency
   const lastUpdateTimeRef = useRef(0);
 
