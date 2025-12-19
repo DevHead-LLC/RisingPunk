@@ -726,10 +726,17 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const mapData = needsFullMap ? fullMapData : initialViewportData;
   const isLoading = isLoadingInitialViewport || (needsFullMap && isLoadingFullMap);
   
-  // Check if user's house is in initial viewport (only check once)
+  // Check if user's house is in initial viewport (check once per user)
   const hasCheckedUserLocationRef = useRef<boolean>(false);
+  const lastCheckedUserHandleRef = useRef<string | null>(null);
   useEffect(() => {
-    if (hasCheckedUserLocationRef.current) return; // Only check once
+    // Reset check if user handle changed
+    if (lastCheckedUserHandleRef.current !== currentUserHandle) {
+      hasCheckedUserLocationRef.current = false;
+      lastCheckedUserHandleRef.current = currentUserHandle;
+    }
+    
+    if (hasCheckedUserLocationRef.current) return; // Already checked for this user
     if (!initialViewportData || !initialViewportData.grid || !currentUserHandle) return;
     if (needsFullMap) return; // Already decided we need full map
     
@@ -1952,8 +1959,20 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   // Restore pan position if provided (now safe, computeWindow is defined)
   // Track restored position to prevent re-restoring when user pans
   const restoredPanRef = useRef<{ x: number; y: number } | null>(null);
+  
+  // Track bounds ready state in JS to trigger effect when bounds become ready
+  const [boundsReadyJS, setBoundsReadyJS] = useState(false);
+  useAnimatedReaction(
+    () => boundsReady.value,
+    (ready) => {
+      if (ready) {
+        runOnJS(setBoundsReadyJS)(true);
+      }
+    }
+  );
+  
   useEffect(() => {
-    if (restorePan && containerSize.width > 0 && containerSize.height > 0 && boundsReady.value) {
+    if (restorePan && containerSize.width > 0 && containerSize.height > 0 && boundsReadyJS) {
       // Only restore if this is a new restorePan value (not already restored)
       const restoreKey = `${restorePan.x},${restorePan.y}`;
       const lastRestoredKey = restoredPanRef.current ? `${restoredPanRef.current.x},${restoredPanRef.current.y}` : null;
@@ -1973,7 +1992,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       const targetX = (containerSize.width / 2) - MARGIN_SIZE - ((restorePan.x + 0.5) * CELL_SIZE);
       const targetY = (containerSize.height / 2) - MARGIN_SIZE - ((restorePan.y + 0.5) * CELL_SIZE);
       
-      // Clamp to valid pan bounds
+      // Clamp to valid pan bounds (read SharedValues directly)
       const clampedX = Math.min(maxX.value, Math.max(minX.value, targetX));
       const clampedY = Math.min(maxY.value, Math.max(minY.value, targetY));
       
@@ -2009,7 +2028,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       // Clear restored ref when restorePan is cleared (user navigated away)
       restoredPanRef.current = null;
     }
-  }, [restorePan, containerSize.width, containerSize.height, computeWindow, maxX, maxY, grid, boundsReady]);
+  }, [restorePan, containerSize.width, containerSize.height, computeWindow, grid, boundsReadyJS]);
 
   useEffect(() => {
     // Only compute initial window after bounds are ready and container is set
