@@ -114,6 +114,85 @@ const cleanupEmptyCells = (
   return deletedKeys;
 };
 
+/**
+ * Get cells to check for cleanup operations
+ * Returns array of {x, y, cell} objects either from viewport or full grid
+ * @param grid - Grid data
+ * @param viewport - Optional viewport coordinates { x1, y1, x2, y2 }
+ * @returns Array of {x, y, cell} objects
+ */
+const getCellsToCheck = (
+  grid: any[][],
+  viewport?: { x1: number; y1: number; x2: number; y2: number }
+): Array<{ x: number; y: number; cell: any }> => {
+  const cells: Array<{ x: number; y: number; cell: any }> = [];
+  
+  if (viewport) {
+    // Viewport: only iterate through cells in viewport
+    for (let y = viewport.y1; y <= viewport.y2; y++) {
+      const row = grid[y];
+      if (!row) continue;
+      for (let x = viewport.x1; x <= viewport.x2; x++) {
+        const cell = row[x];
+        if (cell) cells.push({ x, y, cell });
+      }
+    }
+  } else {
+    // Full map: iterate through all cells
+    for (let y = 0; y < grid.length; y++) {
+      const row = grid[y];
+      if (!row) continue;
+      for (let x = 0; x < row.length; x++) {
+        const cell = row[x];
+        if (cell) cells.push({ x, y, cell });
+      }
+    }
+  }
+  
+  return cells;
+};
+
+/**
+ * Merge grid data from new grid into current grid for a specific viewport
+ * Creates a deep copy of current grid and merges new data within viewport bounds
+ * @param currentGrid - Current grid data (from gridRef or state)
+ * @param newGrid - New grid data to merge
+ * @param viewport - Viewport coordinates { x1, y1, x2, y2 }
+ * @param gridSize - Grid size (for fallback empty grid creation)
+ * @returns Merged grid (deep copy, safe to mutate)
+ */
+const mergeGridData = (
+  currentGrid: any[][],
+  newGrid: any[][],
+  viewport: { x1: number; y1: number; x2: number; y2: number },
+  gridSize: number
+): any[][] => {
+  // Create a deep copy to avoid mutating Redux state
+  const mergedGrid = (currentGrid.length > 0 ? currentGrid : Array.from({ length: gridSize }, () => 
+    Array.from({ length: gridSize }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
+  )).map(row => row ? [...row] : []);
+  
+  // Only update cells within viewport
+  for (let y = viewport.y1; y <= viewport.y2; y++) {
+    const row = newGrid[y];
+    if (!row) continue;
+    if (!mergedGrid[y]) {
+      mergedGrid[y] = [];
+    }
+    for (let x = viewport.x1; x <= viewport.x2; x++) {
+      const cell = row[x];
+      if (cell) {
+        if (!mergedGrid[y][x]) {
+          mergedGrid[y][x] = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityType };
+        }
+        mergedGrid[y][x] = { ...mergedGrid[y][x], ...cell };
+      }
+    }
+  }
+  
+  return mergedGrid;
+};
+
 type Props = {
   onClose: () => void;
   restorePan?: { x: number; y: number };
@@ -1490,27 +1569,16 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         });
         
         // Update grid data - use ref to get latest grid value to avoid stale closures
-        const currentGrid = gridRef.current.length > 0 ? gridRef.current : Array.from({ length: gridSize }, () => 
-          Array.from({ length: gridSize }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
+        const mergedGrid = mergeGridData(
+          gridRef.current,
+          entityUpdateViewportData.grid,
+          viewport,
+          gridSize
         );
-        const mergedGrid = currentGrid.map(row => row ? [...row] : []);
-        for (let y = viewport.y1; y <= viewport.y2; y++) {
-          const row = entityUpdateViewportData.grid[y];
-          if (!row) continue;
-          if (!mergedGrid[y]) {
-            mergedGrid[y] = [];
-          }
-          for (let x = viewport.x1; x <= viewport.x2; x++) {
-            const cell = row[x];
-            if (cell) {
-              if (!mergedGrid[y][x]) {
-                mergedGrid[y][x] = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityType };
-              }
-              mergedGrid[y][x] = { ...mergedGrid[y][x], ...cell };
-            }
-          }
-        }
         dispatch(setGrid(mergedGrid));
+        // Bug Fix: Update gridRef immediately to prevent race conditions
+        // If multiple effects run in the same cycle, they need to read the updated value
+        gridRef.current = mergedGrid;
       });
       
       // Clear viewport params to allow next refresh
@@ -1786,37 +1854,12 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           
           // Phase 2: Also clear entityImageData for cells that are now empty
           // Bug Fix: Only iterate through cells that are in the viewport (if viewport provided)
-          const cellsToCheck = mapData.viewport 
-            ? (() => {
-                const cells: Array<{ x: number; y: number; cell: any }> = [];
-                for (let y = mapData.viewport!.y1; y <= mapData.viewport!.y2; y++) {
-                  const row = mapData.grid[y];
-                  if (!row) continue;
-                  for (let x = mapData.viewport!.x1; x <= mapData.viewport!.x2; x++) {
-                    const cell = row[x];
-                    if (cell) cells.push({ x, y, cell });
-                  }
-                }
-                return cells;
-              })()
-            : (() => {
-                const cells: Array<{ x: number; y: number; cell: any }> = [];
-                for (let y = 0; y < mapData.grid.length; y++) {
-                  const row = mapData.grid[y];
-                  if (!row) continue;
-                  for (let x = 0; x < row.length; x++) {
-                    const cell = row[x];
-                    if (cell) cells.push({ x, y, cell });
-                  }
-                }
-                return cells;
-              })();
-          
-          // Clean up entity image cache for cells that are now empty
           if (mapData.viewport) {
+            // Viewport: use helper for efficient cleanup
             cleanupEmptyCells(merged, mapData.grid, mapData.viewport);
           } else {
-            // For full map, iterate through all cells
+            // Full map: iterate through all cells
+            const cellsToCheck = getCellsToCheck(mapData.grid);
             for (const { x, y, cell } of cellsToCheck) {
               const key = `${x},${y}`;
               if (cell.entity === 'empty' && merged[key]) {
@@ -1837,37 +1880,12 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           
           // Bug Fix: Only iterate through cells that are in the viewport (if viewport provided)
           // For full map requests, iterate all cells. For viewport requests, only viewport cells.
-          const cellsToCheck = mapData.viewport 
-            ? (() => {
-                const cells: Array<{ x: number; y: number; cell: any }> = [];
-                for (let y = mapData.viewport!.y1; y <= mapData.viewport!.y2; y++) {
-                  const row = mapData.grid[y];
-                  if (!row) continue;
-                  for (let x = mapData.viewport!.x1; x <= mapData.viewport!.x2; x++) {
-                    const cell = row[x];
-                    if (cell) cells.push({ x, y, cell });
-                  }
-                }
-                return cells;
-              })()
-            : (() => {
-                const cells: Array<{ x: number; y: number; cell: any }> = [];
-                for (let y = 0; y < mapData.grid.length; y++) {
-                  const row = mapData.grid[y];
-                  if (!row) continue;
-                  for (let x = 0; x < row.length; x++) {
-                    const cell = row[x];
-                    if (cell) cells.push({ x, y, cell });
-                  }
-                }
-                return cells;
-              })();
-          
-          // Clean up entity details cache for cells that are now empty
           if (mapData.viewport) {
+            // Viewport: use helper for efficient cleanup
             cleanupEmptyCells(merged, mapData.grid, mapData.viewport);
           } else {
-            // For full map, iterate through all cells
+            // Full map: iterate through all cells
+            const cellsToCheck = getCellsToCheck(mapData.grid);
             for (const { x, y, cell } of cellsToCheck) {
               const key = `${x},${y}`;
               if (cell.entity === 'empty' && merged[key]) {
@@ -1898,38 +1916,25 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             // Viewport request - merge with existing grid
             // Bug Fix: Read from ref to get latest grid value, avoiding stale closures
             // This ensures sequential viewport updates don't overwrite each other's changes
-            const currentGrid = gridRef.current.length > 0 ? gridRef.current : Array.from({ length: mapData.grid.length }, () => 
-              Array.from({ length: mapData.grid[0]?.length || 50 }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
+            const mergedGrid = mergeGridData(
+              gridRef.current,
+              mapData.grid,
+              { x1: vx1, y1: vy1, x2: vx2, y2: vy2 },
+              mapData.grid.length
             );
             
-            // Create a deep copy to avoid mutating Redux state
-            const mergedGrid = currentGrid.map(row => row ? [...row] : []);
-            
-            // Only update cells within viewport (using validated coordinates)
-            for (let y = vy1; y <= vy2; y++) {
-              const row = mapData.grid[y];
-              if (!row) continue;
-              if (!mergedGrid[y]) {
-                mergedGrid[y] = [];
-              }
-              for (let x = vx1; x <= vx2; x++) {
-                const cell = row[x];
-                if (cell) {
-                  if (!mergedGrid[y][x]) {
-                    mergedGrid[y][x] = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityType };
-                  }
-                  mergedGrid[y][x] = { ...mergedGrid[y][x], ...cell };
-                }
-              }
-            }
-            
             dispatch(setGrid(mergedGrid));
+            // Bug Fix: Update gridRef immediately to prevent race conditions
+            // If multiple effects run in the same cycle, they need to read the updated value
+            gridRef.current = mergedGrid;
             // Phase 5 Fix: Initialize last fetched viewport to initial viewport bounds
             lastFetchedViewportRef.current = { x1: vx1, y1: vy1, x2: vx2, y2: vy2 };
           }
         } else {
           // Full map request - replace entire grid
           dispatch(setGrid(mapData.grid));
+          // Bug Fix: Update gridRef immediately to prevent race conditions
+          gridRef.current = mapData.grid;
           // Phase 5 Fix: Initialize last fetched viewport to full map bounds
           lastFetchedViewportRef.current = { x1: 0, y1: 0, x2: gridSize - 1, y2: gridSize - 1 };
         }
@@ -1999,28 +2004,16 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         // Merge grid data - use ref to get latest grid value to avoid stale closures
         // Bug #13: Calculate gridSize from ref inside effect (not from outer scope)
         const gridSize = gridRef.current.length > 0 ? gridRef.current.length : 50;
-        const currentGrid = gridRef.current.length > 0 ? gridRef.current : Array.from({ length: gridSize }, () => 
-          Array.from({ length: gridSize }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
+        const mergedGrid = mergeGridData(
+          gridRef.current,
+          panningViewportData.grid,
+          viewport,
+          gridSize
         );
-        // Create a deep copy to avoid mutating Redux state
-        const mergedGrid = currentGrid.map(row => row ? [...row] : []);
-        for (let y = viewport.y1; y <= viewport.y2; y++) {
-          const row = panningViewportData.grid[y];
-          if (!row) continue;
-          if (!mergedGrid[y]) {
-            mergedGrid[y] = [];
-          }
-          for (let x = viewport.x1; x <= viewport.x2; x++) {
-            const cell = row[x];
-            if (cell) {
-              if (!mergedGrid[y][x]) {
-                mergedGrid[y][x] = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityType };
-              }
-              mergedGrid[y][x] = { ...mergedGrid[y][x], ...cell };
-            }
-          }
-        }
         dispatch(setGrid(mergedGrid));
+        // Bug Fix: Update gridRef immediately to prevent race conditions
+        // If multiple effects run in the same cycle, they need to read the updated value
+        gridRef.current = mergedGrid;
       });
       
       // Update last fetched viewport (without minimal flag for comparison)
@@ -2111,28 +2104,16 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         });
         
         // Merge grid data (update entity details in grid) - use ref to get latest grid value to avoid stale closures
-        const currentGrid = gridRef.current.length > 0 ? gridRef.current : Array.from({ length: gridSize }, () => 
-          Array.from({ length: gridSize }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
+        const mergedGrid = mergeGridData(
+          gridRef.current,
+          stoppedViewportData.grid,
+          viewport,
+          gridSize
         );
-        // Create a deep copy to avoid mutating Redux state
-        const mergedGrid = currentGrid.map(row => row ? [...row] : []);
-        for (let y = viewport.y1; y <= viewport.y2; y++) {
-          const row = stoppedViewportData.grid[y];
-          if (!row) continue;
-          if (!mergedGrid[y]) {
-            mergedGrid[y] = [];
-          }
-          for (let x = viewport.x1; x <= viewport.x2; x++) {
-            const cell = row[x];
-            if (cell) {
-              if (!mergedGrid[y][x]) {
-                mergedGrid[y][x] = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityType };
-              }
-              mergedGrid[y][x] = { ...mergedGrid[y][x], ...cell };
-            }
-          }
-        }
         dispatch(setGrid(mergedGrid));
+        // Bug Fix: Update gridRef immediately to prevent race conditions
+        // If multiple effects run in the same cycle, they need to read the updated value
+        gridRef.current = mergedGrid;
       });
       
       // Clear stopped viewport params to allow next fetch
