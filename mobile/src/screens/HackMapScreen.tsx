@@ -283,6 +283,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [lastShieldStatus, setLastShieldStatus] = useState<boolean | null>(null);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
+  // Phase 1: Panning state management
+  const [isPanningJS, setIsPanningJS] = useState<boolean>(false);
+  const [panningStopped, setPanningStopped] = useState<boolean>(true);
+
   // Use ref for lastUpdateTime to avoid circular dependency
   const lastUpdateTimeRef = useRef(0);
   
@@ -465,6 +469,26 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       ],
     } as const;
   });
+
+  // Phase 1: Sync Reanimated isPanning to JS state
+  useAnimatedReaction(
+    () => isPanning.value,
+    (panning) => {
+      runOnJS(setIsPanningJS)(panning);
+    }
+  );
+
+  // Phase 1: Debounce panning stopped (200ms after pan ends)
+  useEffect(() => {
+    if (!isPanningJS) {
+      const timer = setTimeout(() => {
+        setPanningStopped(true);
+      }, 200);
+      return () => clearTimeout(timer);
+    } else {
+      setPanningStopped(false);
+    }
+  }, [isPanningJS]);
 
   useAnimatedReaction(
     () => {
