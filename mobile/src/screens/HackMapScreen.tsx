@@ -354,6 +354,7 @@ const panningTileMemoComparison = <T extends {
     userId?: string;
     npcSlug?: string;
   };
+  currentUserId?: string | null;
   isShieldActive: boolean;
 }>(prevProps: T, nextProps: T): boolean => {
   return (
@@ -364,6 +365,7 @@ const panningTileMemoComparison = <T extends {
     prevProps.entityImage?.owner === nextProps.entityImage?.owner &&
     prevProps.entityImage?.userId === nextProps.entityImage?.userId &&
     prevProps.entityImage?.npcSlug === nextProps.entityImage?.npcSlug &&
+    prevProps.currentUserId === nextProps.currentUserId &&
     prevProps.isShieldActive === nextProps.isShieldActive
   );
 };
