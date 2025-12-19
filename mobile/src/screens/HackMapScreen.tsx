@@ -1199,18 +1199,22 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   );
 
   // Phase 9: Process entity update viewport data
-  // Track processed viewport to prevent infinite loops
-  const processedEntityUpdateViewportRef = useRef<string | null>(null);
+  // Track processed viewport with timestamp to allow reprocessing for polling updates
+  const processedEntityUpdateViewportRef = useRef<{ viewportKey: string; timestamp: number } | null>(null);
   useEffect(() => {
     if (entityUpdateViewportData && entityUpdateViewportData.grid && entityUpdateViewportData.viewport) {
       const viewport = entityUpdateViewportData.viewport;
       const viewportKey = `${viewport.x1},${viewport.y1},${viewport.x2},${viewport.y2}`;
+      const now = Date.now();
       
-      // Phase 9: Prevent processing the same viewport twice
-      if (processedEntityUpdateViewportRef.current === viewportKey) {
+      // Phase 9: Prevent duplicate processing within same render cycle, but allow reprocessing for polling
+      // Check if same viewport was processed very recently (< 1 second) to prevent infinite loops
+      // This allows 10-second polling to work while preventing rapid duplicate processing
+      if (processedEntityUpdateViewportRef.current?.viewportKey === viewportKey && 
+          now - processedEntityUpdateViewportRef.current.timestamp < 1000) {
         return;
       }
-      processedEntityUpdateViewportRef.current = viewportKey;
+      processedEntityUpdateViewportRef.current = { viewportKey, timestamp: now };
       
       const { terrain, entityImages, entityDetails } = separateStaticAndDynamicData(entityUpdateViewportData.grid, entityUpdateViewportData.viewport);
       
