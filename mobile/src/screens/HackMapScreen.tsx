@@ -1224,6 +1224,20 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         Object.entries(entityImages).forEach(([key, value]) => {
           merged[key] = value;
         });
+        
+        // Clean up entity image cache for cells that are now empty
+        for (let y = viewport.y1; y <= viewport.y2; y++) {
+          const row = entityUpdateViewportData.grid[y];
+          if (!row) continue;
+          for (let x = viewport.x1; x <= viewport.x2; x++) {
+            const cell = row[x];
+            const key = `${x},${y}`;
+            if (cell && cell.entity === 'empty' && merged[key]) {
+              delete merged[key];
+            }
+          }
+        }
+        
         return merged;
       });
       
@@ -1232,6 +1246,20 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         Object.entries(entityDetails).forEach(([key, value]) => {
           merged[key] = value;
         });
+        
+        // Clean up entity details cache for cells that are now empty
+        for (let y = viewport.y1; y <= viewport.y2; y++) {
+          const row = entityUpdateViewportData.grid[y];
+          if (!row) continue;
+          for (let x = viewport.x1; x <= viewport.x2; x++) {
+            const cell = row[x];
+            const key = `${x},${y}`;
+            if (cell && cell.entity === 'empty' && merged[key]) {
+              delete merged[key];
+            }
+          }
+        }
+        
         return merged;
       });
       
@@ -1612,6 +1640,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           }
           
           dispatch(setGrid(mergedGrid));
+          // Phase 5 Fix: Initialize last fetched viewport to initial viewport bounds
+          lastFetchedViewportRef.current = { x1: vx1, y1: vy1, x2: vx2, y2: vy2 };
         }
       } else {
         // Full map request - replace entire grid
@@ -1656,6 +1686,20 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         Object.entries(entityImages).forEach(([key, value]) => {
           merged[key] = value;
         });
+        
+        // Clean up entity image cache for cells that are now empty
+        for (let y = viewport.y1; y <= viewport.y2; y++) {
+          const row = panningViewportData.grid[y];
+          if (!row) continue;
+          for (let x = viewport.x1; x <= viewport.x2; x++) {
+            const cell = row[x];
+            const key = `${x},${y}`;
+            if (cell && cell.entity === 'empty' && merged[key]) {
+              delete merged[key];
+            }
+          }
+        }
+        
         return merged;
       });
       
@@ -1667,6 +1711,20 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           Object.entries(entityDetails).forEach(([key, value]) => {
             merged[key] = value;
           });
+          
+          // Clean up entity details cache for cells that are now empty
+          for (let y = viewport.y1; y <= viewport.y2; y++) {
+            const row = panningViewportData.grid[y];
+            if (!row) continue;
+            for (let x = viewport.x1; x <= viewport.x2; x++) {
+              const cell = row[x];
+              const key = `${x},${y}`;
+              if (cell && cell.entity === 'empty' && merged[key]) {
+                delete merged[key];
+              }
+            }
+          }
+          
           return merged;
         });
       }
@@ -1892,8 +1950,19 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   }, [gridSize, calculateVirtualViewport, isPanningJS]);
 
   // Restore pan position if provided (now safe, computeWindow is defined)
+  // Track restored position to prevent re-restoring when user pans
+  const restoredPanRef = useRef<{ x: number; y: number } | null>(null);
   useEffect(() => {
     if (restorePan && containerSize.width > 0 && containerSize.height > 0 && boundsReady.value) {
+      // Only restore if this is a new restorePan value (not already restored)
+      const restoreKey = `${restorePan.x},${restorePan.y}`;
+      const lastRestoredKey = restoredPanRef.current ? `${restoredPanRef.current.x},${restoredPanRef.current.y}` : null;
+      
+      if (restoreKey === lastRestoredKey) {
+        // Already restored this position - don't restore again
+        return;
+      }
+      
       // Validate grid coordinates are within bounds
       const gridSize = grid.length || 50;
       if (restorePan.x < 0 || restorePan.x >= gridSize || restorePan.y < 0 || restorePan.y >= gridSize) {
@@ -1911,6 +1980,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       offsetX.value = clampedX;
       offsetY.value = clampedY;
       lastComputedPan.value = { x: clampedX, y: clampedY };
+      
+      // Mark this position as restored
+      restoredPanRef.current = { x: restorePan.x, y: restorePan.y };
       
       // Force tile loading by properly calculating the new window range
       requestAnimationFrame(() => {
@@ -1933,8 +2005,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           colEnd: endCol
         });
       });
+    } else if (!restorePan) {
+      // Clear restored ref when restorePan is cleared (user navigated away)
+      restoredPanRef.current = null;
     }
-  }, [restorePan, containerSize.width, containerSize.height, computeWindow, offsetX, offsetY, maxX, maxY, grid]);
+  }, [restorePan, containerSize.width, containerSize.height, computeWindow, maxX, maxY, grid, boundsReady]);
 
   useEffect(() => {
     // Only compute initial window after bounds are ready and container is set
