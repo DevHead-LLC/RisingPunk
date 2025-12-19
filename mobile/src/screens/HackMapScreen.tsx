@@ -26,8 +26,41 @@ import { SIZING } from '../styles/theme';
 const CELL_SIZE = 75;
 const MARGIN_SIZE = 80;
 
-
-
+/**
+ * Calculate viewport coordinates from pan position
+ * @param panX - Pan X coordinate
+ * @param panY - Pan Y coordinate
+ * @param width - Container width
+ * @param height - Container height
+ * @param gridSize - Grid size (for clamping)
+ * @param buffer - Optional buffer in cells (default: 0)
+ * @returns Viewport coordinates { startCol, endCol, startRow, endRow } clamped to grid bounds
+ */
+const calculateViewportFromPan = (
+  panX: number,
+  panY: number,
+  width: number,
+  height: number,
+  gridSize: number,
+  buffer: number = 0
+): { startCol: number; endCol: number; startRow: number; endRow: number } => {
+  const gridLeft = panX + MARGIN_SIZE;
+  const gridTop = panY + MARGIN_SIZE;
+  
+  // Convert screen coordinates to grid coordinates
+  const baseStartCol = Math.floor((-gridLeft) / CELL_SIZE);
+  const baseEndCol = Math.ceil((width - gridLeft) / CELL_SIZE);
+  const baseStartRow = Math.floor((-gridTop) / CELL_SIZE);
+  const baseEndRow = Math.ceil((height - gridTop) / CELL_SIZE);
+  
+  // Apply buffer and clamp to grid bounds
+  const startCol = Math.max(0, baseStartCol - buffer);
+  const endCol = Math.min(gridSize - 1, baseEndCol + buffer);
+  const startRow = Math.max(0, baseStartRow - buffer);
+  const endRow = Math.min(gridSize - 1, baseEndRow + buffer);
+  
+  return { startCol, endCol, startRow, endRow };
+};
 
 type Props = {
   onClose: () => void;
@@ -632,22 +665,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const calculateVirtualViewport = useCallback((panX: number, panY: number, width: number, height: number) => {
     if (width <= 0 || height <= 0) return;
     
-    // Calculate the exact visible area in grid coordinates
-    const gridLeft = panX + MARGIN_SIZE;
-    const gridTop = panY + MARGIN_SIZE;
-    
-    // Convert screen coordinates to grid coordinates
-    const startCol = Math.floor((-gridLeft) / CELL_SIZE);
-    const endCol = Math.ceil((width - gridLeft) / CELL_SIZE);
-    const startRow = Math.floor((-gridTop) / CELL_SIZE);
-    const endRow = Math.ceil((height - gridTop) / CELL_SIZE);
-    
-    // Clamp to grid bounds
+    // Calculate the exact visible area in grid coordinates (no buffer)
     const gridSize = grid.length || 50;
-    const clampedStartCol = Math.max(0, startCol);
-    const clampedEndCol = Math.min(gridSize - 1, endCol);
-    const clampedStartRow = Math.max(0, startRow);
-    const clampedEndRow = Math.min(gridSize - 1, endRow);
+    const { startCol: clampedStartCol, endCol: clampedEndCol, startRow: clampedStartRow, endRow: clampedEndRow } = 
+      calculateViewportFromPan(panX, panY, width, height, gridSize, 0);
     
     // Generate visible tile keys (only what's actually on screen)
     const visibleTiles = new Set<string>();
@@ -2143,16 +2164,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     
     // Simplified buffer calculation - removed complex velocity math
     const baseBuffer = 8; // Reduced from 12 for better performance
-    const gridLeft = panX + MARGIN_SIZE;
-    const gridTop = panY + MARGIN_SIZE;
-    const baseStartCol = Math.floor((-gridLeft) / CELL_SIZE);
-    const baseEndCol = Math.ceil((width - gridLeft) / CELL_SIZE);
-    const baseStartRow = Math.floor((-gridTop) / CELL_SIZE);
-    const baseEndRow = Math.ceil((height - gridTop) / CELL_SIZE);
-    const startCol = Math.max(0, baseStartCol - baseBuffer);
-    const endCol = Math.min(gridSize - 1, baseEndCol + baseBuffer);
-    const startRow = Math.max(0, baseStartRow - baseBuffer);
-    const endRow = Math.min(gridSize - 1, baseEndRow + baseBuffer);
+    const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(panX, panY, width, height, gridSize, baseBuffer);
     
     // Phase 5: Use ref for windowRange during panning, state when not panning
     const newWindowRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
@@ -2268,12 +2280,14 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         computeWindow(clampedX, clampedY, containerSize.width, containerSize.height);
         
         // Calculate the correct window range for the restored position
-        const gridLeft = clampedX + MARGIN_SIZE;
-        const gridTop = clampedY + MARGIN_SIZE;
-        const startCol = Math.max(0, Math.floor((-gridLeft) / CELL_SIZE));
-        const endCol = Math.min(gridSize - 1, Math.ceil((containerSize.width - gridLeft) / CELL_SIZE));
-        const startRow = Math.max(0, Math.floor((-gridTop) / CELL_SIZE));
-        const endRow = Math.min(gridSize - 1, Math.ceil((containerSize.height - gridTop) / CELL_SIZE));
+        const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(
+          clampedX, 
+          clampedY, 
+          containerSize.width, 
+          containerSize.height, 
+          gridSize, 
+          0
+        );
         
         // Force tile loading by setting the correct window range
         setWindowRange({
