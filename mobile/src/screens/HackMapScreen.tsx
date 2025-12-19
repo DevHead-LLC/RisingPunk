@@ -1531,6 +1531,97 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       setPanningViewportParams(null);
     }
   }, [panningViewportData, separateStaticAndDynamicData, dispatch, grid]);
+  
+  // Phase 7: Load entity details when panning stops
+  const [stoppedViewportParams, setStoppedViewportParams] = useState<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>(null);
+  const { data: stoppedViewportData, isLoading: isLoadingStoppedViewport } = useFetchMapViewportQuery(
+    stoppedViewportParams!,
+    { skip: !stoppedViewportParams || !terrainDataLoaded || !panningStopped }
+  );
+  
+  // Phase 7: Trigger entity details fetch when panning stops
+  const lastStoppedViewportRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (panningStopped && terrainDataLoaded && !isPanningJS) {
+      // Calculate current viewport from windowRange
+      const currentViewport = {
+        x1: windowRange.colStart,
+        y1: windowRange.rowStart,
+        x2: windowRange.colEnd,
+        y2: windowRange.rowEnd,
+      };
+      
+      const viewportKey = `${currentViewport.x1},${currentViewport.y1},${currentViewport.x2},${currentViewport.y2}`;
+      
+      // Check if we've already fetched details for this viewport
+      if (lastStoppedViewportRef.current === viewportKey) {
+        return;
+      }
+      
+      // Check if entity details are already loaded for visible tiles
+      let needsDetails = false;
+      for (let y = currentViewport.y1; y <= currentViewport.y2; y++) {
+        for (let x = currentViewport.x1; x <= currentViewport.x2; x++) {
+          const key = `${x},${y}`;
+          const hasEntityImage = entityImageData[key];
+          const hasEntityDetails = dynamicEntityData[key];
+          
+          // If we have an entity image but no details, we need to fetch details
+          if (hasEntityImage && !hasEntityDetails) {
+            needsDetails = true;
+            break;
+          }
+        }
+        if (needsDetails) break;
+      }
+      
+      if (needsDetails) {
+        lastStoppedViewportRef.current = viewportKey;
+        // Fetch full details (minimal: false)
+        setStoppedViewportParams({ ...currentViewport, minimal: false });
+      }
+    }
+  }, [panningStopped, terrainDataLoaded, isPanningJS, windowRange, entityImageData, dynamicEntityData]);
+  
+  // Phase 7: Process stopped viewport data (full details only)
+  useEffect(() => {
+    if (stoppedViewportData && stoppedViewportData.grid && stoppedViewportData.viewport) {
+      const { terrain, entityImages, entityDetails } = separateStaticAndDynamicData(stoppedViewportData.grid, stoppedViewportData.viewport);
+      
+      // Phase 7: Only merge entity details (terrain and images already loaded)
+      setDynamicEntityData(prev => {
+        const merged = { ...prev };
+        Object.entries(entityDetails).forEach(([key, value]) => {
+          merged[key] = value;
+        });
+        return merged;
+      });
+      
+      // Merge grid data (update entity details in grid)
+      const viewport = stoppedViewportData.viewport;
+      const mergedGrid = [...grid];
+      for (let y = viewport.y1; y <= viewport.y2; y++) {
+        const row = stoppedViewportData.grid[y];
+        if (!row) continue;
+        if (!mergedGrid[y]) {
+          mergedGrid[y] = [];
+        }
+        for (let x = viewport.x1; x <= viewport.x2; x++) {
+          const cell = row[x];
+          if (cell) {
+            if (!mergedGrid[y][x]) {
+              mergedGrid[y][x] = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityType };
+            }
+            mergedGrid[y][x] = { ...mergedGrid[y][x], ...cell };
+          }
+        }
+      }
+      dispatch(setGrid(mergedGrid));
+      
+      // Clear stopped viewport params to allow next fetch
+      setStoppedViewportParams(null);
+    }
+  }, [stoppedViewportData, separateStaticAndDynamicData, dispatch, grid]);
 
   // Force refresh map data when returning from battle to ensure NPCs are updated
   // Phase 4B: Only clear cache when explicitly needed (restorePan = returning from battle)
