@@ -409,6 +409,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [isPanningJS, setIsPanningJS] = useState<boolean>(false);
   const [panningStopped, setPanningStopped] = useState<boolean>(true);
 
+  // Phase 4: Throttle re-renders during panning
+  const lastWindowRangeUpdateRef = useRef<number>(0);
+  const renderThrottleMs = 33; // 30fps during panning
+
   // Use ref for lastUpdateTime to avoid circular dependency
   const lastUpdateTimeRef = useRef(0);
   
@@ -1382,9 +1386,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const computeWindow = useCallback((panX: number, panY: number, width: number, height: number) => {
     if (width <= 0 || height <= 0) {return;}
     
-    // Reduce throttle from 40ms to 16ms for 60fps responsiveness
+    // Phase 4: Conditional throttle - 33ms during panning (30fps), 16ms when not panning (60fps)
     const now = Date.now();
-    if (now - lastComputeTs.value < 16) {return;} // 60fps throttle
+    const throttleMs = isPanningJS ? 33 : 16; // 30fps during panning, 60fps when not panning
+    if (now - lastComputeTs.value < throttleMs) {return;}
     lastComputeTs.value = now;
     
     // Skip tiny pan changes to reduce churn
@@ -1411,6 +1416,16 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     const startRow = Math.max(0, baseStartRow - baseBuffer);
     const endRow = Math.min(gridSize - 1, baseEndRow + baseBuffer);
     
+    // Phase 4: Throttle windowRange updates during panning to reduce re-renders
+    const shouldThrottle = isPanningJS;
+    if (shouldThrottle) {
+      const timeSinceLastUpdate = now - lastWindowRangeUpdateRef.current;
+      if (timeSinceLastUpdate < renderThrottleMs) {
+        return; // Skip this update during panning if throttled
+      }
+      lastWindowRangeUpdateRef.current = now;
+    }
+    
     setWindowRange(prev => {
       const same = prev.rowStart === startRow && prev.rowEnd === endRow && prev.colStart === startCol && prev.colEnd === endCol;
       if (same) return prev;
@@ -1423,7 +1438,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       if (smallShift) return prev;
       return { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
     });
-  }, [gridSize, calculateVirtualViewport]);
+  }, [gridSize, calculateVirtualViewport, isPanningJS]);
 
   // Restore pan position if provided (now safe, computeWindow is defined)
   useEffect(() => {
