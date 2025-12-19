@@ -54,6 +54,14 @@ interface UserProfile {
     hackRig: boolean;
     researchCenter: boolean;
   };
+  battleStats?: {
+    botsDestroyed: number;
+    botsLost: number;
+    successfulAttacks: number;
+    failedAttacks: number;
+    successfulDefenses: number;
+    failedDefenses: number;
+  };
 }
 
 type TabType = 'profile' | 'settings' | 'account' | 'content';
@@ -285,6 +293,66 @@ const createProfileStyles = (colors: any, screenWidth: number, scaleFactor: numb
   statValue: {
     color: colors.matrix,
     fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
+  battleStatsSection: {
+    marginBottom: SIZING.spacing.lg,
+    marginHorizontal: SIZING.spacing.sm,
+  },
+  battleStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: SIZING.spacing.sm,
+    marginBottom: SIZING.spacing.md,
+  },
+  battleStatCard: {
+    backgroundColor: colors.matrix + '1A',
+    borderWidth: 1,
+    borderColor: colors.matrix,
+    borderRadius: 8,
+    padding: SIZING.spacing.md,
+    alignItems: 'center',
+    minWidth: '30%',
+    flex: 1,
+    maxWidth: '48%',
+  },
+  battleStatLabel: {
+    color: colors.text.secondary,
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.xs,
+    textAlign: 'center',
+  },
+  battleStatValue: {
+    color: colors.matrix,
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
+  winPercentageContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    gap: SIZING.spacing.md,
+    marginTop: SIZING.spacing.sm,
+  },
+  winPercentageItem: {
+    backgroundColor: colors.accent,
+    borderWidth: 1,
+    borderColor: colors.matrix,
+    borderRadius: 8,
+    padding: SIZING.spacing.md,
+    alignItems: 'center',
+    flex: 1,
+  },
+  winPercentageLabel: {
+    color: colors.text.secondary,
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.xs,
+  },
+  winPercentageValue: {
+    color: colors.matrix,
+    fontSize: SIZING.font.h3,
     fontWeight: 'bold',
   },
   featuresSection: {
@@ -566,8 +634,15 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
     unlockedFeatures: {
       hackRig: profileData.unlockedFeatures?.hackRig || false,
       researchCenter: researchCenterData?.isUnlocked || false,
-    }
+    },
+    battleStats: profileData.battleStats
   } : null;
+
+  const calculateWinPercentage = (successful: number, failed: number): string => {
+    const total = successful + failed;
+    if (total === 0) return 'N/A';
+    return `${Math.round((successful / total) * 100)}%`;
+  };
 
   const botStats: Record<string, BotStats> = botStatsData?.botStats || {};
 
@@ -724,6 +799,53 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                   ))}
                 </View>
               </View>
+
+              {/* Battle Stats Section */}
+              {profile?.battleStats && (
+                <View style={styles.battleStatsSection}>
+                  <Text style={styles.sectionTitle}>BATTLE STATISTICS</Text>
+                  <View style={styles.battleStatsGrid}>
+                    <View style={styles.battleStatCard}>
+                      <Text style={styles.battleStatLabel}>Bots Destroyed</Text>
+                      <Text style={styles.battleStatValue}>{profile.battleStats.botsDestroyed}</Text>
+                    </View>
+                    <View style={styles.battleStatCard}>
+                      <Text style={styles.battleStatLabel}>Bots Lost</Text>
+                      <Text style={styles.battleStatValue}>{profile.battleStats.botsLost}</Text>
+                    </View>
+                    <View style={styles.battleStatCard}>
+                      <Text style={styles.battleStatLabel}>Successful Attacks</Text>
+                      <Text style={styles.battleStatValue}>{profile.battleStats.successfulAttacks}</Text>
+                    </View>
+                    <View style={styles.battleStatCard}>
+                      <Text style={styles.battleStatLabel}>Failed Attacks</Text>
+                      <Text style={styles.battleStatValue}>{profile.battleStats.failedAttacks}</Text>
+                    </View>
+                    <View style={styles.battleStatCard}>
+                      <Text style={styles.battleStatLabel}>Successful Defenses</Text>
+                      <Text style={styles.battleStatValue}>{profile.battleStats.successfulDefenses}</Text>
+                    </View>
+                    <View style={styles.battleStatCard}>
+                      <Text style={styles.battleStatLabel}>Failed Defenses</Text>
+                      <Text style={styles.battleStatValue}>{profile.battleStats.failedDefenses}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.winPercentageContainer}>
+                    <View style={styles.winPercentageItem}>
+                      <Text style={styles.winPercentageLabel}>Attack Win %</Text>
+                      <Text style={styles.winPercentageValue}>
+                        {calculateWinPercentage(profile.battleStats.successfulAttacks, profile.battleStats.failedAttacks)}
+                      </Text>
+                    </View>
+                    <View style={styles.winPercentageItem}>
+                      <Text style={styles.winPercentageLabel}>Defense Win %</Text>
+                      <Text style={styles.winPercentageValue}>
+                        {calculateWinPercentage(profile.battleStats.successfulDefenses, profile.battleStats.failedDefenses)}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              )}
 
               {/* Features Section */}
               <View style={styles.featuresSection}>
