@@ -1737,6 +1737,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       }
       
       // Merge grid data - use ref to get latest grid value to avoid stale closures
+      const gridSize = gridRef.current.length > 0 ? gridRef.current.length : 50;
       const currentGrid = gridRef.current.length > 0 ? gridRef.current : Array.from({ length: gridSize }, () => 
         Array.from({ length: gridSize }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
       );
@@ -1767,7 +1768,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       panningViewportMinimalRef.current = false;
       setPanningViewportParams(null);
     }
-  }, [panningViewportData, separateStaticAndDynamicData, dispatch, grid]);
+  }, [panningViewportData, separateStaticAndDynamicData, dispatch]);
   
   // Phase 7: Load entity details when panning stops
   const [stoppedViewportParams, setStoppedViewportParams] = useState<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>(null);
