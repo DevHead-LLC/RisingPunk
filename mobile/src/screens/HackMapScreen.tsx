@@ -87,16 +87,15 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   };
 
   const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember }) => {
+    const key = `${x},${y}`;
+    const dynamicEntity = dynamicEntityData[key];
+    const isShielded = dynamicEntity?.isShielded ?? (cell as any).isShielded;
+    
     const houseBgStyle = cell.entity === 'house'
       ? (cell.owner === 'player'
           ? (cell.name === currentUserHandle ? styles.userHouseBg : styles.otherUserHouseBg)
           : styles.enemyHouseBg)
       : null;
-    
-    // Check for shield status in both grid data and dynamic entity data
-    const key = `${x},${y}`;
-    const dynamicEntity = dynamicEntityData[key];
-    const isShielded = dynamicEntity?.isShielded ?? (cell as any).isShielded;
     return (
       <Pressable
         style={[
@@ -455,8 +454,12 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         }
         return prev;
       });
-    } else if (!isPanningJS) {
-      // Not panning - keep ref in sync with state
+    }
+    
+    // Keep ref in sync with state when not panning and panning has stopped
+    // Only sync when panningStopped is true to avoid overwriting ref during 200ms transition window
+    // During transition: isPanningJS=false but panningStopped=false, ref still has latest panning data
+    if (!isPanningJS && panningStopped) {
       windowRangeRef.current = windowRange;
     }
   }, [panningStopped, isPanningJS, windowRange]);
@@ -495,6 +498,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
   // Phase 3: Shield status cache to track previous shield status per user
   const shieldStatusCacheRef = useRef<Record<string, boolean>>({});
+  
+  const prevVisibleCellsCountRef = useRef<number>(0);
   
   // Update specific tile shield status without full map refresh
   const updateTileShieldStatus = useCallback(async (userId: string, currentShieldStatus: boolean) => {
@@ -656,13 +661,31 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       }
     }
     
-    // Update virtual viewport state
-    const totalTiles = (clampedEndRow - clampedStartRow + 1) * (clampedEndCol - clampedStartCol + 1);
-    setVirtualViewport(prev => ({
-      visibleTiles,
-      renderCount: visibleTiles.size,
-      totalTiles
-    }));
+    // Only update if Set contents actually changed (compare sizes and contents)
+    setVirtualViewport(prev => {
+      // Compare Set contents to avoid unnecessary updates
+      if (prev.visibleTiles.size === visibleTiles.size) {
+        let contentsMatch = true;
+        for (const tile of visibleTiles) {
+          if (!prev.visibleTiles.has(tile)) {
+            contentsMatch = false;
+            break;
+          }
+        }
+        if (contentsMatch) {
+          // Contents are identical, return previous state to avoid new Set reference
+          return prev;
+        }
+      }
+      
+      // Contents changed, update state
+      const totalTiles = (clampedEndRow - clampedStartRow + 1) * (clampedEndCol - clampedStartCol + 1);
+      return {
+        visibleTiles,
+        renderCount: visibleTiles.size,
+        totalTiles
+      };
+    });
   }, [grid]);
 
   const animatedMapStyle = useAnimatedStyle(() => {
@@ -1373,11 +1396,16 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         // Update entity data (terrain already loaded, just update entities)
         setEntityImageData(prev => {
           const merged = { ...prev };
+          const updatedKeys: string[] = [];
           Object.entries(entityImages).forEach(([key, value]) => {
+            if (prev[key] !== value) {
+              updatedKeys.push(key);
+            }
             merged[key] = value;
           });
           
           // Clean up entity image cache for cells that are now empty
+          const deletedKeys: string[] = [];
           for (let y = viewport.y1; y <= viewport.y2; y++) {
             const row = entityUpdateViewportData.grid[y];
             if (!row) continue;
@@ -1386,6 +1414,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
               const key = `${x},${y}`;
               if (cell && cell.entity === 'empty' && merged[key]) {
                 delete merged[key];
+                deletedKeys.push(key);
               }
             }
           }
@@ -1497,10 +1526,24 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   );
 
   // Phase 2: Stabilize cell object references using cache
+  const isPanningJSRef = useRef(isPanningJS);
+  useEffect(() => {
+    isPanningJSRef.current = isPanningJS;
+  }, [isPanningJS]);
+  
+  // Use key counts to detect when data actually changes (instead of object references)
+  const staticTerrainDataKeys = Object.keys(staticTerrainData).length;
+  const dynamicEntityDataKeys = Object.keys(dynamicEntityData).length;
+  
   const visibleCells = useMemo(() => {
     const cells: Array<{ x: number; y: number; cell: CellData }> = [];
     
     if (!terrainDataLoaded) return cells;
+    
+    // Use ref for panning state, but read data directly from state (not refs)
+    // This ensures we get the latest data even after cache clears
+    const currentIsPanningJS = isPanningJSRef.current;
+    const currentWindowRange = currentIsPanningJS ? windowRangeRef.current : windowRange;
     
     const cache = cellCacheRef.current;
     const MAX_CACHE_SIZE = 1000;
@@ -1545,6 +1588,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     if (virtualViewport.visibleTiles.size > 0) {
       virtualViewport.visibleTiles.forEach(tileKey => {
         const [x, y] = tileKey.split(',').map(Number);
+        // Read directly from state to avoid ref timing issues after cache clears
         const terrain = staticTerrainData[tileKey];
         const entity = dynamicEntityData[tileKey];
         
@@ -1555,10 +1599,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       });
     } else {
       // Phase 5: Use ref when panning, state when not panning
-      const currentWindowRange = isPanningJS ? windowRangeRef.current : windowRange;
       for (let y = currentWindowRange.rowStart; y <= currentWindowRange.rowEnd; y++) {
         for (let x = currentWindowRange.colStart; x <= currentWindowRange.colEnd; x++) {
           const key = `${x},${y}`;
+          // Read directly from state to avoid ref timing issues after cache clears
           const terrain = staticTerrainData[key];
           const entity = dynamicEntityData[key];
           
@@ -1570,8 +1614,13 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       }
     }
     
+    // Logging: Track visibleCells count changes (only log if count actually changed)
+    if (prevVisibleCellsCountRef.current !== cells.length) {
+      prevVisibleCellsCountRef.current = cells.length;
+    }
+    
     return cells;
-  }, [virtualViewport.visibleTiles, virtualViewport.visibleTiles.size, windowRange.rowStart, windowRange.rowEnd, windowRange.colStart, windowRange.colEnd, staticTerrainData, dynamicEntityData, terrainDataLoaded, isPanningJS]);
+  }, [virtualViewport.visibleTiles, windowRange.rowStart, windowRange.rowEnd, windowRange.colStart, windowRange.colEnd, staticTerrainDataKeys, dynamicEntityDataKeys, terrainDataLoaded]);
 
 
 
