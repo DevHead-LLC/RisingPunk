@@ -419,8 +419,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [showCrewOnboardingModal, setShowCrewOnboardingModal] = useState(false);
   const [showVisitingProfileModal, setShowVisitingProfileModal] = useState(false);
   const [visitingProfileUserId, setVisitingProfileUserId] = useState<string | null>(null);
-  const visitingProfileCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const visitCrewCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const visitingProfileCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const visitCrewCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showVisitCrewModal, setShowVisitCrewModal] = useState(false);
   const [visitCrewId, setVisitCrewId] = useState<string | null>(null);
   const [visitCrewName, setVisitCrewName] = useState<string | null>(null);
@@ -440,6 +440,28 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   
   // Phase 5: Use ref for windowRange during panning to reduce re-renders
   const windowRangeRef = useRef<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>(windowRange);
+  
+  const [isMapReady, setIsMapReady] = useState<boolean>(false);
+  
+  // Static vs Dynamic Data Separation
+  const [staticTerrainData, setStaticTerrainData] = useState<Record<string, TerrainType>>({});
+  const [dynamicEntityData, setDynamicEntityData] = useState<Record<string, any>>({});
+  // Phase 2: Separate entity images from entity details
+  const [entityImageData, setEntityImageData] = useState<Record<string, {
+    entity: EntityType;
+    owner?: string;
+    userId?: string;
+    npcSlug?: string;
+  }>>({});
+  const [terrainDataLoaded, setTerrainDataLoaded] = useState<boolean>(false);
+  
+  // Shield status change tracking
+  const [lastShieldStatus, setLastShieldStatus] = useState<boolean | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+
+  // Phase 1: Panning state management
+  const [isPanningJS, setIsPanningJS] = useState<boolean>(false);
+  const [panningStopped, setPanningStopped] = useState<boolean>(true);
   
   // Phase 5: Sync ref to state when panning stops
   useEffect(() => {
@@ -463,28 +485,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       windowRangeRef.current = windowRange;
     }
   }, [panningStopped, isPanningJS, windowRange]);
-  
-  const [isMapReady, setIsMapReady] = useState<boolean>(false);
-  
-  // Static vs Dynamic Data Separation
-  const [staticTerrainData, setStaticTerrainData] = useState<Record<string, TerrainType>>({});
-  const [dynamicEntityData, setDynamicEntityData] = useState<Record<string, any>>({});
-  // Phase 2: Separate entity images from entity details
-  const [entityImageData, setEntityImageData] = useState<Record<string, {
-    entity: EntityType;
-    owner?: string;
-    userId?: string;
-    npcSlug?: string;
-  }>>({});
-  const [terrainDataLoaded, setTerrainDataLoaded] = useState<boolean>(false);
-  
-  // Shield status change tracking
-  const [lastShieldStatus, setLastShieldStatus] = useState<boolean | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
-
-  // Phase 1: Panning state management
-  const [isPanningJS, setIsPanningJS] = useState<boolean>(false);
-  const [panningStopped, setPanningStopped] = useState<boolean>(true);
 
   // Phase 4: Throttle re-renders during panning
   const lastWindowRangeUpdateRef = useRef<number>(0);
@@ -838,7 +838,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     // Reset check if user handle changed
     if (lastCheckedUserHandleRef.current !== currentUserHandle) {
       hasCheckedUserLocationRef.current = false;
-      lastCheckedUserHandleRef.current = currentUserHandle;
+      lastCheckedUserHandleRef.current = currentUserHandle || null;
     }
     
     if (hasCheckedUserLocationRef.current) return; // Already checked for this user
@@ -1368,7 +1368,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [entityUpdateViewportParams, setEntityUpdateViewportParams] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
   const { data: entityUpdateViewportData } = useFetchMapViewportQuery(
     entityUpdateViewportParams!,
-    { skip: !entityUpdateViewportParams || !terrainDataLoaded || !hasVisibleEntities }
+    { 
+      skip: !entityUpdateViewportParams || !terrainDataLoaded || !hasVisibleEntities,
+      refetchOnMountOrArgChange: true
+    }
   );
 
   // Phase 9: Process entity update viewport data
@@ -1471,7 +1474,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       // Clear viewport params to allow next refresh
       setEntityUpdateViewportParams(null);
     }
-  }, [entityUpdateViewportData, separateStaticAndDynamicData, dispatch, gridSize]);
+  }, [entityUpdateViewportData, dispatch, gridSize]);
 
   // Phase 8: Synchronized 10-second polling group
   // Phase 9: Added entity updates (NPCs, player positions, entity changes) to 10s group
@@ -1548,28 +1551,38 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     const cache = cellCacheRef.current;
     const MAX_CACHE_SIZE = 1000;
     
-    const getOrCreateCell = (x: number, y: number, terrain: TerrainType, entity: any): CellData => {
-      const cacheKey = `${x},${y}-${terrain}-${entity?.entity || 'empty'}-${entity?.owner || ''}-${entity?.name || ''}-${entity?.userId || ''}-${entity?.npcSlug || ''}-${entity?.npcInstanceId || ''}-${entity?.npcLevel || ''}-${entity?.isShielded || false}`;
+    // Phase 2: Cell cache to maintain stable object references
+    // Bug Fix: Use entityImageData as fallback when dynamicEntityData is missing
+    // This prevents entities from disappearing when panning stops before full details are loaded
+    const getOrCreateCell = (x: number, y: number, terrain: TerrainType, entity: any, entityImage: any): CellData => {
+      // Include entityImage in cache key to ensure proper cache invalidation
+      const cacheKey = `${x},${y}-${terrain}-${entity?.entity || entityImage?.entity || 'empty'}-${entity?.owner || entityImage?.owner || ''}-${entity?.name || ''}-${entity?.userId || entityImage?.userId || ''}-${entity?.npcSlug || entityImage?.npcSlug || ''}-${entity?.npcInstanceId || ''}-${entity?.npcLevel || ''}-${entity?.isShielded || false}`;
       
       let cell = cache.get(cacheKey);
       
+      // Check if cached cell matches current data (including entityImage fallback)
+      const currentEntity = entity?.entity || entityImage?.entity || 'empty';
+      const currentOwner = entity?.owner || entityImage?.owner;
+      const currentUserId = entity?.userId || entityImage?.userId;
+      const currentNpcSlug = entity?.npcSlug || entityImage?.npcSlug;
+      
       if (!cell || 
           cell.terrain !== terrain ||
-          cell.entity !== (entity?.entity || 'empty') ||
-          cell.owner !== entity?.owner ||
+          cell.entity !== currentEntity ||
+          cell.owner !== currentOwner ||
           cell.name !== entity?.name ||
-          cell.userId !== entity?.userId ||
-          cell.npcSlug !== entity?.npcSlug ||
+          cell.userId !== currentUserId ||
+          cell.npcSlug !== currentNpcSlug ||
           cell.npcInstanceId !== entity?.npcInstanceId ||
           cell.npcLevel !== entity?.npcLevel ||
           cell.isShielded !== entity?.isShielded) {
-        cell = {
+        const newCell: CellData = {
           terrain,
-          entity: entity?.entity || 'empty',
-          owner: entity?.owner,
+          entity: currentEntity,
+          owner: currentOwner,
           name: entity?.name,
-          userId: entity?.userId,
-          npcSlug: entity?.npcSlug,
+          userId: currentUserId,
+          npcSlug: currentNpcSlug,
           npcInstanceId: entity?.npcInstanceId,
           npcLevel: entity?.npcLevel,
           isShielded: entity?.isShielded,
@@ -1577,24 +1590,32 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         
         if (cache.size >= MAX_CACHE_SIZE) {
           const firstKey = cache.keys().next().value;
-          cache.delete(firstKey);
+          if (firstKey !== undefined) {
+            cache.delete(firstKey);
+          }
         }
-        cache.set(cacheKey, cell);
+        cache.set(cacheKey, newCell);
+        cell = newCell;
       }
       
       return cell;
     };
     
+    // Phase 7A: Virtual Scrolling - Only render tiles that are actually visible
     if (virtualViewport.visibleTiles.size > 0) {
+      // Use virtual viewport for ultra-efficient rendering
       virtualViewport.visibleTiles.forEach(tileKey => {
         const [x, y] = tileKey.split(',').map(Number);
         // Read directly from state to avoid ref timing issues after cache clears
         const terrain = staticTerrainData[tileKey];
         const entity = dynamicEntityData[tileKey];
+        // Bug Fix: Use entityImageData as fallback when dynamicEntityData is missing
+        // This prevents entities from disappearing when panning stops before full details are loaded
+        const entityImage = entityImageData[tileKey];
         
         if (!terrain) return;
         
-        const cell = getOrCreateCell(x, y, terrain, entity);
+        const cell = getOrCreateCell(x, y, terrain, entity, entityImage);
         cells.push({ x, y, cell });
       });
     } else {
@@ -1605,10 +1626,13 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           // Read directly from state to avoid ref timing issues after cache clears
           const terrain = staticTerrainData[key];
           const entity = dynamicEntityData[key];
+          // Bug Fix: Use entityImageData as fallback when dynamicEntityData is missing
+          // This prevents entities from disappearing when panning stops before full details are loaded
+          const entityImage = entityImageData[key];
           
           if (!terrain) continue;
           
-          const cell = getOrCreateCell(x, y, terrain, entity);
+          const cell = getOrCreateCell(x, y, terrain, entity, entityImage);
           cells.push({ x, y, cell });
         }
       }
@@ -2701,7 +2725,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                           clearTimeout(visitingProfileCloseTimeoutRef.current);
                           visitingProfileCloseTimeoutRef.current = null;
                         }
-                        setVisitingProfileUserId(selectedCell.info.userId);
+                        setVisitingProfileUserId(selectedCell.info.userId || null);
                         setShowVisitingProfileModal(true);
                       }}
                     >
@@ -2831,17 +2855,17 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
               } else {
                 // When not panning: render full tile with all details and interactions
                 const selected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
-                const isCrewMember = cell.owner === 'player' && 
+                const isCrewMember = !!(cell.owner === 'player' && 
                                      cell.userId && 
-                                     crewMemberUserIds.has(String(cell.userId));
-                const isWarCrewMember = cell.owner === 'player' && 
+                                     crewMemberUserIds.has(String(cell.userId)));
+                const isWarCrewMember = !!(cell.owner === 'player' && 
                                        cell.userId && 
-                                       warCrewMemberUserIds.has(String(cell.userId));
+                                       warCrewMemberUserIds.has(String(cell.userId)));
                 // Only show yellow border for allies, not our own crew members
-                const isAllianceCrewMember = cell.owner === 'player' && 
+                const isAllianceCrewMember = !!(cell.owner === 'player' && 
                                              cell.userId && 
                                              !isCrewMember && // Exclude our own crew members
-                                             allianceCrewMemberUserIds.has(String(cell.userId));
+                                             allianceCrewMemberUserIds.has(String(cell.userId)));
                 return (
                   <PoolTile
                     key={`${x}-${y}`}
