@@ -285,7 +285,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\n\n# Set ENVFILE for react-native-config\n# Priority: 1) ENVFILE from npm script (when running via npm run ios:dev), 2) ENVFILE from Xcode scheme, 3) API_ENV build setting, 4) default\n# When running via npm, ENVFILE is already set, so we respect that\nif [ -n \"$ENVFILE\" ]; then\n  # ENVFILE is already set (from npm script or Xcode scheme) - use it as-is\n  ENVFILE_VALUE=\"$ENVFILE\"\n  echo \"[React Native Bundle] Using existing ENVFILE: $ENVFILE_VALUE\"\nelif [ -n \"$API_ENV\" ]; then\n  # Fall back to API_ENV build setting (for Xcode-only builds without scheme ENVFILE)\n  case \"$API_ENV\" in\n    dev)\n      ENVFILE_VALUE=\".env.dev\"\n      ;;\n    staging)\n      ENVFILE_VALUE=\".env.staging\"\n      ;;\n    prod)\n      ENVFILE_VALUE=\".env.prod\"\n      ;;\n    *)\n      echo \"Warning: Unknown API_ENV value: $API_ENV, defaulting to .env\"\n      ENVFILE_VALUE=\".env\"\n      ;;\n  esac\n  echo \"[React Native Bundle] Using ENVFILE from API_ENV build setting: $ENVFILE_VALUE\"\nelse\n  echo \"Warning: Neither ENVFILE nor API_ENV is set, defaulting to .env\"\n  ENVFILE_VALUE=\".env\"\nfi\n\n# Write to /tmp/envfile (react-native-config checks this first)\necho \"$ENVFILE_VALUE\" > /tmp/envfile\n\n# Also export as environment variable (for react-native-config)\nexport ENVFILE=\"$ENVFILE_VALUE\"\n\necho \"[React Native Bundle] Final ENVFILE=$ENVFILE_VALUE\"\n\nWITH_ENVIRONMENT=\"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\nREACT_NATIVE_XCODE=\"$REACT_NATIVE_PATH/scripts/react-native-xcode.sh\"\n\n/bin/sh -c \"$WITH_ENVIRONMENT $REACT_NATIVE_XCODE\"\n";
+			shellScript = "set -e\n\n# Set ENVFILE for react-native-config\n# Priority: 1) ENVFILE from npm script (when running via npm run ios:dev), 2) /tmp/envfile from PreAction, 3) ENVFILE from Xcode scheme, 4) API_ENV build setting, 5) default\n# When running via npm, ENVFILE is already set, so we respect that\nif [ -n \"$ENVFILE\" ]; then\n  # ENVFILE is already set (from npm script or Xcode scheme) - use it as-is\n  ENVFILE_VALUE=\"$ENVFILE\"\n  echo \"[React Native Bundle] Using existing ENVFILE: $ENVFILE_VALUE\"\nelif [ -f /tmp/envfile ]; then\n  # Read from /tmp/envfile (set by PreAction in Xcode scheme)\n  ENVFILE_VALUE=$(cat /tmp/envfile | tr -d '[:space:]')\n  echo \"[React Native Bundle] Using ENVFILE from /tmp/envfile: $ENVFILE_VALUE\"\nelif [ -n \"$API_ENV\" ]; then\n  # Fall back to API_ENV build setting (for Xcode-only builds without scheme ENVFILE)\n  case \"$API_ENV\" in\n    dev)\n      ENVFILE_VALUE=\".env.dev\"\n      ;;\n    staging)\n      ENVFILE_VALUE=\".env.staging\"\n      ;;\n    prod)\n      ENVFILE_VALUE=\".env.prod\"\n      ;;\n    *)\n      echo \"Warning: Unknown API_ENV value: $API_ENV, defaulting to .env\"\n      ENVFILE_VALUE=\".env\"\n      ;;\n  esac\n  echo \"[React Native Bundle] Using ENVFILE from API_ENV build setting: $ENVFILE_VALUE\"\nelse\n  echo \"Warning: Neither ENVFILE nor API_ENV is set, defaulting to .env\"\n  ENVFILE_VALUE=\".env\"\nfi\n\n# Write to /tmp/envfile (react-native-config checks this first)\necho \"$ENVFILE_VALUE\" > /tmp/envfile\n\n# Also export as environment variable (for react-native-config)\nexport ENVFILE=\"$ENVFILE_VALUE\"\n\necho \"[React Native Bundle] Final ENVFILE=$ENVFILE_VALUE\"\n\nWITH_ENVIRONMENT=\"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\nREACT_NATIVE_XCODE=\"$REACT_NATIVE_PATH/scripts/react-native-xcode.sh\"\n\n/bin/sh -c \"$WITH_ENVIRONMENT $REACT_NATIVE_XCODE\"\n";
 		};
 		3891D4C06E52BD72996D991C /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -295,9 +295,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile-mobileTests/Pods-mobile-mobileTests-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile-mobileTests/Pods-mobile-mobileTests-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -312,9 +316,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile/Pods-mobile-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile/Pods-mobile-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -329,9 +337,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile-mobileTests/Pods-mobile-mobileTests-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile-mobileTests/Pods-mobile-mobileTests-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -390,9 +402,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile/Pods-mobile-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile/Pods-mobile-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -516,7 +532,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = mobile/mobile.entitlements;
-				CURRENT_PROJECT_VERSION = 32;
+				CURRENT_PROJECT_VERSION = 44;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 26522YLRG2;
 				ENABLE_BITCODE = NO;
@@ -553,7 +569,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = mobile/mobile.entitlements;
-				CURRENT_PROJECT_VERSION = 32;
+				CURRENT_PROJECT_VERSION = 44;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 26522YLRG2;
 				INFOPLIST_FILE = mobile/Info.plist;
@@ -588,7 +604,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = mobile/mobile.entitlements;
-				CURRENT_PROJECT_VERSION = 32;
+				CURRENT_PROJECT_VERSION = 44;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 26522YLRG2;
 				INFOPLIST_FILE = mobile/Info.plist;
