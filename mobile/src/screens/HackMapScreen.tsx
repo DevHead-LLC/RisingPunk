@@ -62,6 +62,29 @@ const calculateViewportFromPan = (
   return { startCol, endCol, startRow, endRow };
 };
 
+/**
+ * Generate Set of visible tile keys from viewport coordinates
+ * @param startCol - Start column
+ * @param endCol - End column
+ * @param startRow - Start row
+ * @param endRow - End row
+ * @returns Set of tile keys in format "x,y"
+ */
+const generateVisibleTileKeys = (
+  startCol: number,
+  endCol: number,
+  startRow: number,
+  endRow: number
+): Set<string> => {
+  const visibleTiles = new Set<string>();
+  for (let y = startRow; y <= endRow; y++) {
+    for (let x = startCol; x <= endCol; x++) {
+      visibleTiles.add(`${x},${y}`);
+    }
+  }
+  return visibleTiles;
+};
+
 type Props = {
   onClose: () => void;
   restorePan?: { x: number; y: number };
@@ -671,12 +694,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       calculateViewportFromPan(panX, panY, width, height, gridSize, 0);
     
     // Generate visible tile keys (only what's actually on screen)
-    const visibleTiles = new Set<string>();
-    for (let y = clampedStartRow; y <= clampedEndRow; y++) {
-      for (let x = clampedStartCol; x <= clampedEndCol; x++) {
-        visibleTiles.add(`${x},${y}`);
-      }
-    }
+    const visibleTiles = generateVisibleTileKeys(clampedStartCol, clampedEndCol, clampedStartRow, clampedEndRow);
     
     // Only update if Set contents actually changed (compare sizes and contents)
     setVirtualViewport(prev => {
