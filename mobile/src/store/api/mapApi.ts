@@ -35,21 +35,15 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
       // RTK Query cancels in-flight requests when new requests are made (expected during fast panning)
       const errorString = typeof error?.error === 'string' ? error.error : '';
       const errorMessage = typeof error?.message === 'string' ? error.message : '';
+      const errorData = error?.data;
       const status = error?.status;
       
-      const isAbortError = 
-        errorString === 'AbortError: Aborted' ||
-        errorString.includes('AbortError') ||
-        errorMessage.includes('AbortError') ||
-        errorMessage.includes('aborted') ||
-        (status === 'TIMEOUT_ERROR' && (errorString.includes('Abort') || errorMessage.includes('Abort'))) ||
-        error?.name === 'AbortError';
+      // Check if error data contains abort information
+      const errorDataString = typeof errorData === 'string' ? errorData : '';
+      const errorDataError = typeof errorData?.error === 'string' ? errorData.error : '';
       
-      if (isAbortError) {
-        // RTK Query automatically cancels in-flight requests when new requests are made
-        // This is expected behavior during fast panning - don't treat as an error
-        return result;
-      }
+      // Also check serialized error string for comprehensive detection
+      const errorStringified = JSON.stringify(error);
       
       globalErrorHandler.handleDatabaseError(result.error);
     }
