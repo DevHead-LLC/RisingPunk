@@ -30,21 +30,6 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
       api.dispatch({ type: 'auth/logout' });
       return result;
     } else {
-      const error = result.error as any;
-      // Check for AbortError in multiple possible locations and formats
-      // RTK Query cancels in-flight requests when new requests are made (expected during fast panning)
-      const errorString = typeof error?.error === 'string' ? error.error : '';
-      const errorMessage = typeof error?.message === 'string' ? error.message : '';
-      const errorData = error?.data;
-      const status = error?.status;
-      
-      // Check if error data contains abort information
-      const errorDataString = typeof errorData === 'string' ? errorData : '';
-      const errorDataError = typeof errorData?.error === 'string' ? errorData.error : '';
-      
-      // Also check serialized error string for comprehensive detection
-      const errorStringified = JSON.stringify(error);
-      
       globalErrorHandler.handleDatabaseError(result.error);
     }
   }
