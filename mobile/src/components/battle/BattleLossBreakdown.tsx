@@ -31,7 +31,7 @@ export const BattleLossBreakdown: React.FC<Props> = ({ battleEndData }) => {
   const attackerBotsLost = calculateBotQuantityLosses(userBattalions);
   const defenderBotsDestroyed = calculateBotQuantityLosses(userBattalions);
   const defenderBotsLost = calculateBotQuantityLosses(enemyBattalions);
-  const isUserVsUser = isUserDefender === true;
+  const isUserVsUser = battleEndData.isPvPBattle === true;
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>

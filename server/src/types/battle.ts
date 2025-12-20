@@ -215,6 +215,7 @@ export interface BattleEndData {
     levelsGained: number;
     newLevel: number;
   };
+  isPvPBattle?: boolean;
 }
 
 export interface RetargetingQueueTask {
