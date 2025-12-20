@@ -61,6 +61,14 @@ export interface IUser extends Document {
     completesAt: Date | null;
     cooldownUntil: Date | null;
   };
+  battleStats?: {
+    botsDestroyed: number;
+    botsLost: number;
+    successfulAttacks: number;
+    failedAttacks: number;
+    successfulDefenses: number;
+    failedDefenses: number;
+  };
   verifyAccessKey(accessKey: string): Promise<boolean>;
   getDecryptedEmail(): string;
   setEncryptedEmail(email: string): void;
@@ -311,6 +319,32 @@ const userSchema = new Schema({
     cooldownUntil: {
       type: Date,
       default: null
+    }
+  },
+  battleStats: {
+    botsDestroyed: {
+      type: Number,
+      default: 0
+    },
+    botsLost: {
+      type: Number,
+      default: 0
+    },
+    successfulAttacks: {
+      type: Number,
+      default: 0
+    },
+    failedAttacks: {
+      type: Number,
+      default: 0
+    },
+    successfulDefenses: {
+      type: Number,
+      default: 0
+    },
+    failedDefenses: {
+      type: Number,
+      default: 0
     }
   },
   currentTokenId: {

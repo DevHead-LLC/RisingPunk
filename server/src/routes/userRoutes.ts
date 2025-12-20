@@ -17,7 +17,7 @@ const router = express.Router();
 
 router.get('/profile', auth, async (req: Request, res: Response) => {
   try {
-    const user = await User.findById(req.user._id).select('handle email level experience unlockedFeatures profileGender');
+    const user = await User.findById(req.user._id).select('handle email level experience unlockedFeatures profileGender battleStats');
     
     if (!user) {
       res.status(404).json({ message: 'User not found' });
@@ -40,7 +40,15 @@ router.get('/profile', auth, async (req: Request, res: Response) => {
       profileGender: user.profileGender || 'male',
       emailVerified: user.emailVerified || false,
       emailVerificationToken: user.emailVerificationToken || null,
-      emailVerificationPrompted: user.emailVerificationPrompted || false
+      emailVerificationPrompted: user.emailVerificationPrompted || false,
+      battleStats: {
+        botsDestroyed: user.battleStats?.botsDestroyed || 0,
+        botsLost: user.battleStats?.botsLost || 0,
+        successfulAttacks: user.battleStats?.successfulAttacks || 0,
+        failedAttacks: user.battleStats?.failedAttacks || 0,
+        successfulDefenses: user.battleStats?.successfulDefenses || 0,
+        failedDefenses: user.battleStats?.failedDefenses || 0
+      }
     });
   } catch (error) {
     console.error('Server error:', error);
@@ -57,7 +65,7 @@ router.get('/profile/:userId', auth, async (req: Request, res: Response) => {
       return;
     }
 
-    const user = await User.findById(userId).select('handle level profileGender');
+    const user = await User.findById(userId).select('handle level profileGender battleStats');
     
     if (!user) {
       res.status(404).json({ error: 'User not found' });
@@ -68,7 +76,15 @@ router.get('/profile/:userId', auth, async (req: Request, res: Response) => {
       userId: String(user._id),
       handle: user.handle,
       level: user.level,
-      profileGender: user.profileGender || 'male'
+      profileGender: user.profileGender || 'male',
+      battleStats: {
+        botsDestroyed: user.battleStats?.botsDestroyed || 0,
+        botsLost: user.battleStats?.botsLost || 0,
+        successfulAttacks: user.battleStats?.successfulAttacks || 0,
+        failedAttacks: user.battleStats?.failedAttacks || 0,
+        successfulDefenses: user.battleStats?.successfulDefenses || 0,
+        failedDefenses: user.battleStats?.failedDefenses || 0
+      }
     });
   } catch (error) {
     console.error('Server error:', error);
