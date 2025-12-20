@@ -42,6 +42,7 @@ export interface BattleEndData {
     newLevel: number;
   };
   isUserDefender?: boolean;
+  isPvPBattle?: boolean;
 }
 
 export interface BattleState {
