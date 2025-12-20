@@ -28,6 +28,20 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
     onChangeQuantity(Math.min(Math.max(0, value), maxQuantity));
   }, [maxQuantity, onChangeQuantity]);
 
+  const handleMaxQuantity = React.useCallback(() => {
+    if (
+      typeof maxQuantity !== 'number' ||
+      !Number.isFinite(maxQuantity) ||
+      maxQuantity < 0 ||
+      maxQuantity > MAX_BATTALION_SIZE
+    ) {
+      return;
+    }
+    
+    const safeValue = Math.min(Math.max(0, maxQuantity), MAX_BATTALION_SIZE);
+    onChangeQuantity(safeValue);
+  }, [maxQuantity, onChangeQuantity]);
+
   return (
     <View style={styles.container}>
       <View style={styles.row}>
@@ -87,6 +101,16 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
             onPress={() => adjustQuantity(25)}
           >
             <Text style={[styles.buttonText, { color: colors.secondary }]}>+25</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, { 
+              backgroundColor: themeMode === 'light' ? 'rgba(71, 23, 246, 0.15)' : 'rgba(71, 23, 246, 0.1)',
+              borderColor: colors.secondary 
+            }]}
+            onPress={handleMaxQuantity}
+          >
+            <Text style={[styles.buttonText, { color: colors.secondary }]}>MAX</Text>
           </TouchableOpacity>
         </View>
       </View>
