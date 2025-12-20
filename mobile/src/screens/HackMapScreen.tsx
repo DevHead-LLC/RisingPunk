@@ -2058,6 +2058,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       if (pendingViewportParamsRef.current) {
         const pending = pendingViewportParamsRef.current;
         pendingViewportParamsRef.current = null;
+        viewportRequestInFlightRef.current = true;
         panningViewportMinimalRef.current = true;
         setPanningViewportParams(pending);
         return;

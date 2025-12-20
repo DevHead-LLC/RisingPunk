@@ -32,10 +32,22 @@ const getNextQuarterHour = (): Date => {
 
 const shouldInvalidateCache = (cacheTime: Date): boolean => {
   const now = new Date();
-  const minutes = now.getMinutes();
-  const seconds = now.getSeconds();
+  const cacheMinutes = cacheTime.getMinutes();
+  const cacheQuarter = Math.floor(cacheMinutes / 15);
+  const nowMinutes = now.getMinutes();
+  const nowQuarter = Math.floor(nowMinutes / 15);
   
-  if (minutes % 15 === 0 && seconds === 0) {
+  if (nowQuarter !== cacheQuarter) {
+    return true;
+  }
+  
+  if (now.getHours() !== cacheTime.getHours()) {
+    return true;
+  }
+  
+  if (now.getDate() !== cacheTime.getDate() || 
+      now.getMonth() !== cacheTime.getMonth() || 
+      now.getFullYear() !== cacheTime.getFullYear()) {
     return true;
   }
   

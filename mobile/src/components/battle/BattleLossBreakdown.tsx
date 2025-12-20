@@ -27,7 +27,7 @@ export const BattleLossBreakdown: React.FC<Props> = ({ battleEndData }) => {
     }, 0);
   };
 
-  const attackerBotsDestroyed = calculateBotQuantityLosses(userBattalions);
+  const attackerBotsLost = calculateBotQuantityLosses(userBattalions);
   const defenderBotsLost = calculateBotQuantityLosses(enemyBattalions);
   const isUserVsUser = isUserDefender === true;
 
@@ -65,11 +65,11 @@ export const BattleLossBreakdown: React.FC<Props> = ({ battleEndData }) => {
           <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>Bot Losses</Text>
           <View style={styles.botLossesContainer}>
             <View style={[styles.botLossItem, { backgroundColor: colors.accent, borderColor: colors.secondary }]}>
-              <Text style={[styles.botLossLabel, { color: colors.neutral }]}>Bots Destroyed (Attacker)</Text>
-              <Text style={[styles.botLossValue, { color: colors.matrix }]}>{attackerBotsDestroyed}</Text>
+              <Text style={[styles.botLossLabel, { color: colors.neutral }]}>Attacker's Losses</Text>
+              <Text style={[styles.botLossValue, { color: colors.matrix }]}>{attackerBotsLost}</Text>
             </View>
             <View style={[styles.botLossItem, { backgroundColor: colors.accent, borderColor: colors.error }]}>
-              <Text style={[styles.botLossLabel, { color: colors.neutral }]}>Bots Lost (Defender)</Text>
+              <Text style={[styles.botLossLabel, { color: colors.neutral }]}>Defender's Losses</Text>
               <Text style={[styles.botLossValue, { color: colors.matrix }]}>{defenderBotsLost}</Text>
             </View>
           </View>
