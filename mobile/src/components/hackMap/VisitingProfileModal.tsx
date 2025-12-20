@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, SafeAreaView, Image } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, SafeAreaView, Image, ScrollView } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { useGetUserProfileQuery } from '../../store/api/authApi';
@@ -24,6 +24,12 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
   const profileImageSource = userProfile?.profileGender === 'female' 
     ? require('../../assets/images/profile-female.png')
     : require('../../assets/images/profile.png');
+
+  const calculateWinPercentage = (successful: number, failed: number): string => {
+    const total = successful + failed;
+    if (total === 0) return 'N/A';
+    return `${Math.round((successful / total) * 100)}%`;
+  };
 
   return (
     <Modal
@@ -60,38 +66,116 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
               </TouchableOpacity>
             </View>
 
-            <View style={styles.profileContent}>
-              {isLoading ? (
-                <Text style={[styles.loadingText, { color: colors.text.secondary }]}>
-                  Loading...
-                </Text>
-              ) : error ? (
-                <Text style={[styles.errorText, { color: colors.error }]}>
-                  Failed to load profile
-                </Text>
-              ) : userProfile ? (
-                <>
-                  <View style={[styles.avatarContainer, { borderColor: colors.secondary }]}>
-                    <Image
-                      source={profileImageSource}
-                      style={styles.avatarImage}
-                      resizeMode="contain"
-                    />
-                  </View>
-                  <Text style={[styles.username, { color: colors.text.primary }]}>
-                    {userProfile.handle}
+            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+              <View style={styles.profileContent}>
+                {isLoading ? (
+                  <Text style={[styles.loadingText, { color: colors.text.secondary }]}>
+                    Loading...
                   </Text>
-                  <View style={[styles.levelContainer, { backgroundColor: colors.surface, borderColor: colors.secondary }]}>
-                    <Text style={[styles.levelLabel, { color: colors.text.secondary }]}>
-                      Level
+                ) : error ? (
+                  <Text style={[styles.errorText, { color: colors.error }]}>
+                    Failed to load profile
+                  </Text>
+                ) : userProfile ? (
+                  <>
+                    <View style={[styles.avatarContainer, { borderColor: colors.secondary }]}>
+                      <Image
+                        source={profileImageSource}
+                        style={styles.avatarImage}
+                        resizeMode="contain"
+                      />
+                    </View>
+                    <Text style={[styles.username, { color: colors.text.primary }]}>
+                      {userProfile.handle}
                     </Text>
-                    <Text style={[styles.levelValue, { color: colors.text.primary }]}>
-                      {userProfile.level}
-                    </Text>
-                  </View>
-                </>
-              ) : null}
-            </View>
+                    <View style={[styles.levelContainer, { backgroundColor: colors.surface, borderColor: colors.secondary }]}>
+                      <Text style={[styles.levelLabel, { color: colors.text.secondary }]}>
+                        Level
+                      </Text>
+                      <Text style={[styles.levelValue, { color: colors.text.primary }]}>
+                        {userProfile.level}
+                      </Text>
+                    </View>
+
+                    {userProfile.battleStats && (
+                      <View style={styles.battleStatsSection}>
+                        <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
+                          BATTLE STATISTICS
+                        </Text>
+                        <View style={styles.battleStatsGrid}>
+                          <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
+                            <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
+                              Bots Destroyed
+                            </Text>
+                            <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
+                              {userProfile.battleStats.botsDestroyed}
+                            </Text>
+                          </View>
+                          <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
+                            <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
+                              Bots Lost
+                            </Text>
+                            <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
+                              {userProfile.battleStats.botsLost}
+                            </Text>
+                          </View>
+                          <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
+                            <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
+                              Successful Attacks
+                            </Text>
+                            <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
+                              {userProfile.battleStats.successfulAttacks}
+                            </Text>
+                          </View>
+                          <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
+                            <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
+                              Failed Attacks
+                            </Text>
+                            <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
+                              {userProfile.battleStats.failedAttacks}
+                            </Text>
+                          </View>
+                          <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
+                            <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
+                              Successful Defenses
+                            </Text>
+                            <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
+                              {userProfile.battleStats.successfulDefenses}
+                            </Text>
+                          </View>
+                          <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
+                            <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
+                              Failed Defenses
+                            </Text>
+                            <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
+                              {userProfile.battleStats.failedDefenses}
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={styles.winPercentageContainer}>
+                          <View style={[styles.winPercentageItem, { borderColor: colors.matrix }]}>
+                            <Text style={[styles.winPercentageLabel, { color: colors.text.secondary }]}>
+                              Attack Win %
+                            </Text>
+                            <Text style={[styles.winPercentageValue, { color: colors.matrix }]}>
+                              {calculateWinPercentage(userProfile.battleStats.successfulAttacks, userProfile.battleStats.failedAttacks)}
+                            </Text>
+                          </View>
+                          <View style={[styles.winPercentageItem, { borderColor: colors.matrix }]}>
+                            <Text style={[styles.winPercentageLabel, { color: colors.text.secondary }]}>
+                              Defense Win %
+                            </Text>
+                            <Text style={[styles.winPercentageValue, { color: colors.matrix }]}>
+                              {calculateWinPercentage(userProfile.battleStats.successfulDefenses, userProfile.battleStats.failedDefenses)}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    )}
+                  </>
+                ) : null}
+              </View>
+            </ScrollView>
           </SafeAreaView>
         </TouchableOpacity>
       </TouchableOpacity>
@@ -202,6 +286,68 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: SIZING.font.body,
     textAlign: 'center',
     padding: SIZING.spacing.lg,
+  },
+  scrollView: {
+    maxHeight: '80%',
+  },
+  battleStatsSection: {
+    marginTop: SIZING.spacing.lg,
+    width: '100%',
+  },
+  sectionTitle: {
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.md,
+    textAlign: 'center',
+  },
+  battleStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: SIZING.spacing.sm,
+    marginBottom: SIZING.spacing.md,
+  },
+  battleStatCard: {
+    backgroundColor: colors.matrix + '1A',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: SIZING.spacing.sm,
+    alignItems: 'center',
+    minWidth: '30%',
+    flex: 1,
+    maxWidth: '48%',
+  },
+  battleStatLabel: {
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.xs,
+    textAlign: 'center',
+  },
+  battleStatValue: {
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
+  winPercentageContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    gap: SIZING.spacing.md,
+  },
+  winPercentageItem: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: SIZING.spacing.md,
+    alignItems: 'center',
+    flex: 1,
+  },
+  winPercentageLabel: {
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.xs,
+  },
+  winPercentageValue: {
+    fontSize: SIZING.font.h3,
+    fontWeight: 'bold',
   },
 });
 

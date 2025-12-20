@@ -186,6 +186,12 @@ export class BattleResponseService {
       battleDuration
     };
 
+    const isPvPBattle = battle.isUserDefender === true || 
+                       (!(battle as any).defenderNpcSlug && 
+                        battle.defenderId !== 'computer-opponent' && 
+                        !battle.defenderId.startsWith('npc-') && 
+                        !battle.defenderId.startsWith('computer'));
+
     const battleEndData = {
       battleId: battle.battleId,
       winner: battleLosses.winner,
@@ -194,7 +200,9 @@ export class BattleResponseService {
       phase: battle.phase,
       experienceGained,
       hackerRewards,
-      levelUp
+      levelUp,
+      isUserDefender: battle.isUserDefender || false,
+      isPvPBattle
     };
     
     return battleEndData;
