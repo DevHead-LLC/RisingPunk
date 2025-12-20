@@ -95,31 +95,51 @@ export class BattleStatisticsService {
     botsLost: number,
     won: boolean
   ): Promise<void> {
-    const user = await User.findById(attackerId);
-    if (!user) {
-      return;
-    }
-
-    if (!user.battleStats) {
-      user.battleStats = {
-        botsDestroyed: 0,
-        botsLost: 0,
-        successfulAttacks: 0,
-        failedAttacks: 0,
-        successfulDefenses: 0,
-        failedDefenses: 0
-      };
-    }
-
-    user.battleStats.botsDestroyed += botsDestroyed;
-    user.battleStats.botsLost += botsLost;
-    if (won) {
-      user.battleStats.successfulAttacks += 1;
-    } else {
-      user.battleStats.failedAttacks += 1;
-    }
-
-    await user.save();
+    await User.findByIdAndUpdate(
+      attackerId,
+      [
+        {
+          $set: {
+            battleStats: {
+              $ifNull: [
+                '$battleStats',
+                {
+                  botsDestroyed: 0,
+                  botsLost: 0,
+                  successfulAttacks: 0,
+                  failedAttacks: 0,
+                  successfulDefenses: 0,
+                  failedDefenses: 0
+                }
+              ]
+            }
+          }
+        },
+        {
+          $set: {
+            'battleStats.botsDestroyed': {
+              $add: ['$battleStats.botsDestroyed', botsDestroyed]
+            },
+            'battleStats.botsLost': {
+              $add: ['$battleStats.botsLost', botsLost]
+            },
+            'battleStats.successfulAttacks': {
+              $add: [
+                '$battleStats.successfulAttacks',
+                won ? 1 : 0
+              ]
+            },
+            'battleStats.failedAttacks': {
+              $add: [
+                '$battleStats.failedAttacks',
+                won ? 0 : 1
+              ]
+            }
+          }
+        }
+      ],
+      { upsert: false }
+    );
   }
 
   private static async updateDefenderStats(
@@ -128,31 +148,51 @@ export class BattleStatisticsService {
     botsLost: number,
     won: boolean
   ): Promise<void> {
-    const user = await User.findById(defenderId);
-    if (!user) {
-      return;
-    }
-
-    if (!user.battleStats) {
-      user.battleStats = {
-        botsDestroyed: 0,
-        botsLost: 0,
-        successfulAttacks: 0,
-        failedAttacks: 0,
-        successfulDefenses: 0,
-        failedDefenses: 0
-      };
-    }
-
-    user.battleStats.botsDestroyed += botsDestroyed;
-    user.battleStats.botsLost += botsLost;
-    if (won) {
-      user.battleStats.successfulDefenses += 1;
-    } else {
-      user.battleStats.failedDefenses += 1;
-    }
-
-    await user.save();
+    await User.findByIdAndUpdate(
+      defenderId,
+      [
+        {
+          $set: {
+            battleStats: {
+              $ifNull: [
+                '$battleStats',
+                {
+                  botsDestroyed: 0,
+                  botsLost: 0,
+                  successfulAttacks: 0,
+                  failedAttacks: 0,
+                  successfulDefenses: 0,
+                  failedDefenses: 0
+                }
+              ]
+            }
+          }
+        },
+        {
+          $set: {
+            'battleStats.botsDestroyed': {
+              $add: ['$battleStats.botsDestroyed', botsDestroyed]
+            },
+            'battleStats.botsLost': {
+              $add: ['$battleStats.botsLost', botsLost]
+            },
+            'battleStats.successfulDefenses': {
+              $add: [
+                '$battleStats.successfulDefenses',
+                won ? 1 : 0
+              ]
+            },
+            'battleStats.failedDefenses': {
+              $add: [
+                '$battleStats.failedDefenses',
+                won ? 0 : 1
+              ]
+            }
+          }
+        }
+      ],
+      { upsert: false }
+    );
   }
 }
 
