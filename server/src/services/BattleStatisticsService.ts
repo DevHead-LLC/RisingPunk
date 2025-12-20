@@ -95,17 +95,6 @@ export class BattleStatisticsService {
     botsLost: number,
     won: boolean
   ): Promise<void> {
-    const incUpdate: any = {
-      'battleStats.botsDestroyed': botsDestroyed,
-      'battleStats.botsLost': botsLost
-    };
-
-    if (won) {
-      incUpdate['battleStats.successfulAttacks'] = 1;
-    } else {
-      incUpdate['battleStats.failedAttacks'] = 1;
-    }
-
     await User.findByIdAndUpdate(
       attackerId,
       [
@@ -127,7 +116,26 @@ export class BattleStatisticsService {
           }
         },
         {
-          $inc: incUpdate
+          $set: {
+            'battleStats.botsDestroyed': {
+              $add: ['$battleStats.botsDestroyed', botsDestroyed]
+            },
+            'battleStats.botsLost': {
+              $add: ['$battleStats.botsLost', botsLost]
+            },
+            'battleStats.successfulAttacks': {
+              $add: [
+                '$battleStats.successfulAttacks',
+                won ? 1 : 0
+              ]
+            },
+            'battleStats.failedAttacks': {
+              $add: [
+                '$battleStats.failedAttacks',
+                won ? 0 : 1
+              ]
+            }
+          }
         }
       ],
       { upsert: false }
@@ -140,17 +148,6 @@ export class BattleStatisticsService {
     botsLost: number,
     won: boolean
   ): Promise<void> {
-    const incUpdate: any = {
-      'battleStats.botsDestroyed': botsDestroyed,
-      'battleStats.botsLost': botsLost
-    };
-
-    if (won) {
-      incUpdate['battleStats.successfulDefenses'] = 1;
-    } else {
-      incUpdate['battleStats.failedDefenses'] = 1;
-    }
-
     await User.findByIdAndUpdate(
       defenderId,
       [
@@ -172,7 +169,26 @@ export class BattleStatisticsService {
           }
         },
         {
-          $inc: incUpdate
+          $set: {
+            'battleStats.botsDestroyed': {
+              $add: ['$battleStats.botsDestroyed', botsDestroyed]
+            },
+            'battleStats.botsLost': {
+              $add: ['$battleStats.botsLost', botsLost]
+            },
+            'battleStats.successfulDefenses': {
+              $add: [
+                '$battleStats.successfulDefenses',
+                won ? 1 : 0
+              ]
+            },
+            'battleStats.failedDefenses': {
+              $add: [
+                '$battleStats.failedDefenses',
+                won ? 0 : 1
+              ]
+            }
+          }
         }
       ],
       { upsert: false }
