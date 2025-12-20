@@ -11,7 +11,12 @@ import {
 } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
-import { useGetIndividualBotsDestroyedLeaderboardQuery, useGetIndividualNetWorthLeaderboardQuery } from '../../store/api/leaderboardApi';
+import { 
+  useGetIndividualBotsDestroyedLeaderboardQuery, 
+  useGetIndividualNetWorthLeaderboardQuery,
+  useGetCrewBotsDestroyedLeaderboardQuery,
+  useGetCrewNetWorthLeaderboardQuery,
+} from '../../store/api/leaderboardApi';
 
 interface LeaderboardModalProps {
   visible: boolean;
@@ -40,6 +45,18 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
   const { data: netWorthData, isLoading: isLoadingNetWorth, error: netWorthError } = useGetIndividualNetWorthLeaderboardQuery(undefined, {
     skip: !visible || mainTab !== 'individual' || metricTab !== 'netWorth',
     pollingInterval: visible && mainTab === 'individual' && metricTab === 'netWorth' ? 900000 : 0,
+    refetchOnMountOrArgChange: true,
+  });
+
+  const { data: crewBotsDestroyedData, isLoading: isLoadingCrewBotsDestroyed, error: crewBotsDestroyedError } = useGetCrewBotsDestroyedLeaderboardQuery(undefined, {
+    skip: !visible || mainTab !== 'crew' || metricTab !== 'botsDestroyed',
+    pollingInterval: visible && mainTab === 'crew' && metricTab === 'botsDestroyed' ? 900000 : 0,
+    refetchOnMountOrArgChange: true,
+  });
+
+  const { data: crewNetWorthData, isLoading: isLoadingCrewNetWorth, error: crewNetWorthError } = useGetCrewNetWorthLeaderboardQuery(undefined, {
+    skip: !visible || mainTab !== 'crew' || metricTab !== 'netWorth',
+    pollingInterval: visible && mainTab === 'crew' && metricTab === 'netWorth' ? 900000 : 0,
     refetchOnMountOrArgChange: true,
   });
 
@@ -107,36 +124,186 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
     );
   };
 
+  const renderNetWorthContent = () => {
+    if (isLoadingNetWorth) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading leaderboard...</Text>
+        </View>
+      );
+    }
+
+    if (netWorthError) {
+      return (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Error loading leaderboard</Text>
+        </View>
+      );
+    }
+
+    if (!netWorthData || netWorthData.users.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No leaderboard data available yet</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.leaderboardContainer}>
+        {netWorthData.users.map((user) => (
+          <View key={user.rank} style={styles.leaderboardRow}>
+            <View style={styles.rankContainer}>
+              <Text style={styles.rankText}>{user.rank}</Text>
+            </View>
+            <View style={styles.userInfoContainer}>
+              <Text style={styles.handleText}>{user.handle}</Text>
+              <Text style={styles.levelText}>Level {user.level}</Text>
+            </View>
+            <View style={styles.statContainer}>
+              <Text style={styles.statValue}>${user.netWorth?.toLocaleString() || 0}</Text>
+              <Text style={styles.statLabel}>Net Worth</Text>
+            </View>
+          </View>
+        ))}
+        {netWorthData.lastUpdated && (
+          <View style={styles.footerContainer}>
+            <Text style={styles.lastUpdatedText}>
+              Last updated: {formatLastUpdated(netWorthData.lastUpdated)}
+            </Text>
+            <Text style={styles.updateNoteText}>*Leaderboard updates every 15 minutes</Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  const renderCrewBotsDestroyedContent = () => {
+    if (isLoadingCrewBotsDestroyed) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading leaderboard...</Text>
+        </View>
+      );
+    }
+
+    if (crewBotsDestroyedError) {
+      return (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Error loading leaderboard</Text>
+        </View>
+      );
+    }
+
+    if (!crewBotsDestroyedData || crewBotsDestroyedData.crews.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No leaderboard data available yet</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.leaderboardContainer}>
+        {crewBotsDestroyedData.crews.map((crew) => (
+          <View key={crew.rank} style={styles.leaderboardRow}>
+            <View style={styles.rankContainer}>
+              <Text style={styles.rankText}>{crew.rank}</Text>
+            </View>
+            <View style={styles.userInfoContainer}>
+              <Text style={styles.handleText}>{crew.crewName}</Text>
+              <Text style={styles.levelText}>{crew.crewIdentifier} • {crew.memberCount} members</Text>
+            </View>
+            <View style={styles.statContainer}>
+              <Text style={styles.statValue}>{crew.botsDestroyed?.toLocaleString() || 0}</Text>
+              <Text style={styles.statLabel}>Bots Destroyed</Text>
+            </View>
+          </View>
+        ))}
+        {crewBotsDestroyedData.lastUpdated && (
+          <View style={styles.footerContainer}>
+            <Text style={styles.lastUpdatedText}>
+              Last updated: {formatLastUpdated(crewBotsDestroyedData.lastUpdated)}
+            </Text>
+            <Text style={styles.updateNoteText}>*Leaderboard updates every 15 minutes</Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  const renderCrewNetWorthContent = () => {
+    if (isLoadingCrewNetWorth) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading leaderboard...</Text>
+        </View>
+      );
+    }
+
+    if (crewNetWorthError) {
+      return (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Error loading leaderboard</Text>
+        </View>
+      );
+    }
+
+    if (!crewNetWorthData || crewNetWorthData.crews.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No leaderboard data available yet</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.leaderboardContainer}>
+        {crewNetWorthData.crews.map((crew) => (
+          <View key={crew.rank} style={styles.leaderboardRow}>
+            <View style={styles.rankContainer}>
+              <Text style={styles.rankText}>{crew.rank}</Text>
+            </View>
+            <View style={styles.userInfoContainer}>
+              <Text style={styles.handleText}>{crew.crewName}</Text>
+              <Text style={styles.levelText}>{crew.crewIdentifier} • {crew.memberCount} members</Text>
+            </View>
+            <View style={styles.statContainer}>
+              <Text style={styles.statValue}>${crew.netWorth?.toLocaleString() || 0}</Text>
+              <Text style={styles.statLabel}>Net Worth</Text>
+            </View>
+          </View>
+        ))}
+        {crewNetWorthData.lastUpdated && (
+          <View style={styles.footerContainer}>
+            <Text style={styles.lastUpdatedText}>
+              Last updated: {formatLastUpdated(crewNetWorthData.lastUpdated)}
+            </Text>
+            <Text style={styles.updateNoteText}>*Leaderboard updates every 15 minutes</Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
   const renderContent = () => {
     if (mainTab === 'individual' && metricTab === 'botsDestroyed') {
       return renderBotsDestroyedContent();
     }
 
     if (mainTab === 'individual' && metricTab === 'netWorth') {
-      return (
-        <View style={styles.contentContainer}>
-          <Text style={styles.placeholderText}>Individual Leaderboards - Net Worth</Text>
-          <Text style={styles.placeholderSubtext}>Coming soon...</Text>
-        </View>
-      );
+      return renderNetWorthContent();
     }
 
     if (mainTab === 'crew' && metricTab === 'botsDestroyed') {
-      return (
-        <View style={styles.contentContainer}>
-          <Text style={styles.placeholderText}>Crew Leaderboards - Bots Destroyed</Text>
-          <Text style={styles.placeholderSubtext}>Coming soon...</Text>
-        </View>
-      );
+      return renderCrewBotsDestroyedContent();
     }
 
     if (mainTab === 'crew' && metricTab === 'netWorth') {
-      return (
-        <View style={styles.contentContainer}>
-          <Text style={styles.placeholderText}>Crew Leaderboards - Net Worth</Text>
-          <Text style={styles.placeholderSubtext}>Coming soon...</Text>
-        </View>
-      );
+      return renderCrewNetWorthContent();
     }
 
     return null;
