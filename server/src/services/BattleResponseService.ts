@@ -194,7 +194,8 @@ export class BattleResponseService {
       phase: battle.phase,
       experienceGained,
       hackerRewards,
-      levelUp
+      levelUp,
+      isUserDefender: battle.isUserDefender || false
     };
     
     return battleEndData;
