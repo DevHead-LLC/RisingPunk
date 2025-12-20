@@ -460,4 +460,7 @@ userSchema.methods.isTokenValid = function(tokenId: string): boolean {
   return this.currentTokenId === tokenId;
 };
 
+userSchema.index({ 'battleStats.botsDestroyed': -1 });
+userSchema.index({ 'balance.total': -1 });
+
 export const User = mongoose.model<IUser, IUserModel>('User', userSchema); 

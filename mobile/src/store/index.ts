@@ -17,6 +17,7 @@ import { preferencesApi } from './api/preferencesApi';
 import { antivirusApi } from './api/antivirusApi';
 import { rentalHousingApi } from './api/rentalHousingApi';
 import { researchFeaturesApi } from './api/researchFeaturesApi';
+import { leaderboardApi } from './api/leaderboardApi';
 
 export const store = configureStore({
   reducer: {
@@ -38,6 +39,7 @@ export const store = configureStore({
     [antivirusApi.reducerPath]: antivirusApi.reducer,
     [rentalHousingApi.reducerPath]: rentalHousingApi.reducer,
     [researchFeaturesApi.reducerPath]: researchFeaturesApi.reducer,
+    [leaderboardApi.reducerPath]: leaderboardApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
@@ -54,7 +56,8 @@ export const store = configureStore({
     .concat(preferencesApi.middleware)
     .concat(antivirusApi.middleware)
     .concat(rentalHousingApi.middleware)
-    .concat(researchFeaturesApi.middleware),
+    .concat(researchFeaturesApi.middleware)
+    .concat(leaderboardApi.middleware),
   devTools: __DEV__,
 });
 

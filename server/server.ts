@@ -24,6 +24,7 @@ import testRoutes from './src/routes/test';
 import botsRoutes from './src/routes/bots';
 import crewRoutes from './src/routes/crew';
 import reportsRoutes from './src/routes/reports';
+import leaderboardRoutes from './src/routes/leaderboardRoutes';
 
 declare global {
   namespace Express {
@@ -503,6 +504,7 @@ app.use('/api/battle', battleRoutes);
 app.use('/api/research', researchRoutes);
 app.use('/api/crew', crewRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/documents', documentsRoutes);
 
 // Test routes for privacy policy compliance verification
