@@ -30,6 +30,27 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
       api.dispatch({ type: 'auth/logout' });
       return result;
     } else {
+      const error = result.error as any;
+      // Check for AbortError in multiple possible locations and formats
+      // RTK Query cancels in-flight requests when new requests are made (expected during fast panning)
+      const errorString = typeof error?.error === 'string' ? error.error : '';
+      const errorMessage = typeof error?.message === 'string' ? error.message : '';
+      const status = error?.status;
+      
+      const isAbortError = 
+        errorString === 'AbortError: Aborted' ||
+        errorString.includes('AbortError') ||
+        errorMessage.includes('AbortError') ||
+        errorMessage.includes('aborted') ||
+        (status === 'TIMEOUT_ERROR' && (errorString.includes('Abort') || errorMessage.includes('Abort'))) ||
+        error?.name === 'AbortError';
+      
+      if (isAbortError) {
+        // RTK Query automatically cancels in-flight requests when new requests are made
+        // This is expected behavior during fast panning - don't treat as an error
+        return result;
+      }
+      
       globalErrorHandler.handleDatabaseError(result.error);
     }
   }
@@ -46,10 +67,10 @@ export const mapApi = createApi({
       query: () => '/api/map/main',
       providesTags: ['Map'],
     }),
-    fetchMapViewport: builder.query<MapResponse, { x1: number; y1: number; x2: number; y2: number }>({
-      query: ({ x1, y1, x2, y2 }) => ({
+    fetchMapViewport: builder.query<MapResponse, { x1: number; y1: number; x2: number; y2: number; minimal?: boolean }>({
+      query: ({ x1, y1, x2, y2, minimal }) => ({
         url: '/api/map/main',
-        params: { x1, y1, x2, y2 },
+        params: { x1, y1, x2, y2, minimal: minimal ? 'true' : undefined },
       }),
       providesTags: ['Map'],
     }),
