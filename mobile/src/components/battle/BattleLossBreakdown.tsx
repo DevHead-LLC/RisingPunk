@@ -27,7 +27,7 @@ export const BattleLossBreakdown: React.FC<Props> = ({ battleEndData }) => {
     }, 0);
   };
 
-  const attackerBotsDestroyed = calculateBotQuantityLosses(userBattalions);
+  const attackerBotsDestroyed = calculateBotQuantityLosses(enemyBattalions);
   const defenderBotsLost = calculateBotQuantityLosses(userBattalions);
   const isUserVsUser = isUserDefender === true;
 
