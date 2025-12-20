@@ -17,6 +17,7 @@ import { WarManagementModal } from './WarManagementModal';
 import { AllianceManagementModal } from './AllianceManagementModal';
 import { EditableCrewRules } from './EditableCrewRules';
 import { CrewChatModal } from './CrewChatModal';
+import { LeaderboardModal } from './LeaderboardModal';
 import { UserReportModal } from '../modals/UserReportModal';
 import { FilteredTextInput } from '../common/FilteredTextInput';
 import { FilteredText } from '../common/FilteredText';
@@ -77,6 +78,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [showWarManagementModal, setShowWarManagementModal] = useState(false);
   const [showAllianceManagementModal, setShowAllianceManagementModal] = useState(false);
   const [showCrewChatModal, setShowCrewChatModal] = useState(false);
+  const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
   const [viewingProfileUserId, setViewingProfileUserId] = useState<string | null>(null);
   const [promotingUserId, setPromotingUserId] = useState<string | null>(null);
   const [demotingUserId, setDemotingUserId] = useState<string | null>(null);
@@ -586,15 +588,24 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     return (
       <SafeAreaView style={styles.crewModalContainer}>
         <View style={styles.header}>
-          {crewStatus?.crewId && (
+          <View style={styles.headerLeft}>
+            {crewStatus?.crewId && (
+              <TouchableOpacity
+                style={styles.chatIconButton}
+                onPress={() => setShowCrewChatModal(true)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.chatIconText}>💬</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
-              style={styles.chatIconButton}
-              onPress={() => setShowCrewChatModal(true)}
+              style={styles.leaderboardIconButton}
+              onPress={() => setShowLeaderboardModal(true)}
               activeOpacity={0.7}
             >
-              <Text style={styles.chatIconText}>💬</Text>
+              <Text style={styles.leaderboardIconText}>📈</Text>
             </TouchableOpacity>
-          )}
+          </View>
           <Text style={styles.title}>{title}</Text>
           <TouchableOpacity
             style={styles.closeButton}
@@ -1887,6 +1898,11 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         />
       )}
 
+      <LeaderboardModal
+        visible={showLeaderboardModal}
+        onClose={() => setShowLeaderboardModal(false)}
+      />
+
       {activeCrewDetails?.crew && currentUser && activeCrewDetails.crew.president && (
         <>
           {externalMessageReportData && (
@@ -1981,6 +1997,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     gap: SIZING.spacing.sm,
   },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   chatIconButton: {
     width: 44,
     height: 44,
@@ -1993,6 +2013,20 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginRight: SIZING.spacing.sm,
   },
   chatIconText: {
+    fontSize: 20,
+  },
+  leaderboardIconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primary,
+    borderColor: colors.secondary,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SIZING.spacing.sm,
+  },
+  leaderboardIconText: {
     fontSize: 20,
   },
   title: {

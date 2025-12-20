@@ -16,8 +16,18 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
   })(args, api, extraOptions);
 
   if (result.error) {
-    // Check for account switched error first
-    if ((result.error as any)?.status === 401 && (result.error as any)?.data?.error === 'ACCOUNT_SWITCHED') {
+    const error = result.error as any;
+    
+    // Check for abort errors first - these are expected during fast map panning
+    const isAbortError = error?.name === 'AbortError' || 
+                         (error instanceof Error && error.name === 'AbortError');
+    
+    if (isAbortError) {
+      return result;
+    }
+    
+    // Check for account switched error
+    if (error?.status === 401 && error?.data?.error === 'ACCOUNT_SWITCHED') {
       // Always dispatch account switched action - the auth slice will handle showing banner appropriately
       api.dispatch({ type: 'auth/handleAccountSwitched' });
       
@@ -25,32 +35,11 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
       resetAllApiCaches(api);
       
       return result; // Return early to prevent other error handling
-    } else if ((result.error as any)?.status === 401 && (result.error as any)?.data?.error === 'Token expired') {
+    } else if (error?.status === 401 && error?.data?.error === 'Token expired') {
       // Dispatch logout action using action type to avoid circular dependency
       api.dispatch({ type: 'auth/logout' });
       return result;
     } else {
-      const error = result.error as any;
-      // Check for AbortError in multiple possible locations and formats
-      // RTK Query cancels in-flight requests when new requests are made (expected during fast panning)
-      const errorString = typeof error?.error === 'string' ? error.error : '';
-      const errorMessage = typeof error?.message === 'string' ? error.message : '';
-      const status = error?.status;
-      
-      const isAbortError = 
-        errorString === 'AbortError: Aborted' ||
-        errorString.includes('AbortError') ||
-        errorMessage.includes('AbortError') ||
-        errorMessage.includes('aborted') ||
-        (status === 'TIMEOUT_ERROR' && (errorString.includes('Abort') || errorMessage.includes('Abort'))) ||
-        error?.name === 'AbortError';
-      
-      if (isAbortError) {
-        // RTK Query automatically cancels in-flight requests when new requests are made
-        // This is expected behavior during fast panning - don't treat as an error
-        return result;
-      }
-      
       globalErrorHandler.handleDatabaseError(result.error);
     }
   }

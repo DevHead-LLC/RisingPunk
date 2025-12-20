@@ -265,15 +265,28 @@ const shouldFetchViewport = (
 
 /**
  * Trigger viewport fetch with minimal flag
+ * Prevents new requests while one is in flight to avoid cancelling requests
  * @param newViewport - New viewport coordinates { x1, y1, x2, y2, minimal?: boolean }
  * @param panningViewportMinimalRef - Ref to store minimal flag
  * @param setPanningViewportParams - State setter for viewport params
+ * @param viewportRequestInFlightRef - Ref to track if request is in flight
+ * @param pendingViewportParamsRef - Ref to store pending viewport if request is in flight
  */
 const triggerViewportFetch = (
   newViewport: { x1: number; y1: number; x2: number; y2: number; minimal?: boolean },
   panningViewportMinimalRef: React.MutableRefObject<boolean>,
-  setPanningViewportParams: React.Dispatch<React.SetStateAction<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>>
+  setPanningViewportParams: React.Dispatch<React.SetStateAction<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>>,
+  viewportRequestInFlightRef: React.MutableRefObject<boolean>,
+  pendingViewportParamsRef: React.MutableRefObject<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>
 ): void => {
+  if (viewportRequestInFlightRef.current) {
+    // Request already in flight - store this as pending instead of cancelling the current one
+    pendingViewportParamsRef.current = newViewport;
+    return;
+  }
+  
+  // No request in flight - start new request
+  viewportRequestInFlightRef.current = true;
   panningViewportMinimalRef.current = true;
   setPanningViewportParams(newViewport);
 };
@@ -1014,23 +1027,48 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const totalSize = gridSize * CELL_SIZE;
   
   // Phase 5: Two-step approach - fetch initial viewport, then full map if user not found
-  // Step 1: Fetch a reasonable initial viewport (center of map with buffer)
+  // Step 1: Fetch a reasonable initial viewport based on actual pan position (0,0) and visible area
   const initialViewport = useMemo(() => {
-    const buffer = 15; // Larger buffer (30x30 area) to increase chance of finding user
-    const centerX = Math.floor(gridSize / 2);
-    const centerY = Math.floor(gridSize / 2);
+    if (containerSize.width === 0 || containerSize.height === 0) {
+      // Fallback to center if container not ready (shouldn't happen due to skip condition)
+      const buffer = 15;
+      const centerX = Math.floor(gridSize / 2);
+      const centerY = Math.floor(gridSize / 2);
+      return {
+        x1: Math.max(0, centerX - buffer),
+        y1: Math.max(0, centerY - buffer),
+        x2: Math.min(gridSize - 1, centerX + buffer),
+        y2: Math.min(gridSize - 1, centerY + buffer),
+      };
+    }
+    
+    // Calculate viewport from initial pan position (0,0) to match what's actually visible
+    const buffer = 15; // Larger buffer to increase chance of finding user
+    const initialPanX = 0;
+    const initialPanY = 0;
+    const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(
+      initialPanX,
+      initialPanY,
+      containerSize.width,
+      containerSize.height,
+      gridSize,
+      buffer
+    );
+    
     return {
-      x1: Math.max(0, centerX - buffer),
-      y1: Math.max(0, centerY - buffer),
-      x2: Math.min(gridSize - 1, centerX + buffer),
-      y2: Math.min(gridSize - 1, centerY + buffer),
+      x1: startCol,
+      y1: startRow,
+      x2: endCol,
+      y2: endRow,
     };
-  }, [gridSize]);
+  }, [gridSize, containerSize.width, containerSize.height]);
   
+  const shouldSkipInitialQuery = containerSize.width === 0 || containerSize.height === 0;
   const { data: initialViewportData, isLoading: isLoadingInitialViewport, refetch: refetchInitialViewport } = useFetchMapViewportQuery(
     initialViewport,
-    { skip: containerSize.width === 0 || containerSize.height === 0 }
+    { skip: shouldSkipInitialQuery }
   );
+  
   
   // Step 2: Check if user's house is in initial viewport, if not, fetch full map
   const [needsFullMap, setNeedsFullMap] = useState<boolean>(false);
@@ -1095,9 +1133,12 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [panningViewportParams, setPanningViewportParams] = useState<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>(null);
   // Phase 6: Track minimal flag in ref to avoid dependency issues
   const panningViewportMinimalRef = useRef<boolean>(false);
+  // Track if a viewport request is currently in flight to prevent cancelling it
+  const viewportRequestInFlightRef = useRef<boolean>(false);
+  const pendingViewportParamsRef = useRef<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>(null);
   
   // Phase 6: Fetch viewport data during panning with minimal flag (terrain + images only, skip details)
-  const { data: panningViewportData, isLoading: isLoadingPanningViewport } = useFetchMapViewportQuery(
+  const { data: panningViewportData, isLoading: isLoadingPanningViewport, error: panningViewportError } = useFetchMapViewportQuery(
     panningViewportParams!,
     { skip: !panningViewportParams || !terrainDataLoaded }
   );
@@ -1723,6 +1764,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     
     if (!terrainDataLoaded) return cells;
     
+    
     // Use ref for panning state, but read data directly from state (not refs)
     // This ensures we get the latest data even after cache clears
     const currentIsPanningJS = isPanningJSRef.current;
@@ -2008,6 +2050,21 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   // Track processed viewport to prevent infinite loops
   const processedViewportRef = useRef<string | null>(null);
   useEffect(() => {
+    // Mark request as complete (success or error)
+    if (panningViewportData || panningViewportError) {
+      viewportRequestInFlightRef.current = false;
+      
+      // If there's a pending viewport, trigger it now
+      if (pendingViewportParamsRef.current) {
+        const pending = pendingViewportParamsRef.current;
+        pendingViewportParamsRef.current = null;
+        viewportRequestInFlightRef.current = true;
+        panningViewportMinimalRef.current = true;
+        setPanningViewportParams(pending);
+        return;
+      }
+    }
+    
     if (panningViewportData && panningViewportData.grid && panningViewportData.viewport) {
       const viewport = panningViewportData.viewport;
       const viewportKey = `${viewport.x1},${viewport.y1},${viewport.x2},${viewport.y2}`;
@@ -2085,7 +2142,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       panningViewportMinimalRef.current = false;
       setPanningViewportParams(null);
     }
-  }, [panningViewportData, separateStaticAndDynamicData, dispatch]);
+  }, [panningViewportData, panningViewportError, separateStaticAndDynamicData, dispatch]);
   
   // Phase 7: Load entity details when panning stops
   const [stoppedViewportParams, setStoppedViewportParams] = useState<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>(null);
@@ -2240,7 +2297,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           // Phase 6: Trigger viewport fetch with minimal flag if we've moved significantly outside the last fetched viewport
           const newViewport = { x1: startCol, y1: startRow, x2: endCol, y2: endRow, minimal: true };
           if (shouldFetchViewport(newViewport, lastFetchedViewportRef.current)) {
-            triggerViewportFetch(newViewport, panningViewportMinimalRef, setPanningViewportParams);
+            triggerViewportFetch(newViewport, panningViewportMinimalRef, setPanningViewportParams, viewportRequestInFlightRef, pendingViewportParamsRef);
           }
         }
       }
@@ -2263,7 +2320,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         // Phase 6: Trigger viewport fetch with minimal flag if we've moved significantly outside the last fetched viewport
         const newViewport = { x1: startCol, y1: startRow, x2: endCol, y2: endRow, minimal: true };
         if (shouldFetchViewport(newViewport, lastFetchedViewportRef.current)) {
-          triggerViewportFetch(newViewport, panningViewportMinimalRef, setPanningViewportParams);
+          triggerViewportFetch(newViewport, panningViewportMinimalRef, setPanningViewportParams, viewportRequestInFlightRef, pendingViewportParamsRef);
         }
         
         return newWindowRange;
