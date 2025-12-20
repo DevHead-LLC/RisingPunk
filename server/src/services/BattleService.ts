@@ -244,6 +244,15 @@ export class BattleService {
         console.error('Battle inventory settlement failed for', battleId, e);
         // Continue with battle end even if settlement fails
       }
+
+      // Record battle statistics for user-vs-user battles
+      try {
+        const { BattleStatisticsService } = require('./BattleStatisticsService');
+        await BattleStatisticsService.recordBattleStats(battle);
+      } catch (e) {
+        console.error('Battle statistics recording failed for', battleId, e);
+        // Continue with battle end even if statistics recording fails
+      }
     }
 
     // Process battle rewards and bot losses if this was a battle against an NPC
