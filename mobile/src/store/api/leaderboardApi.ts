@@ -10,8 +10,22 @@ export interface LeaderboardUser {
   netWorth?: number;
 }
 
-export interface LeaderboardResponse {
+export interface LeaderboardCrew {
+  rank: number;
+  crewName: string;
+  crewIdentifier: string;
+  botsDestroyed?: number;
+  netWorth?: number;
+  memberCount: number;
+}
+
+export interface IndividualLeaderboardResponse {
   users: LeaderboardUser[];
+  lastUpdated: string;
+}
+
+export interface CrewLeaderboardResponse {
+  crews: LeaderboardCrew[];
   lastUpdated: string;
 }
 
@@ -53,12 +67,20 @@ export const leaderboardApi = createApi({
   }),
   tagTypes: ['Leaderboard'],
   endpoints: (builder) => ({
-    getIndividualBotsDestroyedLeaderboard: builder.query<LeaderboardResponse, void>({
+    getIndividualBotsDestroyedLeaderboard: builder.query<IndividualLeaderboardResponse, void>({
       query: () => '/api/leaderboard/individual/bots-destroyed',
       providesTags: ['Leaderboard'],
     }),
-    getIndividualNetWorthLeaderboard: builder.query<LeaderboardResponse, void>({
+    getIndividualNetWorthLeaderboard: builder.query<IndividualLeaderboardResponse, void>({
       query: () => '/api/leaderboard/individual/net-worth',
+      providesTags: ['Leaderboard'],
+    }),
+    getCrewBotsDestroyedLeaderboard: builder.query<CrewLeaderboardResponse, void>({
+      query: () => '/api/leaderboard/crew/bots-destroyed',
+      providesTags: ['Leaderboard'],
+    }),
+    getCrewNetWorthLeaderboard: builder.query<CrewLeaderboardResponse, void>({
+      query: () => '/api/leaderboard/crew/net-worth',
       providesTags: ['Leaderboard'],
     }),
   }),
@@ -67,5 +89,7 @@ export const leaderboardApi = createApi({
 export const {
   useGetIndividualBotsDestroyedLeaderboardQuery,
   useGetIndividualNetWorthLeaderboardQuery,
+  useGetCrewBotsDestroyedLeaderboardQuery,
+  useGetCrewNetWorthLeaderboardQuery,
 } = leaderboardApi;
 
