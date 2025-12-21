@@ -969,6 +969,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
   );
 
+
   // Phase 1: Debounce panning stopped (200ms after pan ends)
   useEffect(() => {
     if (!isPanningJS) {
@@ -2562,8 +2563,24 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const lastPressCoordsRef = useRef<{ x: number; y: number } | null>(null);
   const PRESS_DEBOUNCE_MS = 300;
   const DOUBLE_PRESS_THRESHOLD_MS = 500;
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const handleCellPress = useCallback(async (x: number, y: number, cellData: CellData) => {
+    const gridSize = grid.length || 50;
+    
+    // Security: Validate coordinates
+    if (x < 0 || y < 0 || x >= gridSize || y >= gridSize) {
+      return;
+    }
+    
+    // Security: Validate cellData structure
+    if (!cellData || typeof cellData !== 'object') {
+      return;
+    }
+    if (typeof cellData.terrain !== 'string' || typeof cellData.entity !== 'string') {
+      return;
+    }
+    
     const now = Date.now();
     const lastPress = lastPressTimeRef.current;
     const lastCoords = lastPressCoordsRef.current;
@@ -2586,33 +2603,65 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     lastPressTimeRef.current = now;
     lastPressCoordsRef.current = { x, y };
     
-    // Allow clicking even while panning - this provides immediate feedback
-    // The modal will still work, and the pan will continue if user keeps dragging
-    
     // If clicking on another player, fetch their current shield status
     if (cellData.owner === 'player' && cellData.userId && cellData.name !== currentUserHandle) {
+      // Security: Validate userId
+      const userId = cellData.userId;
+      if (!userId || typeof userId !== 'string' || userId.trim().length === 0) {
+        setSelectedCell({x, y, info: cellData});
+        return;
+      }
+      
+      // Security: Validate token
+      if (!token || typeof token !== 'string') {
+        setSelectedCell({x, y, info: cellData});
+        return;
+      }
+      
+      // Performance: Cancel previous request if new one starts
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+      
       try {
-        const response = await fetch(`${API_URL}/api/users/shield-status/${cellData.userId}`, {
+        const response = await fetch(`${API_URL}/api/users/shield-status/${userId}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
+          signal: abortControllerRef.current.signal,
         });
-        if (response.ok) {
-          const userData = await response.json();
-          const updatedCellData = {
-            ...cellData,
-            isShielded: userData.antivirusShield?.active || false
-          };
-          setSelectedCell({x, y, info: updatedCellData});
+        
+        // Security: Validate API response
+        if (!response.ok) {
+          setSelectedCell({x, y, info: cellData});
           return;
         }
-      } catch (error) {
+        
+        const userData = await response.json();
+        if (!userData || typeof userData !== 'object') {
+          setSelectedCell({x, y, info: cellData});
+          return;
+        }
+        
+        const updatedCellData = {
+          ...cellData,
+          isShielded: userData.antivirusShield?.active || false
+        };
+        setSelectedCell({x, y, info: updatedCellData});
+        return;
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          return;
+        }
         console.error('Failed to fetch shield status:', error);
+        setSelectedCell({x, y, info: cellData});
+        return;
       }
     }
     
     setSelectedCell({x, y, info: cellData});
-  }, [currentUserHandle, token, isPanningJS]);
+  }, [currentUserHandle, token, isPanningJS, grid]);
 
   // Store handler in ref for stable reference
   handleCellPressRef.current = handleCellPress;
@@ -2716,6 +2765,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       if (visitCrewCloseTimeoutRef.current) {
         clearTimeout(visitCrewCloseTimeoutRef.current);
         visitCrewCloseTimeoutRef.current = null;
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
       }
     };
   }, []);

@@ -50,7 +50,7 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
       >
         <View
           style={[styles.modalContainer, { backgroundColor: colors.background, borderColor: colors.secondary }]}
-          onStartShouldSetResponder={() => false}
+          onStartShouldSetResponder={() => true}
           onMoveShouldSetResponder={() => false}
         >
           <SafeAreaView style={styles.content}>
