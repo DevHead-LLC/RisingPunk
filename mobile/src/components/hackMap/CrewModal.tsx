@@ -1887,7 +1887,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         />
       )}
 
-      {activeCrewDetails?.crew && currentUser && activeCrewDetails.crew.president && (
+      {activeCrewDetails?.crew && currentUser && currentUser._id && activeCrewDetails.crew.president && (
         <>
           {externalMessageReportData && (
             <UserReportModal
@@ -1898,7 +1898,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
               }}
               reportedUserId={externalMessageReportData.reportedUserId}
               reportedUsername={externalMessageReportData.reportedUsername}
-              reportingUserId={currentUser._id}
+              reportingUserId={String(currentUser._id)}
               reportingUsername={currentUser.handle || 'Unknown'}
               context="external-message-board"
               contextData={{
@@ -1917,7 +1917,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
               }}
               reportedUserId={internalMessageReportData.reportedUserId}
               reportedUsername={internalMessageReportData.reportedUsername}
-              reportingUserId={currentUser._id}
+              reportingUserId={String(currentUser._id)}
               reportingUsername={currentUser.handle || 'Unknown'}
               context="internal-message-board"
               contextData={{
@@ -1936,7 +1936,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
               }}
               reportedUserId={crewNameReportData.reportedUserId}
               reportedUsername={crewNameReportData.reportedUsername}
-              reportingUserId={currentUser._id}
+              reportingUserId={String(currentUser._id)}
               reportingUsername={currentUser.handle || 'Unknown'}
               context="crew-name"
               contextData={{
