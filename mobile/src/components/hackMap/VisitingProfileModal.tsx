@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, SafeAreaView, Image, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, SafeAreaView, Image } from 'react-native';
+import { ScrollView } from 'react-native-gesture-handler';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { useGetUserProfileQuery } from '../../store/api/authApi';
@@ -47,10 +48,10 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
         activeOpacity={1}
         onPress={onClose}
       >
-        <TouchableOpacity
+        <View
           style={[styles.modalContainer, { backgroundColor: colors.background, borderColor: colors.secondary }]}
-          activeOpacity={1}
-          onPress={(e) => e.stopPropagation()}
+          onStartShouldSetResponder={() => false}
+          onMoveShouldSetResponder={() => false}
         >
           <SafeAreaView style={styles.content}>
             <View style={styles.header}>
@@ -66,7 +67,15 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+              style={styles.scrollView}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+              nestedScrollEnabled={true}
+              keyboardShouldPersistTaps="handled"
+              scrollEnabled={true}
+              bounces={true}
+            >
               <View style={styles.profileContent}>
                 {isLoading ? (
                   <Text style={[styles.loadingText, { color: colors.text.secondary }]}>
@@ -177,7 +186,7 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
               </View>
             </ScrollView>
           </SafeAreaView>
-        </TouchableOpacity>
+        </View>
       </TouchableOpacity>
     </Modal>
   );
@@ -290,6 +299,9 @@ const createStyles = (colors: any) => StyleSheet.create({
   scrollView: {
     maxHeight: '80%',
   },
+  scrollContent: {
+    flexGrow: 1,
+  },
   battleStatsSection: {
     marginTop: SIZING.spacing.lg,
     width: '100%',
@@ -346,7 +358,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginBottom: SIZING.spacing.xs,
   },
   winPercentageValue: {
-    fontSize: SIZING.font.h3,
+    fontSize: SIZING.font.h2,
     fontWeight: 'bold',
   },
 });
