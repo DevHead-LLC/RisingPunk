@@ -67,8 +67,11 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
   const [showReasonPicker, setShowReasonPicker] = useState(false);
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
+  const [isSubmittingLocal, setIsSubmittingLocal] = useState(false);
   
   const [submitReport, { isLoading: isSubmitting }] = useSubmitReportMutation();
+
+  const isSubmittingFinal = isSubmitting || isSubmittingLocal;
 
   // Reset form when modal opens/closes
   useEffect(() => {
@@ -77,6 +80,7 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
       setDescription('');
       setError('');
       setShowReasonPicker(false);
+      setIsSubmittingLocal(false);
     }
   }, [visible]);
 
@@ -126,6 +130,10 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
   };
 
   const handleSubmit = useCallback(async () => {
+    if (isSubmittingFinal) {
+      return;
+    }
+
     if (!selectedReason) {
       setError('Please select a reason for reporting');
       return;
@@ -141,7 +149,13 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
       return;
     }
 
+    if (!reportingUserId || !reportedUserId) {
+      setError('Missing user information. Please try again.');
+      return;
+    }
+
     setError('');
+    setIsSubmittingLocal(true);
 
     try {
       await submitReport({
@@ -155,14 +169,15 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
         contextData,
       }).unwrap();
 
-      // Success - close modal
+      setIsSubmittingLocal(false);
       onClose();
     } catch (err: any) {
+      setIsSubmittingLocal(false);
       setError(err?.data?.error || err?.message || 'Failed to submit report. Please try again.');
     }
-  }, [selectedReason, description, maxDescriptionLength, reportedUserId, reportedUsername, reportingUserId, reportingUsername, context, contextData, submitReport, onClose]);
+  }, [selectedReason, description, maxDescriptionLength, reportedUserId, reportedUsername, reportingUserId, reportingUsername, context, contextData, submitReport, onClose, isSubmittingFinal]);
 
-  const isFormValid = selectedReason !== null && description.trim().length > 0 && description.length <= maxDescriptionLength;
+  const isFormValid = selectedReason !== null && description.trim().length > 0 && description.length <= maxDescriptionLength && !isSubmittingFinal;
   const contextDataDisplay = getContextDataDisplay();
   const placeholder = maxDescriptionLength === 200 
     ? 'Provide short description of report purpose'
@@ -200,6 +215,8 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled={true}
+                scrollEnabled={true}
               >
                   <Text style={[styles.title, { color: colors.primary }]}>
                     REPORT USER
@@ -308,8 +325,10 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
                       ]}
                       value={description}
                       onChangeText={(text) => {
-                        setDescription(text);
-                        setError('');
+                        if (text.length <= maxDescriptionLength) {
+                          setDescription(text);
+                          setError('');
+                        }
                       }}
                       placeholder={placeholder}
                       placeholderTextColor={colors.text.placeholder}
@@ -349,16 +368,16 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
                       style={[
                         styles.submitButton,
                         {
-                          backgroundColor: !isFormValid || isSubmitting ? colors.buttonDisabled : colors.buttonBg,
+                          backgroundColor: !isFormValid || isSubmittingFinal ? colors.buttonDisabled : colors.buttonBg,
                           borderColor: colors.matrix,
                         }
                       ]}
                       onPress={handleSubmit}
-                      disabled={!isFormValid || isSubmitting}
+                      disabled={!isFormValid || isSubmittingFinal}
                       activeOpacity={0.7}
                     >
                       <Text style={[styles.submitButtonText, { color: '#FFFFFF' }]}>
-                        {isSubmitting ? 'SUBMITTING...' : 'SUBMIT REPORT'}
+                        {isSubmittingFinal ? 'SUBMITTING...' : 'SUBMIT REPORT'}
                       </Text>
                     </TouchableOpacity>
                   </View>
