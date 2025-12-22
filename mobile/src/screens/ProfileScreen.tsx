@@ -16,6 +16,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { logout, setShowOnboarding, updateUserHandle, forceRefresh, setShowEmailVerification, refreshUserData } from '../store/slices/authSlice';
 import { updateProfileGender } from '../store/slices/preferencesSlice';
 import { useUpdatePreferencesMutation } from '../store/api/preferencesApi';
+import { useGetCurrentTaskGuideTaskQuery, useUpdateTaskGuideVisibilityMutation } from '../store/api/userGuideApi';
 import { useGetProfileQuery, useGetResearchCenterStatusQuery, useDeleteAccountMutation, authApi } from '../store/api/authApi';
 import { useFetchBotStatsQuery, botsApi } from '../store/api/botsApi';
 import { balanceApi } from '../store/api/balanceApi';
@@ -577,6 +578,8 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
 
   const [updatePreferences] = useUpdatePreferencesMutation();
   const [deleteAccount] = useDeleteAccountMutation();
+  const { data: taskGuideData } = useGetCurrentTaskGuideTaskQuery();
+  const [updateTaskGuideVisibility] = useUpdateTaskGuideVisibilityMutation();
 
   
   const styles = useMemo(() => createProfileStyles(colors, screenWidth, scaleFactor), [colors, screenWidth, scaleFactor]);
@@ -936,6 +939,37 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                     </View>
                     <Text style={styles.themeToggleText}>
                       {profileGender === 'male' ? 'Switch to Female' : 'Switch to Male'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              {/* Task Guide Toggle Section */}
+              <View style={styles.settingCard}>
+                <Text style={styles.settingLabel}>TASK GUIDE</Text>
+                <TouchableOpacity
+                  style={styles.themeToggle}
+                  onPress={async () => {
+                    const newShowTaskGuide = !(taskGuideData?.showTaskGuide ?? true);
+                    
+                    try {
+                      await updateTaskGuideVisibility({ showTaskGuide: newShowTaskGuide }).unwrap();
+                    } catch (error) {
+                      console.error('ProfileScreen: Failed to update task guide visibility:', error);
+                    }
+                  }}
+                >
+                  <View style={styles.themeToggleContent}>
+                    <View style={[
+                      styles.themeIconContainer,
+                      !(taskGuideData?.showTaskGuide ?? true) && styles.themeIconContainerDark
+                    ]}>
+                      <Text style={styles.themeIcon}>
+                        {(taskGuideData?.showTaskGuide ?? true) ? '📋' : '🚫'}
+                      </Text>
+                    </View>
+                    <Text style={styles.themeToggleText}>
+                      {(taskGuideData?.showTaskGuide ?? true) ? 'Hide Task Guide' : 'Show Task Guide'}
                     </Text>
                   </View>
                 </TouchableOpacity>
