@@ -2085,25 +2085,24 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     // Mark request as complete (success or error)
     if (panningViewportData || panningViewportError) {
       viewportRequestInFlightRef.current = false;
-      
-      // If there's a pending viewport, trigger it now
-      if (pendingViewportParamsRef.current) {
-        const pending = pendingViewportParamsRef.current;
-        pendingViewportParamsRef.current = null;
-        viewportRequestInFlightRef.current = true;
-        // Respect the minimal flag from the pending request (restorePan uses minimal: false)
-        panningViewportMinimalRef.current = pending.minimal ?? true;
-        setPanningViewportParams(pending);
-        return;
-      }
     }
     
+    // Process current data first before handling pending requests
+    // This ensures non-minimal restorePan data isn't discarded when a panning request is pending
     if (panningViewportData && panningViewportData.grid && panningViewportData.viewport) {
       const viewport = panningViewportData.viewport;
       const viewportKey = `${viewport.x1},${viewport.y1},${viewport.x2},${viewport.y2}`;
       
       // Phase 6: Prevent processing the same viewport twice
       if (processedViewportRef.current === viewportKey) {
+        // Still handle pending requests even if this viewport was already processed
+        if (pendingViewportParamsRef.current) {
+          const pending = pendingViewportParamsRef.current;
+          pendingViewportParamsRef.current = null;
+          viewportRequestInFlightRef.current = true;
+          panningViewportMinimalRef.current = pending.minimal ?? true;
+          setPanningViewportParams(pending);
+        }
         return;
       }
       processedViewportRef.current = viewportKey;
@@ -2180,6 +2179,17 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       // Clear viewport params and reset minimal flag to allow next fetch
       panningViewportMinimalRef.current = false;
       setPanningViewportParams(null);
+    }
+    
+    // Handle pending requests after processing current data
+    // This ensures non-minimal restorePan data is processed even if a panning request is pending
+    if ((panningViewportData || panningViewportError) && pendingViewportParamsRef.current) {
+      const pending = pendingViewportParamsRef.current;
+      pendingViewportParamsRef.current = null;
+      viewportRequestInFlightRef.current = true;
+      // Respect the minimal flag from the pending request (restorePan uses minimal: false)
+      panningViewportMinimalRef.current = pending.minimal ?? true;
+      setPanningViewportParams(pending);
     }
   }, [panningViewportData, panningViewportError, separateStaticAndDynamicData, dispatch]);
   
