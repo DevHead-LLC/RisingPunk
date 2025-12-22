@@ -2313,10 +2313,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       );
       
       // Fetch viewport at restorePan location instead of initial viewport
-      // Reset minimal flag to ensure restorePan request is processed as non-minimal
-      // This prevents terrainDataLoaded from being incorrectly skipped
-      panningViewportMinimalRef.current = false;
-      
       // Mark request as in flight to prevent panning from overwriting restorePan request
       // If a panning request is already in flight, store restorePan as pending
       if (viewportRequestInFlightRef.current) {
@@ -2328,6 +2324,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           minimal: false
         };
       } else {
+        // Reset minimal flag to ensure restorePan request is processed as non-minimal
+        // This prevents terrainDataLoaded from being incorrectly skipped
+        // Only set when starting a new request to avoid race condition with in-flight requests
+        panningViewportMinimalRef.current = false;
         viewportRequestInFlightRef.current = true;
         setPanningViewportParams({
           x1: restoreViewport.startCol,
