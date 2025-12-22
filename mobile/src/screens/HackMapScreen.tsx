@@ -2091,7 +2091,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         const pending = pendingViewportParamsRef.current;
         pendingViewportParamsRef.current = null;
         viewportRequestInFlightRef.current = true;
-        panningViewportMinimalRef.current = true;
+        // Respect the minimal flag from the pending request (restorePan uses minimal: false)
+        panningViewportMinimalRef.current = pending.minimal ?? true;
         setPanningViewportParams(pending);
         return;
       }
@@ -2312,13 +2313,30 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       );
       
       // Fetch viewport at restorePan location instead of initial viewport
-      setPanningViewportParams({
-        x1: restoreViewport.startCol,
-        y1: restoreViewport.startRow,
-        x2: restoreViewport.endCol,
-        y2: restoreViewport.endRow,
-        minimal: false
-      });
+      // Reset minimal flag to ensure restorePan request is processed as non-minimal
+      // This prevents terrainDataLoaded from being incorrectly skipped
+      panningViewportMinimalRef.current = false;
+      
+      // Mark request as in flight to prevent panning from overwriting restorePan request
+      // If a panning request is already in flight, store restorePan as pending
+      if (viewportRequestInFlightRef.current) {
+        pendingViewportParamsRef.current = {
+          x1: restoreViewport.startCol,
+          y1: restoreViewport.startRow,
+          x2: restoreViewport.endCol,
+          y2: restoreViewport.endRow,
+          minimal: false
+        };
+      } else {
+        viewportRequestInFlightRef.current = true;
+        setPanningViewportParams({
+          x1: restoreViewport.startCol,
+          y1: restoreViewport.startRow,
+          x2: restoreViewport.endCol,
+          y2: restoreViewport.endRow,
+          minimal: false
+        });
+      }
       
       // Clear cache for the restorePan area only (not everything)
       // This ensures fresh data for NPCs that may have been defeated
