@@ -2385,8 +2385,13 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       }
       
       // Validate grid coordinates are within bounds
-      const gridSize = getGridSize(grid);
-      if (restorePan.x < 0 || restorePan.x >= gridSize || restorePan.y < 0 || restorePan.y >= gridSize) {
+      // y represents row index, validate against number of rows
+      if (!grid || restorePan.y < 0 || restorePan.y >= grid.length) {
+        return;
+      }
+      // x represents column index, validate against number of columns in that row
+      const row = grid[restorePan.y];
+      if (!row || restorePan.x < 0 || restorePan.x >= row.length) {
         return;
       }
       
@@ -2566,10 +2571,14 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const handleCellPress = useCallback(async (x: number, y: number, cellData: CellData) => {
-    const gridSize = grid.length || 50;
-    
     // Security: Validate coordinates
-    if (x < 0 || y < 0 || x >= gridSize || y >= gridSize) {
+    // y represents row index, validate against number of rows
+    if (y < 0 || !grid || y >= grid.length) {
+      return;
+    }
+    // x represents column index, validate against number of columns in that row
+    const row = grid[y];
+    if (!row || x < 0 || x >= row.length) {
       return;
     }
     
