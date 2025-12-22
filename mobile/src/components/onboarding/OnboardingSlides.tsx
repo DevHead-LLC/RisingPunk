@@ -13,28 +13,21 @@ interface OnboardingSlidesProps {
 }
 
 const SLIDE_IMAGES = [
-  require('../../assets/images/onboarding/one.png'),
-  require('../../assets/images/onboarding/two.png'),
-  require('../../assets/images/onboarding/three.png'),
-  require('../../assets/images/onboarding/four.png'),
-  require('../../assets/images/onboarding/five.png'),
-  require('../../assets/images/onboarding/six.png'),
-  require('../../assets/images/onboarding/seven.png'),
-  require('../../assets/images/onboarding/eight.png'),
-  require('../../assets/images/onboarding/nine.png'),
-  require('../../assets/images/onboarding/ten.png'),
-  require('../../assets/images/onboarding/eleven.png'),
-  require('../../assets/images/onboarding/twelve.png'),
-  require('../../assets/images/onboarding/thirteen.png'),
-  require('../../assets/images/onboarding/fourteen.png'),
-  require('../../assets/images/onboarding/fifteen.png'),
-  require('../../assets/images/onboarding/sixteen.png'),
-  require('../../assets/images/onboarding/seventeen.png'),
-  require('../../assets/images/onboarding/eighteen.png'),
-  require('../../assets/images/onboarding/nineteen.png'),
-  require('../../assets/images/onboarding/twenty.png'),
-  require('../../assets/images/onboarding/twentyone.png'),
-  require('../../assets/images/onboarding/twentythree.png'),
+  require('../../assets/images/onboarding/slide1.png'),
+  require('../../assets/images/onboarding/slide2.png'),
+  require('../../assets/images/onboarding/slide3.png'),
+  require('../../assets/images/onboarding/slide4.png'),
+  require('../../assets/images/onboarding/slide5.png'),
+  require('../../assets/images/onboarding/slide6.png'),
+  require('../../assets/images/onboarding/slide7.png'),
+  require('../../assets/images/onboarding/slide8.png'),
+  require('../../assets/images/onboarding/slide9.png'),
+  require('../../assets/images/onboarding/slide10.png'),
+  require('../../assets/images/onboarding/slide11.png'),
+  require('../../assets/images/onboarding/slide12.png'),
+  require('../../assets/images/onboarding/slide13.png'),
+  require('../../assets/images/onboarding/slide14.png'),
+  require('../../assets/images/RisingPunkLogo.png'),
 ];
 
 export const OnboardingSlides: React.FC<OnboardingSlidesProps> = ({ onComplete, onSkip }) => {
@@ -55,18 +48,21 @@ export const OnboardingSlides: React.FC<OnboardingSlidesProps> = ({ onComplete, 
 
   const currentImage = SLIDE_IMAGES[currentSlideIndex];
   const isLastSlide = currentSlideIndex === SLIDE_IMAGES.length - 1;
+  const isLogoSlide = currentSlideIndex === SLIDE_IMAGES.length - 1;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <TouchableOpacity 
         style={styles.slideContainer} 
-        onPress={handleNextSlide}
+        onPress={isLogoSlide ? undefined : handleNextSlide}
         activeOpacity={0.9}
+        disabled={isLogoSlide}
       >
         <SlideContent 
           image={currentImage}
           slideNumber={currentSlideIndex + 1}
           totalSlides={SLIDE_IMAGES.length}
+          onComplete={isLogoSlide ? onComplete : undefined}
         />
       </TouchableOpacity>
       
@@ -75,7 +71,7 @@ export const OnboardingSlides: React.FC<OnboardingSlidesProps> = ({ onComplete, 
           currentSlide={currentSlideIndex + 1}
           totalSlides={SLIDE_IMAGES.length}
         />
-        <SkipButton onSkip={handleSkip} />
+        {!isLogoSlide && <SkipButton onSkip={handleSkip} />}
       </View>
     </View>
   );
