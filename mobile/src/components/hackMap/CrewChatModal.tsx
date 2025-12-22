@@ -124,11 +124,12 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
 
   const isCurrentUser = useCallback((userId: string) => {
     if (!currentUserId || !userId) return false;
-    // Normalize both IDs to strings and compare
+    if (!currentUser) return false;
     const currentIdStr = String(currentUserId).trim();
     const messageIdStr = String(userId).trim();
-    return currentIdStr === messageIdStr;
-  }, [currentUserId]);
+    const currentIdAlt = String(currentUser._id || (currentUser as any)?.id || '').trim();
+    return currentIdStr === messageIdStr || currentIdAlt === messageIdStr;
+  }, [currentUserId, currentUser]);
 
   const handleReportMessage = (message: ChatMessage) => {
     // Capture message data immediately before potential deletion
