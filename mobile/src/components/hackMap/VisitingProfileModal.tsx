@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, SafeAreaView, Image, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, SafeAreaView, Image, ScrollView, Platform } from 'react-native';
+import { ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { useGetUserProfileQuery } from '../../store/api/authApi';
@@ -31,6 +32,117 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
     return `${Math.round((successful / total) * 100)}%`;
   };
 
+  const profileContent = (
+    <View style={styles.profileContent}>
+      {isLoading ? (
+        <Text style={[styles.loadingText, { color: colors.text.secondary }]}>
+          Loading...
+        </Text>
+      ) : error ? (
+        <Text style={[styles.errorText, { color: colors.error }]}>
+          Failed to load profile
+        </Text>
+      ) : userProfile ? (
+        <>
+          <View style={[styles.avatarContainer, { borderColor: colors.secondary }]}>
+            <Image
+              source={profileImageSource}
+              style={styles.avatarImage}
+              resizeMode="contain"
+            />
+          </View>
+          <Text style={[styles.username, { color: colors.text.primary }]}>
+            {userProfile.handle}
+          </Text>
+          <View style={[styles.levelContainer, { backgroundColor: colors.surface, borderColor: colors.secondary }]}>
+            <Text style={[styles.levelLabel, { color: colors.text.secondary }]}>
+              Level
+            </Text>
+            <Text style={[styles.levelValue, { color: colors.text.primary }]}>
+              {userProfile.level}
+            </Text>
+          </View>
+
+          {userProfile.battleStats && (
+            <View style={styles.battleStatsSection}>
+              <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
+                BATTLE STATISTICS
+              </Text>
+              <View style={styles.battleStatsGrid}>
+                <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
+                  <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
+                    Bots Destroyed
+                  </Text>
+                  <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
+                    {userProfile.battleStats.botsDestroyed}
+                  </Text>
+                </View>
+                <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
+                  <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
+                    Bots Lost
+                  </Text>
+                  <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
+                    {userProfile.battleStats.botsLost}
+                  </Text>
+                </View>
+                <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
+                  <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
+                    Successful Attacks
+                  </Text>
+                  <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
+                    {userProfile.battleStats.successfulAttacks}
+                  </Text>
+                </View>
+                <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
+                  <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
+                    Failed Attacks
+                  </Text>
+                  <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
+                    {userProfile.battleStats.failedAttacks}
+                  </Text>
+                </View>
+                <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
+                  <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
+                    Successful Defenses
+                  </Text>
+                  <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
+                    {userProfile.battleStats.successfulDefenses}
+                  </Text>
+                </View>
+                <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
+                  <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
+                    Failed Defenses
+                  </Text>
+                  <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
+                    {userProfile.battleStats.failedDefenses}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.winPercentageContainer}>
+                <View style={[styles.winPercentageItem, { borderColor: colors.matrix }]}>
+                  <Text style={[styles.winPercentageLabel, { color: colors.text.secondary }]}>
+                    Attack Win %
+                  </Text>
+                  <Text style={[styles.winPercentageValue, { color: colors.matrix }]}>
+                    {calculateWinPercentage(userProfile.battleStats.successfulAttacks, userProfile.battleStats.failedAttacks)}
+                  </Text>
+                </View>
+                <View style={[styles.winPercentageItem, { borderColor: colors.matrix }]}>
+                  <Text style={[styles.winPercentageLabel, { color: colors.text.secondary }]}>
+                    Defense Win %
+                  </Text>
+                  <Text style={[styles.winPercentageValue, { color: colors.matrix }]}>
+                    {calculateWinPercentage(userProfile.battleStats.successfulDefenses, userProfile.battleStats.failedDefenses)}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+        </>
+      ) : null}
+    </View>
+  );
+
   return (
     <Modal
       visible={visible}
@@ -47,10 +159,10 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
         activeOpacity={1}
         onPress={onClose}
       >
-        <TouchableOpacity
+        <View
           style={[styles.modalContainer, { backgroundColor: colors.background, borderColor: colors.secondary }]}
-          activeOpacity={1}
-          onPress={(e) => e.stopPropagation()}
+          onStartShouldSetResponder={() => true}
+          onMoveShouldSetResponder={() => false}
         >
           <SafeAreaView style={styles.content}>
             <View style={styles.header}>
@@ -66,118 +178,33 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-              <View style={styles.profileContent}>
-                {isLoading ? (
-                  <Text style={[styles.loadingText, { color: colors.text.secondary }]}>
-                    Loading...
-                  </Text>
-                ) : error ? (
-                  <Text style={[styles.errorText, { color: colors.error }]}>
-                    Failed to load profile
-                  </Text>
-                ) : userProfile ? (
-                  <>
-                    <View style={[styles.avatarContainer, { borderColor: colors.secondary }]}>
-                      <Image
-                        source={profileImageSource}
-                        style={styles.avatarImage}
-                        resizeMode="contain"
-                      />
-                    </View>
-                    <Text style={[styles.username, { color: colors.text.primary }]}>
-                      {userProfile.handle}
-                    </Text>
-                    <View style={[styles.levelContainer, { backgroundColor: colors.surface, borderColor: colors.secondary }]}>
-                      <Text style={[styles.levelLabel, { color: colors.text.secondary }]}>
-                        Level
-                      </Text>
-                      <Text style={[styles.levelValue, { color: colors.text.primary }]}>
-                        {userProfile.level}
-                      </Text>
-                    </View>
-
-                    {userProfile.battleStats && (
-                      <View style={styles.battleStatsSection}>
-                        <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
-                          BATTLE STATISTICS
-                        </Text>
-                        <View style={styles.battleStatsGrid}>
-                          <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
-                            <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
-                              Bots Destroyed
-                            </Text>
-                            <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
-                              {userProfile.battleStats.botsDestroyed}
-                            </Text>
-                          </View>
-                          <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
-                            <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
-                              Bots Lost
-                            </Text>
-                            <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
-                              {userProfile.battleStats.botsLost}
-                            </Text>
-                          </View>
-                          <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
-                            <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
-                              Successful Attacks
-                            </Text>
-                            <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
-                              {userProfile.battleStats.successfulAttacks}
-                            </Text>
-                          </View>
-                          <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
-                            <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
-                              Failed Attacks
-                            </Text>
-                            <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
-                              {userProfile.battleStats.failedAttacks}
-                            </Text>
-                          </View>
-                          <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
-                            <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
-                              Successful Defenses
-                            </Text>
-                            <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
-                              {userProfile.battleStats.successfulDefenses}
-                            </Text>
-                          </View>
-                          <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
-                            <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
-                              Failed Defenses
-                            </Text>
-                            <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
-                              {userProfile.battleStats.failedDefenses}
-                            </Text>
-                          </View>
-                        </View>
-                        <View style={styles.winPercentageContainer}>
-                          <View style={[styles.winPercentageItem, { borderColor: colors.matrix }]}>
-                            <Text style={[styles.winPercentageLabel, { color: colors.text.secondary }]}>
-                              Attack Win %
-                            </Text>
-                            <Text style={[styles.winPercentageValue, { color: colors.matrix }]}>
-                              {calculateWinPercentage(userProfile.battleStats.successfulAttacks, userProfile.battleStats.failedAttacks)}
-                            </Text>
-                          </View>
-                          <View style={[styles.winPercentageItem, { borderColor: colors.matrix }]}>
-                            <Text style={[styles.winPercentageLabel, { color: colors.text.secondary }]}>
-                              Defense Win %
-                            </Text>
-                            <Text style={[styles.winPercentageValue, { color: colors.matrix }]}>
-                              {calculateWinPercentage(userProfile.battleStats.successfulDefenses, userProfile.battleStats.failedDefenses)}
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    )}
-                  </>
-                ) : null}
-              </View>
-            </ScrollView>
+            {Platform.OS === 'ios' ? (
+              <GestureScrollView 
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}
+                keyboardShouldPersistTaps="handled"
+                scrollEnabled={true}
+                bounces={true}
+              >
+                {profileContent}
+              </GestureScrollView>
+            ) : (
+              <ScrollView 
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}
+                keyboardShouldPersistTaps="handled"
+                scrollEnabled={true}
+                bounces={true}
+              >
+                {profileContent}
+              </ScrollView>
+            )}
           </SafeAreaView>
-        </TouchableOpacity>
+        </View>
       </TouchableOpacity>
     </Modal>
   );
@@ -290,6 +317,9 @@ const createStyles = (colors: any) => StyleSheet.create({
   scrollView: {
     maxHeight: '80%',
   },
+  scrollContent: {
+    flexGrow: 1,
+  },
   battleStatsSection: {
     marginTop: SIZING.spacing.lg,
     width: '100%',
@@ -346,7 +376,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginBottom: SIZING.spacing.xs,
   },
   winPercentageValue: {
-    fontSize: SIZING.font.h3,
+    fontSize: SIZING.font.h2,
     fontWeight: 'bold',
   },
 });
