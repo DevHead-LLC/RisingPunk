@@ -439,12 +439,29 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     const key = `${x},${y}`;
     const dynamicEntity = dynamicEntityData[key];
     const isShielded = dynamicEntity?.isShielded ?? (cell as any).isShielded;
+    const pressStartTimeRef = useRef<number>(0);
+    const pressStartCoordsRef = useRef<{ x: number; y: number } | null>(null);
     
     const houseBgStyle = cell.entity === 'house'
       ? (cell.owner === 'player'
           ? (cell.name === currentUserHandle ? styles.userHouseBg : styles.otherUserHouseBg)
           : styles.enemyHouseBg)
       : null;
+    
+    const handlePress = useCallback(() => {
+      const now = Date.now();
+      const startTime = pressStartTimeRef.current;
+      const startCoords = pressStartCoordsRef.current;
+      
+      // Only trigger if it was a quick tap (less than 300ms)
+      if (startTime > 0 && now - startTime < 300 && startCoords) {
+        onPress(x, y, cell);
+      }
+      
+      pressStartTimeRef.current = 0;
+      pressStartCoordsRef.current = null;
+    }, [x, y, cell, onPress]);
+    
     return (
       <Pressable
         style={[
@@ -456,7 +473,24 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           !isWarCrewMember && isAllianceCrewMember && styles.allianceCrewMemberCell,
           !isWarCrewMember && !isAllianceCrewMember && isCrewMember && styles.crewMemberCell,
         ]}
-        onPress={() => onPress(x, y, cell)}
+        hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+        onPress={handlePress}
+        onPressIn={(e) => {
+          pressStartTimeRef.current = Date.now();
+          pressStartCoordsRef.current = { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY };
+        }}
+        onPressOut={(e) => {
+          const startTime = pressStartTimeRef.current;
+          const startCoords = pressStartCoordsRef.current;
+          if (startTime > 0 && startCoords) {
+            const moved = Math.abs(e.nativeEvent.locationX - startCoords.x) > 5 || 
+                         Math.abs(e.nativeEvent.locationY - startCoords.y) > 5;
+            if (moved) {
+              pressStartTimeRef.current = 0;
+              pressStartCoordsRef.current = null;
+            }
+          }
+        }}
       >
         <View style={[styles.cellContent, terrainStyleMap[cell.terrain], houseBgStyle]}>
           {cell.entity !== 'house' && getTerrainIcon(cell.terrain)}
@@ -935,6 +969,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
   );
 
+
   // Phase 1: Debounce panning stopped (200ms after pan ends)
   useEffect(() => {
     if (!isPanningJS) {
@@ -968,6 +1003,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   );
 
   const panGesture = Gesture.Pan()
+    .minDistance(10)
     .onStart(() => {
       startX.value = offsetX.value;
       startY.value = offsetY.value;
@@ -2522,34 +2558,113 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     hasCenteredOnHome.value = true;
   }, [grid, currentUserHandle, restorePan, containerSize.width, containerSize.height, minX, maxX, boundsReady, computeWindow, offsetX, offsetY]);
 
+  const handleCellPressRef = useRef<((x: number, y: number, cellData: CellData) => Promise<void>) | null>(null);
+  const lastPressTimeRef = useRef<number>(0);
+  const lastPressCoordsRef = useRef<{ x: number; y: number } | null>(null);
+  const PRESS_DEBOUNCE_MS = 300;
+  const DOUBLE_PRESS_THRESHOLD_MS = 500;
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   const handleCellPress = useCallback(async (x: number, y: number, cellData: CellData) => {
-    // Allow clicking even while panning - this provides immediate feedback
-    // The modal will still work, and the pan will continue if user keeps dragging
+    const gridSize = grid.length || 50;
+    
+    // Security: Validate coordinates
+    if (x < 0 || y < 0 || x >= gridSize || y >= gridSize) {
+      return;
+    }
+    
+    // Security: Validate cellData structure
+    if (!cellData || typeof cellData !== 'object') {
+      return;
+    }
+    if (typeof cellData.terrain !== 'string' || typeof cellData.entity !== 'string') {
+      return;
+    }
+    
+    const now = Date.now();
+    const lastPress = lastPressTimeRef.current;
+    const lastCoords = lastPressCoordsRef.current;
+    
+    // Don't handle presses if we're currently panning
+    if (isPanningJS) {
+      return;
+    }
+    
+    // Debounce: ignore if pressed too soon after last press (but only if same coordinates)
+    if (lastCoords && lastCoords.x === x && lastCoords.y === y && now - lastPress < PRESS_DEBOUNCE_MS) {
+      return;
+    }
+    
+    // Prevent double-clicks from same location
+    if (lastCoords && lastCoords.x === x && lastCoords.y === y && now - lastPress < DOUBLE_PRESS_THRESHOLD_MS) {
+      return;
+    }
+    
+    lastPressTimeRef.current = now;
+    lastPressCoordsRef.current = { x, y };
     
     // If clicking on another player, fetch their current shield status
     if (cellData.owner === 'player' && cellData.userId && cellData.name !== currentUserHandle) {
+      // Security: Validate userId
+      const userId = cellData.userId;
+      if (!userId || typeof userId !== 'string' || userId.trim().length === 0) {
+        setSelectedCell({x, y, info: cellData});
+        return;
+      }
+      
+      // Security: Validate token
+      if (!token || typeof token !== 'string') {
+        setSelectedCell({x, y, info: cellData});
+        return;
+      }
+      
+      // Performance: Cancel previous request if new one starts
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+      
       try {
-        const response = await fetch(`${API_URL}/api/users/shield-status/${cellData.userId}`, {
+        const response = await fetch(`${API_URL}/api/users/shield-status/${userId}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
+          signal: abortControllerRef.current.signal,
         });
-        if (response.ok) {
-          const userData = await response.json();
-          const updatedCellData = {
-            ...cellData,
-            isShielded: userData.antivirusShield?.active || false
-          };
-          setSelectedCell({x, y, info: updatedCellData});
+        
+        // Security: Validate API response
+        if (!response.ok) {
+          setSelectedCell({x, y, info: cellData});
           return;
         }
-      } catch (error) {
+        
+        const userData = await response.json();
+        if (!userData || typeof userData !== 'object') {
+          setSelectedCell({x, y, info: cellData});
+          return;
+        }
+        
+        const updatedCellData = {
+          ...cellData,
+          isShielded: userData.antivirusShield?.active || false
+        };
+        setSelectedCell({x, y, info: updatedCellData});
+        return;
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          return;
+        }
         console.error('Failed to fetch shield status:', error);
+        setSelectedCell({x, y, info: cellData});
+        return;
       }
     }
     
     setSelectedCell({x, y, info: cellData});
-  }, [currentUserHandle, token]);
+  }, [currentUserHandle, token, isPanningJS, grid]);
+
+  // Store handler in ref for stable reference
+  handleCellPressRef.current = handleCellPress;
 
   const centerOnUserHome = useCallback(() => {
     if (!currentUserHandle || !grid.length) return;
@@ -2650,6 +2765,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       if (visitCrewCloseTimeoutRef.current) {
         clearTimeout(visitCrewCloseTimeoutRef.current);
         visitCrewCloseTimeoutRef.current = null;
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
       }
     };
   }, []);
