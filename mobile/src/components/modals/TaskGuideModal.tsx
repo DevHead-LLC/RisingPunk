@@ -20,11 +20,13 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 interface TaskGuideModalProps {
   visible: boolean;
   onClose: () => void;
+  onNavigateToProfile?: () => void;
 }
 
 export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
   visible,
   onClose,
+  onNavigateToProfile,
 }) => {
   const colors = useThemeColors();
   const { data, isLoading, error } = useGetCurrentTaskGuideTaskQuery(undefined, {
@@ -62,6 +64,11 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
         // Close modal and trigger highlight mode for profile
         onClose();
         setHighlightTaskId('view-profile');
+      } else if (taskId === 'use-hacker-mode' || taskId === 'use-business-mode') {
+        // Close modal and trigger highlight mode for theme switching
+        // User will be guided to click profile icon on turf screen first
+        onClose();
+        setHighlightTaskId(taskId);
       } else {
         // For other tasks, just close modal for now
         onClose();
@@ -391,7 +398,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     marginRight: SIZING.spacing.md,
   },
   headerRewardAmount: {
-    width: 60,
+    width: 90,
     textAlign: 'right',
     marginRight: SIZING.spacing.md,
   },
@@ -425,7 +432,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   rewardAmount: {
     fontSize: SIZING.font.body,
     fontWeight: '600',
-    width: 60,
+    width: 90,
     textAlign: 'right',
     marginRight: SIZING.spacing.md,
   },

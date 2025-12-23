@@ -30,7 +30,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
         new: true,
         setDefaultsOnInsert: true
       }
-    ).select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt').lean();
+    ).select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt').lean();
 
     if (!progress) {
       res.status(500).json({ error: 'Failed to initialize task progress' });
@@ -62,10 +62,14 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
       if (task.autoCompleteConditions) {
         const shouldAutoComplete = task.autoCompleteConditions(user as any, progress);
         if (shouldAutoComplete) {
-          // Only auto-complete if task is not already in completedTaskIds
+          // Check if task is already completed to avoid duplicate key errors
           if (!completedTaskIds.has(task.id)) {
+            // Use atomic operation to prevent race conditions - only add if taskId doesn't exist
             await UserTaskProgress.findOneAndUpdate(
-              { userId },
+              {
+                userId,
+                'completedTasks.taskId': { $ne: task.id }
+              },
               {
                 $push: {
                   completedTasks: {
@@ -73,14 +77,9 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
                     completedAt: new Date()
                   }
                 },
-                $setOnInsert: {
-                  collectedTasks: [],
-                  skippedTasks: [],
-                  showTaskGuide: true
-                },
                 $set: { lastCompletedTaskId: task.id }
               },
-              { upsert: true, new: true }
+              { new: true }
             );
           }
           continue;
@@ -348,18 +347,38 @@ router.post('/track-profile-visit', auth, async (req: Request, res: Response) =>
       const taskList = getTaskList();
       const viewProfileTask = taskList.find(t => t.id === 'view-profile');
       
-      if (viewProfileTask && viewProfileTask.autoCompleteConditions) {
+        if (viewProfileTask && viewProfileTask.autoCompleteConditions) {
         const user = await User.findById(userId).lean();
         if (user) {
           const updatedProgress = await UserTaskProgress.findOne({ userId });
-          const shouldAutoComplete = viewProfileTask.autoCompleteConditions(user as any, updatedProgress);
+          const shouldAutoComplete = viewProfileTask.autoCompleteConditions(user as any, updatedProgress ?? undefined);
           
           if (shouldAutoComplete) {
-            // Mark task as completed (without reward - reward is collected separately via /complete-task)
-            const alreadyCompleted = updatedProgress?.completedTasks.some(t => t.taskId === 'view-profile');
-            if (!alreadyCompleted) {
+            // Check if task is already completed to avoid duplicate key errors
+            const isAlreadyCompleted = updatedProgress?.completedTasks?.some(
+              (task: any) => task.taskId === 'view-profile'
+            );
+            
+            if (!isAlreadyCompleted) {
+              // Ensure document exists first
               await UserTaskProgress.findOneAndUpdate(
                 { userId },
+                {
+                  $setOnInsert: {
+                    collectedTasks: [],
+                    skippedTasks: [],
+                    showTaskGuide: true
+                  }
+                },
+                { upsert: true }
+              );
+              
+              // Use atomic operation to prevent race conditions - only add if taskId doesn't exist
+              await UserTaskProgress.findOneAndUpdate(
+                {
+                  userId,
+                  'completedTasks.taskId': { $ne: 'view-profile' }
+                },
                 {
                   $push: {
                     completedTasks: {
@@ -369,7 +388,7 @@ router.post('/track-profile-visit', auth, async (req: Request, res: Response) =>
                   },
                   $set: { lastCompletedTaskId: 'view-profile' }
                 },
-                { upsert: true, new: true }
+                { new: true }
               );
             }
           }
@@ -380,6 +399,105 @@ router.post('/track-profile-visit', auth, async (req: Request, res: Response) =>
     res.json({ success: true, message: 'Profile visit tracked' });
   } catch (error) {
     console.error('Error tracking profile visit:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/track-theme-change', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const { theme } = req.body;
+
+    if (!theme || (theme !== 'dark' && theme !== 'light')) {
+      res.status(400).json({ error: 'Valid theme is required (dark or light)' });
+      return;
+    }
+
+    const existingProgress = await UserTaskProgress.findOne({ userId });
+    const wasAlreadyChanged = theme === 'dark' 
+      ? existingProgress?.themeChangedToDarkAt 
+      : existingProgress?.themeChangedToLightAt;
+
+    const fieldToUpdate = theme === 'dark' ? 'themeChangedToDarkAt' : 'themeChangedToLightAt';
+    const taskId = theme === 'dark' ? 'use-hacker-mode' : 'use-business-mode';
+
+    if (!wasAlreadyChanged) {
+      await UserTaskProgress.findOneAndUpdate(
+        { userId },
+        {
+          $set: { [fieldToUpdate]: new Date() },
+          $setOnInsert: {
+            completedTasks: [],
+            collectedTasks: [],
+            skippedTasks: [],
+            showTaskGuide: true
+          }
+        },
+        { upsert: true, new: true }
+      );
+    }
+
+    if (!wasAlreadyChanged) {
+      const taskList = getTaskList();
+      const themeTask = taskList.find(t => t.id === taskId);
+      
+      if (themeTask && themeTask.autoCompleteConditions) {
+        const user = await User.findById(userId).lean();
+        if (user) {
+          const updatedProgress = await UserTaskProgress.findOne({ userId });
+          const shouldAutoComplete = themeTask.autoCompleteConditions(user as any, updatedProgress ?? undefined);
+          
+          if (shouldAutoComplete) {
+            // Check if task is already completed to avoid duplicate key errors
+            const isAlreadyCompleted = updatedProgress?.completedTasks?.some(
+              (task: any) => task.taskId === taskId
+            );
+            
+            if (!isAlreadyCompleted) {
+              // Ensure document exists first
+              await UserTaskProgress.findOneAndUpdate(
+                { userId },
+                {
+                  $setOnInsert: {
+                    collectedTasks: [],
+                    skippedTasks: [],
+                    showTaskGuide: true
+                  }
+                },
+                { upsert: true }
+              );
+              
+              // Use atomic operation to prevent race conditions - only add if taskId doesn't exist
+              await UserTaskProgress.findOneAndUpdate(
+                {
+                  userId,
+                  'completedTasks.taskId': { $ne: taskId }
+                },
+                {
+                  $push: {
+                    completedTasks: {
+                      taskId: taskId,
+                      completedAt: new Date()
+                    }
+                  },
+                  $set: { lastCompletedTaskId: taskId }
+                },
+                { new: true }
+              );
+            }
+          }
+        }
+      }
+    }
+
+    res.json({ success: true, message: 'Theme change tracked' });
+  } catch (error) {
+    console.error('Error tracking theme change:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

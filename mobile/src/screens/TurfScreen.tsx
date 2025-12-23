@@ -974,8 +974,11 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
               )}
             </View>
             <ProfileLocation onPress={() => navigateToScreen('profile')} isIntroActive={currentIntroStep === 'profile'} />
-            <TaskGuide currentScreen={currentScreen} />
-            <TaskGuideHighlightOverlay />
+            <TaskGuide 
+              currentScreen={currentScreen} 
+              onNavigateToProfile={() => navigateToScreen('profile')}
+            />
+            <TaskGuideHighlightOverlay forProfile={true} />
           </View>
         );
     }

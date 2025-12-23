@@ -13,12 +13,20 @@ type ProfileLocationProps = {
 export const ProfileLocation = memo(function ProfileLocation({ onPress, isIntroActive = false }: ProfileLocationProps) {
   const colors = useThemeColors();
   const profileGender = useAppSelector((state) => state.preferences.profileGender);
-  const { highlightTaskId } = useTaskGuideHighlight();
+  const { highlightTaskId, highlightStep, advanceHighlightStep } = useTaskGuideHighlight();
   const [currentColorIndex, setCurrentColorIndex] = useState(0);
   const animatedBorderColor = useState(new Animated.Value(0))[0];
   
   const introColors = [colors.primary, colors.secondary, colors.matrix];
-  const isHighlighted = isIntroActive || highlightTaskId === 'view-profile';
+  const isThemeTask = highlightTaskId === 'use-hacker-mode' || highlightTaskId === 'use-business-mode';
+  const isHighlighted = isIntroActive || highlightTaskId === 'view-profile' || (isThemeTask && highlightStep === null);
+  
+  const handlePress = () => {
+    if (isThemeTask && highlightStep === null) {
+      advanceHighlightStep();
+    }
+    onPress();
+  };
 
   const profileImageSource = profileGender === 'female' 
     ? require('../../assets/images/profile-female.png')
@@ -56,7 +64,7 @@ export const ProfileLocation = memo(function ProfileLocation({ onPress, isIntroA
         borderWidth: isHighlighted ? 3 : 1
       }]}
     >
-      <TouchableOpacity onPress={onPress}>
+      <TouchableOpacity onPress={handlePress}>
         <View style={styles.profileContainer}>
           <Image
             source={profileImageSource}

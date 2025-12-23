@@ -77,10 +77,12 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
   const hasScrolledOnOpen = useRef(false);
   const lastVisibleState = useRef(false);
   
-  // Reset scroll flag when modal closes
+  // Reset scroll flag and report modal state when modal closes
   useEffect(() => {
     if (!visible && lastVisibleState.current) {
       hasScrolledOnOpen.current = false;
+      setShowReportModal(false);
+      setReportedMessage(null);
     }
     lastVisibleState.current = visible;
   }, [visible]);
@@ -119,21 +121,26 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
 
   const handleClose = () => {
     setMessageInput('');
+    setShowReportModal(false);
+    setReportedMessage(null);
     onClose();
   };
 
   const isCurrentUser = useCallback((userId: string) => {
-    if (!currentUserId || !userId) return false;
-    if (!currentUser) return false;
-    const currentIdStr = String(currentUserId).trim();
+    if (!userId || !currentUser) return false;
+    if (!currentUserId) return false;
+    
+    const currentIdStr = String(currentUserId || '').trim();
     const messageIdStr = String(userId).trim();
     const currentIdAlt = String(currentUser._id || (currentUser as any)?.id || '').trim();
     return currentIdStr === messageIdStr || currentIdAlt === messageIdStr;
   }, [currentUserId, currentUser]);
 
   const handleReportMessage = (message: ChatMessage) => {
-    // Capture message data immediately before potential deletion
-    // Ensure timestamp is a Date object (API returns string, we convert it)
+    if (isCurrentUser(message.userId)) {
+      return;
+    }
+    
     const timestamp = message.timestamp instanceof Date 
       ? message.timestamp 
       : new Date(message.timestamp);
@@ -156,6 +163,7 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
   const styles = createStyles(colors);
 
   return (
+    <>
     <Modal
       visible={visible}
       transparent={true}
@@ -333,18 +341,18 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
           </View>
         </SafeAreaView>
       </KeyboardAvoidingView>
-
-      {currentUser && currentUserId && reportedMessage && (
+      
+      {currentUser && reportedMessage && showReportModal && (
         <UserReportModal
           visible={showReportModal}
           onClose={handleCloseReportModal}
           reportedUserId={reportedMessage.userId}
           reportedUsername={reportedMessage.username}
-          reportingUserId={String(currentUserId)}
+          reportingUserId={String(currentUser._id || (currentUser as any)?.id || '')}
           reportingUsername={currentUser.handle || 'Unknown'}
           context="chat-message"
           contextData={{
-            message: reportedMessage.message, // Server will look up original content from database
+            message: reportedMessage.message,
             messageId: reportedMessage.id,
             timestamp: (reportedMessage.timestamp instanceof Date 
               ? reportedMessage.timestamp 
@@ -352,9 +360,11 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
             crewId: crewId,
           }}
           maxDescriptionLength={1000}
+          renderAsOverlay={true}
         />
       )}
     </Modal>
+    </>
   );
 };
 

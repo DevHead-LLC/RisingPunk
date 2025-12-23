@@ -62,3 +62,12 @@ export interface TrackProfileVisitResponse {
   message?: string;
 }
 
+export interface TrackThemeChangeRequest {
+  theme: 'dark' | 'light';
+}
+
+export interface TrackThemeChangeResponse {
+  success: boolean;
+  message?: string;
+}
+

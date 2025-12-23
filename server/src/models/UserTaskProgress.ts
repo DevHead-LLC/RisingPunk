@@ -11,6 +11,8 @@ export interface IUserTaskProgress extends Document {
   lastCompletedTaskId?: string;
   showTaskGuide: boolean;
   profileVisitedAt?: Date;
+  themeChangedToDarkAt?: Date;
+  themeChangedToLightAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -48,6 +50,14 @@ const userTaskProgressSchema = new Schema({
     default: true
   },
   profileVisitedAt: {
+    type: Date,
+    required: false
+  },
+  themeChangedToDarkAt: {
+    type: Date,
+    required: false
+  },
+  themeChangedToLightAt: {
     type: Date,
     required: false
   }
