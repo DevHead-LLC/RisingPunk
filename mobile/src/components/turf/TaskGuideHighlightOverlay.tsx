@@ -34,6 +34,8 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
     // Show profile overlay on turf screen when highlightStep is null (initial state)
     if (forProfile && highlightStep === null) {
       // Allow this to render - show profile highlight on turf screen
+    } else if (forProfile && highlightStep !== null) {
+      return null; // Don't show profile overlay after step has advanced
     } else if (forSettings && highlightStep !== 'settings-tab') {
       return null; // Only show settings overlay when step is 'settings-tab'
     } else if (forThemeToggle && highlightStep !== 'theme-toggle') {
@@ -55,24 +57,7 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
           </View>
         </View>
       )}
-      {forSettings && (
-        <View style={styles.clickHereContainerSettings} pointerEvents="none">
-          <View style={[styles.clickHereBox, { backgroundColor: colors.background, borderColor: colors.primary }]}>
-            <Text style={[styles.clickHereText, { color: colors.text.primary }]}>
-              Click Here
-            </Text>
-          </View>
-        </View>
-      )}
-      {forThemeToggle && (
-        <View style={styles.clickHereContainerThemeToggle} pointerEvents="none">
-          <View style={[styles.clickHereBox, { backgroundColor: colors.background, borderColor: colors.primary }]}>
-            <Text style={[styles.clickHereText, { color: colors.text.primary }]}>
-              Click Here
-            </Text>
-          </View>
-        </View>
-      )}
+      {/* Settings and theme toggle overlays: dark overlay only, no "Click Here" text for theme tasks */}
     </>
   );
 };
