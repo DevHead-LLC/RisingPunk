@@ -76,20 +76,30 @@ export function ResearchLockedModal({
 
     if (requirements.categoryId === 'hack-crew') {
       if (isLoadingHomeDefenseFeatures) {
-        return true;
+        return false;
       }
       
-      if (homeDefenseFeatures) {
-        return requirements.requiredFeatures.every(featureId => {
-          const feature = homeDefenseFeatures.find(f => f.id === featureId);
-          if (!feature) return false;
-          
-          const now = new Date().getTime();
-          const researchCompletesAt = feature.researchCompletesAt ? new Date(feature.researchCompletesAt).getTime() : 0;
-          const remaining = Math.max(0, researchCompletesAt - now);
-          return feature.isUnlocked || (feature.isResearching && remaining === 0);
-        });
+      if (!homeDefenseFeatures) {
+        return false;
       }
+      
+      return requirements.requiredFeatures.every(featureId => {
+        const feature = homeDefenseFeatures.find(f => f.id === featureId);
+        if (!feature) return false;
+        
+        if (feature.isUnlocked) {
+          return true;
+        }
+        
+        if (feature.isResearching && feature.researchCompletesAt) {
+          const now = new Date().getTime();
+          const researchCompletesAt = new Date(feature.researchCompletesAt).getTime();
+          const remaining = Math.max(0, researchCompletesAt - now);
+          return remaining === 0;
+        }
+        
+        return false;
+      });
     }
 
     return true;
