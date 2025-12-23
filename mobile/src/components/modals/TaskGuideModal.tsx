@@ -65,12 +65,10 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
         onClose();
         setHighlightTaskId('view-profile');
       } else if (taskId === 'use-hacker-mode' || taskId === 'use-business-mode') {
-        // Close modal, navigate to profile, and trigger highlight mode for theme switching
+        // Close modal and trigger highlight mode for theme switching
+        // User will be guided to click profile icon on turf screen first
         onClose();
         setHighlightTaskId(taskId);
-        if (onNavigateToProfile) {
-          onNavigateToProfile();
-        }
       } else {
         // For other tasks, just close modal for now
         onClose();

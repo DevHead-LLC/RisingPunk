@@ -416,12 +416,14 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
         activeOpacity={1}
         onPress={() => setShowReasonPicker(false)}
       >
-        <TouchableOpacity
+        <View
           style={[styles.pickerContainer, { backgroundColor: colors.background, borderColor: colors.matrix }]}
-          activeOpacity={1}
-          onPress={() => {}}
+          pointerEvents="box-none"
         >
-          <View style={[styles.pickerHeader, { borderBottomColor: colors.secondary }]}>
+          <View 
+            style={[styles.pickerHeader, { borderBottomColor: colors.secondary }]}
+            pointerEvents="auto"
+          >
             <Text style={[styles.pickerTitle, { color: colors.text.primary }]}>
               Select Reason
             </Text>
@@ -434,44 +436,46 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
               </Text>
             </TouchableOpacity>
           </View>
-          <FlatList
-            data={REPORT_REASONS}
-            keyExtractor={(item) => item.value}
-            keyboardShouldPersistTaps="handled"
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[
-                  styles.pickerOption,
-                  {
-                    backgroundColor: selectedReason === item.value ? colors.primary + '30' : 'transparent',
-                  }
-                ]}
-                onPress={() => {
-                  setSelectedReason(item.value);
-                  setShowReasonPicker(false);
-                  setError('');
-                }}
-                activeOpacity={0.7}
-              >
-                <Text
+          <View pointerEvents="auto">
+            <FlatList
+              data={REPORT_REASONS}
+              keyExtractor={(item) => item.value}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => (
+                <TouchableOpacity
                   style={[
-                    styles.pickerOptionText,
+                    styles.pickerOption,
                     {
-                      color: selectedReason === item.value ? colors.primary : colors.text.primary,
+                      backgroundColor: selectedReason === item.value ? colors.primary + '30' : 'transparent',
                     }
                   ]}
+                  onPress={() => {
+                    setSelectedReason(item.value);
+                    setShowReasonPicker(false);
+                    setError('');
+                  }}
+                  activeOpacity={0.7}
                 >
-                  {item.label}
-                </Text>
-                {selectedReason === item.value && (
-                  <Text style={[styles.pickerOptionCheck, { color: colors.primary }]}>
-                    ✓
+                  <Text
+                    style={[
+                      styles.pickerOptionText,
+                      {
+                        color: selectedReason === item.value ? colors.primary : colors.text.primary,
+                      }
+                    ]}
+                  >
+                    {item.label}
                   </Text>
-                )}
-              </TouchableOpacity>
-            )}
-          />
-        </TouchableOpacity>
+                  {selectedReason === item.value && (
+                    <Text style={[styles.pickerOptionCheck, { color: colors.primary }]}>
+                      ✓
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
       </TouchableOpacity>
     </View>
   );

@@ -31,13 +31,14 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
 
   // For theme tasks, use highlightStep to control which overlay shows (sequential flow)
   if (isThemeTask) {
-    if (forSettings && highlightStep !== 'settings-tab') {
+    // Show profile overlay on turf screen when highlightStep is null (initial state)
+    if (forProfile && highlightStep === null) {
+      // Allow this to render - show profile highlight on turf screen
+    } else if (forSettings && highlightStep !== 'settings-tab') {
       return null; // Only show settings overlay when step is 'settings-tab'
-    }
-    if (forThemeToggle && highlightStep !== 'theme-toggle') {
+    } else if (forThemeToggle && highlightStep !== 'theme-toggle') {
       return null; // Only show theme toggle overlay when step is 'theme-toggle'
-    }
-    if (!forSettings && !forThemeToggle) {
+    } else if (!forProfile && !forSettings && !forThemeToggle) {
       return null; // Neither prop set, don't render
     }
   }
@@ -47,6 +48,24 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
       <View style={styles.overlay} pointerEvents="none" />
       {forProfile && (
         <View style={styles.clickHereContainerProfile} pointerEvents="none">
+          <View style={[styles.clickHereBox, { backgroundColor: colors.background, borderColor: colors.primary }]}>
+            <Text style={[styles.clickHereText, { color: colors.text.primary }]}>
+              Click Here
+            </Text>
+          </View>
+        </View>
+      )}
+      {forSettings && (
+        <View style={styles.clickHereContainerSettings} pointerEvents="none">
+          <View style={[styles.clickHereBox, { backgroundColor: colors.background, borderColor: colors.primary }]}>
+            <Text style={[styles.clickHereText, { color: colors.text.primary }]}>
+              Click Here
+            </Text>
+          </View>
+        </View>
+      )}
+      {forThemeToggle && (
+        <View style={styles.clickHereContainerThemeToggle} pointerEvents="none">
           <View style={[styles.clickHereBox, { backgroundColor: colors.background, borderColor: colors.primary }]}>
             <Text style={[styles.clickHereText, { color: colors.text.primary }]}>
               Click Here

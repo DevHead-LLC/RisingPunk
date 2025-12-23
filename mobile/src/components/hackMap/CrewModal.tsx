@@ -658,7 +658,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
               )}
             </View>
           </ScrollView>
-          {activeCrewDetails?.crew && currentUser?._id && activeCrewDetails.crew.president?.userId && String(currentUser._id) !== String(activeCrewDetails.crew.president.userId) && (
+          {activeCrewDetails?.crew && (currentUser?._id || (currentUser as any)?.id) && activeCrewDetails.crew.president?.userId && String(currentUser._id || (currentUser as any)?.id || '') !== String(activeCrewDetails.crew.president.userId) && (
             <TouchableOpacity
               onPress={() => {
                 // Capture crew name/identifier data and president info immediately before potential changes
@@ -1468,7 +1468,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
               <>
                 <View style={styles.internalMessageHeader}>
                   <View style={styles.internalMessageHeaderSpacer} />
-                  {currentUser?._id && activeCrewDetails?.crew?.president?.userId && String(currentUser._id) !== String(activeCrewDetails.crew.president.userId) && (
+                  {(currentUser?._id || (currentUser as any)?.id) && activeCrewDetails?.crew?.president?.userId && String(currentUser._id || (currentUser as any)?.id || '') !== String(activeCrewDetails.crew.president.userId) && (
                     <TouchableOpacity
                       onPress={() => {
                         // Capture message data and president info immediately before potential changes
@@ -1617,7 +1617,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
               <>
                 <View style={styles.externalMessageHeader}>
                   <View style={styles.externalMessageHeaderSpacer} />
-                  {currentUser?._id && activeCrewDetails?.crew?.president?.userId && String(currentUser._id) !== String(activeCrewDetails.crew.president.userId) && (
+                  {(currentUser?._id || (currentUser as any)?.id) && activeCrewDetails?.crew?.president?.userId && String(currentUser._id || (currentUser as any)?.id || '') !== String(activeCrewDetails.crew.president.userId) && (
                     <TouchableOpacity
                       onPress={() => {
                         // Capture message data and president info immediately before potential changes
