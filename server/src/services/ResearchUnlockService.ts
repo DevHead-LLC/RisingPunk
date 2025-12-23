@@ -145,10 +145,24 @@ export class ResearchUnlockService {
     const antivirusFeature = await UserResearchFeature.findOne({
       userId,
       categoryId: 'home-defense',
-      featureId: 'antivirus',
-      isUnlocked: true
+      featureId: 'antivirus'
     });
-    return !!antivirusFeature;
+    
+    if (!antivirusFeature) {
+      return false;
+    }
+
+    if (antivirusFeature.isUnlocked) {
+      return true;
+    }
+
+    if (antivirusFeature.isResearching && antivirusFeature.researchCompletesAt) {
+      const now = new Date();
+      const completesAt = antivirusFeature.researchCompletesAt;
+      return now >= completesAt;
+    }
+
+    return false;
   }
 
   static getUnlockCost(categoryId: string): number {
