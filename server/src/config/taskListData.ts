@@ -49,6 +49,9 @@ const TASK_LIST: Task[] = [
     title: 'Use Hacker (Dark) Mode',
     description: 'Switch to dark theme',
     order: 3,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.themeChangedToDarkAt);
+    },
     skipable: true,
     reward: { type: 'wallet', value: 10 }
   },
@@ -57,6 +60,9 @@ const TASK_LIST: Task[] = [
     title: 'Use Business (Light) Mode',
     description: 'Switch to light theme',
     order: 4,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.themeChangedToLightAt);
+    },
     skipable: true,
     reward: { type: 'wallet', value: 10 }
   },

@@ -30,7 +30,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
         new: true,
         setDefaultsOnInsert: true
       }
-    ).select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt').lean();
+    ).select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt').lean();
 
     if (!progress) {
       res.status(500).json({ error: 'Failed to initialize task progress' });
@@ -380,6 +380,84 @@ router.post('/track-profile-visit', auth, async (req: Request, res: Response) =>
     res.json({ success: true, message: 'Profile visit tracked' });
   } catch (error) {
     console.error('Error tracking profile visit:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/track-theme-change', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const { theme } = req.body;
+
+    if (!theme || (theme !== 'dark' && theme !== 'light')) {
+      res.status(400).json({ error: 'Valid theme is required (dark or light)' });
+      return;
+    }
+
+    const existingProgress = await UserTaskProgress.findOne({ userId });
+    const wasAlreadyChanged = theme === 'dark' 
+      ? existingProgress?.themeChangedToDarkAt 
+      : existingProgress?.themeChangedToLightAt;
+
+    const fieldToUpdate = theme === 'dark' ? 'themeChangedToDarkAt' : 'themeChangedToLightAt';
+    const taskId = theme === 'dark' ? 'use-hacker-mode' : 'use-business-mode';
+
+    if (!wasAlreadyChanged) {
+      await UserTaskProgress.findOneAndUpdate(
+        { userId },
+        {
+          $set: { [fieldToUpdate]: new Date() },
+          $setOnInsert: {
+            completedTasks: [],
+            collectedTasks: [],
+            skippedTasks: [],
+            showTaskGuide: true
+          }
+        },
+        { upsert: true, new: true }
+      );
+    }
+
+    if (!wasAlreadyChanged) {
+      const taskList = getTaskList();
+      const themeTask = taskList.find(t => t.id === taskId);
+      
+      if (themeTask && themeTask.autoCompleteConditions) {
+        const user = await User.findById(userId).lean();
+        if (user) {
+          const updatedProgress = await UserTaskProgress.findOne({ userId });
+          const shouldAutoComplete = themeTask.autoCompleteConditions(user as any, updatedProgress);
+          
+          if (shouldAutoComplete) {
+            const alreadyCompleted = updatedProgress?.completedTasks.some(t => t.taskId === taskId);
+            if (!alreadyCompleted) {
+              await UserTaskProgress.findOneAndUpdate(
+                { userId },
+                {
+                  $push: {
+                    completedTasks: {
+                      taskId: taskId,
+                      completedAt: new Date()
+                    }
+                  },
+                  $set: { lastCompletedTaskId: taskId }
+                },
+                { upsert: true, new: true }
+              );
+            }
+          }
+        }
+      }
+    }
+
+    res.json({ success: true, message: 'Theme change tracked' });
+  } catch (error) {
+    console.error('Error tracking theme change:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -4,18 +4,48 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { useTaskGuideHighlight } from '../../contexts/TaskGuideHighlightContext';
 import { SIZING } from '../../styles/theme';
 
-export const TaskGuideHighlightOverlay: React.FC = () => {
-  const colors = useThemeColors();
-  const { highlightTaskId } = useTaskGuideHighlight();
+interface TaskGuideHighlightOverlayProps {
+  forProfile?: boolean;
+  forSettings?: boolean;
+  forThemeToggle?: boolean;
+}
 
-  if (highlightTaskId !== 'view-profile') {
+export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps> = ({ 
+  forProfile = false,
+  forSettings = false,
+  forThemeToggle = false
+}) => {
+  const colors = useThemeColors();
+  const { highlightTaskId, highlightStep } = useTaskGuideHighlight();
+
+  const isThemeTask = highlightTaskId === 'use-hacker-mode' || highlightTaskId === 'use-business-mode';
+  const isViewProfile = highlightTaskId === 'view-profile';
+
+  if (!isViewProfile && !isThemeTask) {
     return null;
+  }
+
+  if (isViewProfile && !forProfile) {
+    return null;
+  }
+
+  if (isThemeTask && !forSettings && !forThemeToggle) {
+    return null;
+  }
+
+  let clickHerePosition = styles.clickHereContainer;
+  if (forProfile) {
+    clickHerePosition = styles.clickHereContainerProfile;
+  } else if (forSettings) {
+    clickHerePosition = styles.clickHereContainerSettings;
+  } else if (forThemeToggle) {
+    clickHerePosition = styles.clickHereContainerThemeToggle;
   }
 
   return (
     <>
       <View style={styles.overlay} pointerEvents="none" />
-      <View style={styles.clickHereContainer} pointerEvents="none">
+      <View style={clickHerePosition} pointerEvents="none">
         <View style={[styles.clickHereBox, { backgroundColor: colors.background, borderColor: colors.primary }]}>
           <Text style={[styles.clickHereText, { color: colors.text.primary }]}>
             Click Here
@@ -36,11 +66,35 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.85)',
     zIndex: 999,
   },
-  clickHereContainer: {
+  clickHereContainerProfile: {
     position: 'absolute',
     top: SIZING.spacing.lg,
     right: SIZING.spacing.lg + 80, // Position to the left of profile (profile is 60px wide + spacing)
     zIndex: 1001, // Higher than profile (1000) so it appears above
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clickHereContainerSettings: {
+    position: 'absolute',
+    top: SIZING.spacing.xl,
+    left: SIZING.spacing.lg,
+    zIndex: 1001, // Higher than Settings tab (1000) so it appears above
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clickHereContainerThemeToggle: {
+    position: 'absolute',
+    top: 200, // Position above theme toggle (adjust as needed)
+    left: SIZING.spacing.lg,
+    zIndex: 1001, // Higher than theme toggle (1000) so it appears above
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clickHereContainer: {
+    position: 'absolute',
+    top: SIZING.spacing.lg,
+    right: SIZING.spacing.lg + 80,
+    zIndex: 1001,
     alignItems: 'center',
     justifyContent: 'center',
   },
