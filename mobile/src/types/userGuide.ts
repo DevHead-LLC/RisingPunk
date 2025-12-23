@@ -52,10 +52,6 @@ export interface UpdateVisibilityRequest {
   showTaskGuide: boolean;
 }
 
-export interface UpdateVisibilityRequest {
-  showTaskGuide: boolean;
-}
-
 export interface UpdateVisibilityResponse {
   success: boolean;
   showTaskGuide: boolean;

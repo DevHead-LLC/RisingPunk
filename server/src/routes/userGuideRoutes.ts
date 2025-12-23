@@ -62,24 +62,27 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
       if (task.autoCompleteConditions) {
         const shouldAutoComplete = task.autoCompleteConditions(user as any, progress);
         if (shouldAutoComplete) {
-          await UserTaskProgress.findOneAndUpdate(
-            { userId },
-            {
-              $push: {
-                completedTasks: {
-                  taskId: task.id,
-                  completedAt: new Date()
-                }
+          // Only auto-complete if task is not already in completedTaskIds
+          if (!completedTaskIds.has(task.id)) {
+            await UserTaskProgress.findOneAndUpdate(
+              { userId },
+              {
+                $push: {
+                  completedTasks: {
+                    taskId: task.id,
+                    completedAt: new Date()
+                  }
+                },
+                $setOnInsert: {
+                  collectedTasks: [],
+                  skippedTasks: [],
+                  showTaskGuide: true
+                },
+                $set: { lastCompletedTaskId: task.id }
               },
-              $setOnInsert: {
-                collectedTasks: [],
-                skippedTasks: [],
-                showTaskGuide: true
-              },
-              $set: { lastCompletedTaskId: task.id }
-            },
-            { upsert: true, new: true }
-          );
+              { upsert: true, new: true }
+            );
+          }
           continue;
         }
       }
@@ -153,7 +156,7 @@ router.post('/complete-task', auth, async (req: Request, res: Response) => {
 
     try {
       // Check if already collected INSIDE transaction to prevent race conditions
-      const progress = await UserTaskProgress.findOne({ userId }).session(session);
+      let progress = await UserTaskProgress.findOne({ userId }).session(session);
       const alreadyCollected = progress?.collectedTasks?.includes(trimmedTaskId);
 
       if (alreadyCollected) {
@@ -171,32 +174,26 @@ router.post('/complete-task', auth, async (req: Request, res: Response) => {
       // Ensure task is marked as completed (action done) before collecting reward
       const isCompleted = progress?.completedTasks.some(t => t.taskId === trimmedTaskId);
       if (!isCompleted) {
-        // Mark as completed first (action done, but reward not collected yet)
-        if (!progress) {
-          await UserTaskProgress.create([{
-            userId,
-            completedTasks: [{
-              taskId: trimmedTaskId,
-              completedAt: new Date()
-            }],
-            collectedTasks: [],
-            skippedTasks: [],
-            showTaskGuide: true
-          }], { session });
-        } else {
-          await UserTaskProgress.findOneAndUpdate(
-            { userId },
-            {
-              $addToSet: {
-                completedTasks: {
-                  taskId: trimmedTaskId,
-                  completedAt: new Date()
-                }
+        // Mark as completed first (action done, but reward not collected yet) - atomic operation
+        const updatedProgress = await UserTaskProgress.findOneAndUpdate(
+          { userId },
+          {
+            $addToSet: {
+              completedTasks: {
+                taskId: trimmedTaskId,
+                completedAt: new Date()
               }
             },
-            { new: true, session }
-          );
-        }
+            $setOnInsert: {
+              collectedTasks: [],
+              skippedTasks: [],
+              showTaskGuide: true
+            }
+          },
+          { upsert: true, new: true, session }
+        );
+        // Reassign progress to reflect the updated state
+        progress = updatedProgress;
       }
 
       // Update user balance with reward (atomic with collectedTasks update)
@@ -210,43 +207,38 @@ router.post('/complete-task', auth, async (req: Request, res: Response) => {
       }
 
       // Mark task as collected (reward given) - atomic operation
-      if (!progress) {
-        await UserTaskProgress.create([{
+      // Use findOneAndUpdate with condition to atomically check and update
+      const updateResult = await UserTaskProgress.findOneAndUpdate(
+        { 
           userId,
-          completedTasks: [{
-            taskId: trimmedTaskId,
-            completedAt: new Date()
-          }],
-          collectedTasks: [trimmedTaskId],
-          skippedTasks: [],
-          lastCompletedTaskId: trimmedTaskId,
-          showTaskGuide: true
-        }], { session });
-      } else {
-        // Use findOneAndUpdate with condition to atomically check and update
-        const updateResult = await UserTaskProgress.findOneAndUpdate(
-          { 
-            userId,
-            collectedTasks: { $ne: trimmedTaskId } // Only update if not already collected
-          },
-          {
-            $addToSet: { collectedTasks: trimmedTaskId },
-            $set: { lastCompletedTaskId: trimmedTaskId }
-          },
-          { new: true, session }
-        );
+          collectedTasks: { $ne: trimmedTaskId } // Only update if not already collected
+        },
+        {
+          $addToSet: { collectedTasks: trimmedTaskId },
+          $set: { lastCompletedTaskId: trimmedTaskId },
+          $setOnInsert: {
+            completedTasks: progress?.completedTasks || [{
+              taskId: trimmedTaskId,
+              completedAt: new Date()
+            }],
+            skippedTasks: [],
+            showTaskGuide: true
+          }
+        },
+        { upsert: true, new: true, session }
+      );
 
-        // If updateResult is null, task was already collected by another request
-        if (!updateResult) {
-          await session.abortTransaction();
-          session.endSession();
-          res.json({
-            success: true,
-            message: 'Task already collected',
-            rewardAmount: 0
-          });
-          return;
-        }
+      // If updateResult is null, task was already collected by another request
+      // (This shouldn't happen due to the $ne condition, but handle it defensively)
+      if (!updateResult) {
+        await session.abortTransaction();
+        session.endSession();
+        res.json({
+          success: true,
+          message: 'Task already collected',
+          rewardAmount: 0
+        });
+        return;
       }
 
       await session.commitTransaction();
@@ -297,25 +289,19 @@ router.post('/skip-task', auth, async (req: Request, res: Response) => {
       return;
     }
 
-    const progress = await UserTaskProgress.findOne({ userId });
-    if (!progress) {
-      await UserTaskProgress.create({
-        userId,
-        completedTasks: [],
-        skippedTasks: [trimmedTaskId],
-        showTaskGuide: true
-      });
-    } else {
-      if (!progress.skippedTasks.includes(trimmedTaskId)) {
-        await UserTaskProgress.findOneAndUpdate(
-          { userId },
-          {
-            $addToSet: { skippedTasks: trimmedTaskId }
-          },
-          { new: true }
-        );
-      }
-    }
+    // Use atomic findOneAndUpdate with upsert to prevent race conditions
+    await UserTaskProgress.findOneAndUpdate(
+      { userId },
+      {
+        $addToSet: { skippedTasks: trimmedTaskId },
+        $setOnInsert: {
+          completedTasks: [],
+          collectedTasks: [],
+          showTaskGuide: true
+        }
+      },
+      { upsert: true, new: true }
+    );
 
     res.json({
       success: true,
