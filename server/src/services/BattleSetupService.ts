@@ -72,9 +72,9 @@ export class BattleSetupService {
     let npc = !isUserDefender && defenderNpcSlug ? await NPCService.getNPCBySlug(defenderNpcSlug) : null;
     let actualDefenderNpcSlug = defenderNpcSlug;
     
-    // If computer-opponent battle without NPC slug, select a random level 1 NPC
-    // This handles cases like the first HackRig battle where no NPC is specified
-    if (!isUserDefender && defenderId === 'computer-opponent' && !defenderNpcSlug && !npc) {
+    // If NPC lookup failed or no slug provided, select a random level 1 NPC
+    // This handles cases like the first HackRig battle where NPC doesn't exist or isn't specified
+    if (!isUserDefender && defenderId === 'computer-opponent' && !npc) {
       const level1NPCs = await NPCService.getNPCsByLevel(1);
       if (level1NPCs.length === 0) {
         throw new Error('No level 1 NPCs found in database. Cannot create battle without NPC configuration.');

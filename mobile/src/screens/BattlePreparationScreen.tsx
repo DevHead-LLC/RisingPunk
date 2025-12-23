@@ -189,15 +189,18 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
     }
   }, []);
 
-  const battleStartData = React.useMemo(() => ({
-    userBattalions,
-    screenWidth: SCREEN_WIDTH,
-    screenHeight: SCREEN_HEIGHT,
-    defenderId,
-    defenderNpcSlug: defenderNpcSlug || 'npc-small-corporation',
-    unlockHackRigOnWin: !defenderNpcSlug, // only true when battle started from hack rig flow
-    defenderNpcInstanceId,
-  }), [userBattalions, defenderId, defenderNpcSlug, defenderNpcInstanceId]);
+  const battleStartData = React.useMemo(() => {
+    const isHackRigBattle = !defenderId && !defenderNpcSlug;
+    return {
+      userBattalions,
+      screenWidth: SCREEN_WIDTH,
+      screenHeight: SCREEN_HEIGHT,
+      defenderId,
+      defenderNpcSlug: isHackRigBattle ? undefined : defenderNpcSlug,
+      unlockHackRigOnWin: isHackRigBattle,
+      defenderNpcInstanceId,
+    };
+  }, [userBattalions, defenderId, defenderNpcSlug, defenderNpcInstanceId]);
 
   // Handle battle start - check for shield warning first
   const handleBattleStart = React.useCallback(async () => {
@@ -213,18 +216,18 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       return;
     }
 
+    const isShieldActive = (isActuallyUnlocked && shieldData?.isActive) || false;
+    const isDefendingUser = !!defenderId && !defenderNpcSlug;
+    
+    // If attacking user has shield activated AND defending entity is another user, show modal
+    if (isShieldActive && isDefendingUser) {
+      setShieldCheckModalVisible(true);
+      return;
+    }
+
     setIsStartingBattle(true);
 
     try {
-      const isShieldActive = (isActuallyUnlocked && shieldData?.isActive) || false;
-      const isDefendingUser = !!defenderId && !defenderNpcSlug;
-      
-      // If attacking user has shield activated AND defending entity is another user, show modal
-      if (isShieldActive && isDefendingUser) {
-        setShieldCheckModalVisible(true);
-        return;
-      }
-
       // Otherwise proceed directly with battle start
       const result = await startBattle(battleStartData).unwrap();
       onBattleStart(result.battleId);
@@ -239,6 +242,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
   // Handle continue from shield modal - deactivate shield and proceed to battle
   const handleShieldModalContinue = React.useCallback(async () => {
     setShieldCheckModalVisible(false);
+    setIsStartingBattle(true);
     
     try {
       // First deactivate the shield
@@ -250,6 +254,8 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
     } catch (error) {
       console.error('Failed to deactivate shield or start battle:', error);
       onBattleStart();
+    } finally {
+      setIsStartingBattle(false);
     }
   }, [battleStartData, startBattle, onBattleStart, deactivateShield]);
 
