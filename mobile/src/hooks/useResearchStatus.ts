@@ -11,6 +11,7 @@ export interface ResearchStatus {
   levelRequirement: number;
   balanceRequirement: number;
   dependencies: string[];
+  requiredFeatures?: string[];
   image: string;
 }
 
@@ -27,10 +28,11 @@ export function useResearchStatus() {
       setLoading(true);
       setError(null);
       
-      const response = await fetch(`${API_URL}/api/research/status`, {
+      const response = await fetch(`${API_URL}/api/research/status?t=${Date.now()}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
+        cache: 'no-store',
       });
 
       if (!response.ok) {
@@ -40,6 +42,15 @@ export function useResearchStatus() {
       const data = await response.json();
       
       if (data.success) {
+        const hackCrew = data.data.find((r: any) => r.categoryId === 'hack-crew');
+        if (hackCrew) {
+          console.log('🔍 DEBUG: Hack Crew research status:', {
+            categoryId: hackCrew.categoryId,
+            requiredFeatures: hackCrew.requiredFeatures,
+            hasRequiredFeatures: !!hackCrew.requiredFeatures,
+            requiredFeaturesLength: hackCrew.requiredFeatures?.length
+          });
+        }
         setResearchStatus(data.data);
       } else {
         setError(data.message || 'Failed to fetch research status');
@@ -66,6 +77,7 @@ export function useResearchStatus() {
       levelRequirement: research.levelRequirement,
       balanceRequirement: research.balanceRequirement,
       dependencies: research.dependencies,
+      requiredFeatures: research.requiredFeatures || [],
       unlockCost: research.unlockCost,
       isUnlocked: research.isUnlocked
     };

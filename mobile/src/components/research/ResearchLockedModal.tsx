@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Alert } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -7,6 +7,7 @@ import { LockedFeatureModal } from '../turf/LockedFeatureModal';
 import { API_URL } from '../../config';
 import { useAppSelector } from '../../store/hooks';
 import { getCurrentBalance } from '../../store/slices/balanceSlice';
+import { useGetUserFeaturesQuery } from '../../store/api/researchFeaturesApi';
 
 interface ResearchRequirements {
   categoryId: string;
@@ -14,6 +15,7 @@ interface ResearchRequirements {
   levelRequirement: number;
   balanceRequirement: number;
   dependencies: string[];
+  requiredFeatures?: string[];
   unlockCost: number;
   isUnlocked: boolean;
 }
@@ -62,7 +64,39 @@ export function ResearchLockedModal({
   const colors = useThemeColors();
   const styles = createStyles(colors);
 
+  const { data: homeDefenseFeatures } = useGetUserFeaturesQuery('home-defense', {
+    skip: !requirements || requirements.categoryId !== 'hack-crew'
+  });
+
+  // Check if required features are unlocked (must be before early return)
+  const requiredFeaturesMet = useMemo(() => {
+    if (!requirements?.requiredFeatures || requirements.requiredFeatures.length === 0) {
+      return true;
+    }
+
+    if (requirements.categoryId === 'hack-crew' && homeDefenseFeatures) {
+      return requirements.requiredFeatures.every(featureId => {
+        const feature = homeDefenseFeatures.find(f => f.id === featureId);
+        if (!feature) return false;
+        
+        const now = new Date().getTime();
+        const researchCompletesAt = feature.researchCompletesAt ? new Date(feature.researchCompletesAt).getTime() : 0;
+        const remaining = Math.max(0, researchCompletesAt - now);
+        return feature.isUnlocked || (feature.isResearching && remaining === 0);
+      });
+    }
+
+    return false;
+  }, [requirements?.requiredFeatures, requirements?.categoryId, homeDefenseFeatures]);
+
   if (!requirements) return null;
+
+  console.log('🔍 ResearchLockedModal - requirements:', {
+    categoryId: requirements.categoryId,
+    requiredFeatures: requirements.requiredFeatures,
+    hasRequiredFeatures: !!requirements.requiredFeatures,
+    requiredFeaturesLength: requirements.requiredFeatures?.length
+  });
 
   const levelMet = currentLevel >= requirements.levelRequirement;
   const balanceMet = currentBalance >= requirements.balanceRequirement;
@@ -73,7 +107,7 @@ export function ResearchLockedModal({
     return depResearch?.isUnlocked || false;
   });
   
-  const canUnlock = levelMet && balanceMet && dependenciesMet;
+  const canUnlock = levelMet && balanceMet && dependenciesMet && requiredFeaturesMet;
 
   const handleUnlock = async () => {
     if (!token) {
@@ -172,6 +206,18 @@ export function ResearchLockedModal({
                     dependenciesMet ? styles.requirementMet : styles.requirementNotMet
                   ]}>
                     {requirements.dependencies.join(', ')}
+                  </Text>
+                </View>
+              )}
+
+              {requirements.requiredFeatures && requirements.requiredFeatures.length > 0 && (
+                <View style={styles.requirementRow}>
+                  <Text style={styles.requirementLabel}>Required Features:</Text>
+                  <Text style={[
+                    styles.requirementValue,
+                    requiredFeaturesMet ? styles.requirementMet : styles.requirementNotMet
+                  ]}>
+                    {requirements.requiredFeatures.map(f => f.charAt(0).toUpperCase() + f.slice(1)).join(', ')}
                   </Text>
                 </View>
               )}
