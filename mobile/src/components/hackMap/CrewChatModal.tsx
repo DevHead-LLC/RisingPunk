@@ -45,6 +45,14 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
   const currentUser = useAppSelector((state) => state.auth.user);
   const currentUserId = currentUser?._id || (currentUser as any)?.id;
   const currentUsername = currentUser?.handle || 'You';
+  
+  console.log('[rp-must-see] CrewChatModal currentUser check', {
+    hasCurrentUser: !!currentUser,
+    currentUserKeys: currentUser ? Object.keys(currentUser) : [],
+    _id: currentUser?._id,
+    id: (currentUser as any)?.id,
+    currentUserId,
+  });
 
   const [messageInput, setMessageInput] = useState('');
   const scrollViewRef = useRef<ScrollView>(null);
@@ -136,19 +144,30 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
   }, [currentUserId, currentUser]);
 
   const handleReportMessage = (message: ChatMessage) => {
-    // Capture message data immediately before potential deletion
-    // Ensure timestamp is a Date object (API returns string, we convert it)
+    console.log('[rp-must-see] handleReportMessage called', {
+      messageId: message.id,
+      userId: message.userId,
+      username: message.username,
+      currentUser: !!currentUser,
+      currentUserId: currentUserId,
+    });
+    
     const timestamp = message.timestamp instanceof Date 
       ? message.timestamp 
       : new Date(message.timestamp);
     
-    setReportedMessage({
+    const reportData = {
       id: message.id,
       userId: message.userId,
       username: message.username,
       message: message.message,
       timestamp: timestamp,
-    });
+    };
+    
+    console.log('[rp-must-see] Setting reportedMessage state', reportData);
+    setReportedMessage(reportData);
+    
+    console.log('[rp-must-see] Setting showReportModal to true');
     setShowReportModal(true);
   };
 
@@ -160,7 +179,6 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
   const styles = createStyles(colors);
 
   return (
-    <>
     <Modal
       visible={visible}
       transparent={true}
@@ -262,7 +280,14 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
                       </View>
                       {!isOwnMessage && (
                         <TouchableOpacity
-                          onPress={() => handleReportMessage(message)}
+                          onPress={() => {
+                            console.log('[rp-must-see] Report button pressed', {
+                              messageId: message.id,
+                              userId: message.userId,
+                              username: message.username,
+                            });
+                            handleReportMessage(message);
+                          }}
                           activeOpacity={0.7}
                           style={[
                             styles.reportButton,
@@ -338,29 +363,28 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
           </View>
         </SafeAreaView>
       </KeyboardAvoidingView>
-    </Modal>
 
-    {currentUser && currentUserId && reportedMessage && (
-      <UserReportModal
-        visible={showReportModal}
-        onClose={handleCloseReportModal}
-        reportedUserId={reportedMessage.userId}
-        reportedUsername={reportedMessage.username}
-        reportingUserId={String(currentUserId)}
-        reportingUsername={currentUser.handle || 'Unknown'}
-        context="chat-message"
-        contextData={{
-          message: reportedMessage.message,
-          messageId: reportedMessage.id,
-          timestamp: (reportedMessage.timestamp instanceof Date 
-            ? reportedMessage.timestamp 
-            : new Date(reportedMessage.timestamp)).toISOString(),
-          crewId: crewId,
-        }}
-        maxDescriptionLength={1000}
-      />
-    )}
-  </>
+      {currentUser && reportedMessage && (currentUser._id || (currentUser as any)?.id) && (
+        <UserReportModal
+          visible={showReportModal}
+          onClose={handleCloseReportModal}
+          reportedUserId={reportedMessage.userId}
+          reportedUsername={reportedMessage.username}
+          reportingUserId={String(currentUser._id || (currentUser as any)?.id)}
+          reportingUsername={currentUser.handle || 'Unknown'}
+          context="chat-message"
+          contextData={{
+            message: reportedMessage.message,
+            messageId: reportedMessage.id,
+            timestamp: (reportedMessage.timestamp instanceof Date 
+              ? reportedMessage.timestamp 
+              : new Date(reportedMessage.timestamp)).toISOString(),
+            crewId: crewId,
+          }}
+          maxDescriptionLength={1000}
+        />
+      )}
+    </Modal>
   );
 };
 

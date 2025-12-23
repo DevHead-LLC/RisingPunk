@@ -74,6 +74,17 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
 
   const isSubmittingFinal = isSubmitting || isSubmittingLocal;
 
+  useEffect(() => {
+    console.log('[rp-must-see] UserReportModal visible prop changed', {
+      visible,
+      reportedUserId,
+      reportedUsername,
+      reportingUserId,
+      reportingUsername,
+      context,
+    });
+  }, [visible, reportedUserId, reportedUsername, reportingUserId, reportingUsername, context]);
+
   // Reset form when modal opens/closes
   useEffect(() => {
     if (!visible) {
@@ -351,6 +362,12 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
       </View>
     </View>
   );
+
+  console.log('[rp-must-see] UserReportModal render - Modal component rendering', {
+    visible,
+    reportedUserId,
+    reportedUsername,
+  });
 
   return (
     <Modal
