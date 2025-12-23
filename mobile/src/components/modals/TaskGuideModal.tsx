@@ -104,6 +104,14 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
               </TouchableOpacity>
             </View>
 
+            <View style={[styles.tableHeader, { borderBottomColor: colors.secondary, backgroundColor: colors.secondary + '20' }]}>
+              <Text style={[styles.headerText, styles.headerTaskTitle, { color: colors.text.primary }]}>Task</Text>
+              <View style={styles.rightSection}>
+                <Text style={[styles.headerText, styles.headerRewardAmount, { color: colors.text.primary }]}>Reward</Text>
+                <Text style={[styles.headerText, styles.headerButton, { color: colors.text.primary }]}>Button</Text>
+              </View>
+            </View>
+
             {Platform.OS === 'ios' ? (
               <GestureScrollView 
                 style={styles.scrollView}
@@ -181,7 +189,7 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
                         activeOpacity={0.7}
                       >
                         <Text style={[styles.actionButtonText, { color: colors.background }]}>
-                          {completed ? `Collect $${rewardValue}!` : "Let's Go!"}
+                          {completed ? 'Collect' : "Let's Go!"}
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -340,6 +348,33 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   scrollContent: {
     paddingBottom: SIZING.spacing.lg,
     flexGrow: 1,
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SIZING.spacing.md,
+    paddingVertical: SIZING.spacing.sm,
+    borderBottomWidth: 2,
+    minHeight: 40,
+  },
+  headerText: {
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+  },
+  headerTaskTitle: {
+    flex: 1,
+    marginRight: SIZING.spacing.md,
+  },
+  headerRewardAmount: {
+    width: 60,
+    textAlign: 'right',
+    marginRight: SIZING.spacing.md,
+  },
+  headerButton: {
+    width: 120,
+    textAlign: 'center',
   },
   taskItem: {
     flexDirection: 'row',
