@@ -401,8 +401,15 @@ router.put('/visibility', auth, async (req: Request, res: Response) => {
 
     const progress = await UserTaskProgress.findOneAndUpdate(
       { userId },
-      { $set: { showTaskGuide } },
-      { upsert: true, new: true }
+      {
+        $set: { showTaskGuide },
+        $setOnInsert: {
+          completedTasks: [],
+          collectedTasks: [],
+          skippedTasks: []
+        }
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
     res.json({
