@@ -332,7 +332,6 @@ export class ResearchUnlockService {
 
       if (research.categoryId === 'hack-crew') {
         result.requiredFeatures = ['antivirus'];
-        console.log('🔍 Server: Setting requiredFeatures for hack-crew:', result.requiredFeatures);
       }
 
       return result;

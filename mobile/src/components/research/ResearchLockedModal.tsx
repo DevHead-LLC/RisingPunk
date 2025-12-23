@@ -64,7 +64,7 @@ export function ResearchLockedModal({
   const colors = useThemeColors();
   const styles = createStyles(colors);
 
-  const { data: homeDefenseFeatures } = useGetUserFeaturesQuery('home-defense', {
+  const { data: homeDefenseFeatures, isLoading: isLoadingHomeDefenseFeatures } = useGetUserFeaturesQuery('home-defense', {
     skip: !requirements || requirements.categoryId !== 'hack-crew'
   });
 
@@ -74,29 +74,28 @@ export function ResearchLockedModal({
       return true;
     }
 
-    if (requirements.categoryId === 'hack-crew' && homeDefenseFeatures) {
-      return requirements.requiredFeatures.every(featureId => {
-        const feature = homeDefenseFeatures.find(f => f.id === featureId);
-        if (!feature) return false;
-        
-        const now = new Date().getTime();
-        const researchCompletesAt = feature.researchCompletesAt ? new Date(feature.researchCompletesAt).getTime() : 0;
-        const remaining = Math.max(0, researchCompletesAt - now);
-        return feature.isUnlocked || (feature.isResearching && remaining === 0);
-      });
+    if (requirements.categoryId === 'hack-crew') {
+      if (isLoadingHomeDefenseFeatures) {
+        return true;
+      }
+      
+      if (homeDefenseFeatures) {
+        return requirements.requiredFeatures.every(featureId => {
+          const feature = homeDefenseFeatures.find(f => f.id === featureId);
+          if (!feature) return false;
+          
+          const now = new Date().getTime();
+          const researchCompletesAt = feature.researchCompletesAt ? new Date(feature.researchCompletesAt).getTime() : 0;
+          const remaining = Math.max(0, researchCompletesAt - now);
+          return feature.isUnlocked || (feature.isResearching && remaining === 0);
+        });
+      }
     }
 
-    return false;
-  }, [requirements?.requiredFeatures, requirements?.categoryId, homeDefenseFeatures]);
+    return true;
+  }, [requirements?.requiredFeatures, requirements?.categoryId, homeDefenseFeatures, isLoadingHomeDefenseFeatures]);
 
   if (!requirements) return null;
-
-  console.log('🔍 ResearchLockedModal - requirements:', {
-    categoryId: requirements.categoryId,
-    requiredFeatures: requirements.requiredFeatures,
-    hasRequiredFeatures: !!requirements.requiredFeatures,
-    requiredFeaturesLength: requirements.requiredFeatures?.length
-  });
 
   const levelMet = currentLevel >= requirements.levelRequirement;
   const balanceMet = currentBalance >= requirements.balanceRequirement;

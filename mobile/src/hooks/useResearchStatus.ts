@@ -42,15 +42,6 @@ export function useResearchStatus() {
       const data = await response.json();
       
       if (data.success) {
-        const hackCrew = data.data.find((r: any) => r.categoryId === 'hack-crew');
-        if (hackCrew) {
-          console.log('🔍 DEBUG: Hack Crew research status:', {
-            categoryId: hackCrew.categoryId,
-            requiredFeatures: hackCrew.requiredFeatures,
-            hasRequiredFeatures: !!hackCrew.requiredFeatures,
-            requiredFeaturesLength: hackCrew.requiredFeatures?.length
-          });
-        }
         setResearchStatus(data.data);
       } else {
         setError(data.message || 'Failed to fetch research status');
