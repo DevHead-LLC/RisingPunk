@@ -1,11 +1,12 @@
 import { IUser } from '../models/User';
+import { IUserTaskProgress } from '../models/UserTaskProgress';
 
 export interface Task {
   id: string;
   title: string;
   description: string;
   order: number;
-  autoCompleteConditions?: (user: IUser, progress?: any) => boolean;
+  autoCompleteConditions?: (user: IUser, progress?: IUserTaskProgress) => boolean;
   skipable: boolean;
   reward?: {
     type: string;
@@ -37,7 +38,7 @@ const TASK_LIST: Task[] = [
     title: 'View Profile',
     description: 'Check out your profile page',
     order: 2,
-    autoCompleteConditions: (user: IUser, progress?: any) => {
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
       // Auto-complete if profile has been visited (forward compatible only)
       return !!(progress?.profileVisitedAt);
     },

@@ -7,9 +7,10 @@ import { TaskGuideModal } from '../modals/TaskGuideModal';
 
 type TaskGuideProps = {
   currentScreen: string;
+  onNavigateToProfile?: () => void;
 };
 
-export const TaskGuide = memo(({ currentScreen }: TaskGuideProps) => {
+export const TaskGuide = memo(({ currentScreen, onNavigateToProfile }: TaskGuideProps) => {
   const colors = useThemeColors();
   const [taskGuideColorIndex, setTaskGuideColorIndex] = useState(0);
   const taskGuideAnimatedColor = useState(new Animated.Value(0))[0];
@@ -117,6 +118,7 @@ export const TaskGuide = memo(({ currentScreen }: TaskGuideProps) => {
         onClose={() => {
           setModalVisible(false);
         }}
+        onNavigateToProfile={onNavigateToProfile}
       />
     </>
   );

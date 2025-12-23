@@ -120,7 +120,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const currentBalanceState = useAppSelector((state) => state.balance);
   
   const userRole = crewStatus?.role;
-  const currentUserId = currentUser?._id;
+  const currentUserId = currentUser?._id || (currentUser as any)?.id;
   
   const { data: crewDetails, refetch: refetchCrewDetails } = useGetCrewDetailsQuery(
     crewStatus?.crewId || '',
@@ -250,7 +250,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
 
   const getVisibleCategories = (): typeof CATEGORIES => {
     const userRole = crewStatus?.role;
-    const currentUserId = currentUser?._id;
+    const currentUserId = currentUser?._id || (currentUser as any)?.id;
     const executives = activeCrewDetails?.crew?.executives || [];
     const isExecutive = currentUserId && executives.some(exec => String(exec.userId) === String(currentUserId));
     
@@ -662,12 +662,14 @@ export const CrewModal: React.FC<CrewModalProps> = ({
             <TouchableOpacity
               onPress={() => {
                 // Capture crew name/identifier data and president info immediately before potential changes
+                const president = activeCrewDetails.crew.president;
+                if (!president) return;
                 setCrewNameReportData({
                   crewName: activeCrewDetails.crew.crewName,
                   crewIdentifier: activeCrewDetails.crew.crewIdentifier,
                   crewId: activeCrewDetails.crew.id,
-                  reportedUserId: activeCrewDetails.crew.president.userId,
-                  reportedUsername: activeCrewDetails.crew.president.handle,
+                  reportedUserId: president.userId,
+                  reportedUsername: president.handle,
                 });
                 setShowCrewNameReportModal(true);
               }}
@@ -1472,11 +1474,13 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                         // Capture message data and president info immediately before potential changes
                         // Note: Original content is not exposed in API for security.
                         // Server will look up original content from database when processing report.
+                        const president = activeCrewDetails.crew.president;
+                        if (!president) return;
                         setInternalMessageReportData({
                           message: currentMessage, // Use filtered content; server will enrich with original
                           crewId: activeCrewDetails.crew.id,
-                          reportedUserId: activeCrewDetails.crew.president.userId,
-                          reportedUsername: activeCrewDetails.crew.president.handle,
+                          reportedUserId: president.userId,
+                          reportedUsername: president.handle,
                         });
                         setShowInternalMessageReportModal(true);
                       }}
@@ -1619,11 +1623,13 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                         // Capture message data and president info immediately before potential changes
                         // Note: Original content is not exposed in API for security.
                         // Server will look up original content from database when processing report.
+                        const president = activeCrewDetails.crew.president;
+                        if (!president) return;
                         setExternalMessageReportData({
                           message: currentMessage, // Use filtered content; server will enrich with original
                           crewId: activeCrewDetails.crew.id,
-                          reportedUserId: activeCrewDetails.crew.president.userId,
-                          reportedUsername: activeCrewDetails.crew.president.handle,
+                          reportedUserId: president.userId,
+                          reportedUsername: president.handle,
                         });
                         setShowExternalMessageReportModal(true);
                       }}
@@ -1903,7 +1909,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         onClose={() => setShowLeaderboardModal(false)}
       />
 
-      {activeCrewDetails?.crew && currentUser && currentUser._id && activeCrewDetails.crew.president && (
+      {activeCrewDetails?.crew && currentUser && activeCrewDetails.crew.president && (
         <>
           {externalMessageReportData && (
             <UserReportModal
@@ -1914,7 +1920,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
               }}
               reportedUserId={externalMessageReportData.reportedUserId}
               reportedUsername={externalMessageReportData.reportedUsername}
-              reportingUserId={String(currentUser._id)}
+              reportingUserId={String(currentUser._id || (currentUser as any)?.id || '')}
               reportingUsername={currentUser.handle || 'Unknown'}
               context="external-message-board"
               contextData={{
@@ -1933,7 +1939,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
               }}
               reportedUserId={internalMessageReportData.reportedUserId}
               reportedUsername={internalMessageReportData.reportedUsername}
-              reportingUserId={String(currentUser._id)}
+              reportingUserId={String(currentUser._id || (currentUser as any)?.id || '')}
               reportingUsername={currentUser.handle || 'Unknown'}
               context="internal-message-board"
               contextData={{
@@ -1952,7 +1958,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
               }}
               reportedUserId={crewNameReportData.reportedUserId}
               reportedUsername={crewNameReportData.reportedUsername}
-              reportingUserId={String(currentUser._id)}
+              reportingUserId={String(currentUser._id || (currentUser as any)?.id || '')}
               reportingUsername={currentUser.handle || 'Unknown'}
               context="crew-name"
               contextData={{
@@ -2557,7 +2563,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginBottom: SIZING.spacing.lg,
   },
   warNotificationTitle: {
-    fontSize: SIZING.font.h3,
+    fontSize: SIZING.font.h2,
     fontWeight: 'bold',
     marginBottom: SIZING.spacing.sm,
     textAlign: 'center',
@@ -2575,7 +2581,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     lineHeight: SIZING.font.body * 1.4,
   },
   warStatusInternalTitle: {
-    fontSize: SIZING.font.h4,
+    fontSize: SIZING.font.large,
     fontWeight: 'bold',
     marginBottom: SIZING.spacing.sm,
   },

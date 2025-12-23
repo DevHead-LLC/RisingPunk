@@ -575,6 +575,10 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
             transparent={true}
             animationType="fade"
             onRequestClose={() => setShowLanguagePicker(false)}
+            statusBarTranslucent={true}
+            hardwareAccelerated={true}
+            supportedOrientations={['landscape']}
+            presentationStyle="overFullScreen"
           >
             <TouchableOpacity
               style={styles.languagePickerOverlay}
@@ -601,6 +605,8 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
                 <FlatList
                   data={LANGUAGES}
                   keyExtractor={(item) => item}
+                  keyboardShouldPersistTaps="handled"
+                  nestedScrollEnabled={true}
                   renderItem={({ item }) => (
                     <TouchableOpacity
                       style={[

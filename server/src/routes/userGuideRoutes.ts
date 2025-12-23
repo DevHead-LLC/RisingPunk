@@ -62,27 +62,28 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
       if (task.autoCompleteConditions) {
         const shouldAutoComplete = task.autoCompleteConditions(user as any, progress);
         if (shouldAutoComplete) {
-          // Only auto-complete if task is not already in completedTaskIds
-          if (!completedTaskIds.has(task.id)) {
-            await UserTaskProgress.findOneAndUpdate(
-              { userId },
-              {
-                $push: {
-                  completedTasks: {
-                    taskId: task.id,
-                    completedAt: new Date()
-                  }
-                },
-                $setOnInsert: {
-                  collectedTasks: [],
-                  skippedTasks: [],
-                  showTaskGuide: true
-                },
-                $set: { lastCompletedTaskId: task.id }
+          // Use atomic operation to prevent race conditions - only add if taskId doesn't exist
+          await UserTaskProgress.findOneAndUpdate(
+            {
+              userId,
+              'completedTasks.taskId': { $ne: task.id }
+            },
+            {
+              $push: {
+                completedTasks: {
+                  taskId: task.id,
+                  completedAt: new Date()
+                }
               },
-              { upsert: true, new: true }
-            );
-          }
+              $setOnInsert: {
+                collectedTasks: [],
+                skippedTasks: [],
+                showTaskGuide: true
+              },
+              $set: { lastCompletedTaskId: task.id }
+            },
+            { upsert: true, new: true }
+          );
           continue;
         }
       }
@@ -348,30 +349,35 @@ router.post('/track-profile-visit', auth, async (req: Request, res: Response) =>
       const taskList = getTaskList();
       const viewProfileTask = taskList.find(t => t.id === 'view-profile');
       
-      if (viewProfileTask && viewProfileTask.autoCompleteConditions) {
+        if (viewProfileTask && viewProfileTask.autoCompleteConditions) {
         const user = await User.findById(userId).lean();
         if (user) {
           const updatedProgress = await UserTaskProgress.findOne({ userId });
-          const shouldAutoComplete = viewProfileTask.autoCompleteConditions(user as any, updatedProgress);
+          const shouldAutoComplete = viewProfileTask.autoCompleteConditions(user as any, updatedProgress ?? undefined);
           
           if (shouldAutoComplete) {
-            // Mark task as completed (without reward - reward is collected separately via /complete-task)
-            const alreadyCompleted = updatedProgress?.completedTasks.some(t => t.taskId === 'view-profile');
-            if (!alreadyCompleted) {
-              await UserTaskProgress.findOneAndUpdate(
-                { userId },
-                {
-                  $push: {
-                    completedTasks: {
-                      taskId: 'view-profile',
-                      completedAt: new Date()
-                    }
-                  },
-                  $set: { lastCompletedTaskId: 'view-profile' }
+            // Use atomic operation to prevent race conditions - only add if taskId doesn't exist
+            await UserTaskProgress.findOneAndUpdate(
+              {
+                userId,
+                'completedTasks.taskId': { $ne: 'view-profile' }
+              },
+              {
+                $push: {
+                  completedTasks: {
+                    taskId: 'view-profile',
+                    completedAt: new Date()
+                  }
                 },
-                { upsert: true, new: true }
-              );
-            }
+                $setOnInsert: {
+                  collectedTasks: [],
+                  skippedTasks: [],
+                  showTaskGuide: true
+                },
+                $set: { lastCompletedTaskId: 'view-profile' }
+              },
+              { upsert: true, new: true }
+            );
           }
         }
       }
@@ -431,25 +437,31 @@ router.post('/track-theme-change', auth, async (req: Request, res: Response) => 
         const user = await User.findById(userId).lean();
         if (user) {
           const updatedProgress = await UserTaskProgress.findOne({ userId });
-          const shouldAutoComplete = themeTask.autoCompleteConditions(user as any, updatedProgress);
+          const shouldAutoComplete = themeTask.autoCompleteConditions(user as any, updatedProgress ?? undefined);
           
           if (shouldAutoComplete) {
-            const alreadyCompleted = updatedProgress?.completedTasks.some(t => t.taskId === taskId);
-            if (!alreadyCompleted) {
-              await UserTaskProgress.findOneAndUpdate(
-                { userId },
-                {
-                  $push: {
-                    completedTasks: {
-                      taskId: taskId,
-                      completedAt: new Date()
-                    }
-                  },
-                  $set: { lastCompletedTaskId: taskId }
+            // Use atomic operation to prevent race conditions - only add if taskId doesn't exist
+            await UserTaskProgress.findOneAndUpdate(
+              {
+                userId,
+                'completedTasks.taskId': { $ne: taskId }
+              },
+              {
+                $push: {
+                  completedTasks: {
+                    taskId: taskId,
+                    completedAt: new Date()
+                  }
                 },
-                { upsert: true, new: true }
-              );
-            }
+                $setOnInsert: {
+                  collectedTasks: [],
+                  skippedTasks: [],
+                  showTaskGuide: true
+                },
+                $set: { lastCompletedTaskId: taskId }
+              },
+              { upsert: true, new: true }
+            );
           }
         }
       }

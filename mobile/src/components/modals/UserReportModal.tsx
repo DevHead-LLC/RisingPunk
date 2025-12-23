@@ -32,6 +32,7 @@ export interface UserReportModalProps {
   context: ReportContext;        // Context of the report
   contextData?: any;             // Additional context-specific data (e.g., message content, rule text)
   maxDescriptionLength?: number; // Max characters for description (default 200, can be 1000 for other plans)
+  renderAsOverlay?: boolean;     // If true, renders as View overlay instead of Modal (for use inside other modals)
 }
 
 const REPORT_REASONS: Array<{ value: ReportReason; label: string }> = [
@@ -62,6 +63,7 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
   context,
   contextData,
   maxDescriptionLength = 200,
+  renderAsOverlay = false,
 }) => {
   const colors = useThemeColors();
   const [selectedReason, setSelectedReason] = useState<ReportReason | null>(null);
@@ -152,6 +154,11 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
 
     if (!reportingUserId || !reportedUserId) {
       setError('Missing user information. Please try again.');
+      return;
+    }
+
+    if (String(reportingUserId).trim() === String(reportedUserId).trim()) {
+      setError('You cannot report yourself.');
       return;
     }
 
@@ -352,6 +359,135 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
     </View>
   );
 
+  const overlayContent = (
+    <View style={styles.overlay}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardAvoidingView}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <TouchableOpacity
+          style={styles.overlayTouchable}
+          activeOpacity={1}
+          onPress={Keyboard.dismiss}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => {}}
+          >
+            <View style={[styles.modalContainer, { backgroundColor: colors.background, borderColor: colors.matrix }]}>
+            {Platform.OS === 'ios' ? (
+              <GestureScrollView 
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}
+                keyboardShouldPersistTaps="handled"
+                scrollEnabled={true}
+                bounces={true}
+              >
+                {modalContent}
+              </GestureScrollView>
+            ) : (
+              <ScrollView 
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}
+                keyboardShouldPersistTaps="handled"
+                scrollEnabled={true}
+                bounces={true}
+              >
+                {modalContent}
+              </ScrollView>
+            )}
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </KeyboardAvoidingView>
+    </View>
+  );
+
+  // Reason Picker Overlay - Using View instead of nested Modal to avoid iOS crash
+  const reasonPickerOverlay = showReasonPicker && (
+    <View style={styles.pickerOverlayContainer} pointerEvents="box-none">
+      <TouchableOpacity
+        style={styles.pickerOverlay}
+        activeOpacity={1}
+        onPress={() => setShowReasonPicker(false)}
+      >
+        <TouchableOpacity
+          style={[styles.pickerContainer, { backgroundColor: colors.background, borderColor: colors.matrix }]}
+          activeOpacity={1}
+          onPress={() => {}}
+        >
+          <View style={[styles.pickerHeader, { borderBottomColor: colors.secondary }]}>
+            <Text style={[styles.pickerTitle, { color: colors.text.primary }]}>
+              Select Reason
+            </Text>
+            <TouchableOpacity
+              onPress={() => setShowReasonPicker(false)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.pickerClose, { color: colors.text.secondary }]}>
+                ×
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={REPORT_REASONS}
+            keyExtractor={(item) => item.value}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[
+                  styles.pickerOption,
+                  {
+                    backgroundColor: selectedReason === item.value ? colors.primary + '30' : 'transparent',
+                  }
+                ]}
+                onPress={() => {
+                  setSelectedReason(item.value);
+                  setShowReasonPicker(false);
+                  setError('');
+                }}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.pickerOptionText,
+                    {
+                      color: selectedReason === item.value ? colors.primary : colors.text.primary,
+                    }
+                  ]}
+                >
+                  {item.label}
+                </Text>
+                {selectedReason === item.value && (
+                  <Text style={[styles.pickerOptionCheck, { color: colors.primary }]}>
+                    ✓
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
+          />
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // Render as View overlay when inside another modal (to avoid nested Modal iOS crash)
+  if (renderAsOverlay) {
+    if (!visible) return null;
+    return (
+      <View style={styles.overlayContainer}>
+        {overlayContent}
+        {reasonPickerOverlay}
+      </View>
+    );
+  }
+
+  // Render as Modal when used standalone
   return (
     <Modal
       visible={visible}
@@ -363,120 +499,8 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
       supportedOrientations={['landscape']}
       presentationStyle="overFullScreen"
     >
-      <View style={styles.overlay}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardAvoidingView}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-        >
-          <TouchableOpacity
-            style={styles.overlayTouchable}
-            activeOpacity={1}
-            onPress={Keyboard.dismiss}
-          >
-            <TouchableOpacity
-              activeOpacity={1}
-              onPress={() => {}}
-            >
-              <View style={[styles.modalContainer, { backgroundColor: colors.background, borderColor: colors.matrix }]}>
-              {Platform.OS === 'ios' ? (
-                <GestureScrollView 
-                  style={styles.scrollView}
-                  contentContainerStyle={styles.scrollContent}
-                  showsVerticalScrollIndicator={false}
-                  nestedScrollEnabled={true}
-                  keyboardShouldPersistTaps="handled"
-                  scrollEnabled={true}
-                  bounces={true}
-                >
-                  {modalContent}
-                </GestureScrollView>
-              ) : (
-                <ScrollView 
-                  style={styles.scrollView}
-                  contentContainerStyle={styles.scrollContent}
-                  showsVerticalScrollIndicator={false}
-                  nestedScrollEnabled={true}
-                  keyboardShouldPersistTaps="handled"
-                  scrollEnabled={true}
-                  bounces={true}
-                >
-                  {modalContent}
-                </ScrollView>
-              )}
-              </View>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </KeyboardAvoidingView>
-      </View>
-
-      {/* Reason Picker Overlay - Using View instead of nested Modal to avoid iOS crash */}
-      {showReasonPicker && (
-        <View style={styles.pickerOverlayContainer} pointerEvents="box-none">
-          <TouchableOpacity
-            style={styles.pickerOverlay}
-            activeOpacity={1}
-            onPress={() => setShowReasonPicker(false)}
-          >
-            <TouchableOpacity
-              style={[styles.pickerContainer, { backgroundColor: colors.background, borderColor: colors.matrix }]}
-              activeOpacity={1}
-              onPress={() => {}}
-            >
-              <View style={[styles.pickerHeader, { borderBottomColor: colors.secondary }]}>
-                <Text style={[styles.pickerTitle, { color: colors.text.primary }]}>
-                  Select Reason
-                </Text>
-                <TouchableOpacity
-                  onPress={() => setShowReasonPicker(false)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.pickerClose, { color: colors.text.secondary }]}>
-                    ×
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              <FlatList
-                data={REPORT_REASONS}
-                keyExtractor={(item) => item.value}
-                keyboardShouldPersistTaps="handled"
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={[
-                      styles.pickerOption,
-                      {
-                        backgroundColor: selectedReason === item.value ? colors.primary + '30' : 'transparent',
-                      }
-                    ]}
-                    onPress={() => {
-                      setSelectedReason(item.value);
-                      setShowReasonPicker(false);
-                      setError('');
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.pickerOptionText,
-                        {
-                          color: selectedReason === item.value ? colors.primary : colors.text.primary,
-                        }
-                      ]}
-                    >
-                      {item.label}
-                    </Text>
-                    {selectedReason === item.value && (
-                      <Text style={[styles.pickerOptionCheck, { color: colors.primary }]}>
-                        ✓
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                )}
-              />
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </View>
-      )}
+      {overlayContent}
+      {reasonPickerOverlay}
     </Modal>
   );
 };
@@ -641,6 +665,14 @@ const styles = StyleSheet.create({
     fontSize: SIZING.font.body,
     fontWeight: '600',
     letterSpacing: 1,
+  },
+  overlayContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 9999,
   },
   pickerOverlayContainer: {
     position: 'absolute',
