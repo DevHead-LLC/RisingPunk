@@ -77,10 +77,12 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
   const hasScrolledOnOpen = useRef(false);
   const lastVisibleState = useRef(false);
   
-  // Reset scroll flag when modal closes
+  // Reset scroll flag and report modal state when modal closes
   useEffect(() => {
     if (!visible && lastVisibleState.current) {
       hasScrolledOnOpen.current = false;
+      setShowReportModal(false);
+      setReportedMessage(null);
     }
     lastVisibleState.current = visible;
   }, [visible]);
@@ -119,6 +121,8 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
 
   const handleClose = () => {
     setMessageInput('');
+    setShowReportModal(false);
+    setReportedMessage(null);
     onClose();
   };
 
