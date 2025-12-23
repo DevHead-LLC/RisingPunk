@@ -77,10 +77,12 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
   const hasScrolledOnOpen = useRef(false);
   const lastVisibleState = useRef(false);
   
-  // Reset scroll flag when modal closes
+  // Reset scroll flag and report modal state when modal closes
   useEffect(() => {
     if (!visible && lastVisibleState.current) {
       hasScrolledOnOpen.current = false;
+      setShowReportModal(false);
+      setReportedMessage(null);
     }
     lastVisibleState.current = visible;
   }, [visible]);
@@ -119,6 +121,8 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
 
   const handleClose = () => {
     setMessageInput('');
+    setShowReportModal(false);
+    setReportedMessage(null);
     onClose();
   };
 
@@ -156,6 +160,7 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
   const styles = createStyles(colors);
 
   return (
+    <>
     <Modal
       visible={visible}
       transparent={true}
@@ -333,28 +338,29 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
           </View>
         </SafeAreaView>
       </KeyboardAvoidingView>
-
-      {currentUser && currentUserId && reportedMessage && (
-        <UserReportModal
-          visible={showReportModal}
-          onClose={handleCloseReportModal}
-          reportedUserId={reportedMessage.userId}
-          reportedUsername={reportedMessage.username}
-          reportingUserId={String(currentUserId)}
-          reportingUsername={currentUser.handle || 'Unknown'}
-          context="chat-message"
-          contextData={{
-            message: reportedMessage.message, // Server will look up original content from database
-            messageId: reportedMessage.id,
-            timestamp: (reportedMessage.timestamp instanceof Date 
-              ? reportedMessage.timestamp 
-              : new Date(reportedMessage.timestamp)).toISOString(),
-            crewId: crewId,
-          }}
-          maxDescriptionLength={1000}
-        />
-      )}
     </Modal>
+
+    {currentUser && currentUserId && reportedMessage && (
+      <UserReportModal
+        visible={showReportModal}
+        onClose={handleCloseReportModal}
+        reportedUserId={reportedMessage.userId}
+        reportedUsername={reportedMessage.username}
+        reportingUserId={String(currentUserId)}
+        reportingUsername={currentUser.handle || 'Unknown'}
+        context="chat-message"
+        contextData={{
+          message: reportedMessage.message,
+          messageId: reportedMessage.id,
+          timestamp: (reportedMessage.timestamp instanceof Date 
+            ? reportedMessage.timestamp 
+            : new Date(reportedMessage.timestamp)).toISOString(),
+          crewId: crewId,
+        }}
+        maxDescriptionLength={1000}
+      />
+    )}
+  </>
   );
 };
 
