@@ -58,14 +58,29 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
 
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  // Show next 10 tasks (sorted by order, including completed ones that can be collected)
+  // Show next 10 tasks that are either incomplete or completed but not yet collected
+  // After collection, tasks disappear from the list
   const visibleTasks = useMemo(() => {
     if (taskList.length === 0) {
       return [];
     }
     const sorted = [...taskList].sort((a, b) => (a.order || 0) - (b.order || 0));
-    return sorted.slice(0, 10);
-  }, [taskList]);
+    
+    // Filter to show only tasks that are:
+    // 1. Not completed (incomplete tasks)
+    // 2. Completed but not yet collected (can collect reward)
+    // Note: "create-account" is always considered completed but can be collected
+    const filtered = sorted.filter(task => {
+      if (task.id === 'create-account') {
+        // Show create-account if it hasn't been collected yet
+        return !completedTaskIds.has(task.id);
+      }
+      // Show task if it's not in completedTaskIds (not collected yet)
+      return !completedTaskIds.has(task.id);
+    });
+    
+    return filtered.slice(0, 10);
+  }, [taskList, completedTaskIds]);
 
   return (
     <Modal

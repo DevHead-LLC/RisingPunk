@@ -150,42 +150,55 @@ router.post('/complete-task', auth, async (req: Request, res: Response) => {
       return;
     }
 
-    // Update user balance with reward
-    if (rewardAmount > 0) {
-      const user = await User.findById(userId);
-      if (user) {
-        user.balance.total += rewardAmount;
-        user.balance.lastUpdated = new Date();
-        await user.save();
-      }
-    }
+    // Use transaction to ensure atomicity
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    // Mark task as completed
-    if (!progress) {
-      await UserTaskProgress.create({
-        userId,
-        completedTasks: [{
-          taskId: trimmedTaskId,
-          completedAt: new Date()
-        }],
-        skippedTasks: [],
-        lastCompletedTaskId: trimmedTaskId,
-        showTaskGuide: true
-      });
-    } else {
-      await UserTaskProgress.findOneAndUpdate(
-        { userId },
-        {
-          $push: {
-            completedTasks: {
-              taskId: trimmedTaskId,
-              completedAt: new Date()
-            }
+    try {
+      // Update user balance with reward
+      if (rewardAmount > 0) {
+        const user = await User.findById(userId).session(session);
+        if (user) {
+          user.balance.total += rewardAmount;
+          user.balance.lastUpdated = new Date();
+          await user.save({ session });
+        }
+      }
+
+      // Mark task as completed
+      if (!progress) {
+        await UserTaskProgress.create([{
+          userId,
+          completedTasks: [{
+            taskId: trimmedTaskId,
+            completedAt: new Date()
+          }],
+          skippedTasks: [],
+          lastCompletedTaskId: trimmedTaskId,
+          showTaskGuide: true
+        }], { session });
+      } else {
+        await UserTaskProgress.findOneAndUpdate(
+          { userId },
+          {
+            $push: {
+              completedTasks: {
+                taskId: trimmedTaskId,
+                completedAt: new Date()
+              }
+            },
+            $set: { lastCompletedTaskId: trimmedTaskId }
           },
-          $set: { lastCompletedTaskId: trimmedTaskId }
-        },
-        { new: true }
-      );
+          { new: true, session }
+        );
+      }
+
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
     }
 
     res.json({

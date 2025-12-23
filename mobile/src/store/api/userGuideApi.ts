@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
+import { balanceApi } from './balanceApi';
 import type {
   CurrentTaskResponse,
   CompleteTaskRequest,
@@ -35,6 +36,15 @@ export const userGuideApi = createApi({
         method: 'POST',
         body,
       }),
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Invalidate Balance tag from balanceApi to ensure fresh balance data
+          dispatch(balanceApi.util.invalidateTags(['Balance']));
+        } catch {
+          // Error handling is done by the mutation itself
+        }
+      },
       invalidatesTags: ['UserTaskProgress'],
     }),
     skipTaskGuideTask: builder.mutation<SkipTaskResponse, SkipTaskRequest>({
