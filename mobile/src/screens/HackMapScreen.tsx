@@ -439,12 +439,29 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     const key = `${x},${y}`;
     const dynamicEntity = dynamicEntityData[key];
     const isShielded = dynamicEntity?.isShielded ?? (cell as any).isShielded;
+    const pressStartTimeRef = useRef<number>(0);
+    const pressStartCoordsRef = useRef<{ x: number; y: number } | null>(null);
     
     const houseBgStyle = cell.entity === 'house'
       ? (cell.owner === 'player'
           ? (cell.name === currentUserHandle ? styles.userHouseBg : styles.otherUserHouseBg)
           : styles.enemyHouseBg)
       : null;
+    
+    const handlePress = useCallback(() => {
+      const now = Date.now();
+      const startTime = pressStartTimeRef.current;
+      const startCoords = pressStartCoordsRef.current;
+      
+      // Only trigger if it was a quick tap (less than 300ms)
+      if (startTime > 0 && now - startTime < 300 && startCoords) {
+        onPress(x, y, cell);
+      }
+      
+      pressStartTimeRef.current = 0;
+      pressStartCoordsRef.current = null;
+    }, [x, y, cell, onPress]);
+    
     return (
       <Pressable
         style={[
@@ -456,7 +473,24 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           !isWarCrewMember && isAllianceCrewMember && styles.allianceCrewMemberCell,
           !isWarCrewMember && !isAllianceCrewMember && isCrewMember && styles.crewMemberCell,
         ]}
-        onPress={() => onPress(x, y, cell)}
+        hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+        onPress={handlePress}
+        onPressIn={(e) => {
+          pressStartTimeRef.current = Date.now();
+          pressStartCoordsRef.current = { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY };
+        }}
+        onPressOut={(e) => {
+          const startTime = pressStartTimeRef.current;
+          const startCoords = pressStartCoordsRef.current;
+          if (startTime > 0 && startCoords) {
+            const moved = Math.abs(e.nativeEvent.locationX - startCoords.x) > 5 || 
+                         Math.abs(e.nativeEvent.locationY - startCoords.y) > 5;
+            if (moved) {
+              pressStartTimeRef.current = 0;
+              pressStartCoordsRef.current = null;
+            }
+          }
+        }}
       >
         <View style={[styles.cellContent, terrainStyleMap[cell.terrain], houseBgStyle]}>
           {cell.entity !== 'house' && getTerrainIcon(cell.terrain)}
@@ -935,6 +969,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
   );
 
+
   // Phase 1: Debounce panning stopped (200ms after pan ends)
   useEffect(() => {
     if (!isPanningJS) {
@@ -968,6 +1003,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   );
 
   const panGesture = Gesture.Pan()
+    .minDistance(10)
     .onStart(() => {
       startX.value = offsetX.value;
       startY.value = offsetY.value;
@@ -1138,9 +1174,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const pendingViewportParamsRef = useRef<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>(null);
   
   // Phase 6: Fetch viewport data during panning with minimal flag (terrain + images only, skip details)
+  // Allow query to run when restorePan is set even if terrainDataLoaded is false (returning from battle)
+  const shouldSkipPanningViewport = !panningViewportParams || (!terrainDataLoaded && !restorePan);
   const { data: panningViewportData, isLoading: isLoadingPanningViewport, error: panningViewportError } = useFetchMapViewportQuery(
     panningViewportParams!,
-    { skip: !panningViewportParams || !terrainDataLoaded }
+    { skip: shouldSkipPanningViewport }
   );
   // Phase 5: Optimize shield status polling - increase interval and make viewport-aware
   // Check if there are any player tiles in the visible viewport
@@ -2047,24 +2085,24 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     // Mark request as complete (success or error)
     if (panningViewportData || panningViewportError) {
       viewportRequestInFlightRef.current = false;
-      
-      // If there's a pending viewport, trigger it now
-      if (pendingViewportParamsRef.current) {
-        const pending = pendingViewportParamsRef.current;
-        pendingViewportParamsRef.current = null;
-        viewportRequestInFlightRef.current = true;
-        panningViewportMinimalRef.current = true;
-        setPanningViewportParams(pending);
-        return;
-      }
     }
     
+    // Process current data first before handling pending requests
+    // This ensures non-minimal restorePan data isn't discarded when a panning request is pending
     if (panningViewportData && panningViewportData.grid && panningViewportData.viewport) {
       const viewport = panningViewportData.viewport;
       const viewportKey = `${viewport.x1},${viewport.y1},${viewport.x2},${viewport.y2}`;
       
       // Phase 6: Prevent processing the same viewport twice
       if (processedViewportRef.current === viewportKey) {
+        // Still handle pending requests even if this viewport was already processed
+        if (pendingViewportParamsRef.current) {
+          const pending = pendingViewportParamsRef.current;
+          pendingViewportParamsRef.current = null;
+          viewportRequestInFlightRef.current = true;
+          panningViewportMinimalRef.current = pending.minimal ?? true;
+          setPanningViewportParams(pending);
+        }
         return;
       }
       processedViewportRef.current = viewportKey;
@@ -2127,6 +2165,12 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         // Bug Fix: Update gridRef immediately to prevent race conditions
         // If multiple effects run in the same cycle, they need to read the updated value
         gridRef.current = mergedGrid;
+        
+        // Set terrainDataLoaded to true when processing restorePan viewport (non-minimal request)
+        // This ensures the map loads properly when returning from battle prep
+        if (!isMinimalRequest) {
+          setTerrainDataLoaded(true);
+        }
       });
       
       // Update last fetched viewport (without minimal flag for comparison)
@@ -2135,6 +2179,17 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       // Clear viewport params and reset minimal flag to allow next fetch
       panningViewportMinimalRef.current = false;
       setPanningViewportParams(null);
+    }
+    
+    // Handle pending requests after processing current data
+    // This ensures non-minimal restorePan data is processed even if a panning request is pending
+    if ((panningViewportData || panningViewportError) && pendingViewportParamsRef.current) {
+      const pending = pendingViewportParamsRef.current;
+      pendingViewportParamsRef.current = null;
+      viewportRequestInFlightRef.current = true;
+      // Respect the minimal flag from the pending request (restorePan uses minimal: false)
+      panningViewportMinimalRef.current = pending.minimal ?? true;
+      setPanningViewportParams(pending);
     }
   }, [panningViewportData, panningViewportError, separateStaticAndDynamicData, dispatch]);
   
@@ -2237,15 +2292,73 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   // Force refresh map data when returning from battle to ensure NPCs are updated
   // Phase 4B: Only clear cache when explicitly needed (restorePan = returning from battle)
   useEffect(() => {
-    if (restorePan) {
-      // Clear cache when returning from battle to ensure fresh data (NPCs may have been defeated)
+    if (restorePan && containerSize.width > 0 && containerSize.height > 0) {
+      const restoreKey = `${restorePan.x},${restorePan.y}`;
+      
+      // Prevent processing the same restorePan viewport multiple times
+      if (processedRestorePanViewportRef.current === restoreKey) {
+        return;
+      }
+      processedRestorePanViewportRef.current = restoreKey;
+      
+      // Calculate viewport around restorePan location instead of clearing everything
+      const buffer = 15;
+      const gridSize = getGridSize(grid, 50);
+      
+      // Convert restorePan grid coordinates to pan coordinates to calculate correct viewport
+      const { x: panX, y: panY } = gridToPanCoordinates(
+        restorePan.x,
+        restorePan.y,
+        containerSize.width,
+        containerSize.height
+      );
+      
+      const restoreViewport = calculateViewportFromPan(
+        panX,
+        panY,
+        containerSize.width,
+        containerSize.height,
+        gridSize,
+        buffer
+      );
+      
+      // Fetch viewport at restorePan location instead of initial viewport
+      // Mark request as in flight to prevent panning from overwriting restorePan request
+      // If a panning request is already in flight, store restorePan as pending
+      if (viewportRequestInFlightRef.current) {
+        pendingViewportParamsRef.current = {
+          x1: restoreViewport.startCol,
+          y1: restoreViewport.startRow,
+          x2: restoreViewport.endCol,
+          y2: restoreViewport.endRow,
+          minimal: false
+        };
+      } else {
+        // Reset minimal flag to ensure restorePan request is processed as non-minimal
+        // This prevents terrainDataLoaded from being incorrectly skipped
+        // Only set when starting a new request to avoid race condition with in-flight requests
+        panningViewportMinimalRef.current = false;
+        viewportRequestInFlightRef.current = true;
+        setPanningViewportParams({
+          x1: restoreViewport.startCol,
+          y1: restoreViewport.startRow,
+          x2: restoreViewport.endCol,
+          y2: restoreViewport.endRow,
+          minimal: false
+        });
+      }
+      
+      // Clear cache for the restorePan area only (not everything)
+      // This ensures fresh data for NPCs that may have been defeated
       setStaticTerrainData({});
       setDynamicEntityData({});
       setEntityImageData({});
       setTerrainDataLoaded(false);
-      refetch();
+    } else if (!restorePan) {
+      // Clear processed ref when restorePan is cleared
+      processedRestorePanViewportRef.current = null;
     }
-  }, [restorePan, refetch]);
+  }, [restorePan, containerSize.width, containerSize.height, grid]);
 
   const computeWindow = useCallback((panX: number, panY: number, width: number, height: number) => {
     if (width <= 0 || height <= 0) {return;}
@@ -2325,6 +2438,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   // Restore pan position if provided (now safe, computeWindow is defined)
   // Track restored position to prevent re-restoring when user pans
   const restoredPanRef = useRef<{ x: number; y: number } | null>(null);
+  const processedRestorePanViewportRef = useRef<string | null>(null);
   
   // Track bounds ready state in JS to trigger effect when bounds become ready
   const [boundsReadyJS, setBoundsReadyJS] = useState(false);
@@ -2349,8 +2463,13 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       }
       
       // Validate grid coordinates are within bounds
-      const gridSize = getGridSize(grid);
-      if (restorePan.x < 0 || restorePan.x >= gridSize || restorePan.y < 0 || restorePan.y >= gridSize) {
+      // y represents row index, validate against number of rows
+      if (!grid || restorePan.y < 0 || restorePan.y >= grid.length) {
+        return;
+      }
+      // x represents column index, validate against number of columns in that row
+      const row = grid[restorePan.y];
+      if (!row || restorePan.x < 0 || restorePan.x >= row.length) {
         return;
       }
       
@@ -2363,39 +2482,44 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       
       offsetX.value = clampedX;
       offsetY.value = clampedY;
-      lastComputedPan.value = { x: clampedX, y: clampedY };
       
       // Mark this position as restored
       restoredPanRef.current = { x: restorePan.x, y: restorePan.y };
       
       // Force tile loading by properly calculating the new window range
+      // Reset throttle timestamp to ensure computeWindow runs immediately
+      lastComputeTs.value = 0;
+      
+      // Calculate the correct window range for the restored position
+      const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(
+        clampedX, 
+        clampedY, 
+        containerSize.width, 
+        containerSize.height, 
+        gridSize, 
+        PAN_BUFFER
+      );
+      
+      // Calculate virtual viewport for visible tiles
+      calculateVirtualViewport(clampedX, clampedY, containerSize.width, containerSize.height);
+      
+      // Force window range update immediately (bypass computeWindow throttling)
+      const newWindowRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
+      windowRangeRef.current = newWindowRange;
+      setWindowRange(newWindowRange);
+      
+      // Update lastComputedPan after setting window range to ensure computeWindow can run if needed
+      lastComputedPan.value = { x: clampedX, y: clampedY };
+      
+      // Force computeWindow to run to trigger any additional updates (viewport fetch, etc.)
       requestAnimationFrame(() => {
-        // First compute the window at the restored position
         computeWindow(clampedX, clampedY, containerSize.width, containerSize.height);
-        
-        // Calculate the correct window range for the restored position
-        const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(
-          clampedX, 
-          clampedY, 
-          containerSize.width, 
-          containerSize.height, 
-          gridSize, 
-          0
-        );
-        
-        // Force tile loading by setting the correct window range
-        setWindowRange({
-          rowStart: startRow,
-          rowEnd: endRow,
-          colStart: startCol,
-          colEnd: endCol
-        });
       });
     } else if (!restorePan) {
       // Clear restored ref when restorePan is cleared (user navigated away)
       restoredPanRef.current = null;
     }
-  }, [restorePan, containerSize.width, containerSize.height, computeWindow, grid, boundsReadyJS]);
+  }, [restorePan, containerSize.width, containerSize.height, computeWindow, grid, boundsReadyJS, gridSize, calculateVirtualViewport]);
 
   useEffect(() => {
     // Only compute initial window after bounds are ready and container is set
@@ -2522,34 +2646,117 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     hasCenteredOnHome.value = true;
   }, [grid, currentUserHandle, restorePan, containerSize.width, containerSize.height, minX, maxX, boundsReady, computeWindow, offsetX, offsetY]);
 
+  const handleCellPressRef = useRef<((x: number, y: number, cellData: CellData) => Promise<void>) | null>(null);
+  const lastPressTimeRef = useRef<number>(0);
+  const lastPressCoordsRef = useRef<{ x: number; y: number } | null>(null);
+  const PRESS_DEBOUNCE_MS = 300;
+  const DOUBLE_PRESS_THRESHOLD_MS = 500;
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   const handleCellPress = useCallback(async (x: number, y: number, cellData: CellData) => {
-    // Allow clicking even while panning - this provides immediate feedback
-    // The modal will still work, and the pan will continue if user keeps dragging
+    // Security: Validate coordinates
+    // y represents row index, validate against number of rows
+    if (y < 0 || !grid || y >= grid.length) {
+      return;
+    }
+    // x represents column index, validate against number of columns in that row
+    const row = grid[y];
+    if (!row || x < 0 || x >= row.length) {
+      return;
+    }
+    
+    // Security: Validate cellData structure
+    if (!cellData || typeof cellData !== 'object') {
+      return;
+    }
+    if (typeof cellData.terrain !== 'string' || typeof cellData.entity !== 'string') {
+      return;
+    }
+    
+    const now = Date.now();
+    const lastPress = lastPressTimeRef.current;
+    const lastCoords = lastPressCoordsRef.current;
+    
+    // Don't handle presses if we're currently panning
+    if (isPanningJS) {
+      return;
+    }
+    
+    // Debounce: ignore if pressed too soon after last press (but only if same coordinates)
+    if (lastCoords && lastCoords.x === x && lastCoords.y === y && now - lastPress < PRESS_DEBOUNCE_MS) {
+      return;
+    }
+    
+    // Prevent double-clicks from same location
+    if (lastCoords && lastCoords.x === x && lastCoords.y === y && now - lastPress < DOUBLE_PRESS_THRESHOLD_MS) {
+      return;
+    }
+    
+    lastPressTimeRef.current = now;
+    lastPressCoordsRef.current = { x, y };
     
     // If clicking on another player, fetch their current shield status
     if (cellData.owner === 'player' && cellData.userId && cellData.name !== currentUserHandle) {
+      // Security: Validate userId
+      const userId = cellData.userId;
+      if (!userId || typeof userId !== 'string' || userId.trim().length === 0) {
+        setSelectedCell({x, y, info: cellData});
+        return;
+      }
+      
+      // Security: Validate token
+      if (!token || typeof token !== 'string') {
+        setSelectedCell({x, y, info: cellData});
+        return;
+      }
+      
+      // Performance: Cancel previous request if new one starts
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+      
       try {
-        const response = await fetch(`${API_URL}/api/users/shield-status/${cellData.userId}`, {
+        const response = await fetch(`${API_URL}/api/users/shield-status/${userId}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
+          signal: abortControllerRef.current.signal,
         });
-        if (response.ok) {
-          const userData = await response.json();
-          const updatedCellData = {
-            ...cellData,
-            isShielded: userData.antivirusShield?.active || false
-          };
-          setSelectedCell({x, y, info: updatedCellData});
+        
+        // Security: Validate API response
+        if (!response.ok) {
+          setSelectedCell({x, y, info: cellData});
           return;
         }
-      } catch (error) {
+        
+        const userData = await response.json();
+        if (!userData || typeof userData !== 'object') {
+          setSelectedCell({x, y, info: cellData});
+          return;
+        }
+        
+        const updatedCellData = {
+          ...cellData,
+          isShielded: userData.antivirusShield?.active || false
+        };
+        setSelectedCell({x, y, info: updatedCellData});
+        return;
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          return;
+        }
         console.error('Failed to fetch shield status:', error);
+        setSelectedCell({x, y, info: cellData});
+        return;
       }
     }
     
     setSelectedCell({x, y, info: cellData});
-  }, [currentUserHandle, token]);
+  }, [currentUserHandle, token, isPanningJS, grid]);
+
+  // Store handler in ref for stable reference
+  handleCellPressRef.current = handleCellPress;
 
   const centerOnUserHome = useCallback(() => {
     if (!currentUserHandle || !grid.length) return;
@@ -2650,6 +2857,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       if (visitCrewCloseTimeoutRef.current) {
         clearTimeout(visitCrewCloseTimeoutRef.current);
         visitCrewCloseTimeoutRef.current = null;
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
       }
     };
   }, []);

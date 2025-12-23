@@ -36,14 +36,19 @@ export class BattleService {
   }
 
   async createBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number}>, defenderNpcSlug?: string, unlockHackRigOnWin?: boolean, defenderNpcInstanceId?: string): Promise<IBattleDocument> {
-    const battle = await BattleSetupService.createBattle(attackerId, defenderId, screenWidth, screenHeight, userBattalions, defenderNpcSlug, unlockHackRigOnWin === true, defenderNpcInstanceId);
-    
-    ScreenDimensionService.setBattleScreenDimensions(battle.battleId, screenWidth, screenHeight);
-    
-    this.timerService.startTimer(battle.battleId);
-    this.setupTimerListeners(battle.battleId);
-    
-    return battle;
+    try {
+      const battle = await BattleSetupService.createBattle(attackerId, defenderId, screenWidth, screenHeight, userBattalions, defenderNpcSlug, unlockHackRigOnWin === true, defenderNpcInstanceId);
+      
+      ScreenDimensionService.setBattleScreenDimensions(battle.battleId, screenWidth, screenHeight);
+      
+      this.timerService.startTimer(battle.battleId);
+      
+      this.setupTimerListeners(battle.battleId);
+      
+      return battle;
+    } catch (error) {
+      throw error;
+    }
   }
   
   async getBattle(battleId: string): Promise<IBattleDocument | null> {
