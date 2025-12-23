@@ -25,6 +25,7 @@ import {useGetRentalHousingStatusQuery, useCompleteRentalHousingMutation, useCom
 import {OnboardingSlides} from '../components/onboarding';
 import {TurfIntro} from '../components/turf-intro';
 import {TaskGuide} from '../components/turf/TaskGuide';
+import {TaskGuideHighlightOverlay} from '../components/turf/TaskGuideHighlightOverlay';
 
 // Platform-specific imports - available on both platforms but only used on Android
 let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, withTiming: any, computePanBounds: any;
@@ -974,6 +975,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
             </View>
             <ProfileLocation onPress={() => navigateToScreen('profile')} isIntroActive={currentIntroStep === 'profile'} />
             <TaskGuide currentScreen={currentScreen} />
+            <TaskGuideHighlightOverlay />
           </View>
         );
     }

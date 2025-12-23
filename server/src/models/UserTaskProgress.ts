@@ -6,9 +6,11 @@ export interface IUserTaskProgress extends Document {
     taskId: string;
     completedAt: Date;
   }[];
+  collectedTasks: string[]; // Tasks that have had their reward collected
   skippedTasks: string[];
   lastCompletedTaskId?: string;
   showTaskGuide: boolean;
+  profileVisitedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -31,6 +33,9 @@ const userTaskProgressSchema = new Schema({
       default: Date.now
     }
   }],
+  collectedTasks: [{
+    type: String
+  }],
   skippedTasks: [{
     type: String
   }],
@@ -41,6 +46,10 @@ const userTaskProgressSchema = new Schema({
   showTaskGuide: {
     type: Boolean,
     default: true
+  },
+  profileVisitedAt: {
+    type: Date,
+    required: false
   }
 }, {
   collection: 'usertaskprogress',

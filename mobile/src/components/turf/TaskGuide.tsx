@@ -69,12 +69,13 @@ export const TaskGuide = memo(({ currentScreen }: TaskGuideProps) => {
   // Always show "Next Task" as the title
   const displayTitle = 'Next Task';
   
-  // Check if current task is completed
+  // Check if current task is completed (action done) but not collected (reward not given)
   const currentTaskId = data?.currentTask?.id;
   const completedTaskIds = new Set(data?.completedTaskIds || []);
-  // "create-account" is always completed (user is logged in)
+  const collectedTaskIds = new Set(data?.collectedTaskIds || []);
+  // Task is completed if it's in completedTaskIds but not yet in collectedTaskIds
   const isCurrentTaskCompleted = currentTaskId 
-    ? (currentTaskId === 'create-account' || completedTaskIds.has(currentTaskId))
+    ? (completedTaskIds.has(currentTaskId) && !collectedTaskIds.has(currentTaskId))
     : false;
   
   // Show "Collect Reward!" if task is completed, otherwise show description

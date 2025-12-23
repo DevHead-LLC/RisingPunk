@@ -13,6 +13,7 @@ import { ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { useGetCurrentTaskGuideTaskQuery, useCompleteTaskGuideTaskMutation } from '../../store/api/userGuideApi';
+import { useTaskGuideHighlight } from '../../contexts/TaskGuideHighlightContext';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -30,14 +31,20 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
     skip: false, // Always fetch, don't skip
   });
   const [completeTask] = useCompleteTaskGuideTaskMutation();
+  const { setHighlightTaskId } = useTaskGuideHighlight();
 
   const taskList = data?.taskList || [];
   const completedTaskIds = new Set(data?.completedTaskIds || []);
+  const collectedTaskIds = new Set(data?.collectedTaskIds || []);
 
-  // Mark create-account as completed (since user is logged in)
+  // Check if task is completed (action done) but not yet collected (reward not given)
+  // A task shows "Collect" button if it's completed but not collected
   const isTaskCompleted = (taskId: string) => {
-    if (taskId === 'create-account') return true;
-    return completedTaskIds.has(taskId);
+    // create-account is always considered completed (user is logged in)
+    // but it can still be collected if not in collectedTaskIds
+    if (taskId === 'create-account') return !collectedTaskIds.has(taskId);
+    // Task is completed if it's in completedTaskIds but not yet in collectedTaskIds
+    return completedTaskIds.has(taskId) && !collectedTaskIds.has(taskId);
   };
 
   const handleTaskAction = async (taskId: string) => {
@@ -50,9 +57,15 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
         console.error('Error collecting reward:', error);
       }
     } else {
-      // Navigate to task (for now, just close modal)
-      // TODO: Implement navigation to specific task locations
-      onClose();
+      // Handle task-specific navigation
+      if (taskId === 'view-profile') {
+        // Close modal and trigger highlight mode for profile
+        onClose();
+        setHighlightTaskId('view-profile');
+      } else {
+        // For other tasks, just close modal for now
+        onClose();
+      }
     }
   };
 
@@ -67,20 +80,15 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
     const sorted = [...taskList].sort((a, b) => (a.order || 0) - (b.order || 0));
     
     // Filter to show only tasks that are:
-    // 1. Not completed (incomplete tasks)
-    // 2. Completed but not yet collected (can collect reward)
-    // Note: "create-account" is always considered completed but can be collected
+    // 1. Not collected (incomplete or completed but reward not collected)
+    // Tasks are filtered out only when they've been collected (reward given)
     const filtered = sorted.filter(task => {
-      if (task.id === 'create-account') {
-        // Show create-account if it hasn't been collected yet
-        return !completedTaskIds.has(task.id);
-      }
-      // Show task if it's not in completedTaskIds (not collected yet)
-      return !completedTaskIds.has(task.id);
+      // Filter out tasks that have been collected (reward given)
+      return !collectedTaskIds.has(task.id);
     });
     
     return filtered.slice(0, 10);
-  }, [taskList, completedTaskIds]);
+  }, [taskList, collectedTaskIds]);
 
   return (
     <Modal

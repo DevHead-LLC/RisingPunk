@@ -20,6 +20,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
       {
         $setOnInsert: {
           completedTasks: [],
+          collectedTasks: [],
           skippedTasks: [],
           showTaskGuide: true
         }
@@ -29,7 +30,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
         new: true,
         setDefaultsOnInsert: true
       }
-    ).select('completedTasks skippedTasks showTaskGuide').lean();
+    ).select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt').lean();
 
     if (!progress) {
       res.status(500).json({ error: 'Failed to initialize task progress' });
@@ -38,7 +39,9 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
 
     const taskList = getTaskList();
     const completedTaskIdsArray = progress.completedTasks.map(t => t.taskId);
+    const collectedTaskIdsArray = progress.collectedTasks || [];
     const completedTaskIds = new Set(completedTaskIdsArray);
+    const collectedTaskIds = new Set(collectedTaskIdsArray);
     const skippedTaskIds = new Set(progress.skippedTasks);
 
     const user = await User.findById(userId).lean();
@@ -51,12 +54,13 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
     const sortedTasks = [...taskList].sort((a, b) => a.order - b.order);
 
     for (const task of sortedTasks) {
-      if (completedTaskIds.has(task.id) || skippedTaskIds.has(task.id)) {
+      // Skip tasks that have been collected (reward given) or skipped
+      if (collectedTaskIds.has(task.id) || skippedTaskIds.has(task.id)) {
         continue;
       }
 
       if (task.autoCompleteConditions) {
-        const shouldAutoComplete = task.autoCompleteConditions(user as any);
+        const shouldAutoComplete = task.autoCompleteConditions(user as any, progress);
         if (shouldAutoComplete) {
           await UserTaskProgress.findOneAndUpdate(
             { userId },
@@ -66,6 +70,11 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
                   taskId: task.id,
                   completedAt: new Date()
                 }
+              },
+              $setOnInsert: {
+                collectedTasks: [],
+                skippedTasks: [],
+                showTaskGuide: true
               },
               $set: { lastCompletedTaskId: task.id }
             },
@@ -101,7 +110,8 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
         order: task.order,
         reward: task.reward
       })),
-      completedTaskIds: completedTaskIdsArray
+      completedTaskIds: completedTaskIdsArray,
+      collectedTaskIds: collectedTaskIdsArray
     });
   } catch (error) {
     console.error('Error fetching current task:', error);
@@ -138,9 +148,9 @@ router.post('/complete-task', auth, async (req: Request, res: Response) => {
     const rewardAmount = task?.reward?.value || 0;
 
     const progress = await UserTaskProgress.findOne({ userId });
-    const alreadyCompleted = progress?.completedTasks.some(t => t.taskId === trimmedTaskId);
+    const alreadyCollected = progress?.collectedTasks?.includes(trimmedTaskId);
 
-    if (alreadyCompleted) {
+    if (alreadyCollected) {
       // Task already collected, return success
       res.json({
         success: true,
@@ -148,6 +158,37 @@ router.post('/complete-task', auth, async (req: Request, res: Response) => {
         rewardAmount: 0
       });
       return;
+    }
+
+    // Ensure task is marked as completed (action done) before collecting reward
+    const isCompleted = progress?.completedTasks.some(t => t.taskId === trimmedTaskId);
+    if (!isCompleted) {
+      // Mark as completed first (action done, but reward not collected yet)
+      if (!progress) {
+        await UserTaskProgress.create({
+          userId,
+          completedTasks: [{
+            taskId: trimmedTaskId,
+            completedAt: new Date()
+          }],
+          collectedTasks: [],
+          skippedTasks: [],
+          showTaskGuide: true
+        });
+      } else {
+        await UserTaskProgress.findOneAndUpdate(
+          { userId },
+          {
+            $addToSet: {
+              completedTasks: {
+                taskId: trimmedTaskId,
+                completedAt: new Date()
+              }
+            }
+          },
+          { new: true }
+        );
+      }
     }
 
     // Use transaction to ensure atomicity
@@ -165,7 +206,7 @@ router.post('/complete-task', auth, async (req: Request, res: Response) => {
         }
       }
 
-      // Mark task as completed
+      // Mark task as collected (reward given)
       if (!progress) {
         await UserTaskProgress.create([{
           userId,
@@ -173,6 +214,7 @@ router.post('/complete-task', auth, async (req: Request, res: Response) => {
             taskId: trimmedTaskId,
             completedAt: new Date()
           }],
+          collectedTasks: [trimmedTaskId],
           skippedTasks: [],
           lastCompletedTaskId: trimmedTaskId,
           showTaskGuide: true
@@ -181,12 +223,7 @@ router.post('/complete-task', auth, async (req: Request, res: Response) => {
         await UserTaskProgress.findOneAndUpdate(
           { userId },
           {
-            $push: {
-              completedTasks: {
-                taskId: trimmedTaskId,
-                completedAt: new Date()
-              }
-            },
+            $addToSet: { collectedTasks: trimmedTaskId },
             $set: { lastCompletedTaskId: trimmedTaskId }
           },
           { new: true, session }
@@ -267,6 +304,66 @@ router.post('/skip-task', auth, async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Error skipping task:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/track-profile-visit', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    // Check if profile was already visited
+    const existingProgress = await UserTaskProgress.findOne({ userId });
+    const wasAlreadyVisited = existingProgress?.profileVisitedAt;
+
+    // Update profileVisitedAt if not already set (forward compatible - only track new visits)
+    await UserTaskProgress.findOneAndUpdate(
+      { userId, profileVisitedAt: { $exists: false } },
+      { $set: { profileVisitedAt: new Date() } },
+      { upsert: true, new: true }
+    );
+
+    // If this is a new visit (not already visited), check if view-profile task should be auto-completed
+    if (!wasAlreadyVisited) {
+      const taskList = getTaskList();
+      const viewProfileTask = taskList.find(t => t.id === 'view-profile');
+      
+      if (viewProfileTask && viewProfileTask.autoCompleteConditions) {
+        const user = await User.findById(userId).lean();
+        if (user) {
+          const updatedProgress = await UserTaskProgress.findOne({ userId });
+          const shouldAutoComplete = viewProfileTask.autoCompleteConditions(user as any, updatedProgress);
+          
+          if (shouldAutoComplete) {
+            // Mark task as completed (without reward - reward is collected separately via /complete-task)
+            const alreadyCompleted = updatedProgress?.completedTasks.some(t => t.taskId === 'view-profile');
+            if (!alreadyCompleted) {
+              await UserTaskProgress.findOneAndUpdate(
+                { userId },
+                {
+                  $push: {
+                    completedTasks: {
+                      taskId: 'view-profile',
+                      completedAt: new Date()
+                    }
+                  },
+                  $set: { lastCompletedTaskId: 'view-profile' }
+                },
+                { upsert: true, new: true }
+              );
+            }
+          }
+        }
+      }
+    }
+
+    res.json({ success: true, message: 'Profile visit tracked' });
+  } catch (error) {
+    console.error('Error tracking profile visit:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

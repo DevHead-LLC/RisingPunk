@@ -16,7 +16,8 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { logout, setShowOnboarding, updateUserHandle, forceRefresh, setShowEmailVerification, refreshUserData } from '../store/slices/authSlice';
 import { updateProfileGender } from '../store/slices/preferencesSlice';
 import { useUpdatePreferencesMutation } from '../store/api/preferencesApi';
-import { useGetCurrentTaskGuideTaskQuery, useUpdateTaskGuideVisibilityMutation } from '../store/api/userGuideApi';
+import { useGetCurrentTaskGuideTaskQuery, useUpdateTaskGuideVisibilityMutation, useTrackProfileVisitMutation } from '../store/api/userGuideApi';
+import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
 import { useGetProfileQuery, useGetResearchCenterStatusQuery, useDeleteAccountMutation, authApi } from '../store/api/authApi';
 import { useFetchBotStatsQuery, botsApi } from '../store/api/botsApi';
 import { balanceApi } from '../store/api/balanceApi';
@@ -580,6 +581,8 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const [deleteAccount] = useDeleteAccountMutation();
   const { data: taskGuideData } = useGetCurrentTaskGuideTaskQuery();
   const [updateTaskGuideVisibility] = useUpdateTaskGuideVisibilityMutation();
+  const [trackProfileVisit] = useTrackProfileVisitMutation();
+  const { highlightTaskId, clearHighlight } = useTaskGuideHighlight();
 
   
   const styles = useMemo(() => createProfileStyles(colors, screenWidth, scaleFactor), [colors, screenWidth, scaleFactor]);
@@ -595,6 +598,24 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const { data: researchCenterData, isLoading: researchCenterLoading } = useGetResearchCenterStatusQuery(undefined, {
     skip: !token,
   });
+
+  useEffect(() => {
+    if (token) {
+      // Track profile visit (forward compatible - only tracks new visits)
+      // This will also auto-complete the view-profile task if conditions are met
+      trackProfileVisit().then(() => {
+        // Clear highlight mode after tracking visit
+        if (highlightTaskId === 'view-profile') {
+          clearHighlight();
+        }
+      }).catch(() => {
+        // Silently fail if tracking fails
+        if (highlightTaskId === 'view-profile') {
+          clearHighlight();
+        }
+      });
+    }
+  }, [token, highlightTaskId, trackProfileVisit, clearHighlight]);
 
   const handleLogout = () => {
     dispatch(logout());

@@ -27,6 +27,7 @@ export interface CurrentTaskResponse {
   showTaskGuide: boolean;
   taskList?: TaskListItem[];
   completedTaskIds?: string[];
+  collectedTaskIds?: string[];
 }
 
 export interface CompleteTaskRequest {
@@ -51,8 +52,17 @@ export interface UpdateVisibilityRequest {
   showTaskGuide: boolean;
 }
 
+export interface UpdateVisibilityRequest {
+  showTaskGuide: boolean;
+}
+
 export interface UpdateVisibilityResponse {
   success: boolean;
   showTaskGuide: boolean;
+}
+
+export interface TrackProfileVisitResponse {
+  success: boolean;
+  message?: string;
 }
 

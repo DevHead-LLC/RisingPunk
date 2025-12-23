@@ -5,7 +5,7 @@ export interface Task {
   title: string;
   description: string;
   order: number;
-  autoCompleteConditions?: (user: IUser) => boolean;
+  autoCompleteConditions?: (user: IUser, progress?: any) => boolean;
   skipable: boolean;
   reward?: {
     type: string;
@@ -28,6 +28,7 @@ const TASK_LIST: Task[] = [
     title: 'Create Account',
     description: 'Welcome to RisingPunk!',
     order: 1,
+    autoCompleteConditions: (user: IUser) => true, // Always true for logged-in users
     skipable: false,
     reward: { type: 'wallet', value: 10 }
   },
@@ -36,6 +37,10 @@ const TASK_LIST: Task[] = [
     title: 'View Profile',
     description: 'Check out your profile page',
     order: 2,
+    autoCompleteConditions: (user: IUser, progress?: any) => {
+      // Auto-complete if profile has been visited (forward compatible only)
+      return !!(progress?.profileVisitedAt);
+    },
     skipable: true,
     reward: { type: 'wallet', value: 10 }
   },
