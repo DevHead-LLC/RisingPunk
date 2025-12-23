@@ -147,56 +147,59 @@ router.post('/complete-task', auth, async (req: Request, res: Response) => {
     const task = taskList.find(t => t.id === trimmedTaskId);
     const rewardAmount = task?.reward?.value || 0;
 
-    const progress = await UserTaskProgress.findOne({ userId });
-    const alreadyCollected = progress?.collectedTasks?.includes(trimmedTaskId);
-
-    if (alreadyCollected) {
-      // Task already collected, return success
-      res.json({
-        success: true,
-        message: 'Task already collected',
-        rewardAmount: 0
-      });
-      return;
-    }
-
-    // Ensure task is marked as completed (action done) before collecting reward
-    const isCompleted = progress?.completedTasks.some(t => t.taskId === trimmedTaskId);
-    if (!isCompleted) {
-      // Mark as completed first (action done, but reward not collected yet)
-      if (!progress) {
-        await UserTaskProgress.create({
-          userId,
-          completedTasks: [{
-            taskId: trimmedTaskId,
-            completedAt: new Date()
-          }],
-          collectedTasks: [],
-          skippedTasks: [],
-          showTaskGuide: true
-        });
-      } else {
-        await UserTaskProgress.findOneAndUpdate(
-          { userId },
-          {
-            $addToSet: {
-              completedTasks: {
-                taskId: trimmedTaskId,
-                completedAt: new Date()
-              }
-            }
-          },
-          { new: true }
-        );
-      }
-    }
-
-    // Use transaction to ensure atomicity
+    // Use transaction to ensure atomicity and prevent race conditions
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-      // Update user balance with reward
+      // Check if already collected INSIDE transaction to prevent race conditions
+      const progress = await UserTaskProgress.findOne({ userId }).session(session);
+      const alreadyCollected = progress?.collectedTasks?.includes(trimmedTaskId);
+
+      if (alreadyCollected) {
+        await session.abortTransaction();
+        session.endSession();
+        // Task already collected, return success
+        res.json({
+          success: true,
+          message: 'Task already collected',
+          rewardAmount: 0
+        });
+        return;
+      }
+
+      // Ensure task is marked as completed (action done) before collecting reward
+      const isCompleted = progress?.completedTasks.some(t => t.taskId === trimmedTaskId);
+      if (!isCompleted) {
+        // Mark as completed first (action done, but reward not collected yet)
+        if (!progress) {
+          await UserTaskProgress.create([{
+            userId,
+            completedTasks: [{
+              taskId: trimmedTaskId,
+              completedAt: new Date()
+            }],
+            collectedTasks: [],
+            skippedTasks: [],
+            showTaskGuide: true
+          }], { session });
+        } else {
+          await UserTaskProgress.findOneAndUpdate(
+            { userId },
+            {
+              $addToSet: {
+                completedTasks: {
+                  taskId: trimmedTaskId,
+                  completedAt: new Date()
+                }
+              }
+            },
+            { new: true, session }
+          );
+        }
+      }
+
+      // Update user balance with reward (atomic with collectedTasks update)
       if (rewardAmount > 0) {
         const user = await User.findById(userId).session(session);
         if (user) {
@@ -206,7 +209,7 @@ router.post('/complete-task', auth, async (req: Request, res: Response) => {
         }
       }
 
-      // Mark task as collected (reward given)
+      // Mark task as collected (reward given) - atomic operation
       if (!progress) {
         await UserTaskProgress.create([{
           userId,
@@ -220,22 +223,38 @@ router.post('/complete-task', auth, async (req: Request, res: Response) => {
           showTaskGuide: true
         }], { session });
       } else {
-        await UserTaskProgress.findOneAndUpdate(
-          { userId },
+        // Use findOneAndUpdate with condition to atomically check and update
+        const updateResult = await UserTaskProgress.findOneAndUpdate(
+          { 
+            userId,
+            collectedTasks: { $ne: trimmedTaskId } // Only update if not already collected
+          },
           {
             $addToSet: { collectedTasks: trimmedTaskId },
             $set: { lastCompletedTaskId: trimmedTaskId }
           },
           { new: true, session }
         );
+
+        // If updateResult is null, task was already collected by another request
+        if (!updateResult) {
+          await session.abortTransaction();
+          session.endSession();
+          res.json({
+            success: true,
+            message: 'Task already collected',
+            rewardAmount: 0
+          });
+          return;
+        }
       }
 
       await session.commitTransaction();
+      session.endSession();
     } catch (error) {
       await session.abortTransaction();
-      throw error;
-    } finally {
       session.endSession();
+      throw error;
     }
 
     res.json({
@@ -321,11 +340,22 @@ router.post('/track-profile-visit', auth, async (req: Request, res: Response) =>
     const wasAlreadyVisited = existingProgress?.profileVisitedAt;
 
     // Update profileVisitedAt if not already set (forward compatible - only track new visits)
-    await UserTaskProgress.findOneAndUpdate(
-      { userId, profileVisitedAt: { $exists: false } },
-      { $set: { profileVisitedAt: new Date() } },
-      { upsert: true, new: true }
-    );
+    if (!wasAlreadyVisited) {
+      // Only update if profileVisitedAt doesn't exist
+      await UserTaskProgress.findOneAndUpdate(
+        { userId },
+        {
+          $set: { profileVisitedAt: new Date() },
+          $setOnInsert: {
+            completedTasks: [],
+            collectedTasks: [],
+            skippedTasks: [],
+            showTaskGuide: true
+          }
+        },
+        { upsert: true, new: true }
+      );
+    }
 
     // If this is a new visit (not already visited), check if view-profile task should be auto-completed
     if (!wasAlreadyVisited) {

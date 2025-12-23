@@ -298,7 +298,7 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
                             activeOpacity={0.7}
                           >
                             <Text style={[styles.actionButtonText, { color: colors.background }]}>
-                              {completed ? `Collect $${rewardValue}!` : "Let's Go!"}
+                              {completed ? 'Collect' : "Let's Go!"}
                             </Text>
                           </TouchableOpacity>
                         </View>
