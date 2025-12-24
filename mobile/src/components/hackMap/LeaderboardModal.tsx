@@ -136,7 +136,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
       );
     }
 
-    if (netWorthError) {
+    if (netWorthError || (netWorthData && 'message' in netWorthData)) {
       return (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Error loading leaderboard</Text>
@@ -246,7 +246,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
       );
     }
 
-    if (crewNetWorthError) {
+    if (crewNetWorthError || (crewNetWorthData && 'message' in crewNetWorthData)) {
       return (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Error loading leaderboard</Text>
