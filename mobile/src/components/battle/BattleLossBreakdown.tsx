@@ -79,7 +79,7 @@ export const BattleLossBreakdown: React.FC<Props> = ({ battleEndData }) => {
               <Text style={[styles.botLossValue, { color: colors.matrix }]}>{defenderBotsDestroyed}</Text>
             </View>
             <View style={[styles.botLossItem, { backgroundColor: colors.accent, borderColor: colors.error }]}>
-              <Text style={[styles.botLossLabel, { color: colors.neutral }]}>Bots Lost (Defender)</Text>
+              <Text style={[styles.botLossLabel, { color: colors.neutral }]}>Defender's Losses</Text>
               <Text style={[styles.botLossValue, { color: colors.matrix }]}>{defenderBotsLost}</Text>
             </View>
           </View>
