@@ -97,7 +97,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
   
   const isAppActive = appState === 'active';
 
-  const shouldSkipQueries = !delayedVisible || !isAppActive;
+  const shouldSkipQueries = !delayedVisible || !isAppActive || !isMountedRef.current;
 
   const { data: botsDestroyedData, isLoading: isLoadingBotsDestroyed, error: botsDestroyedError } = useGetIndividualBotsDestroyedLeaderboardQuery(undefined, {
     skip: shouldSkipQueries || mainTab !== 'individual' || metricTab !== 'botsDestroyed',
@@ -122,6 +122,10 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
     pollingInterval: delayedVisible && isAppActive && mainTab === 'crew' && metricTab === 'netWorth' ? 900000 : 0,
     refetchOnMountOrArgChange: true,
   });
+
+  if (!isMountedRef.current) {
+    return null;
+  }
 
   const formatLastUpdated = (dateString: string | undefined | null): string => {
     if (!dateString) return '';
@@ -378,10 +382,6 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
     );
   };
 
-  if (!delayedVisible || !isAppActive || !isMountedRef.current) {
-    return null;
-  }
-
   const handleDismiss = () => {
     if (isMountedRef.current) {
       onClose();
@@ -390,7 +390,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
 
   return (
     <Modal
-      visible={delayedVisible && isAppActive}
+      visible={delayedVisible && isAppActive && isMountedRef.current}
       animationType="fade"
       transparent={true}
       onRequestClose={handleDismiss}
