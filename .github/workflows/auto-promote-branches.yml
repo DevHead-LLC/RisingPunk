@@ -92,26 +92,20 @@ jobs:
                   fi
                   
                   if [ -n "$CURSOR_COMMENTS" ]; then
-                    if echo "$CURSOR_COMMENTS" | grep -qiE "no bugs|no issues|passed|success|all clear|no problems found"; then
-                      echo "✅ Cursor comments indicate no bugs found. Proceeding with promotion."
+                    echo "Found Cursor comments. Analyzing for bugs..."
+                    echo "Comment preview: $(echo "$CURSOR_COMMENTS" | head -c 200)..."
+                    
+                    if echo "$CURSOR_COMMENTS" | grep -qiE "no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|passed|success|no\s+problems?\s+found"; then
+                      echo "✅ Cursor comments explicitly state no bugs found. Proceeding with promotion."
                       CURSOR_CHECK_PASSED=true
                       break
-                    elif echo "$CURSOR_COMMENTS" | grep -qiE "(blocking|critical)\s+(bug|issue|error)|must\s+fix|(failed|failing)\s+(check|test|validation)"; then
-                      echo "❌ Cursor comments indicate bugs found! Stopping workflow."
+                    elif echo "$CURSOR_COMMENTS" | grep -qiE "(bug|issue|error|problem|warning|inconsistent|incorrect|wrong|missing|broken|fails?)"; then
+                      echo "❌ Cursor comments contain bug-related keywords! Treating as failure."
+                      echo "Bug indicators found in comments. Stopping workflow."
                       CURSOR_CHECK_FAILED=true
                       break
-                    elif echo "$CURSOR_COMMENTS" | grep -qiE "(bugs?|issues?|errors?)\s+(found|detected|identified)"; then
-                      if ! echo "$CURSOR_COMMENTS" | grep -qiE "no\s+(bugs?|issues?|errors?)"; then
-                        echo "❌ Cursor comments indicate bugs found! Stopping workflow."
-                        CURSOR_CHECK_FAILED=true
-                        break
-                      else
-                        echo "✅ Cursor comments indicate no bugs found. Proceeding with promotion."
-                        CURSOR_CHECK_PASSED=true
-                        break
-                      fi
                     else
-                      echo "⚠️  Cursor check completed with neutral conclusion but no clear bug status in comments. Treating as failure for safety."
+                      echo "⚠️  Cursor check completed with neutral conclusion and comments exist, but no explicit 'no bugs' statement. Treating as failure for safety."
                       CURSOR_CHECK_FAILED=true
                       break
                     fi
@@ -370,26 +364,20 @@ jobs:
                   fi
                   
                   if [ -n "$CURSOR_COMMENTS" ]; then
-                    if echo "$CURSOR_COMMENTS" | grep -qiE "no bugs|no issues|passed|success|all clear|no problems found"; then
-                      echo "✅ Cursor comments indicate no bugs found. Proceeding with promotion."
+                    echo "Found Cursor comments. Analyzing for bugs..."
+                    echo "Comment preview: $(echo "$CURSOR_COMMENTS" | head -c 200)..."
+                    
+                    if echo "$CURSOR_COMMENTS" | grep -qiE "no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|passed|success|no\s+problems?\s+found"; then
+                      echo "✅ Cursor comments explicitly state no bugs found. Proceeding with promotion."
                       CURSOR_CHECK_PASSED=true
                       break
-                    elif echo "$CURSOR_COMMENTS" | grep -qiE "(blocking|critical)\s+(bug|issue|error)|must\s+fix|(failed|failing)\s+(check|test|validation)"; then
-                      echo "❌ Cursor comments indicate bugs found! Stopping workflow."
+                    elif echo "$CURSOR_COMMENTS" | grep -qiE "(bug|issue|error|problem|warning|inconsistent|incorrect|wrong|missing|broken|fails?)"; then
+                      echo "❌ Cursor comments contain bug-related keywords! Treating as failure."
+                      echo "Bug indicators found in comments. Stopping workflow."
                       CURSOR_CHECK_FAILED=true
                       break
-                    elif echo "$CURSOR_COMMENTS" | grep -qiE "(bugs?|issues?|errors?)\s+(found|detected|identified)"; then
-                      if ! echo "$CURSOR_COMMENTS" | grep -qiE "no\s+(bugs?|issues?|errors?)"; then
-                        echo "❌ Cursor comments indicate bugs found! Stopping workflow."
-                        CURSOR_CHECK_FAILED=true
-                        break
-                      else
-                        echo "✅ Cursor comments indicate no bugs found. Proceeding with promotion."
-                        CURSOR_CHECK_PASSED=true
-                        break
-                      fi
                     else
-                      echo "⚠️  Cursor check completed with neutral conclusion but no clear bug status in comments. Treating as failure for safety."
+                      echo "⚠️  Cursor check completed with neutral conclusion and comments exist, but no explicit 'no bugs' statement. Treating as failure for safety."
                       CURSOR_CHECK_FAILED=true
                       break
                     fi
