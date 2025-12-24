@@ -212,7 +212,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
         {crewBotsDestroyedData.crews.map((crew, index) => (
           <View key={crew.rank != null ? crew.rank : `crew-${index}`} style={styles.leaderboardRow}>
             <View style={styles.rankContainer}>
-              <Text style={styles.rankText}>{crew.rank}</Text>
+              <Text style={styles.rankText}>{crew.rank != null ? crew.rank : index + 1}</Text>
             </View>
             <View style={styles.userInfoContainer}>
               <Text style={styles.handleText}>{crew.crewName || ''}</Text>
@@ -267,7 +267,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
         {crewNetWorthData.crews.map((crew, index) => (
           <View key={crew.rank != null ? crew.rank : `crew-${index}`} style={styles.leaderboardRow}>
             <View style={styles.rankContainer}>
-              <Text style={styles.rankText}>{crew.rank}</Text>
+              <Text style={styles.rankText}>{crew.rank != null ? crew.rank : index + 1}</Text>
             </View>
             <View style={styles.userInfoContainer}>
               <Text style={styles.handleText}>{crew.crewName || ''}</Text>
