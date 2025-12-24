@@ -123,13 +123,13 @@ router.get('/individual/net-worth', auth, async (req: Request, res: Response) =>
 
     const leaderboard = users.map((user, index) => ({
       rank: index + 1,
-      handle: user.handle,
+      handle: user.handle || '',
       level: user.level || 1,
       netWorth: user.balance?.total || 0,
     }));
 
     const response = {
-      users: leaderboard,
+      users: leaderboard || [],
       lastUpdated: new Date(),
     };
 
@@ -297,14 +297,14 @@ router.get('/crew/net-worth', auth, async (req: Request, res: Response) => {
 
     const leaderboard = crewStats.map((crew, index) => ({
       rank: index + 1,
-      crewName: crew.crewName,
-      crewIdentifier: crew.crewIdentifier,
-      netWorth: crew.totalNetWorth,
-      memberCount: crew.memberCount,
+      crewName: crew.crewName || '',
+      crewIdentifier: crew.crewIdentifier || '',
+      netWorth: crew.totalNetWorth || 0,
+      memberCount: crew.memberCount || 0,
     }));
 
     const response = {
-      crews: leaderboard,
+      crews: leaderboard || [],
       lastUpdated: new Date(),
     };
 
