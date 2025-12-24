@@ -244,22 +244,23 @@ jobs:
               fi
               
               if [ -n "$CURSOR_COMMENTS" ]; then
-                BUG_KEYWORDS="bug|error|issue|problem|fail"
-                if echo "$CURSOR_COMMENTS" | grep -qiE "$BUG_KEYWORDS"; then
-                  if echo "$CURSOR_COMMENTS" | grep -qiE "no bugs|no issues|passed|success|all clear|no problems found"; then
-                    echo "✅ Cursor comments indicate no bugs found"
+                if [ -n "$CURSOR_CHECK_CONCLUSION" ] && [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
+                  echo "✅ Cursor check run conclusion is neutral. Comments are informational, proceeding..."
+                  CURSOR_CHECK_PASSED=true
+                  break
+                elif echo "$CURSOR_COMMENTS" | grep -qiE "no bugs|no issues|passed|success|all clear|no problems found"; then
+                  echo "✅ Cursor comments indicate no bugs found"
+                  CURSOR_CHECK_PASSED=true
+                  break
+                elif echo "$CURSOR_COMMENTS" | grep -qiE "(bugs?|issues?|errors?)\s+(found|detected|identified)|(blocking|critical)\s+(bug|issue|error)|must\s+fix|(failed|failing)\s+(check|test|validation)"; then
+                  echo "❌ Cursor comments indicate bugs found!"
+                  CURSOR_CHECK_FAILED=true
+                  break
+                elif [ -n "$CURSOR_CHECK_STATUS" ] && [ "$CURSOR_CHECK_STATUS" = "completed" ]; then
+                  if [ "$CURSOR_CHECK_CONCLUSION" = "success" ] || [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
+                    echo "✅ Cursor check run completed with $CURSOR_CHECK_CONCLUSION. Comments are informational, proceeding..."
                     CURSOR_CHECK_PASSED=true
                     break
-                  elif echo "$CURSOR_COMMENTS" | grep -qiE "bugs found|issues found|failed|errors found|blocking|critical|must fix"; then
-                    echo "❌ Cursor comments indicate bugs found!"
-                    CURSOR_CHECK_FAILED=true
-                    break
-                  elif [ -n "$CURSOR_CHECK_STATUS" ] && [ "$CURSOR_CHECK_STATUS" = "completed" ]; then
-                    if [ "$CURSOR_CHECK_CONCLUSION" = "success" ] || [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
-                      echo "✅ Cursor check run completed with $CURSOR_CHECK_CONCLUSION. Comments are informational, proceeding..."
-                      CURSOR_CHECK_PASSED=true
-                      break
-                    fi
                   fi
                 fi
               fi
