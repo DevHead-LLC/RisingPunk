@@ -29,29 +29,35 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
     return null;
   }
 
-  if (isThemeTask && !forSettings && !forThemeToggle) {
-    return null;
-  }
-
-  let clickHerePosition = styles.clickHereContainer;
-  if (forProfile) {
-    clickHerePosition = styles.clickHereContainerProfile;
-  } else if (forSettings) {
-    clickHerePosition = styles.clickHereContainerSettings;
-  } else if (forThemeToggle) {
-    clickHerePosition = styles.clickHereContainerThemeToggle;
+  // For theme tasks, use highlightStep to control which overlay shows (sequential flow)
+  if (isThemeTask) {
+    // Show profile overlay on turf screen when highlightStep is null (initial state)
+    if (forProfile && highlightStep === null) {
+      // Allow this to render - show profile highlight on turf screen
+    } else if (forProfile && highlightStep !== null) {
+      return null; // Don't show profile overlay after step has advanced
+    } else if (forSettings && highlightStep !== 'settings-tab') {
+      return null; // Only show settings overlay when step is 'settings-tab'
+    } else if (forThemeToggle && highlightStep !== 'theme-toggle') {
+      return null; // Only show theme toggle overlay when step is 'theme-toggle'
+    } else if (!forProfile && !forSettings && !forThemeToggle) {
+      return null; // Neither prop set, don't render
+    }
   }
 
   return (
     <>
       <View style={styles.overlay} pointerEvents="none" />
-      <View style={clickHerePosition} pointerEvents="none">
-        <View style={[styles.clickHereBox, { backgroundColor: colors.background, borderColor: colors.primary }]}>
-          <Text style={[styles.clickHereText, { color: colors.text.primary }]}>
-            Click Here
-          </Text>
+      {forProfile && (
+        <View style={styles.clickHereContainerProfile} pointerEvents="none">
+          <View style={[styles.clickHereBox, { backgroundColor: colors.background, borderColor: colors.primary }]}>
+            <Text style={[styles.clickHereText, { color: colors.text.primary }]}>
+              Click Here
+            </Text>
+          </View>
         </View>
-      </View>
+      )}
+      {/* Settings and theme toggle overlays: dark overlay only, no "Click Here" text for theme tasks */}
     </>
   );
 };

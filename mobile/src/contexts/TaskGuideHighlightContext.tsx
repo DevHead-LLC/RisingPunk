@@ -23,7 +23,9 @@ export const TaskGuideHighlightProvider: React.FC<{ children: ReactNode }> = ({ 
   }, []);
 
   const advanceHighlightStep = useCallback(() => {
-    if (highlightStep === 'settings-tab') {
+    if (highlightStep === null) {
+      setHighlightStep('settings-tab');
+    } else if (highlightStep === 'settings-tab') {
       setHighlightStep('theme-toggle');
     }
   }, [highlightStep]);
@@ -31,7 +33,7 @@ export const TaskGuideHighlightProvider: React.FC<{ children: ReactNode }> = ({ 
   const handleSetHighlightTaskId = useCallback((taskId: string | null) => {
     setHighlightTaskId(taskId);
     if (taskId === 'use-hacker-mode' || taskId === 'use-business-mode') {
-      setHighlightStep('settings-tab');
+      setHighlightStep(null);
     } else {
       setHighlightStep(null);
     }

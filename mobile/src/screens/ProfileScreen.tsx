@@ -10,12 +10,16 @@ import {
   Image,
   Alert,
   Platform,
+  Animated,
 } from 'react-native';
 import { CloseButton } from '../components/common/CloseButton';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { logout, setShowOnboarding, updateUserHandle, forceRefresh, setShowEmailVerification, refreshUserData } from '../store/slices/authSlice';
 import { updateProfileGender } from '../store/slices/preferencesSlice';
 import { useUpdatePreferencesMutation } from '../store/api/preferencesApi';
+import { useGetCurrentTaskGuideTaskQuery, useUpdateTaskGuideVisibilityMutation, useTrackProfileVisitMutation, useTrackThemeChangeMutation } from '../store/api/userGuideApi';
+import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
+import { TaskGuideHighlightOverlay } from '../components/turf/TaskGuideHighlightOverlay';
 import { useGetProfileQuery, useGetResearchCenterStatusQuery, useDeleteAccountMutation, authApi } from '../store/api/authApi';
 import { useFetchBotStatsQuery, botsApi } from '../store/api/botsApi';
 import { balanceApi } from '../store/api/balanceApi';
@@ -85,11 +89,14 @@ const createProfileStyles = (colors: any, screenWidth: number, scaleFactor: numb
     justifyContent: 'center',
     paddingTop: 0,
   },
+  leftTabContainer: {
+    marginBottom: SIZING.spacing.sm,
+    borderRadius: 4,
+  },
   leftTab: {
     paddingVertical: SIZING.spacing.sm,
     paddingHorizontal: SIZING.spacing.xs,
     alignItems: 'center',
-    marginBottom: SIZING.spacing.sm,
     marginLeft: SIZING.spacing.sm,
     borderRadius: 8,
     minHeight: 40,
@@ -455,6 +462,9 @@ const createProfileStyles = (colors: any, screenWidth: number, scaleFactor: numb
     marginBottom: SIZING.spacing.sm,
     textAlign: 'center',
   },
+  themeToggleContainer: {
+    alignItems: 'center',
+  },
   themeToggle: {
     alignItems: 'center',
   },
@@ -577,6 +587,93 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
 
   const [updatePreferences] = useUpdatePreferencesMutation();
   const [deleteAccount] = useDeleteAccountMutation();
+  const { data: taskGuideData } = useGetCurrentTaskGuideTaskQuery();
+  const [updateTaskGuideVisibility] = useUpdateTaskGuideVisibilityMutation();
+  const [trackProfileVisit] = useTrackProfileVisitMutation();
+  const [trackThemeChange] = useTrackThemeChangeMutation();
+  const { highlightTaskId, highlightStep, clearHighlight, advanceHighlightStep } = useTaskGuideHighlight();
+  
+  const isThemeTask = highlightTaskId === 'use-hacker-mode' || highlightTaskId === 'use-business-mode';
+  const isSettingsHighlighted = isThemeTask && highlightStep === 'settings-tab';
+  const isThemeToggleHighlighted = isThemeTask && highlightStep === 'theme-toggle';
+  
+  const [settingsColorIndex, setSettingsColorIndex] = useState(0);
+  const [themeToggleColorIndex, setThemeToggleColorIndex] = useState(0);
+  const settingsAnimatedBorderColor = useState(new Animated.Value(0))[0];
+  const themeToggleAnimatedBorderColor = useState(new Animated.Value(0))[0];
+  const highlightColors = [colors.primary, colors.secondary, colors.matrix];
+  
+  useEffect(() => {
+    if (isSettingsHighlighted) {
+      const interval = setInterval(() => {
+        setSettingsColorIndex(prev => (prev + 1) % highlightColors.length);
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [isSettingsHighlighted, highlightColors.length]);
+  
+  useEffect(() => {
+    if (isSettingsHighlighted) {
+      Animated.timing(settingsAnimatedBorderColor, {
+        toValue: settingsColorIndex,
+        duration: 500,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [settingsColorIndex, isSettingsHighlighted, settingsAnimatedBorderColor]);
+  
+  useEffect(() => {
+    if (isThemeToggleHighlighted) {
+      const interval = setInterval(() => {
+        setThemeToggleColorIndex(prev => (prev + 1) % highlightColors.length);
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [isThemeToggleHighlighted, highlightColors.length]);
+  
+  useEffect(() => {
+    if (isThemeToggleHighlighted) {
+      Animated.timing(themeToggleAnimatedBorderColor, {
+        toValue: themeToggleColorIndex,
+        duration: 500,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [themeToggleColorIndex, isThemeToggleHighlighted, themeToggleAnimatedBorderColor]);
+  
+  const settingsAnimatedBorderColorValue = settingsAnimatedBorderColor.interpolate({
+    inputRange: [0, 1, 2],
+    outputRange: highlightColors,
+  });
+  
+  const themeToggleAnimatedBorderColorValue = themeToggleAnimatedBorderColor.interpolate({
+    inputRange: [0, 1, 2],
+    outputRange: highlightColors,
+  });
+  
+  const handleSettingsTabPress = useCallback(() => {
+    setActiveTab('settings');
+    if (isThemeTask && highlightStep === 'settings-tab') {
+      advanceHighlightStep();
+    }
+  }, [isThemeTask, highlightStep, advanceHighlightStep]);
+  
+  const handleThemeToggle = useCallback(async () => {
+    const newTheme = themeMode === 'dark' ? 'light' : 'dark';
+    toggleTheme();
+    
+    if (isThemeTask) {
+      try {
+        await trackThemeChange({ theme: newTheme }).unwrap();
+        clearHighlight();
+      } catch (error) {
+        console.error('Error tracking theme change:', error);
+        clearHighlight();
+      }
+    } else {
+      trackThemeChange({ theme: newTheme }).catch(() => {});
+    }
+  }, [themeMode, toggleTheme, isThemeTask, trackThemeChange, clearHighlight]);
 
   
   const styles = useMemo(() => createProfileStyles(colors, screenWidth, scaleFactor), [colors, screenWidth, scaleFactor]);
@@ -592,6 +689,24 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const { data: researchCenterData, isLoading: researchCenterLoading } = useGetResearchCenterStatusQuery(undefined, {
     skip: !token,
   });
+
+  useEffect(() => {
+    if (token) {
+      // Track profile visit (forward compatible - only tracks new visits)
+      // This will also auto-complete the view-profile task if conditions are met
+      trackProfileVisit().then(() => {
+        // Clear highlight mode after tracking visit
+        if (highlightTaskId === 'view-profile') {
+          clearHighlight();
+        }
+      }).catch(() => {
+        // Silently fail if tracking fails
+        if (highlightTaskId === 'view-profile') {
+          clearHighlight();
+        }
+      });
+    }
+  }, [token, highlightTaskId, trackProfileVisit, clearHighlight]);
 
   const handleLogout = () => {
     dispatch(logout());
@@ -687,6 +802,12 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   return (
     <SafeAreaView style={[styles.container, Platform.OS === 'android' && { paddingBottom: 20 }]}>
       <CloseButton onPress={onClose} />
+      {isThemeTask && (
+        <TaskGuideHighlightOverlay 
+          forSettings={highlightStep === 'settings-tab'} 
+          forThemeToggle={highlightStep === 'theme-toggle'} 
+        />
+      )}
       
       <View style={styles.mainLayout}>
         {/* LEFT SIDE TABS - AS REQUESTED */}
@@ -700,14 +821,25 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
             </Text>
           </TouchableOpacity>
           
-          <TouchableOpacity
-            style={[styles.leftTab, activeTab === 'settings' && styles.activeLeftTab]}
-            onPress={() => setActiveTab('settings')}
+          <Animated.View
+            style={[
+              styles.leftTabContainer,
+              isSettingsHighlighted && {
+                borderColor: settingsAnimatedBorderColorValue,
+                borderWidth: 3,
+                zIndex: 1000,
+              }
+            ]}
           >
-            <Text style={[styles.leftTabText, activeTab === 'settings' && styles.activeLeftTabText]}>
-              SETTINGS
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.leftTab, activeTab === 'settings' && styles.activeLeftTab]}
+              onPress={handleSettingsTabPress}
+            >
+              <Text style={[styles.leftTabText, activeTab === 'settings' && styles.activeLeftTabText]}>
+                SETTINGS
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
           
           <TouchableOpacity
             style={[styles.leftTab, activeTab === 'account' && styles.activeLeftTab]}
@@ -889,24 +1021,36 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
               {/* Theme Toggle Section */}
               <View style={styles.settingCard}>
                 <Text style={styles.settingLabel}>APPEARANCE</Text>
-                <TouchableOpacity
-                  style={styles.themeToggle}
-                  onPress={toggleTheme}
+                <Animated.View
+                  style={[
+                    styles.themeToggleContainer,
+                    isThemeToggleHighlighted && {
+                      borderColor: themeToggleAnimatedBorderColorValue,
+                      borderWidth: 3,
+                      borderRadius: 8,
+                      zIndex: 1000,
+                    }
+                  ]}
                 >
-                  <View style={styles.themeToggleContent}>
-                    <View style={[
-                      styles.themeIconContainer,
-                      themeMode === 'light' && styles.themeIconContainerDark
-                    ]}>
-                      <Text style={styles.themeIcon}>
-                        {themeMode === 'light' ? '👀' : '💡'}
+                  <TouchableOpacity
+                    style={styles.themeToggle}
+                    onPress={handleThemeToggle}
+                  >
+                    <View style={styles.themeToggleContent}>
+                      <View style={[
+                        styles.themeIconContainer,
+                        themeMode === 'light' && styles.themeIconContainerDark
+                      ]}>
+                        <Text style={styles.themeIcon}>
+                          {themeMode === 'light' ? '👀' : '💡'}
+                        </Text>
+                      </View>
+                      <Text style={styles.themeToggleText}>
+                        {themeMode === 'light' ? 'Go Hacker' : 'Go Business'}
                       </Text>
                     </View>
-                    <Text style={styles.themeToggleText}>
-                      {themeMode === 'light' ? 'Go Hacker' : 'Go Business'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                </Animated.View>
               </View>
 
               {/* Gender Toggle Section */}
@@ -936,6 +1080,37 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                     </View>
                     <Text style={styles.themeToggleText}>
                       {profileGender === 'male' ? 'Switch to Female' : 'Switch to Male'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              {/* Task Guide Toggle Section */}
+              <View style={styles.settingCard}>
+                <Text style={styles.settingLabel}>TASK GUIDE</Text>
+                <TouchableOpacity
+                  style={styles.themeToggle}
+                  onPress={async () => {
+                    const newShowTaskGuide = !(taskGuideData?.showTaskGuide ?? true);
+                    
+                    try {
+                      await updateTaskGuideVisibility({ showTaskGuide: newShowTaskGuide }).unwrap();
+                    } catch (error) {
+                      console.error('ProfileScreen: Failed to update task guide visibility:', error);
+                    }
+                  }}
+                >
+                  <View style={styles.themeToggleContent}>
+                    <View style={[
+                      styles.themeIconContainer,
+                      !(taskGuideData?.showTaskGuide ?? true) && styles.themeIconContainerDark
+                    ]}>
+                      <Text style={styles.themeIcon}>
+                        {(taskGuideData?.showTaskGuide ?? true) ? '📋' : '🚫'}
+                      </Text>
+                    </View>
+                    <Text style={styles.themeToggleText}>
+                      {(taskGuideData?.showTaskGuide ?? true) ? 'Hide Task Guide' : 'Show Task Guide'}
                     </Text>
                   </View>
                 </TouchableOpacity>
