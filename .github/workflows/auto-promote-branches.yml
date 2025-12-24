@@ -207,6 +207,53 @@ jobs:
           echo "Processing PR #$PR_NUMBER: $PR_SOURCE → $PR_TARGET"
           echo "=========================================="
           
+          echo "🔍 FINAL VERIFICATION: Checking Cursor Bugbot one last time before merge..."
+          
+          HEAD_SHA=$(gh pr view $PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "")
+          
+          CHECKS_JSON=$(gh api repos/${{ github.repository }}/commits/$HEAD_SHA/check-runs 2>/dev/null || echo "{}")
+          
+          if command -v jq &> /dev/null; then
+            CURSOR_CHECK_CONCLUSION=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.name | ascii_downcase | contains("cursor")) | .conclusion // empty' | head -1 || echo "")
+          else
+            CURSOR_CHECK_CONCLUSION=$(echo "$CHECKS_JSON" | grep -i "cursor" -A 10 | grep -oP '"conclusion":\s*"\K[^"]+' | head -1 || echo "")
+          fi
+          
+          if [ "$CURSOR_CHECK_CONCLUSION" = "failure" ] || [ "$CURSOR_CHECK_CONCLUSION" = "action_required" ]; then
+            echo "❌❌❌ FINAL CHECK FAILED: Cursor Bugbot reports FAILURE. BLOCKING MERGE."
+            exit 1
+          fi
+          
+          PR_COMMENTS_JSON=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/comments 2>/dev/null || echo "[]")
+          
+          if command -v jq &> /dev/null; then
+            CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | jq -r '.[] | select(.user.login | ascii_downcase | contains("cursor") or contains("app") or contains("[bot]")) | .body' 2>/dev/null || echo "")
+          else
+            CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | grep -i "cursor\|\[bot\]" -A 5 | grep -oP '"body":\s*"\K[^"]+' || echo "")
+          fi
+          
+          if [ -n "$CURSOR_COMMENTS" ]; then
+            if echo "$CURSOR_COMMENTS" | grep -qiE "(bug|issue|error|problem|warning|inconsistent|incorrect|wrong|missing|broken|fails?)"; then
+              if ! echo "$CURSOR_COMMENTS" | grep -qiE "no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|passed|success|no\s+problems?\s+found"; then
+                echo "❌❌❌ FINAL CHECK FAILED: Cursor comments contain bug indicators. BLOCKING MERGE."
+                echo "Bug indicators found: $(echo "$CURSOR_COMMENTS" | grep -iE "(bug|issue|error|problem|warning|inconsistent|incorrect|wrong|missing|broken|fails?)" | head -c 300)"
+                exit 1
+              fi
+            fi
+          fi
+          
+          if [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
+            if [ -z "$CURSOR_COMMENTS" ]; then
+              echo "❌❌❌ FINAL CHECK FAILED: Cursor check is neutral with no comments. BLOCKING MERGE for safety."
+              exit 1
+            elif ! echo "$CURSOR_COMMENTS" | grep -qiE "no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|passed|success|no\s+problems?\s+found"; then
+              echo "❌❌❌ FINAL CHECK FAILED: Cursor check is neutral but no explicit 'no bugs' statement. BLOCKING MERGE."
+              exit 1
+            fi
+          fi
+          
+          echo "✅ Final verification passed. Proceeding with merge..."
+          
           PR_STATE_BEFORE_MERGE=$(gh pr view $PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
           
           if [ "$PR_STATE_BEFORE_MERGE" = "merged" ] || [ "$PR_STATE_BEFORE_MERGE" = "closed" ]; then
@@ -444,7 +491,54 @@ jobs:
               exit 1
             fi
             
-            echo "✅ Cursor check passed. Merging PR #$NEXT_PR_NUMBER: $CURRENT_SOURCE → $TARGET"
+            echo "✅ Cursor check passed. Performing FINAL VERIFICATION before merge..."
+            
+            echo "🔍 FINAL VERIFICATION: Checking Cursor Bugbot one last time before merge..."
+            
+            HEAD_SHA=$(gh pr view $NEXT_PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "")
+            
+            CHECKS_JSON=$(gh api repos/${{ github.repository }}/commits/$HEAD_SHA/check-runs 2>/dev/null || echo "{}")
+            
+            if command -v jq &> /dev/null; then
+              CURSOR_CHECK_CONCLUSION=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.name | ascii_downcase | contains("cursor")) | .conclusion // empty' | head -1 || echo "")
+            else
+              CURSOR_CHECK_CONCLUSION=$(echo "$CHECKS_JSON" | grep -i "cursor" -A 10 | grep -oP '"conclusion":\s*"\K[^"]+' | head -1 || echo "")
+            fi
+            
+            if [ "$CURSOR_CHECK_CONCLUSION" = "failure" ] || [ "$CURSOR_CHECK_CONCLUSION" = "action_required" ]; then
+              echo "❌❌❌ FINAL CHECK FAILED: Cursor Bugbot reports FAILURE. BLOCKING MERGE."
+              exit 1
+            fi
+            
+            PR_COMMENTS_JSON=$(gh api repos/${{ github.repository }}/pulls/$NEXT_PR_NUMBER/comments 2>/dev/null || echo "[]")
+            
+            if command -v jq &> /dev/null; then
+              CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | jq -r '.[] | select(.user.login | ascii_downcase | contains("cursor") or contains("app") or contains("[bot]")) | .body' 2>/dev/null || echo "")
+            else
+              CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | grep -i "cursor\|\[bot\]" -A 5 | grep -oP '"body":\s*"\K[^"]+' || echo "")
+            fi
+            
+            if [ -n "$CURSOR_COMMENTS" ]; then
+              if echo "$CURSOR_COMMENTS" | grep -qiE "(bug|issue|error|problem|warning|inconsistent|incorrect|wrong|missing|broken|fails?)"; then
+                if ! echo "$CURSOR_COMMENTS" | grep -qiE "no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|passed|success|no\s+problems?\s+found"; then
+                  echo "❌❌❌ FINAL CHECK FAILED: Cursor comments contain bug indicators. BLOCKING MERGE."
+                  echo "Bug indicators found: $(echo "$CURSOR_COMMENTS" | grep -iE "(bug|issue|error|problem|warning|inconsistent|incorrect|wrong|missing|broken|fails?)" | head -c 300)"
+                  exit 1
+                fi
+              fi
+            fi
+            
+            if [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
+              if [ -z "$CURSOR_COMMENTS" ]; then
+                echo "❌❌❌ FINAL CHECK FAILED: Cursor check is neutral with no comments. BLOCKING MERGE for safety."
+                exit 1
+              elif ! echo "$CURSOR_COMMENTS" | grep -qiE "no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|passed|success|no\s+problems?\s+found"; then
+                echo "❌❌❌ FINAL CHECK FAILED: Cursor check is neutral but no explicit 'no bugs' statement. BLOCKING MERGE."
+                exit 1
+              fi
+            fi
+            
+            echo "✅ Final verification passed. Merging PR #$NEXT_PR_NUMBER: $CURRENT_SOURCE → $TARGET"
             
             PR_STATE_BEFORE_MERGE=$(gh pr view $NEXT_PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
             
