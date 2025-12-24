@@ -378,10 +378,6 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
     );
   };
 
-  if (!delayedVisible || !isAppActive || !isMountedRef.current) {
-    return null;
-  }
-
   const handleDismiss = () => {
     if (isMountedRef.current) {
       onClose();
@@ -390,7 +386,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
 
   return (
     <Modal
-      visible={delayedVisible && isAppActive}
+      visible={delayedVisible && isAppActive && isMountedRef.current}
       animationType="fade"
       transparent={true}
       onRequestClose={handleDismiss}
