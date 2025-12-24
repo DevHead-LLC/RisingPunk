@@ -167,13 +167,11 @@ router.get('/crew/bots-destroyed', auth, async (req: Request, res: Response) => 
       let totalBotsDestroyed = 0;
       const memberIds: any[] = [];
 
-      if (crew.presidentId) {
+      if (crew.presidentId && typeof crew.presidentId === 'object' && crew.presidentId !== null) {
         memberIds.push(crew.presidentId);
-        if (typeof crew.presidentId === 'object' && crew.presidentId !== null) {
-          const president = crew.presidentId as any;
-          if (president.battleStats && typeof president.battleStats === 'object') {
-            totalBotsDestroyed += president.battleStats.botsDestroyed || 0;
-          }
+        const president = crew.presidentId as any;
+        if (president.battleStats && typeof president.battleStats === 'object') {
+          totalBotsDestroyed += president.battleStats.botsDestroyed || 0;
         }
       }
       
@@ -257,18 +255,18 @@ router.get('/crew/net-worth', auth, async (req: Request, res: Response) => {
       let totalNetWorth = 0;
       const memberIds: any[] = [];
 
-      if (crew.presidentId) {
+      if (crew.presidentId && typeof crew.presidentId === 'object' && crew.presidentId !== null) {
         memberIds.push(crew.presidentId);
-        if (typeof crew.presidentId === 'object' && 'balance' in crew.presidentId) {
+        if ('balance' in crew.presidentId) {
           totalNetWorth += (crew.presidentId as any).balance?.total || 0;
         }
       }
       
       if (crew.members && Array.isArray(crew.members)) {
         crew.members.forEach((member: any) => {
-          if (member) {
+          if (member && typeof member === 'object' && member !== null) {
             memberIds.push(member);
-            if (typeof member === 'object' && 'balance' in member) {
+            if ('balance' in member) {
               totalNetWorth += member.balance?.total || 0;
             }
           }
@@ -277,9 +275,9 @@ router.get('/crew/net-worth', auth, async (req: Request, res: Response) => {
       
       if (crew.executives && Array.isArray(crew.executives)) {
         crew.executives.forEach((executive: any) => {
-          if (executive) {
+          if (executive && typeof executive === 'object' && executive !== null) {
             memberIds.push(executive);
-            if (typeof executive === 'object' && 'balance' in executive) {
+            if ('balance' in executive) {
               totalNetWorth += executive.balance?.total || 0;
             }
           }
