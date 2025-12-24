@@ -262,11 +262,18 @@ jobs:
               MERGEABLE=$(gh pr view $PR_NUMBER --json mergeable -q '.mergeable' 2>/dev/null || echo "UNKNOWN")
               
               if [ "$MERGEABLE" = "true" ] && [ $ELAPSED -gt 30 ]; then
-                REQUIRED_CHECKS=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER 2>/dev/null | jq -r '.required_status_checks.contexts[]?' 2>/dev/null || echo "")
-                if [ -z "$REQUIRED_CHECKS" ] || ! echo "$REQUIRED_CHECKS" | grep -qi "cursor"; then
-                  echo "✅ PR is mergeable and no Cursor checks are required. Proceeding..."
-                  CURSOR_CHECK_PASSED=true
-                  break
+                PR_DATA=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER 2>/dev/null || echo "")
+                if [ -n "$PR_DATA" ]; then
+                  if command -v jq &> /dev/null; then
+                    REQUIRED_CHECKS=$(echo "$PR_DATA" | jq -r '.required_status_checks.contexts[]?' 2>/dev/null || echo "")
+                  else
+                    REQUIRED_CHECKS=$(echo "$PR_DATA" | grep -oP '"contexts":\s*\[\s*"\K[^"]+' || echo "")
+                  fi
+                  if [ -z "$REQUIRED_CHECKS" ] || ! echo "$REQUIRED_CHECKS" | grep -qi "cursor"; then
+                    echo "✅ PR is mergeable and no Cursor checks are required. Proceeding..."
+                    CURSOR_CHECK_PASSED=true
+                    break
+                  fi
                 fi
               fi
               
