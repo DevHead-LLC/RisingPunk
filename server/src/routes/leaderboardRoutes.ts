@@ -78,13 +78,13 @@ router.get('/individual/bots-destroyed', auth, async (req: Request, res: Respons
 
     const leaderboard = users.map((user, index) => ({
       rank: index + 1,
-      handle: user.handle,
+      handle: user.handle || '',
       level: user.level || 1,
       botsDestroyed: user.battleStats?.botsDestroyed || 0,
     }));
 
     const response = {
-      users: leaderboard,
+      users: leaderboard || [],
       lastUpdated: new Date(),
     };
 
@@ -123,13 +123,13 @@ router.get('/individual/net-worth', auth, async (req: Request, res: Response) =>
 
     const leaderboard = users.map((user, index) => ({
       rank: index + 1,
-      handle: user.handle,
+      handle: user.handle || '',
       level: user.level || 1,
       netWorth: user.balance?.total || 0,
     }));
 
     const response = {
-      users: leaderboard,
+      users: leaderboard || [],
       lastUpdated: new Date(),
     };
 
@@ -159,27 +159,28 @@ router.get('/crew/bots-destroyed', auth, async (req: Request, res: Response) => 
     }
 
     const crews = await Crew.find({})
-      .populate('presidentId', 'battleStats.botsDestroyed')
-      .populate('members', 'battleStats.botsDestroyed')
-      .populate('executives', 'battleStats.botsDestroyed');
+      .populate('presidentId', 'battleStats')
+      .populate('members', 'battleStats')
+      .populate('executives', 'battleStats');
 
     const crewStats = crews.map((crew) => {
       let totalBotsDestroyed = 0;
       const memberIds: any[] = [];
 
-      if (crew.presidentId) {
+      if (crew.presidentId && typeof crew.presidentId === 'object' && crew.presidentId !== null) {
         memberIds.push(crew.presidentId);
-        if (typeof crew.presidentId === 'object' && 'battleStats' in crew.presidentId) {
-          totalBotsDestroyed += (crew.presidentId as any).battleStats?.botsDestroyed || 0;
+        const president = crew.presidentId as any;
+        if (president.battleStats && typeof president.battleStats === 'object') {
+          totalBotsDestroyed += president.battleStats.botsDestroyed || 0;
         }
       }
       
       if (crew.members && Array.isArray(crew.members)) {
         crew.members.forEach((member: any) => {
-          if (member) {
+          if (member && typeof member === 'object' && member !== null) {
             memberIds.push(member);
-            if (typeof member === 'object' && 'battleStats' in member) {
-              totalBotsDestroyed += member.battleStats?.botsDestroyed || 0;
+            if (member.battleStats && typeof member.battleStats === 'object') {
+              totalBotsDestroyed += member.battleStats.botsDestroyed || 0;
             }
           }
         });
@@ -187,10 +188,10 @@ router.get('/crew/bots-destroyed', auth, async (req: Request, res: Response) => 
       
       if (crew.executives && Array.isArray(crew.executives)) {
         crew.executives.forEach((executive: any) => {
-          if (executive) {
+          if (executive && typeof executive === 'object' && executive !== null) {
             memberIds.push(executive);
-            if (typeof executive === 'object' && 'battleStats' in executive) {
-              totalBotsDestroyed += executive.battleStats?.botsDestroyed || 0;
+            if (executive.battleStats && typeof executive.battleStats === 'object') {
+              totalBotsDestroyed += executive.battleStats.botsDestroyed || 0;
             }
           }
         });
@@ -209,14 +210,14 @@ router.get('/crew/bots-destroyed', auth, async (req: Request, res: Response) => 
 
     const leaderboard = crewStats.map((crew, index) => ({
       rank: index + 1,
-      crewName: crew.crewName,
-      crewIdentifier: crew.crewIdentifier,
-      botsDestroyed: crew.totalBotsDestroyed,
-      memberCount: crew.memberCount,
+      crewName: crew.crewName || '',
+      crewIdentifier: crew.crewIdentifier || '',
+      botsDestroyed: crew.totalBotsDestroyed || 0,
+      memberCount: crew.memberCount || 0,
     }));
 
     const response = {
-      crews: leaderboard,
+      crews: leaderboard || [],
       lastUpdated: new Date(),
     };
 
@@ -246,26 +247,26 @@ router.get('/crew/net-worth', auth, async (req: Request, res: Response) => {
     }
 
     const crews = await Crew.find({})
-      .populate('presidentId', 'balance.total')
-      .populate('members', 'balance.total')
-      .populate('executives', 'balance.total');
+      .populate('presidentId', 'balance')
+      .populate('members', 'balance')
+      .populate('executives', 'balance');
 
     const crewStats = crews.map((crew) => {
       let totalNetWorth = 0;
       const memberIds: any[] = [];
 
-      if (crew.presidentId) {
+      if (crew.presidentId && typeof crew.presidentId === 'object' && crew.presidentId !== null) {
         memberIds.push(crew.presidentId);
-        if (typeof crew.presidentId === 'object' && 'balance' in crew.presidentId) {
+        if ('balance' in crew.presidentId) {
           totalNetWorth += (crew.presidentId as any).balance?.total || 0;
         }
       }
       
       if (crew.members && Array.isArray(crew.members)) {
         crew.members.forEach((member: any) => {
-          if (member) {
+          if (member && typeof member === 'object' && member !== null) {
             memberIds.push(member);
-            if (typeof member === 'object' && 'balance' in member) {
+            if ('balance' in member) {
               totalNetWorth += member.balance?.total || 0;
             }
           }
@@ -274,9 +275,9 @@ router.get('/crew/net-worth', auth, async (req: Request, res: Response) => {
       
       if (crew.executives && Array.isArray(crew.executives)) {
         crew.executives.forEach((executive: any) => {
-          if (executive) {
+          if (executive && typeof executive === 'object' && executive !== null) {
             memberIds.push(executive);
-            if (typeof executive === 'object' && 'balance' in executive) {
+            if ('balance' in executive) {
               totalNetWorth += executive.balance?.total || 0;
             }
           }
@@ -296,14 +297,14 @@ router.get('/crew/net-worth', auth, async (req: Request, res: Response) => {
 
     const leaderboard = crewStats.map((crew, index) => ({
       rank: index + 1,
-      crewName: crew.crewName,
-      crewIdentifier: crew.crewIdentifier,
-      netWorth: crew.totalNetWorth,
-      memberCount: crew.memberCount,
+      crewName: crew.crewName || '',
+      crewIdentifier: crew.crewIdentifier || '',
+      netWorth: crew.totalNetWorth || 0,
+      memberCount: crew.memberCount || 0,
     }));
 
     const response = {
-      crews: leaderboard,
+      crews: leaderboard || [],
       lastUpdated: new Date(),
     };
 
