@@ -26,12 +26,6 @@ on:
       - dev
       - main
       - staging
-  push:
-    branches-ignore:
-      - dev
-      - main
-      - staging
-      - prod
 
 env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -42,8 +36,8 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-      statuses: read
-      checks: read
+      statuses: write
+      checks: write
 
     steps:
       - name: Checkout repository
@@ -179,17 +173,18 @@ jobs:
             CURSOR_CHECK_FAILED=false
             HEAD_SHA=$(gh pr view $PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "")
             
+            echo "=========================================="
+            echo "🔍 DEBUG: Starting Cursor check loop"
+            echo "🔍 DEBUG: PR_NUMBER=$PR_NUMBER"
+            echo "🔍 DEBUG: HEAD_SHA=$HEAD_SHA"
+            echo "🔍 DEBUG: MAX_WAIT=$MAX_WAIT seconds"
+            echo "=========================================="
+            
             while [ $ELAPSED -lt $MAX_WAIT ]; do
               sleep $WAIT_INTERVAL
               ELAPSED=$((ELAPSED + WAIT_INTERVAL))
               
               PR_STATE=$(gh pr view $PR_NUMBER --json state,mergeable -q '.state' 2>/dev/null || echo "")
-              
-              if [ "$PR_STATE" = "closed" ] || [ "$PR_STATE" = "merged" ]; then
-                echo "PR #$PR_NUMBER was already merged/closed"
-                CURSOR_CHECK_PASSED=true
-                break
-              fi
               
               HEAD_SHA=$(gh pr view $PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "$HEAD_SHA")
               
@@ -216,8 +211,8 @@ jobs:
               CHECKS_JSON=$(gh api repos/${{ github.repository }}/commits/$HEAD_SHA/check-runs 2>/dev/null || echo "{}")
               
               if command -v jq &> /dev/null; then
-                CURSOR_CHECK_STATUS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.name | ascii_downcase | contains("cursor")) | .status' | head -1 || echo "")
-                CURSOR_CHECK_CONCLUSION=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.name | ascii_downcase | contains("cursor")) | .conclusion' | head -1 || echo "")
+                CURSOR_CHECK_STATUS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.name | ascii_downcase | contains("cursor")) | .status // empty' | head -1 || echo "")
+                CURSOR_CHECK_CONCLUSION=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.name | ascii_downcase | contains("cursor")) | .conclusion // empty' | head -1 || echo "")
               else
                 CURSOR_CHECK_STATUS=$(echo "$CHECKS_JSON" | grep -i "cursor" -A 10 | grep -oP '"status":\s*"\K[^"]+' | head -1 || echo "")
                 CURSOR_CHECK_CONCLUSION=$(echo "$CHECKS_JSON" | grep -i "cursor" -A 10 | grep -oP '"conclusion":\s*"\K[^"]+' | head -1 || echo "")
@@ -232,7 +227,13 @@ jobs:
                   echo "❌ Cursor bug check failed (check run: $CURSOR_CHECK_CONCLUSION)!"
                   CURSOR_CHECK_FAILED=true
                   break
+                elif [ -z "$CURSOR_CHECK_CONCLUSION" ] || [ "$CURSOR_CHECK_CONCLUSION" = "null" ]; then
+                  echo "⚠️  Cursor check completed but conclusion is null/unexpected. Treating as failure for safety."
+                  CURSOR_CHECK_FAILED=true
+                  break
                 fi
+              elif [ -n "$CURSOR_CHECK_STATUS" ] && [ "$CURSOR_CHECK_STATUS" != "completed" ]; then
+                echo "⏳ Cursor check is in progress (status: $CURSOR_CHECK_STATUS). Waiting..."
               fi
               
               PR_COMMENTS_JSON=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/comments 2>/dev/null || echo "[]")
@@ -244,82 +245,167 @@ jobs:
               fi
               
               if [ -n "$CURSOR_COMMENTS" ]; then
-                if [ -n "$CURSOR_CHECK_CONCLUSION" ] && [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
-                  echo "✅ Cursor check run conclusion is neutral. Comments are informational, proceeding..."
+                echo "🔍 DEBUG: Found CURSOR_COMMENTS. Length: ${#CURSOR_COMMENTS} chars"
+                echo "🔍 DEBUG: CURSOR_CHECK_STATUS=$CURSOR_CHECK_STATUS, CURSOR_CHECK_CONCLUSION=$CURSOR_CHECK_CONCLUSION"
+                
+                if echo "$CURSOR_COMMENTS" | grep -qiE "no bugs|no issues|passed|success|all clear|no problems found"; then
+                  echo "✅ Cursor comments indicate no bugs found (positive pattern matched)"
                   CURSOR_CHECK_PASSED=true
                   break
-                elif echo "$CURSOR_COMMENTS" | grep -qiE "no bugs|no issues|passed|success|all clear|no problems found"; then
-                  echo "✅ Cursor comments indicate no bugs found"
-                  CURSOR_CHECK_PASSED=true
-                  break
-                elif echo "$CURSOR_COMMENTS" | grep -qiE "(bugs?|issues?|errors?)\s+(found|detected|identified)|(blocking|critical)\s+(bug|issue|error)|must\s+fix|(failed|failing)\s+(check|test|validation)"; then
+                fi
+                
+                BUG_PATTERN_MATCHED=false
+                if echo "$CURSOR_COMMENTS" | grep -qiE "(blocking|critical)\s+(bug|issue|error)"; then
+                  BUG_PATTERN_MATCHED=true
+                  echo "🔍 DEBUG: Matched blocking/critical pattern"
+                elif echo "$CURSOR_COMMENTS" | grep -qiE "must\s+fix"; then
+                  BUG_PATTERN_MATCHED=true
+                  echo "🔍 DEBUG: Matched 'must fix' pattern"
+                elif echo "$CURSOR_COMMENTS" | grep -qiE "(failed|failing)\s+(check|test|validation)"; then
+                  BUG_PATTERN_MATCHED=true
+                  echo "🔍 DEBUG: Matched failed check pattern"
+                elif echo "$CURSOR_COMMENTS" | grep -qiE "(bugs?|issues?|errors?)\s+(found|detected|identified)"; then
+                  if ! echo "$CURSOR_COMMENTS" | grep -qiE "no\s+(bugs?|issues?|errors?)"; then
+                    BUG_PATTERN_MATCHED=true
+                    echo "🔍 DEBUG: Matched bugs/issues/errors found pattern (and NOT 'no bugs')"
+                  else
+                    echo "🔍 DEBUG: Found 'bugs found' but also 'no bugs' - skipping"
+                  fi
+                fi
+                
+                if [ "$BUG_PATTERN_MATCHED" = "true" ]; then
                   echo "❌ Cursor comments indicate bugs found!"
                   CURSOR_CHECK_FAILED=true
                   break
-                elif [ -n "$CURSOR_CHECK_STATUS" ] && [ "$CURSOR_CHECK_STATUS" = "completed" ]; then
+                fi
+                
+                if [ -n "$CURSOR_CHECK_STATUS" ] && [ "$CURSOR_CHECK_STATUS" = "completed" ]; then
                   if [ "$CURSOR_CHECK_CONCLUSION" = "success" ] || [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
                     echo "✅ Cursor check run completed with $CURSOR_CHECK_CONCLUSION. Comments are informational, proceeding..."
                     CURSOR_CHECK_PASSED=true
                     break
                   fi
+                elif [ -n "$CURSOR_CHECK_CONCLUSION" ] && [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
+                  echo "✅ Cursor check run conclusion is neutral. Comments are informational, proceeding..."
+                  CURSOR_CHECK_PASSED=true
+                  break
                 fi
               fi
               
-              MERGEABLE=$(gh pr view $PR_NUMBER --json mergeable -q '.mergeable' 2>/dev/null || echo "UNKNOWN")
-              
-              if [ "$MERGEABLE" = "true" ] && [ $ELAPSED -gt 30 ]; then
-                PR_DATA=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER 2>/dev/null || echo "")
-                if [ -n "$PR_DATA" ]; then
-                  if command -v jq &> /dev/null; then
-                    REQUIRED_CHECKS=$(echo "$PR_DATA" | jq -r '.required_status_checks.contexts[]?' 2>/dev/null || echo "")
-                  else
-                    REQUIRED_CHECKS=$(echo "$PR_DATA" | grep -oP '"contexts":\s*\[\s*"\K[^"]+' || echo "")
-                  fi
-                  if [ -z "$REQUIRED_CHECKS" ] || ! echo "$REQUIRED_CHECKS" | grep -qi "cursor"; then
-                    echo "✅ PR is mergeable and no Cursor checks are required. Proceeding..."
-                    CURSOR_CHECK_PASSED=true
-                    break
-                  fi
+              if [ "$PR_STATE" = "closed" ] || [ "$PR_STATE" = "merged" ]; then
+                echo "⚠️  PR #$PR_NUMBER was already merged/closed. Verifying Cursor checks passed before merge..."
+                
+                PR_DATA=$(gh pr view $PR_NUMBER --json mergeCommit,headRefOid,state 2>/dev/null || echo "")
+                if [ -z "$PR_DATA" ]; then
+                  echo "❌ Could not retrieve PR data. Cannot verify safety. Stopping."
+                  CURSOR_CHECK_FAILED=true
+                  break
+                fi
+                
+                if command -v jq &> /dev/null; then
+                  MERGE_COMMIT_SHA=$(echo "$PR_DATA" | jq -r '.mergeCommit.oid // empty' 2>/dev/null || echo "")
+                  HEAD_SHA=$(echo "$PR_DATA" | jq -r '.headRefOid' 2>/dev/null || echo "")
+                else
+                  MERGE_COMMIT_SHA=$(echo "$PR_DATA" | grep -oP '"mergeCommit":\s*\{\s*"oid":\s*"\K[^"]+' || echo "")
+                  HEAD_SHA=$(echo "$PR_DATA" | grep -oP '"headRefOid":\s*"\K[^"]+' || echo "")
+                fi
+                
+                CHECK_SHA="${MERGE_COMMIT_SHA:-$HEAD_SHA}"
+                if [ -z "$CHECK_SHA" ]; then
+                  echo "❌ Could not determine commit SHA to check. Cannot verify safety. Stopping."
+                  CURSOR_CHECK_FAILED=true
+                  break
+                fi
+                
+                CHECKS_JSON=$(gh api repos/${{ github.repository }}/commits/$CHECK_SHA/check-runs 2>/dev/null || echo "{}")
+                if command -v jq &> /dev/null; then
+                  CURSOR_CHECK_CONCLUSION=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.name | ascii_downcase | contains("cursor")) | .conclusion // empty' | head -1 || echo "")
+                else
+                  CURSOR_CHECK_CONCLUSION=$(echo "$CHECKS_JSON" | grep -i "cursor" -A 10 | grep -oP '"conclusion":\s*"\K[^"]+' | head -1 || echo "")
+                fi
+                
+                if [ "$CURSOR_CHECK_CONCLUSION" = "failure" ] || [ "$CURSOR_CHECK_CONCLUSION" = "action_required" ]; then
+                  echo "❌ PR was merged but Cursor check failed on commit $CHECK_SHA! This should not have been merged."
+                  CURSOR_CHECK_FAILED=true
+                  break
+                elif [ -z "$CURSOR_CHECK_CONCLUSION" ] || [ "$CURSOR_CHECK_CONCLUSION" = "null" ]; then
+                  echo "⚠️  PR was merged but Cursor check is still in-progress or not found on commit $CHECK_SHA. Cannot verify safety. Stopping."
+                  CURSOR_CHECK_FAILED=true
+                  break
+                elif [ "$CURSOR_CHECK_CONCLUSION" = "success" ] || [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
+                  echo "✅ PR was merged and Cursor check passed ($CURSOR_CHECK_CONCLUSION) on commit $CHECK_SHA. Continuing..."
+                  CURSOR_CHECK_PASSED=true
+                  break
+                else
+                  echo "⚠️  PR was merged but Cursor check has unexpected conclusion: $CURSOR_CHECK_CONCLUSION. Stopping for safety."
+                  CURSOR_CHECK_FAILED=true
+                  break
                 fi
               fi
+              
               
               echo "Waiting for Cursor check... (${ELAPSED}s/${MAX_WAIT}s)"
             done
             
+            echo "=========================================="
+            echo "🔍 DEBUG: Loop completed. Final state:"
+            echo "🔍 DEBUG: CURSOR_CHECK_FAILED=$CURSOR_CHECK_FAILED"
+            echo "🔍 DEBUG: CURSOR_CHECK_PASSED=$CURSOR_CHECK_PASSED"
+            echo "🔍 DEBUG: ELAPSED=$ELAPSED seconds"
+            echo "=========================================="
+            
             if [ "$CURSOR_CHECK_FAILED" = "true" ]; then
+              echo "::error::Cursor bug check FAILED - PR contains bugs and cannot be merged"
               echo "=========================================="
               echo "❌ Cursor bug check FAILED for PR #$PR_NUMBER"
               echo "Stopping promotion chain."
               echo "Please fix bugs and restart the workflow."
               echo "PR: https://github.com/${{ github.repository }}/pull/$PR_NUMBER"
               echo "=========================================="
+              gh pr comment $PR_NUMBER --body "❌ **Cursor Bug Check Failed** - This PR contains bugs and cannot be merged. Please fix the issues identified by Cursor bot before merging." || true
               exit 1
             fi
             
             if [ "$CURSOR_CHECK_PASSED" = "false" ]; then
-              echo "⚠️  Cursor check did not complete within timeout."
-              echo "Checking PR mergeability..."
-              
-              MERGEABLE=$(gh pr view $PR_NUMBER --json mergeable -q '.mergeable' 2>/dev/null || echo "UNKNOWN")
-              
-              if [ "$MERGEABLE" != "true" ]; then
-                echo "❌ PR is not mergeable. Stopping promotion chain."
-                exit 1
-              fi
-              
-              echo "⚠️  Proceeding with merge despite timeout (PR is mergeable)"
+              echo "=========================================="
+              echo "❌ Cursor check did not complete within timeout (${MAX_WAIT}s)."
+              echo "Stopping promotion chain for safety."
+              echo "Please ensure Cursor bot runs and completes before merging."
+              echo "PR: https://github.com/${{ github.repository }}/pull/$PR_NUMBER"
+              echo "=========================================="
+              exit 1
             fi
             
-            echo "Merging PR #$PR_NUMBER: $CURRENT_SOURCE → $TARGET"
-            
-            MERGE_RESULT=$(gh pr merge $PR_NUMBER --merge --delete-branch=false 2>&1 || echo "FAILED")
-            
-            if echo "$MERGE_RESULT" | grep -qi "merged\|already merged"; then
-              echo "✅ Successfully merged PR #$PR_NUMBER: $CURRENT_SOURCE → $TARGET"
-            else
-              echo "❌ Failed to merge PR #$PR_NUMBER"
-              echo "Merge result: $MERGE_RESULT"
+            if [ "$CURSOR_CHECK_PASSED" != "true" ]; then
+              echo "=========================================="
+              echo "❌ Cursor check state is unclear (CURSOR_CHECK_PASSED=$CURSOR_CHECK_PASSED)."
+              echo "Stopping promotion chain for safety."
+              echo "PR: https://github.com/${{ github.repository }}/pull/$PR_NUMBER"
+              echo "=========================================="
               exit 1
+            fi
+            
+            echo "✅ Cursor check passed. Proceeding with merge..."
+            
+            PR_STATE_BEFORE_MERGE=$(gh pr view $PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
+            
+            if [ "$PR_STATE_BEFORE_MERGE" = "merged" ] || [ "$PR_STATE_BEFORE_MERGE" = "closed" ]; then
+              echo "✅ PR #$PR_NUMBER was already merged. Continuing to next branch..."
+            else
+              echo "Merging PR #$PR_NUMBER: $CURRENT_SOURCE → $TARGET"
+              
+              MERGE_OUTPUT=$(gh pr merge $PR_NUMBER --merge --delete-branch=false 2>&1)
+              MERGE_EXIT_CODE=$?
+              
+              if [ $MERGE_EXIT_CODE -eq 0 ]; then
+                echo "✅ Successfully merged PR #$PR_NUMBER: $CURRENT_SOURCE → $TARGET"
+              elif echo "$MERGE_OUTPUT" | grep -qi "already merged\|already been merged"; then
+                echo "✅ PR #$PR_NUMBER was already merged (detected during merge attempt). Continuing..."
+              else
+                echo "❌ Failed to merge PR #$PR_NUMBER (exit code: $MERGE_EXIT_CODE)"
+                echo "Merge output: $MERGE_OUTPUT"
+                exit 1
+              fi
             fi
             
             CURRENT_SOURCE="$TARGET"
