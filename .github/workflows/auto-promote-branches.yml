@@ -76,10 +76,50 @@ jobs:
                   echo "❌ Cursor bot completed with failure. Stopping workflow."
                   CURSOR_CHECK_FAILED=true
                   break
-                elif [ "$CURSOR_CHECK_CONCLUSION" = "success" ] || [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
+                elif [ "$CURSOR_CHECK_CONCLUSION" = "success" ]; then
                   echo "✅ Cursor bot completed successfully. Proceeding with promotion."
                   CURSOR_CHECK_PASSED=true
                   break
+                elif [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
+                  echo "⚠️  Cursor bot completed with neutral conclusion. Checking comments for bugs..."
+                  
+                  PR_COMMENTS_JSON=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/comments 2>/dev/null || echo "[]")
+                  
+                  if command -v jq &> /dev/null; then
+                    CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | jq -r '.[] | select(.user.login | ascii_downcase | contains("cursor") or contains("app") or contains("[bot]")) | .body' 2>/dev/null || echo "")
+                  else
+                    CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | grep -i "cursor\|\[bot\]" -A 5 | grep -oP '"body":\s*"\K[^"]+' || echo "")
+                  fi
+                  
+                  if [ -n "$CURSOR_COMMENTS" ]; then
+                    if echo "$CURSOR_COMMENTS" | grep -qiE "no bugs|no issues|passed|success|all clear|no problems found"; then
+                      echo "✅ Cursor comments indicate no bugs found. Proceeding with promotion."
+                      CURSOR_CHECK_PASSED=true
+                      break
+                    elif echo "$CURSOR_COMMENTS" | grep -qiE "(blocking|critical)\s+(bug|issue|error)|must\s+fix|(failed|failing)\s+(check|test|validation)"; then
+                      echo "❌ Cursor comments indicate bugs found! Stopping workflow."
+                      CURSOR_CHECK_FAILED=true
+                      break
+                    elif echo "$CURSOR_COMMENTS" | grep -qiE "(bugs?|issues?|errors?)\s+(found|detected|identified)"; then
+                      if ! echo "$CURSOR_COMMENTS" | grep -qiE "no\s+(bugs?|issues?|errors?)"; then
+                        echo "❌ Cursor comments indicate bugs found! Stopping workflow."
+                        CURSOR_CHECK_FAILED=true
+                        break
+                      else
+                        echo "✅ Cursor comments indicate no bugs found. Proceeding with promotion."
+                        CURSOR_CHECK_PASSED=true
+                        break
+                      fi
+                    else
+                      echo "⚠️  Cursor check completed with neutral conclusion but no clear bug status in comments. Treating as failure for safety."
+                      CURSOR_CHECK_FAILED=true
+                      break
+                    fi
+                  else
+                    echo "⚠️  Cursor check completed with neutral conclusion but no comments found. Treating as failure for safety."
+                    CURSOR_CHECK_FAILED=true
+                    break
+                  fi
                 elif [ -z "$CURSOR_CHECK_CONCLUSION" ] || [ "$CURSOR_CHECK_CONCLUSION" = "null" ]; then
                   echo "⚠️  Cursor check completed but conclusion is null/unexpected. Treating as failure for safety."
                   CURSOR_CHECK_FAILED=true
@@ -310,14 +350,54 @@ jobs:
               fi
               
               if [ -n "$CURSOR_CHECK_STATUS" ] && [ "$CURSOR_CHECK_STATUS" = "completed" ]; then
-                if [ "$CURSOR_CHECK_CONCLUSION" = "success" ] || [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
-                  echo "✅ Cursor bug check passed (check run: $CURSOR_CHECK_CONCLUSION)!"
-                  CURSOR_CHECK_PASSED=true
-                  break
-                elif [ "$CURSOR_CHECK_CONCLUSION" = "failure" ] || [ "$CURSOR_CHECK_CONCLUSION" = "action_required" ]; then
+                if [ "$CURSOR_CHECK_CONCLUSION" = "failure" ] || [ "$CURSOR_CHECK_CONCLUSION" = "action_required" ]; then
                   echo "❌ Cursor bug check failed (check run: $CURSOR_CHECK_CONCLUSION)!"
                   CURSOR_CHECK_FAILED=true
                   break
+                elif [ "$CURSOR_CHECK_CONCLUSION" = "success" ]; then
+                  echo "✅ Cursor bug check passed (check run: $CURSOR_CHECK_CONCLUSION)!"
+                  CURSOR_CHECK_PASSED=true
+                  break
+                elif [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
+                  echo "⚠️  Cursor check completed with neutral conclusion. Checking comments for bugs..."
+                  
+                  PR_COMMENTS_JSON=$(gh api repos/${{ github.repository }}/pulls/$NEXT_PR_NUMBER/comments 2>/dev/null || echo "[]")
+                  
+                  if command -v jq &> /dev/null; then
+                    CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | jq -r '.[] | select(.user.login | ascii_downcase | contains("cursor") or contains("app") or contains("[bot]")) | .body' 2>/dev/null || echo "")
+                  else
+                    CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | grep -i "cursor\|\[bot\]" -A 5 | grep -oP '"body":\s*"\K[^"]+' || echo "")
+                  fi
+                  
+                  if [ -n "$CURSOR_COMMENTS" ]; then
+                    if echo "$CURSOR_COMMENTS" | grep -qiE "no bugs|no issues|passed|success|all clear|no problems found"; then
+                      echo "✅ Cursor comments indicate no bugs found. Proceeding with promotion."
+                      CURSOR_CHECK_PASSED=true
+                      break
+                    elif echo "$CURSOR_COMMENTS" | grep -qiE "(blocking|critical)\s+(bug|issue|error)|must\s+fix|(failed|failing)\s+(check|test|validation)"; then
+                      echo "❌ Cursor comments indicate bugs found! Stopping workflow."
+                      CURSOR_CHECK_FAILED=true
+                      break
+                    elif echo "$CURSOR_COMMENTS" | grep -qiE "(bugs?|issues?|errors?)\s+(found|detected|identified)"; then
+                      if ! echo "$CURSOR_COMMENTS" | grep -qiE "no\s+(bugs?|issues?|errors?)"; then
+                        echo "❌ Cursor comments indicate bugs found! Stopping workflow."
+                        CURSOR_CHECK_FAILED=true
+                        break
+                      else
+                        echo "✅ Cursor comments indicate no bugs found. Proceeding with promotion."
+                        CURSOR_CHECK_PASSED=true
+                        break
+                      fi
+                    else
+                      echo "⚠️  Cursor check completed with neutral conclusion but no clear bug status in comments. Treating as failure for safety."
+                      CURSOR_CHECK_FAILED=true
+                      break
+                    fi
+                  else
+                    echo "⚠️  Cursor check completed with neutral conclusion but no comments found. Treating as failure for safety."
+                    CURSOR_CHECK_FAILED=true
+                    break
+                  fi
                 elif [ -z "$CURSOR_CHECK_CONCLUSION" ] || [ "$CURSOR_CHECK_CONCLUSION" = "null" ]; then
                   echo "⚠️  Cursor check completed but conclusion is null/unexpected. Treating as failure for safety."
                   CURSOR_CHECK_FAILED=true
@@ -350,16 +430,6 @@ jobs:
                     CURSOR_CHECK_FAILED=true
                     break
                   fi
-                elif [ -n "$CURSOR_CHECK_STATUS" ] && [ "$CURSOR_CHECK_STATUS" = "completed" ]; then
-                  if [ "$CURSOR_CHECK_CONCLUSION" = "success" ] || [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
-                    echo "✅ Cursor check run completed with $CURSOR_CHECK_CONCLUSION. Comments are informational, proceeding..."
-                    CURSOR_CHECK_PASSED=true
-                    break
-                  fi
-                elif [ -n "$CURSOR_CHECK_CONCLUSION" ] && [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
-                  echo "✅ Cursor check run conclusion is neutral. Comments are informational, proceeding..."
-                  CURSOR_CHECK_PASSED=true
-                  break
                 fi
               fi
               
