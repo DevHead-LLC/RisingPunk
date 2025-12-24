@@ -36,8 +36,8 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-      statuses: read
-      checks: read
+      statuses: write
+      checks: write
 
     steps:
       - name: Checkout repository
@@ -173,6 +173,13 @@ jobs:
             CURSOR_CHECK_FAILED=false
             HEAD_SHA=$(gh pr view $PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "")
             
+            echo "=========================================="
+            echo "🔍 DEBUG: Starting Cursor check loop"
+            echo "🔍 DEBUG: PR_NUMBER=$PR_NUMBER"
+            echo "🔍 DEBUG: HEAD_SHA=$HEAD_SHA"
+            echo "🔍 DEBUG: MAX_WAIT=$MAX_WAIT seconds"
+            echo "=========================================="
+            
             while [ $ELAPSED -lt $MAX_WAIT ]; do
               sleep $WAIT_INTERVAL
               ELAPSED=$((ELAPSED + WAIT_INTERVAL))
@@ -238,15 +245,41 @@ jobs:
               fi
               
               if [ -n "$CURSOR_COMMENTS" ]; then
-                if echo "$CURSOR_COMMENTS" | grep -qiE "(bugs?|issues?|errors?)\s+(found|detected|identified)|(blocking|critical)\s+(bug|issue|error)|must\s+fix|(failed|failing)\s+(check|test|validation)"; then
+                echo "🔍 DEBUG: Found CURSOR_COMMENTS. Length: ${#CURSOR_COMMENTS} chars"
+                echo "🔍 DEBUG: CURSOR_CHECK_STATUS=$CURSOR_CHECK_STATUS, CURSOR_CHECK_CONCLUSION=$CURSOR_CHECK_CONCLUSION"
+                
+                if echo "$CURSOR_COMMENTS" | grep -qiE "no bugs|no issues|passed|success|all clear|no problems found"; then
+                  echo "✅ Cursor comments indicate no bugs found (positive pattern matched)"
+                  CURSOR_CHECK_PASSED=true
+                  break
+                fi
+                
+                BUG_PATTERN_MATCHED=false
+                if echo "$CURSOR_COMMENTS" | grep -qiE "(blocking|critical)\s+(bug|issue|error)"; then
+                  BUG_PATTERN_MATCHED=true
+                  echo "🔍 DEBUG: Matched blocking/critical pattern"
+                elif echo "$CURSOR_COMMENTS" | grep -qiE "must\s+fix"; then
+                  BUG_PATTERN_MATCHED=true
+                  echo "🔍 DEBUG: Matched 'must fix' pattern"
+                elif echo "$CURSOR_COMMENTS" | grep -qiE "(failed|failing)\s+(check|test|validation)"; then
+                  BUG_PATTERN_MATCHED=true
+                  echo "🔍 DEBUG: Matched failed check pattern"
+                elif echo "$CURSOR_COMMENTS" | grep -qiE "(bugs?|issues?|errors?)\s+(found|detected|identified)"; then
+                  if ! echo "$CURSOR_COMMENTS" | grep -qiE "no\s+(bugs?|issues?|errors?)"; then
+                    BUG_PATTERN_MATCHED=true
+                    echo "🔍 DEBUG: Matched bugs/issues/errors found pattern (and NOT 'no bugs')"
+                  else
+                    echo "🔍 DEBUG: Found 'bugs found' but also 'no bugs' - skipping"
+                  fi
+                fi
+                
+                if [ "$BUG_PATTERN_MATCHED" = "true" ]; then
                   echo "❌ Cursor comments indicate bugs found!"
                   CURSOR_CHECK_FAILED=true
                   break
-                elif echo "$CURSOR_COMMENTS" | grep -qiE "no bugs|no issues|passed|success|all clear|no problems found"; then
-                  echo "✅ Cursor comments indicate no bugs found"
-                  CURSOR_CHECK_PASSED=true
-                  break
-                elif [ -n "$CURSOR_CHECK_STATUS" ] && [ "$CURSOR_CHECK_STATUS" = "completed" ]; then
+                fi
+                
+                if [ -n "$CURSOR_CHECK_STATUS" ] && [ "$CURSOR_CHECK_STATUS" = "completed" ]; then
                   if [ "$CURSOR_CHECK_CONCLUSION" = "success" ] || [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
                     echo "✅ Cursor check run completed with $CURSOR_CHECK_CONCLUSION. Comments are informational, proceeding..."
                     CURSOR_CHECK_PASSED=true
@@ -314,13 +347,22 @@ jobs:
               echo "Waiting for Cursor check... (${ELAPSED}s/${MAX_WAIT}s)"
             done
             
+            echo "=========================================="
+            echo "🔍 DEBUG: Loop completed. Final state:"
+            echo "🔍 DEBUG: CURSOR_CHECK_FAILED=$CURSOR_CHECK_FAILED"
+            echo "🔍 DEBUG: CURSOR_CHECK_PASSED=$CURSOR_CHECK_PASSED"
+            echo "🔍 DEBUG: ELAPSED=$ELAPSED seconds"
+            echo "=========================================="
+            
             if [ "$CURSOR_CHECK_FAILED" = "true" ]; then
+              echo "::error::Cursor bug check FAILED - PR contains bugs and cannot be merged"
               echo "=========================================="
               echo "❌ Cursor bug check FAILED for PR #$PR_NUMBER"
               echo "Stopping promotion chain."
               echo "Please fix bugs and restart the workflow."
               echo "PR: https://github.com/${{ github.repository }}/pull/$PR_NUMBER"
               echo "=========================================="
+              gh pr comment $PR_NUMBER --body "❌ **Cursor Bug Check Failed** - This PR contains bugs and cannot be merged. Please fix the issues identified by Cursor bot before merging." || true
               exit 1
             fi
             
@@ -333,6 +375,17 @@ jobs:
               echo "=========================================="
               exit 1
             fi
+            
+            if [ "$CURSOR_CHECK_PASSED" != "true" ]; then
+              echo "=========================================="
+              echo "❌ Cursor check state is unclear (CURSOR_CHECK_PASSED=$CURSOR_CHECK_PASSED)."
+              echo "Stopping promotion chain for safety."
+              echo "PR: https://github.com/${{ github.repository }}/pull/$PR_NUMBER"
+              echo "=========================================="
+              exit 1
+            fi
+            
+            echo "✅ Cursor check passed. Proceeding with merge..."
             
             PR_STATE_BEFORE_MERGE=$(gh pr view $PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
             
