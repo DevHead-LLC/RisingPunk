@@ -247,9 +247,9 @@ router.get('/crew/net-worth', auth, async (req: Request, res: Response) => {
     }
 
     const crews = await Crew.find({})
-      .populate('presidentId', 'balance.total')
-      .populate('members', 'balance.total')
-      .populate('executives', 'balance.total');
+      .populate('presidentId', 'balance')
+      .populate('members', 'balance')
+      .populate('executives', 'balance');
 
     const crewStats = crews.map((crew) => {
       let totalNetWorth = 0;
