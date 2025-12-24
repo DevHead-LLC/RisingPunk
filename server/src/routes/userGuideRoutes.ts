@@ -207,25 +207,43 @@ router.post('/complete-task', auth, async (req: Request, res: Response) => {
 
       // Mark task as collected (reward given) - atomic operation
       // Use findOneAndUpdate with condition to atomically check and update
-      const updateResult = await UserTaskProgress.findOneAndUpdate(
-        { 
-          userId,
-          collectedTasks: { $ne: trimmedTaskId } // Only update if not already collected
-        },
-        {
-          $addToSet: { collectedTasks: trimmedTaskId },
-          $set: { lastCompletedTaskId: trimmedTaskId },
-          $setOnInsert: {
-            completedTasks: progress?.completedTasks || [{
-              taskId: trimmedTaskId,
-              completedAt: new Date()
-            }],
-            skippedTasks: [],
-            showTaskGuide: true
-          }
-        },
-        { upsert: true, new: true, session }
-      );
+      let updateResult;
+      try {
+        updateResult = await UserTaskProgress.findOneAndUpdate(
+          { 
+            userId,
+            collectedTasks: { $ne: trimmedTaskId } // Only update if not already collected
+          },
+          {
+            $addToSet: { collectedTasks: trimmedTaskId },
+            $set: { lastCompletedTaskId: trimmedTaskId },
+            $setOnInsert: {
+              completedTasks: progress?.completedTasks || [{
+                taskId: trimmedTaskId,
+                completedAt: new Date()
+              }],
+              skippedTasks: [],
+              showTaskGuide: true
+            }
+          },
+          { upsert: true, new: true, session }
+        );
+      } catch (error: any) {
+        // Handle race condition: if another request already collected the task,
+        // MongoDB may throw E11000 duplicate key error when trying to upsert
+        // because the query condition no longer matches and upsert tries to create duplicate userId
+        if (error.code === 11000 || error.codeName === 'DuplicateKey') {
+          await session.abortTransaction();
+          session.endSession();
+          res.json({
+            success: true,
+            message: 'Task already collected',
+            rewardAmount: 0
+          });
+          return;
+        }
+        throw error;
+      }
 
       // If updateResult is null, task was already collected by another request
       // (This shouldn't happen due to the $ne condition, but handle it defensively)
