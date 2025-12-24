@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   ScrollView,
   ActivityIndicator,
+  AppState,
 } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
@@ -33,32 +34,98 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
   const colors = useThemeColors();
   const [mainTab, setMainTab] = useState<MainTab>('individual');
   const [metricTab, setMetricTab] = useState<MetricTab>('botsDestroyed');
+  const [appState, setAppState] = useState(AppState.currentState);
+  const [delayedVisible, setDelayedVisible] = useState(false);
+  const isMountedRef = useRef(true);
+  const delayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (!isMountedRef.current) return;
+      setAppState(nextAppState);
+      if (nextAppState !== 'active' && visible) {
+        onClose();
+      }
+    });
+
+    return () => {
+      isMountedRef.current = false;
+      subscription.remove();
+    };
+  }, [visible, onClose]);
+
+  useEffect(() => {
+    if (visible) {
+      if (delayTimeoutRef.current) {
+        clearTimeout(delayTimeoutRef.current);
+      }
+      delayTimeoutRef.current = setTimeout(() => {
+        if (isMountedRef.current) {
+          setDelayedVisible(true);
+        }
+      }, 100);
+    } else {
+      setDelayedVisible(false);
+      if (delayTimeoutRef.current) {
+        clearTimeout(delayTimeoutRef.current);
+        delayTimeoutRef.current = null;
+      }
+    }
+
+    return () => {
+      if (delayTimeoutRef.current) {
+        clearTimeout(delayTimeoutRef.current);
+      }
+    };
+  }, [visible]);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (delayTimeoutRef.current) {
+        clearTimeout(delayTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  if (!colors) {
+    return null;
+  }
 
   const styles = createStyles(colors);
+  
+  const isAppActive = appState === 'active';
+
+  const shouldSkipQueries = !delayedVisible || !isAppActive || !isMountedRef.current;
 
   const { data: botsDestroyedData, isLoading: isLoadingBotsDestroyed, error: botsDestroyedError } = useGetIndividualBotsDestroyedLeaderboardQuery(undefined, {
-    skip: !visible || mainTab !== 'individual' || metricTab !== 'botsDestroyed',
-    pollingInterval: visible && mainTab === 'individual' && metricTab === 'botsDestroyed' ? 900000 : 0,
+    skip: shouldSkipQueries || mainTab !== 'individual' || metricTab !== 'botsDestroyed',
+    pollingInterval: delayedVisible && isAppActive && mainTab === 'individual' && metricTab === 'botsDestroyed' ? 900000 : 0,
     refetchOnMountOrArgChange: true,
   });
 
   const { data: netWorthData, isLoading: isLoadingNetWorth, error: netWorthError } = useGetIndividualNetWorthLeaderboardQuery(undefined, {
-    skip: !visible || mainTab !== 'individual' || metricTab !== 'netWorth',
-    pollingInterval: visible && mainTab === 'individual' && metricTab === 'netWorth' ? 900000 : 0,
+    skip: shouldSkipQueries || mainTab !== 'individual' || metricTab !== 'netWorth',
+    pollingInterval: delayedVisible && isAppActive && mainTab === 'individual' && metricTab === 'netWorth' ? 900000 : 0,
     refetchOnMountOrArgChange: true,
   });
 
   const { data: crewBotsDestroyedData, isLoading: isLoadingCrewBotsDestroyed, error: crewBotsDestroyedError } = useGetCrewBotsDestroyedLeaderboardQuery(undefined, {
-    skip: !visible || mainTab !== 'crew' || metricTab !== 'botsDestroyed',
-    pollingInterval: visible && mainTab === 'crew' && metricTab === 'botsDestroyed' ? 900000 : 0,
+    skip: shouldSkipQueries || mainTab !== 'crew' || metricTab !== 'botsDestroyed',
+    pollingInterval: delayedVisible && isAppActive && mainTab === 'crew' && metricTab === 'botsDestroyed' ? 900000 : 0,
     refetchOnMountOrArgChange: true,
   });
 
   const { data: crewNetWorthData, isLoading: isLoadingCrewNetWorth, error: crewNetWorthError } = useGetCrewNetWorthLeaderboardQuery(undefined, {
-    skip: !visible || mainTab !== 'crew' || metricTab !== 'netWorth',
-    pollingInterval: visible && mainTab === 'crew' && metricTab === 'netWorth' ? 900000 : 0,
+    skip: shouldSkipQueries || mainTab !== 'crew' || metricTab !== 'netWorth',
+    pollingInterval: delayedVisible && isAppActive && mainTab === 'crew' && metricTab === 'netWorth' ? 900000 : 0,
     refetchOnMountOrArgChange: true,
   });
+
+  if (!isMountedRef.current) {
+    return null;
+  }
 
   const formatLastUpdated = (dateString: string | undefined | null): string => {
     if (!dateString) return '';
@@ -308,15 +375,30 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
       return renderCrewNetWorthContent();
     }
 
-    return null;
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>No content available</Text>
+      </View>
+    );
+  };
+
+  const handleDismiss = () => {
+    if (isMountedRef.current) {
+      onClose();
+    }
   };
 
   return (
     <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={false}
-      onRequestClose={onClose}
+      visible={delayedVisible && isAppActive && isMountedRef.current}
+      animationType="fade"
+      transparent={true}
+      onRequestClose={handleDismiss}
+      onDismiss={handleDismiss}
+      statusBarTranslucent={true}
+      supportedOrientations={['landscape']}
+      hardwareAccelerated={true}
+      presentationStyle="overFullScreen"
     >
       <SafeAreaView style={styles.overlay}>
         <View style={styles.modalContainer}>
@@ -406,7 +488,10 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.contentScrollView} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+              style={styles.contentScrollView} 
+              showsVerticalScrollIndicator={false}
+            >
               {renderContent()}
             </ScrollView>
           </View>
