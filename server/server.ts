@@ -24,6 +24,8 @@ import testRoutes from './src/routes/test';
 import botsRoutes from './src/routes/bots';
 import crewRoutes from './src/routes/crew';
 import reportsRoutes from './src/routes/reports';
+import leaderboardRoutes from './src/routes/leaderboardRoutes';
+import userGuideRoutes from './src/routes/userGuideRoutes';
 
 declare global {
   namespace Express {
@@ -499,10 +501,12 @@ app.post('/api/antivirus-shield/deactivate', auth, async (req: Request, res: Res
 app.use('/api/map', mapRoutes);
 
 app.use('/api/users', userRoutes);
+app.use('/api/users/user-guide', userGuideRoutes);
 app.use('/api/battle', battleRoutes);
 app.use('/api/research', researchRoutes);
 app.use('/api/crew', crewRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/documents', documentsRoutes);
 
 // Test routes for privacy policy compliance verification

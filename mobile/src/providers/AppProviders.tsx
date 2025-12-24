@@ -4,6 +4,7 @@ import { store } from '../store';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ThemeProvider } from '../context/ThemeContext';
 import { NetworkConnectivityProvider } from './NetworkConnectivityProvider';
+import { TaskGuideHighlightProvider } from '../contexts/TaskGuideHighlightContext';
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
@@ -11,7 +12,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       <Provider store={store}>
         <ThemeProvider>
           <NetworkConnectivityProvider>
-            {children}
+            <TaskGuideHighlightProvider>
+              {children}
+            </TaskGuideHighlightProvider>
           </NetworkConnectivityProvider>
         </ThemeProvider>
       </Provider>
