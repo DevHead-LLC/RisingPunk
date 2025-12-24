@@ -72,6 +72,9 @@ const TASK_LIST: Task[] = [
     title: 'Change your avatar',
     description: 'Update your profile avatar',
     order: 5,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.avatarChangedAt);
+    },
     skipable: true,
     reward: { type: 'wallet', value: 10 }
   },

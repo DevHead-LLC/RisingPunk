@@ -8,20 +8,23 @@ interface TaskGuideHighlightOverlayProps {
   forProfile?: boolean;
   forSettings?: boolean;
   forThemeToggle?: boolean;
+  forAvatarToggle?: boolean;
 }
 
 export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps> = ({ 
   forProfile = false,
   forSettings = false,
-  forThemeToggle = false
+  forThemeToggle = false,
+  forAvatarToggle = false
 }) => {
   const colors = useThemeColors();
   const { highlightTaskId, highlightStep } = useTaskGuideHighlight();
 
   const isThemeTask = highlightTaskId === 'use-hacker-mode' || highlightTaskId === 'use-business-mode';
+  const isAvatarTask = highlightTaskId === 'change-avatar';
   const isViewProfile = highlightTaskId === 'view-profile';
 
-  if (!isViewProfile && !isThemeTask) {
+  if (!isViewProfile && !isThemeTask && !isAvatarTask) {
     return null;
   }
 
@@ -45,6 +48,22 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
     }
   }
 
+  // For avatar tasks, use highlightStep to control which overlay shows (sequential flow)
+  if (isAvatarTask) {
+    // Show profile overlay on turf screen when highlightStep is null (initial state)
+    if (forProfile && highlightStep === null) {
+      // Allow this to render - show profile highlight on turf screen
+    } else if (forProfile && highlightStep !== null) {
+      return null; // Don't show profile overlay after step has advanced
+    } else if (forSettings && highlightStep !== 'settings-tab') {
+      return null; // Only show settings overlay when step is 'settings-tab'
+    } else if (forAvatarToggle && highlightStep !== 'avatar-toggle') {
+      return null; // Only show avatar toggle overlay when step is 'avatar-toggle'
+    } else if (!forProfile && !forSettings && !forAvatarToggle) {
+      return null; // Neither prop set, don't render
+    }
+  }
+
   return (
     <>
       <View style={styles.overlay} pointerEvents="none" />
@@ -57,7 +76,6 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
           </View>
         </View>
       )}
-      {/* Settings and theme toggle overlays: dark overlay only, no "Click Here" text for theme tasks */}
     </>
   );
 };

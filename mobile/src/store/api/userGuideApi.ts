@@ -11,7 +11,8 @@ import type {
   UpdateVisibilityResponse,
   TrackProfileVisitResponse,
   TrackThemeChangeRequest,
-  TrackThemeChangeResponse
+  TrackThemeChangeResponse,
+  TrackAvatarChangeResponse
 } from '../../types/userGuide';
 
 export const userGuideApi = createApi({
@@ -99,6 +100,22 @@ export const userGuideApi = createApi({
         }
       },
     }),
+    trackAvatarChange: builder.mutation<TrackAvatarChangeResponse, void>({
+      query: () => ({
+        url: '/api/users/user-guide/track-avatar-change',
+        method: 'POST',
+      }),
+      invalidatesTags: ['UserTaskProgress'],
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Invalidate to refetch current task and update UI
+          dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
+        } catch {
+          // Error handling is done by the mutation itself
+        }
+      },
+    }),
   }),
 });
 
@@ -108,6 +125,7 @@ export const {
   useSkipTaskGuideTaskMutation,
   useUpdateTaskGuideVisibilityMutation,
   useTrackProfileVisitMutation,
-  useTrackThemeChangeMutation
+  useTrackThemeChangeMutation,
+  useTrackAvatarChangeMutation
 } = userGuideApi;
 

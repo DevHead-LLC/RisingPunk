@@ -19,10 +19,11 @@ export const ProfileLocation = memo(function ProfileLocation({ onPress, isIntroA
   
   const introColors = [colors.primary, colors.secondary, colors.matrix];
   const isThemeTask = highlightTaskId === 'use-hacker-mode' || highlightTaskId === 'use-business-mode';
-  const isHighlighted = isIntroActive || highlightTaskId === 'view-profile' || (isThemeTask && highlightStep === null);
+  const isAvatarTask = highlightTaskId === 'change-avatar';
+  const isHighlighted = isIntroActive || highlightTaskId === 'view-profile' || (isThemeTask && highlightStep === null) || (isAvatarTask && highlightStep === null);
   
   const handlePress = () => {
-    if (isThemeTask && highlightStep === null) {
+    if ((isThemeTask || isAvatarTask) && highlightStep === null) {
       advanceHighlightStep();
     }
     onPress();
