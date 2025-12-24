@@ -268,17 +268,30 @@ jobs:
               MERGEABLE=$(gh pr view $PR_NUMBER --json mergeable -q '.mergeable' 2>/dev/null || echo "UNKNOWN")
               
               if [ "$MERGEABLE" = "true" ] && [ $ELAPSED -gt 30 ]; then
-                PR_DATA=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER 2>/dev/null || echo "")
-                if [ -n "$PR_DATA" ]; then
-                  if command -v jq &> /dev/null; then
-                    REQUIRED_CHECKS=$(echo "$PR_DATA" | jq -r '.required_status_checks.contexts[]?' 2>/dev/null || echo "")
-                  else
-                    REQUIRED_CHECKS=$(echo "$PR_DATA" | grep -oP '"contexts":\s*\[\s*"\K[^"]+' || echo "")
-                  fi
-                  if [ -z "$REQUIRED_CHECKS" ] || ! echo "$REQUIRED_CHECKS" | grep -qi "cursor"; then
-                    echo "✅ PR is mergeable and no Cursor checks are required. Proceeding..."
+                TARGET_BRANCH_NAME=$(gh pr view $PR_NUMBER --json baseRefName -q '.baseRefName' 2>/dev/null || echo "")
+                if [ -n "$TARGET_BRANCH_NAME" ]; then
+                  PROTECTION_RESPONSE=$(gh api repos/${{ github.repository }}/branches/$TARGET_BRANCH_NAME/protection 2>&1)
+                  PROTECTION_EXIT_CODE=$?
+                  
+                  if [ $PROTECTION_EXIT_CODE -eq 0 ] && [ -n "$PROTECTION_RESPONSE" ]; then
+                    if command -v jq &> /dev/null; then
+                      REQUIRED_CHECKS=$(echo "$PROTECTION_RESPONSE" | jq -r '.required_status_checks.contexts[]?' 2>/dev/null || echo "")
+                    else
+                      REQUIRED_CHECKS=$(echo "$PROTECTION_RESPONSE" | grep -oP '"contexts":\s*\[\s*"\K[^"]+' || echo "")
+                    fi
+                    if [ -z "$REQUIRED_CHECKS" ] || ! echo "$REQUIRED_CHECKS" | grep -qi "cursor"; then
+                      echo "✅ PR is mergeable and no Cursor checks are required on branch protection. Proceeding..."
+                      CURSOR_CHECK_PASSED=true
+                      break
+                    else
+                      echo "⚠️  Cursor is a required check on branch protection. Waiting for Cursor check to complete..."
+                    fi
+                  elif echo "$PROTECTION_RESPONSE" | grep -qi "404\|not found"; then
+                    echo "✅ Branch protection not configured. No required checks. Proceeding..."
                     CURSOR_CHECK_PASSED=true
                     break
+                  else
+                    echo "⚠️  Could not access branch protection (exit code: $PROTECTION_EXIT_CODE). Waiting for explicit Cursor check..."
                   fi
                 fi
               fi
@@ -312,13 +325,14 @@ jobs:
             
             echo "Merging PR #$PR_NUMBER: $CURRENT_SOURCE → $TARGET"
             
-            MERGE_RESULT=$(gh pr merge $PR_NUMBER --merge --delete-branch=false 2>&1 || echo "FAILED")
+            MERGE_OUTPUT=$(gh pr merge $PR_NUMBER --merge --delete-branch=false 2>&1)
+            MERGE_EXIT_CODE=$?
             
-            if echo "$MERGE_RESULT" | grep -qi "merged\|already merged"; then
+            if [ $MERGE_EXIT_CODE -eq 0 ]; then
               echo "✅ Successfully merged PR #$PR_NUMBER: $CURRENT_SOURCE → $TARGET"
             else
-              echo "❌ Failed to merge PR #$PR_NUMBER"
-              echo "Merge result: $MERGE_RESULT"
+              echo "❌ Failed to merge PR #$PR_NUMBER (exit code: $MERGE_EXIT_CODE)"
+              echo "Merge output: $MERGE_OUTPUT"
               exit 1
             fi
             
