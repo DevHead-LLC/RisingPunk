@@ -60,9 +60,11 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
     refetchOnMountOrArgChange: true,
   });
 
-  const formatLastUpdated = (dateString: string): string => {
+  const formatLastUpdated = (dateString: string | undefined | null): string => {
+    if (!dateString) return '';
     try {
       const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '';
       return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } catch {
       return '';
@@ -79,7 +81,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
       );
     }
 
-    if (botsDestroyedError) {
+    if (botsDestroyedError || (botsDestroyedData && 'message' in botsDestroyedData)) {
       return (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Error loading leaderboard</Text>
@@ -87,7 +89,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
       );
     }
 
-    if (!botsDestroyedData || botsDestroyedData.users.length === 0) {
+    if (!botsDestroyedData || !botsDestroyedData.users || botsDestroyedData.users.length === 0) {
       return (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No leaderboard data available yet</Text>
@@ -97,17 +99,17 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
 
     return (
       <View style={styles.leaderboardContainer}>
-        {botsDestroyedData.users.map((user) => (
-          <View key={user.rank} style={styles.leaderboardRow}>
+        {botsDestroyedData.users.map((user, index) => (
+          <View key={user.rank != null ? user.rank : `user-${index}`} style={styles.leaderboardRow}>
             <View style={styles.rankContainer}>
-              <Text style={styles.rankText}>{user.rank}</Text>
+              <Text style={styles.rankText}>{user.rank != null ? user.rank : index + 1}</Text>
             </View>
             <View style={styles.userInfoContainer}>
-              <Text style={styles.handleText}>{user.handle}</Text>
-              <Text style={styles.levelText}>Level {user.level}</Text>
+              <Text style={styles.handleText}>{user.handle || ''}</Text>
+              <Text style={styles.levelText}>Level {user.level || 0}</Text>
             </View>
             <View style={styles.statContainer}>
-              <Text style={styles.statValue}>{user.botsDestroyed?.toLocaleString() || 0}</Text>
+              <Text style={styles.statValue}>{(user.botsDestroyed != null ? user.botsDestroyed.toLocaleString() : '0')}</Text>
               <Text style={styles.statLabel}>Bots Destroyed</Text>
             </View>
           </View>
@@ -134,7 +136,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
       );
     }
 
-    if (netWorthError) {
+    if (netWorthError || (netWorthData && 'message' in netWorthData)) {
       return (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Error loading leaderboard</Text>
@@ -142,7 +144,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
       );
     }
 
-    if (!netWorthData || netWorthData.users.length === 0) {
+    if (!netWorthData || !netWorthData.users || netWorthData.users.length === 0) {
       return (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No leaderboard data available yet</Text>
@@ -152,17 +154,17 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
 
     return (
       <View style={styles.leaderboardContainer}>
-        {netWorthData.users.map((user) => (
-          <View key={user.rank} style={styles.leaderboardRow}>
+        {netWorthData.users.map((user, index) => (
+          <View key={user.rank != null ? user.rank : `user-${index}`} style={styles.leaderboardRow}>
             <View style={styles.rankContainer}>
-              <Text style={styles.rankText}>{user.rank}</Text>
+              <Text style={styles.rankText}>{user.rank != null ? user.rank : index + 1}</Text>
             </View>
             <View style={styles.userInfoContainer}>
-              <Text style={styles.handleText}>{user.handle}</Text>
-              <Text style={styles.levelText}>Level {user.level}</Text>
+              <Text style={styles.handleText}>{user.handle || ''}</Text>
+              <Text style={styles.levelText}>Level {user.level || 0}</Text>
             </View>
             <View style={styles.statContainer}>
-              <Text style={styles.statValue}>${user.netWorth?.toLocaleString() || 0}</Text>
+              <Text style={styles.statValue}>${(user.netWorth != null ? user.netWorth.toLocaleString() : '0')}</Text>
               <Text style={styles.statLabel}>Net Worth</Text>
             </View>
           </View>
@@ -189,7 +191,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
       );
     }
 
-    if (crewBotsDestroyedError) {
+    if (crewBotsDestroyedError || (crewBotsDestroyedData && 'message' in crewBotsDestroyedData)) {
       return (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Error loading leaderboard</Text>
@@ -197,7 +199,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
       );
     }
 
-    if (!crewBotsDestroyedData || crewBotsDestroyedData.crews.length === 0) {
+    if (!crewBotsDestroyedData || !crewBotsDestroyedData.crews || crewBotsDestroyedData.crews.length === 0) {
       return (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No leaderboard data available yet</Text>
@@ -207,17 +209,17 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
 
     return (
       <View style={styles.leaderboardContainer}>
-        {crewBotsDestroyedData.crews.map((crew) => (
-          <View key={crew.rank} style={styles.leaderboardRow}>
+        {crewBotsDestroyedData.crews.map((crew, index) => (
+          <View key={crew.rank != null ? crew.rank : `crew-${index}`} style={styles.leaderboardRow}>
             <View style={styles.rankContainer}>
-              <Text style={styles.rankText}>{crew.rank}</Text>
+              <Text style={styles.rankText}>{crew.rank != null ? crew.rank : index + 1}</Text>
             </View>
             <View style={styles.userInfoContainer}>
-              <Text style={styles.handleText}>{crew.crewName}</Text>
-              <Text style={styles.levelText}>{crew.crewIdentifier} • {crew.memberCount} members</Text>
+              <Text style={styles.handleText}>{crew.crewName || ''}</Text>
+              <Text style={styles.levelText}>{crew.crewIdentifier || 'N/A'} • {crew.memberCount != null ? crew.memberCount : 0} members</Text>
             </View>
             <View style={styles.statContainer}>
-              <Text style={styles.statValue}>{crew.botsDestroyed?.toLocaleString() || 0}</Text>
+              <Text style={styles.statValue}>{(crew.botsDestroyed != null ? crew.botsDestroyed.toLocaleString() : '0')}</Text>
               <Text style={styles.statLabel}>Bots Destroyed</Text>
             </View>
           </View>
@@ -244,7 +246,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
       );
     }
 
-    if (crewNetWorthError) {
+    if (crewNetWorthError || (crewNetWorthData && 'message' in crewNetWorthData)) {
       return (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Error loading leaderboard</Text>
@@ -252,7 +254,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
       );
     }
 
-    if (!crewNetWorthData || crewNetWorthData.crews.length === 0) {
+    if (!crewNetWorthData || !crewNetWorthData.crews || crewNetWorthData.crews.length === 0) {
       return (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No leaderboard data available yet</Text>
@@ -262,17 +264,17 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
 
     return (
       <View style={styles.leaderboardContainer}>
-        {crewNetWorthData.crews.map((crew) => (
-          <View key={crew.rank} style={styles.leaderboardRow}>
+        {crewNetWorthData.crews.map((crew, index) => (
+          <View key={crew.rank != null ? crew.rank : `crew-${index}`} style={styles.leaderboardRow}>
             <View style={styles.rankContainer}>
-              <Text style={styles.rankText}>{crew.rank}</Text>
+              <Text style={styles.rankText}>{crew.rank != null ? crew.rank : index + 1}</Text>
             </View>
             <View style={styles.userInfoContainer}>
-              <Text style={styles.handleText}>{crew.crewName}</Text>
-              <Text style={styles.levelText}>{crew.crewIdentifier} • {crew.memberCount} members</Text>
+              <Text style={styles.handleText}>{crew.crewName || ''}</Text>
+              <Text style={styles.levelText}>{crew.crewIdentifier || 'N/A'} • {crew.memberCount != null ? crew.memberCount : 0} members</Text>
             </View>
             <View style={styles.statContainer}>
-              <Text style={styles.statValue}>${crew.netWorth?.toLocaleString() || 0}</Text>
+              <Text style={styles.statValue}>${(crew.netWorth != null ? crew.netWorth.toLocaleString() : '0')}</Text>
               <Text style={styles.statLabel}>Net Worth</Text>
             </View>
           </View>
