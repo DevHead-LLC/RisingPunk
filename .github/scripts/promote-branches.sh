@@ -132,22 +132,73 @@ This PR was created automatically by the branch promotion workflow.
 Cursor bug bot will run automatically on this PR."
     
     echo "Creating PR: $CURRENT_SOURCE → $TARGET"
-    NEXT_PR_NUMBER=$(gh pr create \
+    set +e
+    CREATE_OUTPUT=$(gh pr create \
       --base "$TARGET" \
       --head "$CURRENT_SOURCE" \
       --title "$PR_TITLE" \
       --body "$PR_BODY" \
-      --draft false 2>&1 | grep -oP 'pull/\K[0-9]+' || echo "")
+      --draft false 2>&1)
+    CREATE_EXIT_CODE=$?
+    set -e
+    NEXT_PR_NUMBER=$(echo "$CREATE_OUTPUT" | grep -oP 'pull/\K[0-9]+' || echo "")
     
     if [ -z "$NEXT_PR_NUMBER" ]; then
-      echo "Failed to create PR. Trying alternative method..."
-      PR_RESPONSE=$(gh api repos/$GITHUB_REPOSITORY/pulls \
-        -X POST \
-        -f base="$TARGET" \
-        -f head="$CURRENT_SOURCE" \
-        -f title="$PR_TITLE" \
-        -f body="$PR_BODY" 2>&1)
-      NEXT_PR_NUMBER=$(echo "$PR_RESPONSE" | grep -oP '"number":\s*\K[0-9]+' || echo "")
+      echo "⚠️  First PR creation method failed (exit code: $CREATE_EXIT_CODE)"
+      echo "🔍 DEBUG: Create output: $CREATE_OUTPUT"
+      
+      if echo "$CREATE_OUTPUT" | grep -qiE "(already exists|no commits|no changes|nothing to compare|branches are the same)"; then
+        echo "ℹ️  PR may already exist or branches are in sync. Checking for existing open PR..."
+        EXISTING_PR=$(gh pr list --base "$TARGET" --head "$CURRENT_SOURCE" --state open --json number -q '.[0].number' 2>/dev/null || echo "")
+        if [ -n "$EXISTING_PR" ]; then
+          echo "✅ Found existing open PR #$EXISTING_PR. Using it."
+          NEXT_PR_NUMBER="$EXISTING_PR"
+        else
+          echo "ℹ️  No existing open PR found. Branches may be in sync (no changes to promote)."
+          echo "✅ Skipping promotion from $CURRENT_SOURCE to $TARGET (no changes)"
+          CURRENT_SOURCE="$TARGET"
+          continue
+        fi
+      else
+        echo "⚠️  Trying alternative API method..."
+        set +e
+        PR_RESPONSE=$(gh api repos/$GITHUB_REPOSITORY/pulls \
+          -X POST \
+          -f base="$TARGET" \
+          -f head="$CURRENT_SOURCE" \
+          -f title="$PR_TITLE" \
+          -f body="$PR_BODY" 2>&1)
+        API_EXIT_CODE=$?
+        set -e
+        NEXT_PR_NUMBER=$(echo "$PR_RESPONSE" | grep -oP '"number":\s*\K[0-9]+' || echo "")
+        
+        if [ -z "$NEXT_PR_NUMBER" ]; then
+          echo "❌ Alternative API method also failed (exit code: $API_EXIT_CODE)"
+          echo "🔍 DEBUG: Full API response:"
+          echo "$PR_RESPONSE"
+          
+          if echo "$PR_RESPONSE" | grep -qiE "(already exists|pull request already exists)"; then
+            echo "ℹ️  PR already exists. Checking for existing open PR..."
+            EXISTING_PR=$(gh pr list --base "$TARGET" --head "$CURRENT_SOURCE" --state open --json number -q '.[0].number' 2>/dev/null || echo "")
+            if [ -n "$EXISTING_PR" ]; then
+              echo "✅ Found existing open PR #$EXISTING_PR. Using it."
+              NEXT_PR_NUMBER="$EXISTING_PR"
+            else
+              echo "❌ Failed to find existing open PR despite 'already exists' error"
+              exit 1
+            fi
+          elif echo "$PR_RESPONSE" | grep -qiE "(no commits|no changes|nothing to compare|branches are the same|no difference)"; then
+            echo "ℹ️  Branches are in sync (no changes to promote)."
+            echo "✅ Skipping promotion from $CURRENT_SOURCE to $TARGET (no changes)"
+            CURRENT_SOURCE="$TARGET"
+            continue
+          else
+            echo "❌ Failed to create PR from $CURRENT_SOURCE to $TARGET"
+            echo "❌ Unknown error. Please check the API response above."
+            exit 1
+          fi
+        fi
+      fi
     fi
     
     if [ -z "$NEXT_PR_NUMBER" ]; then
