@@ -262,6 +262,7 @@ Cursor bug bot will run automatically on this PR."
     fi
     
     if [ -n "$CURSOR_STATUS" ]; then
+      CURSOR_CHECK_FOUND=true
       if [ "$CURSOR_STATUS" = "success" ]; then
         echo "✅ Cursor bug check passed (status check)!"
         CURSOR_CHECK_PASSED=true
@@ -283,16 +284,18 @@ Cursor bug bot will run automatically on this PR."
       CURSOR_CHECK_CONCLUSION=$(echo "$CHECKS_JSON" | grep -i "cursor" -A 10 | grep -oP '"conclusion":\s*"\K[^"]+' | head -1 || echo "")
     fi
     
-    if [ -n "$CURSOR_CHECK_STATUS" ] && [ "$CURSOR_CHECK_STATUS" = "completed" ]; then
-      if [ "$CURSOR_CHECK_CONCLUSION" = "failure" ] || [ "$CURSOR_CHECK_CONCLUSION" = "action_required" ]; then
-        echo "❌ Cursor bug check failed (check run: $CURSOR_CHECK_CONCLUSION)!"
-        CURSOR_CHECK_FAILED=true
-        break
-      elif [ "$CURSOR_CHECK_CONCLUSION" = "success" ]; then
-        echo "✅ Cursor bug check passed (check run: $CURSOR_CHECK_CONCLUSION)!"
-        CURSOR_CHECK_PASSED=true
-        break
-      elif [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
+    if [ -n "$CURSOR_CHECK_STATUS" ]; then
+      CURSOR_CHECK_FOUND=true
+      if [ "$CURSOR_CHECK_STATUS" = "completed" ]; then
+        if [ "$CURSOR_CHECK_CONCLUSION" = "failure" ] || [ "$CURSOR_CHECK_CONCLUSION" = "action_required" ]; then
+          echo "❌ Cursor bug check failed (check run: $CURSOR_CHECK_CONCLUSION)!"
+          CURSOR_CHECK_FAILED=true
+          break
+        elif [ "$CURSOR_CHECK_CONCLUSION" = "success" ]; then
+          echo "✅ Cursor bug check passed (check run: $CURSOR_CHECK_CONCLUSION)!"
+          CURSOR_CHECK_PASSED=true
+          break
+        elif [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
         echo "⚠️  Cursor check completed with neutral conclusion. Checking comments for bugs..."
         
         PR_COMMENTS_JSON=$(gh api repos/$GITHUB_REPOSITORY/pulls/$NEXT_PR_NUMBER/comments 2>/dev/null || echo "[]")
@@ -343,9 +346,10 @@ Cursor bug bot will run automatically on this PR."
         CURSOR_CHECK_FAILED=true
         break
       fi
-    elif [ -n "$CURSOR_CHECK_STATUS" ] && [ "$CURSOR_CHECK_STATUS" != "completed" ]; then
-      if [ "$SHOULD_LOG" = "true" ]; then
-        echo "⏳ Cursor check is in progress (status: $CURSOR_CHECK_STATUS). Waiting..."
+      elif [ "$CURSOR_CHECK_STATUS" != "completed" ]; then
+        if [ "$SHOULD_LOG" = "true" ]; then
+          echo "⏳ Cursor check is in progress (status: $CURSOR_CHECK_STATUS). Waiting..."
+        fi
       fi
     fi
     
