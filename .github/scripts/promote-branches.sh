@@ -10,72 +10,6 @@ echo "=========================================="
 echo "Processing PR #$PR_NUMBER: $PR_SOURCE → $PR_TARGET"
 echo "=========================================="
 
-echo "🔍 FINAL VERIFICATION: Checking Cursor Bugbot one last time before merge..."
-
-HEAD_SHA=$(gh pr view $PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "")
-
-CHECKS_JSON=$(gh api repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs 2>/dev/null || echo "{}")
-
-if command -v jq &> /dev/null; then
-  CURSOR_CHECK_CONCLUSION=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.name | ascii_downcase | contains("cursor")) | .conclusion // empty' | head -1 || echo "")
-else
-  CURSOR_CHECK_CONCLUSION=$(echo "$CHECKS_JSON" | grep -i "cursor" -A 10 | grep -oP '"conclusion":\s*"\K[^"]+' | head -1 || echo "")
-fi
-
-if [ "$CURSOR_CHECK_CONCLUSION" = "failure" ] || [ "$CURSOR_CHECK_CONCLUSION" = "action_required" ]; then
-  echo "❌❌❌ FINAL CHECK FAILED: Cursor Bugbot reports FAILURE. BLOCKING MERGE."
-  exit 1
-fi
-
-if [ -z "$CURSOR_CHECK_CONCLUSION" ] || [ "$CURSOR_CHECK_CONCLUSION" = "null" ] || [ "$CURSOR_CHECK_CONCLUSION" = "cancelled" ] || [ "$CURSOR_CHECK_CONCLUSION" = "skipped" ] || [ "$CURSOR_CHECK_CONCLUSION" = "timed_out" ] || [ "$CURSOR_CHECK_CONCLUSION" = "stale" ]; then
-  echo "❌❌❌ FINAL CHECK FAILED: Cursor check has unexpected conclusion ($CURSOR_CHECK_CONCLUSION). BLOCKING MERGE for safety."
-  exit 1
-fi
-
-PR_COMMENTS_JSON=$(gh api repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/comments 2>/dev/null || echo "[]")
-
-if command -v jq &> /dev/null; then
-  CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | jq -r '.[] | select(.user.login | ascii_downcase | contains("cursor") or (contains("[bot]") and contains("cursor"))) | .body' 2>/dev/null || echo "")
-else
-  CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | grep -i "cursor" -A 5 | grep -oP '"body":\s*"\K[^"]+' || echo "")
-fi
-
-if [ -n "$CURSOR_COMMENTS" ]; then
-  echo "🔍 DEBUG: Final verification - checking comments for bugs..."
-  echo "🔍 DEBUG: Comment preview: $(echo "$CURSOR_COMMENTS" | head -c 500)..."
-  
-  HAS_NO_BUGS_STATEMENT=false
-  if echo "$CURSOR_COMMENTS" | grep -qiE "\b(no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|no\s+problems?\s+found|passed|success)\b"; then
-    HAS_NO_BUGS_STATEMENT=true
-    echo "🔍 DEBUG: Found 'no bugs' statement in comments"
-  fi
-  
-  COMMENT_WITHOUT_NO_BUG=$(echo "$CURSOR_COMMENTS" | sed -e 's/no\s\+\(bugs\?\|issues\?\|errors\?\|problems\?\)\s\+\(found\|detected\|identified\)//gi' -e 's/all\s\+clear//gi' -e 's/no\s\+problems\?\s\+found//gi' -e 's/\bpassed\b//gi' -e 's/\bsuccess\b//gi')
-  
-  if echo "$COMMENT_WITHOUT_NO_BUG" | grep -qiE "(bugs?\s+(found|detected|identified)|issues?\s+(found|detected|identified|with)|errors?\s+(found|detected|identified)|problems?\s+(found|detected|identified)|(blocking|critical)\s+(bug|issue|error|problem)|must\s+fix|(failed|failing)\s+(check|test|validation))"; then
-    echo "❌❌❌ FINAL CHECK FAILED: Cursor comments contain bug-specific phrases! BLOCKING MERGE."
-    echo "🔍 DEBUG: Bug phrases found in: $(echo "$COMMENT_WITHOUT_NO_BUG" | grep -iE "(bugs?\s+(found|detected|identified)|issues?\s+(found|detected|identified|with)|errors?\s+(found|detected|identified)|problems?\s+(found|detected|identified)|(blocking|critical)\s+(bug|issue|error|problem)|must\s+fix|(failed|failing)\s+(check|test|validation))" | head -c 300)"
-    exit 1
-  fi
-fi
-
-if [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
-  if [ -z "$CURSOR_COMMENTS" ]; then
-    echo "❌❌❌ FINAL CHECK FAILED: Cursor check is neutral with no comments. BLOCKING MERGE for safety."
-    exit 1
-  elif [ "$HAS_NO_BUGS_STATEMENT" != "true" ]; then
-    echo "❌❌❌ FINAL CHECK FAILED: Cursor check is neutral but no explicit 'no bugs' statement. BLOCKING MERGE."
-    exit 1
-  else
-    echo "✅ Final verification passed. Neutral conclusion with 'no bugs' statement confirmed. Proceeding with merge..."
-  fi
-elif [ "$CURSOR_CHECK_CONCLUSION" != "success" ]; then
-  echo "❌❌❌ FINAL CHECK FAILED: Cursor check conclusion is not 'success' ($CURSOR_CHECK_CONCLUSION). BLOCKING MERGE."
-  exit 1
-else
-  echo "✅ Final verification passed. Proceeding with merge..."
-fi
-
 PR_STATE_BEFORE_MERGE=$(gh pr view $PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
 
 if [ "$PR_STATE_BEFORE_MERGE" = "merged" ] || [ "$PR_STATE_BEFORE_MERGE" = "closed" ]; then
@@ -296,51 +230,9 @@ Cursor bug bot will run automatically on this PR."
           CURSOR_CHECK_PASSED=true
           break
         elif [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
-        echo "⚠️  Cursor check completed with neutral conclusion. Checking comments for bugs..."
-        
-        PR_COMMENTS_JSON=$(gh api repos/$GITHUB_REPOSITORY/pulls/$NEXT_PR_NUMBER/comments 2>/dev/null || echo "[]")
-        
-        if command -v jq &> /dev/null; then
-          CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | jq -r '.[] | select(.user.login | ascii_downcase | contains("cursor") or (contains("[bot]") and contains("cursor"))) | .body' 2>/dev/null || echo "")
-        else
-          CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | grep -i "cursor" -A 5 | grep -oP '"body":\s*"\K[^"]+' || echo "")
-        fi
-        
-        if [ -n "$CURSOR_COMMENTS" ]; then
-          echo "🔍 DEBUG: Found Cursor comments. Analyzing for bugs..."
-          echo "🔍 DEBUG: Comment preview: $(echo "$CURSOR_COMMENTS" | head -c 500)..."
-          
-          HAS_NO_BUGS_STATEMENT=false
-          if echo "$CURSOR_COMMENTS" | grep -qiE "\b(no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|no\s+problems?\s+found|passed|success)\b"; then
-            HAS_NO_BUGS_STATEMENT=true
-            echo "🔍 DEBUG: Found 'no bugs' statement in comments"
-          fi
-          
-          COMMENT_WITHOUT_NO_BUG=$(echo "$CURSOR_COMMENTS" | sed -e 's/no\s\+\(bugs\?\|issues\?\|errors\?\|problems\?\)\s\+\(found\|detected\|identified\)//gi' -e 's/all\s\+clear//gi' -e 's/no\s\+problems\?\s\+found//gi' -e 's/\bpassed\b//gi' -e 's/\bsuccess\b//gi')
-          
-          if echo "$COMMENT_WITHOUT_NO_BUG" | grep -qiE "(bugs?\s+(found|detected|identified)|issues?\s+(found|detected|identified|with)|errors?\s+(found|detected|identified)|problems?\s+(found|detected|identified)|(blocking|critical)\s+(bug|issue|error|problem)|must\s+fix|(failed|failing)\s+(check|test|validation))"; then
-            echo "❌❌❌ BUG DETECTED: Cursor comments contain bug-specific phrases!"
-            echo "🔍 DEBUG: Bug phrases found in: $(echo "$COMMENT_WITHOUT_NO_BUG" | grep -iE "(bugs?\s+(found|detected|identified)|issues?\s+(found|detected|identified|with)|errors?\s+(found|detected|identified)|problems?\s+(found|detected|identified)|(blocking|critical)\s+(bug|issue|error|problem)|must\s+fix|(failed|failing)\s+(check|test|validation))" | head -c 300)"
-            echo "❌ Stopping workflow - bugs found!"
-            CURSOR_CHECK_FAILED=true
-            break
-          fi
-          
-          if [ "$HAS_NO_BUGS_STATEMENT" = "true" ]; then
-            echo "✅ Cursor comments explicitly state no bugs found. Proceeding with promotion."
-            CURSOR_CHECK_PASSED=true
-            break
-          else
-            echo "⚠️  Cursor check completed with neutral conclusion and comments exist, but no explicit 'no bugs' statement."
-            echo "🔍 DEBUG: Comments found but no clear 'no bugs' confirmation. Treating as failure for safety."
-            CURSOR_CHECK_FAILED=true
-            break
-          fi
-        else
-          echo "⚠️  Cursor check completed with neutral conclusion but no comments found. Treating as failure for safety."
+          echo "❌ Cursor check completed with neutral conclusion. Only 'success' conclusion is accepted. Stopping workflow."
           CURSOR_CHECK_FAILED=true
           break
-        fi
       elif [ -z "$CURSOR_CHECK_CONCLUSION" ] || [ "$CURSOR_CHECK_CONCLUSION" = "null" ]; then
         echo "⚠️  Cursor check completed but conclusion is null/unexpected. Treating as failure for safety."
         CURSOR_CHECK_FAILED=true
@@ -353,36 +245,6 @@ Cursor bug bot will run automatically on this PR."
       fi
     fi
     
-    PR_COMMENTS_JSON=$(gh api repos/$GITHUB_REPOSITORY/pulls/$NEXT_PR_NUMBER/comments 2>/dev/null || echo "[]")
-    
-    if command -v jq &> /dev/null; then
-      CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | jq -r '.[] | select(.user.login | ascii_downcase | contains("cursor") or (contains("[bot]") and contains("cursor"))) | .body' 2>/dev/null || echo "")
-    else
-      CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | grep -i "cursor" -A 5 | grep -oP '"body":\s*"\K[^"]+' || echo "")
-    fi
-    
-    if [ -n "$CURSOR_COMMENTS" ]; then
-      HAS_NO_BUGS_STATEMENT=false
-      if echo "$CURSOR_COMMENTS" | grep -qiE "\b(no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|no\s+problems?\s+found|passed|success)\b"; then
-        HAS_NO_BUGS_STATEMENT=true
-        if [ "$SHOULD_LOG" = "true" ]; then
-          echo "🔍 DEBUG: Found 'no bugs' statement in comments"
-        fi
-      fi
-      
-      COMMENT_WITHOUT_NO_BUG=$(echo "$CURSOR_COMMENTS" | sed -e 's/no\s\+\(bugs\?\|issues\?\|errors\?\|problems\?\)\s\+\(found\|detected\|identified\)//gi' -e 's/all\s\+clear//gi' -e 's/no\s\+problems\?\s\+found//gi' -e 's/\bpassed\b//gi' -e 's/\bsuccess\b//gi')
-      
-      if echo "$COMMENT_WITHOUT_NO_BUG" | grep -qiE "(bugs?\s+(found|detected|identified)|issues?\s+(found|detected|identified|with)|errors?\s+(found|detected|identified)|problems?\s+(found|detected|identified)|(blocking|critical)\s+(bug|issue|error|problem)|must\s+fix|(failed|failing)\s+(check|test|validation))"; then
-        echo "❌❌❌ BUG DETECTED: Cursor comments contain bug-specific phrases!"
-        echo "🔍 DEBUG: Bug phrases found. Stopping workflow."
-        CURSOR_CHECK_FAILED=true
-        break
-      elif [ "$HAS_NO_BUGS_STATEMENT" = "true" ]; then
-        echo "✅ Cursor comments explicitly state no bugs found. Proceeding with promotion."
-        CURSOR_CHECK_PASSED=true
-        break
-      fi
-    fi
     
     if [ "$SHOULD_LOG" = "true" ]; then
       echo "Waiting for Cursor check... (${ELAPSED}s/${MAX_WAIT}s)"
@@ -443,44 +305,7 @@ Cursor bug bot will run automatically on this PR."
     exit 1
   fi
   
-  PR_COMMENTS_JSON=$(gh api repos/$GITHUB_REPOSITORY/pulls/$NEXT_PR_NUMBER/comments 2>/dev/null || echo "[]")
-  
-  if command -v jq &> /dev/null; then
-    CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | jq -r '.[] | select(.user.login | ascii_downcase | contains("cursor") or (contains("[bot]") and contains("cursor"))) | .body' 2>/dev/null || echo "")
-  else
-    CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | grep -i "cursor" -A 5 | grep -oP '"body":\s*"\K[^"]+' || echo "")
-  fi
-  
-  if [ -n "$CURSOR_COMMENTS" ]; then
-    echo "🔍 DEBUG: Final verification - checking comments for bugs..."
-    echo "🔍 DEBUG: Comment preview: $(echo "$CURSOR_COMMENTS" | head -c 500)..."
-    
-    HAS_NO_BUGS_STATEMENT=false
-    if echo "$CURSOR_COMMENTS" | grep -qiE "\b(no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|no\s+problems?\s+found|passed|success)\b"; then
-      HAS_NO_BUGS_STATEMENT=true
-      echo "🔍 DEBUG: Found 'no bugs' statement in comments"
-    fi
-    
-    COMMENT_WITHOUT_NO_BUG=$(echo "$CURSOR_COMMENTS" | sed -e 's/no\s\+\(bugs\?\|issues\?\|errors\?\|problems\?\)\s\+\(found\|detected\|identified\)//gi' -e 's/all\s\+clear//gi' -e 's/no\s\+problems\?\s\+found//gi' -e 's/\bpassed\b//gi' -e 's/\bsuccess\b//gi')
-    
-    if echo "$COMMENT_WITHOUT_NO_BUG" | grep -qiE "(bugs?\s+(found|detected|identified)|issues?\s+(found|detected|identified|with)|errors?\s+(found|detected|identified)|problems?\s+(found|detected|identified)|(blocking|critical)\s+(bug|issue|error|problem)|must\s+fix|(failed|failing)\s+(check|test|validation))"; then
-      echo "❌❌❌ FINAL CHECK FAILED: Cursor comments contain bug-specific phrases! BLOCKING MERGE."
-      echo "🔍 DEBUG: Bug phrases found in: $(echo "$COMMENT_WITHOUT_NO_BUG" | grep -iE "(bugs?\s+(found|detected|identified)|issues?\s+(found|detected|identified|with)|errors?\s+(found|detected|identified)|problems?\s+(found|detected|identified)|(blocking|critical)\s+(bug|issue|error|problem)|must\s+fix|(failed|failing)\s+(check|test|validation))" | head -c 300)"
-      exit 1
-    fi
-  fi
-  
-  if [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
-    if [ -z "$CURSOR_COMMENTS" ]; then
-      echo "❌❌❌ FINAL CHECK FAILED: Cursor check is neutral with no comments. BLOCKING MERGE for safety."
-      exit 1
-    elif [ "$HAS_NO_BUGS_STATEMENT" != "true" ]; then
-      echo "❌❌❌ FINAL CHECK FAILED: Cursor check is neutral but no explicit 'no bugs' statement. BLOCKING MERGE."
-      exit 1
-    else
-      echo "✅ Final verification passed. Neutral conclusion with 'no bugs' statement confirmed. Proceeding with merge..."
-    fi
-  elif [ "$CURSOR_CHECK_CONCLUSION" != "success" ]; then
+  if [ "$CURSOR_CHECK_CONCLUSION" != "success" ]; then
     echo "❌❌❌ FINAL CHECK FAILED: Cursor check conclusion is not 'success' ($CURSOR_CHECK_CONCLUSION). BLOCKING MERGE."
     exit 1
   else
