@@ -13,8 +13,9 @@ echo "=========================================="
 INITIAL_PR_MERGE_COMPLETE=false
 
 PR_STATE_BEFORE_MERGE=$(gh pr view $PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
+PR_STATE_BEFORE_MERGE_LOWER=$(echo "$PR_STATE_BEFORE_MERGE" | tr '[:upper:]' '[:lower:]')
 
-if [ "$PR_STATE_BEFORE_MERGE" = "merged" ] || [ "$PR_STATE_BEFORE_MERGE" = "closed" ]; then
+if [ "$PR_STATE_BEFORE_MERGE_LOWER" = "merged" ] || [ "$PR_STATE_BEFORE_MERGE_LOWER" = "closed" ]; then
   echo "✅ PR #$PR_NUMBER was already merged. Verifying all actions have stopped..."
   
   HEAD_SHA=$(gh pr view $PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "")
@@ -55,8 +56,9 @@ else
       VERIFY_ELAPSED=$((VERIFY_ELAPSED + VERIFY_INTERVAL))
       
       PR_STATE_AFTER_MERGE=$(gh pr view $PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
+      PR_STATE_AFTER_MERGE_LOWER=$(echo "$PR_STATE_AFTER_MERGE" | tr '[:upper:]' '[:lower:]')
       
-      if [ "$PR_STATE_AFTER_MERGE" = "merged" ]; then
+      if [ "$PR_STATE_AFTER_MERGE_LOWER" = "merged" ]; then
         echo "✅ PR #$PR_NUMBER confirmed merged. Verifying all actions have stopped..."
         
         HEAD_SHA=$(gh pr view $PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "")
@@ -95,7 +97,8 @@ else
   elif echo "$MERGE_OUTPUT" | grep -qi "already merged\|already been merged"; then
     echo "✅ PR #$PR_NUMBER was already merged (detected during merge attempt). Verifying complete..."
     PR_STATE_AFTER_MERGE=$(gh pr view $PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
-    if [ "$PR_STATE_AFTER_MERGE" != "merged" ]; then
+    PR_STATE_AFTER_MERGE_LOWER=$(echo "$PR_STATE_AFTER_MERGE" | tr '[:upper:]' '[:lower:]')
+    if [ "$PR_STATE_AFTER_MERGE_LOWER" != "merged" ]; then
       echo "❌ PR state verification failed. Expected 'merged', got: ${PR_STATE_AFTER_MERGE:-unknown}"
       exit 1
     fi
@@ -284,8 +287,9 @@ Cursor bug bot will run automatically on this PR."
     fi
     
     PR_STATE=$(gh pr view $NEXT_PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
+    PR_STATE_LOWER=$(echo "$PR_STATE" | tr '[:upper:]' '[:lower:]')
     
-    if [ "$PR_STATE" = "closed" ] || [ "$PR_STATE" = "merged" ]; then
+    if [ "$PR_STATE_LOWER" = "closed" ] || [ "$PR_STATE_LOWER" = "merged" ]; then
       echo "❌ PR #$NEXT_PR_NUMBER was merged/closed while workflow was running!"
       echo "❌ This should not happen - PR was merged before Cursor check completed."
       echo "❌ Stopping to prevent unsafe deployment."
@@ -438,7 +442,9 @@ Cursor bug bot will run automatically on this PR."
   
   PR_STATE_BEFORE_MERGE=$(gh pr view $NEXT_PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
   
-  if [ "$PR_STATE_BEFORE_MERGE" = "merged" ] || [ "$PR_STATE_BEFORE_MERGE" = "closed" ]; then
+  PR_STATE_BEFORE_MERGE_LOWER=$(echo "$PR_STATE_BEFORE_MERGE" | tr '[:upper:]' '[:lower:]')
+  
+  if [ "$PR_STATE_BEFORE_MERGE_LOWER" = "merged" ] || [ "$PR_STATE_BEFORE_MERGE_LOWER" = "closed" ]; then
     echo "✅ PR #$NEXT_PR_NUMBER was already merged. Verifying all actions have stopped..."
     
     HEAD_SHA=$(gh pr view $NEXT_PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "")
@@ -477,8 +483,9 @@ Cursor bug bot will run automatically on this PR."
         VERIFY_ELAPSED=$((VERIFY_ELAPSED + VERIFY_INTERVAL))
         
         PR_STATE_AFTER_MERGE=$(gh pr view $NEXT_PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
+        PR_STATE_AFTER_MERGE_LOWER=$(echo "$PR_STATE_AFTER_MERGE" | tr '[:upper:]' '[:lower:]')
         
-        if [ "$PR_STATE_AFTER_MERGE" = "merged" ]; then
+        if [ "$PR_STATE_AFTER_MERGE_LOWER" = "merged" ]; then
           echo "✅ PR #$NEXT_PR_NUMBER confirmed merged. Verifying all actions have stopped..."
           
           HEAD_SHA=$(gh pr view $NEXT_PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "")
@@ -517,7 +524,8 @@ Cursor bug bot will run automatically on this PR."
     elif echo "$MERGE_OUTPUT" | grep -qi "already merged\|already been merged"; then
       echo "✅ PR #$NEXT_PR_NUMBER was already merged (detected during merge attempt). Verifying complete..."
       PR_STATE_AFTER_MERGE=$(gh pr view $NEXT_PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
-      if [ "$PR_STATE_AFTER_MERGE" != "merged" ]; then
+      PR_STATE_AFTER_MERGE_LOWER=$(echo "$PR_STATE_AFTER_MERGE" | tr '[:upper:]' '[:lower:]')
+      if [ "$PR_STATE_AFTER_MERGE_LOWER" != "merged" ]; then
         echo "❌ PR state verification failed. Expected 'merged', got: ${PR_STATE_AFTER_MERGE:-unknown}"
         exit 1
       fi
