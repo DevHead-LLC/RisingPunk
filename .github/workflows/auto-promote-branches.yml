@@ -40,7 +40,7 @@ jobs:
           PR_NUMBER="${{ github.event.pull_request.number }}"
           HEAD_SHA=$(gh pr view $PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "")
           
-          echo "⏳ Waiting for Cursor bot to appear and complete on PR #$PR_NUMBER before proceeding..."
+          echo "Waiting for Cursor bot to appear and complete on PR #$PR_NUMBER before proceeding..."
           
           MAX_WAIT=600
           WAIT_INTERVAL=10
@@ -98,7 +98,7 @@ jobs:
                   if command -v jq &> /dev/null; then
                     CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | jq -r '.[] | select(.user.login | ascii_downcase | contains("cursor") or (contains("[bot]") and contains("cursor"))) | .body' 2>/dev/null || echo "")
                   else
-                    CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | grep -i "cursor\|\[bot\]" -A 5 | grep -oP '"body":\s*"\K[^"]+' || echo "")
+                    CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | grep -i "cursor" -A 5 | grep -oP '"body":\s*"\K[^"]+' || echo "")
                   fi
                   
                   if [ -n "$CURSOR_COMMENTS" ]; then
@@ -178,7 +178,7 @@ jobs:
             if command -v jq &> /dev/null; then
               CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | jq -r '.[] | select(.user.login | ascii_downcase | contains("cursor") or (contains("[bot]") and contains("cursor"))) | .body' 2>/dev/null || echo "")
             else
-              CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | grep -i "cursor\|\[bot\]" -A 5 | grep -oP '"body":\s*"\K[^"]+' || echo "")
+              CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | grep -i "cursor" -A 5 | grep -oP '"body":\s*"\K[^"]+' || echo "")
             fi
             
             if [ -n "$CURSOR_COMMENTS" ]; then
@@ -303,15 +303,15 @@ jobs:
             elif [ "$HAS_NO_BUGS_STATEMENT" != "true" ]; then
               echo "❌❌❌ FINAL CHECK FAILED: Cursor check is neutral but no explicit 'no bugs' statement. BLOCKING MERGE."
               exit 1
+            else
+              echo "✅ Final verification passed. Neutral conclusion with 'no bugs' statement confirmed. Proceeding with merge..."
             fi
-          fi
-          
-          if [ "$CURSOR_CHECK_CONCLUSION" != "success" ]; then
+          elif [ "$CURSOR_CHECK_CONCLUSION" != "success" ]; then
             echo "❌❌❌ FINAL CHECK FAILED: Cursor check conclusion is not 'success' ($CURSOR_CHECK_CONCLUSION). BLOCKING MERGE."
             exit 1
+          else
+            echo "✅ Final verification passed. Proceeding with merge..."
           fi
-          
-          echo "✅ Final verification passed. Proceeding with merge..."
           
           PR_STATE_BEFORE_MERGE=$(gh pr view $PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
           
@@ -474,7 +474,7 @@ jobs:
                   if command -v jq &> /dev/null; then
                     CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | jq -r '.[] | select(.user.login | ascii_downcase | contains("cursor") or (contains("[bot]") and contains("cursor"))) | .body' 2>/dev/null || echo "")
                   else
-                    CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | grep -i "cursor\|\[bot\]" -A 5 | grep -oP '"body":\s*"\K[^"]+' || echo "")
+                    CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | grep -i "cursor" -A 5 | grep -oP '"body":\s*"\K[^"]+' || echo "")
                   fi
                   
                   if [ -n "$CURSOR_COMMENTS" ]; then
@@ -532,7 +532,7 @@ jobs:
               if command -v jq &> /dev/null; then
                 CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | jq -r '.[] | select(.user.login | ascii_downcase | contains("cursor") or (contains("[bot]") and contains("cursor"))) | .body' 2>/dev/null || echo "")
               else
-                CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | grep -i "cursor\|\[bot\]" -A 5 | grep -oP '"body":\s*"\K[^"]+' || echo "")
+                CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | grep -i "cursor" -A 5 | grep -oP '"body":\s*"\K[^"]+' || echo "")
               fi
               
               if [ -n "$CURSOR_COMMENTS" ]; then
@@ -614,7 +614,7 @@ jobs:
             if command -v jq &> /dev/null; then
               CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | jq -r '.[] | select(.user.login | ascii_downcase | contains("cursor") or (contains("[bot]") and contains("cursor"))) | .body' 2>/dev/null || echo "")
             else
-              CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | grep -i "cursor\|\[bot\]" -A 5 | grep -oP '"body":\s*"\K[^"]+' || echo "")
+              CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | grep -i "cursor" -A 5 | grep -oP '"body":\s*"\K[^"]+' || echo "")
             fi
             
             if [ -n "$CURSOR_COMMENTS" ]; then
@@ -646,15 +646,15 @@ jobs:
               elif [ "$HAS_NO_BUGS_STATEMENT" != "true" ]; then
                 echo "❌❌❌ FINAL CHECK FAILED: Cursor check is neutral but no explicit 'no bugs' statement. BLOCKING MERGE."
                 exit 1
+              else
+                echo "✅ Final verification passed. Neutral conclusion with 'no bugs' statement confirmed. Proceeding with merge..."
               fi
-            fi
-            
-            if [ "$CURSOR_CHECK_CONCLUSION" != "success" ]; then
+            elif [ "$CURSOR_CHECK_CONCLUSION" != "success" ]; then
               echo "❌❌❌ FINAL CHECK FAILED: Cursor check conclusion is not 'success' ($CURSOR_CHECK_CONCLUSION). BLOCKING MERGE."
               exit 1
+            else
+              echo "✅ Final verification passed. Merging PR #$NEXT_PR_NUMBER: $CURRENT_SOURCE → $TARGET"
             fi
-            
-            echo "✅ Final verification passed. Merging PR #$NEXT_PR_NUMBER: $CURRENT_SOURCE → $TARGET"
             
             PR_STATE_BEFORE_MERGE=$(gh pr view $NEXT_PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
             
