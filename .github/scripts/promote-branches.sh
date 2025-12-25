@@ -23,7 +23,7 @@ if [ "$PR_STATE_BEFORE_MERGE" = "merged" ] || [ "$PR_STATE_BEFORE_MERGE" = "clos
   if command -v jq &> /dev/null; then
     RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | .name' 2>/dev/null || echo "")
   else
-    RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -i "status" | grep -v "completed" | head -1 || echo "")
+    RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
   fi
   
   if [ -n "$RUNNING_CHECKS" ]; then
@@ -65,7 +65,7 @@ else
         if command -v jq &> /dev/null; then
           RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | .name' 2>/dev/null || echo "")
         else
-          RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -i "status" | grep -v "completed" | head -1 || echo "")
+          RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
         fi
         
         if [ -z "$RUNNING_CHECKS" ]; then
@@ -106,7 +106,7 @@ else
     if command -v jq &> /dev/null; then
       RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | .name' 2>/dev/null || echo "")
     else
-      RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -i "status" | grep -v "completed" | head -1 || echo "")
+      RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
     fi
     
     if [ -n "$RUNNING_CHECKS" ]; then
@@ -447,7 +447,7 @@ Cursor bug bot will run automatically on this PR."
     if command -v jq &> /dev/null; then
       RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | .name' 2>/dev/null || echo "")
     else
-      RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -i "status" | grep -v "completed" | head -1 || echo "")
+      RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
     fi
     
     if [ -n "$RUNNING_CHECKS" ]; then
@@ -487,7 +487,7 @@ Cursor bug bot will run automatically on this PR."
           if command -v jq &> /dev/null; then
             RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | .name' 2>/dev/null || echo "")
           else
-            RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -i "status" | grep -v "completed" | head -1 || echo "")
+            RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
           fi
           
           if [ -z "$RUNNING_CHECKS" ]; then
@@ -528,7 +528,7 @@ Cursor bug bot will run automatically on this PR."
       if command -v jq &> /dev/null; then
         RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | .name' 2>/dev/null || echo "")
       else
-        RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -i "status" | grep -v "completed" | head -1 || echo "")
+        RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
       fi
       
       if [ -n "$RUNNING_CHECKS" ]; then
