@@ -83,11 +83,15 @@ if [ "$PR_STATE_BEFORE_MERGE" = "merged" ] || [ "$PR_STATE_BEFORE_MERGE" = "clos
 else
   echo "Merging PR #$PR_NUMBER: $PR_SOURCE → $PR_TARGET"
   
+  set +e
   MERGE_OUTPUT=$(gh pr merge $PR_NUMBER --merge --delete-branch=false 2>&1)
   MERGE_EXIT_CODE=$?
+  set -e
   
   if [ $MERGE_EXIT_CODE -eq 0 ]; then
     echo "✅ Successfully merged PR #$PR_NUMBER: $PR_SOURCE → $PR_TARGET"
+    echo "⏳ Waiting 3 seconds for merge to propagate..."
+    sleep 3
   elif echo "$MERGE_OUTPUT" | grep -qi "already merged\|already been merged"; then
     echo "✅ PR #$PR_NUMBER was already merged (detected during merge attempt). Continuing..."
   else
@@ -99,6 +103,11 @@ fi
 
 BRANCHES=("dev" "main" "staging" "prod")
 CURRENT_SOURCE="$PR_TARGET"
+
+echo "=========================================="
+echo "Starting promotion chain from: $CURRENT_SOURCE"
+echo "Promotion chain: dev → main → staging → prod"
+echo "=========================================="
 
 for i in "${!BRANCHES[@]}"; do
   if [ "${BRANCHES[$i]}" = "$PR_TARGET" ]; then
@@ -137,8 +146,7 @@ Cursor bug bot will run automatically on this PR."
       --base "$TARGET" \
       --head "$CURRENT_SOURCE" \
       --title "$PR_TITLE" \
-      --body "$PR_BODY" \
-      --draft false 2>&1)
+      --body "$PR_BODY" 2>&1)
     CREATE_EXIT_CODE=$?
     set -e
     NEXT_PR_NUMBER=$(echo "$CREATE_OUTPUT" | grep -oP 'pull/\K[0-9]+' || echo "")
@@ -464,8 +472,10 @@ Cursor bug bot will run automatically on this PR."
   if [ "$PR_STATE_BEFORE_MERGE" = "merged" ] || [ "$PR_STATE_BEFORE_MERGE" = "closed" ]; then
     echo "✅ PR #$NEXT_PR_NUMBER was already merged. Continuing to next branch..."
   else
+    set +e
     MERGE_OUTPUT=$(gh pr merge $NEXT_PR_NUMBER --merge --delete-branch=false 2>&1)
     MERGE_EXIT_CODE=$?
+    set -e
     
     if [ $MERGE_EXIT_CODE -eq 0 ]; then
       echo "✅ Successfully merged PR #$NEXT_PR_NUMBER: $CURRENT_SOURCE → $TARGET"
