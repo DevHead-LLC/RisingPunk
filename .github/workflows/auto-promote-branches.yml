@@ -275,14 +275,14 @@ jobs:
             
             # FIRST: Check for explicit "no bugs" statements (must check FIRST to avoid false positives)
             HAS_NO_BUGS_STATEMENT=false
-            if echo "$CURSOR_COMMENTS" | grep -qiE "\b(no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|no\s+problems?\s+found)\b"; then
+            if echo "$CURSOR_COMMENTS" | grep -qiE "\b(no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|no\s+problems?\s+found|passed|success)\b"; then
               HAS_NO_BUGS_STATEMENT=true
               echo "🔍 DEBUG: Found 'no bugs' statement in comments"
             fi
             
             # SECOND: Check for bug keywords (including plural forms)
-            # Remove "no bug" context to avoid false positives from "No bug found"
-            COMMENT_WITHOUT_NO_BUG=$(echo "$CURSOR_COMMENTS" | sed 's/no\s\+\(bugs\?\|issues\?\|errors\?\|problems\?\)\s\+\(found\|detected\|identified\)//gi')
+            # Remove "no bug" context and success indicators to avoid false positives
+            COMMENT_WITHOUT_NO_BUG=$(echo "$CURSOR_COMMENTS" | sed -e 's/no\s\+\(bugs\?\|issues\?\|errors\?\|problems\?\)\s\+\(found\|detected\|identified\)//gi' -e 's/all\s\+clear//gi' -e 's/no\s\+problems\?\s\+found//gi' -e 's/\bpassed\b//gi' -e 's/\bsuccess\b//gi')
             
             if echo "$COMMENT_WITHOUT_NO_BUG" | grep -qiE "\b(bugs?|issues?|errors?|problems?|warning|warnings|inconsistent|incorrect|wrong|missing|broken|fail|fails|failed|failure)\b"; then
               echo "❌❌❌ FINAL CHECK FAILED: Cursor comments contain bug-related keywords! BLOCKING MERGE."
@@ -528,14 +528,14 @@ jobs:
               if [ -n "$CURSOR_COMMENTS" ]; then
                 # FIRST: Check for explicit "no bugs" statements (must check FIRST to avoid false positives)
                 HAS_NO_BUGS_STATEMENT=false
-                if echo "$CURSOR_COMMENTS" | grep -qiE "\b(no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|no\s+problems?\s+found)\b"; then
+                if echo "$CURSOR_COMMENTS" | grep -qiE "\b(no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|no\s+problems?\s+found|passed|success)\b"; then
                   HAS_NO_BUGS_STATEMENT=true
                   echo "🔍 DEBUG: Found 'no bugs' statement in comments"
                 fi
                 
                 # SECOND: Check for bug keywords (including plural forms)
-                # Remove "no bug" context to avoid false positives from "No bug found"
-                COMMENT_WITHOUT_NO_BUG=$(echo "$CURSOR_COMMENTS" | sed 's/no\s\+\(bugs\?\|issues\?\|errors\?\|problems\?\)\s\+\(found\|detected\|identified\)//gi')
+                # Remove "no bug" context and success indicators to avoid false positives
+                COMMENT_WITHOUT_NO_BUG=$(echo "$CURSOR_COMMENTS" | sed -e 's/no\s\+\(bugs\?\|issues\?\|errors\?\|problems\?\)\s\+\(found\|detected\|identified\)//gi' -e 's/all\s\+clear//gi' -e 's/no\s\+problems\?\s\+found//gi' -e 's/\bpassed\b//gi' -e 's/\bsuccess\b//gi')
                 
                 if echo "$COMMENT_WITHOUT_NO_BUG" | grep -qiE "\b(bugs?|issues?|errors?|problems?|warning|warnings|inconsistent|incorrect|wrong|missing|broken|fail|fails|failed|failure)\b"; then
                   echo "❌❌❌ BUG DETECTED: Cursor comments contain bug-related keywords!"
@@ -608,14 +608,14 @@ jobs:
               
               # FIRST: Check for explicit "no bugs" statements (must check FIRST to avoid false positives)
               HAS_NO_BUGS_STATEMENT=false
-              if echo "$CURSOR_COMMENTS" | grep -qiE "\b(no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|no\s+problems?\s+found)\b"; then
+              if echo "$CURSOR_COMMENTS" | grep -qiE "\b(no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|no\s+problems?\s+found|passed|success)\b"; then
                 HAS_NO_BUGS_STATEMENT=true
                 echo "🔍 DEBUG: Found 'no bugs' statement in comments"
               fi
               
               # SECOND: Check for bug keywords (including plural forms)
-              # Remove "no bug" context to avoid false positives from "No bug found"
-              COMMENT_WITHOUT_NO_BUG=$(echo "$CURSOR_COMMENTS" | sed 's/no\s\+\(bugs\?\|issues\?\|errors\?\|problems\?\)\s\+\(found\|detected\|identified\)//gi')
+              # Remove "no bug" context and success indicators to avoid false positives
+              COMMENT_WITHOUT_NO_BUG=$(echo "$CURSOR_COMMENTS" | sed -e 's/no\s\+\(bugs\?\|issues\?\|errors\?\|problems\?\)\s\+\(found\|detected\|identified\)//gi' -e 's/all\s\+clear//gi' -e 's/no\s\+problems\?\s\+found//gi' -e 's/\bpassed\b//gi' -e 's/\bsuccess\b//gi')
               
               if echo "$COMMENT_WITHOUT_NO_BUG" | grep -qiE "\b(bugs?|issues?|errors?|problems?|warning|warnings|inconsistent|incorrect|wrong|missing|broken|fail|fails|failed|failure)\b"; then
                 echo "❌❌❌ FINAL CHECK FAILED: Cursor comments contain bug-related keywords! BLOCKING MERGE."
