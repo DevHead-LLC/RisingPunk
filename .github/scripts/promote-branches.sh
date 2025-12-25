@@ -148,13 +148,13 @@ Cursor bug bot will run automatically on this PR."
       echo "🔍 DEBUG: Create output: $CREATE_OUTPUT"
       
       if echo "$CREATE_OUTPUT" | grep -qiE "(already exists|no commits|no changes|nothing to compare|branches are the same)"; then
-        echo "ℹ️  PR may already exist or branches are in sync. Checking for existing PR..."
-        EXISTING_PR=$(gh pr list --base "$TARGET" --head "$CURRENT_SOURCE" --state all --json number -q '.[0].number' 2>/dev/null || echo "")
+        echo "ℹ️  PR may already exist or branches are in sync. Checking for existing open PR..."
+        EXISTING_PR=$(gh pr list --base "$TARGET" --head "$CURRENT_SOURCE" --state open --json number -q '.[0].number' 2>/dev/null || echo "")
         if [ -n "$EXISTING_PR" ]; then
-          echo "✅ Found existing PR #$EXISTING_PR. Using it."
+          echo "✅ Found existing open PR #$EXISTING_PR. Using it."
           NEXT_PR_NUMBER="$EXISTING_PR"
         else
-          echo "ℹ️  No existing PR found. Branches may be in sync (no changes to promote)."
+          echo "ℹ️  No existing open PR found. Branches may be in sync (no changes to promote)."
           echo "✅ Skipping promotion from $CURRENT_SOURCE to $TARGET (no changes)"
           CURRENT_SOURCE="$TARGET"
           continue
@@ -178,13 +178,13 @@ Cursor bug bot will run automatically on this PR."
           echo "$PR_RESPONSE"
           
           if echo "$PR_RESPONSE" | grep -qiE "(already exists|pull request already exists)"; then
-            echo "ℹ️  PR already exists. Checking for existing PR..."
-            EXISTING_PR=$(gh pr list --base "$TARGET" --head "$CURRENT_SOURCE" --state all --json number -q '.[0].number' 2>/dev/null || echo "")
+            echo "ℹ️  PR already exists. Checking for existing open PR..."
+            EXISTING_PR=$(gh pr list --base "$TARGET" --head "$CURRENT_SOURCE" --state open --json number -q '.[0].number' 2>/dev/null || echo "")
             if [ -n "$EXISTING_PR" ]; then
-              echo "✅ Found existing PR #$EXISTING_PR. Using it."
+              echo "✅ Found existing open PR #$EXISTING_PR. Using it."
               NEXT_PR_NUMBER="$EXISTING_PR"
             else
-              echo "❌ Failed to find existing PR despite 'already exists' error"
+              echo "❌ Failed to find existing open PR despite 'already exists' error"
               exit 1
             fi
           elif echo "$PR_RESPONSE" | grep -qiE "(no commits|no changes|nothing to compare|branches are the same|no difference)"; then
