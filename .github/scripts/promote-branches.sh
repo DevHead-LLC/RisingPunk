@@ -24,9 +24,20 @@ if [ "$PR_STATE_BEFORE_MERGE_LOWER" = "merged" ] || [ "$PR_STATE_BEFORE_MERGE_LO
   if command -v jq &> /dev/null; then
     RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
   else
-    RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
-    if [ -n "$RUNNING_CHECKS" ]; then
-      RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -v -i "promote" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
+    RUNNING_CHECK_CONTEXT=$(echo "$CHECKS_JSON" | grep -B 30 -E '"status"\s*:\s*"(in_progress|queued)"' | head -30 || echo "")
+    if [ -n "$RUNNING_CHECK_CONTEXT" ]; then
+      if echo "$RUNNING_CHECK_CONTEXT" | grep -qi "promote"; then
+        RUNNING_CHECKS=""
+      else
+        CHECK_NAME=$(echo "$RUNNING_CHECK_CONTEXT" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | grep -oE '"[^"]+"' | tr -d '"' || echo "")
+        if [ -n "$CHECK_NAME" ]; then
+          RUNNING_CHECKS="$CHECK_NAME"
+        else
+          RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
+        fi
+      fi
+    else
+      RUNNING_CHECKS=""
     fi
   fi
   
@@ -70,9 +81,20 @@ else
         if command -v jq &> /dev/null; then
           RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
         else
-          RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
-          if [ -n "$RUNNING_CHECKS" ]; then
-            RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -v -i "promote" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
+          RUNNING_CHECK_CONTEXT=$(echo "$CHECKS_JSON" | grep -B 30 -E '"status"\s*:\s*"(in_progress|queued)"' | head -30 || echo "")
+          if [ -n "$RUNNING_CHECK_CONTEXT" ]; then
+            if echo "$RUNNING_CHECK_CONTEXT" | grep -qi "promote"; then
+              RUNNING_CHECKS=""
+            else
+              CHECK_NAME=$(echo "$RUNNING_CHECK_CONTEXT" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | grep -oE '"[^"]+"' | tr -d '"' || echo "")
+              if [ -n "$CHECK_NAME" ]; then
+                RUNNING_CHECKS="$CHECK_NAME"
+              else
+                RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
+              fi
+            fi
+          else
+            RUNNING_CHECKS=""
           fi
         fi
         
@@ -115,9 +137,20 @@ else
     if command -v jq &> /dev/null; then
       RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
     else
-      RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
-      if [ -n "$RUNNING_CHECKS" ]; then
-        RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -v -i "promote" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
+      RUNNING_CHECK_CONTEXT=$(echo "$CHECKS_JSON" | grep -B 30 -E '"status"\s*:\s*"(in_progress|queued)"' | head -30 || echo "")
+      if [ -n "$RUNNING_CHECK_CONTEXT" ]; then
+        if echo "$RUNNING_CHECK_CONTEXT" | grep -qi "promote"; then
+          RUNNING_CHECKS=""
+        else
+          CHECK_NAME=$(echo "$RUNNING_CHECK_CONTEXT" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | grep -oE '"[^"]+"' | tr -d '"' || echo "")
+          if [ -n "$CHECK_NAME" ]; then
+            RUNNING_CHECKS="$CHECK_NAME"
+          else
+            RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
+          fi
+        fi
+      else
+        RUNNING_CHECKS=""
       fi
     fi
     
@@ -462,9 +495,20 @@ Cursor bug bot will run automatically on this PR."
     if command -v jq &> /dev/null; then
       RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
     else
-      RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
-      if [ -n "$RUNNING_CHECKS" ]; then
-        RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -v -i "promote" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
+      RUNNING_CHECK_CONTEXT=$(echo "$CHECKS_JSON" | grep -B 30 -E '"status"\s*:\s*"(in_progress|queued)"' | head -30 || echo "")
+      if [ -n "$RUNNING_CHECK_CONTEXT" ]; then
+        if echo "$RUNNING_CHECK_CONTEXT" | grep -qi "promote"; then
+          RUNNING_CHECKS=""
+        else
+          CHECK_NAME=$(echo "$RUNNING_CHECK_CONTEXT" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | grep -oE '"[^"]+"' | tr -d '"' || echo "")
+          if [ -n "$CHECK_NAME" ]; then
+            RUNNING_CHECKS="$CHECK_NAME"
+          else
+            RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
+          fi
+        fi
+      else
+        RUNNING_CHECKS=""
       fi
     fi
     
@@ -506,9 +550,20 @@ Cursor bug bot will run automatically on this PR."
           if command -v jq &> /dev/null; then
             RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
           else
-            RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
-            if [ -n "$RUNNING_CHECKS" ]; then
-              RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -v -i "promote" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
+            RUNNING_CHECK_CONTEXT=$(echo "$CHECKS_JSON" | grep -B 30 -E '"status"\s*:\s*"(in_progress|queued)"' | head -30 || echo "")
+            if [ -n "$RUNNING_CHECK_CONTEXT" ]; then
+              if echo "$RUNNING_CHECK_CONTEXT" | grep -qi "promote"; then
+                RUNNING_CHECKS=""
+              else
+                CHECK_NAME=$(echo "$RUNNING_CHECK_CONTEXT" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | grep -oE '"[^"]+"' | tr -d '"' || echo "")
+                if [ -n "$CHECK_NAME" ]; then
+                  RUNNING_CHECKS="$CHECK_NAME"
+                else
+                  RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
+                fi
+              fi
+            else
+              RUNNING_CHECKS=""
             fi
           fi
           
@@ -551,9 +606,20 @@ Cursor bug bot will run automatically on this PR."
     if command -v jq &> /dev/null; then
       RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
     else
-      RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
-      if [ -n "$RUNNING_CHECKS" ]; then
-        RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -v -i "promote" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
+      RUNNING_CHECK_CONTEXT=$(echo "$CHECKS_JSON" | grep -B 30 -E '"status"\s*:\s*"(in_progress|queued)"' | head -30 || echo "")
+      if [ -n "$RUNNING_CHECK_CONTEXT" ]; then
+        if echo "$RUNNING_CHECK_CONTEXT" | grep -qi "promote"; then
+          RUNNING_CHECKS=""
+        else
+          CHECK_NAME=$(echo "$RUNNING_CHECK_CONTEXT" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | grep -oE '"[^"]+"' | tr -d '"' || echo "")
+          if [ -n "$CHECK_NAME" ]; then
+            RUNNING_CHECKS="$CHECK_NAME"
+          else
+            RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
+          fi
+        fi
+      else
+        RUNNING_CHECKS=""
       fi
     fi
     
