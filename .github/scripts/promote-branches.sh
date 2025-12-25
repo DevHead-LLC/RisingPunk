@@ -132,6 +132,7 @@ This PR was created automatically by the branch promotion workflow.
 Cursor bug bot will run automatically on this PR."
     
     echo "Creating PR: $CURRENT_SOURCE → $TARGET"
+    set +e
     CREATE_OUTPUT=$(gh pr create \
       --base "$TARGET" \
       --head "$CURRENT_SOURCE" \
@@ -139,6 +140,7 @@ Cursor bug bot will run automatically on this PR."
       --body "$PR_BODY" \
       --draft false 2>&1)
     CREATE_EXIT_CODE=$?
+    set -e
     NEXT_PR_NUMBER=$(echo "$CREATE_OUTPUT" | grep -oP 'pull/\K[0-9]+' || echo "")
     
     if [ -z "$NEXT_PR_NUMBER" ]; then
