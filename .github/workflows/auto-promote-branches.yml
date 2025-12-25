@@ -40,7 +40,7 @@ jobs:
           PR_NUMBER="${{ github.event.pull_request.number }}"
           HEAD_SHA=$(gh pr view $PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "")
           
-          echo "Waiting for Cursor bot to appear and complete on PR #$PR_NUMBER before proceeding..."
+          echo "⏳ Waiting for Cursor bot to appear and complete on PR #$PR_NUMBER before proceeding..."
           
           MAX_WAIT=600
           WAIT_INTERVAL=10
