@@ -1711,7 +1711,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                   } else if (isDisbandCrew) {
                     handleDisbandCrewPress();
                   } else {
-                    console.log(`${buttonText} pressed`);
+                    console.log(`${buttonText} pressed!`);
                   }
                 }}
                 activeOpacity={0.7}
