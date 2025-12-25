@@ -142,6 +142,8 @@ jobs:
           fi
           
           if [ "$CURSOR_CHECK_PASSED" = "true" ]; then
+            echo "✅ Cursor bot check COMPLETE: conclusion = 'success'"
+            echo "✅ Setting completion flag: cursor_completed=true"
             echo "cursor_completed=true" >> $GITHUB_OUTPUT
           elif [ "$CURSOR_CHECK_FOUND" = "false" ]; then
             echo "⚠️  Cursor bot did not appear within timeout (${MAX_WAIT}s). Stopping workflow."
