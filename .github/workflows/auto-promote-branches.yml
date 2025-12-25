@@ -231,9 +231,10 @@ jobs:
             exit 1
           fi
 
-      - name: Process PR and continue promotion chain
+      - name: Create promotion script
         if: steps.wait_for_cursor.outputs.cursor_completed == 'true'
         run: |
+          cat > /tmp/promote.sh << SCRIPT_EOF
           set -e
           
           PR_NUMBER="${{ github.event.pull_request.number }}"
@@ -271,22 +272,19 @@ jobs:
           if command -v jq &> /dev/null; then
             CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | jq -r '.[] | select(.user.login | ascii_downcase | contains("cursor") or (contains("[bot]") and contains("cursor"))) | .body' 2>/dev/null || echo "")
           else
-            CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | grep -i "cursor\|\[bot\]" -A 5 | grep -oP '"body":\s*"\K[^"]+' || echo "")
+            CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | grep -i "cursor" -A 5 | grep -oP '"body":\s*"\K[^"]+' || echo "")
           fi
           
           if [ -n "$CURSOR_COMMENTS" ]; then
             echo "🔍 DEBUG: Final verification - checking comments for bugs..."
             echo "🔍 DEBUG: Comment preview: $(echo "$CURSOR_COMMENTS" | head -c 500)..."
             
-            # FIRST: Check for explicit "no bugs" statements (must check FIRST to avoid false positives)
             HAS_NO_BUGS_STATEMENT=false
             if echo "$CURSOR_COMMENTS" | grep -qiE "\b(no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|no\s+problems?\s+found|passed|success)\b"; then
               HAS_NO_BUGS_STATEMENT=true
               echo "🔍 DEBUG: Found 'no bugs' statement in comments"
             fi
             
-            # SECOND: Check for bug-specific phrases (not standalone words to avoid false positives)
-            # Remove "no bug" context and success indicators to avoid false positives
             COMMENT_WITHOUT_NO_BUG=$(echo "$CURSOR_COMMENTS" | sed -e 's/no\s\+\(bugs\?\|issues\?\|errors\?\|problems\?\)\s\+\(found\|detected\|identified\)//gi' -e 's/all\s\+clear//gi' -e 's/no\s\+problems\?\s\+found//gi' -e 's/\bpassed\b//gi' -e 's/\bsuccess\b//gi')
             
             if echo "$COMMENT_WITHOUT_NO_BUG" | grep -qiE "(bugs?\s+(found|detected|identified)|issues?\s+(found|detected|identified|with)|errors?\s+(found|detected|identified)|problems?\s+(found|detected|identified)|(blocking|critical)\s+(bug|issue|error|problem)|must\s+fix|(failed|failing)\s+(check|test|validation))"; then
@@ -481,15 +479,12 @@ jobs:
                     echo "🔍 DEBUG: Found Cursor comments. Analyzing for bugs..."
                     echo "🔍 DEBUG: Comment preview: $(echo "$CURSOR_COMMENTS" | head -c 500)..."
                     
-                    # FIRST: Check for explicit "no bugs" statements (must check FIRST to avoid false positives)
                     HAS_NO_BUGS_STATEMENT=false
                     if echo "$CURSOR_COMMENTS" | grep -qiE "\b(no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|no\s+problems?\s+found|passed|success)\b"; then
                       HAS_NO_BUGS_STATEMENT=true
                       echo "🔍 DEBUG: Found 'no bugs' statement in comments"
                     fi
                     
-                    # SECOND: Check for bug-specific phrases (not standalone words to avoid false positives)
-                    # Remove "no bug" context and success indicators to avoid false positives
                     COMMENT_WITHOUT_NO_BUG=$(echo "$CURSOR_COMMENTS" | sed -e 's/no\s\+\(bugs\?\|issues\?\|errors\?\|problems\?\)\s\+\(found\|detected\|identified\)//gi' -e 's/all\s\+clear//gi' -e 's/no\s\+problems\?\s\+found//gi' -e 's/\bpassed\b//gi' -e 's/\bsuccess\b//gi')
                     
                     if echo "$COMMENT_WITHOUT_NO_BUG" | grep -qiE "(bugs?\s+(found|detected|identified)|issues?\s+(found|detected|identified|with)|errors?\s+(found|detected|identified)|problems?\s+(found|detected|identified)|(blocking|critical)\s+(bug|issue|error|problem)|must\s+fix|(failed|failing)\s+(check|test|validation))"; then
@@ -500,7 +495,6 @@ jobs:
                       break
                     fi
                     
-                    # THIRD: If we have "no bugs" statement and no bug keywords, PASS
                     if [ "$HAS_NO_BUGS_STATEMENT" = "true" ]; then
                       echo "✅ Cursor comments explicitly state no bugs found. Proceeding with promotion."
                       CURSOR_CHECK_PASSED=true
@@ -536,15 +530,12 @@ jobs:
               fi
               
               if [ -n "$CURSOR_COMMENTS" ]; then
-                # FIRST: Check for explicit "no bugs" statements (must check FIRST to avoid false positives)
                 HAS_NO_BUGS_STATEMENT=false
                 if echo "$CURSOR_COMMENTS" | grep -qiE "\b(no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|no\s+problems?\s+found|passed|success)\b"; then
                   HAS_NO_BUGS_STATEMENT=true
                   echo "🔍 DEBUG: Found 'no bugs' statement in comments"
                 fi
                 
-                # SECOND: Check for bug-specific phrases (not standalone words to avoid false positives)
-                # Remove "no bug" context and success indicators to avoid false positives
                 COMMENT_WITHOUT_NO_BUG=$(echo "$CURSOR_COMMENTS" | sed -e 's/no\s\+\(bugs\?\|issues\?\|errors\?\|problems\?\)\s\+\(found\|detected\|identified\)//gi' -e 's/all\s\+clear//gi' -e 's/no\s\+problems\?\s\+found//gi' -e 's/\bpassed\b//gi' -e 's/\bsuccess\b//gi')
                 
                 if echo "$COMMENT_WITHOUT_NO_BUG" | grep -qiE "(bugs?\s+(found|detected|identified)|issues?\s+(found|detected|identified|with)|errors?\s+(found|detected|identified)|problems?\s+(found|detected|identified)|(blocking|critical)\s+(bug|issue|error|problem)|must\s+fix|(failed|failing)\s+(check|test|validation))"; then
@@ -552,7 +543,6 @@ jobs:
                   echo "🔍 DEBUG: Bug phrases found. Stopping workflow."
                   CURSOR_CHECK_FAILED=true
                   break
-                # THIRD: If we have "no bugs" statement and no bug keywords, PASS
                 elif [ "$HAS_NO_BUGS_STATEMENT" = "true" ]; then
                   echo "✅ Cursor comments explicitly state no bugs found. Proceeding with promotion."
                   CURSOR_CHECK_PASSED=true
@@ -621,15 +611,12 @@ jobs:
               echo "🔍 DEBUG: Final verification - checking comments for bugs..."
               echo "🔍 DEBUG: Comment preview: $(echo "$CURSOR_COMMENTS" | head -c 500)..."
               
-              # FIRST: Check for explicit "no bugs" statements (must check FIRST to avoid false positives)
               HAS_NO_BUGS_STATEMENT=false
               if echo "$CURSOR_COMMENTS" | grep -qiE "\b(no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|no\s+problems?\s+found|passed|success)\b"; then
                 HAS_NO_BUGS_STATEMENT=true
                 echo "🔍 DEBUG: Found 'no bugs' statement in comments"
               fi
               
-              # SECOND: Check for bug-specific phrases (not standalone words to avoid false positives)
-              # Remove "no bug" context and success indicators to avoid false positives
               COMMENT_WITHOUT_NO_BUG=$(echo "$CURSOR_COMMENTS" | sed -e 's/no\s\+\(bugs\?\|issues\?\|errors\?\|problems\?\)\s\+\(found\|detected\|identified\)//gi' -e 's/all\s\+clear//gi' -e 's/no\s\+problems\?\s\+found//gi' -e 's/\bpassed\b//gi' -e 's/\bsuccess\b//gi')
               
               if echo "$COMMENT_WITHOUT_NO_BUG" | grep -qiE "(bugs?\s+(found|detected|identified)|issues?\s+(found|detected|identified|with)|errors?\s+(found|detected|identified)|problems?\s+(found|detected|identified)|(blocking|critical)\s+(bug|issue|error|problem)|must\s+fix|(failed|failing)\s+(check|test|validation))"; then
@@ -688,3 +675,9 @@ jobs:
             echo "Waiting 5 seconds before next promotion..."
             sleep 5
           done
+          SCRIPT_EOF
+          chmod +x /tmp/promote.sh
+      
+      - name: Process PR and continue promotion chain
+        if: steps.wait_for_cursor.outputs.cursor_completed == 'true'
+        run: /tmp/promote.sh
