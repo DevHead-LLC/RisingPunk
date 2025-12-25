@@ -91,6 +91,7 @@ else
     fi
     
     echo "✅ PR #$PR_NUMBER: $PR_SOURCE → $PR_TARGET merge verified complete. All actions stopped."
+    INITIAL_PR_MERGE_COMPLETE=true
   elif echo "$MERGE_OUTPUT" | grep -qi "already merged\|already been merged"; then
     echo "✅ PR #$PR_NUMBER was already merged (detected during merge attempt). Verifying complete..."
     PR_STATE_AFTER_MERGE=$(gh pr view $PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
