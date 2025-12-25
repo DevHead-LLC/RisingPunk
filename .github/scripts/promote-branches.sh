@@ -222,7 +222,7 @@ Cursor bug bot will run automatically on this PR."
   echo "⏳ Waiting 30 seconds before first check to allow Cursor bot to initialize..."
   sleep 30
   
-  MAX_WAIT=600
+  MAX_WAIT=1200
   WAIT_INTERVAL=10
   LOG_INTERVAL=60
   ELAPSED=30
@@ -365,7 +365,9 @@ Cursor bug bot will run automatically on this PR."
       HAS_NO_BUGS_STATEMENT=false
       if echo "$CURSOR_COMMENTS" | grep -qiE "\b(no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|no\s+problems?\s+found|passed|success)\b"; then
         HAS_NO_BUGS_STATEMENT=true
-        echo "🔍 DEBUG: Found 'no bugs' statement in comments"
+        if [ "$SHOULD_LOG" = "true" ]; then
+          echo "🔍 DEBUG: Found 'no bugs' statement in comments"
+        fi
       fi
       
       COMMENT_WITHOUT_NO_BUG=$(echo "$CURSOR_COMMENTS" | sed -e 's/no\s\+\(bugs\?\|issues\?\|errors\?\|problems\?\)\s\+\(found\|detected\|identified\)//gi' -e 's/all\s\+clear//gi' -e 's/no\s\+problems\?\s\+found//gi' -e 's/\bpassed\b//gi' -e 's/\bsuccess\b//gi')

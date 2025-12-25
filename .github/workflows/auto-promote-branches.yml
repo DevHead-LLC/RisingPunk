@@ -42,7 +42,7 @@ jobs:
           
           echo "Waiting for Cursor bot to appear and complete on PR #$PR_NUMBER before proceeding..."
           
-          MAX_WAIT=600
+          MAX_WAIT=1200
           WAIT_INTERVAL=10
           LOG_INTERVAL=60
           ELAPSED=0
@@ -159,7 +159,9 @@ jobs:
                 fi
                 
                 if [ -n "$CURSOR_COMMENTS" ]; then
-                  echo "🔍 DEBUG: Found Cursor comments while check is in progress. Checking for completion signal..."
+                  if [ "$SHOULD_LOG" = "true" ]; then
+                    echo "🔍 DEBUG: Found Cursor comments while check is in progress. Checking for completion signal..."
+                  fi
                   
                   HAS_NO_BUGS_STATEMENT=false
                   if echo "$CURSOR_COMMENTS" | grep -qiE "\b(no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|no\s+problems?\s+found|passed|success)\b"; then
