@@ -456,6 +456,7 @@ Cursor bug bot will run automatically on this PR."
     fi
     
     echo "✅ PR #$NEXT_PR_NUMBER merge verified complete. All actions stopped. Continuing to next branch..."
+    PR_MERGE_COMPLETE=true
   else
     set +e
     MERGE_OUTPUT=$(gh pr merge $NEXT_PR_NUMBER --merge --delete-branch=false 2>&1)
