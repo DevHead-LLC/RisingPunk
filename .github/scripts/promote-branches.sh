@@ -218,14 +218,18 @@ Cursor bug bot will run automatically on this PR."
   fi
   
   echo "Waiting for Cursor bug bot to run on PR #$NEXT_PR_NUMBER..."
+  echo "ℹ️  Note: Cursor bot may take 30-60 seconds to appear on newly created PRs."
+  echo "⏳ Waiting 30 seconds before first check to allow Cursor bot to initialize..."
+  sleep 30
   
   MAX_WAIT=600
   WAIT_INTERVAL=10
   LOG_INTERVAL=60
-  ELAPSED=0
-  LAST_LOG_ELAPSED=0
+  ELAPSED=30
+  LAST_LOG_ELAPSED=30
   CURSOR_CHECK_PASSED=false
   CURSOR_CHECK_FAILED=false
+  CURSOR_CHECK_FOUND=false
   HEAD_SHA=$(gh pr view $NEXT_PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "")
   
   while [ $ELAPSED -lt $MAX_WAIT ]; do
@@ -391,9 +395,19 @@ Cursor bug bot will run automatically on this PR."
   
   if [ "$CURSOR_CHECK_PASSED" = "false" ]; then
     echo "=========================================="
-    echo "❌ Cursor check did not complete within timeout (${MAX_WAIT}s)."
+    if [ "$CURSOR_CHECK_FOUND" = "false" ]; then
+      echo "❌ Cursor bot did not appear on PR #$NEXT_PR_NUMBER within timeout (${MAX_WAIT}s)."
+      echo "⚠️  This may indicate that Cursor bot is not configured to run on bot-created PRs."
+      echo "💡 Possible solutions:"
+      echo "   1. Check Cursor bot settings to allow running on bot-created PRs"
+      echo "   2. Manually trigger Cursor bot by commenting on the PR"
+      echo "   3. The PR may need to be created by a user account instead of a bot"
+    else
+      echo "❌ Cursor check did not complete within timeout (${MAX_WAIT}s)."
+      echo "⚠️  Cursor bot appeared but did not finish (status: in_progress)."
+      echo "💡 This may indicate Cursor bot is stuck or taking longer than expected."
+    fi
     echo "Stopping promotion chain for safety."
-    echo "Please ensure Cursor bot runs and completes before merging."
     echo "PR: https://github.com/$GITHUB_REPOSITORY/pull/$NEXT_PR_NUMBER"
     echo "=========================================="
     exit 1
