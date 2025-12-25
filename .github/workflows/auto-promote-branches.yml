@@ -42,7 +42,7 @@ jobs:
           
           echo "Waiting for Cursor bot to appear and complete on PR #$PR_NUMBER before proceeding..."
           
-          MAX_WAIT=600
+          MAX_WAIT=1200
           WAIT_INTERVAL=10
           LOG_INTERVAL=60
           ELAPSED=0
@@ -105,15 +105,12 @@ jobs:
                     echo "🔍 DEBUG: Found Cursor comments. Analyzing for bugs..."
                     echo "🔍 DEBUG: Comment preview: $(echo "$CURSOR_COMMENTS" | head -c 500)..."
                     
-                    # FIRST: Check for explicit "no bugs" statements (must check FIRST to avoid false positives)
                     HAS_NO_BUGS_STATEMENT=false
                     if echo "$CURSOR_COMMENTS" | grep -qiE "\b(no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|no\s+problems?\s+found|passed|success)\b"; then
                       HAS_NO_BUGS_STATEMENT=true
                       echo "🔍 DEBUG: Found 'no bugs' statement in comments"
                     fi
                     
-                    # SECOND: Check for bug-specific phrases (not standalone words to avoid false positives)
-                    # Remove "no bug" context and success indicators to avoid false positives
                     COMMENT_WITHOUT_NO_BUG=$(echo "$CURSOR_COMMENTS" | sed -e 's/no\s\+\(bugs\?\|issues\?\|errors\?\|problems\?\)\s\+\(found\|detected\|identified\)//gi' -e 's/all\s\+clear//gi' -e 's/no\s\+problems\?\s\+found//gi' -e 's/\bpassed\b//gi' -e 's/\bsuccess\b//gi')
                     
                     if echo "$COMMENT_WITHOUT_NO_BUG" | grep -qiE "(bugs?\s+(found|detected|identified)|issues?\s+(found|detected|identified|with)|errors?\s+(found|detected|identified)|problems?\s+(found|detected|identified)|(blocking|critical)\s+(bug|issue|error|problem)|must\s+fix|(failed|failing)\s+(check|test|validation))"; then
@@ -122,10 +119,7 @@ jobs:
                       echo "❌ Stopping workflow - bugs found!"
                       CURSOR_CHECK_FAILED=true
                       break
-                    fi
-                    
-                    # THIRD: If we have "no bugs" statement and no bug keywords, PASS
-                    if [ "$HAS_NO_BUGS_STATEMENT" = "true" ]; then
+                    elif [ "$HAS_NO_BUGS_STATEMENT" = "true" ]; then
                       echo "✅ Cursor comments explicitly state no bugs found. Proceeding with promotion."
                       CURSOR_CHECK_PASSED=true
                       break
@@ -169,40 +163,6 @@ jobs:
               elif [ "$CURSOR_STATUS" = "failure" ] || [ "$CURSOR_STATUS" = "error" ]; then
                 echo "❌ Cursor bot failed (status check: $CURSOR_STATUS). Stopping workflow."
                 CURSOR_CHECK_FAILED=true
-                break
-              fi
-            fi
-            
-            PR_COMMENTS_JSON=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/comments 2>/dev/null || echo "[]")
-            
-            if command -v jq &> /dev/null; then
-              CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | jq -r '.[] | select(.user.login | ascii_downcase | contains("cursor") or (contains("[bot]") and contains("cursor"))) | .body' 2>/dev/null || echo "")
-            else
-              CURSOR_COMMENTS=$(echo "$PR_COMMENTS_JSON" | grep -i "cursor" -A 5 | grep -oP '"body":\s*"\K[^"]+' || echo "")
-            fi
-            
-            if [ -n "$CURSOR_COMMENTS" ]; then
-              CURSOR_CHECK_FOUND=true
-              # FIRST: Check for explicit "no bugs" statements (must check FIRST to avoid false positives)
-              HAS_NO_BUGS_STATEMENT=false
-              if echo "$CURSOR_COMMENTS" | grep -qiE "\b(no\s+(bugs?|issues?|errors?|problems?)\s+(found|detected|identified)|all\s+clear|no\s+problems?\s+found|passed|success)\b"; then
-                HAS_NO_BUGS_STATEMENT=true
-                echo "🔍 DEBUG: Found 'no bugs' statement in comments"
-              fi
-              
-              # SECOND: Check for bug-specific phrases (not standalone words to avoid false positives)
-              # Remove "no bug" context and success indicators to avoid false positives
-              COMMENT_WITHOUT_NO_BUG=$(echo "$CURSOR_COMMENTS" | sed -e 's/no\s\+\(bugs\?\|issues\?\|errors\?\|problems\?\)\s\+\(found\|detected\|identified\)//gi' -e 's/all\s\+clear//gi' -e 's/no\s\+problems\?\s\+found//gi' -e 's/\bpassed\b//gi' -e 's/\bsuccess\b//gi')
-              
-              if echo "$COMMENT_WITHOUT_NO_BUG" | grep -qiE "(bugs?\s+(found|detected|identified)|issues?\s+(found|detected|identified|with)|errors?\s+(found|detected|identified)|problems?\s+(found|detected|identified)|(blocking|critical)\s+(bug|issue|error|problem)|must\s+fix|(failed|failing)\s+(check|test|validation))"; then
-                echo "❌❌❌ BUG DETECTED: Cursor comments contain bug-specific phrases!"
-                echo "🔍 DEBUG: Bug phrases found. Stopping workflow."
-                CURSOR_CHECK_FAILED=true
-                break
-              # THIRD: If we have "no bugs" statement and no bug keywords, PASS
-              elif [ "$HAS_NO_BUGS_STATEMENT" = "true" ]; then
-                echo "✅ Cursor comments explicitly state no bugs found. Proceeding with promotion."
-                CURSOR_CHECK_PASSED=true
                 break
               fi
             fi
