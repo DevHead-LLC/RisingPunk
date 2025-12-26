@@ -71,3 +71,8 @@ export interface TrackThemeChangeResponse {
   message?: string;
 }
 
+export interface TrackAvatarChangeResponse {
+  success: boolean;
+  message?: string;
+}
+
