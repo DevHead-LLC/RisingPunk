@@ -84,24 +84,13 @@ jobs:
               fi
               
               if [ "$CURSOR_CHECK_STATUS" = "completed" ]; then
-                if [ "$CURSOR_CHECK_CONCLUSION" = "failure" ] || [ "$CURSOR_CHECK_CONCLUSION" = "action_required" ]; then
-                  echo "❌ Cursor bot completed with failure. Stopping workflow."
-                  CURSOR_CHECK_FAILED=true
-                  break
-                elif [ "$CURSOR_CHECK_CONCLUSION" = "success" ] || [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
+                if [ "$CURSOR_CHECK_CONCLUSION" = "success" ] || [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
                   echo "✅ Cursor bot completed successfully (conclusion: $CURSOR_CHECK_CONCLUSION). Proceeding with promotion."
                   CURSOR_CHECK_PASSED=true
                   break
-                elif [ "$CURSOR_CHECK_CONCLUSION" = "cancelled" ] || [ "$CURSOR_CHECK_CONCLUSION" = "skipped" ] || [ "$CURSOR_CHECK_CONCLUSION" = "timed_out" ] || [ "$CURSOR_CHECK_CONCLUSION" = "stale" ]; then
-                  echo "❌ Cursor check completed with terminal state ($CURSOR_CHECK_CONCLUSION). Treating as failure."
-                  CURSOR_CHECK_FAILED=true
-                  break
-                elif [ -z "$CURSOR_CHECK_CONCLUSION" ] || [ "$CURSOR_CHECK_CONCLUSION" = "null" ]; then
-                  echo "⚠️  Cursor check completed but conclusion is null/unexpected. Treating as failure for safety."
-                  CURSOR_CHECK_FAILED=true
-                  break
                 else
-                  echo "❌ Cursor check completed with unknown conclusion ($CURSOR_CHECK_CONCLUSION). Treating as failure for safety."
+                  echo "❌ Cursor bot completed with conclusion: $CURSOR_CHECK_CONCLUSION"
+                  echo "❌ Only 'success' or 'neutral' conclusions are allowed. Stopping workflow immediately."
                   CURSOR_CHECK_FAILED=true
                   break
                 fi
@@ -143,19 +132,31 @@ jobs:
           done
           
           if [ "$CURSOR_CHECK_FAILED" = "true" ]; then
-            echo "❌ Cursor bot check failed. Workflow stopped."
+            echo "=========================================="
+            echo "❌ CRITICAL: Cursor bot check FAILED"
+            echo "❌ Bugs detected - workflow STOPPED"
+            echo "❌ No PR will be merged. No promotion will occur."
+            echo "=========================================="
             exit 1
           fi
           
           if [ "$CURSOR_CHECK_PASSED" = "true" ]; then
-            echo "✅ Cursor bot check COMPLETE: conclusion = 'success'"
+            echo "✅ Cursor bot check COMPLETE: conclusion = 'success' or 'neutral'"
             echo "✅ Setting completion flag: cursor_completed=true"
             echo "cursor_completed=true" >> $GITHUB_OUTPUT
           elif [ "$CURSOR_CHECK_FOUND" = "false" ]; then
-            echo "⚠️  Cursor bot did not appear within timeout (${MAX_WAIT}s). Stopping workflow."
+            echo "=========================================="
+            echo "❌ CRITICAL: Cursor bot did not appear within timeout (${MAX_WAIT}s)"
+            echo "❌ Cannot verify no bugs - workflow STOPPED"
+            echo "❌ No PR will be merged. No promotion will occur."
+            echo "=========================================="
             exit 1
           else
-            echo "⚠️  Cursor bot did not complete within timeout (${MAX_WAIT}s). Stopping workflow."
+            echo "=========================================="
+            echo "❌ CRITICAL: Cursor bot did not complete within timeout (${MAX_WAIT}s)"
+            echo "❌ Cannot verify no bugs - workflow STOPPED"
+            echo "❌ No PR will be merged. No promotion will occur."
+            echo "=========================================="
             exit 1
           fi
 
