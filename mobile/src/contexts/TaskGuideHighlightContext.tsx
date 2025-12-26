@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 
-export type HighlightStep = 'settings-tab' | 'theme-toggle' | 'avatar-toggle' | null;
+export type HighlightStep = 'settings-tab' | 'theme-toggle' | 'avatar-toggle' | 'task-guide-toggle' | null;
 
 interface TaskGuideHighlightContextType {
   highlightTaskId: string | null;
@@ -28,10 +28,13 @@ export const TaskGuideHighlightProvider: React.FC<{ children: ReactNode }> = ({ 
     } else if (highlightStep === 'settings-tab') {
       const isThemeTask = highlightTaskId === 'use-hacker-mode' || highlightTaskId === 'use-business-mode';
       const isAvatarTask = highlightTaskId === 'change-avatar';
+      const isHideTaskListTask = highlightTaskId === 'hide-task-list';
       if (isThemeTask) {
         setHighlightStep('theme-toggle');
       } else if (isAvatarTask) {
         setHighlightStep('avatar-toggle');
+      } else if (isHideTaskListTask) {
+        setHighlightStep('task-guide-toggle');
       }
     }
   }, [highlightStep, highlightTaskId]);

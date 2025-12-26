@@ -9,22 +9,25 @@ interface TaskGuideHighlightOverlayProps {
   forSettings?: boolean;
   forThemeToggle?: boolean;
   forAvatarToggle?: boolean;
+  forTaskGuideToggle?: boolean;
 }
 
 export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps> = ({ 
   forProfile = false,
   forSettings = false,
   forThemeToggle = false,
-  forAvatarToggle = false
+  forAvatarToggle = false,
+  forTaskGuideToggle = false
 }) => {
   const colors = useThemeColors();
   const { highlightTaskId, highlightStep } = useTaskGuideHighlight();
 
   const isThemeTask = highlightTaskId === 'use-hacker-mode' || highlightTaskId === 'use-business-mode';
   const isAvatarTask = highlightTaskId === 'change-avatar';
+  const isHideTaskListTask = highlightTaskId === 'hide-task-list';
   const isViewProfile = highlightTaskId === 'view-profile';
 
-  if (!isViewProfile && !isThemeTask && !isAvatarTask) {
+  if (!isViewProfile && !isThemeTask && !isAvatarTask && !isHideTaskListTask) {
     return null;
   }
 
@@ -60,6 +63,22 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
     } else if (forAvatarToggle && highlightStep !== 'avatar-toggle') {
       return null; // Only show avatar toggle overlay when step is 'avatar-toggle'
     } else if (!forProfile && !forSettings && !forAvatarToggle) {
+      return null; // Neither prop set, don't render
+    }
+  }
+
+  // For hide-task-list tasks, use highlightStep to control which overlay shows (sequential flow)
+  if (isHideTaskListTask) {
+    // Show profile overlay on turf screen when highlightStep is null (initial state)
+    if (forProfile && highlightStep === null) {
+      // Allow this to render - show profile highlight on turf screen
+    } else if (forProfile && highlightStep !== null) {
+      return null; // Don't show profile overlay after step has advanced
+    } else if (forSettings && highlightStep !== 'settings-tab') {
+      return null; // Only show settings overlay when step is 'settings-tab'
+    } else if (forTaskGuideToggle && highlightStep !== 'task-guide-toggle') {
+      return null; // Only show task guide toggle overlay when step is 'task-guide-toggle'
+    } else if (!forProfile && !forSettings && !forTaskGuideToggle) {
       return null; // Neither prop set, don't render
     }
   }

@@ -38,11 +38,11 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
     }
 
     const taskList = getTaskList();
-    const completedTaskIdsArray = progress.completedTasks.map(t => t.taskId);
-    const collectedTaskIdsArray = progress.collectedTasks || [];
-    const completedTaskIds = new Set(completedTaskIdsArray);
-    const collectedTaskIds = new Set(collectedTaskIdsArray);
-    const skippedTaskIds = new Set(progress.skippedTasks);
+    let completedTaskIdsArray = progress.completedTasks.map(t => t.taskId);
+    let collectedTaskIdsArray = progress.collectedTasks || [];
+    let completedTaskIds = new Set(completedTaskIdsArray);
+    let collectedTaskIds = new Set(collectedTaskIdsArray);
+    let skippedTaskIds = new Set(progress.skippedTasks);
 
     const user = await User.findById(userId).lean();
     if (!user) {
@@ -52,6 +52,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
 
     let currentTask = null;
     const sortedTasks = [...taskList].sort((a, b) => a.order - b.order);
+    let anyTaskAutoCompleted = false;
 
     for (const task of sortedTasks) {
       // Skip tasks that have been collected (reward given) or skipped
@@ -81,6 +82,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
               },
               { new: true }
             );
+            anyTaskAutoCompleted = true;
           }
           continue;
         }
@@ -92,6 +94,21 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
         description: task.description
       };
       break;
+    }
+
+    if (anyTaskAutoCompleted) {
+      const updatedProgress = await UserTaskProgress.findOne({ userId })
+        .select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt')
+        .lean();
+      
+      if (updatedProgress) {
+        progress = updatedProgress;
+        completedTaskIdsArray = progress.completedTasks.map(t => t.taskId);
+        collectedTaskIdsArray = progress.collectedTasks || [];
+        completedTaskIds = new Set(completedTaskIdsArray);
+        collectedTaskIds = new Set(collectedTaskIdsArray);
+        skippedTaskIds = new Set(progress.skippedTasks);
+      }
     }
 
     const totalTasks = taskList.length;

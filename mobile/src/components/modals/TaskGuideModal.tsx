@@ -74,6 +74,11 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
         // User will be guided to click profile icon on turf screen first
         onClose();
         setHighlightTaskId(taskId);
+      } else if (taskId === 'hide-task-list') {
+        // Close modal and trigger highlight mode for hiding task guide
+        // User will be guided to click profile icon on turf screen first
+        onClose();
+        setHighlightTaskId(taskId);
       } else {
         // For other tasks, just close modal for now
         onClose();

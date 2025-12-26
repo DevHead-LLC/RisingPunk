@@ -83,6 +83,9 @@ const TASK_LIST: Task[] = [
     title: 'Hide this Task List',
     description: 'Hide the task guide from view',
     order: 6,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return progress?.showTaskGuide === false;
+    },
     skipable: true,
     reward: { type: 'wallet', value: 10 }
   },
@@ -91,6 +94,9 @@ const TASK_LIST: Task[] = [
     title: 'Show the Task List',
     description: 'Show the task guide',
     order: 7,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return progress?.showTaskGuide === true;
+    },
     skipable: true,
     reward: { type: 'wallet', value: 10 }
   },
