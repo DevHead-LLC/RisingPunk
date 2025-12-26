@@ -29,6 +29,7 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GH_PAT }}
+          ref: ${{ github.event.pull_request.base.ref }}
 
       - name: Setup GitHub CLI and tools
         run: |

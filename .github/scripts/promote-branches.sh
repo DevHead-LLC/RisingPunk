@@ -14,19 +14,31 @@ echo "=========================================="
 BRANCHES=("dev" "main" "staging" "prod")
 
 STAGE_NAME=""
-for i in "${!BRANCHES[@]}"; do
-  if [ "${BRANCHES[$i]}" = "$PR_SOURCE" ] && [ "$((i + 1))" -lt "${#BRANCHES[@]}" ]; then
-    if [ "${BRANCHES[$((i + 1))]}" = "$PR_TARGET" ]; then
-      STAGE_NAME="${BRANCHES[$i]} → ${BRANCHES[$((i + 1))]}"
-      break
-    fi
-  fi
-done
+
+echo "🔍 DEBUG: Checking stage validation..."
+echo "   PR_SOURCE: '$PR_SOURCE'"
+echo "   PR_TARGET: '$PR_TARGET'"
+
+if [ "$PR_TARGET" = "dev" ]; then
+  STAGE_NAME="feature → dev"
+  echo "   ✅ Matched: feature → dev (any branch → dev)"
+elif [ "$PR_SOURCE" = "dev" ] && [ "$PR_TARGET" = "main" ]; then
+  STAGE_NAME="dev → main"
+  echo "   ✅ Matched: dev → main"
+elif [ "$PR_SOURCE" = "main" ] && [ "$PR_TARGET" = "staging" ]; then
+  STAGE_NAME="main → staging"
+  echo "   ✅ Matched: main → staging"
+elif [ "$PR_SOURCE" = "staging" ] && [ "$PR_TARGET" = "prod" ]; then
+  STAGE_NAME="staging → prod"
+  echo "   ✅ Matched: staging → prod"
+else
+  echo "   ❌ No match found"
+fi
 
 if [ -z "$STAGE_NAME" ]; then
   echo "⚠️  PR $PR_SOURCE → $PR_TARGET is not a valid promotion stage."
   echo "   Valid stages: feature → dev, dev → main, main → staging, staging → prod"
-  echo "   Exiting (this may be a feature branch PR or invalid combination)."
+  echo "   Exiting (this may be an invalid combination)."
   exit 0
 fi
 
