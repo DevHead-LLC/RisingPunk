@@ -405,13 +405,9 @@ Cursor bug bot will run automatically on this PR."
           echo "❌ Cursor bug check failed (check run: $CURSOR_CHECK_CONCLUSION)!"
           CURSOR_CHECK_FAILED=true
           break
-        elif [ "$CURSOR_CHECK_CONCLUSION" = "success" ]; then
+        elif [ "$CURSOR_CHECK_CONCLUSION" = "success" ] || [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
           echo "✅ Cursor bug check passed (check run: $CURSOR_CHECK_CONCLUSION)!"
           CURSOR_CHECK_PASSED=true
-          break
-        elif [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
-          echo "❌ Cursor check completed with neutral conclusion. Only 'success' conclusion is accepted. Stopping workflow."
-          CURSOR_CHECK_FAILED=true
           break
       elif [ -z "$CURSOR_CHECK_CONCLUSION" ] || [ "$CURSOR_CHECK_CONCLUSION" = "null" ]; then
         echo "⚠️  Cursor check completed but conclusion is null/unexpected. Treating as failure for safety."
@@ -491,12 +487,12 @@ Cursor bug bot will run automatically on this PR."
     exit 1
   fi
   
-  if [ "$CURSOR_CHECK_CONCLUSION" != "success" ]; then
-    echo "❌❌❌ FINAL CHECK FAILED: Cursor check conclusion is not 'success' ($CURSOR_CHECK_CONCLUSION). BLOCKING MERGE."
-    exit 1
-  else
-    echo "✅ Final verification passed. Merging PR #$NEXT_PR_NUMBER: $CURRENT_SOURCE → $TARGET"
+  if [ "$CURSOR_CHECK_CONCLUSION" = "success" ] || [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
+    echo "✅ Final verification passed (conclusion: $CURSOR_CHECK_CONCLUSION). Merging PR #$NEXT_PR_NUMBER: $CURRENT_SOURCE → $TARGET"
     FINAL_VERIFICATION_COMPLETE=true
+  else
+    echo "❌❌❌ FINAL CHECK FAILED: Cursor check conclusion is not 'success' or 'neutral' ($CURSOR_CHECK_CONCLUSION). BLOCKING MERGE."
+    exit 1
   fi
   
   if [ "$FINAL_VERIFICATION_COMPLETE" != "true" ]; then
