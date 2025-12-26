@@ -25,25 +25,28 @@ if [ "$PR_STATE_BEFORE_MERGE_LOWER" = "merged" ] || [ "$PR_STATE_BEFORE_MERGE_LO
     RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
   else
     RUNNING_CHECKS=""
-    STATUS_MATCHES=$(echo "$CHECKS_JSON" | grep -n -E '"status"\s*:\s*"(in_progress|queued)"' || echo "")
-    if [ -n "$STATUS_MATCHES" ]; then
-      while IFS=: read -r LINE_NUM STATUS_LINE; do
-        START_LINE=$((LINE_NUM > 30 ? LINE_NUM - 30 : 1))
-        CHECK_CONTEXT=$(echo "$CHECKS_JSON" | sed -n "${START_LINE},${LINE_NUM}p" | head -30 || echo "")
-        if [ -n "$CHECK_CONTEXT" ]; then
-          CHECK_NAME=$(echo "$CHECK_CONTEXT" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | grep -oE '"[^"]+"' | tr -d '"' || echo "")
-          if [ -n "$CHECK_NAME" ]; then
-            CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
-            if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
-              if [ -z "$RUNNING_CHECKS" ]; then
-                RUNNING_CHECKS="$CHECK_NAME"
-              else
-                RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
+    STATUS_PATTERN='"status"\s*:\s*"(in_progress|queued)"'
+    STATUS_POSITIONS=$(echo "$CHECKS_JSON" | grep -boE "$STATUS_PATTERN" | cut -d: -f1 || echo "")
+    if [ -n "$STATUS_POSITIONS" ]; then
+      for STATUS_POS in $STATUS_POSITIONS; do
+        WINDOW_START=$((STATUS_POS > 500 ? STATUS_POS - 500 : 0))
+        WINDOW_END=$((STATUS_POS + 500))
+        CONTEXT_WINDOW="${CHECKS_JSON:$WINDOW_START:$((WINDOW_END - WINDOW_START))}"
+        CHECK_NAME=$(echo "$CONTEXT_WINDOW" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | sed -E 's/.*:\s*"([^"]+)".*/\1/' || echo "")
+        if [ -n "$CHECK_NAME" ]; then
+          CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
+          if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
+            if [ -z "$RUNNING_CHECKS" ]; then
+              RUNNING_CHECKS="$CHECK_NAME"
+            else
+              if echo "$RUNNING_CHECKS" | grep -qF "$CHECK_NAME"; then
+                continue
               fi
+              RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
             fi
           fi
         fi
-      done <<< "$STATUS_MATCHES"
+      done
     fi
   fi
   
@@ -88,25 +91,28 @@ else
           RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
         else
           RUNNING_CHECKS=""
-          STATUS_MATCHES=$(echo "$CHECKS_JSON" | grep -n -E '"status"\s*:\s*"(in_progress|queued)"' || echo "")
-          if [ -n "$STATUS_MATCHES" ]; then
-            while IFS=: read -r LINE_NUM STATUS_LINE; do
-              START_LINE=$((LINE_NUM > 30 ? LINE_NUM - 30 : 1))
-              CHECK_CONTEXT=$(echo "$CHECKS_JSON" | sed -n "${START_LINE},${LINE_NUM}p" | head -30 || echo "")
-              if [ -n "$CHECK_CONTEXT" ]; then
-                CHECK_NAME=$(echo "$CHECK_CONTEXT" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | grep -oE '"[^"]+"' | tr -d '"' || echo "")
-                if [ -n "$CHECK_NAME" ]; then
-                  CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
-                  if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
-                    if [ -z "$RUNNING_CHECKS" ]; then
-                      RUNNING_CHECKS="$CHECK_NAME"
-                    else
-                      RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
+          STATUS_PATTERN='"status"\s*:\s*"(in_progress|queued)"'
+          STATUS_POSITIONS=$(echo "$CHECKS_JSON" | grep -boE "$STATUS_PATTERN" | cut -d: -f1 || echo "")
+          if [ -n "$STATUS_POSITIONS" ]; then
+            for STATUS_POS in $STATUS_POSITIONS; do
+              WINDOW_START=$((STATUS_POS > 500 ? STATUS_POS - 500 : 0))
+              WINDOW_END=$((STATUS_POS + 500))
+              CONTEXT_WINDOW="${CHECKS_JSON:$WINDOW_START:$((WINDOW_END - WINDOW_START))}"
+              CHECK_NAME=$(echo "$CONTEXT_WINDOW" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | sed -E 's/.*:\s*"([^"]+)".*/\1/' || echo "")
+              if [ -n "$CHECK_NAME" ]; then
+                CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
+                if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
+                  if [ -z "$RUNNING_CHECKS" ]; then
+                    RUNNING_CHECKS="$CHECK_NAME"
+                  else
+                    if echo "$RUNNING_CHECKS" | grep -qF "$CHECK_NAME"; then
+                      continue
                     fi
+                    RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
                   fi
                 fi
               fi
-            done <<< "$STATUS_MATCHES"
+            done
           fi
         fi
         
@@ -150,25 +156,28 @@ else
       RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
     else
       RUNNING_CHECKS=""
-      STATUS_MATCHES=$(echo "$CHECKS_JSON" | grep -n -E '"status"\s*:\s*"(in_progress|queued)"' || echo "")
-      if [ -n "$STATUS_MATCHES" ]; then
-        while IFS=: read -r LINE_NUM STATUS_LINE; do
-          START_LINE=$((LINE_NUM > 30 ? LINE_NUM - 30 : 1))
-          CHECK_CONTEXT=$(echo "$CHECKS_JSON" | sed -n "${START_LINE},${LINE_NUM}p" | head -30 || echo "")
-          if [ -n "$CHECK_CONTEXT" ]; then
-            CHECK_NAME=$(echo "$CHECK_CONTEXT" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | grep -oE '"[^"]+"' | tr -d '"' || echo "")
-            if [ -n "$CHECK_NAME" ]; then
-              CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
-              if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
-                if [ -z "$RUNNING_CHECKS" ]; then
-                  RUNNING_CHECKS="$CHECK_NAME"
-                else
-                  RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
+      STATUS_PATTERN='"status"\s*:\s*"(in_progress|queued)"'
+      STATUS_POSITIONS=$(echo "$CHECKS_JSON" | grep -boE "$STATUS_PATTERN" | cut -d: -f1 || echo "")
+      if [ -n "$STATUS_POSITIONS" ]; then
+        for STATUS_POS in $STATUS_POSITIONS; do
+          WINDOW_START=$((STATUS_POS > 500 ? STATUS_POS - 500 : 0))
+          WINDOW_END=$((STATUS_POS + 500))
+          CONTEXT_WINDOW="${CHECKS_JSON:$WINDOW_START:$((WINDOW_END - WINDOW_START))}"
+          CHECK_NAME=$(echo "$CONTEXT_WINDOW" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | sed -E 's/.*:\s*"([^"]+)".*/\1/' || echo "")
+          if [ -n "$CHECK_NAME" ]; then
+            CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
+            if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
+              if [ -z "$RUNNING_CHECKS" ]; then
+                RUNNING_CHECKS="$CHECK_NAME"
+              else
+                if echo "$RUNNING_CHECKS" | grep -qF "$CHECK_NAME"; then
+                  continue
                 fi
+                RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
               fi
             fi
           fi
-        done <<< "$STATUS_MATCHES"
+        done
       fi
     fi
     
@@ -514,25 +523,28 @@ Cursor bug bot will run automatically on this PR."
       RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
     else
       RUNNING_CHECKS=""
-      STATUS_MATCHES=$(echo "$CHECKS_JSON" | grep -n -E '"status"\s*:\s*"(in_progress|queued)"' || echo "")
-      if [ -n "$STATUS_MATCHES" ]; then
-        while IFS=: read -r LINE_NUM STATUS_LINE; do
-          START_LINE=$((LINE_NUM > 30 ? LINE_NUM - 30 : 1))
-          CHECK_CONTEXT=$(echo "$CHECKS_JSON" | sed -n "${START_LINE},${LINE_NUM}p" | head -30 || echo "")
-          if [ -n "$CHECK_CONTEXT" ]; then
-            CHECK_NAME=$(echo "$CHECK_CONTEXT" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | grep -oE '"[^"]+"' | tr -d '"' || echo "")
-            if [ -n "$CHECK_NAME" ]; then
-              CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
-              if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
-                if [ -z "$RUNNING_CHECKS" ]; then
-                  RUNNING_CHECKS="$CHECK_NAME"
-                else
-                  RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
+      STATUS_PATTERN='"status"\s*:\s*"(in_progress|queued)"'
+      STATUS_POSITIONS=$(echo "$CHECKS_JSON" | grep -boE "$STATUS_PATTERN" | cut -d: -f1 || echo "")
+      if [ -n "$STATUS_POSITIONS" ]; then
+        for STATUS_POS in $STATUS_POSITIONS; do
+          WINDOW_START=$((STATUS_POS > 500 ? STATUS_POS - 500 : 0))
+          WINDOW_END=$((STATUS_POS + 500))
+          CONTEXT_WINDOW="${CHECKS_JSON:$WINDOW_START:$((WINDOW_END - WINDOW_START))}"
+          CHECK_NAME=$(echo "$CONTEXT_WINDOW" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | sed -E 's/.*:\s*"([^"]+)".*/\1/' || echo "")
+          if [ -n "$CHECK_NAME" ]; then
+            CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
+            if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
+              if [ -z "$RUNNING_CHECKS" ]; then
+                RUNNING_CHECKS="$CHECK_NAME"
+              else
+                if echo "$RUNNING_CHECKS" | grep -qF "$CHECK_NAME"; then
+                  continue
                 fi
+                RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
               fi
             fi
           fi
-        done <<< "$STATUS_MATCHES"
+        done
       fi
     fi
     
@@ -575,25 +587,28 @@ Cursor bug bot will run automatically on this PR."
             RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
           else
             RUNNING_CHECKS=""
-            STATUS_MATCHES=$(echo "$CHECKS_JSON" | grep -n -E '"status"\s*:\s*"(in_progress|queued)"' || echo "")
-            if [ -n "$STATUS_MATCHES" ]; then
-              while IFS=: read -r LINE_NUM STATUS_LINE; do
-                START_LINE=$((LINE_NUM > 30 ? LINE_NUM - 30 : 1))
-                CHECK_CONTEXT=$(echo "$CHECKS_JSON" | sed -n "${START_LINE},${LINE_NUM}p" | head -30 || echo "")
-                if [ -n "$CHECK_CONTEXT" ]; then
-                  CHECK_NAME=$(echo "$CHECK_CONTEXT" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | grep -oE '"[^"]+"' | tr -d '"' || echo "")
-                  if [ -n "$CHECK_NAME" ]; then
-                    CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
-                    if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
-                      if [ -z "$RUNNING_CHECKS" ]; then
-                        RUNNING_CHECKS="$CHECK_NAME"
-                      else
-                        RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
+            STATUS_PATTERN='"status"\s*:\s*"(in_progress|queued)"'
+            STATUS_POSITIONS=$(echo "$CHECKS_JSON" | grep -boE "$STATUS_PATTERN" | cut -d: -f1 || echo "")
+            if [ -n "$STATUS_POSITIONS" ]; then
+              for STATUS_POS in $STATUS_POSITIONS; do
+                WINDOW_START=$((STATUS_POS > 500 ? STATUS_POS - 500 : 0))
+                WINDOW_END=$((STATUS_POS + 500))
+                CONTEXT_WINDOW="${CHECKS_JSON:$WINDOW_START:$((WINDOW_END - WINDOW_START))}"
+                CHECK_NAME=$(echo "$CONTEXT_WINDOW" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | sed -E 's/.*:\s*"([^"]+)".*/\1/' || echo "")
+                if [ -n "$CHECK_NAME" ]; then
+                  CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
+                  if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
+                    if [ -z "$RUNNING_CHECKS" ]; then
+                      RUNNING_CHECKS="$CHECK_NAME"
+                    else
+                      if echo "$RUNNING_CHECKS" | grep -qF "$CHECK_NAME"; then
+                        continue
                       fi
+                      RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
                     fi
                   fi
                 fi
-              done <<< "$STATUS_MATCHES"
+              done
             fi
           fi
           
@@ -637,25 +652,28 @@ Cursor bug bot will run automatically on this PR."
       RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
     else
       RUNNING_CHECKS=""
-      STATUS_MATCHES=$(echo "$CHECKS_JSON" | grep -n -E '"status"\s*:\s*"(in_progress|queued)"' || echo "")
-      if [ -n "$STATUS_MATCHES" ]; then
-        while IFS=: read -r LINE_NUM STATUS_LINE; do
-          START_LINE=$((LINE_NUM > 30 ? LINE_NUM - 30 : 1))
-          CHECK_CONTEXT=$(echo "$CHECKS_JSON" | sed -n "${START_LINE},${LINE_NUM}p" | head -30 || echo "")
-          if [ -n "$CHECK_CONTEXT" ]; then
-            CHECK_NAME=$(echo "$CHECK_CONTEXT" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | grep -oE '"[^"]+"' | tr -d '"' || echo "")
-            if [ -n "$CHECK_NAME" ]; then
-              CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
-              if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
-                if [ -z "$RUNNING_CHECKS" ]; then
-                  RUNNING_CHECKS="$CHECK_NAME"
-                else
-                  RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
+      STATUS_PATTERN='"status"\s*:\s*"(in_progress|queued)"'
+      STATUS_POSITIONS=$(echo "$CHECKS_JSON" | grep -boE "$STATUS_PATTERN" | cut -d: -f1 || echo "")
+      if [ -n "$STATUS_POSITIONS" ]; then
+        for STATUS_POS in $STATUS_POSITIONS; do
+          WINDOW_START=$((STATUS_POS > 500 ? STATUS_POS - 500 : 0))
+          WINDOW_END=$((STATUS_POS + 500))
+          CONTEXT_WINDOW="${CHECKS_JSON:$WINDOW_START:$((WINDOW_END - WINDOW_START))}"
+          CHECK_NAME=$(echo "$CONTEXT_WINDOW" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | sed -E 's/.*:\s*"([^"]+)".*/\1/' || echo "")
+          if [ -n "$CHECK_NAME" ]; then
+            CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
+            if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
+              if [ -z "$RUNNING_CHECKS" ]; then
+                RUNNING_CHECKS="$CHECK_NAME"
+              else
+                if echo "$RUNNING_CHECKS" | grep -qF "$CHECK_NAME"; then
+                  continue
                 fi
+                RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
               fi
             fi
           fi
-        done <<< "$STATUS_MATCHES"
+        done
       fi
     fi
     
