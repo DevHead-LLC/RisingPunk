@@ -9,6 +9,7 @@ on:
       - dev
       - main
       - staging
+      - prod
 
 env:
   GH_TOKEN: ${{ secrets.GH_PAT }}
@@ -28,6 +29,7 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GH_PAT }}
+          ref: ${{ github.event.pull_request.base.ref }}
 
       - name: Setup GitHub CLI and tools
         run: |
@@ -90,8 +92,16 @@ jobs:
                   echo "✅ Cursor bot completed successfully (conclusion: $CURSOR_CHECK_CONCLUSION). Proceeding with promotion."
                   CURSOR_CHECK_PASSED=true
                   break
+                elif [ "$CURSOR_CHECK_CONCLUSION" = "cancelled" ] || [ "$CURSOR_CHECK_CONCLUSION" = "skipped" ] || [ "$CURSOR_CHECK_CONCLUSION" = "timed_out" ] || [ "$CURSOR_CHECK_CONCLUSION" = "stale" ]; then
+                  echo "❌ Cursor check completed with terminal state ($CURSOR_CHECK_CONCLUSION). Treating as failure."
+                  CURSOR_CHECK_FAILED=true
+                  break
                 elif [ -z "$CURSOR_CHECK_CONCLUSION" ] || [ "$CURSOR_CHECK_CONCLUSION" = "null" ]; then
                   echo "⚠️  Cursor check completed but conclusion is null/unexpected. Treating as failure for safety."
+                  CURSOR_CHECK_FAILED=true
+                  break
+                else
+                  echo "❌ Cursor check completed with unknown conclusion ($CURSOR_CHECK_CONCLUSION). Treating as failure for safety."
                   CURSOR_CHECK_FAILED=true
                   break
                 fi
@@ -149,7 +159,7 @@ jobs:
             exit 1
           fi
 
-      - name: Process PR and continue promotion chain
+      - name: Process PR and create next stage PR
         if: steps.wait_for_cursor.outputs.cursor_completed == 'true'
         run: |
           chmod +x .github/scripts/promote-branches.sh
@@ -158,3 +168,5 @@ jobs:
             "${{ github.event.pull_request.head.ref }}" \
             "${{ github.event.pull_request.base.ref }}" \
             "${{ github.repository }}"
+          echo "✅ This workflow run is complete"
+          echo "   The next workflow will be triggered automatically when the PR is created"
