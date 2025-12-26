@@ -10,10 +10,54 @@ echo "=========================================="
 echo "Processing PR #$PR_NUMBER: $PR_SOURCE → $PR_TARGET"
 echo "=========================================="
 
-PR_STATE_BEFORE_MERGE=$(gh pr view $PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
+INITIAL_PR_MERGE_COMPLETE=false
 
-if [ "$PR_STATE_BEFORE_MERGE" = "merged" ] || [ "$PR_STATE_BEFORE_MERGE" = "closed" ]; then
-  echo "✅ PR #$PR_NUMBER was already merged. Continuing to next branch..."
+PR_STATE_BEFORE_MERGE=$(gh pr view $PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
+PR_STATE_BEFORE_MERGE_LOWER=$(echo "$PR_STATE_BEFORE_MERGE" | tr '[:upper:]' '[:lower:]')
+
+if [ "$PR_STATE_BEFORE_MERGE_LOWER" = "merged" ] || [ "$PR_STATE_BEFORE_MERGE_LOWER" = "closed" ]; then
+  echo "✅ PR #$PR_NUMBER was already merged. Verifying all actions have stopped..."
+  
+  HEAD_SHA=$(gh pr view $PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "")
+  CHECKS_JSON=$(gh api repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs 2>/dev/null || echo "{}")
+  
+  if command -v jq &> /dev/null; then
+    RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
+  else
+    RUNNING_CHECKS=""
+    STATUS_PATTERN='"status"\s*:\s*"(in_progress|queued)"'
+    STATUS_POSITIONS=$(echo "$CHECKS_JSON" | grep -boE "$STATUS_PATTERN" | cut -d: -f1 || echo "")
+    if [ -n "$STATUS_POSITIONS" ]; then
+      for STATUS_POS in $STATUS_POSITIONS; do
+        WINDOW_START=$((STATUS_POS > 500 ? STATUS_POS - 500 : 0))
+        WINDOW_END=$((STATUS_POS + 500))
+        CONTEXT_WINDOW="${CHECKS_JSON:$WINDOW_START:$((WINDOW_END - WINDOW_START))}"
+        CHECK_NAME=$(echo "$CONTEXT_WINDOW" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | sed -E 's/.*:\s*"([^"]+)".*/\1/' || echo "")
+        if [ -n "$CHECK_NAME" ]; then
+          CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
+          if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
+            if [ -z "$RUNNING_CHECKS" ]; then
+              RUNNING_CHECKS="$CHECK_NAME"
+            else
+              if echo "$RUNNING_CHECKS" | grep -qF "$CHECK_NAME"; then
+                continue
+              fi
+              RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
+            fi
+          fi
+        fi
+      done
+    fi
+  fi
+  
+  if [ -n "$RUNNING_CHECKS" ]; then
+    echo "❌ PR #$PR_NUMBER is merged but actions are still running: $RUNNING_CHECKS"
+    echo "❌ Cannot proceed - all actions must be stopped before continuing."
+    exit 1
+  fi
+  
+  echo "✅ PR #$PR_NUMBER merge verified complete. All actions stopped. Continuing to next branch..."
+  INITIAL_PR_MERGE_COMPLETE=true
 else
   echo "Merging PR #$PR_NUMBER: $PR_SOURCE → $PR_TARGET"
   
@@ -23,11 +67,128 @@ else
   set -e
   
   if [ $MERGE_EXIT_CODE -eq 0 ]; then
-    echo "✅ Successfully merged PR #$PR_NUMBER: $PR_SOURCE → $PR_TARGET"
-    echo "⏳ Waiting 3 seconds for merge to propagate..."
-    sleep 3
+    echo "✅ Merge command succeeded. Verifying merge is complete..."
+    
+    MAX_VERIFY_WAIT=60
+    VERIFY_ELAPSED=0
+    VERIFY_INTERVAL=2
+    MERGE_VERIFIED=false
+    
+    while [ $VERIFY_ELAPSED -lt $MAX_VERIFY_WAIT ]; do
+      sleep $VERIFY_INTERVAL
+      VERIFY_ELAPSED=$((VERIFY_ELAPSED + VERIFY_INTERVAL))
+      
+      PR_STATE_AFTER_MERGE=$(gh pr view $PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
+      PR_STATE_AFTER_MERGE_LOWER=$(echo "$PR_STATE_AFTER_MERGE" | tr '[:upper:]' '[:lower:]')
+      
+      if [ "$PR_STATE_AFTER_MERGE_LOWER" = "merged" ]; then
+        echo "✅ PR #$PR_NUMBER confirmed merged. Verifying all actions have stopped..."
+        
+        HEAD_SHA=$(gh pr view $PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "")
+        CHECKS_JSON=$(gh api repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs 2>/dev/null || echo "{}")
+        
+        if command -v jq &> /dev/null; then
+          RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
+        else
+          RUNNING_CHECKS=""
+          STATUS_PATTERN='"status"\s*:\s*"(in_progress|queued)"'
+          STATUS_POSITIONS=$(echo "$CHECKS_JSON" | grep -boE "$STATUS_PATTERN" | cut -d: -f1 || echo "")
+          if [ -n "$STATUS_POSITIONS" ]; then
+            for STATUS_POS in $STATUS_POSITIONS; do
+              WINDOW_START=$((STATUS_POS > 500 ? STATUS_POS - 500 : 0))
+              WINDOW_END=$((STATUS_POS + 500))
+              CONTEXT_WINDOW="${CHECKS_JSON:$WINDOW_START:$((WINDOW_END - WINDOW_START))}"
+              CHECK_NAME=$(echo "$CONTEXT_WINDOW" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | sed -E 's/.*:\s*"([^"]+)".*/\1/' || echo "")
+              if [ -n "$CHECK_NAME" ]; then
+                CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
+                if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
+                  if [ -z "$RUNNING_CHECKS" ]; then
+                    RUNNING_CHECKS="$CHECK_NAME"
+                  else
+                    if echo "$RUNNING_CHECKS" | grep -qF "$CHECK_NAME"; then
+                      continue
+                    fi
+                    RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
+                  fi
+                fi
+              fi
+            done
+          fi
+        fi
+        
+        if [ -z "$RUNNING_CHECKS" ]; then
+          echo "✅ All checks/actions have stopped. Merge is 100% complete."
+          MERGE_VERIFIED=true
+          break
+        else
+          echo "⏳ Waiting for actions to complete... (${VERIFY_ELAPSED}s/${MAX_VERIFY_WAIT}s)"
+        fi
+      else
+        echo "⏳ Waiting for merge to complete... PR state: ${PR_STATE_AFTER_MERGE:-unknown} (${VERIFY_ELAPSED}s/${MAX_VERIFY_WAIT}s)"
+      fi
+    done
+    
+    if [ "$MERGE_VERIFIED" != "true" ]; then
+      echo "❌ PR #$PR_NUMBER merge verification failed."
+      echo "❌ PR state: ${PR_STATE_AFTER_MERGE:-unknown}"
+      if [ -n "$RUNNING_CHECKS" ]; then
+        echo "❌ Running checks still present: $RUNNING_CHECKS"
+      fi
+      echo "❌ Cannot proceed - merge not confirmed complete and all actions stopped."
+      exit 1
+    fi
+    
+    echo "✅ PR #$PR_NUMBER: $PR_SOURCE → $PR_TARGET merge verified complete. All actions stopped."
+    INITIAL_PR_MERGE_COMPLETE=true
   elif echo "$MERGE_OUTPUT" | grep -qi "already merged\|already been merged"; then
-    echo "✅ PR #$PR_NUMBER was already merged (detected during merge attempt). Continuing..."
+    echo "✅ PR #$PR_NUMBER was already merged (detected during merge attempt). Verifying complete..."
+    PR_STATE_AFTER_MERGE=$(gh pr view $PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
+    PR_STATE_AFTER_MERGE_LOWER=$(echo "$PR_STATE_AFTER_MERGE" | tr '[:upper:]' '[:lower:]')
+    if [ "$PR_STATE_AFTER_MERGE_LOWER" != "merged" ]; then
+      echo "❌ PR state verification failed. Expected 'merged', got: ${PR_STATE_AFTER_MERGE:-unknown}"
+      exit 1
+    fi
+    
+    HEAD_SHA=$(gh pr view $PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "")
+    CHECKS_JSON=$(gh api repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs 2>/dev/null || echo "{}")
+    
+    if command -v jq &> /dev/null; then
+      RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
+    else
+      RUNNING_CHECKS=""
+      STATUS_PATTERN='"status"\s*:\s*"(in_progress|queued)"'
+      STATUS_POSITIONS=$(echo "$CHECKS_JSON" | grep -boE "$STATUS_PATTERN" | cut -d: -f1 || echo "")
+      if [ -n "$STATUS_POSITIONS" ]; then
+        for STATUS_POS in $STATUS_POSITIONS; do
+          WINDOW_START=$((STATUS_POS > 500 ? STATUS_POS - 500 : 0))
+          WINDOW_END=$((STATUS_POS + 500))
+          CONTEXT_WINDOW="${CHECKS_JSON:$WINDOW_START:$((WINDOW_END - WINDOW_START))}"
+          CHECK_NAME=$(echo "$CONTEXT_WINDOW" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | sed -E 's/.*:\s*"([^"]+)".*/\1/' || echo "")
+          if [ -n "$CHECK_NAME" ]; then
+            CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
+            if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
+              if [ -z "$RUNNING_CHECKS" ]; then
+                RUNNING_CHECKS="$CHECK_NAME"
+              else
+                if echo "$RUNNING_CHECKS" | grep -qF "$CHECK_NAME"; then
+                  continue
+                fi
+                RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
+              fi
+            fi
+          fi
+        done
+      fi
+    fi
+    
+    if [ -n "$RUNNING_CHECKS" ]; then
+      echo "❌ PR #$PR_NUMBER is merged but actions are still running: $RUNNING_CHECKS"
+      echo "❌ Cannot proceed - all actions must be stopped before continuing."
+      exit 1
+    fi
+    
+    echo "✅ PR #$PR_NUMBER merge verified complete. All actions stopped."
+    INITIAL_PR_MERGE_COMPLETE=true
   else
     echo "❌ Failed to merge PR #$PR_NUMBER (exit code: $MERGE_EXIT_CODE)"
     echo "Merge output: $MERGE_OUTPUT"
@@ -58,6 +219,12 @@ fi
 for ((i=$START_INDEX; i<${#BRANCHES[@]}; i++)); do
   TARGET="${BRANCHES[$i]}"
   
+  PROMOTION_STEP_COMPLETE=false
+  PR_CREATED=false
+  CURSOR_CHECK_COMPLETE=false
+  FINAL_VERIFICATION_COMPLETE=false
+  PR_MERGE_COMPLETE=false
+  
   echo "=========================================="
   echo "Promoting: $CURRENT_SOURCE → $TARGET"
   echo "=========================================="
@@ -67,6 +234,7 @@ for ((i=$START_INDEX; i<${#BRANCHES[@]}; i++)); do
   if [ -n "$EXISTING_PR" ]; then
     echo "PR already exists: #$EXISTING_PR"
     NEXT_PR_NUMBER="$EXISTING_PR"
+    PR_CREATED=true
   else
     PR_TITLE="Auto-promote: $CURRENT_SOURCE → $TARGET"
     PR_BODY="Automated promotion from $CURRENT_SOURCE to $TARGET branch.
@@ -149,7 +317,18 @@ Cursor bug bot will run automatically on this PR."
     fi
     
     echo "✅ Created PR #$NEXT_PR_NUMBER: $CURRENT_SOURCE → $TARGET"
+    PR_CREATED=true
   fi
+  
+  if [ "$PR_CREATED" != "true" ]; then
+    echo "❌ Failed to create or find PR for $CURRENT_SOURCE → $TARGET. Cannot proceed."
+    exit 1
+  fi
+  
+  echo "=========================================="
+  echo "✅ PR CREATION COMPLETE: PR #$NEXT_PR_NUMBER ($CURRENT_SOURCE → $TARGET)"
+  echo "✅ Proceeding to Cursor bot check..."
+  echo "=========================================="
   
   echo "Waiting for Cursor bug bot to run on PR #$NEXT_PR_NUMBER..."
   echo "ℹ️  Note: Cursor bot may take 30-60 seconds to appear on newly created PRs."
@@ -177,8 +356,9 @@ Cursor bug bot will run automatically on this PR."
     fi
     
     PR_STATE=$(gh pr view $NEXT_PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
+    PR_STATE_LOWER=$(echo "$PR_STATE" | tr '[:upper:]' '[:lower:]')
     
-    if [ "$PR_STATE" = "closed" ] || [ "$PR_STATE" = "merged" ]; then
+    if [ "$PR_STATE_LOWER" = "closed" ] || [ "$PR_STATE_LOWER" = "merged" ]; then
       echo "❌ PR #$NEXT_PR_NUMBER was merged/closed while workflow was running!"
       echo "❌ This should not happen - PR was merged before Cursor check completed."
       echo "❌ Stopping to prevent unsafe deployment."
@@ -225,13 +405,9 @@ Cursor bug bot will run automatically on this PR."
           echo "❌ Cursor bug check failed (check run: $CURSOR_CHECK_CONCLUSION)!"
           CURSOR_CHECK_FAILED=true
           break
-        elif [ "$CURSOR_CHECK_CONCLUSION" = "success" ]; then
+        elif [ "$CURSOR_CHECK_CONCLUSION" = "success" ] || [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
           echo "✅ Cursor bug check passed (check run: $CURSOR_CHECK_CONCLUSION)!"
           CURSOR_CHECK_PASSED=true
-          break
-        elif [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
-          echo "❌ Cursor check completed with neutral conclusion. Only 'success' conclusion is accepted. Stopping workflow."
-          CURSOR_CHECK_FAILED=true
           break
       elif [ -z "$CURSOR_CHECK_CONCLUSION" ] || [ "$CURSOR_CHECK_CONCLUSION" = "null" ]; then
         echo "⚠️  Cursor check completed but conclusion is null/unexpected. Treating as failure for safety."
@@ -281,6 +457,12 @@ Cursor bug bot will run automatically on this PR."
     exit 1
   fi
   
+  CURSOR_CHECK_COMPLETE=true
+  echo "=========================================="
+  echo "✅ CURSOR CHECK COMPLETE: PR #$NEXT_PR_NUMBER passed"
+  echo "✅ Proceeding to final verification..."
+  echo "=========================================="
+  
   echo "✅ Cursor check passed. Performing FINAL VERIFICATION before merge..."
   
   echo "🔍 FINAL VERIFICATION: Checking Cursor Bugbot one last time before merge..."
@@ -305,17 +487,71 @@ Cursor bug bot will run automatically on this PR."
     exit 1
   fi
   
-  if [ "$CURSOR_CHECK_CONCLUSION" != "success" ]; then
-    echo "❌❌❌ FINAL CHECK FAILED: Cursor check conclusion is not 'success' ($CURSOR_CHECK_CONCLUSION). BLOCKING MERGE."
-    exit 1
+  if [ "$CURSOR_CHECK_CONCLUSION" = "success" ] || [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
+    echo "✅ Final verification passed (conclusion: $CURSOR_CHECK_CONCLUSION). Merging PR #$NEXT_PR_NUMBER: $CURRENT_SOURCE → $TARGET"
+    FINAL_VERIFICATION_COMPLETE=true
   else
-    echo "✅ Final verification passed. Merging PR #$NEXT_PR_NUMBER: $CURRENT_SOURCE → $TARGET"
+    echo "❌❌❌ FINAL CHECK FAILED: Cursor check conclusion is not 'success' or 'neutral' ($CURSOR_CHECK_CONCLUSION). BLOCKING MERGE."
+    exit 1
   fi
+  
+  if [ "$FINAL_VERIFICATION_COMPLETE" != "true" ]; then
+    echo "❌ Final verification did not complete successfully. Cannot proceed to merge."
+    exit 1
+  fi
+  
+  echo "=========================================="
+  echo "✅ FINAL VERIFICATION COMPLETE: PR #$NEXT_PR_NUMBER"
+  echo "✅ Proceeding to merge..."
+  echo "=========================================="
   
   PR_STATE_BEFORE_MERGE=$(gh pr view $NEXT_PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
   
-  if [ "$PR_STATE_BEFORE_MERGE" = "merged" ] || [ "$PR_STATE_BEFORE_MERGE" = "closed" ]; then
-    echo "✅ PR #$NEXT_PR_NUMBER was already merged. Continuing to next branch..."
+  PR_STATE_BEFORE_MERGE_LOWER=$(echo "$PR_STATE_BEFORE_MERGE" | tr '[:upper:]' '[:lower:]')
+  
+  if [ "$PR_STATE_BEFORE_MERGE_LOWER" = "merged" ] || [ "$PR_STATE_BEFORE_MERGE_LOWER" = "closed" ]; then
+    echo "✅ PR #$NEXT_PR_NUMBER was already merged. Verifying all actions have stopped..."
+    
+    HEAD_SHA=$(gh pr view $NEXT_PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "")
+    CHECKS_JSON=$(gh api repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs 2>/dev/null || echo "{}")
+    
+    if command -v jq &> /dev/null; then
+      RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
+    else
+      RUNNING_CHECKS=""
+      STATUS_PATTERN='"status"\s*:\s*"(in_progress|queued)"'
+      STATUS_POSITIONS=$(echo "$CHECKS_JSON" | grep -boE "$STATUS_PATTERN" | cut -d: -f1 || echo "")
+      if [ -n "$STATUS_POSITIONS" ]; then
+        for STATUS_POS in $STATUS_POSITIONS; do
+          WINDOW_START=$((STATUS_POS > 500 ? STATUS_POS - 500 : 0))
+          WINDOW_END=$((STATUS_POS + 500))
+          CONTEXT_WINDOW="${CHECKS_JSON:$WINDOW_START:$((WINDOW_END - WINDOW_START))}"
+          CHECK_NAME=$(echo "$CONTEXT_WINDOW" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | sed -E 's/.*:\s*"([^"]+)".*/\1/' || echo "")
+          if [ -n "$CHECK_NAME" ]; then
+            CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
+            if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
+              if [ -z "$RUNNING_CHECKS" ]; then
+                RUNNING_CHECKS="$CHECK_NAME"
+              else
+                if echo "$RUNNING_CHECKS" | grep -qF "$CHECK_NAME"; then
+                  continue
+                fi
+                RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
+              fi
+            fi
+          fi
+        done
+      fi
+    fi
+    
+    if [ -n "$RUNNING_CHECKS" ]; then
+      echo "❌ PR #$NEXT_PR_NUMBER is merged but actions are still running: $RUNNING_CHECKS"
+      echo "❌ Cannot proceed - all actions must be stopped before continuing."
+      exit 1
+    fi
+    
+    echo "✅ PR #$NEXT_PR_NUMBER merge verified complete. All actions stopped. Continuing to next branch..."
+    PR_MERGE_COMPLETE=true
   else
     set +e
     MERGE_OUTPUT=$(gh pr merge $NEXT_PR_NUMBER --merge --delete-branch=false 2>&1)
@@ -323,15 +559,152 @@ Cursor bug bot will run automatically on this PR."
     set -e
     
     if [ $MERGE_EXIT_CODE -eq 0 ]; then
-      echo "✅ Successfully merged PR #$NEXT_PR_NUMBER: $CURRENT_SOURCE → $TARGET"
+      echo "✅ Merge command succeeded. Verifying merge is complete..."
+      
+      MAX_VERIFY_WAIT=60
+      VERIFY_ELAPSED=0
+      VERIFY_INTERVAL=2
+      
+      MERGE_VERIFIED=false
+      while [ $VERIFY_ELAPSED -lt $MAX_VERIFY_WAIT ]; do
+        sleep $VERIFY_INTERVAL
+        VERIFY_ELAPSED=$((VERIFY_ELAPSED + VERIFY_INTERVAL))
+        
+        PR_STATE_AFTER_MERGE=$(gh pr view $NEXT_PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
+        PR_STATE_AFTER_MERGE_LOWER=$(echo "$PR_STATE_AFTER_MERGE" | tr '[:upper:]' '[:lower:]')
+        
+        if [ "$PR_STATE_AFTER_MERGE_LOWER" = "merged" ]; then
+          echo "✅ PR #$NEXT_PR_NUMBER confirmed merged. Verifying all actions have stopped..."
+          
+          HEAD_SHA=$(gh pr view $NEXT_PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "")
+          CHECKS_JSON=$(gh api repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs 2>/dev/null || echo "{}")
+          
+          if command -v jq &> /dev/null; then
+            RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
+          else
+            RUNNING_CHECKS=""
+            STATUS_PATTERN='"status"\s*:\s*"(in_progress|queued)"'
+            STATUS_POSITIONS=$(echo "$CHECKS_JSON" | grep -boE "$STATUS_PATTERN" | cut -d: -f1 || echo "")
+            if [ -n "$STATUS_POSITIONS" ]; then
+              for STATUS_POS in $STATUS_POSITIONS; do
+                WINDOW_START=$((STATUS_POS > 500 ? STATUS_POS - 500 : 0))
+                WINDOW_END=$((STATUS_POS + 500))
+                CONTEXT_WINDOW="${CHECKS_JSON:$WINDOW_START:$((WINDOW_END - WINDOW_START))}"
+                CHECK_NAME=$(echo "$CONTEXT_WINDOW" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | sed -E 's/.*:\s*"([^"]+)".*/\1/' || echo "")
+                if [ -n "$CHECK_NAME" ]; then
+                  CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
+                  if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
+                    if [ -z "$RUNNING_CHECKS" ]; then
+                      RUNNING_CHECKS="$CHECK_NAME"
+                    else
+                      if echo "$RUNNING_CHECKS" | grep -qF "$CHECK_NAME"; then
+                        continue
+                      fi
+                      RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
+                    fi
+                  fi
+                fi
+              done
+            fi
+          fi
+          
+          if [ -z "$RUNNING_CHECKS" ]; then
+            echo "✅ All checks/actions have stopped. Merge is 100% complete."
+            MERGE_VERIFIED=true
+            break
+          else
+            echo "⏳ Waiting for actions to complete... (${VERIFY_ELAPSED}s/${MAX_VERIFY_WAIT}s)"
+          fi
+        else
+          echo "⏳ Waiting for merge to complete... PR state: ${PR_STATE_AFTER_MERGE:-unknown} (${VERIFY_ELAPSED}s/${MAX_VERIFY_WAIT}s)"
+        fi
+      done
+      
+      if [ "$MERGE_VERIFIED" != "true" ]; then
+        echo "❌ PR #$NEXT_PR_NUMBER merge verification failed."
+        echo "❌ PR state: ${PR_STATE_AFTER_MERGE:-unknown}"
+        if [ -n "$RUNNING_CHECKS" ]; then
+          echo "❌ Running checks still present: $RUNNING_CHECKS"
+        fi
+        echo "❌ Cannot proceed - merge not confirmed complete and all actions stopped."
+        exit 1
+      fi
+      
+      echo "✅ PR #$NEXT_PR_NUMBER: $CURRENT_SOURCE → $TARGET merge verified complete. All actions stopped."
+      PR_MERGE_COMPLETE=true
     elif echo "$MERGE_OUTPUT" | grep -qi "already merged\|already been merged"; then
-      echo "✅ PR #$NEXT_PR_NUMBER was already merged (detected during merge attempt). Continuing..."
+      echo "✅ PR #$NEXT_PR_NUMBER was already merged (detected during merge attempt). Verifying complete..."
+      PR_STATE_AFTER_MERGE=$(gh pr view $NEXT_PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
+      PR_STATE_AFTER_MERGE_LOWER=$(echo "$PR_STATE_AFTER_MERGE" | tr '[:upper:]' '[:lower:]')
+      if [ "$PR_STATE_AFTER_MERGE_LOWER" != "merged" ]; then
+        echo "❌ PR state verification failed. Expected 'merged', got: ${PR_STATE_AFTER_MERGE:-unknown}"
+        exit 1
+      fi
+      
+    HEAD_SHA=$(gh pr view $NEXT_PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "")
+    CHECKS_JSON=$(gh api repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs 2>/dev/null || echo "{}")
+    
+    if command -v jq &> /dev/null; then
+      RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
+    else
+      RUNNING_CHECKS=""
+      STATUS_PATTERN='"status"\s*:\s*"(in_progress|queued)"'
+      STATUS_POSITIONS=$(echo "$CHECKS_JSON" | grep -boE "$STATUS_PATTERN" | cut -d: -f1 || echo "")
+      if [ -n "$STATUS_POSITIONS" ]; then
+        for STATUS_POS in $STATUS_POSITIONS; do
+          WINDOW_START=$((STATUS_POS > 500 ? STATUS_POS - 500 : 0))
+          WINDOW_END=$((STATUS_POS + 500))
+          CONTEXT_WINDOW="${CHECKS_JSON:$WINDOW_START:$((WINDOW_END - WINDOW_START))}"
+          CHECK_NAME=$(echo "$CONTEXT_WINDOW" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | sed -E 's/.*:\s*"([^"]+)".*/\1/' || echo "")
+          if [ -n "$CHECK_NAME" ]; then
+            CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
+            if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
+              if [ -z "$RUNNING_CHECKS" ]; then
+                RUNNING_CHECKS="$CHECK_NAME"
+              else
+                if echo "$RUNNING_CHECKS" | grep -qF "$CHECK_NAME"; then
+                  continue
+                fi
+                RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
+              fi
+            fi
+          fi
+        done
+      fi
+    fi
+    
+    if [ -n "$RUNNING_CHECKS" ]; then
+      echo "❌ PR #$NEXT_PR_NUMBER is merged but actions are still running: $RUNNING_CHECKS"
+      echo "❌ Cannot proceed - all actions must be stopped before continuing."
+      exit 1
+    fi
+    
+    echo "✅ PR #$NEXT_PR_NUMBER merge verified complete. All actions stopped."
+    PR_MERGE_COMPLETE=true
     else
       echo "❌ Failed to merge PR #$NEXT_PR_NUMBER (exit code: $MERGE_EXIT_CODE)"
       echo "Merge output: $MERGE_OUTPUT"
       exit 1
     fi
   fi
+  
+  if [ "$PR_MERGE_COMPLETE" != "true" ]; then
+    echo "❌ PR merge did not complete successfully. Cannot proceed to next branch."
+    exit 1
+  fi
+  
+  PROMOTION_STEP_COMPLETE=true
+  
+  echo "=========================================="
+  echo "✅ PROMOTION STEP COMPLETE: $CURRENT_SOURCE → $TARGET"
+  echo "✅ All sub-steps completed:"
+  echo "   - PR created: $PR_CREATED"
+  echo "   - Cursor check: $CURSOR_CHECK_COMPLETE"
+  echo "   - Final verification: $FINAL_VERIFICATION_COMPLETE"
+  echo "   - PR merged: $PR_MERGE_COMPLETE"
+  echo "✅ Merge verified complete. All actions stopped."
+  echo "✅ Ready to proceed to next branch."
+  echo "=========================================="
   
   CURRENT_SOURCE="$TARGET"
   
@@ -343,7 +716,7 @@ Cursor bug bot will run automatically on this PR."
     break
   fi
   
-  echo "Waiting 5 seconds before next promotion..."
-  sleep 5
+  echo "⏳ Waiting 10 seconds before starting next promotion to ensure stability..."
+  sleep 10
 done
 

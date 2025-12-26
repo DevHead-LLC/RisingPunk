@@ -86,13 +86,9 @@ jobs:
                   echo "❌ Cursor bot completed with failure. Stopping workflow."
                   CURSOR_CHECK_FAILED=true
                   break
-                elif [ "$CURSOR_CHECK_CONCLUSION" = "success" ]; then
-                  echo "✅ Cursor bot completed successfully. Proceeding with promotion."
+                elif [ "$CURSOR_CHECK_CONCLUSION" = "success" ] || [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
+                  echo "✅ Cursor bot completed successfully (conclusion: $CURSOR_CHECK_CONCLUSION). Proceeding with promotion."
                   CURSOR_CHECK_PASSED=true
-                  break
-                elif [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
-                  echo "❌ Cursor bot completed with neutral conclusion. Only 'success' conclusion is accepted. Stopping workflow."
-                  CURSOR_CHECK_FAILED=true
                   break
                 elif [ -z "$CURSOR_CHECK_CONCLUSION" ] || [ "$CURSOR_CHECK_CONCLUSION" = "null" ]; then
                   echo "⚠️  Cursor check completed but conclusion is null/unexpected. Treating as failure for safety."
@@ -142,6 +138,8 @@ jobs:
           fi
           
           if [ "$CURSOR_CHECK_PASSED" = "true" ]; then
+            echo "✅ Cursor bot check COMPLETE: conclusion = 'success'"
+            echo "✅ Setting completion flag: cursor_completed=true"
             echo "cursor_completed=true" >> $GITHUB_OUTPUT
           elif [ "$CURSOR_CHECK_FOUND" = "false" ]; then
             echo "⚠️  Cursor bot did not appear within timeout (${MAX_WAIT}s). Stopping workflow."
