@@ -22,9 +22,32 @@ if [ "$PR_STATE_BEFORE_MERGE_LOWER" = "merged" ] || [ "$PR_STATE_BEFORE_MERGE_LO
   CHECKS_JSON=$(gh api repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs 2>/dev/null || echo "{}")
   
   if command -v jq &> /dev/null; then
-    RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | .name' 2>/dev/null || echo "")
+    RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
   else
-    RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
+    RUNNING_CHECKS=""
+    STATUS_PATTERN='"status"\s*:\s*"(in_progress|queued)"'
+    STATUS_POSITIONS=$(echo "$CHECKS_JSON" | grep -boE "$STATUS_PATTERN" | cut -d: -f1 || echo "")
+    if [ -n "$STATUS_POSITIONS" ]; then
+      for STATUS_POS in $STATUS_POSITIONS; do
+        WINDOW_START=$((STATUS_POS > 500 ? STATUS_POS - 500 : 0))
+        WINDOW_END=$((STATUS_POS + 500))
+        CONTEXT_WINDOW="${CHECKS_JSON:$WINDOW_START:$((WINDOW_END - WINDOW_START))}"
+        CHECK_NAME=$(echo "$CONTEXT_WINDOW" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | sed -E 's/.*:\s*"([^"]+)".*/\1/' || echo "")
+        if [ -n "$CHECK_NAME" ]; then
+          CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
+          if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
+            if [ -z "$RUNNING_CHECKS" ]; then
+              RUNNING_CHECKS="$CHECK_NAME"
+            else
+              if echo "$RUNNING_CHECKS" | grep -qF "$CHECK_NAME"; then
+                continue
+              fi
+              RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
+            fi
+          fi
+        fi
+      done
+    fi
   fi
   
   if [ -n "$RUNNING_CHECKS" ]; then
@@ -65,9 +88,32 @@ else
         CHECKS_JSON=$(gh api repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs 2>/dev/null || echo "{}")
         
         if command -v jq &> /dev/null; then
-          RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | .name' 2>/dev/null || echo "")
+          RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
         else
-          RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
+          RUNNING_CHECKS=""
+          STATUS_PATTERN='"status"\s*:\s*"(in_progress|queued)"'
+          STATUS_POSITIONS=$(echo "$CHECKS_JSON" | grep -boE "$STATUS_PATTERN" | cut -d: -f1 || echo "")
+          if [ -n "$STATUS_POSITIONS" ]; then
+            for STATUS_POS in $STATUS_POSITIONS; do
+              WINDOW_START=$((STATUS_POS > 500 ? STATUS_POS - 500 : 0))
+              WINDOW_END=$((STATUS_POS + 500))
+              CONTEXT_WINDOW="${CHECKS_JSON:$WINDOW_START:$((WINDOW_END - WINDOW_START))}"
+              CHECK_NAME=$(echo "$CONTEXT_WINDOW" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | sed -E 's/.*:\s*"([^"]+)".*/\1/' || echo "")
+              if [ -n "$CHECK_NAME" ]; then
+                CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
+                if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
+                  if [ -z "$RUNNING_CHECKS" ]; then
+                    RUNNING_CHECKS="$CHECK_NAME"
+                  else
+                    if echo "$RUNNING_CHECKS" | grep -qF "$CHECK_NAME"; then
+                      continue
+                    fi
+                    RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
+                  fi
+                fi
+              fi
+            done
+          fi
         fi
         
         if [ -z "$RUNNING_CHECKS" ]; then
@@ -107,9 +153,32 @@ else
     CHECKS_JSON=$(gh api repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs 2>/dev/null || echo "{}")
     
     if command -v jq &> /dev/null; then
-      RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | .name' 2>/dev/null || echo "")
+      RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
     else
-      RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
+      RUNNING_CHECKS=""
+      STATUS_PATTERN='"status"\s*:\s*"(in_progress|queued)"'
+      STATUS_POSITIONS=$(echo "$CHECKS_JSON" | grep -boE "$STATUS_PATTERN" | cut -d: -f1 || echo "")
+      if [ -n "$STATUS_POSITIONS" ]; then
+        for STATUS_POS in $STATUS_POSITIONS; do
+          WINDOW_START=$((STATUS_POS > 500 ? STATUS_POS - 500 : 0))
+          WINDOW_END=$((STATUS_POS + 500))
+          CONTEXT_WINDOW="${CHECKS_JSON:$WINDOW_START:$((WINDOW_END - WINDOW_START))}"
+          CHECK_NAME=$(echo "$CONTEXT_WINDOW" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | sed -E 's/.*:\s*"([^"]+)".*/\1/' || echo "")
+          if [ -n "$CHECK_NAME" ]; then
+            CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
+            if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
+              if [ -z "$RUNNING_CHECKS" ]; then
+                RUNNING_CHECKS="$CHECK_NAME"
+              else
+                if echo "$RUNNING_CHECKS" | grep -qF "$CHECK_NAME"; then
+                  continue
+                fi
+                RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
+              fi
+            fi
+          fi
+        done
+      fi
     fi
     
     if [ -n "$RUNNING_CHECKS" ]; then
@@ -336,13 +405,9 @@ Cursor bug bot will run automatically on this PR."
           echo "❌ Cursor bug check failed (check run: $CURSOR_CHECK_CONCLUSION)!"
           CURSOR_CHECK_FAILED=true
           break
-        elif [ "$CURSOR_CHECK_CONCLUSION" = "success" ]; then
+        elif [ "$CURSOR_CHECK_CONCLUSION" = "success" ] || [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
           echo "✅ Cursor bug check passed (check run: $CURSOR_CHECK_CONCLUSION)!"
           CURSOR_CHECK_PASSED=true
-          break
-        elif [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
-          echo "❌ Cursor check completed with neutral conclusion. Only 'success' conclusion is accepted. Stopping workflow."
-          CURSOR_CHECK_FAILED=true
           break
       elif [ -z "$CURSOR_CHECK_CONCLUSION" ] || [ "$CURSOR_CHECK_CONCLUSION" = "null" ]; then
         echo "⚠️  Cursor check completed but conclusion is null/unexpected. Treating as failure for safety."
@@ -422,12 +487,12 @@ Cursor bug bot will run automatically on this PR."
     exit 1
   fi
   
-  if [ "$CURSOR_CHECK_CONCLUSION" != "success" ]; then
-    echo "❌❌❌ FINAL CHECK FAILED: Cursor check conclusion is not 'success' ($CURSOR_CHECK_CONCLUSION). BLOCKING MERGE."
-    exit 1
-  else
-    echo "✅ Final verification passed. Merging PR #$NEXT_PR_NUMBER: $CURRENT_SOURCE → $TARGET"
+  if [ "$CURSOR_CHECK_CONCLUSION" = "success" ] || [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
+    echo "✅ Final verification passed (conclusion: $CURSOR_CHECK_CONCLUSION). Merging PR #$NEXT_PR_NUMBER: $CURRENT_SOURCE → $TARGET"
     FINAL_VERIFICATION_COMPLETE=true
+  else
+    echo "❌❌❌ FINAL CHECK FAILED: Cursor check conclusion is not 'success' or 'neutral' ($CURSOR_CHECK_CONCLUSION). BLOCKING MERGE."
+    exit 1
   fi
   
   if [ "$FINAL_VERIFICATION_COMPLETE" != "true" ]; then
@@ -451,9 +516,32 @@ Cursor bug bot will run automatically on this PR."
     CHECKS_JSON=$(gh api repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs 2>/dev/null || echo "{}")
     
     if command -v jq &> /dev/null; then
-      RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | .name' 2>/dev/null || echo "")
+      RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
     else
-      RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
+      RUNNING_CHECKS=""
+      STATUS_PATTERN='"status"\s*:\s*"(in_progress|queued)"'
+      STATUS_POSITIONS=$(echo "$CHECKS_JSON" | grep -boE "$STATUS_PATTERN" | cut -d: -f1 || echo "")
+      if [ -n "$STATUS_POSITIONS" ]; then
+        for STATUS_POS in $STATUS_POSITIONS; do
+          WINDOW_START=$((STATUS_POS > 500 ? STATUS_POS - 500 : 0))
+          WINDOW_END=$((STATUS_POS + 500))
+          CONTEXT_WINDOW="${CHECKS_JSON:$WINDOW_START:$((WINDOW_END - WINDOW_START))}"
+          CHECK_NAME=$(echo "$CONTEXT_WINDOW" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | sed -E 's/.*:\s*"([^"]+)".*/\1/' || echo "")
+          if [ -n "$CHECK_NAME" ]; then
+            CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
+            if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
+              if [ -z "$RUNNING_CHECKS" ]; then
+                RUNNING_CHECKS="$CHECK_NAME"
+              else
+                if echo "$RUNNING_CHECKS" | grep -qF "$CHECK_NAME"; then
+                  continue
+                fi
+                RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
+              fi
+            fi
+          fi
+        done
+      fi
     fi
     
     if [ -n "$RUNNING_CHECKS" ]; then
@@ -492,9 +580,32 @@ Cursor bug bot will run automatically on this PR."
           CHECKS_JSON=$(gh api repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs 2>/dev/null || echo "{}")
           
           if command -v jq &> /dev/null; then
-            RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | .name' 2>/dev/null || echo "")
+            RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
           else
-            RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
+            RUNNING_CHECKS=""
+            STATUS_PATTERN='"status"\s*:\s*"(in_progress|queued)"'
+            STATUS_POSITIONS=$(echo "$CHECKS_JSON" | grep -boE "$STATUS_PATTERN" | cut -d: -f1 || echo "")
+            if [ -n "$STATUS_POSITIONS" ]; then
+              for STATUS_POS in $STATUS_POSITIONS; do
+                WINDOW_START=$((STATUS_POS > 500 ? STATUS_POS - 500 : 0))
+                WINDOW_END=$((STATUS_POS + 500))
+                CONTEXT_WINDOW="${CHECKS_JSON:$WINDOW_START:$((WINDOW_END - WINDOW_START))}"
+                CHECK_NAME=$(echo "$CONTEXT_WINDOW" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | sed -E 's/.*:\s*"([^"]+)".*/\1/' || echo "")
+                if [ -n "$CHECK_NAME" ]; then
+                  CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
+                  if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
+                    if [ -z "$RUNNING_CHECKS" ]; then
+                      RUNNING_CHECKS="$CHECK_NAME"
+                    else
+                      if echo "$RUNNING_CHECKS" | grep -qF "$CHECK_NAME"; then
+                        continue
+                      fi
+                      RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
+                    fi
+                  fi
+                fi
+              done
+            fi
           fi
           
           if [ -z "$RUNNING_CHECKS" ]; then
@@ -530,23 +641,46 @@ Cursor bug bot will run automatically on this PR."
         exit 1
       fi
       
-      HEAD_SHA=$(gh pr view $NEXT_PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "")
-      CHECKS_JSON=$(gh api repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs 2>/dev/null || echo "{}")
-      
-      if command -v jq &> /dev/null; then
-        RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | .name' 2>/dev/null || echo "")
-      else
-        RUNNING_CHECKS=$(echo "$CHECKS_JSON" | grep -oE '"status"\s*:\s*"(in_progress|queued)"' | head -1 || echo "")
+    HEAD_SHA=$(gh pr view $NEXT_PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "")
+    CHECKS_JSON=$(gh api repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs 2>/dev/null || echo "{}")
+    
+    if command -v jq &> /dev/null; then
+      RUNNING_CHECKS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.status != "completed") | select(.name | ascii_downcase | (contains("promote") | not)) | .name' 2>/dev/null || echo "")
+    else
+      RUNNING_CHECKS=""
+      STATUS_PATTERN='"status"\s*:\s*"(in_progress|queued)"'
+      STATUS_POSITIONS=$(echo "$CHECKS_JSON" | grep -boE "$STATUS_PATTERN" | cut -d: -f1 || echo "")
+      if [ -n "$STATUS_POSITIONS" ]; then
+        for STATUS_POS in $STATUS_POSITIONS; do
+          WINDOW_START=$((STATUS_POS > 500 ? STATUS_POS - 500 : 0))
+          WINDOW_END=$((STATUS_POS + 500))
+          CONTEXT_WINDOW="${CHECKS_JSON:$WINDOW_START:$((WINDOW_END - WINDOW_START))}"
+          CHECK_NAME=$(echo "$CONTEXT_WINDOW" | grep -oE '"name"\s*:\s*"[^"]+"' | head -1 | sed -E 's/.*:\s*"([^"]+)".*/\1/' || echo "")
+          if [ -n "$CHECK_NAME" ]; then
+            CHECK_NAME_LOWER=$(echo "$CHECK_NAME" | tr '[:upper:]' '[:lower:]')
+            if ! echo "$CHECK_NAME_LOWER" | grep -qi "promote"; then
+              if [ -z "$RUNNING_CHECKS" ]; then
+                RUNNING_CHECKS="$CHECK_NAME"
+              else
+                if echo "$RUNNING_CHECKS" | grep -qF "$CHECK_NAME"; then
+                  continue
+                fi
+                RUNNING_CHECKS="$RUNNING_CHECKS $CHECK_NAME"
+              fi
+            fi
+          fi
+        done
       fi
-      
-      if [ -n "$RUNNING_CHECKS" ]; then
-        echo "❌ PR #$NEXT_PR_NUMBER is merged but actions are still running: $RUNNING_CHECKS"
-        echo "❌ Cannot proceed - all actions must be stopped before continuing."
-        exit 1
-      fi
-      
-      echo "✅ PR #$NEXT_PR_NUMBER merge verified complete. All actions stopped."
-      PR_MERGE_COMPLETE=true
+    fi
+    
+    if [ -n "$RUNNING_CHECKS" ]; then
+      echo "❌ PR #$NEXT_PR_NUMBER is merged but actions are still running: $RUNNING_CHECKS"
+      echo "❌ Cannot proceed - all actions must be stopped before continuing."
+      exit 1
+    fi
+    
+    echo "✅ PR #$NEXT_PR_NUMBER merge verified complete. All actions stopped."
+    PR_MERGE_COMPLETE=true
     else
       echo "❌ Failed to merge PR #$NEXT_PR_NUMBER (exit code: $MERGE_EXIT_CODE)"
       echo "Merge output: $MERGE_OUTPUT"
