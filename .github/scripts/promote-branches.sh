@@ -48,6 +48,42 @@ echo "🎯 Action: Merge PR #$PR_NUMBER ($PR_SOURCE → $PR_TARGET)"
 echo "✅ Completion: PR merged AND all actions stopped, then create next PR"
 echo "=========================================="
 
+echo "🔍 SAFETY CHECK: Verifying Cursor bot passed before proceeding..."
+HEAD_SHA=$(gh pr view $PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "")
+if [ -z "$HEAD_SHA" ]; then
+  echo "❌ CRITICAL: Cannot get PR head SHA. Stopping to prevent unsafe merge."
+  exit 1
+fi
+
+CHECKS_JSON=$(gh api repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs 2>/dev/null || echo "{}")
+if command -v jq &> /dev/null; then
+  CURSOR_CHECK_CONCLUSION=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.name | ascii_downcase | contains("cursor")) | .conclusion // empty' | head -1 || echo "")
+else
+  CURSOR_CHECK_CONCLUSION=$(echo "$CHECKS_JSON" | grep -i "cursor" -A 10 | grep -oP '"conclusion":\s*"\K[^"]+' | head -1 || echo "")
+fi
+
+if [ -n "$CURSOR_CHECK_CONCLUSION" ]; then
+  if [ "$CURSOR_CHECK_CONCLUSION" != "success" ] && [ "$CURSOR_CHECK_CONCLUSION" != "neutral" ]; then
+    echo "=========================================="
+    echo "❌ CRITICAL: Cursor bot check FAILED in script verification"
+    echo "❌ Cursor bot conclusion: $CURSOR_CHECK_CONCLUSION"
+    echo "❌ Only 'success' or 'neutral' conclusions are allowed"
+    echo "❌ Bugs detected - stopping immediately"
+    echo "❌ No PR will be merged. No promotion will occur."
+    echo "=========================================="
+    exit 1
+  else
+    echo "✅ Cursor bot verification passed (conclusion: $CURSOR_CHECK_CONCLUSION)"
+  fi
+else
+  echo "⚠️  WARNING: Cursor bot check not found in commit checks"
+  echo "⚠️  This may indicate Cursor bot hasn't run yet or workflow bypassed check"
+  echo "❌ Cannot proceed without Cursor bot verification - stopping for safety"
+  exit 1
+fi
+
+echo "=========================================="
+
 PR_STATE_BEFORE_MERGE=$(gh pr view $PR_NUMBER --json state -q '.state' 2>/dev/null || echo "")
 PR_STATE_BEFORE_MERGE_LOWER=$(echo "$PR_STATE_BEFORE_MERGE" | tr '[:upper:]' '[:lower:]')
 
