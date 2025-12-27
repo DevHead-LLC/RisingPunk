@@ -33,13 +33,22 @@ jobs:
 
       - name: Fetch latest script from head branch
         run: |
-          git fetch origin ${{ github.event.pull_request.head.ref }} || true
-          if git show FETCH_HEAD:.github/scripts/promote-branches.sh > /tmp/promote-branches.sh 2>/dev/null; then
-            mv /tmp/promote-branches.sh .github/scripts/promote-branches.sh
-            chmod +x .github/scripts/promote-branches.sh
-            echo "✅ Updated script from head branch"
+          set +e
+          git fetch origin ${{ github.event.pull_request.head.ref }} 2>&1 | tee /tmp/fetch_output.txt
+          FETCH_EXIT_CODE=$?
+          set -e
+          
+          if [ $FETCH_EXIT_CODE -eq 0 ]; then
+            if git show FETCH_HEAD:.github/scripts/promote-branches.sh > /tmp/promote-branches.sh 2>/dev/null; then
+              mv /tmp/promote-branches.sh .github/scripts/promote-branches.sh
+              chmod +x .github/scripts/promote-branches.sh
+              echo "✅ Updated script from head branch (${{ github.event.pull_request.head.ref }})"
+            else
+              echo "⚠️  Fetch succeeded but script not found in head branch. Using base branch script."
+            fi
           else
-            echo "ℹ️  Using script from base branch"
+            echo "ℹ️  Could not fetch head branch (${{ github.event.pull_request.head.ref }}). Using script from base branch."
+            echo "   Fetch error: $(cat /tmp/fetch_output.txt 2>/dev/null || echo 'unknown')"
           fi
 
       - name: Setup GitHub CLI and tools
