@@ -30,7 +30,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
         new: true,
         setDefaultsOnInsert: true
       }
-    ).select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt').lean();
+    ).select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt').lean();
 
     if (!progress) {
       res.status(500).json({ error: 'Failed to initialize task progress' });
@@ -55,8 +55,8 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
     let anyTaskAutoCompleted = false;
 
     for (const task of sortedTasks) {
-      // Skip tasks that have been collected (reward given) or skipped
-      if (collectedTaskIds.has(task.id) || skippedTaskIds.has(task.id)) {
+      // Skip tasks that have been collected (reward given), skipped, or already completed
+      if (collectedTaskIds.has(task.id) || skippedTaskIds.has(task.id) || completedTaskIds.has(task.id)) {
         continue;
       }
 
@@ -98,7 +98,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
 
     if (anyTaskAutoCompleted) {
       const updatedProgress = await UserTaskProgress.findOne({ userId })
-        .select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt')
+        .select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt')
         .lean();
       
       if (updatedProgress) {
@@ -636,16 +636,26 @@ router.put('/visibility', auth, async (req: Request, res: Response) => {
       return;
     }
 
+    const existingProgress = await UserTaskProgress.findOne({ userId });
+    const wasPreviouslyHidden = existingProgress?.showTaskGuide === false;
+    const shouldTrackShow = showTaskGuide === true && wasPreviouslyHidden && !existingProgress?.taskGuideShownAt;
+
+    const updateData: any = {
+      $set: { showTaskGuide },
+      $setOnInsert: {
+        completedTasks: [],
+        collectedTasks: [],
+        skippedTasks: []
+      }
+    };
+
+    if (shouldTrackShow) {
+      updateData.$set.taskGuideShownAt = new Date();
+    }
+
     const progress = await UserTaskProgress.findOneAndUpdate(
       { userId },
-      {
-        $set: { showTaskGuide },
-        $setOnInsert: {
-          completedTasks: [],
-          collectedTasks: [],
-          skippedTasks: []
-        }
-      },
+      updateData,
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
