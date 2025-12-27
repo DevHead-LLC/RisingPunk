@@ -55,8 +55,8 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
     let anyTaskAutoCompleted = false;
 
     for (const task of sortedTasks) {
-      // Skip tasks that have been collected (reward given) or skipped
-      if (collectedTaskIds.has(task.id) || skippedTaskIds.has(task.id)) {
+      // Skip tasks that have been collected (reward given), skipped, or already completed
+      if (collectedTaskIds.has(task.id) || skippedTaskIds.has(task.id) || completedTaskIds.has(task.id)) {
         continue;
       }
 
