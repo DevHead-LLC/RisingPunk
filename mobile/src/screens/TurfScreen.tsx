@@ -26,7 +26,6 @@ import {OnboardingSlides} from '../components/onboarding';
 import {TurfIntro} from '../components/turf-intro';
 import {TaskGuide} from '../components/turf/TaskGuide';
 import {TaskGuideHighlightOverlay} from '../components/turf/TaskGuideHighlightOverlay';
-import {useTaskGuideHighlight} from '../contexts/TaskGuideHighlightContext';
 
 // Platform-specific imports - available on both platforms but only used on Android
 let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, withTiming: any, computePanBounds: any;
@@ -170,9 +169,6 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       offsetY.value = 0;
     }
   }, [offsetX, offsetY]);
-
-  // Task guide highlight state
-  const { highlightTaskId } = useTaskGuideHighlight();
 
   // Onboarding state
   const showOnboarding = useAppSelector((state) => state.auth.showOnboarding);
@@ -676,26 +672,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   useEffect(() => {
     // Center the view immediately when the screen mounts
     centerView();
-  }, [centerView]);
-
-  useEffect(() => {
-    if (highlightTaskId === 'visit-home' && currentScreen === 'turf') {
-      setTimeout(() => {
-        if (Platform.OS === 'android') {
-          centerAndroidView();
-        } else {
-          const SCREEN_WIDTH = Dimensions.get('window').width;
-          const CONTENT_WIDTH = 2000;
-          const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
-          horizontalScrollRef.current?.scrollTo({
-            x: CENTER_X,
-            y: 0,
-            animated: true,
-          });
-        }
-      }, 100);
-    }
-  }, [highlightTaskId, currentScreen, centerAndroidView]);
+  }, [centerView]); // Include centerView in dependencies
 
   useEffect(() => {
     // Clean up pending data when navigating away from battlePrep
@@ -838,13 +815,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                 <ScrollViewMemo horizontalScrollRef={horizontalScrollRef} onScroll={handleTurfScroll}>
                   <View style={[styles.scrollContent, { backgroundColor: colors.background, borderColor: colors.secondary + '99' }]}>
                     <DiagonalLines colors={colors} />
-                    <View style={[styles.digitalGround, { 
-                      backgroundColor: colors.matrix + '0D', 
-                      borderColor: colors.matrix + '33'
-                    }]}>
-                      {highlightTaskId !== 'visit-home' && (
-                        <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />
-                      )}
+                    <View style={[styles.digitalGround, { backgroundColor: colors.matrix + '0D', borderColor: colors.matrix + '33' }]}>
+                      <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />
                       <DigitalBarracksLocation onPress={() => navigateToScreen('barracks')} isIntroActive={currentIntroStep === 'barracks'} />
                     </View>
                     <ResearchCenterLocation 
@@ -916,21 +888,16 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                 </ScrollViewMemo>
               ) : (
                 <GesturePanView 
-                    horizontalScrollRef={horizontalScrollRef} 
-                    onScroll={handleTurfScroll}
-                    offsetX={offsetX}
-                    offsetY={offsetY}
-                    panGesture={panGesture}
-                    colors={colors}
-                  >
+                  horizontalScrollRef={horizontalScrollRef} 
+                  onScroll={handleTurfScroll}
+                  offsetX={offsetX}
+                  offsetY={offsetY}
+                  panGesture={panGesture}
+                  colors={colors}
+                >
                   <DiagonalLines colors={colors} />
-                  <View style={[styles.digitalGround, { 
-                    backgroundColor: colors.matrix + '0D', 
-                    borderColor: colors.matrix + '33'
-                  }]}>
-                    {highlightTaskId !== 'visit-home' && (
-                      <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />
-                    )}
+                  <View style={[styles.digitalGround, { backgroundColor: colors.matrix + '0D', borderColor: colors.matrix + '33' }]}>
+                    <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />
                     <DigitalBarracksLocation onPress={() => navigateToScreen('barracks')} isIntroActive={currentIntroStep === 'barracks'} />
                   </View>
                   <ResearchCenterLocation 
@@ -1006,10 +973,6 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                 </GesturePanView>
               )}
             </View>
-            <TaskGuideHighlightOverlay forHome={true} />
-            {highlightTaskId === 'visit-home' && (
-              <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={false} />
-            )}
             <ProfileLocation onPress={() => navigateToScreen('profile')} isIntroActive={currentIntroStep === 'profile'} />
             <TaskGuide 
               currentScreen={currentScreen} 
@@ -1045,6 +1008,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    zIndex: 1,
   },
   turfGrid: {
     flex: 1,

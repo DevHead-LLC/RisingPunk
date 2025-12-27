@@ -76,8 +76,3 @@ export interface TrackAvatarChangeResponse {
   message?: string;
 }
 
-export interface TrackHomeVisitResponse {
-  success: boolean;
-  message?: string;
-}
-

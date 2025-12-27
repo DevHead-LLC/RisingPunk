@@ -1,8 +1,7 @@
 import React, {memo, useEffect, useState} from 'react';
-import {TouchableOpacity, View, Text, Image, StyleSheet, Animated, Dimensions} from 'react-native';
+import {TouchableOpacity, View, Text, Image, StyleSheet, Animated} from 'react-native';
 import {COLORS, SIZING} from '../../styles/theme';
 import {useThemeColors} from '../../hooks/useThemeColors';
-import {useTaskGuideHighlight} from '../../contexts/TaskGuideHighlightContext';
 
 type HomeLocationProps = {
   onPress: () => void;
@@ -11,73 +10,55 @@ type HomeLocationProps = {
 
 export const HomeLocation = memo(function HomeLocation({ onPress, isIntroActive = false }: HomeLocationProps) {
   const colors = useThemeColors();
-  const { highlightTaskId } = useTaskGuideHighlight();
   const [currentColorIndex, setCurrentColorIndex] = useState(0);
   const animatedBorderColor = useState(new Animated.Value(0))[0];
   
   const introColors = [colors.primary, colors.secondary, colors.matrix];
-  const isHighlighted = isIntroActive || highlightTaskId === 'visit-home';
-  const isRenderedAtRoot = highlightTaskId === 'visit-home' && !isIntroActive;
-  
-  const screenDimensions = Dimensions.get('window');
-  const screenWidth = screenDimensions.width;
-  const screenHeight = screenDimensions.height;
   
   useEffect(() => {
-    if (isHighlighted) {
+    if (isIntroActive) {
       const interval = setInterval(() => {
         setCurrentColorIndex(prev => (prev + 1) % introColors.length);
       }, 1000);
       
       return () => clearInterval(interval);
     }
-  }, [isHighlighted, introColors.length]);
+  }, [isIntroActive, introColors.length]);
   
   useEffect(() => {
-    if (isHighlighted) {
+    if (isIntroActive) {
       Animated.timing(animatedBorderColor, {
         toValue: currentColorIndex,
         duration: 500,
         useNativeDriver: false,
       }).start();
     }
-  }, [currentColorIndex, isHighlighted, animatedBorderColor]);
+  }, [currentColorIndex, isIntroActive, animatedBorderColor]);
   
   const animatedBorderColorValue = animatedBorderColor.interpolate({
     inputRange: [0, 1, 2],
     outputRange: introColors,
   });
   
-  const positionStyle = isRenderedAtRoot ? {
-    top: screenHeight * 0.5 - 80,
-    left: screenWidth * 0.5 - 60,
-  } : styles.homePosition;
-  
   return (
-    <Animated.View
-      style={[styles.location, positionStyle, { 
-        borderColor: isHighlighted ? animatedBorderColorValue : 'transparent',
-        borderWidth: isHighlighted ? 3 : 0,
-        zIndex: isHighlighted ? 1000 : 3,
-        elevation: isHighlighted ? 1000 : 3
-      }]}
+    <TouchableOpacity
+      style={[styles.location, styles.homePosition]}
+      onPress={onPress}
     >
-      <TouchableOpacity onPress={onPress}>
-        <Animated.View style={[
-          styles.iconContainer, 
-          { 
-            borderWidth: isHighlighted ? 3 : 1,
-            borderColor: isHighlighted ? animatedBorderColorValue : colors.matrix
-          }
-        ]}>
-          <Image
-            source={require('../../assets/images/home.png')}
-            style={styles.locationIcon}
-          />
-        </Animated.View>
-        <Text style={styles.locationLabel}>HOME</Text>
-      </TouchableOpacity>
-    </Animated.View>
+      <Animated.View style={[
+        styles.iconContainer, 
+        { 
+          borderWidth: isIntroActive ? 3 : 1,
+          borderColor: isIntroActive ? animatedBorderColorValue : colors.matrix
+        }
+      ]}>
+        <Image
+          source={require('../../assets/images/home.png')}
+          style={styles.locationIcon}
+        />
+      </Animated.View>
+      <Text style={styles.locationLabel}>HOME</Text>
+    </TouchableOpacity>
   );
 });
 
@@ -87,7 +68,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: SIZING.spacing.sm,
     backgroundColor: 'transparent',
-    borderRadius: 4,
+    zIndex: 3,
   },
   iconContainer: {
     width: 120,
@@ -121,7 +102,6 @@ const styles = StyleSheet.create({
     top: '50%',
     left: '25%',
     transform: [{translateX: -60}, {translateY: -80}],
-    zIndex: 1000,
-    elevation: 1000,
+    zIndex: 3,
   },
 });

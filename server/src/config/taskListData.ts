@@ -105,9 +105,6 @@ const TASK_LIST: Task[] = [
     title: 'Visit the Home Location',
     description: 'Navigate to your home',
     order: 8,
-    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
-      return !!(progress?.homeVisitedAt);
-    },
     skipable: true,
     reward: { type: 'wallet', value: 10 }
   },

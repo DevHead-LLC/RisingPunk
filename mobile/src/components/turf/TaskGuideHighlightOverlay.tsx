@@ -10,7 +10,6 @@ interface TaskGuideHighlightOverlayProps {
   forThemeToggle?: boolean;
   forAvatarToggle?: boolean;
   forTaskGuideToggle?: boolean;
-  forHome?: boolean;
 }
 
 export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps> = ({ 
@@ -18,8 +17,7 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
   forSettings = false,
   forThemeToggle = false,
   forAvatarToggle = false,
-  forTaskGuideToggle = false,
-  forHome = false
+  forTaskGuideToggle = false
 }) => {
   const colors = useThemeColors();
   const { highlightTaskId, highlightStep } = useTaskGuideHighlight();
@@ -28,17 +26,12 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
   const isAvatarTask = highlightTaskId === 'change-avatar';
   const isHideTaskListTask = highlightTaskId === 'hide-task-list';
   const isViewProfile = highlightTaskId === 'view-profile';
-  const isVisitHome = highlightTaskId === 'visit-home';
 
-  if (!isViewProfile && !isThemeTask && !isAvatarTask && !isHideTaskListTask && !isVisitHome) {
+  if (!isViewProfile && !isThemeTask && !isAvatarTask && !isHideTaskListTask) {
     return null;
   }
 
   if (isViewProfile && !forProfile) {
-    return null;
-  }
-
-  if (isVisitHome && !forHome) {
     return null;
   }
 
@@ -91,7 +84,18 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
   }
 
   return (
-    <View style={styles.overlay} pointerEvents="none" />
+    <>
+      <View style={styles.overlay} pointerEvents="none" />
+      {forProfile && (
+        <View style={styles.clickHereContainerProfile} pointerEvents="none">
+          <View style={[styles.clickHereBox, { backgroundColor: colors.background, borderColor: colors.primary }]}>
+            <Text style={[styles.clickHereText, { color: colors.text.primary }]}>
+              Click Here
+            </Text>
+          </View>
+        </View>
+      )}
+    </>
   );
 };
 
@@ -104,7 +108,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.85)',
     zIndex: 999,
-    elevation: 999,
   },
   clickHereContainerProfile: {
     position: 'absolute',
