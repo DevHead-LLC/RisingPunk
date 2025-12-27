@@ -6,6 +6,9 @@ import { HackRigDisplay } from '../components/home/HackRigDisplay';
 import { BotAssembly } from '../components/home/BotAssembly';
 import { HomeFloorPlan } from '../components/home/HomeFloorPlan';
 import { useThemeColors } from '../hooks/useThemeColors';
+import { useTrackHomeVisitMutation } from '../store/api/userGuideApi';
+import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
+import { useAppSelector } from '../store/hooks';
 
 let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, computePanBounds: any;
 
@@ -79,9 +82,12 @@ export const HomeScreen = memo(function HomeScreen({
   onNavigateToBattle,
 }: HomeScreenProps): React.JSX.Element {
   const colors = useThemeColors();
+  const token = useAppSelector((state) => state.auth.token);
   const [activeTab, setActiveTab] = useState<TabType>('floorPlan');
   const scrollViewRef = useRef<ScrollView>(null);
   const garageScrollViewRef = useRef<ScrollView>(null);
+  const [trackHomeVisit] = useTrackHomeVisitMutation();
+  const { highlightTaskId, clearHighlight } = useTaskGuideHighlight();
 
   const FLOOR_PLAN_WIDTH = 1250;
   const FLOOR_PLAN_HEIGHT = 950;
@@ -359,6 +365,20 @@ export const HomeScreen = memo(function HomeScreen({
       }, 100);
     }
   }, [activeTab, centerGarage, centerFloorPlan, floorPlanStartX, floorPlanStartY, floorPlanOffsetX, floorPlanOffsetY, garageStartX, garageStartY, garageOffsetX, garageOffsetY]);
+
+  useEffect(() => {
+    if (token) {
+      trackHomeVisit().then(() => {
+        if (highlightTaskId === 'visit-home') {
+          clearHighlight();
+        }
+      }).catch(() => {
+        if (highlightTaskId === 'visit-home') {
+          clearHighlight();
+        }
+      });
+    }
+  }, [token, highlightTaskId, trackHomeVisit, clearHighlight]);
 
   const renderFloorPlan = () => (
     <View style={styles.scrollView}>

@@ -2,38 +2,50 @@ import React, {memo, useEffect, useState} from 'react';
 import {TouchableOpacity, View, Text, Image, StyleSheet, Animated} from 'react-native';
 import {COLORS, SIZING} from '../../styles/theme';
 import {useThemeColors} from '../../hooks/useThemeColors';
+import {useTaskGuideHighlight} from '../../contexts/TaskGuideHighlightContext';
 
 type HomeLocationProps = {
   onPress: () => void;
   isIntroActive?: boolean;
+  useAbsolutePosition?: boolean;
 };
 
-export const HomeLocation = memo(function HomeLocation({ onPress, isIntroActive = false }: HomeLocationProps) {
+export const HomeLocation = memo(function HomeLocation({ onPress, isIntroActive = false, useAbsolutePosition = false }: HomeLocationProps) {
   const colors = useThemeColors();
+  const { highlightTaskId, clearHighlight } = useTaskGuideHighlight();
   const [currentColorIndex, setCurrentColorIndex] = useState(0);
   const animatedBorderColor = useState(new Animated.Value(0))[0];
   
   const introColors = [colors.primary, colors.secondary, colors.matrix];
+  const isVisitHome = highlightTaskId === 'visit-home';
+  const isHighlighted = isIntroActive || isVisitHome;
+  
+  const handlePress = () => {
+    if (isVisitHome) {
+      clearHighlight();
+    }
+    onPress();
+  };
   
   useEffect(() => {
-    if (isIntroActive) {
+    if (isHighlighted) {
       const interval = setInterval(() => {
         setCurrentColorIndex(prev => (prev + 1) % introColors.length);
       }, 1000);
       
       return () => clearInterval(interval);
     }
-  }, [isIntroActive, introColors.length]);
+  }, [isHighlighted, introColors.length]);
   
   useEffect(() => {
-    if (isIntroActive) {
+    if (isHighlighted) {
       Animated.timing(animatedBorderColor, {
         toValue: currentColorIndex,
         duration: 500,
         useNativeDriver: false,
       }).start();
     }
-  }, [currentColorIndex, isIntroActive, animatedBorderColor]);
+  }, [currentColorIndex, isHighlighted, animatedBorderColor]);
   
   const animatedBorderColorValue = animatedBorderColor.interpolate({
     inputRange: [0, 1, 2],
@@ -41,24 +53,23 @@ export const HomeLocation = memo(function HomeLocation({ onPress, isIntroActive 
   });
   
   return (
-    <TouchableOpacity
-      style={[styles.location, styles.homePosition]}
-      onPress={onPress}
-    >
-      <Animated.View style={[
-        styles.iconContainer, 
-        { 
-          borderWidth: isIntroActive ? 3 : 1,
-          borderColor: isIntroActive ? animatedBorderColorValue : colors.matrix
-        }
-      ]}>
-        <Image
-          source={require('../../assets/images/home.png')}
-          style={styles.locationIcon}
-        />
-      </Animated.View>
-      <Text style={styles.locationLabel}>HOME</Text>
-    </TouchableOpacity>
+    <View style={[styles.location, styles.homePosition, isHighlighted && { zIndex: 1000 }]}>
+      <TouchableOpacity onPress={handlePress}>
+        <Animated.View style={[
+          styles.iconContainer, 
+          { 
+            borderWidth: isHighlighted ? 3 : 1,
+            borderColor: isHighlighted ? animatedBorderColorValue : colors.matrix
+          }
+        ]}>
+          <Image
+            source={require('../../assets/images/home.png')}
+            style={styles.locationIcon}
+          />
+        </Animated.View>
+        <Text style={styles.locationLabel}>HOME</Text>
+      </TouchableOpacity>
+    </View>
   );
 });
 
@@ -68,7 +79,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: SIZING.spacing.sm,
     backgroundColor: 'transparent',
-    zIndex: 3,
   },
   iconContainer: {
     width: 120,
@@ -102,6 +112,5 @@ const styles = StyleSheet.create({
     top: '50%',
     left: '25%',
     transform: [{translateX: -60}, {translateY: -80}],
-    zIndex: 3,
   },
 });

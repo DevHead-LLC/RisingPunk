@@ -63,7 +63,8 @@ export const ProfileLocation = memo(function ProfileLocation({ onPress, isIntroA
     <Animated.View
       style={[styles.location, styles.profilePosition, { 
         borderColor: isHighlighted ? animatedBorderColorValue : colors.primary,
-        borderWidth: isHighlighted ? 3 : 1
+        borderWidth: isHighlighted ? 3 : 1,
+        zIndex: isHighlighted ? 1000 : 3
       }]}
     >
       <TouchableOpacity onPress={handlePress}>
@@ -83,7 +84,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     alignItems: 'center',
     backgroundColor: 'transparent',
-    zIndex: 1000, // Higher than overlay (999) so profile is visible above it
   },
   profileContainer: {
     width: 60,
