@@ -30,7 +30,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
         new: true,
         setDefaultsOnInsert: true
       }
-    ).select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt').lean();
+    ).select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt').lean();
 
     if (!progress) {
       res.status(500).json({ error: 'Failed to initialize task progress' });
@@ -98,7 +98,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
 
     if (anyTaskAutoCompleted) {
       const updatedProgress = await UserTaskProgress.findOne({ userId })
-        .select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt')
+        .select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt')
         .lean();
       
       if (updatedProgress) {
@@ -617,6 +617,90 @@ router.post('/track-avatar-change', auth, async (req: Request, res: Response) =>
     res.json({ success: true, message: 'Avatar change tracked' });
   } catch (error) {
     console.error('Error tracking avatar change:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/track-home-visit', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const existingProgress = await UserTaskProgress.findOne({ userId });
+    const wasAlreadyVisited = existingProgress?.homeVisitedAt;
+
+    if (!wasAlreadyVisited) {
+      await UserTaskProgress.findOneAndUpdate(
+        { userId },
+        {
+          $set: { homeVisitedAt: new Date() },
+          $setOnInsert: {
+            completedTasks: [],
+            collectedTasks: [],
+            skippedTasks: [],
+            showTaskGuide: true
+          }
+        },
+        { upsert: true, new: true }
+      );
+    }
+
+    if (!wasAlreadyVisited) {
+      const taskList = getTaskList();
+      const homeTask = taskList.find(t => t.id === 'visit-home');
+      
+      if (homeTask && homeTask.autoCompleteConditions) {
+        const user = await User.findById(userId).lean();
+        if (user) {
+          const updatedProgress = await UserTaskProgress.findOne({ userId });
+          const shouldAutoComplete = homeTask.autoCompleteConditions(user as any, updatedProgress ?? undefined);
+          
+          if (shouldAutoComplete) {
+            const isAlreadyCompleted = updatedProgress?.completedTasks?.some(
+              (task: any) => task.taskId === 'visit-home'
+            );
+            
+            if (!isAlreadyCompleted) {
+              await UserTaskProgress.findOneAndUpdate(
+                { userId },
+                {
+                  $setOnInsert: {
+                    collectedTasks: [],
+                    skippedTasks: [],
+                    showTaskGuide: true
+                  }
+                },
+                { upsert: true }
+              );
+              
+              await UserTaskProgress.findOneAndUpdate(
+                {
+                  userId,
+                  'completedTasks.taskId': { $ne: 'visit-home' }
+                },
+                {
+                  $push: {
+                    completedTasks: {
+                      taskId: 'visit-home',
+                      completedAt: new Date()
+                    }
+                  },
+                  $set: { lastCompletedTaskId: 'visit-home' }
+                },
+                { new: true }
+              );
+            }
+          }
+        }
+      }
+    }
+
+    res.json({ success: true, message: 'Home visit tracked' });
+  } catch (error) {
+    console.error('Error tracking home visit:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
