@@ -69,7 +69,8 @@ export const Balance = memo(({ isIntroActive = false }: BalanceProps) => {
       { 
         backgroundColor: colors.accent, 
         borderColor: isIntroActive ? animatedBorderColorValue : colors.primary,
-        borderWidth: isIntroActive ? 3 : 1
+        borderWidth: isIntroActive ? 3 : 1,
+        zIndex: isIntroActive ? 9999 : 3
       }
     ]}>
       <TouchableOpacity 
@@ -94,7 +95,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     borderWidth: 1,
     maxWidth: 180,
-    zIndex: 9999,
   },
   balanceContent: {
     flexDirection: 'row',

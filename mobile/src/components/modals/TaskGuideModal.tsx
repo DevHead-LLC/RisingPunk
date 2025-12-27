@@ -79,6 +79,10 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
         // User will be guided to click profile icon on turf screen first
         onClose();
         setHighlightTaskId(taskId);
+      } else if (taskId === 'visit-home') {
+        // Close modal and trigger highlight mode for home location
+        onClose();
+        setHighlightTaskId(taskId);
       } else {
         // For other tasks, just close modal for now
         onClose();

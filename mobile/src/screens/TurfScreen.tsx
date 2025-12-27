@@ -26,6 +26,7 @@ import {OnboardingSlides} from '../components/onboarding';
 import {TurfIntro} from '../components/turf-intro';
 import {TaskGuide} from '../components/turf/TaskGuide';
 import {TaskGuideHighlightOverlay} from '../components/turf/TaskGuideHighlightOverlay';
+import {useTaskGuideHighlight} from '../contexts/TaskGuideHighlightContext';
 
 // Platform-specific imports - available on both platforms but only used on Android
 let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, withTiming: any, computePanBounds: any;
@@ -58,10 +59,12 @@ const ScrollViewMemo = memo(function ScrollViewMemo({
   children,
   horizontalScrollRef,
   onScroll,
+  scrollEnabled = true,
 }: {
   children: React.ReactNode;
   horizontalScrollRef: React.RefObject<ScrollView>;
   onScroll?: (event: any) => void;
+  scrollEnabled?: boolean;
 }) {
   const SCREEN_WIDTH = Dimensions.get('window').width;
   const CONTENT_WIDTH = 2000;
@@ -74,7 +77,7 @@ const ScrollViewMemo = memo(function ScrollViewMemo({
       showsHorizontalScrollIndicator={false}
       showsVerticalScrollIndicator={false}
       contentOffset={{ x: CENTER_X, y: 0 }}
-      scrollEnabled={true}
+      scrollEnabled={scrollEnabled}
       maximumZoomScale={1}
       minimumZoomScale={1}
       bounces={false}
@@ -131,6 +134,8 @@ const GesturePanView = memo(function GesturePanView({
 
 export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element => {
   const colors = useThemeColors();
+  const { highlightTaskId } = useTaskGuideHighlight();
+  const isVisitHome = highlightTaskId === 'visit-home';
   const [currentScreen, setCurrentScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research' | 'investmentProperty'>('turf');
   const [battleId, setBattleId] = useState<string | null>(null);
   const [pendingNpcSlug, setPendingNpcSlug] = useState<string | null>(null);
@@ -270,6 +275,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       return Gesture.Pan()
         .minPointers(1)
         .maxPointers(1)
+        .enabled(!isVisitHome)
         .onStart(() => {
           'worklet';
           startX.value = offsetX.value;
@@ -310,7 +316,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         });
     }
     return null;
-  }, [offsetX, offsetY, startX, startY, boundsReady, minX, maxX, minY, maxY, withDecay]);
+  }, [offsetX, offsetY, startX, startY, boundsReady, minX, maxX, minY, maxY, withDecay, isVisitHome]);
 
   // Fetch Property 1's status to determine Property 2's rendering
   const { data: property1Status } = useGetRentalHousingStatusQuery(1);
@@ -683,6 +689,25 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     }
   }, [currentScreen]);
 
+  useEffect(() => {
+    if (isVisitHome && currentScreen === 'turf') {
+      setTimeout(() => {
+        if (Platform.OS === 'android') {
+          centerAndroidView();
+        } else {
+          const SCREEN_WIDTH = Dimensions.get('window').width;
+          const CONTENT_WIDTH = 2000;
+          const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+          horizontalScrollRef.current?.scrollTo({
+            x: CENTER_X,
+            y: 0,
+            animated: true,
+          });
+        }
+      }, 100);
+    }
+  }, [isVisitHome, currentScreen, centerAndroidView]);
+
   const renderScreen = useCallback(() => {
     switch (currentScreen) {
       case 'hackRig':
@@ -812,11 +837,11 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
             </ErrorBoundary>
             <View style={styles.scrollWrapper}>
               {Platform.OS === 'ios' ? (
-                <ScrollViewMemo horizontalScrollRef={horizontalScrollRef} onScroll={handleTurfScroll}>
+                <ScrollViewMemo horizontalScrollRef={horizontalScrollRef} onScroll={handleTurfScroll} scrollEnabled={!isVisitHome}>
                   <View style={[styles.scrollContent, { backgroundColor: colors.background, borderColor: colors.secondary + '99' }]}>
                     <DiagonalLines colors={colors} />
                     <View style={[styles.digitalGround, { backgroundColor: colors.matrix + '0D', borderColor: colors.matrix + '33' }]}>
-                      <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />
+                      {!isVisitHome && <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />}
                       <DigitalBarracksLocation onPress={() => navigateToScreen('barracks')} isIntroActive={currentIntroStep === 'barracks'} />
                     </View>
                     <ResearchCenterLocation 
@@ -888,16 +913,16 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                 </ScrollViewMemo>
               ) : (
                 <GesturePanView 
-                  horizontalScrollRef={horizontalScrollRef} 
-                  onScroll={handleTurfScroll}
-                  offsetX={offsetX}
-                  offsetY={offsetY}
-                  panGesture={panGesture}
-                  colors={colors}
-                >
+                    horizontalScrollRef={horizontalScrollRef} 
+                    onScroll={handleTurfScroll}
+                    offsetX={offsetX}
+                    offsetY={offsetY}
+                    panGesture={panGesture}
+                    colors={colors}
+                  >
                   <DiagonalLines colors={colors} />
                   <View style={[styles.digitalGround, { backgroundColor: colors.matrix + '0D', borderColor: colors.matrix + '33' }]}>
-                    <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />
+                    {!isVisitHome && <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />}
                     <DigitalBarracksLocation onPress={() => navigateToScreen('barracks')} isIntroActive={currentIntroStep === 'barracks'} />
                   </View>
                   <ResearchCenterLocation 
@@ -973,6 +998,14 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                 </GesturePanView>
               )}
             </View>
+            {isVisitHome && (
+              <>
+                <View style={styles.homeLocationElevatedWrapper}>
+                  <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />
+                </View>
+                <TaskGuideHighlightOverlay forHome={true} />
+              </>
+            )}
             <ProfileLocation onPress={() => navigateToScreen('profile')} isIntroActive={currentIntroStep === 'profile'} />
             <TaskGuide 
               currentScreen={currentScreen} 
@@ -982,7 +1015,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           </View>
         );
     }
-  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep]);
+  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isVisitHome]);
 
   return (
     <>
@@ -1038,9 +1071,20 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     zIndex: 1,
   },
+  homeLocationElevatedWrapper: {
+    position: 'absolute',
+    top: '53%',
+    left: '35%',
+    width: 120,
+    height: 120,
+    zIndex: 1000,
+    transform: [{ translateX: -60 }, { translateY: -80 }],
+    pointerEvents: 'box-none',
+  },
   scrollWrapper: {
     flex: 1,
     backgroundColor: 'transparent',
+    zIndex: 1,
   },
   scrollContent: {
     width: 2000,
