@@ -88,6 +88,7 @@ export const HomeScreen = memo(function HomeScreen({
   const garageScrollViewRef = useRef<ScrollView>(null);
   const [trackHomeVisit] = useTrackHomeVisitMutation();
   const { highlightTaskId, clearHighlight } = useTaskGuideHighlight();
+  const hasTrackedVisit = useRef(false);
 
   const FLOOR_PLAN_WIDTH = 1250;
   const FLOOR_PLAN_HEIGHT = 950;
@@ -367,15 +368,12 @@ export const HomeScreen = memo(function HomeScreen({
   }, [activeTab, centerGarage, centerFloorPlan, floorPlanStartX, floorPlanStartY, floorPlanOffsetX, floorPlanOffsetY, garageStartX, garageStartY, garageOffsetX, garageOffsetY]);
 
   useEffect(() => {
-    if (token) {
+    if (token && highlightTaskId === 'visit-home' && !hasTrackedVisit.current) {
+      hasTrackedVisit.current = true;
       trackHomeVisit().then(() => {
-        if (highlightTaskId === 'visit-home') {
-          clearHighlight();
-        }
+        clearHighlight();
       }).catch(() => {
-        if (highlightTaskId === 'visit-home') {
-          clearHighlight();
-        }
+        clearHighlight();
       });
     }
   }, [token, highlightTaskId, trackHomeVisit, clearHighlight]);

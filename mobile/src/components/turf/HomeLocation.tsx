@@ -7,10 +7,9 @@ import {useTaskGuideHighlight} from '../../contexts/TaskGuideHighlightContext';
 type HomeLocationProps = {
   onPress: () => void;
   isIntroActive?: boolean;
-  useAbsolutePosition?: boolean;
 };
 
-export const HomeLocation = memo(function HomeLocation({ onPress, isIntroActive = false, useAbsolutePosition = false }: HomeLocationProps) {
+export const HomeLocation = memo(function HomeLocation({ onPress, isIntroActive = false }: HomeLocationProps) {
   const colors = useThemeColors();
   const { highlightTaskId, clearHighlight } = useTaskGuideHighlight();
   const [currentColorIndex, setCurrentColorIndex] = useState(0);
@@ -52,8 +51,12 @@ export const HomeLocation = memo(function HomeLocation({ onPress, isIntroActive 
     outputRange: introColors,
   });
   
+  const locationStyle = isVisitHome 
+    ? [styles.location, { top: 0, left: 0, transform: [] }]
+    : [styles.location, styles.homePosition];
+  
   return (
-    <View style={[styles.location, styles.homePosition, isHighlighted && { zIndex: 1000 }]}>
+    <View style={[...locationStyle, isHighlighted && { zIndex: 1000 }]}>
       <TouchableOpacity onPress={handlePress}>
         <Animated.View style={[
           styles.iconContainer, 

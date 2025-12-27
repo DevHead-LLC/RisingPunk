@@ -1000,7 +1000,9 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
             </View>
             {isVisitHome && (
               <>
-                <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />
+                <View style={styles.homeLocationElevatedWrapper}>
+                  <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />
+                </View>
                 <TaskGuideHighlightOverlay forHome={true} />
               </>
             )}
@@ -1068,6 +1070,16 @@ const styles = StyleSheet.create({
     height: 220,
     borderRadius: 8,
     zIndex: 1,
+  },
+  homeLocationElevatedWrapper: {
+    position: 'absolute',
+    top: '53%',
+    left: '35%',
+    width: 120,
+    height: 120,
+    zIndex: 1000,
+    transform: [{ translateX: -60 }, { translateY: -80 }],
+    pointerEvents: 'box-none',
   },
   scrollWrapper: {
     flex: 1,
