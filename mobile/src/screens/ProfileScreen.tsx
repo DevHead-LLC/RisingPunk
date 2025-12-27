@@ -17,7 +17,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { logout, setShowOnboarding, updateUserHandle, forceRefresh, setShowEmailVerification, refreshUserData } from '../store/slices/authSlice';
 import { updateProfileGender } from '../store/slices/preferencesSlice';
 import { useUpdatePreferencesMutation } from '../store/api/preferencesApi';
-import { useGetCurrentTaskGuideTaskQuery, useUpdateTaskGuideVisibilityMutation, useTrackProfileVisitMutation, useTrackThemeChangeMutation } from '../store/api/userGuideApi';
+import { useGetCurrentTaskGuideTaskQuery, useUpdateTaskGuideVisibilityMutation, useTrackProfileVisitMutation, useTrackThemeChangeMutation, useTrackAvatarChangeMutation } from '../store/api/userGuideApi';
 import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
 import { TaskGuideHighlightOverlay } from '../components/turf/TaskGuideHighlightOverlay';
 import { useGetProfileQuery, useGetResearchCenterStatusQuery, useDeleteAccountMutation, authApi } from '../store/api/authApi';
@@ -591,16 +591,25 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const [updateTaskGuideVisibility] = useUpdateTaskGuideVisibilityMutation();
   const [trackProfileVisit] = useTrackProfileVisitMutation();
   const [trackThemeChange] = useTrackThemeChangeMutation();
+  const [trackAvatarChange] = useTrackAvatarChangeMutation();
   const { highlightTaskId, highlightStep, clearHighlight, advanceHighlightStep } = useTaskGuideHighlight();
   
   const isThemeTask = highlightTaskId === 'use-hacker-mode' || highlightTaskId === 'use-business-mode';
-  const isSettingsHighlighted = isThemeTask && highlightStep === 'settings-tab';
+  const isAvatarTask = highlightTaskId === 'change-avatar';
+  const isHideTaskListTask = highlightTaskId === 'hide-task-list';
+  const isSettingsHighlighted = (isThemeTask || isAvatarTask || isHideTaskListTask) && highlightStep === 'settings-tab';
   const isThemeToggleHighlighted = isThemeTask && highlightStep === 'theme-toggle';
+  const isAvatarToggleHighlighted = isAvatarTask && highlightStep === 'avatar-toggle';
+  const isTaskGuideToggleHighlighted = isHideTaskListTask && highlightStep === 'task-guide-toggle';
   
   const [settingsColorIndex, setSettingsColorIndex] = useState(0);
   const [themeToggleColorIndex, setThemeToggleColorIndex] = useState(0);
+  const [avatarToggleColorIndex, setAvatarToggleColorIndex] = useState(0);
+  const [taskGuideToggleColorIndex, setTaskGuideToggleColorIndex] = useState(0);
   const settingsAnimatedBorderColor = useState(new Animated.Value(0))[0];
   const themeToggleAnimatedBorderColor = useState(new Animated.Value(0))[0];
+  const avatarToggleAnimatedBorderColor = useState(new Animated.Value(0))[0];
+  const taskGuideToggleAnimatedBorderColor = useState(new Animated.Value(0))[0];
   const highlightColors = [colors.primary, colors.secondary, colors.matrix];
   
   useEffect(() => {
@@ -640,6 +649,44 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
       }).start();
     }
   }, [themeToggleColorIndex, isThemeToggleHighlighted, themeToggleAnimatedBorderColor]);
+
+  useEffect(() => {
+    if (isAvatarToggleHighlighted) {
+      const interval = setInterval(() => {
+        setAvatarToggleColorIndex(prev => (prev + 1) % highlightColors.length);
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [isAvatarToggleHighlighted, highlightColors.length]);
+  
+  useEffect(() => {
+    if (isAvatarToggleHighlighted) {
+      Animated.timing(avatarToggleAnimatedBorderColor, {
+        toValue: avatarToggleColorIndex,
+        duration: 500,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [avatarToggleColorIndex, isAvatarToggleHighlighted, avatarToggleAnimatedBorderColor]);
+
+  useEffect(() => {
+    if (isTaskGuideToggleHighlighted) {
+      const interval = setInterval(() => {
+        setTaskGuideToggleColorIndex(prev => (prev + 1) % highlightColors.length);
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [isTaskGuideToggleHighlighted, highlightColors.length]);
+  
+  useEffect(() => {
+    if (isTaskGuideToggleHighlighted) {
+      Animated.timing(taskGuideToggleAnimatedBorderColor, {
+        toValue: taskGuideToggleColorIndex,
+        duration: 500,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [taskGuideToggleColorIndex, isTaskGuideToggleHighlighted, taskGuideToggleAnimatedBorderColor]);
   
   const settingsAnimatedBorderColorValue = settingsAnimatedBorderColor.interpolate({
     inputRange: [0, 1, 2],
@@ -650,13 +697,23 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
     inputRange: [0, 1, 2],
     outputRange: highlightColors,
   });
+
+  const avatarToggleAnimatedBorderColorValue = avatarToggleAnimatedBorderColor.interpolate({
+    inputRange: [0, 1, 2],
+    outputRange: highlightColors,
+  });
+
+  const taskGuideToggleAnimatedBorderColorValue = taskGuideToggleAnimatedBorderColor.interpolate({
+    inputRange: [0, 1, 2],
+    outputRange: highlightColors,
+  });
   
   const handleSettingsTabPress = useCallback(() => {
     setActiveTab('settings');
-    if (isThemeTask && highlightStep === 'settings-tab') {
+    if ((isThemeTask || isAvatarTask || isHideTaskListTask) && highlightStep === 'settings-tab') {
       advanceHighlightStep();
     }
-  }, [isThemeTask, highlightStep, advanceHighlightStep]);
+  }, [isThemeTask, isAvatarTask, isHideTaskListTask, highlightStep, advanceHighlightStep]);
   
   const handleThemeToggle = useCallback(async () => {
     const newTheme = themeMode === 'dark' ? 'light' : 'dark';
@@ -802,10 +859,12 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   return (
     <SafeAreaView style={[styles.container, Platform.OS === 'android' && { paddingBottom: 20 }]}>
       <CloseButton onPress={onClose} />
-      {isThemeTask && (
+      {(isThemeTask || isAvatarTask || isHideTaskListTask) && (
         <TaskGuideHighlightOverlay 
           forSettings={highlightStep === 'settings-tab'} 
-          forThemeToggle={highlightStep === 'theme-toggle'} 
+          forThemeToggle={highlightStep === 'theme-toggle'}
+          forAvatarToggle={highlightStep === 'avatar-toggle'}
+          forTaskGuideToggle={highlightStep === 'task-guide-toggle'}
         />
       )}
       
@@ -1056,64 +1115,104 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
               {/* Gender Toggle Section */}
               <View style={styles.settingCard}>
                 <Text style={styles.settingLabel}>PROFILE AVATAR</Text>
-                <TouchableOpacity
-                  style={styles.themeToggle}
-                  onPress={async () => {
-                    const newGender = profileGender === 'male' ? 'female' : 'male';
-                    
-                    try {
-                      const result = await updatePreferences({ profileGender: newGender }).unwrap();
-                      dispatch(updateProfileGender(newGender));
-                    } catch (error) {
-                      console.error('ProfileScreen: Failed to update preferences:', error);
+                <Animated.View
+                  style={[
+                    styles.themeToggleContainer,
+                    isAvatarToggleHighlighted && {
+                      borderColor: avatarToggleAnimatedBorderColorValue,
+                      borderWidth: 3,
+                      borderRadius: 8,
+                      zIndex: 1000,
                     }
-                  }}
+                  ]}
                 >
-                  <View style={styles.themeToggleContent}>
-                    <View style={[
-                      styles.themeIconContainer,
-                      profileGender === 'female' && styles.themeIconContainerDark
-                    ]}>
-                      <Text style={styles.themeIcon}>
-                        {profileGender === 'male' ? '👨' : '👩'}
+                  <TouchableOpacity
+                    style={styles.themeToggle}
+                    onPress={async () => {
+                      const newGender = profileGender === 'male' ? 'female' : 'male';
+                      
+                      try {
+                        const result = await updatePreferences({ profileGender: newGender }).unwrap();
+                        dispatch(updateProfileGender(newGender));
+                        
+                        if (isAvatarTask) {
+                          try {
+                            await trackAvatarChange().unwrap();
+                            clearHighlight();
+                          } catch (error) {
+                            console.error('Error tracking avatar change:', error);
+                            clearHighlight();
+                          }
+                        } else {
+                          trackAvatarChange().catch(() => {});
+                        }
+                      } catch (error) {
+                        console.error('ProfileScreen: Failed to update preferences:', error);
+                      }
+                    }}
+                  >
+                    <View style={styles.themeToggleContent}>
+                      <View style={[
+                        styles.themeIconContainer,
+                        profileGender === 'female' && styles.themeIconContainerDark
+                      ]}>
+                        <Text style={styles.themeIcon}>
+                          {profileGender === 'male' ? '👨' : '👩'}
+                        </Text>
+                      </View>
+                      <Text style={styles.themeToggleText}>
+                        {profileGender === 'male' ? 'Switch to Female' : 'Switch to Male'}
                       </Text>
                     </View>
-                    <Text style={styles.themeToggleText}>
-                      {profileGender === 'male' ? 'Switch to Female' : 'Switch to Male'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                </Animated.View>
               </View>
 
               {/* Task Guide Toggle Section */}
               <View style={styles.settingCard}>
                 <Text style={styles.settingLabel}>TASK GUIDE</Text>
-                <TouchableOpacity
-                  style={styles.themeToggle}
-                  onPress={async () => {
-                    const newShowTaskGuide = !(taskGuideData?.showTaskGuide ?? true);
-                    
-                    try {
-                      await updateTaskGuideVisibility({ showTaskGuide: newShowTaskGuide }).unwrap();
-                    } catch (error) {
-                      console.error('ProfileScreen: Failed to update task guide visibility:', error);
+                <Animated.View
+                  style={[
+                    styles.themeToggleContainer,
+                    isTaskGuideToggleHighlighted && {
+                      borderColor: taskGuideToggleAnimatedBorderColorValue,
+                      borderWidth: 3,
+                      borderRadius: 8,
+                      zIndex: 1000,
                     }
-                  }}
+                  ]}
                 >
-                  <View style={styles.themeToggleContent}>
-                    <View style={[
-                      styles.themeIconContainer,
-                      !(taskGuideData?.showTaskGuide ?? true) && styles.themeIconContainerDark
-                    ]}>
-                      <Text style={styles.themeIcon}>
-                        {(taskGuideData?.showTaskGuide ?? true) ? '📋' : '🚫'}
+                  <TouchableOpacity
+                    style={styles.themeToggle}
+                    onPress={async () => {
+                      const newShowTaskGuide = !(taskGuideData?.showTaskGuide ?? true);
+                      
+                      try {
+                        await updateTaskGuideVisibility({ showTaskGuide: newShowTaskGuide }).unwrap();
+                        
+                        if (isHideTaskListTask && newShowTaskGuide === false) {
+                          clearHighlight();
+                        }
+                      } catch (error) {
+                        console.error('ProfileScreen: Failed to update task guide visibility:', error);
+                      }
+                    }}
+                  >
+                    <View style={styles.themeToggleContent}>
+                      <View style={[
+                        styles.themeIconContainer,
+                        !(taskGuideData?.showTaskGuide ?? true) && styles.themeIconContainerDark
+                      ]}>
+                        <Text style={styles.themeIcon}>
+                          {(taskGuideData?.showTaskGuide ?? true) ? '📋' : '🚫'}
+                        </Text>
+                      </View>
+                      <Text style={styles.themeToggleText}>
+                        {(taskGuideData?.showTaskGuide ?? true) ? 'Hide Task Guide' : 'Show Task Guide'}
                       </Text>
                     </View>
-                    <Text style={styles.themeToggleText}>
-                      {(taskGuideData?.showTaskGuide ?? true) ? 'Hide Task Guide' : 'Show Task Guide'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                </Animated.View>
               </View>
             </View>
           ) : activeTab === 'account' ? (
