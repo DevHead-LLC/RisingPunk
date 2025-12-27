@@ -7,6 +7,7 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { useAppDispatch } from '../../store/hooks';
 import { setFinancialStatements } from '../../store/slices/uiSlice';
 import { roundToFloor } from '../../utils/currencyUtils';
+import { useTaskGuideHighlight } from '../../contexts/TaskGuideHighlightContext';
 
 // Utility function for formatting balance
 export function formatBalance(amount: number): string {
@@ -23,11 +24,13 @@ export const Balance = memo(({ isIntroActive = false }: BalanceProps) => {
   const colors = useThemeColors();
   const balance = useAppSelector(getCurrentBalance);
   const dispatch = useAppDispatch();
+  const { highlightTaskId } = useTaskGuideHighlight();
   const [, setUpdateTrigger] = useState(0);
   const [currentColorIndex, setCurrentColorIndex] = useState(0);
   const animatedBorderColor = useState(new Animated.Value(0))[0];
   
   const introColors = [colors.primary, colors.secondary, colors.matrix];
+  const isVisitHome = highlightTaskId === 'visit-home';
 
   // Force re-render every 10 seconds to update balance display
   useEffect(() => {
@@ -69,7 +72,8 @@ export const Balance = memo(({ isIntroActive = false }: BalanceProps) => {
       { 
         backgroundColor: colors.accent, 
         borderColor: isIntroActive ? animatedBorderColorValue : colors.primary,
-        borderWidth: isIntroActive ? 3 : 1
+        borderWidth: isIntroActive ? 3 : 1,
+        zIndex: isVisitHome ? 3 : 9999
       }
     ]}>
       <TouchableOpacity 
@@ -94,7 +98,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     borderWidth: 1,
     maxWidth: 180,
-    zIndex: 9999,
   },
   balanceContent: {
     flexDirection: 'row',

@@ -21,6 +21,7 @@ export const ProfileLocation = memo(function ProfileLocation({ onPress, isIntroA
   const isThemeTask = highlightTaskId === 'use-hacker-mode' || highlightTaskId === 'use-business-mode';
   const isAvatarTask = highlightTaskId === 'change-avatar';
   const isHideTaskListTask = highlightTaskId === 'hide-task-list';
+  const isVisitHome = highlightTaskId === 'visit-home';
   const isHighlighted = isIntroActive || highlightTaskId === 'view-profile' || (isThemeTask && highlightStep === null) || (isAvatarTask && highlightStep === null) || (isHideTaskListTask && highlightStep === null);
   
   const handlePress = () => {
@@ -59,11 +60,22 @@ export const ProfileLocation = memo(function ProfileLocation({ onPress, isIntroA
     outputRange: introColors,
   });
 
+  const getZIndex = () => {
+    if (isHighlighted) {
+      return 1000;
+    }
+    if (isVisitHome) {
+      return 3;
+    }
+    return 3;
+  };
+
   return (
     <Animated.View
       style={[styles.location, styles.profilePosition, { 
         borderColor: isHighlighted ? animatedBorderColorValue : colors.primary,
-        borderWidth: isHighlighted ? 3 : 1
+        borderWidth: isHighlighted ? 3 : 1,
+        zIndex: getZIndex()
       }]}
     >
       <TouchableOpacity onPress={handlePress}>
@@ -83,7 +95,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     alignItems: 'center',
     backgroundColor: 'transparent',
-    zIndex: 1000, // Higher than overlay (999) so profile is visible above it
   },
   profileContainer: {
     width: 60,
