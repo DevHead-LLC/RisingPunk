@@ -53,7 +53,7 @@ export const HomeLocation = memo(function HomeLocation({ onPress, isIntroActive 
     : [styles.location, styles.homePosition];
   
   return (
-    <View style={[...locationStyle, isHighlighted && { zIndex: 1000 }]}>
+    <View style={[...locationStyle, { zIndex: isHighlighted ? 1000 : 3 }]}>
       <TouchableOpacity onPress={handlePress}>
         <Animated.View style={[
           styles.iconContainer, 
