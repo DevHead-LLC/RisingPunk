@@ -33,9 +33,10 @@ jobs:
 
       - name: Fetch latest script from head branch
         run: |
-          git fetch origin ${{ github.event.pull_request.head.ref }}:${{ github.event.pull_request.head.ref }} || true
-          if git show origin/${{ github.event.pull_request.head.ref }}:.github/scripts/promote-branches.sh > /tmp/promote-branches.sh 2>/dev/null; then
+          git fetch origin ${{ github.event.pull_request.head.ref }} || true
+          if git show FETCH_HEAD:.github/scripts/promote-branches.sh > /tmp/promote-branches.sh 2>/dev/null; then
             mv /tmp/promote-branches.sh .github/scripts/promote-branches.sh
+            chmod +x .github/scripts/promote-branches.sh
             echo "✅ Updated script from head branch"
           else
             echo "ℹ️  Using script from base branch"
@@ -105,34 +106,34 @@ jobs:
                     if [ -n "$CURSOR_CHECK_ID" ]; then
                       CHECK_OUTPUT=$(gh api repos/${{ github.repository }}/check-runs/$CURSOR_CHECK_ID 2>/dev/null || echo "{}")
                       CHECK_TEXT=$(echo "$CHECK_OUTPUT" | jq -r '.output.summary // .output.text // ""' 2>/dev/null || echo "")
-                      if echo "$CHECK_TEXT" | grep -qiE "(posted analysis results.*\d+\s+bug(s?)\s+reported|\d+\s+bug(s?)\s+reported)"; then
-                        BUGS_REPORTED=$(echo "$CHECK_TEXT" | grep -oE "(\d+)\s+bug(s?)\s+reported" | head -1 | grep -oE "\d+" || echo "0")
+                      if echo "$CHECK_TEXT" | grep -qiE "(posted analysis results.*[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported|[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported)"; then
+                        BUGS_REPORTED=$(echo "$CHECK_TEXT" | grep -oE "([0-9]+)[[:space:]]+bug(s?)[[:space:]]+reported" | head -1 | grep -oE "[0-9]+" || echo "0")
                         if [ "$BUGS_REPORTED" = "0" ]; then
-                          BUGS_REPORTED=$(echo "$CHECK_TEXT" | grep -oE "posted analysis results.*(\d+)\s+bug" | grep -oE "\d+" | head -1 || echo "0")
+                          BUGS_REPORTED=$(echo "$CHECK_TEXT" | grep -oE "posted analysis results.*([0-9]+)[[:space:]]+bug" | grep -oE "[0-9]+" | head -1 || echo "0")
                         fi
                       fi
                     fi
                     
-                    PR_COMMENTS=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/comments 2>/dev/null || echo "[]")
-                    CURSOR_COMMENTS=$(echo "$PR_COMMENTS" | jq -r '.[] | select(.user.login | ascii_downcase | contains("cursor")) | .body' 2>/dev/null || echo "")
+                    ISSUE_COMMENTS=$(gh api repos/${{ github.repository }}/issues/$PR_NUMBER/comments 2>/dev/null || echo "[]")
+                    CURSOR_COMMENTS=$(echo "$ISSUE_COMMENTS" | jq -r '.[] | select(.user.login | ascii_downcase | contains("cursor")) | .body' 2>/dev/null || echo "")
                     if [ -z "$BUGS_REPORTED" ] || [ "$BUGS_REPORTED" = "0" ]; then
                       if [ -n "$CURSOR_COMMENTS" ]; then
-                        if echo "$CURSOR_COMMENTS" | grep -qiE "(posted analysis results.*\d+\s+bug(s?)\s+reported|\d+\s+bug(s?)\s+reported)"; then
-                          BUGS_REPORTED=$(echo "$CURSOR_COMMENTS" | grep -oE "(\d+)\s+bug(s?)\s+reported" | head -1 | grep -oE "\d+" || echo "0")
+                        if echo "$CURSOR_COMMENTS" | grep -qiE "(posted analysis results.*[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported|[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported)"; then
+                          BUGS_REPORTED=$(echo "$CURSOR_COMMENTS" | grep -oE "([0-9]+)[[:space:]]+bug(s?)[[:space:]]+reported" | head -1 | grep -oE "[0-9]+" || echo "0")
                           if [ "$BUGS_REPORTED" = "0" ]; then
-                            BUGS_REPORTED=$(echo "$CURSOR_COMMENTS" | grep -oE "posted analysis results.*(\d+)\s+bug" | grep -oE "\d+" | head -1 || echo "0")
+                            BUGS_REPORTED=$(echo "$CURSOR_COMMENTS" | grep -oE "posted analysis results.*([0-9]+)[[:space:]]+bug" | grep -oE "[0-9]+" | head -1 || echo "0")
                           fi
                         fi
                       fi
                     fi
                   else
-                    PR_COMMENTS=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/comments 2>/dev/null || echo "[]")
-                    CURSOR_COMMENTS=$(echo "$PR_COMMENTS" | grep -i "cursor" -A 20 | grep -oP '"body":\s*"\K[^"]+' || echo "")
+                    ISSUE_COMMENTS=$(gh api repos/${{ github.repository }}/issues/$PR_NUMBER/comments 2>/dev/null || echo "[]")
+                    CURSOR_COMMENTS=$(echo "$ISSUE_COMMENTS" | grep -i "cursor" -A 20 | grep -oE '"body"[[:space:]]*:[[:space:]]*"[^"]+"' | sed -E 's/.*"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' || echo "")
                     if [ -n "$CURSOR_COMMENTS" ]; then
-                      if echo "$CURSOR_COMMENTS" | grep -qiE "(posted analysis results.*\d+\s+bug(s?)\s+reported|\d+\s+bug(s?)\s+reported)"; then
-                        BUGS_REPORTED=$(echo "$CURSOR_COMMENTS" | grep -oE "(\d+)\s+bug(s?)\s+reported" | head -1 | grep -oE "\d+" || echo "0")
+                      if echo "$CURSOR_COMMENTS" | grep -qiE "(posted analysis results.*[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported|[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported)"; then
+                        BUGS_REPORTED=$(echo "$CURSOR_COMMENTS" | grep -oE "([0-9]+)[[:space:]]+bug(s?)[[:space:]]+reported" | head -1 | grep -oE "[0-9]+" || echo "0")
                         if [ "$BUGS_REPORTED" = "0" ]; then
-                          BUGS_REPORTED=$(echo "$CURSOR_COMMENTS" | grep -oE "posted analysis results.*(\d+)\s+bug" | grep -oE "\d+" | head -1 || echo "0")
+                          BUGS_REPORTED=$(echo "$CURSOR_COMMENTS" | grep -oE "posted analysis results.*([0-9]+)[[:space:]]+bug" | grep -oE "[0-9]+" | head -1 || echo "0")
                         fi
                       fi
                     fi
