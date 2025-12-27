@@ -95,7 +95,7 @@ const TASK_LIST: Task[] = [
     description: 'Show the task guide',
     order: 7,
     autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
-      return progress?.showTaskGuide === true;
+      return !!(progress?.taskGuideShownAt);
     },
     skipable: true,
     reward: { type: 'wallet', value: 10 }
