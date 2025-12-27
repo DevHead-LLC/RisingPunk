@@ -12,7 +12,8 @@ import type {
   TrackProfileVisitResponse,
   TrackThemeChangeRequest,
   TrackThemeChangeResponse,
-  TrackAvatarChangeResponse
+  TrackAvatarChangeResponse,
+  TrackHomeVisitResponse
 } from '../../types/userGuide';
 
 export const userGuideApi = createApi({
@@ -125,6 +126,22 @@ export const userGuideApi = createApi({
         }
       },
     }),
+    trackHomeVisit: builder.mutation<TrackHomeVisitResponse, void>({
+      query: () => ({
+        url: '/api/users/user-guide/track-home-visit',
+        method: 'POST',
+      }),
+      invalidatesTags: ['UserTaskProgress'],
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Invalidate to refetch current task and update UI
+          dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
+        } catch {
+          // Error handling is done by the mutation itself
+        }
+      },
+    }),
   }),
 });
 
@@ -135,6 +152,7 @@ export const {
   useUpdateTaskGuideVisibilityMutation,
   useTrackProfileVisitMutation,
   useTrackThemeChangeMutation,
-  useTrackAvatarChangeMutation
+  useTrackAvatarChangeMutation,
+  useTrackHomeVisitMutation
 } = userGuideApi;
 
