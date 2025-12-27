@@ -29,7 +29,17 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GH_PAT }}
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: ${{ github.event.pull_request.base.ref }}
+
+      - name: Fetch latest script from head branch
+        run: |
+          git fetch origin ${{ github.event.pull_request.head.ref }}:${{ github.event.pull_request.head.ref }} || true
+          if git show origin/${{ github.event.pull_request.head.ref }}:.github/scripts/promote-branches.sh > /tmp/promote-branches.sh 2>/dev/null; then
+            mv /tmp/promote-branches.sh .github/scripts/promote-branches.sh
+            echo "✅ Updated script from head branch"
+          else
+            echo "ℹ️  Using script from base branch"
+          fi
 
       - name: Setup GitHub CLI and tools
         run: |
@@ -85,9 +95,63 @@ jobs:
               
               if [ "$CURSOR_CHECK_STATUS" = "completed" ]; then
                 if [ "$CURSOR_CHECK_CONCLUSION" = "success" ] || [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
-                  echo "✅ Cursor bot completed successfully (conclusion: $CURSOR_CHECK_CONCLUSION). Proceeding with promotion."
-                  CURSOR_CHECK_PASSED=true
-                  break
+                  echo "✅ Cursor bot check run completed (conclusion: $CURSOR_CHECK_CONCLUSION)"
+                  echo "🔍 Checking for actual bug reports in PR comments and check run output..."
+                  
+                  BUGS_REPORTED=0
+                  
+                  if command -v jq &> /dev/null; then
+                    CURSOR_CHECK_ID=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.name | ascii_downcase | contains("cursor")) | .id' | head -1 || echo "")
+                    if [ -n "$CURSOR_CHECK_ID" ]; then
+                      CHECK_OUTPUT=$(gh api repos/${{ github.repository }}/check-runs/$CURSOR_CHECK_ID 2>/dev/null || echo "{}")
+                      CHECK_TEXT=$(echo "$CHECK_OUTPUT" | jq -r '.output.summary // .output.text // ""' 2>/dev/null || echo "")
+                      if echo "$CHECK_TEXT" | grep -qiE "(posted analysis results.*\d+\s+bug(s?)\s+reported|\d+\s+bug(s?)\s+reported)"; then
+                        BUGS_REPORTED=$(echo "$CHECK_TEXT" | grep -oE "(\d+)\s+bug(s?)\s+reported" | head -1 | grep -oE "\d+" || echo "0")
+                        if [ "$BUGS_REPORTED" = "0" ]; then
+                          BUGS_REPORTED=$(echo "$CHECK_TEXT" | grep -oE "posted analysis results.*(\d+)\s+bug" | grep -oE "\d+" | head -1 || echo "0")
+                        fi
+                      fi
+                    fi
+                    
+                    PR_COMMENTS=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/comments 2>/dev/null || echo "[]")
+                    CURSOR_COMMENTS=$(echo "$PR_COMMENTS" | jq -r '.[] | select(.user.login | ascii_downcase | contains("cursor")) | .body' 2>/dev/null || echo "")
+                    if [ -z "$BUGS_REPORTED" ] || [ "$BUGS_REPORTED" = "0" ]; then
+                      if [ -n "$CURSOR_COMMENTS" ]; then
+                        if echo "$CURSOR_COMMENTS" | grep -qiE "(posted analysis results.*\d+\s+bug(s?)\s+reported|\d+\s+bug(s?)\s+reported)"; then
+                          BUGS_REPORTED=$(echo "$CURSOR_COMMENTS" | grep -oE "(\d+)\s+bug(s?)\s+reported" | head -1 | grep -oE "\d+" || echo "0")
+                          if [ "$BUGS_REPORTED" = "0" ]; then
+                            BUGS_REPORTED=$(echo "$CURSOR_COMMENTS" | grep -oE "posted analysis results.*(\d+)\s+bug" | grep -oE "\d+" | head -1 || echo "0")
+                          fi
+                        fi
+                      fi
+                    fi
+                  else
+                    PR_COMMENTS=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/comments 2>/dev/null || echo "[]")
+                    CURSOR_COMMENTS=$(echo "$PR_COMMENTS" | grep -i "cursor" -A 20 | grep -oP '"body":\s*"\K[^"]+' || echo "")
+                    if [ -n "$CURSOR_COMMENTS" ]; then
+                      if echo "$CURSOR_COMMENTS" | grep -qiE "(posted analysis results.*\d+\s+bug(s?)\s+reported|\d+\s+bug(s?)\s+reported)"; then
+                        BUGS_REPORTED=$(echo "$CURSOR_COMMENTS" | grep -oE "(\d+)\s+bug(s?)\s+reported" | head -1 | grep -oE "\d+" || echo "0")
+                        if [ "$BUGS_REPORTED" = "0" ]; then
+                          BUGS_REPORTED=$(echo "$CURSOR_COMMENTS" | grep -oE "posted analysis results.*(\d+)\s+bug" | grep -oE "\d+" | head -1 || echo "0")
+                        fi
+                      fi
+                    fi
+                  fi
+                  
+                  if [ -n "$BUGS_REPORTED" ] && [ "$BUGS_REPORTED" -gt 0 ] 2>/dev/null; then
+                    echo "=========================================="
+                    echo "❌ CRITICAL: Cursor bot reported $BUGS_REPORTED bug(s)"
+                    echo "❌ Actual bugs detected - workflow STOPPED"
+                    echo "❌ No PR will be merged. No promotion will occur."
+                    echo "=========================================="
+                    CURSOR_CHECK_FAILED=true
+                    break
+                  else
+                    echo "✅ No bugs reported (checked for 'X bug(s) reported' pattern)"
+                    echo "✅ Proceeding with promotion."
+                    CURSOR_CHECK_PASSED=true
+                    break
+                  fi
                 else
                   echo "❌ Cursor bot completed with conclusion: $CURSOR_CHECK_CONCLUSION"
                   echo "❌ Only 'success' or 'neutral' conclusions are allowed. Stopping workflow immediately."
