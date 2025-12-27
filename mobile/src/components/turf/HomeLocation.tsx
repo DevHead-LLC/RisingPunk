@@ -11,7 +11,7 @@ type HomeLocationProps = {
 
 export const HomeLocation = memo(function HomeLocation({ onPress, isIntroActive = false }: HomeLocationProps) {
   const colors = useThemeColors();
-  const { highlightTaskId, clearHighlight } = useTaskGuideHighlight();
+  const { highlightTaskId } = useTaskGuideHighlight();
   const [currentColorIndex, setCurrentColorIndex] = useState(0);
   const animatedBorderColor = useState(new Animated.Value(0))[0];
   
@@ -20,9 +20,6 @@ export const HomeLocation = memo(function HomeLocation({ onPress, isIntroActive 
   const isHighlighted = isIntroActive || isVisitHome;
   
   const handlePress = () => {
-    if (isVisitHome) {
-      clearHighlight();
-    }
     onPress();
   };
   
