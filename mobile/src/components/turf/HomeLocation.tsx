@@ -11,15 +11,21 @@ type HomeLocationProps = {
 
 export const HomeLocation = memo(function HomeLocation({ onPress, isIntroActive = false }: HomeLocationProps) {
   const colors = useThemeColors();
-  const { highlightTaskId } = useTaskGuideHighlight();
+  const { highlightTaskId, advanceHighlightStep, clearHighlight } = useTaskGuideHighlight();
   const [currentColorIndex, setCurrentColorIndex] = useState(0);
   const animatedBorderColor = useState(new Animated.Value(0))[0];
   
   const introColors = [colors.primary, colors.secondary, colors.matrix];
   const isVisitHome = highlightTaskId === 'visit-home';
-  const isHighlighted = isIntroActive || isVisitHome;
+  const isBuildGuardians = highlightTaskId === 'build-100-guardians';
+  const isHighlighted = isIntroActive || isVisitHome || isBuildGuardians;
   
   const handlePress = () => {
+    if (isBuildGuardians) {
+      advanceHighlightStep();
+    } else if (isVisitHome) {
+      clearHighlight();
+    }
     onPress();
   };
   
@@ -48,7 +54,7 @@ export const HomeLocation = memo(function HomeLocation({ onPress, isIntroActive 
     outputRange: introColors,
   });
   
-  const locationStyle = isVisitHome 
+  const locationStyle = (isVisitHome || isBuildGuardians)
     ? [styles.location, { top: 0, left: 0, transform: [] }]
     : [styles.location, styles.homePosition];
   

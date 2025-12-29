@@ -44,7 +44,11 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
     let collectedTaskIds = new Set(collectedTaskIdsArray);
     let skippedTaskIds = new Set(progress.skippedTasks);
 
-    const user = await User.findById(userId).lean();
+    // Fetch user with bot build counters to check auto-completion conditions
+    // This ensures tasks like 'build-100-guardians' are auto-completed if user has already built 100+ guardians
+    // Note: Using .lean() to get plain JavaScript object, and explicitly selecting fields
+    // If fields don't exist in database, they will be undefined (not default value)
+    const user = await User.findById(userId).select('totalGuardiansBuilt totalPhreaksBuilt totalBreachersBuilt').lean();
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;
@@ -54,18 +58,25 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
     const sortedTasks = [...taskList].sort((a, b) => a.order - b.order);
     let anyTaskAutoCompleted = false;
 
+    // FIRST PASS: Check ALL tasks for auto-completion conditions
+    // This runs on every task list fetch, so tasks are immediately marked as completed
+    // if their conditions are met (e.g., build-100-guardians if totalGuardiansBuilt >= 100)
     for (const task of sortedTasks) {
       // Skip tasks that have been collected (reward given), skipped, or already completed
       if (collectedTaskIds.has(task.id) || skippedTaskIds.has(task.id) || completedTaskIds.has(task.id)) {
         continue;
       }
 
+      // Check auto-completion conditions (e.g., build-100-guardians checks totalGuardiansBuilt >= 100)
       if (task.autoCompleteConditions) {
         const shouldAutoComplete = task.autoCompleteConditions(user as any, progress);
         if (shouldAutoComplete) {
           // Check if task is already completed to avoid duplicate key errors
           if (!completedTaskIds.has(task.id)) {
             // Use atomic operation to prevent race conditions - only add if taskId doesn't exist
+            // This immediately marks the task as completed, allowing user to collect reward
+            // Note: Document already exists (ensured at start of function), so no upsert needed
+            // Without upsert, if task is already completed, this is a silent no-op (prevents duplicate key errors)
             await UserTaskProgress.findOneAndUpdate(
               {
                 userId,
@@ -84,18 +95,11 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
             );
             anyTaskAutoCompleted = true;
           }
-          continue;
         }
       }
-
-      currentTask = {
-        id: task.id,
-        title: task.title,
-        description: task.description
-      };
-      break;
     }
 
+    // SECOND PASS: After auto-completing tasks, refresh progress and find the current task
     if (anyTaskAutoCompleted) {
       const updatedProgress = await UserTaskProgress.findOne({ userId })
         .select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt')
@@ -109,6 +113,21 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
         collectedTaskIds = new Set(collectedTaskIdsArray);
         skippedTaskIds = new Set(progress.skippedTasks);
       }
+    }
+
+    // Now find the first incomplete task to show as currentTask
+    for (const task of sortedTasks) {
+      // Skip tasks that have been collected (reward given), skipped, or already completed
+      if (collectedTaskIds.has(task.id) || skippedTaskIds.has(task.id) || completedTaskIds.has(task.id)) {
+        continue;
+      }
+
+      currentTask = {
+        id: task.id,
+        title: task.title,
+        description: task.description
+      };
+      break;
     }
 
     const totalTasks = taskList.length;

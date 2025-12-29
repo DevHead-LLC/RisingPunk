@@ -112,12 +112,27 @@ const TASK_LIST: Task[] = [
     reward: { type: 'wallet', value: 10 }
   },
   {
-    id: 'build-first-100-bots',
-    title: 'Build your first 100 bots',
-    description: 'Assemble 100 bots in the Digital Barracks',
+    id: 'build-100-guardians',
+    title: 'Build 100 Guardians',
+    description: 'Build 100 Guardian bots in your garage',
     order: 9,
+    // Auto-complete when user has built 100+ guardians (checked on every task list fetch)
+    // Logic:
+    // - If totalGuardiansBuilt doesn't exist (undefined/null): assume 0, don't auto-complete
+    // - If totalGuardiansBuilt exists and < 100: don't auto-complete
+    // - If totalGuardiansBuilt exists and >= 100: auto-complete (show "Collect" button)
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      // Explicitly check if property exists and is a valid number
+      const totalBuilt = user.totalGuardiansBuilt;
+      // If property doesn't exist (undefined/null) or is not a number, treat as 0
+      if (totalBuilt === undefined || totalBuilt === null || typeof totalBuilt !== 'number') {
+        return false;
+      }
+      // Only auto-complete if user has built 100 or more guardians
+      return totalBuilt >= 100;
+    },
     skipable: true,
-    reward: { type: 'wallet', value: 20 }
+    reward: { type: 'wallet', value: 50 }
   },
   {
     id: 'free-hack-rig',
