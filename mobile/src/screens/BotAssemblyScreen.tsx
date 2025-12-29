@@ -61,9 +61,10 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
   useEffect(() => {
     if (isQuantityInputHighlight && quantity !== '100') {
       setQuantity('100');
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         advanceHighlightStep();
       }, 100);
+      return () => clearTimeout(timer);
     }
   }, [isQuantityInputHighlight, quantity, advanceHighlightStep]);
   
