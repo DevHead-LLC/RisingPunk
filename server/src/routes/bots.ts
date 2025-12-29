@@ -181,6 +181,22 @@ router.get('/build-state', auth, async (req, res) => {
       if (remainingBots > 0) {
         bot.bots[finalType] += remainingBots;
       }
+      
+      const user = await User.findById(req.user._id);
+      if (user && remainingBots > 0) {
+        if (finalType === 'guardian') {
+          const current = user.totalGuardiansBuilt || 0;
+          user.totalGuardiansBuilt = Math.min(1000000, current + remainingBots);
+        } else if (finalType === 'phreak') {
+          const current = user.totalPhreaksBuilt || 0;
+          user.totalPhreaksBuilt = Math.min(1000000, current + remainingBots);
+        } else if (finalType === 'breacher') {
+          const current = user.totalBreachersBuilt || 0;
+          user.totalBreachersBuilt = Math.min(1000000, current + remainingBots);
+        }
+        await user.save();
+      }
+      
       bot.buildQueue = null;
       await bot.save();
 
@@ -263,6 +279,21 @@ router.post('/speedup-build', auth, async (req, res) => {
         
         // Add remaining bots to inventory
         botInTransaction.bots[botInTransaction.buildQueue.type] += remainingBotsToAdd;
+        
+        // Increment lifetime bot build counters (capped at 1,000,000)
+        if (remainingBotsToAdd > 0) {
+          const botType = botInTransaction.buildQueue.type;
+          if (botType === 'guardian') {
+            const current = userInTransaction.totalGuardiansBuilt || 0;
+            userInTransaction.totalGuardiansBuilt = Math.min(1000000, current + remainingBotsToAdd);
+          } else if (botType === 'phreak') {
+            const current = userInTransaction.totalPhreaksBuilt || 0;
+            userInTransaction.totalPhreaksBuilt = Math.min(1000000, current + remainingBotsToAdd);
+          } else if (botType === 'breacher') {
+            const current = userInTransaction.totalBreachersBuilt || 0;
+            userInTransaction.totalBreachersBuilt = Math.min(1000000, current + remainingBotsToAdd);
+          }
+        }
         
         // Clear build queue
         botInTransaction.buildQueue = null;

@@ -112,12 +112,17 @@ const TASK_LIST: Task[] = [
     reward: { type: 'wallet', value: 10 }
   },
   {
-    id: 'build-first-100-bots',
-    title: 'Build your first 100 bots',
-    description: 'Assemble 100 bots in the Digital Barracks',
+    id: 'build-100-guardians',
+    title: 'Build 100 Guardians',
+    description: 'Build 100 Guardian bots in your garage',
     order: 9,
+    // Auto-complete when user has built 100+ guardians (checked on every task list fetch)
+    // If user has already built 100+ guardians before starting the task, it will be immediately marked as completed
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return (user.totalGuardiansBuilt || 0) >= 100;
+    },
     skipable: true,
-    reward: { type: 'wallet', value: 20 }
+    reward: { type: 'wallet', value: 50 }
   },
   {
     id: 'free-hack-rig',

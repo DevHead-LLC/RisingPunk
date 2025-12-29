@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,9 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { useGetCurrentTaskGuideTaskQuery, useCompleteTaskGuideTaskMutation } from '../../store/api/userGuideApi';
 import { useTaskGuideHighlight } from '../../contexts/TaskGuideHighlightContext';
+import { useAppSelector } from '../../store/hooks';
+import { getCurrentBalance } from '../../store/slices/balanceSlice';
+import { LockedFeatureModal } from '../turf/LockedFeatureModal';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -34,6 +37,12 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
   });
   const [completeTask] = useCompleteTaskGuideTaskMutation();
   const { setHighlightTaskId } = useTaskGuideHighlight();
+  const currentBalance = useAppSelector(getCurrentBalance);
+  const buildingProgress = useAppSelector((state) => state.bots.buildingProgress);
+  const buildQueue = useAppSelector((state) => state.bots.buildQueue);
+  const isBuildInProgress = buildingProgress !== null || buildQueue !== null;
+  const [showInsufficientFundsModal, setShowInsufficientFundsModal] = useState(false);
+  const [showBuildInProgressModal, setShowBuildInProgressModal] = useState(false);
 
   const taskList = data?.taskList || [];
   const completedTaskIds = new Set(data?.completedTaskIds || []);
@@ -81,6 +90,23 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
         setHighlightTaskId(taskId);
       } else if (taskId === 'visit-home') {
         // Close modal and trigger highlight mode for home location
+        onClose();
+        setHighlightTaskId(taskId);
+      } else if (taskId === 'build-100-guardians') {
+        // Check if user has sufficient funds ($100 minimum) before starting guided task
+        if (currentBalance < 100) {
+          // Show warning modal and don't start the guided task
+          setShowInsufficientFundsModal(true);
+          return;
+        }
+        // Check if a build is already in progress
+        if (isBuildInProgress) {
+          // Show warning modal and don't start the guided task
+          setShowBuildInProgressModal(true);
+          return;
+        }
+        // Close modal and trigger highlight mode for build-100-guardians
+        // Reuses visit-home flow for initial step (home location)
         onClose();
         setHighlightTaskId(taskId);
       } else {
@@ -333,6 +359,20 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
         </TouchableOpacity>
       </TouchableOpacity>
       </View>
+      <LockedFeatureModal
+        visible={showInsufficientFundsModal}
+        title="INSUFFICIENT FUNDS"
+        message="You need at least $100 to build 100 Guardian bots. Please earn more funds before starting this task."
+        onClose={() => setShowInsufficientFundsModal(false)}
+        closeButtonText="CLOSE"
+      />
+      <LockedFeatureModal
+        visible={showBuildInProgressModal}
+        title="BUILD IN PROGRESS"
+        message="You already have a bot build in progress. Please wait for it to complete or speed it up before starting this guided task."
+        onClose={() => setShowBuildInProgressModal(false)}
+        closeButtonText="CLOSE"
+      />
     </Modal>
   );
 };

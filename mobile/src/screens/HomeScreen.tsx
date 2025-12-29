@@ -1,5 +1,5 @@
 import React, {memo, useRef, useEffect, useState, useMemo, useCallback} from 'react';
-import {View, StyleSheet, ScrollView, Dimensions, Text, TouchableOpacity, Platform} from 'react-native';
+import {View, StyleSheet, ScrollView, Dimensions, Text, TouchableOpacity, Platform, Animated as RNAnimated} from 'react-native';
 import { SIZING } from '../styles/theme';
 import { CloseButton } from '../components/common/CloseButton';
 import { HackRigDisplay } from '../components/home/HackRigDisplay';
@@ -9,6 +9,7 @@ import { useThemeColors } from '../hooks/useThemeColors';
 import { useTrackHomeVisitMutation } from '../store/api/userGuideApi';
 import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
 import { useAppSelector } from '../store/hooks';
+import { TaskGuideHighlightOverlay } from '../components/turf/TaskGuideHighlightOverlay';
 
 let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, computePanBounds: any;
 
@@ -87,8 +88,12 @@ export const HomeScreen = memo(function HomeScreen({
   const scrollViewRef = useRef<ScrollView>(null);
   const garageScrollViewRef = useRef<ScrollView>(null);
   const [trackHomeVisit] = useTrackHomeVisitMutation();
-  const { highlightTaskId, clearHighlight } = useTaskGuideHighlight();
+  const { highlightTaskId, highlightStep, clearHighlight, advanceHighlightStep } = useTaskGuideHighlight();
   const hasTrackedVisit = useRef(false);
+  
+  const isBuildGuardians = highlightTaskId === 'build-100-guardians';
+  const isGarageTabHighlight = isBuildGuardians && highlightStep === 'garage-tab';
+  const isBotAssemblyHighlight = isBuildGuardians && highlightStep === 'bot-assembly';
 
   const FLOOR_PLAN_WIDTH = 1250;
   const FLOOR_PLAN_HEIGHT = 950;
@@ -270,6 +275,7 @@ export const HomeScreen = memo(function HomeScreen({
     return Gesture.Pan()
       .minPointers(1)
       .maxPointers(1)
+      .enabled(!isGarageTabHighlight && !isBotAssemblyHighlight)
       .onStart(() => {
         'worklet';
         floorPlanStartX.value = floorPlanOffsetX.value;
@@ -303,7 +309,7 @@ export const HomeScreen = memo(function HomeScreen({
           });
         }
       });
-  }, [floorPlanOffsetX, floorPlanOffsetY, floorPlanStartX, floorPlanStartY, floorPlanBoundsReady, floorPlanMinX, floorPlanMaxX, floorPlanMinY, floorPlanMaxY, withDecay]);
+  }, [floorPlanOffsetX, floorPlanOffsetY, floorPlanStartX, floorPlanStartY, floorPlanBoundsReady, floorPlanMinX, floorPlanMaxX, floorPlanMinY, floorPlanMaxY, withDecay, isGarageTabHighlight, isBotAssemblyHighlight]);
 
   const garagePanGesture = useMemo(() => {
     if (!Gesture) {
@@ -312,6 +318,7 @@ export const HomeScreen = memo(function HomeScreen({
     return Gesture.Pan()
       .minPointers(1)
       .maxPointers(1)
+      .enabled(!isGarageTabHighlight && !isBotAssemblyHighlight)
       .onStart(() => {
         'worklet';
         garageStartX.value = garageOffsetX.value;
@@ -345,7 +352,7 @@ export const HomeScreen = memo(function HomeScreen({
           });
         }
       });
-  }, [garageOffsetX, garageOffsetY, garageStartX, garageStartY, garageBoundsReady, garageMinX, garageMaxX, garageMinY, garageMaxY, withDecay]);
+  }, [garageOffsetX, garageOffsetY, garageStartX, garageStartY, garageBoundsReady, garageMinX, garageMaxX, garageMinY, garageMaxY, withDecay, isGarageTabHighlight, isBotAssemblyHighlight]);
 
   useEffect(() => {
     if (activeTab === 'garage') {
@@ -368,15 +375,20 @@ export const HomeScreen = memo(function HomeScreen({
   }, [activeTab, centerGarage, centerFloorPlan, floorPlanStartX, floorPlanStartY, floorPlanOffsetX, floorPlanOffsetY, garageStartX, garageStartY, garageOffsetX, garageOffsetY]);
 
   useEffect(() => {
-    if (token && highlightTaskId === 'visit-home' && !hasTrackedVisit.current) {
+    if (token && !hasTrackedVisit.current) {
       hasTrackedVisit.current = true;
       trackHomeVisit().then(() => {
-        clearHighlight();
+        if (highlightTaskId === 'visit-home') {
+          clearHighlight();
+        }
       }).catch(() => {
-        clearHighlight();
+        if (highlightTaskId === 'visit-home') {
+          clearHighlight();
+        }
       });
     }
   }, [token, highlightTaskId, trackHomeVisit, clearHighlight]);
+
 
   const renderFloorPlan = () => (
     <View style={styles.scrollView}>
@@ -386,15 +398,15 @@ export const HomeScreen = memo(function HomeScreen({
         panGesture={floorPlanPanGesture}
         style={styles.scrollContent}
       >
-        <View style={[styles.floorPlanContainer, { borderColor: colors.matrix }]}>
+        <View style={[styles.floorPlanContainer, { borderColor: colors.matrix }, isGarageTabHighlight && { pointerEvents: 'none' }]}>
           <HomeFloorPlan
-            onHackRigPress={onNavigateToMap}
-            onNavigateToBattle={onNavigateToBattle}
+            onHackRigPress={isGarageTabHighlight ? () => {} : onNavigateToMap}
+            onNavigateToBattle={isGarageTabHighlight ? () => {} : onNavigateToBattle}
           />
           <View style={styles.hackRigContainer}>
             <HackRigDisplay
-              onPress={onNavigateToMap}
-              onNavigateToBattle={onNavigateToBattle}
+              onPress={isGarageTabHighlight ? () => {} : onNavigateToMap}
+              onNavigateToBattle={isGarageTabHighlight ? () => {} : onNavigateToBattle}
             />
           </View>
         </View>
@@ -410,30 +422,100 @@ export const HomeScreen = memo(function HomeScreen({
         panGesture={garagePanGesture}
         style={styles.garageScrollContent}
       >
-        <View style={[styles.garageContainer, { borderColor: colors.matrix }]}>
+        <View style={[styles.garageContainer, { borderColor: colors.matrix }, (isGarageTabHighlight || isBotAssemblyHighlight) && { pointerEvents: 'none' }]}>
           <View style={styles.botAssemblyContainer}>
-            <BotAssembly onPress={onNavigateToBotAssembly} />
+            {!isBotAssemblyHighlight && (
+              <BotAssembly 
+                onPress={isGarageTabHighlight ? () => {} : onNavigateToBotAssembly} 
+                isHighlighted={false}
+              />
+            )}
           </View>
         </View>
       </GesturePanView>
     </View>
   );
 
-  const TabButton = ({ label, tab, isActive }: { label: string; tab: TabType; isActive: boolean }) => (
-    <TouchableOpacity
-      onPress={() => setActiveTab(tab)}
-      style={[styles.tabButton, isActive && styles.tabButtonActive]}
-    >
-      <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{label}</Text>
-    </TouchableOpacity>
-  );
+  const TabButton = ({ label, tab, isActive }: { label: string; tab: TabType; isActive: boolean }) => {
+    const isHighlighted = isGarageTabHighlight && tab === 'garage';
+    const [currentColorIndex, setCurrentColorIndex] = useState(0);
+    const animatedBorderColor = useState(new RNAnimated.Value(0))[0];
+    
+    const introColors = [colors.primary, colors.secondary, colors.matrix];
+    
+    useEffect(() => {
+      if (isHighlighted) {
+        const interval = setInterval(() => {
+          setCurrentColorIndex(prev => (prev + 1) % introColors.length);
+        }, 1000);
+        
+        return () => clearInterval(interval);
+      }
+    }, [isHighlighted, introColors.length]);
+    
+    useEffect(() => {
+      if (isHighlighted) {
+        RNAnimated.timing(animatedBorderColor, {
+          toValue: currentColorIndex,
+          duration: 500,
+          useNativeDriver: false,
+        }).start();
+      }
+    }, [currentColorIndex, isHighlighted, animatedBorderColor]);
+    
+    const animatedBorderColorValue = animatedBorderColor.interpolate({
+      inputRange: [0, 1, 2],
+      outputRange: introColors,
+    });
+    
+    const handlePress = () => {
+      setActiveTab(tab);
+      if (isHighlighted) {
+        advanceHighlightStep();
+      }
+    };
+    
+    return (
+      <View style={{ zIndex: isHighlighted ? 1000 : 3 }}>
+        <TouchableOpacity
+          onPress={handlePress}
+          style={[
+            styles.tabButton, 
+            isActive && styles.tabButtonActive, 
+            isHighlighted && { 
+              borderWidth: 3, 
+              borderColor: undefined,
+              overflow: 'hidden',
+            }
+          ]}
+        >
+          {isHighlighted && (
+            <RNAnimated.View 
+              style={[
+                StyleSheet.absoluteFill,
+                {
+                  borderWidth: 3,
+                  borderColor: animatedBorderColorValue,
+                  borderRadius: 6,
+                }
+              ]} 
+              pointerEvents="none"
+            />
+          )}
+          <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{label}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <CloseButton onPress={onClose} />
+      <View style={{ zIndex: (isGarageTabHighlight || isBotAssemblyHighlight) ? 3 : 1000, pointerEvents: (isGarageTabHighlight || isBotAssemblyHighlight) ? 'none' : 'auto' }}>
+        <CloseButton onPress={onClose} />
+      </View>
       
       {/* Fixed pill at top center of screen */}
-      <View style={styles.fixedHomePillWrapper}>
+      <View style={[styles.fixedHomePillWrapper, { zIndex: (isGarageTabHighlight || isBotAssemblyHighlight) ? 3 : 1000 }]}>
         <View style={[styles.fixedHomePill, { backgroundColor: '#2E7D32' }]}>
           <Text style={styles.fixedHomeText}>{activeTab === 'floorPlan' ? 'Main Floor' : 'Garage'}</Text>
         </View>
@@ -455,6 +537,23 @@ export const HomeScreen = memo(function HomeScreen({
         <TabButton label="Main Floor" tab="floorPlan" isActive={activeTab === 'floorPlan'} />
         <TabButton label="Garage" tab="garage" isActive={activeTab === 'garage'} />
       </View>
+      {isBuildGuardians && (
+        <TaskGuideHighlightOverlay 
+          forGarageTab={isGarageTabHighlight}
+          forBotAssembly={isBotAssemblyHighlight}
+        />
+      )}
+      {isBotAssemblyHighlight && (
+        <View style={styles.botAssemblyElevatedWrapper}>
+          <BotAssembly 
+            onPress={() => {
+              advanceHighlightStep();
+              onNavigateToBotAssembly();
+            }} 
+            isHighlighted={true}
+          />
+        </View>
+      )}
     </View>
   );
 });
@@ -567,5 +666,16 @@ const styles = StyleSheet.create({
     height: 375,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  botAssemblyElevatedWrapper: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -250 }, { translateY: -187.5 }],
+    width: 500,
+    height: 375,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
   },
 });

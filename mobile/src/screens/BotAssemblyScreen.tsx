@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -18,6 +18,8 @@ import { useThemeColors } from '../hooks/useThemeColors';
 import { LevelSection } from '../components/botAssembly/LevelSection';
 import { BuildSection } from '../components/botAssembly/BuildSection';
 import { BotAssemblyHeader } from '../components/botAssembly/BotAssemblyHeader';
+import { TaskGuideHighlightOverlay } from '../components/turf/TaskGuideHighlightOverlay';
+import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
 
 type BotType = 'breacher' | 'guardian' | 'phreak';
 
@@ -31,21 +33,46 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
   const BOT_COST = 1;
   const { isSmallDevice, scaleFactor } = useResponsiveDimensions();
   const colors = useThemeColors();
+  const { highlightTaskId, highlightStep, clearHighlight, advanceHighlightStep } = useTaskGuideHighlight();
+  
+  const isBuildGuardians = highlightTaskId === 'build-100-guardians';
+  const isGuardianSelectionHighlight = isBuildGuardians && highlightStep === 'guardian-selection';
+  const isQuantityInputHighlight = isBuildGuardians && highlightStep === 'quantity-input';
+  const isBuildButtonHighlight = isBuildGuardians && highlightStep === 'build-button';
+  const isSpeedupButtonHighlight = isBuildGuardians && highlightStep === 'speedup-button';
 
   const handleBuild = useCallback(() => {
     if (!bots.selectedType) {return;}
     const qty = parseInt(quantity, 10);
     if (isNaN(qty) || qty <= 0) {return;}
     startBuild({ type: bots.selectedType, quantity: qty, totalCost: qty });
-  }, [bots.selectedType, quantity, startBuild]);
+    if (isBuildButtonHighlight) {
+      clearHighlight();
+    }
+  }, [bots.selectedType, quantity, startBuild, isBuildButtonHighlight, clearHighlight]);
 
   const handleQuantityChange = useCallback((value: string) => {
     setQuantity(value);
-  }, []);
+    if (isQuantityInputHighlight && value === '100') {
+      advanceHighlightStep();
+    }
+  }, [isQuantityInputHighlight, advanceHighlightStep]);
 
+  useEffect(() => {
+    if (isQuantityInputHighlight && quantity !== '100') {
+      setQuantity('100');
+      setTimeout(() => {
+        advanceHighlightStep();
+      }, 100);
+    }
+  }, [isQuantityInputHighlight, quantity, advanceHighlightStep]);
+  
   const handleSelectBotType = useCallback((type: BotType) => {
     dispatch(selectBotType(type));
-  }, [dispatch]);
+    if (isGuardianSelectionHighlight && type === 'guardian') {
+      advanceHighlightStep();
+    }
+  }, [dispatch, isGuardianSelectionHighlight, advanceHighlightStep]);
 
   const userLevel = 1;
 
@@ -58,15 +85,18 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
         botCounts={bots.botCounts}
         userLevel={userLevel}
         onSelectBotType={handleSelectBotType}
+        highlightGuardian={isGuardianSelectionHighlight && level === 1}
       />
     ))
-  ), [bots.selectedType, bots.botCounts, userLevel, handleSelectBotType]);
+  ), [bots.selectedType, bots.botCounts, userLevel, handleSelectBotType, isGuardianSelectionHighlight]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <BotAssemblyHeader onClose={onClose} />
+      <View style={{ zIndex: isBuildGuardians ? 3 : 1000, pointerEvents: isBuildGuardians ? 'none' : 'auto' }}>
+        <BotAssemblyHeader onClose={onClose} />
+      </View>
       <KeyboardAvoidingView 
-        style={styles.keyboardAvoidingView}
+        style={[styles.keyboardAvoidingView, (isGuardianSelectionHighlight || isBuildButtonHighlight) && { zIndex: 1001 }]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? (isSmallDevice ? 40 : 60) : 20}
       >
@@ -75,10 +105,12 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
             style={styles.botSelection}
             contentContainerStyle={isSmallDevice ? styles.smallDeviceContent : undefined}
             showsVerticalScrollIndicator={false}
+            scrollEnabled={!isGuardianSelectionHighlight && !isBuildButtonHighlight}
+            pointerEvents={isBuildButtonHighlight ? 'none' : 'auto'}
           >
             {levelSections}
           </ScrollView>
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss} disabled={isGuardianSelectionHighlight || isBuildButtonHighlight}>
             <BuildSection
               selectedType={bots.buildingProgress !== null ? bots.buildQueue?.type || bots.selectedType : bots.selectedType}
               buildingProgress={bots.buildingProgress}
@@ -86,10 +118,22 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
               onQuantityChange={handleQuantityChange}
               onBuild={handleBuild}
               botCost={BOT_COST}
+              highlightQuantityInput={isQuantityInputHighlight}
+              highlightBuildButton={isBuildButtonHighlight}
+              highlightSpeedupButton={isSpeedupButtonHighlight}
+              isInputDisabled={isGuardianSelectionHighlight}
             />
           </TouchableWithoutFeedback>
         </View>
       </KeyboardAvoidingView>
+      {isBuildGuardians && (
+        <TaskGuideHighlightOverlay 
+          forGuardianSelection={isGuardianSelectionHighlight}
+          forQuantityInput={isQuantityInputHighlight}
+          forBuildButton={isBuildButtonHighlight}
+          forSpeedupButton={isSpeedupButtonHighlight}
+        />
+      )}
     </SafeAreaView>
   );
 }
