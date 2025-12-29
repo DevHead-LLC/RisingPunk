@@ -11,6 +11,12 @@ interface TaskGuideHighlightOverlayProps {
   forAvatarToggle?: boolean;
   forTaskGuideToggle?: boolean;
   forHome?: boolean;
+  forGarageTab?: boolean;
+  forBotAssembly?: boolean;
+  forGuardianSelection?: boolean;
+  forQuantityInput?: boolean;
+  forBuildButton?: boolean;
+  forSpeedupButton?: boolean;
 }
 
 export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps> = ({ 
@@ -19,7 +25,13 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
   forThemeToggle = false,
   forAvatarToggle = false,
   forTaskGuideToggle = false,
-  forHome = false
+  forHome = false,
+  forGarageTab = false,
+  forBotAssembly = false,
+  forGuardianSelection = false,
+  forQuantityInput = false,
+  forBuildButton = false,
+  forSpeedupButton = false
 }) => {
   const colors = useThemeColors();
   const { highlightTaskId, highlightStep } = useTaskGuideHighlight();
@@ -29,8 +41,9 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
   const isHideTaskListTask = highlightTaskId === 'hide-task-list';
   const isViewProfile = highlightTaskId === 'view-profile';
   const isVisitHome = highlightTaskId === 'visit-home';
+  const isBuildGuardians = highlightTaskId === 'build-100-guardians';
 
-  if (!isViewProfile && !isThemeTask && !isAvatarTask && !isHideTaskListTask && !isVisitHome) {
+  if (!isViewProfile && !isThemeTask && !isAvatarTask && !isHideTaskListTask && !isVisitHome && !isBuildGuardians) {
     return null;
   }
 
@@ -40,6 +53,30 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
 
   if (isVisitHome && !forHome) {
     return null;
+  }
+
+  if (isBuildGuardians) {
+    if (highlightStep === null && !forHome) {
+      return null;
+    }
+    if (highlightStep === 'garage-tab' && !forGarageTab) {
+      return null;
+    }
+    if (highlightStep === 'bot-assembly' && !forBotAssembly) {
+      return null;
+    }
+    if (highlightStep === 'guardian-selection' && !forGuardianSelection) {
+      return null;
+    }
+    if (highlightStep === 'quantity-input' && !forQuantityInput) {
+      return null;
+    }
+    if (highlightStep === 'build-button' && !forBuildButton) {
+      return null;
+    }
+    if (highlightStep === 'speedup-button' && !forSpeedupButton) {
+      return null;
+    }
   }
 
   // For theme tasks, use highlightStep to control which overlay shows (sequential flow)
@@ -90,13 +127,22 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
     }
   }
 
-  const overlayStyle = isVisitHome && forHome 
+  const shouldShowOverlay = 
+    (isVisitHome && forHome) || 
+    (isBuildGuardians && forHome && highlightStep === null) ||
+    (isBuildGuardians && forGarageTab && highlightStep === 'garage-tab') ||
+    (isBuildGuardians && forBotAssembly && highlightStep === 'bot-assembly') ||
+    (isBuildGuardians && forGuardianSelection && highlightStep === 'guardian-selection') ||
+    (isBuildGuardians && forQuantityInput && highlightStep === 'quantity-input') ||
+    (isBuildGuardians && forBuildButton && highlightStep === 'build-button') ||
+    (isBuildGuardians && forSpeedupButton && highlightStep === 'speedup-button');
+  const overlayStyle = shouldShowOverlay
     ? [styles.overlay, { zIndex: 999 }]
     : styles.overlay;
 
   return (
     <>
-      <View style={overlayStyle} pointerEvents="none" />
+      <View style={overlayStyle} pointerEvents="auto" />
       {forProfile && (
         <View style={styles.clickHereContainerProfile} pointerEvents="none">
           <View style={[styles.clickHereBox, { backgroundColor: colors.background, borderColor: colors.primary }]}>

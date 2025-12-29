@@ -15,6 +15,7 @@ import { useSpeedupBotBuildMutation } from '../../store/api/botsApi';
 import { updateBalance } from '../../store/slices/balanceSlice';
 import { useFetchBalanceQuery } from '../../store/api/balanceApi';
 import { setBots, setBuildState } from '../../store/slices/botsSlice';
+import { useTaskGuideHighlight } from '../../contexts/TaskGuideHighlightContext';
 
 type BuildSectionProps = {
   selectedType: BotType | null;
@@ -23,6 +24,10 @@ type BuildSectionProps = {
   onQuantityChange: (value: string) => void;
   onBuild: () => void;
   botCost: number;
+  highlightQuantityInput?: boolean;
+  highlightBuildButton?: boolean;
+  highlightSpeedupButton?: boolean;
+  isInputDisabled?: boolean;
 };
 
 export const BuildSection = React.memo(function BuildSection({
@@ -32,6 +37,10 @@ export const BuildSection = React.memo(function BuildSection({
   onQuantityChange,
   onBuild,
   botCost,
+  highlightQuantityInput = false,
+  highlightBuildButton = false,
+  highlightSpeedupButton = false,
+  isInputDisabled = false,
 }: BuildSectionProps) {
   const colors = useThemeColors();
   const dispatch = useAppDispatch();
@@ -48,6 +57,7 @@ export const BuildSection = React.memo(function BuildSection({
 
   const currentBalance = balanceData?.total ?? reduxBalance;
   const numericBalance = typeof currentBalance === 'string' ? parseFloat(currentBalance) : currentBalance;
+  const { clearHighlight } = useTaskGuideHighlight();
 
   // Calculate seconds remaining for speedup
   const getSecondsRemaining = (): number => {
@@ -80,8 +90,11 @@ export const BuildSection = React.memo(function BuildSection({
           dispatch(setBuildState({ buildQueue: null, bots: result.bots }));
         }
         
-        // Close modal
+        // Close modal and clear highlight if this was part of build-100-guardians task
         setShowSpeedupModal(false);
+        if (highlightSpeedupButton) {
+          clearHighlight();
+        }
       } else {
         // Handle case where API returns success: false (HTTP 200 but operation failed)
         setShowSpeedupModal(false);
@@ -102,10 +115,10 @@ export const BuildSection = React.memo(function BuildSection({
       }
       setShowErrorModal(true);
     }
-  }, [speedupBotBuild, dispatch, currentBalanceState]);
+  }, [speedupBotBuild, dispatch, currentBalanceState, highlightSpeedupButton, clearHighlight]);
 
   return (
-    <View style={[styles.buildSection, { borderLeftColor: colors.matrix + '20' }]}>
+    <View style={[styles.buildSection, { borderLeftColor: colors.matrix + '20' }, isInputDisabled && { pointerEvents: 'none' }]}>
       <Text style={[styles.buildTitle, { color: colors.secondary }]}>BUILD CONTROLS</Text>
 
       <View style={styles.selectedBotInfo}>
@@ -122,6 +135,9 @@ export const BuildSection = React.memo(function BuildSection({
         onQuantityChange={onQuantityChange}
         onBuild={onBuild}
         onSpeedup={buildingProgress !== null ? () => setShowSpeedupModal(true) : undefined}
+        highlightQuantityInput={highlightQuantityInput}
+        highlightBuildButton={highlightBuildButton}
+        highlightSpeedupButton={highlightSpeedupButton}
       />
 
       <BuildStatus

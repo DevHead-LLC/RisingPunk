@@ -12,6 +12,7 @@ type LevelSectionProps = {
   botCounts: Record<BotType, number>;
   userLevel: number;
   onSelectBotType: (type: BotType) => void;
+  highlightGuardian?: boolean;
 };
 
 export const LevelSection = React.memo(function LevelSection({
@@ -20,6 +21,7 @@ export const LevelSection = React.memo(function LevelSection({
   botCounts,
   userLevel,
   onSelectBotType,
+  highlightGuardian = false,
 }: LevelSectionProps) {
   const isLocked = level > 1; // Marks 2-4 are locked for now
   const colors = useThemeColors();
@@ -28,18 +30,24 @@ export const LevelSection = React.memo(function LevelSection({
     <View style={styles.levelSection}>
       <Text style={[styles.levelTitle, { color: colors.secondary }]}>MARK {level}</Text>
       <View style={styles.botGrid}>
-        {(['breacher', 'guardian', 'phreak'] as BotType[]).map((type) => (
-          <View key={`${type}-${level}`} style={styles.botContainer}>
-            <BotTypeCard
-              type={type}
-              _level={level}
-              isLocked={isLocked}
-              isSelected={!isLocked && selectedType === type}
-              count={botCounts[type]}
-              onPress={() => !isLocked && onSelectBotType(type)}
-            />
-          </View>
-        ))}
+        {(['breacher', 'guardian', 'phreak'] as BotType[]).map((type) => {
+          const isHighlighted = highlightGuardian && type === 'guardian';
+          const isOtherBotType = highlightGuardian && type !== 'guardian';
+          return (
+            <View key={`${type}-${level}`} style={styles.botContainer}>
+              <BotTypeCard
+                type={type}
+                _level={level}
+                isLocked={isLocked}
+                isSelected={!isLocked && selectedType === type}
+                count={botCounts[type]}
+                onPress={() => !isLocked && onSelectBotType(type)}
+                isHighlighted={isHighlighted}
+                isDisabled={isOtherBotType}
+              />
+            </View>
+          );
+        })}
       </View>
     </View>
   );
