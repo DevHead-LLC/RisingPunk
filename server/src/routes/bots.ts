@@ -176,27 +176,39 @@ router.get('/build-state', auth, async (req, res) => {
 
     // If build is complete
     if (progress >= 100) {
-      const finalType = bot.buildQueue.type;
-      const remainingBots = bot.buildQueue.quantity - bot.buildQueue.botsBuilt;
-      if (remainingBots > 0) {
-        bot.bots[finalType] += remainingBots;
-      }
-      
-      // Increment user counters with FULL quantity built (not just remaining)
-      // By the time progress reaches 100%, botsBuilt equals quantity due to incremental updates,
-      // so remainingBots would be 0. We need to count the full quantity to match speedup behavior.
-      const fullQuantityBuilt = bot.buildQueue.quantity;
-      
       // Use transaction to ensure atomicity: counter increment and buildQueue clearing must both succeed
       // This prevents double-counting if bot.save() fails after counter increment
+      // Re-fetch bot inside transaction to prevent race conditions from concurrent requests
       const session = await mongoose.startSession();
       try {
         await session.withTransaction(async () => {
+          // Re-fetch bot within transaction to get latest state
+          // If another concurrent request already cleared buildQueue, this will be null
+          const botInTransaction = await Bot.findOne({ userId: req.user._id }).session(session);
+          
+          if (!botInTransaction || !botInTransaction.buildQueue) {
+            // Build queue was already cleared by another concurrent request, skip increment
+            return;
+          }
+          
+          // Use values from botInTransaction (not stale bot object) to ensure correctness
+          const finalTypeInTransaction = botInTransaction.buildQueue.type;
+          const fullQuantityBuilt = botInTransaction.buildQueue.quantity;
+          const remainingBotsInTransaction = botInTransaction.buildQueue.quantity - botInTransaction.buildQueue.botsBuilt;
+          
+          // Add remaining bots to inventory (if any)
+          if (remainingBotsInTransaction > 0) {
+            botInTransaction.bots[finalTypeInTransaction] += remainingBotsInTransaction;
+          }
+          
+          // Increment user counters with FULL quantity built (not just remaining)
+          // By the time progress reaches 100%, botsBuilt equals quantity due to incremental updates,
+          // so remainingBots would be 0. We need to count the full quantity to match speedup behavior.
           if (fullQuantityBuilt > 0) {
             // Use atomic $inc operator to prevent race conditions when concurrent builds complete
             // This ensures that if multiple builds complete simultaneously, all increments are applied
-            const updateField = finalType === 'guardian' ? 'totalGuardiansBuilt' : 
-                               finalType === 'phreak' ? 'totalPhreaksBuilt' : 'totalBreachersBuilt';
+            const updateField = finalTypeInTransaction === 'guardian' ? 'totalGuardiansBuilt' : 
+                               finalTypeInTransaction === 'phreak' ? 'totalPhreaksBuilt' : 'totalBreachersBuilt';
             
             // First, increment the counter (atomic operation)
             await User.updateOne(
@@ -214,16 +226,18 @@ router.get('/build-state', auth, async (req, res) => {
           }
           
           // Clear build queue within transaction - if this fails, counter increment is rolled back
-          bot.buildQueue = null;
-          await bot.save({ session });
+          botInTransaction.buildQueue = null;
+          await botInTransaction.save({ session });
         });
       } finally {
         await session.endSession();
       }
 
+      // Re-fetch bot to get updated state after transaction
+      const updatedBot = await Bot.findOne({ userId: req.user._id });
       res.json({
         buildQueue: null,
-        bots: bot.bots
+        bots: updatedBot?.bots || bot.bots
       });
       return;
     }
