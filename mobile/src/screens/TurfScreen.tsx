@@ -134,8 +134,10 @@ const GesturePanView = memo(function GesturePanView({
 
 export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element => {
   const colors = useThemeColors();
-  const { highlightTaskId } = useTaskGuideHighlight();
+  const { highlightTaskId, highlightStep } = useTaskGuideHighlight();
   const isVisitHome = highlightTaskId === 'visit-home';
+  const isBuildGuardians = highlightTaskId === 'build-100-guardians';
+  const isHomeHighlight = isVisitHome || (isBuildGuardians && highlightStep === null);
   const [currentScreen, setCurrentScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research' | 'investmentProperty'>('turf');
   const [battleId, setBattleId] = useState<string | null>(null);
   const [pendingNpcSlug, setPendingNpcSlug] = useState<string | null>(null);
@@ -275,7 +277,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       return Gesture.Pan()
         .minPointers(1)
         .maxPointers(1)
-        .enabled(!isVisitHome)
+        .enabled(!isHomeHighlight)
         .onStart(() => {
           'worklet';
           startX.value = offsetX.value;
@@ -316,7 +318,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         });
     }
     return null;
-  }, [offsetX, offsetY, startX, startY, boundsReady, minX, maxX, minY, maxY, withDecay, isVisitHome]);
+  }, [offsetX, offsetY, startX, startY, boundsReady, minX, maxX, minY, maxY, withDecay, isHomeHighlight]);
 
   // Fetch Property 1's status to determine Property 2's rendering
   const { data: property1Status } = useGetRentalHousingStatusQuery(1);
@@ -690,7 +692,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   }, [currentScreen]);
 
   useEffect(() => {
-    if (isVisitHome && currentScreen === 'turf') {
+    if (isHomeHighlight && currentScreen === 'turf') {
       setTimeout(() => {
         if (Platform.OS === 'android') {
           centerAndroidView();
@@ -706,7 +708,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         }
       }, 100);
     }
-  }, [isVisitHome, currentScreen, centerAndroidView]);
+  }, [isHomeHighlight, currentScreen, centerAndroidView]);
 
   const renderScreen = useCallback(() => {
     switch (currentScreen) {
@@ -837,11 +839,11 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
             </ErrorBoundary>
             <View style={styles.scrollWrapper}>
               {Platform.OS === 'ios' ? (
-                <ScrollViewMemo horizontalScrollRef={horizontalScrollRef} onScroll={handleTurfScroll} scrollEnabled={!isVisitHome}>
+                <ScrollViewMemo horizontalScrollRef={horizontalScrollRef} onScroll={handleTurfScroll} scrollEnabled={!isHomeHighlight}>
                   <View style={[styles.scrollContent, { backgroundColor: colors.background, borderColor: colors.secondary + '99' }]}>
                     <DiagonalLines colors={colors} />
                     <View style={[styles.digitalGround, { backgroundColor: colors.matrix + '0D', borderColor: colors.matrix + '33' }]}>
-                      {!isVisitHome && <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />}
+                      {!isHomeHighlight && <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />}
                       <DigitalBarracksLocation onPress={() => navigateToScreen('barracks')} isIntroActive={currentIntroStep === 'barracks'} />
                     </View>
                     <ResearchCenterLocation 
@@ -922,7 +924,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                   >
                   <DiagonalLines colors={colors} />
                   <View style={[styles.digitalGround, { backgroundColor: colors.matrix + '0D', borderColor: colors.matrix + '33' }]}>
-                    {!isVisitHome && <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />}
+                    {!isHomeHighlight && <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />}
                     <DigitalBarracksLocation onPress={() => navigateToScreen('barracks')} isIntroActive={currentIntroStep === 'barracks'} />
                   </View>
                   <ResearchCenterLocation 
@@ -998,7 +1000,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                 </GesturePanView>
               )}
             </View>
-            {isVisitHome && (
+            {isHomeHighlight && (
               <>
                 <View style={styles.homeLocationElevatedWrapper}>
                   <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />
@@ -1015,7 +1017,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           </View>
         );
     }
-  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isVisitHome]);
+  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight]);
 
   return (
     <>

@@ -69,6 +69,9 @@ export interface IUser extends Document {
     successfulDefenses: number;
     failedDefenses: number;
   };
+  totalGuardiansBuilt?: number;
+  totalPhreaksBuilt?: number;
+  totalBreachersBuilt?: number;
   verifyAccessKey(accessKey: string): Promise<boolean>;
   getDecryptedEmail(): string;
   setEncryptedEmail(email: string): void;
@@ -346,6 +349,24 @@ const userSchema = new Schema({
       type: Number,
       default: 0
     }
+  },
+  totalGuardiansBuilt: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 1000000
+  },
+  totalPhreaksBuilt: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 1000000
+  },
+  totalBreachersBuilt: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 1000000
   },
   currentTokenId: {
     type: String,

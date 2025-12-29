@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 
-export type HighlightStep = 'settings-tab' | 'theme-toggle' | 'avatar-toggle' | 'task-guide-toggle' | null;
+export type HighlightStep = 'settings-tab' | 'theme-toggle' | 'avatar-toggle' | 'task-guide-toggle' | 'garage-tab' | 'bot-assembly' | 'guardian-selection' | 'quantity-input' | 'build-button' | 'speedup-button' | null;
 
 interface TaskGuideHighlightContextType {
   highlightTaskId: string | null;
@@ -23,8 +23,14 @@ export const TaskGuideHighlightProvider: React.FC<{ children: ReactNode }> = ({ 
   }, []);
 
   const advanceHighlightStep = useCallback(() => {
+    const isBuildGuardians = highlightTaskId === 'build-100-guardians';
+    
     if (highlightStep === null) {
-      setHighlightStep('settings-tab');
+      if (isBuildGuardians) {
+        setHighlightStep('garage-tab');
+      } else {
+        setHighlightStep('settings-tab');
+      }
     } else if (highlightStep === 'settings-tab') {
       const isThemeTask = highlightTaskId === 'use-hacker-mode' || highlightTaskId === 'use-business-mode';
       const isAvatarTask = highlightTaskId === 'change-avatar';
@@ -36,6 +42,18 @@ export const TaskGuideHighlightProvider: React.FC<{ children: ReactNode }> = ({ 
       } else if (isHideTaskListTask) {
         setHighlightStep('task-guide-toggle');
       }
+    } else if (isBuildGuardians) {
+      if (highlightStep === 'garage-tab') {
+        setHighlightStep('bot-assembly');
+      } else if (highlightStep === 'bot-assembly') {
+        setHighlightStep('guardian-selection');
+      } else if (highlightStep === 'guardian-selection') {
+        setHighlightStep('quantity-input');
+      } else if (highlightStep === 'quantity-input') {
+        setHighlightStep('build-button');
+      }
+      // Note: 'build-button' is the final step - guided task ends when build button is clicked
+      // No advancement to 'speedup-button' - user can discover speedup feature on their own
     }
   }, [highlightStep, highlightTaskId]);
 
