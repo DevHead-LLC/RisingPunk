@@ -187,21 +187,23 @@ router.get('/build-state', auth, async (req, res) => {
       // so remainingBots would be 0. We need to count the full quantity to match speedup behavior.
       const fullQuantityBuilt = bot.buildQueue.quantity;
       if (fullQuantityBuilt > 0) {
-        const user = await User.findById(req.user._id).lean();
-        if (user) {
-          // Use updateOne to only update the specific field without fetching full document
-          // This prevents Mongoose from applying schema defaults to other fields
-          const updateField = finalType === 'guardian' ? 'totalGuardiansBuilt' : 
-                             finalType === 'phreak' ? 'totalPhreaksBuilt' : 'totalBreachersBuilt';
-          const currentValue = user[updateField as keyof typeof user] as number | undefined;
-          const current = (currentValue !== undefined && currentValue !== null) ? currentValue : 0;
-          const newValue = Math.min(1000000, current + fullQuantityBuilt);
-          
-          await User.updateOne(
-            { _id: req.user._id },
-            { $set: { [updateField]: newValue } }
-          );
-        }
+        // Use atomic $inc operator to prevent race conditions when concurrent builds complete
+        // This ensures that if multiple builds complete simultaneously, all increments are applied
+        const updateField = finalType === 'guardian' ? 'totalGuardiansBuilt' : 
+                           finalType === 'phreak' ? 'totalPhreaksBuilt' : 'totalBreachersBuilt';
+        
+        // First, increment the counter (atomic operation)
+        await User.updateOne(
+          { _id: req.user._id },
+          { $inc: { [updateField]: fullQuantityBuilt } }
+        );
+        
+        // Then, cap it at 1,000,000 if needed (separate operation to enforce max)
+        // This is safe because $inc is atomic, and we cap after incrementing
+        await User.updateOne(
+          { _id: req.user._id, [updateField]: { $gt: 1000000 } },
+          { $set: { [updateField]: 1000000 } }
+        );
       }
       
       bot.buildQueue = null;
@@ -295,12 +297,21 @@ router.post('/speedup-build', auth, async (req, res) => {
           const botType = botInTransaction.buildQueue.type;
           const updateField = botType === 'guardian' ? 'totalGuardiansBuilt' : 
                              botType === 'phreak' ? 'totalPhreaksBuilt' : 'totalBreachersBuilt';
-          const currentValue = userInTransaction[updateField as keyof typeof userInTransaction] as number | undefined;
-          const current = (currentValue !== undefined && currentValue !== null) ? currentValue : 0;
-          const newValue = Math.min(1000000, current + fullQuantityBuilt);
           
-          // Set the field directly on the document (will be saved with userInTransaction.save())
-          (userInTransaction as any)[updateField] = newValue;
+          // Use atomic $inc operator within transaction to prevent race conditions
+          // This ensures that if multiple builds complete simultaneously, all increments are applied
+          await User.updateOne(
+            { _id: req.user._id },
+            { $inc: { [updateField]: fullQuantityBuilt } },
+            { session }
+          );
+          
+          // Then, cap it at 1,000,000 if needed (within same transaction)
+          await User.updateOne(
+            { _id: req.user._id, [updateField]: { $gt: 1000000 } },
+            { $set: { [updateField]: 1000000 } },
+            { session }
+          );
         }
         
         // Clear build queue

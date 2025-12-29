@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -58,14 +58,30 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
     }
   }, [isQuantityInputHighlight, advanceHighlightStep]);
 
+  const advanceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     if (isQuantityInputHighlight && quantity !== '100') {
       setQuantity('100');
-      const timer = setTimeout(() => {
-        advanceHighlightStep();
-      }, 100);
-      return () => clearTimeout(timer);
     }
+  }, [isQuantityInputHighlight, quantity]);
+
+  useEffect(() => {
+    if (isQuantityInputHighlight && quantity === '100') {
+      if (advanceTimerRef.current) {
+        clearTimeout(advanceTimerRef.current);
+      }
+      advanceTimerRef.current = setTimeout(() => {
+        advanceHighlightStep();
+        advanceTimerRef.current = null;
+      }, 100);
+    }
+    return () => {
+      if (advanceTimerRef.current) {
+        clearTimeout(advanceTimerRef.current);
+        advanceTimerRef.current = null;
+      }
+    };
   }, [isQuantityInputHighlight, quantity, advanceHighlightStep]);
   
   const handleSelectBotType = useCallback((type: BotType) => {
