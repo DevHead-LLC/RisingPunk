@@ -182,9 +182,11 @@ router.get('/build-state', auth, async (req, res) => {
         bot.bots[finalType] += remainingBots;
       }
       
-      // Only increment user counters if there are actually remaining bots to add
-      // This prevents incorrectly setting counters when build queue is stale or already processed
-      if (remainingBots > 0) {
+      // Increment user counters with FULL quantity built (not just remaining)
+      // By the time progress reaches 100%, botsBuilt equals quantity due to incremental updates,
+      // so remainingBots would be 0. We need to count the full quantity to match speedup behavior.
+      const fullQuantityBuilt = bot.buildQueue.quantity;
+      if (fullQuantityBuilt > 0) {
         const user = await User.findById(req.user._id).lean();
         if (user) {
           // Use updateOne to only update the specific field without fetching full document
@@ -193,7 +195,7 @@ router.get('/build-state', auth, async (req, res) => {
                              finalType === 'phreak' ? 'totalPhreaksBuilt' : 'totalBreachersBuilt';
           const currentValue = user[updateField as keyof typeof user] as number | undefined;
           const current = (currentValue !== undefined && currentValue !== null) ? currentValue : 0;
-          const newValue = Math.min(1000000, current + remainingBots);
+          const newValue = Math.min(1000000, current + fullQuantityBuilt);
           
           await User.updateOne(
             { _id: req.user._id },
