@@ -186,28 +186,40 @@ router.get('/build-state', auth, async (req, res) => {
       // By the time progress reaches 100%, botsBuilt equals quantity due to incremental updates,
       // so remainingBots would be 0. We need to count the full quantity to match speedup behavior.
       const fullQuantityBuilt = bot.buildQueue.quantity;
-      if (fullQuantityBuilt > 0) {
-        // Use atomic $inc operator to prevent race conditions when concurrent builds complete
-        // This ensures that if multiple builds complete simultaneously, all increments are applied
-        const updateField = finalType === 'guardian' ? 'totalGuardiansBuilt' : 
-                           finalType === 'phreak' ? 'totalPhreaksBuilt' : 'totalBreachersBuilt';
-        
-        // First, increment the counter (atomic operation)
-        await User.updateOne(
-          { _id: req.user._id },
-          { $inc: { [updateField]: fullQuantityBuilt } }
-        );
-        
-        // Then, cap it at 1,000,000 if needed (separate operation to enforce max)
-        // This is safe because $inc is atomic, and we cap after incrementing
-        await User.updateOne(
-          { _id: req.user._id, [updateField]: { $gt: 1000000 } },
-          { $set: { [updateField]: 1000000 } }
-        );
-      }
       
-      bot.buildQueue = null;
-      await bot.save();
+      // Use transaction to ensure atomicity: counter increment and buildQueue clearing must both succeed
+      // This prevents double-counting if bot.save() fails after counter increment
+      const session = await mongoose.startSession();
+      try {
+        await session.withTransaction(async () => {
+          if (fullQuantityBuilt > 0) {
+            // Use atomic $inc operator to prevent race conditions when concurrent builds complete
+            // This ensures that if multiple builds complete simultaneously, all increments are applied
+            const updateField = finalType === 'guardian' ? 'totalGuardiansBuilt' : 
+                               finalType === 'phreak' ? 'totalPhreaksBuilt' : 'totalBreachersBuilt';
+            
+            // First, increment the counter (atomic operation)
+            await User.updateOne(
+              { _id: req.user._id },
+              { $inc: { [updateField]: fullQuantityBuilt } },
+              { session }
+            );
+            
+            // Then, cap it at 1,000,000 if needed (within same transaction)
+            await User.updateOne(
+              { _id: req.user._id, [updateField]: { $gt: 1000000 } },
+              { $set: { [updateField]: 1000000 } },
+              { session }
+            );
+          }
+          
+          // Clear build queue within transaction - if this fails, counter increment is rolled back
+          bot.buildQueue = null;
+          await bot.save({ session });
+        });
+      } finally {
+        await session.endSession();
+      }
 
       res.json({
         buildQueue: null,
