@@ -25,8 +25,6 @@ useAnimatedStyle = reanimated.useAnimatedStyle;
 withDecay = reanimated.withDecay;
 computePanBounds = mapPanBounds.computePanBounds;
 
-type TabType = 'floorPlan' | 'garage';
-
 type HomeScreenProps = {
   onClose: () => void;
   onNavigateToMap: () => void;
@@ -75,6 +73,95 @@ function GesturePanView({
     </GestureDetector>
   );
 }
+
+type TabType = 'floorPlan' | 'garage';
+
+const TabButton = memo(({ 
+  label, 
+  tab, 
+  isActive, 
+  isHighlighted,
+  colors,
+  onPress,
+  advanceHighlightStep
+}: { 
+  label: string; 
+  tab: TabType; 
+  isActive: boolean;
+  isHighlighted: boolean;
+  colors: any;
+  onPress: (tab: TabType) => void;
+  advanceHighlightStep: () => void;
+}) => {
+  const [currentColorIndex, setCurrentColorIndex] = useState(0);
+  const animatedBorderColor = useState(new RNAnimated.Value(0))[0];
+  
+  const introColors = [colors.primary, colors.secondary, colors.matrix];
+  
+  useEffect(() => {
+    if (isHighlighted) {
+      const interval = setInterval(() => {
+        setCurrentColorIndex(prev => (prev + 1) % introColors.length);
+      }, 1000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [isHighlighted, introColors.length]);
+  
+  useEffect(() => {
+    if (isHighlighted) {
+      RNAnimated.timing(animatedBorderColor, {
+        toValue: currentColorIndex,
+        duration: 500,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [currentColorIndex, isHighlighted, animatedBorderColor]);
+  
+  const animatedBorderColorValue = animatedBorderColor.interpolate({
+    inputRange: [0, 1, 2],
+    outputRange: introColors,
+  });
+  
+  const handlePress = () => {
+    onPress(tab);
+    if (isHighlighted) {
+      advanceHighlightStep();
+    }
+  };
+  
+  return (
+    <View style={{ zIndex: isHighlighted ? 1000 : 3 }}>
+      <TouchableOpacity
+        onPress={handlePress}
+        style={[
+          styles.tabButton, 
+          isActive && styles.tabButtonActive, 
+          isHighlighted && { 
+            borderWidth: 3, 
+            borderColor: undefined,
+            overflow: 'hidden',
+          }
+        ]}
+      >
+        {isHighlighted && (
+          <RNAnimated.View 
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                borderWidth: 3,
+                borderColor: animatedBorderColorValue,
+                borderRadius: 6,
+              }
+            ]} 
+            pointerEvents="none"
+          />
+        )}
+        <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{label}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+});
 
 export const HomeScreen = memo(function HomeScreen({
   onClose,
@@ -436,78 +523,6 @@ export const HomeScreen = memo(function HomeScreen({
     </View>
   );
 
-  const TabButton = ({ label, tab, isActive }: { label: string; tab: TabType; isActive: boolean }) => {
-    const isHighlighted = isGarageTabHighlight && tab === 'garage';
-    const [currentColorIndex, setCurrentColorIndex] = useState(0);
-    const animatedBorderColor = useState(new RNAnimated.Value(0))[0];
-    
-    const introColors = [colors.primary, colors.secondary, colors.matrix];
-    
-    useEffect(() => {
-      if (isHighlighted) {
-        const interval = setInterval(() => {
-          setCurrentColorIndex(prev => (prev + 1) % introColors.length);
-        }, 1000);
-        
-        return () => clearInterval(interval);
-      }
-    }, [isHighlighted, introColors.length]);
-    
-    useEffect(() => {
-      if (isHighlighted) {
-        RNAnimated.timing(animatedBorderColor, {
-          toValue: currentColorIndex,
-          duration: 500,
-          useNativeDriver: false,
-        }).start();
-      }
-    }, [currentColorIndex, isHighlighted, animatedBorderColor]);
-    
-    const animatedBorderColorValue = animatedBorderColor.interpolate({
-      inputRange: [0, 1, 2],
-      outputRange: introColors,
-    });
-    
-    const handlePress = () => {
-      setActiveTab(tab);
-      if (isHighlighted) {
-        advanceHighlightStep();
-      }
-    };
-    
-    return (
-      <View style={{ zIndex: isHighlighted ? 1000 : 3 }}>
-        <TouchableOpacity
-          onPress={handlePress}
-          style={[
-            styles.tabButton, 
-            isActive && styles.tabButtonActive, 
-            isHighlighted && { 
-              borderWidth: 3, 
-              borderColor: undefined,
-              overflow: 'hidden',
-            }
-          ]}
-        >
-          {isHighlighted && (
-            <RNAnimated.View 
-              style={[
-                StyleSheet.absoluteFill,
-                {
-                  borderWidth: 3,
-                  borderColor: animatedBorderColorValue,
-                  borderRadius: 6,
-                }
-              ]} 
-              pointerEvents="none"
-            />
-          )}
-          <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{label}</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={{ zIndex: (isGarageTabHighlight || isBotAssemblyHighlight) ? 3 : 1000, pointerEvents: (isGarageTabHighlight || isBotAssemblyHighlight) ? 'none' : 'auto' }}>
@@ -534,8 +549,24 @@ export const HomeScreen = memo(function HomeScreen({
       
       {/* Tab Navigation - Fixed at bottom */}
       <View style={styles.tabContainer}>
-        <TabButton label="Main Floor" tab="floorPlan" isActive={activeTab === 'floorPlan'} />
-        <TabButton label="Garage" tab="garage" isActive={activeTab === 'garage'} />
+        <TabButton 
+          label="Main Floor" 
+          tab="floorPlan" 
+          isActive={activeTab === 'floorPlan'}
+          isHighlighted={false}
+          colors={colors}
+          onPress={setActiveTab}
+          advanceHighlightStep={advanceHighlightStep}
+        />
+        <TabButton 
+          label="Garage" 
+          tab="garage" 
+          isActive={activeTab === 'garage'}
+          isHighlighted={isGarageTabHighlight}
+          colors={colors}
+          onPress={setActiveTab}
+          advanceHighlightStep={advanceHighlightStep}
+        />
       </View>
       {isBuildGuardians && (
         <TaskGuideHighlightOverlay 

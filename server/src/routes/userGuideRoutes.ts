@@ -46,6 +46,8 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
 
     // Fetch user with bot build counters to check auto-completion conditions
     // This ensures tasks like 'build-100-guardians' are auto-completed if user has already built 100+ guardians
+    // Note: Using .lean() to get plain JavaScript object, and explicitly selecting fields
+    // If fields don't exist in database, they will be undefined (not default value)
     const user = await User.findById(userId).select('totalGuardiansBuilt totalPhreaksBuilt totalBreachersBuilt').lean();
     if (!user) {
       res.status(404).json({ error: 'User not found' });
@@ -73,6 +75,8 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
           if (!completedTaskIds.has(task.id)) {
             // Use atomic operation to prevent race conditions - only add if taskId doesn't exist
             // This immediately marks the task as completed, allowing user to collect reward
+            // Note: Document already exists (ensured at start of function), so no upsert needed
+            // Without upsert, if task is already completed, this is a silent no-op (prevents duplicate key errors)
             await UserTaskProgress.findOneAndUpdate(
               {
                 userId,
@@ -87,7 +91,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
                 },
                 $set: { lastCompletedTaskId: task.id }
               },
-              { new: true, upsert: true }
+              { new: true }
             );
             anyTaskAutoCompleted = true;
           }

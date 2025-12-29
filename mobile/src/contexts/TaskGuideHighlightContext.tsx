@@ -51,9 +51,9 @@ export const TaskGuideHighlightProvider: React.FC<{ children: ReactNode }> = ({ 
         setHighlightStep('quantity-input');
       } else if (highlightStep === 'quantity-input') {
         setHighlightStep('build-button');
-      } else if (highlightStep === 'build-button') {
-        setHighlightStep('speedup-button');
       }
+      // Note: 'build-button' is the final step - guided task ends when build button is clicked
+      // No advancement to 'speedup-button' - user can discover speedup feature on their own
     }
   }, [highlightStep, highlightTaskId]);
 

@@ -182,19 +182,24 @@ router.get('/build-state', auth, async (req, res) => {
         bot.bots[finalType] += remainingBots;
       }
       
-      const user = await User.findById(req.user._id);
-      if (user && remainingBots > 0) {
-        if (finalType === 'guardian') {
-          const current = user.totalGuardiansBuilt || 0;
-          user.totalGuardiansBuilt = Math.min(1000000, current + remainingBots);
-        } else if (finalType === 'phreak') {
-          const current = user.totalPhreaksBuilt || 0;
-          user.totalPhreaksBuilt = Math.min(1000000, current + remainingBots);
-        } else if (finalType === 'breacher') {
-          const current = user.totalBreachersBuilt || 0;
-          user.totalBreachersBuilt = Math.min(1000000, current + remainingBots);
+      // Only increment user counters if there are actually remaining bots to add
+      // This prevents incorrectly setting counters when build queue is stale or already processed
+      if (remainingBots > 0) {
+        const user = await User.findById(req.user._id).lean();
+        if (user) {
+          // Use updateOne to only update the specific field without fetching full document
+          // This prevents Mongoose from applying schema defaults to other fields
+          const updateField = finalType === 'guardian' ? 'totalGuardiansBuilt' : 
+                             finalType === 'phreak' ? 'totalPhreaksBuilt' : 'totalBreachersBuilt';
+          const currentValue = user[updateField as keyof typeof user] as number | undefined;
+          const current = (currentValue !== undefined && currentValue !== null) ? currentValue : 0;
+          const newValue = Math.min(1000000, current + remainingBots);
+          
+          await User.updateOne(
+            { _id: req.user._id },
+            { $set: { [updateField]: newValue } }
+          );
         }
-        await user.save();
       }
       
       bot.buildQueue = null;
@@ -274,25 +279,26 @@ router.post('/speedup-build', auth, async (req, res) => {
           throw new Error('Insufficient funds');
         }
 
-        // Calculate remaining bots to add
+        // Calculate remaining bots to add to inventory
         const remainingBotsToAdd = botInTransaction.buildQueue.quantity - (botInTransaction.buildQueue.botsBuilt || 0);
         
         // Add remaining bots to inventory
         botInTransaction.bots[botInTransaction.buildQueue.type] += remainingBotsToAdd;
         
         // Increment lifetime bot build counters (capped at 1,000,000)
-        if (remainingBotsToAdd > 0) {
+        // When speedup is used, we count the FULL quantity built, not just remaining
+        // This ensures all bots are counted even if some were already built naturally
+        const fullQuantityBuilt = botInTransaction.buildQueue.quantity;
+        if (fullQuantityBuilt > 0) {
           const botType = botInTransaction.buildQueue.type;
-          if (botType === 'guardian') {
-            const current = userInTransaction.totalGuardiansBuilt || 0;
-            userInTransaction.totalGuardiansBuilt = Math.min(1000000, current + remainingBotsToAdd);
-          } else if (botType === 'phreak') {
-            const current = userInTransaction.totalPhreaksBuilt || 0;
-            userInTransaction.totalPhreaksBuilt = Math.min(1000000, current + remainingBotsToAdd);
-          } else if (botType === 'breacher') {
-            const current = userInTransaction.totalBreachersBuilt || 0;
-            userInTransaction.totalBreachersBuilt = Math.min(1000000, current + remainingBotsToAdd);
-          }
+          const updateField = botType === 'guardian' ? 'totalGuardiansBuilt' : 
+                             botType === 'phreak' ? 'totalPhreaksBuilt' : 'totalBreachersBuilt';
+          const currentValue = userInTransaction[updateField as keyof typeof userInTransaction] as number | undefined;
+          const current = (currentValue !== undefined && currentValue !== null) ? currentValue : 0;
+          const newValue = Math.min(1000000, current + fullQuantityBuilt);
+          
+          // Set the field directly on the document (will be saved with userInTransaction.save())
+          (userInTransaction as any)[updateField] = newValue;
         }
         
         // Clear build queue

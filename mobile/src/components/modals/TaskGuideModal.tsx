@@ -40,7 +40,18 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
   const currentBalance = useAppSelector(getCurrentBalance);
   const buildingProgress = useAppSelector((state) => state.bots.buildingProgress);
   const buildQueue = useAppSelector((state) => state.bots.buildQueue);
-  const isBuildInProgress = buildingProgress !== null || buildQueue !== null;
+  // Check if there's an active build in progress (not completed)
+  // buildingProgress is null when no build, or 0-100 when building (100 = complete)
+  // buildQueue exists when there's an active build queue
+  // Only block if there's an active, incomplete build
+  // Also check if buildQueue has a completesAt date in the future (active build)
+  const hasActiveBuildProgress = buildingProgress !== null && typeof buildingProgress === 'number' && buildingProgress < 100;
+  const hasActiveBuildQueue = buildQueue !== null && 
+                              buildQueue.progress !== undefined && 
+                              buildQueue.progress < 100 &&
+                              buildQueue.completesAt &&
+                              new Date(buildQueue.completesAt) > new Date();
+  const isBuildInProgress = hasActiveBuildProgress || hasActiveBuildQueue;
   const [showInsufficientFundsModal, setShowInsufficientFundsModal] = useState(false);
   const [showBuildInProgressModal, setShowBuildInProgressModal] = useState(false);
 
