@@ -548,7 +548,7 @@ export const HomeScreen = memo(function HomeScreen({
       )}
       
       {/* Tab Navigation - Fixed at bottom */}
-      <View style={styles.tabContainer}>
+      <View style={[styles.tabContainer, isGarageTabHighlight && { zIndex: 1000 }]}>
         <TabButton 
           label="Main Floor" 
           tab="floorPlan" 
