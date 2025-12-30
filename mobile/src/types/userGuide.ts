@@ -81,3 +81,8 @@ export interface TrackHomeVisitResponse {
   message?: string;
 }
 
+export interface TrackHackmapVisitResponse {
+  success: boolean;
+  message?: string;
+}
+

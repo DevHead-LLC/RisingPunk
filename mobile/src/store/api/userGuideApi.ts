@@ -13,7 +13,8 @@ import type {
   TrackThemeChangeRequest,
   TrackThemeChangeResponse,
   TrackAvatarChangeResponse,
-  TrackHomeVisitResponse
+  TrackHomeVisitResponse,
+  TrackHackmapVisitResponse
 } from '../../types/userGuide';
 
 export const userGuideApi = createApi({
@@ -142,6 +143,22 @@ export const userGuideApi = createApi({
         }
       },
     }),
+    trackHackmapVisit: builder.mutation<TrackHackmapVisitResponse, void>({
+      query: () => ({
+        url: '/api/users/user-guide/track-hackmap-visit',
+        method: 'POST',
+      }),
+      invalidatesTags: ['UserTaskProgress'],
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Invalidate to refetch current task and update UI
+          dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
+        } catch {
+          // Error handling is done by the mutation itself
+        }
+      },
+    }),
   }),
 });
 
@@ -153,6 +170,7 @@ export const {
   useTrackProfileVisitMutation,
   useTrackThemeChangeMutation,
   useTrackAvatarChangeMutation,
-  useTrackHomeVisitMutation
+  useTrackHomeVisitMutation,
+  useTrackHackmapVisitMutation
 } = userGuideApi;
 

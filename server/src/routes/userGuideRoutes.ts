@@ -725,6 +725,58 @@ router.post('/track-home-visit', auth, async (req: Request, res: Response) => {
   }
 });
 
+router.post('/track-hackmap-visit', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const existingProgress = await UserTaskProgress.findOne({ userId });
+    const isAlreadyCompleted = existingProgress?.completedTasks?.some(
+      (task: any) => task.taskId === 'visit-hackmap'
+    );
+
+    if (!isAlreadyCompleted) {
+      await UserTaskProgress.findOneAndUpdate(
+        { userId },
+        {
+          $setOnInsert: {
+            completedTasks: [],
+            collectedTasks: [],
+            skippedTasks: [],
+            showTaskGuide: true
+          }
+        },
+        { upsert: true }
+      );
+      
+      await UserTaskProgress.findOneAndUpdate(
+        {
+          userId,
+          'completedTasks.taskId': { $ne: 'visit-hackmap' }
+        },
+        {
+          $push: {
+            completedTasks: {
+              taskId: 'visit-hackmap',
+              completedAt: new Date()
+            }
+          },
+          $set: { lastCompletedTaskId: 'visit-hackmap' }
+        },
+        { new: true }
+      );
+    }
+
+    res.json({ success: true, message: 'Hackmap visit tracked' });
+  } catch (error) {
+    console.error('Error tracking hackmap visit:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.put('/visibility', auth, async (req: Request, res: Response) => {
   try {
     const userId = req.user?._id;

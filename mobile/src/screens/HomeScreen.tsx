@@ -6,7 +6,7 @@ import { HackRigDisplay } from '../components/home/HackRigDisplay';
 import { BotAssembly } from '../components/home/BotAssembly';
 import { HomeFloorPlan } from '../components/home/HomeFloorPlan';
 import { useThemeColors } from '../hooks/useThemeColors';
-import { useTrackHomeVisitMutation } from '../store/api/userGuideApi';
+import { useTrackHomeVisitMutation, useTrackHackmapVisitMutation } from '../store/api/userGuideApi';
 import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
 import { useAppSelector } from '../store/hooks';
 import { TaskGuideHighlightOverlay } from '../components/turf/TaskGuideHighlightOverlay';
@@ -175,11 +175,13 @@ export const HomeScreen = memo(function HomeScreen({
   const scrollViewRef = useRef<ScrollView>(null);
   const garageScrollViewRef = useRef<ScrollView>(null);
   const [trackHomeVisit] = useTrackHomeVisitMutation();
+  const [trackHackmapVisit] = useTrackHackmapVisitMutation();
   const { highlightTaskId, highlightStep, clearHighlight, advanceHighlightStep } = useTaskGuideHighlight();
   const hasTrackedVisit = useRef(false);
   
   const isBuildGuardians = highlightTaskId === 'build-100-guardians';
   const isFreeHackRig = highlightTaskId === 'free-hack-rig';
+  const isVisitHackmap = highlightTaskId === 'visit-hackmap';
   const isGarageTabHighlight = isBuildGuardians && highlightStep === 'garage-tab';
   const isBotAssemblyHighlight = isBuildGuardians && highlightStep === 'bot-assembly';
   const isHackRigHighlight = isFreeHackRig && highlightStep === 'hack-rig';
@@ -519,6 +521,23 @@ export const HomeScreen = memo(function HomeScreen({
     }
   }, [isHackRigHighlight, floorPlanBoundsReady.value, activeTab, centerOnHackRig]);
 
+  useEffect(() => {
+    if (isVisitHackmap && floorPlanBoundsReady.value && activeTab === 'floorPlan') {
+      centerOnHackRig();
+    }
+  }, [isVisitHackmap, floorPlanBoundsReady.value, activeTab, centerOnHackRig]);
+
+  const handleHackRigPress = useCallback(async () => {
+    try {
+      await trackHackmapVisit().unwrap();
+    } catch (error) {
+    }
+    if (isVisitHackmap) {
+      clearHighlight();
+    }
+    onNavigateToMap();
+  }, [trackHackmapVisit, onNavigateToMap, isVisitHackmap, clearHighlight]);
+
   const renderFloorPlan = () => {
     const scrollViewZIndex = isHackRigHighlight ? 1000 : undefined;
     const hackRigContainerZIndex = isHackRigHighlight ? 1000 : undefined;
@@ -533,15 +552,15 @@ export const HomeScreen = memo(function HomeScreen({
         >
           <View style={[styles.floorPlanContainer, { borderColor: colors.matrix }, isHackRigHighlight && { pointerEvents: 'none' }]}>
             <HomeFloorPlan
-              onHackRigPress={isHackRigHighlight ? () => {} : onNavigateToMap}
+              onHackRigPress={isHackRigHighlight ? () => {} : handleHackRigPress}
               onNavigateToBattle={isHackRigHighlight ? () => {} : onNavigateToBattle}
             />
             {!isHackRigHighlight && (
               <View style={styles.hackRigContainer}>
                 <HackRigDisplay
-                  onPress={onNavigateToMap}
+                  onPress={handleHackRigPress}
                   onNavigateToBattle={onNavigateToBattle}
-                  isHighlighted={false}
+                  isHighlighted={isVisitHackmap}
                 />
               </View>
             )}
@@ -575,6 +594,13 @@ export const HomeScreen = memo(function HomeScreen({
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {isVisitHackmap && (
+        <TouchableOpacity
+          style={styles.homeScreenClickHandler}
+          activeOpacity={1}
+          onPress={clearHighlight}
+        />
+      )}
       <View style={{ zIndex: (isGarageTabHighlight || isBotAssemblyHighlight || isHackRigHighlight) ? 3 : 1000, pointerEvents: (isGarageTabHighlight || isBotAssemblyHighlight || isHackRigHighlight) ? 'none' : 'auto' }}>
         <CloseButton onPress={onClose} />
       </View>
@@ -797,5 +823,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
+  },
+  homeScreenClickHandler: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 998,
+    backgroundColor: 'transparent',
   },
 });
