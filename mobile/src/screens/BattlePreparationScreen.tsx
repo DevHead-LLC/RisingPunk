@@ -267,8 +267,14 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
 
     const validation = validateDeployment(assignments);
     
-    if (!validation.isValid && !isDeployPurgeHighlight) {
+    // Always validate that at least one assignment exists (prevent empty battles)
+    // Even during guided task, we need valid assignments to start a battle
+    if (!validation.isValid) {
       console.error('Deployment validation failed:', validation.message);
+      if (isDeployPurgeHighlight) {
+        // During guided task, clear highlight but still prevent battle start
+        clearHighlight();
+      }
       return;
     }
 
@@ -464,7 +470,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
                 }
               ]}
               onPress={handleBattleStart}
-              disabled={false}
+              disabled={!validateDeployment(assignments).isValid || isStartingBattle}
               activeOpacity={0.7}
             >
               <DeployPurgeHighlightBorder colors={colors} />
