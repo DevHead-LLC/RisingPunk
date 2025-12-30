@@ -1,5 +1,5 @@
-import React from 'react';
-import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { TouchableOpacity, Text, StyleSheet, Animated } from 'react-native';
 import { SIZING } from '../../../styles/theme';
 import { useThemeColors } from '../../../hooks/useThemeColors';
 import { useTheme } from '../../../context/ThemeContext';
@@ -10,28 +10,64 @@ type Props = {
   count: number;
   isSelected: boolean;
   onSelect: (type: BotType) => void;
+  isHighlighted?: boolean;
+  disabled?: boolean;
 };
 
-export const BotTypeCard = React.memo(({ type, count, isSelected, onSelect }: Props) => {
+export const BotTypeCard = React.memo(({ type, count, isSelected, onSelect, isHighlighted = false, disabled = false }: Props) => {
   const colors = useThemeColors();
   const { themeMode } = useTheme();
+  const [currentColorIndex, setCurrentColorIndex] = useState(0);
+  const animatedBorderColor = useRef(new Animated.Value(0)).current;
   
-  const cardStyle = React.useMemo(() => [
-    styles.card, 
-    {
-      backgroundColor: themeMode === 'light' ? 'rgba(245, 245, 220, 0.95)' : 'rgba(10, 10, 10, 0.95)',
-      borderColor: themeMode === 'light' ? 'rgba(71, 23, 246, 0.4)' : 'rgba(71, 23, 246, 0.3)',
-    },
-    isSelected && {
-      borderColor: colors.secondary,
-      backgroundColor: themeMode === 'light' ? 'rgba(71, 23, 246, 0.12)' : 'rgba(71, 23, 246, 0.1)',
-      shadowColor: colors.secondary,
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.15,
-      shadowRadius: 4,
-      elevation: 2,
+  const highlightColors = [colors.primary, colors.secondary, colors.matrix];
+
+  useEffect(() => {
+    if (isHighlighted) {
+      const interval = setInterval(() => {
+        setCurrentColorIndex(prev => (prev + 1) % highlightColors.length);
+      }, 1000);
+      
+      return () => clearInterval(interval);
     }
-  ], [isSelected, colors, themeMode]);
+  }, [isHighlighted, highlightColors.length]);
+
+  useEffect(() => {
+    if (isHighlighted) {
+      Animated.timing(animatedBorderColor, {
+        toValue: currentColorIndex,
+        duration: 500,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [currentColorIndex, isHighlighted, animatedBorderColor]);
+
+  const animatedBorderColorValue = animatedBorderColor.interpolate({
+    inputRange: [0, 1, 2],
+    outputRange: highlightColors,
+  });
+  
+  const cardStyle = React.useMemo(() => {
+    return [
+      styles.card, 
+      {
+        backgroundColor: themeMode === 'light' ? 'rgba(245, 245, 220, 0.95)' : 'rgba(10, 10, 10, 0.95)',
+        borderColor: isHighlighted ? undefined : (themeMode === 'light' ? 'rgba(71, 23, 246, 0.4)' : 'rgba(71, 23, 246, 0.3)'),
+        borderWidth: isHighlighted ? 3 : 1,
+        zIndex: isHighlighted ? 1001 : 1,
+        elevation: isHighlighted ? 1001 : 1,
+      },
+      isSelected && !isHighlighted && {
+        borderColor: colors.secondary,
+        backgroundColor: themeMode === 'light' ? 'rgba(71, 23, 246, 0.12)' : 'rgba(71, 23, 246, 0.1)',
+        shadowColor: colors.secondary,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
+        elevation: 2,
+      }
+    ];
+  }, [isSelected, isHighlighted, colors, themeMode, type]);
 
   const typeTextStyle = React.useMemo(() => [
     styles.typeText, 
@@ -57,7 +93,21 @@ export const BotTypeCard = React.memo(({ type, count, isSelected, onSelect }: Pr
     <TouchableOpacity
       style={cardStyle}
       onPress={() => onSelect(type)}
+      disabled={disabled}
     >
+      {isHighlighted && (
+        <Animated.View 
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              borderWidth: 3,
+              borderColor: animatedBorderColorValue,
+              borderRadius: 8,
+            }
+          ]} 
+          pointerEvents="none"
+        />
+      )}
       <Text style={typeTextStyle}>
         {type.toUpperCase()}
       </Text>

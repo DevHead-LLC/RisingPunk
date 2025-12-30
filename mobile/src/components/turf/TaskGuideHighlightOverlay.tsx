@@ -17,6 +17,11 @@ interface TaskGuideHighlightOverlayProps {
   forQuantityInput?: boolean;
   forBuildButton?: boolean;
   forSpeedupButton?: boolean;
+  forHackRig?: boolean;
+  forBattalionA?: boolean;
+  forGuardiansSelection?: boolean;
+  forAssignBots?: boolean;
+  forDeployPurge?: boolean;
 }
 
 export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps> = ({ 
@@ -31,7 +36,12 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
   forGuardianSelection = false,
   forQuantityInput = false,
   forBuildButton = false,
-  forSpeedupButton = false
+  forSpeedupButton = false,
+  forHackRig = false,
+  forBattalionA = false,
+  forGuardiansSelection = false,
+  forAssignBots = false,
+  forDeployPurge = false
 }) => {
   const colors = useThemeColors();
   const { highlightTaskId, highlightStep } = useTaskGuideHighlight();
@@ -42,8 +52,9 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
   const isViewProfile = highlightTaskId === 'view-profile';
   const isVisitHome = highlightTaskId === 'visit-home';
   const isBuildGuardians = highlightTaskId === 'build-100-guardians';
+  const isFreeHackRig = highlightTaskId === 'free-hack-rig';
 
-  if (!isViewProfile && !isThemeTask && !isAvatarTask && !isHideTaskListTask && !isVisitHome && !isBuildGuardians) {
+  if (!isViewProfile && !isThemeTask && !isAvatarTask && !isHideTaskListTask && !isVisitHome && !isBuildGuardians && !isFreeHackRig) {
     return null;
   }
 
@@ -75,6 +86,27 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
       return null;
     }
     if (highlightStep === 'speedup-button' && !forSpeedupButton) {
+      return null;
+    }
+  }
+
+  if (isFreeHackRig) {
+    if (highlightStep === null && !forHome) {
+      return null;
+    }
+    if (highlightStep === 'hack-rig' && !forHackRig) {
+      return null;
+    }
+    if (highlightStep === 'battalion-a' && !forBattalionA) {
+      return null;
+    }
+    if (highlightStep === 'guardians-selection' && !forGuardiansSelection) {
+      return null;
+    }
+    if (highlightStep === 'assign-bots' && !forAssignBots) {
+      return null;
+    }
+    if (highlightStep === 'deploy-purge' && !forDeployPurge) {
       return null;
     }
   }
@@ -130,12 +162,18 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
   const shouldShowOverlay = 
     (isVisitHome && forHome) || 
     (isBuildGuardians && forHome && highlightStep === null) ||
+    (isFreeHackRig && forHome && highlightStep === null) ||
     (isBuildGuardians && forGarageTab && highlightStep === 'garage-tab') ||
     (isBuildGuardians && forBotAssembly && highlightStep === 'bot-assembly') ||
     (isBuildGuardians && forGuardianSelection && highlightStep === 'guardian-selection') ||
     (isBuildGuardians && forQuantityInput && highlightStep === 'quantity-input') ||
     (isBuildGuardians && forBuildButton && highlightStep === 'build-button') ||
-    (isBuildGuardians && forSpeedupButton && highlightStep === 'speedup-button');
+    (isBuildGuardians && forSpeedupButton && highlightStep === 'speedup-button') ||
+    (isFreeHackRig && forHackRig && highlightStep === 'hack-rig') ||
+    (isFreeHackRig && forBattalionA && highlightStep === 'battalion-a') ||
+    (isFreeHackRig && forGuardiansSelection && highlightStep === 'guardians-selection') ||
+    (isFreeHackRig && forAssignBots && highlightStep === 'assign-bots') ||
+    (isFreeHackRig && forDeployPurge && highlightStep === 'deploy-purge');
   const overlayStyle = shouldShowOverlay
     ? [styles.overlay, { zIndex: 999 }]
     : styles.overlay;

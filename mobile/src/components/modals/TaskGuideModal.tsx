@@ -54,6 +54,7 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
   const isBuildInProgress = hasActiveBuildProgress || hasActiveBuildQueue;
   const [showInsufficientFundsModal, setShowInsufficientFundsModal] = useState(false);
   const [showBuildInProgressModal, setShowBuildInProgressModal] = useState(false);
+  const [showLockedFeatureModal, setShowLockedFeatureModal] = useState(false);
 
   const taskList = data?.taskList || [];
   const completedTaskIds = new Set(data?.completedTaskIds || []);
@@ -117,6 +118,22 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
           return;
         }
         // Close modal and trigger highlight mode for build-100-guardians
+        // Reuses visit-home flow for initial step (home location)
+        onClose();
+        setHighlightTaskId(taskId);
+      } else if (taskId === 'free-hack-rig') {
+        // Check if user has completed the "Build 100 Guardians" task
+        // This is more reliable than checking totalGuardiansBuilt from Redux
+        // since Redux may not be updated immediately after building bots
+        const build100GuardiansTaskId = 'build-100-guardians';
+        const hasCompletedBuild100Guardians = completedTaskIds.has(build100GuardiansTaskId) || collectedTaskIds.has(build100GuardiansTaskId);
+        
+        if (!hasCompletedBuild100Guardians) {
+          // Show locked feature modal and don't start the guided task
+          setShowLockedFeatureModal(true);
+          return;
+        }
+        // Close modal and trigger highlight mode for free-hack-rig
         // Reuses visit-home flow for initial step (home location)
         onClose();
         setHighlightTaskId(taskId);
@@ -382,6 +399,13 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
         title="BUILD IN PROGRESS"
         message="You already have a bot build in progress. Please wait for it to complete or speed it up before starting this guided task."
         onClose={() => setShowBuildInProgressModal(false)}
+        closeButtonText="CLOSE"
+      />
+      <LockedFeatureModal
+        visible={showLockedFeatureModal}
+        title="LOCKED FEATURE"
+        message="You need to complete the 'Build 100 Guardians' task before you can unlock the Hack Rig."
+        onClose={() => setShowLockedFeatureModal(false)}
         closeButtonText="CLOSE"
       />
     </Modal>

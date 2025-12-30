@@ -137,7 +137,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const { highlightTaskId, highlightStep } = useTaskGuideHighlight();
   const isVisitHome = highlightTaskId === 'visit-home';
   const isBuildGuardians = highlightTaskId === 'build-100-guardians';
-  const isHomeHighlight = isVisitHome || (isBuildGuardians && highlightStep === null);
+  const isFreeHackRig = highlightTaskId === 'free-hack-rig';
+  const isHomeHighlight = isVisitHome || (isBuildGuardians && highlightStep === null) || (isFreeHackRig && highlightStep === null);
   const [currentScreen, setCurrentScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research' | 'investmentProperty'>('turf');
   const [battleId, setBattleId] = useState<string | null>(null);
   const [pendingNpcSlug, setPendingNpcSlug] = useState<string | null>(null);
