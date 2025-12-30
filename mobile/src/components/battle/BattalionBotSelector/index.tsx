@@ -112,8 +112,11 @@ export const BattalionBotSelector = React.memo(({
   useEffect(() => {
     if (isGuardiansSelectionHighlight && selectedType === 'guardian') {
       const availableGuardians = availableBots.guardian;
-      setQuantity(Math.min(100, availableGuardians));
-      advanceHighlightStep();
+      const computedQuantity = Math.min(100, availableGuardians);
+      setQuantity(computedQuantity);
+      if (computedQuantity > 0) {
+        advanceHighlightStep();
+      }
     } else if (!isAssignBotsHighlight) {
       setQuantity(0);
     }
