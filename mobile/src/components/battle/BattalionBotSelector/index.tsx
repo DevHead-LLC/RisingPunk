@@ -55,7 +55,7 @@ const AnimatedBorderHighlight = React.memo(({ colors }: { colors: any }) => {
 type Props = {
   isVisible: boolean;
   onClose: () => void;
-  onSubmit: (data: { botType: BotType; quantity: number }) => void;
+  onSubmit: (data: { botType: BotType; quantity: number }) => Promise<void> | void;
   battalionName: string;
   availableBots: Record<BotType, number>;
 };
@@ -95,32 +95,38 @@ export const BattalionBotSelector = React.memo(({
   }, [isGuardiansSelectionHighlight]);
 
 
-  const handleSubmit = React.useCallback(() => {
+  const handleSubmit = React.useCallback(async () => {
     if (selectedType) {
-      if (isAssignBotsHighlight) {
-        advanceHighlightStep();
+      try {
+        await onSubmit({ botType: selectedType, quantity });
+        if (isAssignBotsHighlight) {
+          advanceHighlightStep();
+        }
+      } catch (error) {
+        console.error('Failed to assign bots:', error);
       }
-      onSubmit({ botType: selectedType, quantity });
     }
   }, [selectedType, quantity, onSubmit, isAssignBotsHighlight, advanceHighlightStep]);
 
   // Reset quantity when bot type changes
   useEffect(() => {
     if (isGuardiansSelectionHighlight && selectedType === 'guardian') {
-      setQuantity(100);
+      const availableGuardians = availableBots.guardian;
+      setQuantity(Math.min(100, availableGuardians));
       advanceHighlightStep();
     } else if (!isAssignBotsHighlight) {
       setQuantity(0);
     }
-  }, [selectedType, isGuardiansSelectionHighlight, isAssignBotsHighlight, advanceHighlightStep]);
+  }, [selectedType, isGuardiansSelectionHighlight, isAssignBotsHighlight, advanceHighlightStep, availableBots.guardian]);
 
-  // Force 100 guardians on assign-bots step
+  // Force guardians on assign-bots step (use available count, up to 100)
   useEffect(() => {
     if (isAssignBotsHighlight) {
       setSelectedType('guardian');
-      setQuantity(100);
+      const availableGuardians = availableBots.guardian;
+      setQuantity(Math.min(100, availableGuardians));
     }
-  }, [isAssignBotsHighlight]);
+  }, [isAssignBotsHighlight, availableBots.guardian]);
 
   // Reset selected type and quantity when battalion changes
   useEffect(() => {
@@ -191,11 +197,11 @@ export const BattalionBotSelector = React.memo(({
             <TouchableOpacity
               style={[
                 styles.deployButton, 
-                (!selectedType || quantity === 0 || quantity > availableBots[selectedType!]) && styles.deployButtonDisabled,
+                (!selectedType || quantity === 0 || (!isAssignBotsHighlight && quantity > availableBots[selectedType!])) && styles.deployButtonDisabled,
                 isAssignBotsHighlight && { borderWidth: 3, borderColor: undefined }
               ]}
               onPress={handleSubmit}
-              disabled={!selectedType || quantity === 0 || quantity > availableBots[selectedType!]}
+              disabled={!selectedType || quantity === 0 || (!isAssignBotsHighlight && quantity > availableBots[selectedType!])}
             >
               {isAssignBotsHighlight && (
                 <AnimatedBorderHighlight colors={colors} />
