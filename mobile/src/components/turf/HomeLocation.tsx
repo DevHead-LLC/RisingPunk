@@ -17,11 +17,12 @@ export const HomeLocation = memo(function HomeLocation({ onPress, isIntroActive 
   
   const introColors = [colors.primary, colors.secondary, colors.matrix];
   const isVisitHome = highlightTaskId === 'visit-home';
+  const isVisitHackmap = highlightTaskId === 'visit-hackmap';
   const isBuildGuardians = highlightTaskId === 'build-100-guardians';
   const isFreeHackRig = highlightTaskId === 'free-hack-rig';
   const isBuildGuardiansInitialStep = isBuildGuardians && highlightStep === null;
   const isFreeHackRigInitialStep = isFreeHackRig && highlightStep === null;
-  const isHighlighted = isIntroActive || isVisitHome || isBuildGuardiansInitialStep || isFreeHackRigInitialStep;
+  const isHighlighted = isIntroActive || isVisitHome || isVisitHackmap || isBuildGuardiansInitialStep || isFreeHackRigInitialStep;
   
   const handlePress = () => {
     if (isBuildGuardiansInitialStep) {
@@ -59,7 +60,7 @@ export const HomeLocation = memo(function HomeLocation({ onPress, isIntroActive 
     outputRange: introColors,
   });
   
-  const locationStyle = (isVisitHome || isBuildGuardiansInitialStep || isFreeHackRigInitialStep)
+  const locationStyle = (isVisitHome || isVisitHackmap || isBuildGuardiansInitialStep || isFreeHackRigInitialStep)
     ? [styles.location, { top: 0, left: 0, transform: [] }]
     : [styles.location, styles.homePosition];
   

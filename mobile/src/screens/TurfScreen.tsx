@@ -1,5 +1,5 @@
 import React, {useState, useRef, useEffect, useCallback, memo, forwardRef, useImperativeHandle, useMemo} from 'react';
-import {View, StyleSheet, ScrollView, Dimensions, Platform} from 'react-native';
+import {View, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity} from 'react-native';
 import {Balance} from '../components/common/Balance';
 import {HomeScreen} from './HomeScreen';
 import {DigitalBarracksScreen} from './DigitalBarracksScreen';
@@ -134,11 +134,12 @@ const GesturePanView = memo(function GesturePanView({
 
 export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element => {
   const colors = useThemeColors();
-  const { highlightTaskId, highlightStep } = useTaskGuideHighlight();
+  const { highlightTaskId, highlightStep, clearHighlight } = useTaskGuideHighlight();
   const isVisitHome = highlightTaskId === 'visit-home';
+  const isVisitHackmap = highlightTaskId === 'visit-hackmap';
   const isBuildGuardians = highlightTaskId === 'build-100-guardians';
   const isFreeHackRig = highlightTaskId === 'free-hack-rig';
-  const isHomeHighlight = isVisitHome || (isBuildGuardians && highlightStep === null) || (isFreeHackRig && highlightStep === null);
+  const isHomeHighlight = isVisitHome || isVisitHackmap || (isBuildGuardians && highlightStep === null) || (isFreeHackRig && highlightStep === null);
   const [currentScreen, setCurrentScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research' | 'investmentProperty'>('turf');
   const [battleId, setBattleId] = useState<string | null>(null);
   const [pendingNpcSlug, setPendingNpcSlug] = useState<string | null>(null);
@@ -695,12 +696,14 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   useEffect(() => {
     if (isHomeHighlight && currentScreen === 'turf') {
       setTimeout(() => {
+        const SCREEN_WIDTH = Dimensions.get('window').width;
+        const CONTENT_WIDTH = 2000;
+        const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+        
         if (Platform.OS === 'android') {
-          centerAndroidView();
+          offsetX.value = withTiming(-CENTER_X, { duration: 300 });
+          offsetY.value = withTiming(0, { duration: 300 });
         } else {
-          const SCREEN_WIDTH = Dimensions.get('window').width;
-          const CONTENT_WIDTH = 2000;
-          const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
           horizontalScrollRef.current?.scrollTo({
             x: CENTER_X,
             y: 0,
@@ -709,7 +712,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         }
       }, 100);
     }
-  }, [isHomeHighlight, currentScreen, centerAndroidView]);
+  }, [isHomeHighlight, currentScreen, offsetX, offsetY]);
 
   const renderScreen = useCallback(() => {
     switch (currentScreen) {
@@ -838,6 +841,13 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
             <ErrorBoundary>
               <Balance isIntroActive={currentIntroStep === 'wallet'} />
             </ErrorBoundary>
+            {isVisitHackmap && (
+              <TouchableOpacity
+                style={styles.turfClickHandler}
+                activeOpacity={1}
+                onPress={clearHighlight}
+              />
+            )}
             <View style={styles.scrollWrapper}>
               {Platform.OS === 'ios' ? (
                 <ScrollViewMemo horizontalScrollRef={horizontalScrollRef} onScroll={handleTurfScroll} scrollEnabled={!isHomeHighlight}>
@@ -1144,5 +1154,14 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '75deg' }],
     top: '70%',
     left: '-50%',
+  },
+  turfClickHandler: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 998,
+    backgroundColor: 'transparent',
   },
 });
