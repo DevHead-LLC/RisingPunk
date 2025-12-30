@@ -160,8 +160,9 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
   }, [isBattalionAHighlight, advanceHighlightStep]);
 
   const handleBotAssignment = React.useCallback(async (data: { botType: BotType; quantity: number }) => {
-    if (!selectedBattalion) return;
-
+    if (!selectedBattalion) {
+      return;
+    }
 
     try {
       const result = await assignToBattalion({
@@ -169,7 +170,6 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
         quantity: data.quantity,
         battalionId: selectedBattalion,
       });
-
 
       setAssignments(prev => {
         const newAssignments = {
@@ -182,10 +182,12 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
         };
         return newAssignments;
       });
+      setSelectorVisible(false);
     } catch (error) {
       console.error('Failed to assign bots:', error);
+      setSelectorVisible(false);
+      throw error;
     }
-    setSelectorVisible(false);
   }, [selectedBattalion, assignToBattalion, botCounts, assignments]);
 
   const resetBattalions = React.useCallback(async () => {
