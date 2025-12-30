@@ -15,6 +15,50 @@ import { useStartBattleMutation } from '../store/api/battleApi';
 import { useGetShieldStatusQuery, useDeactivateShieldMutation } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { API_URL } from '../config';
+import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
+import { TaskGuideHighlightOverlay } from '../components/turf/TaskGuideHighlightOverlay';
+
+const DeployPurgeHighlightBorder = React.memo(({ colors }: { colors: any }) => {
+  const [currentColorIndex, setCurrentColorIndex] = useState(0);
+  const animatedBorderColor = useRef(new Animated.Value(0)).current;
+  
+  const highlightColors = [colors.primary, colors.secondary, colors.matrix];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentColorIndex(prev => (prev + 1) % highlightColors.length);
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [highlightColors.length]);
+
+  useEffect(() => {
+    Animated.timing(animatedBorderColor, {
+      toValue: currentColorIndex,
+      duration: 500,
+      useNativeDriver: false,
+    }).start();
+  }, [currentColorIndex, animatedBorderColor]);
+
+  const animatedBorderColorValue = animatedBorderColor.interpolate({
+    inputRange: [0, 1, 2],
+    outputRange: highlightColors,
+  });
+
+  return (
+    <Animated.View 
+      style={[
+        StyleSheet.absoluteFill,
+        {
+          borderWidth: 3,
+          borderColor: animatedBorderColorValue,
+          borderRadius: 8,
+        }
+      ]} 
+      pointerEvents="none"
+    />
+  );
+});
 
 type Props = {
   onClose: () => void;
@@ -42,6 +86,11 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
   const { data: shieldData } = useGetShieldStatusQuery(undefined, {
     pollingInterval: 1000,
   });
+  const { highlightTaskId, highlightStep, advanceHighlightStep } = useTaskGuideHighlight();
+  
+  const isFreeHackRig = highlightTaskId === 'free-hack-rig';
+  const isBattalionAHighlight = isFreeHackRig && highlightStep === 'battalion-a';
+  const isDeployPurgeHighlight = isFreeHackRig && highlightStep === 'deploy-purge';
   
   // Get research features data (same as other components)
   const { data: researchFeatures } = useGetUserFeaturesQuery('home-defense');
@@ -103,9 +152,12 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
   }), [pulseAnim]);
 
   const handleBattalionPress = React.useCallback((name: string) => {
+    if (isBattalionAHighlight && name === 'A') {
+      advanceHighlightStep();
+    }
     setSelectedBattalion(name);
     setSelectorVisible(true);
-  }, []);
+  }, [isBattalionAHighlight, advanceHighlightStep]);
 
   const handleBotAssignment = React.useCallback(async (data: { botType: BotType; quantity: number }) => {
     if (!selectedBattalion) return;
@@ -202,6 +254,8 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
     };
   }, [userBattalions, defenderId, defenderNpcSlug, defenderNpcInstanceId]);
 
+  const { clearHighlight } = useTaskGuideHighlight();
+  
   // Handle battle start - check for shield warning first
   const handleBattleStart = React.useCallback(async () => {
     // Prevent double-clicks
@@ -211,9 +265,13 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
 
     const validation = validateDeployment(assignments);
     
-    if (!validation.isValid) {
+    if (!validation.isValid && !isDeployPurgeHighlight) {
       console.error('Deployment validation failed:', validation.message);
       return;
+    }
+
+    if (isDeployPurgeHighlight) {
+      clearHighlight();
     }
 
     const isShieldActive = (isActuallyUnlocked && shieldData?.isActive) || false;
@@ -237,7 +295,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
     } finally {
       setIsStartingBattle(false);
     }
-  }, [assignments, isActuallyUnlocked, shieldData?.isActive, defenderId, defenderNpcSlug, battleStartData, startBattle, onBattleStart, validateDeployment, isStartingBattle]);
+  }, [assignments, isActuallyUnlocked, shieldData?.isActive, defenderId, defenderNpcSlug, battleStartData, startBattle, onBattleStart, validateDeployment, isStartingBattle, isDeployPurgeHighlight, clearHighlight]);
 
   // Handle continue from shield modal - deactivate shield and proceed to battle
   const handleShieldModalContinue = React.useCallback(async () => {
@@ -267,18 +325,24 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
 
   const renderBattalionSlots = React.useCallback((names: string[], isEnemy = false, isLocked = false) => (
     <View style={styles.battalionColumn}>
-      {names.map(name => (
-        <BattalionSlot
-          key={name}
-          name={name}
-          isEnemy={isEnemy}
-          isLocked={isLocked}
-          onPress={!isLocked ? () => handleBattalionPress(name) : undefined}
-          assignment={!isEnemy && !isLocked ? assignments[name] : undefined}
-        />
-      ))}
+      {names.map(name => {
+        const isHighlighted = isBattalionAHighlight && name === 'A' && !isEnemy && !isLocked;
+        const shouldDisable = isBattalionAHighlight && name !== 'A' && !isEnemy && !isLocked;
+        return (
+          <BattalionSlot
+            key={name}
+            name={name}
+            isEnemy={isEnemy}
+            isLocked={isLocked}
+            onPress={!isLocked ? () => handleBattalionPress(name) : undefined}
+            assignment={!isEnemy && !isLocked ? assignments[name] : undefined}
+            isHighlighted={isHighlighted}
+            disabled={shouldDisable}
+          />
+        );
+      })}
     </View>
-  ), [assignments, handleBattalionPress]);
+  ), [assignments, handleBattalionPress, isBattalionAHighlight]);
 
   const renderCircleSlots = React.useCallback((count: number, isEnemy = false) => (
     <View style={isEnemy ? styles.circleColumnEnemy : styles.circleColumn}>
@@ -290,14 +354,27 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <CloseButton onPress={onClose} />
+      {isFreeHackRig && (
+        <TaskGuideHighlightOverlay 
+          forBattalionA={isBattalionAHighlight}
+          forDeployPurge={isDeployPurgeHighlight}
+        />
+      )}
+      <View style={{ zIndex: (isBattalionAHighlight || isDeployPurgeHighlight) ? 3 : 1000, pointerEvents: (isBattalionAHighlight || isDeployPurgeHighlight) ? 'none' : 'auto' }}>
+        <CloseButton onPress={onClose} />
+      </View>
 
       <View style={styles.fixedHeader}>
         <Text style={[styles.title, { color: colors.secondary }]}>BATTLE PREPARATION</Text>
       </View>
 
-      <View style={styles.mainContainer}>
-        <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
+      <View style={[styles.mainContainer, isBattalionAHighlight && { zIndex: 1000, elevation: 1000 }]}>
+        <ScrollView 
+          horizontal 
+          pagingEnabled 
+          showsHorizontalScrollIndicator={false}
+          scrollEnabled={!isBattalionAHighlight}
+        >
           {/* User Forces Screen */}
           <View style={styles.screen}>
             <Text style={[styles.subtitle, { color: colors.text.accent }]}>[USER FORCES]</Text>
@@ -305,7 +382,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
               <Text style={[styles.swipeArrow, { color: colors.text.accent }]}>⟶</Text>
               <Text style={[styles.swipeText, { color: colors.text.accent }]}>ENEMY FORCES</Text>
             </Animated.View>
-            <View style={styles.battalionsContainer}>
+            <View style={[styles.battalionsContainer, isBattalionAHighlight && { zIndex: 1001, elevation: 1001 }]}>
               {renderBattalionSlots(['E', 'F'], false, true)}
               {renderBattalionSlots(['C', 'D'], false, true)}
               {renderBattalionSlots(['A', 'B'])}
@@ -326,34 +403,80 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
         </ScrollView>
       </View>
 
-      <TouchableOpacity
-        style={[
-          styles.executeButton,
-          { 
-            backgroundColor: colors.secondary + '1A',
-            borderColor: colors.secondary 
-          },
-          (!validateDeployment(assignments).isValid || isStartingBattle) && {
-            opacity: 0.5,
-            backgroundColor: colors.neutral + '1A',
-            borderColor: colors.neutral
-          }
-        ]}
-        onPress={handleBattleStart}
-        disabled={!validateDeployment(assignments).isValid || isStartingBattle}
-      >
-        <Text style={[
-          styles.executeText,
-          { 
-            color: colors.secondary,
-          },
-          (!validateDeployment(assignments).isValid || isStartingBattle) && {
-            color: colors.neutral,
-          }
-        ]}>
-          {isStartingBattle ? 'STARTING...' : 'DEPLOY PURGE'}
-        </Text>
-      </TouchableOpacity>
+      {!isDeployPurgeHighlight && (
+        <View>
+          <TouchableOpacity
+            style={[
+              styles.executeButton,
+              { 
+                backgroundColor: colors.secondary + '1A',
+                borderColor: colors.secondary,
+                borderWidth: 1,
+              },
+              (!validateDeployment(assignments).isValid || isStartingBattle) && {
+                opacity: 0.5,
+                backgroundColor: colors.neutral + '1A',
+                borderColor: colors.neutral
+              }
+            ]}
+            onPress={handleBattleStart}
+            disabled={!validateDeployment(assignments).isValid || isStartingBattle}
+          >
+            <Text style={[
+              styles.executeText,
+              { 
+                color: colors.secondary,
+              },
+              (!validateDeployment(assignments).isValid || isStartingBattle) && {
+                color: colors.neutral,
+              }
+            ]}>
+              {isStartingBattle ? 'STARTING...' : 'DEPLOY PURGE'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      {isFreeHackRig && isDeployPurgeHighlight && (
+        <TaskGuideHighlightOverlay 
+          forBattalionA={false}
+          forDeployPurge={true}
+        />
+      )}
+      {isDeployPurgeHighlight && (
+          <View style={{
+            position: 'absolute',
+            bottom: Platform.OS === 'android' ? SIZING.spacing.sm + 24 : SIZING.spacing.sm,
+            left: SIZING.spacing.sm,
+            right: SIZING.spacing.sm,
+            zIndex: 10000,
+            elevation: 10000,
+            pointerEvents: 'box-none',
+          }}>
+            <TouchableOpacity
+              style={[
+                styles.executeButton,
+                { 
+                  backgroundColor: colors.secondary + '1A',
+                  borderColor: undefined,
+                  borderWidth: 3,
+                }
+              ]}
+              onPress={handleBattleStart}
+              disabled={false}
+              activeOpacity={0.7}
+            >
+              <DeployPurgeHighlightBorder colors={colors} />
+              <Text style={[
+                styles.executeText,
+                { 
+                  color: colors.secondary,
+                }
+              ]}>
+                {isStartingBattle ? 'STARTING...' : 'DEPLOY PURGE'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+      )}
 
       <BattalionBotSelector
         isVisible={selectorVisible}
