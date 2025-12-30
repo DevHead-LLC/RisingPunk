@@ -83,7 +83,6 @@ export class BattleSetupService {
       const randomIndex = Math.floor(Math.random() * level1NPCs.length);
       npc = level1NPCs[randomIndex];
       actualDefenderNpcSlug = npc.slug;
-      console.log(`Selected random level 1 NPC for battle: ${npc.slug}`);
     }
     
     // Ensure we have an NPC for computer-opponent battles (no defaults allowed)

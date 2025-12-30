@@ -139,6 +139,9 @@ const TASK_LIST: Task[] = [
     title: 'Free your Hack Rig',
     description: 'Unlock the Hack Rig feature',
     order: 10,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return user.unlockedFeatures?.hackRig === true;
+    },
     skipable: true,
     reward: { type: 'wallet', value: 20 }
   },

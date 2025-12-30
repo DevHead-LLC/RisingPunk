@@ -1,7 +1,8 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { COLORS, SIZING } from '../../styles/theme';
 import { toRomanNumeral } from '../../utils/formatUtils';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 export type BattalionAssignment = {
   botType: string;
@@ -15,6 +16,8 @@ type Props = {
   isEnemy?: boolean;
   onPress?: () => void;
   assignment?: BattalionAssignment;
+  isHighlighted?: boolean;
+  disabled?: boolean;
 };
 
 export const BattalionSlot = React.memo(({
@@ -23,12 +26,51 @@ export const BattalionSlot = React.memo(({
   isEnemy = false,
   onPress,
   assignment,
+  isHighlighted = false,
+  disabled = false,
 }: Props) => {
+  const colors = useThemeColors();
+  const [currentColorIndex, setCurrentColorIndex] = useState(0);
+  const animatedBorderColor = useRef(new Animated.Value(0)).current;
+  
+  const highlightColors = [colors.primary, colors.secondary, colors.matrix];
+
+  useEffect(() => {
+    if (isHighlighted) {
+      const interval = setInterval(() => {
+        setCurrentColorIndex(prev => (prev + 1) % highlightColors.length);
+      }, 1000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [isHighlighted, highlightColors.length]);
+
+  useEffect(() => {
+    if (isHighlighted) {
+      Animated.timing(animatedBorderColor, {
+        toValue: currentColorIndex,
+        duration: 500,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [currentColorIndex, isHighlighted, animatedBorderColor]);
+
+  const animatedBorderColorValue = animatedBorderColor.interpolate({
+    inputRange: [0, 1, 2],
+    outputRange: highlightColors,
+  });
+
   const slotStyle = React.useMemo(() => [
     styles.slot,
     isEnemy ? styles.enemySlot : styles.activeSlot,
     isLocked && (isEnemy ? styles.lockedEnemySlot : styles.lockedSlot),
-  ], [isEnemy, isLocked]);
+    isHighlighted && { 
+      borderWidth: 3, 
+      borderColor: undefined, 
+      zIndex: 1001,
+      elevation: 1001,
+    },
+  ], [isEnemy, isLocked, isHighlighted]);
 
   const textStyle = React.useMemo(() => [
     styles.slotText,
@@ -71,13 +113,41 @@ export const BattalionSlot = React.memo(({
   }
 
   return isEnemy ? (
-    <View style={slotStyle}>{content}</View>
+    <View style={slotStyle}>
+      {isHighlighted && (
+        <Animated.View 
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              borderWidth: 3,
+              borderColor: animatedBorderColorValue,
+              borderRadius: 4,
+            }
+          ]} 
+          pointerEvents="none"
+        />
+      )}
+      {content}
+    </View>
   ) : (
     <TouchableOpacity
       style={slotStyle}
       onPress={onPress}
-      disabled={isLocked || isEnemy}
+      disabled={isLocked || isEnemy || disabled}
     >
+      {isHighlighted && (
+        <Animated.View 
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              borderWidth: 3,
+              borderColor: animatedBorderColorValue,
+              borderRadius: 4,
+            }
+          ]} 
+          pointerEvents="none"
+        />
+      )}
       {content}
     </TouchableOpacity>
   );

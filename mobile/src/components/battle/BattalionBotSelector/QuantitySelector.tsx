@@ -9,11 +9,12 @@ type Props = {
   quantity: number;
   available: number;
   onChangeQuantity: (value: number) => void;
+  disabled?: boolean;
 };
 
 const MAX_BATTALION_SIZE = 250;
 
-export const QuantitySelector = React.memo(({ quantity, available, onChangeQuantity }: Props) => {
+export const QuantitySelector = React.memo(({ quantity, available, onChangeQuantity, disabled = false }: Props) => {
   const colors = useThemeColors();
   const { themeMode } = useTheme();
   const maxQuantity = Math.min(available, MAX_BATTALION_SIZE);
@@ -24,9 +25,10 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
   }, [quantity, maxQuantity, onChangeQuantity]);
 
   const handleDirectInput = React.useCallback((text: string) => {
+    if (disabled) return;
     const value = parseInt(text) || 0;
     onChangeQuantity(Math.min(Math.max(0, value), maxQuantity));
-  }, [maxQuantity, onChangeQuantity]);
+  }, [maxQuantity, onChangeQuantity, disabled]);
 
   const handleMaxQuantity = React.useCallback(() => {
     if (
@@ -50,9 +52,11 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
           <TouchableOpacity
             style={[styles.button, { 
               backgroundColor: themeMode === 'light' ? 'rgba(71, 23, 246, 0.15)' : 'rgba(71, 23, 246, 0.1)',
-              borderColor: colors.secondary 
+              borderColor: colors.secondary,
+              opacity: disabled ? 0.5 : 1
             }]}
             onPress={() => adjustQuantity(-25)}
+            disabled={disabled}
           >
             <Text style={[styles.buttonText, { color: colors.secondary }]}>-25</Text>
           </TouchableOpacity>
@@ -60,9 +64,11 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
           <TouchableOpacity
             style={[styles.button, { 
               backgroundColor: themeMode === 'light' ? 'rgba(71, 23, 246, 0.15)' : 'rgba(71, 23, 246, 0.1)',
-              borderColor: colors.secondary 
+              borderColor: colors.secondary,
+              opacity: disabled ? 0.5 : 1
             }]}
             onPress={() => adjustQuantity(-1)}
+            disabled={disabled}
           >
             <Text style={[styles.buttonText, { color: colors.secondary }]}>-1</Text>
           </TouchableOpacity>
@@ -75,20 +81,24 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
               style={[styles.input, { 
                 backgroundColor: themeMode === 'light' ? 'rgba(248, 246, 240, 0.8)' : 'rgba(0, 0, 0, 0.3)',
                 borderColor: colors.secondary,
-                color: colors.secondary 
+                color: colors.secondary,
+                opacity: disabled ? 0.5 : 1
               }]}
               containerStyle={styles.inputContainer}
               isLastInput={true}
               maxLength={3}
+              editable={!disabled}
             />
           </View>
 
           <TouchableOpacity
             style={[styles.button, { 
               backgroundColor: themeMode === 'light' ? 'rgba(71, 23, 246, 0.15)' : 'rgba(71, 23, 246, 0.1)',
-              borderColor: colors.secondary 
+              borderColor: colors.secondary,
+              opacity: disabled ? 0.5 : 1
             }]}
             onPress={() => adjustQuantity(1)}
+            disabled={disabled}
           >
             <Text style={[styles.buttonText, { color: colors.secondary }]}>+1</Text>
           </TouchableOpacity>
@@ -96,9 +106,11 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
           <TouchableOpacity
             style={[styles.button, { 
               backgroundColor: themeMode === 'light' ? 'rgba(71, 23, 246, 0.15)' : 'rgba(71, 23, 246, 0.1)',
-              borderColor: colors.secondary 
+              borderColor: colors.secondary,
+              opacity: disabled ? 0.5 : 1
             }]}
             onPress={() => adjustQuantity(25)}
+            disabled={disabled}
           >
             <Text style={[styles.buttonText, { color: colors.secondary }]}>+25</Text>
           </TouchableOpacity>
@@ -106,9 +118,11 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
           <TouchableOpacity
             style={[styles.button, { 
               backgroundColor: themeMode === 'light' ? 'rgba(71, 23, 246, 0.15)' : 'rgba(71, 23, 246, 0.1)',
-              borderColor: colors.secondary 
+              borderColor: colors.secondary,
+              opacity: disabled ? 0.5 : 1
             }]}
             onPress={handleMaxQuantity}
+            disabled={disabled}
           >
             <Text style={[styles.buttonText, { color: colors.secondary }]}>MAX</Text>
           </TouchableOpacity>

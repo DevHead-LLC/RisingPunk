@@ -53,6 +53,7 @@ export interface ProfileResponse {
     researchCenter: boolean;
   };
   profileGender: 'male' | 'female';
+  totalGuardiansBuilt?: number;
 }
 
 export interface UserProfileResponse {

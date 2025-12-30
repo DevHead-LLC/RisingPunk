@@ -17,7 +17,7 @@ const router = express.Router();
 
 router.get('/profile', auth, async (req: Request, res: Response) => {
   try {
-    const user = await User.findById(req.user._id).select('handle email level experience unlockedFeatures profileGender battleStats');
+    const user = await User.findById(req.user._id).select('handle email level experience unlockedFeatures profileGender battleStats totalGuardiansBuilt');
     
     if (!user) {
       res.status(404).json({ message: 'User not found' });
@@ -48,7 +48,8 @@ router.get('/profile', auth, async (req: Request, res: Response) => {
         failedAttacks: user.battleStats?.failedAttacks || 0,
         successfulDefenses: user.battleStats?.successfulDefenses || 0,
         failedDefenses: user.battleStats?.failedDefenses || 0
-      }
+      },
+      totalGuardiansBuilt: user.totalGuardiansBuilt || 0
     });
   } catch (error) {
     console.error('Server error:', error);

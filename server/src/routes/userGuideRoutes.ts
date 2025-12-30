@@ -44,11 +44,12 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
     let collectedTaskIds = new Set(collectedTaskIdsArray);
     let skippedTaskIds = new Set(progress.skippedTasks);
 
-    // Fetch user with bot build counters to check auto-completion conditions
+    // Fetch user with bot build counters and unlocked features to check auto-completion conditions
     // This ensures tasks like 'build-100-guardians' are auto-completed if user has already built 100+ guardians
+    // This ensures tasks like 'free-hack-rig' are auto-completed if user has already unlocked Hack Rig
     // Note: Using .lean() to get plain JavaScript object, and explicitly selecting fields
     // If fields don't exist in database, they will be undefined (not default value)
-    const user = await User.findById(userId).select('totalGuardiansBuilt totalPhreaksBuilt totalBreachersBuilt').lean();
+    const user = await User.findById(userId).select('totalGuardiansBuilt totalPhreaksBuilt totalBreachersBuilt unlockedFeatures.hackRig').lean();
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;
