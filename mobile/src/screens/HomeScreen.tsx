@@ -560,12 +560,14 @@ export const HomeScreen = memo(function HomeScreen({
               onNavigateToBattle={isHackRigHighlight ? () => {} : onNavigateToBattle}
             />
             {!isHackRigHighlight && (
-              <View style={styles.hackRigContainer}>
-                <HackRigDisplay
-                  onPress={handleHackRigPress}
-                  onNavigateToBattle={onNavigateToBattle}
-                  isHighlighted={isVisitHackmap}
-                />
+              <View style={styles.hackRigContainer} pointerEvents="box-none">
+                <View pointerEvents="auto">
+                  <HackRigDisplay
+                    onPress={handleHackRigPress}
+                    onNavigateToBattle={onNavigateToBattle}
+                    isHighlighted={isVisitHackmap}
+                  />
+                </View>
               </View>
             )}
           </View>
@@ -599,11 +601,13 @@ export const HomeScreen = memo(function HomeScreen({
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {isVisitHackmap && (
-        <TouchableOpacity
-          style={styles.homeScreenClickHandler}
-          activeOpacity={1}
-          onPress={clearHighlight}
-        />
+        <View style={styles.homeScreenClickHandler} pointerEvents="box-none">
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={clearHighlight}
+          />
+        </View>
       )}
       <View style={{ zIndex: (isGarageTabHighlight || isBotAssemblyHighlight || isHackRigHighlight) ? 3 : 1000, pointerEvents: (isGarageTabHighlight || isBotAssemblyHighlight || isHackRigHighlight) ? 'none' : 'auto' }}>
         <CloseButton onPress={onClose} />
@@ -834,7 +838,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 998,
+    zIndex: 997,
     backgroundColor: 'transparent',
   },
 });
