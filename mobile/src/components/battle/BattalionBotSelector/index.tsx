@@ -209,7 +209,7 @@ export const BattalionBotSelector = React.memo(({
               {isAssignBotsHighlight && (
                 <AnimatedBorderHighlight colors={colors} />
               )}
-              <Text style={[styles.deployButtonText, (!selectedType || quantity === 0 || quantity > availableBots[selectedType!]) && styles.deployButtonTextDisabled]}>
+              <Text style={[styles.deployButtonText, (!selectedType || quantity === 0 || (!isAssignBotsHighlight && quantity > availableBots[selectedType!])) && styles.deployButtonTextDisabled]}>
                 ASSIGN BOTS
               </Text>
             </TouchableOpacity>
