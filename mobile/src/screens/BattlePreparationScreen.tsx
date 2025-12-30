@@ -354,10 +354,10 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      {isFreeHackRig && (
+      {isFreeHackRig && !isDeployPurgeHighlight && (
         <TaskGuideHighlightOverlay 
           forBattalionA={isBattalionAHighlight}
-          forDeployPurge={isDeployPurgeHighlight}
+          forDeployPurge={false}
         />
       )}
       <View style={{ zIndex: (isBattalionAHighlight || isDeployPurgeHighlight) ? 3 : 1000, pointerEvents: (isBattalionAHighlight || isDeployPurgeHighlight) ? 'none' : 'auto' }}>
