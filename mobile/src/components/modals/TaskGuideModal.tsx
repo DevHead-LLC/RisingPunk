@@ -137,6 +137,11 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
         // Reuses visit-home flow for initial step (home location)
         onClose();
         setHighlightTaskId(taskId);
+      } else if (taskId === 'visit-hackmap') {
+        // Close modal and trigger highlight mode for visit-hackmap
+        // Will pan to center on Home Location and animate border
+        onClose();
+        setHighlightTaskId(taskId);
       } else {
         // For other tasks, just close modal for now
         onClose();
