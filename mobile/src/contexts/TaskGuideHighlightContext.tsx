@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 
-export type HighlightStep = 'settings-tab' | 'theme-toggle' | 'avatar-toggle' | 'task-guide-toggle' | 'garage-tab' | 'bot-assembly' | 'guardian-selection' | 'quantity-input' | 'build-button' | 'speedup-button' | null;
+export type HighlightStep = 'settings-tab' | 'theme-toggle' | 'avatar-toggle' | 'task-guide-toggle' | 'garage-tab' | 'bot-assembly' | 'guardian-selection' | 'quantity-input' | 'build-button' | 'speedup-button' | 'hack-rig' | 'battalion-a' | 'guardians-selection' | 'assign-bots' | 'deploy-purge' | null;
 
 interface TaskGuideHighlightContextType {
   highlightTaskId: string | null;
@@ -24,10 +24,13 @@ export const TaskGuideHighlightProvider: React.FC<{ children: ReactNode }> = ({ 
 
   const advanceHighlightStep = useCallback(() => {
     const isBuildGuardians = highlightTaskId === 'build-100-guardians';
+    const isFreeHackRig = highlightTaskId === 'free-hack-rig';
     
     if (highlightStep === null) {
       if (isBuildGuardians) {
         setHighlightStep('garage-tab');
+      } else if (isFreeHackRig) {
+        setHighlightStep('hack-rig');
       } else {
         setHighlightStep('settings-tab');
       }
@@ -54,6 +57,17 @@ export const TaskGuideHighlightProvider: React.FC<{ children: ReactNode }> = ({ 
       }
       // Note: 'build-button' is the final step - guided task ends when build button is clicked
       // No advancement to 'speedup-button' - user can discover speedup feature on their own
+    } else if (isFreeHackRig) {
+      if (highlightStep === 'hack-rig') {
+        setHighlightStep('battalion-a');
+      } else if (highlightStep === 'battalion-a') {
+        setHighlightStep('guardians-selection');
+      } else if (highlightStep === 'guardians-selection') {
+        setHighlightStep('assign-bots');
+      } else if (highlightStep === 'assign-bots') {
+        setHighlightStep('deploy-purge');
+      }
+      // Note: 'deploy-purge' is the final step - guided task ends when deploy purge button is clicked
     }
   }, [highlightStep, highlightTaskId]);
 

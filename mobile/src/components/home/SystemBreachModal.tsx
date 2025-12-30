@@ -1,5 +1,5 @@
-import React from 'react';
-import { Modal, TouchableOpacity, View, Text, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { Modal, TouchableOpacity, View, Text, StyleSheet, Animated } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 
@@ -7,14 +7,43 @@ interface SystemBreachModalProps {
   visible: boolean;
   onCancel: () => void;
   onExecuteExploit: () => void;
+  highlightExecuteButton?: boolean;
 }
 
 export const SystemBreachModal: React.FC<SystemBreachModalProps> = ({
   visible,
   onCancel,
-  onExecuteExploit
+  onExecuteExploit,
+  highlightExecuteButton = false
 }) => {
   const colors = useThemeColors();
+  const [currentColorIndex, setCurrentColorIndex] = useState(0);
+  const animatedBorderColor = useRef(new Animated.Value(0)).current;
+  const highlightColors = [colors.primary, colors.secondary, colors.matrix];
+
+  useEffect(() => {
+    if (highlightExecuteButton) {
+      const interval = setInterval(() => {
+        setCurrentColorIndex(prev => (prev + 1) % highlightColors.length);
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [highlightExecuteButton, highlightColors.length]);
+
+  useEffect(() => {
+    if (highlightExecuteButton) {
+      Animated.timing(animatedBorderColor, {
+        toValue: currentColorIndex,
+        duration: 500,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [currentColorIndex, highlightExecuteButton, animatedBorderColor]);
+
+  const animatedBorderColorValue = animatedBorderColor.interpolate({
+    inputRange: [0, 1, 2],
+    outputRange: highlightColors,
+  });
 
   return (
     <Modal
@@ -57,26 +86,40 @@ export const SystemBreachModal: React.FC<SystemBreachModalProps> = ({
             <TouchableOpacity 
               style={[styles.cancelButton, { 
                 borderColor: colors.matrix,
-                backgroundColor: 'transparent'
+                backgroundColor: 'transparent',
+                opacity: highlightExecuteButton ? 0.3 : 1
               }]} 
-              onPress={onCancel}
+              onPress={highlightExecuteButton ? undefined : onCancel}
+              disabled={highlightExecuteButton}
             >
               <Text style={[styles.cancelButtonText, { color: colors.matrix }]}>
                 CANCEL
               </Text>
             </TouchableOpacity>
             
-            <TouchableOpacity 
-              style={[styles.executeButton, { 
-                backgroundColor: colors.error,
-                borderColor: colors.error
-              }]} 
-              onPress={onExecuteExploit}
+            <Animated.View
+              style={[
+                styles.executeButtonWrapper,
+                highlightExecuteButton && {
+                  borderWidth: 3,
+                  borderColor: animatedBorderColorValue,
+                  borderRadius: 6,
+                }
+              ]}
             >
-              <Text style={[styles.executeButtonText, { color: colors.background }]}>
-                EXECUTE EXPLOIT
-              </Text>
-            </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.executeButton, { 
+                  backgroundColor: colors.error,
+                  borderColor: highlightExecuteButton ? 'transparent' : colors.error,
+                  borderWidth: highlightExecuteButton ? 0 : 1
+                }]} 
+                onPress={onExecuteExploit}
+              >
+                <Text style={[styles.executeButtonText, { color: colors.background }]}>
+                  EXECUTE EXPLOIT
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
           </View>
         </TouchableOpacity>
       </TouchableOpacity>
@@ -160,6 +203,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     letterSpacing: 1,
+  },
+  executeButtonWrapper: {
+    position: 'relative',
   },
   executeButton: {
     paddingHorizontal: SIZING.spacing.lg,
