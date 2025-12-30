@@ -38,7 +38,6 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
   const [completeTask] = useCompleteTaskGuideTaskMutation();
   const { setHighlightTaskId } = useTaskGuideHighlight();
   const currentBalance = useAppSelector(getCurrentBalance);
-  const user = useAppSelector((state) => state.auth.user);
   const buildingProgress = useAppSelector((state) => state.bots.buildingProgress);
   const buildQueue = useAppSelector((state) => state.bots.buildQueue);
   // Check if there's an active build in progress (not completed)

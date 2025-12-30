@@ -70,13 +70,21 @@ export const BattalionBotSelector = React.memo(({
   const colors = useThemeColors();
   const { themeMode } = useTheme();
   const styles = createStyles({ ...colors, themeMode });
-  const { highlightTaskId, highlightStep, advanceHighlightStep } = useTaskGuideHighlight();
+  const { highlightTaskId, highlightStep, advanceHighlightStep, clearHighlight } = useTaskGuideHighlight();
   const [selectedType, setSelectedType] = useState<BotType | null>(null);
   const [quantity, setQuantity] = useState(0);
   
   const isFreeHackRig = highlightTaskId === 'free-hack-rig';
   const isGuardiansSelectionHighlight = isFreeHackRig && highlightStep === 'guardians-selection';
   const isAssignBotsHighlight = isFreeHackRig && highlightStep === 'assign-bots';
+  const hasZeroGuardians = isGuardiansSelectionHighlight && availableBots.guardian === 0;
+  
+  const handleClose = React.useCallback(() => {
+    if (hasZeroGuardians) {
+      clearHighlight();
+    }
+    onClose();
+  }, [hasZeroGuardians, clearHighlight, onClose]);
   const botTypeContainerRef = React.useRef<View>(null);
   const [guardianCardPosition, setGuardianCardPosition] = React.useState<{ pageX: number; pageY: number; width: number; height: number } | null>(null);
   
@@ -142,14 +150,14 @@ export const BattalionBotSelector = React.memo(({
       visible={isVisible}
       transparent
       animationType="fade"
-      onRequestClose={onClose}
+      onRequestClose={hasZeroGuardians ? handleClose : onClose}
       supportedOrientations={['landscape']}
       presentationStyle="overFullScreen"
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          <View style={isGuardiansSelectionHighlight && { pointerEvents: 'none', opacity: 0.3 }}>
-            <CloseButton onPress={onClose} />
+          <View style={isGuardiansSelectionHighlight && !hasZeroGuardians && { pointerEvents: 'none', opacity: 0.3 }}>
+            <CloseButton onPress={handleClose} />
           </View>
 
           <Text style={styles.title}>SELECT BOTS</Text>
@@ -215,7 +223,7 @@ export const BattalionBotSelector = React.memo(({
             </TouchableOpacity>
           </View>
         </View>
-        {isGuardiansSelectionHighlight && (
+        {isGuardiansSelectionHighlight && !hasZeroGuardians && (
           <View style={{
             position: 'absolute',
             top: 0,
