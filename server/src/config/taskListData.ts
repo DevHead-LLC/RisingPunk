@@ -150,6 +150,9 @@ const TASK_LIST: Task[] = [
     title: 'Visit the Hackmap',
     description: 'Explore the hack map',
     order: 11,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.hackmapVisitedAt);
+    },
     skipable: true,
     reward: { type: 'wallet', value: 20 }
   },

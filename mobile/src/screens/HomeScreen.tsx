@@ -178,6 +178,7 @@ export const HomeScreen = memo(function HomeScreen({
   const [trackHackmapVisit] = useTrackHackmapVisitMutation();
   const { highlightTaskId, highlightStep, clearHighlight, advanceHighlightStep } = useTaskGuideHighlight();
   const hasTrackedVisit = useRef(false);
+  const hasTrackedHackmapVisit = useRef(false);
   
   const isBuildGuardians = highlightTaskId === 'build-100-guardians';
   const isFreeHackRig = highlightTaskId === 'free-hack-rig';
@@ -528,9 +529,12 @@ export const HomeScreen = memo(function HomeScreen({
   }, [isVisitHackmap, floorPlanBoundsReady.value, activeTab, centerOnHackRig]);
 
   const handleHackRigPress = useCallback(async () => {
-    try {
-      await trackHackmapVisit().unwrap();
-    } catch (error) {
+    if (!hasTrackedHackmapVisit.current) {
+      hasTrackedHackmapVisit.current = true;
+      try {
+        await trackHackmapVisit().unwrap();
+      } catch (error) {
+      }
     }
     if (isVisitHackmap) {
       clearHighlight();

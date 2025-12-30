@@ -30,7 +30,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
         new: true,
         setDefaultsOnInsert: true
       }
-    ).select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt').lean();
+    ).select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt').lean();
 
     if (!progress) {
       res.status(500).json({ error: 'Failed to initialize task progress' });
@@ -103,7 +103,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
     // SECOND PASS: After auto-completing tasks, refresh progress and find the current task
     if (anyTaskAutoCompleted) {
       const updatedProgress = await UserTaskProgress.findOne({ userId })
-        .select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt')
+        .select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt')
         .lean();
       
       if (updatedProgress) {
@@ -734,14 +734,13 @@ router.post('/track-hackmap-visit', auth, async (req: Request, res: Response) =>
     }
 
     const existingProgress = await UserTaskProgress.findOne({ userId });
-    const isAlreadyCompleted = existingProgress?.completedTasks?.some(
-      (task: any) => task.taskId === 'visit-hackmap'
-    );
+    const wasAlreadyVisited = existingProgress?.hackmapVisitedAt;
 
-    if (!isAlreadyCompleted) {
+    if (!wasAlreadyVisited) {
       await UserTaskProgress.findOneAndUpdate(
         { userId },
         {
+          $set: { hackmapVisitedAt: new Date() },
           $setOnInsert: {
             completedTasks: [],
             collectedTasks: [],
@@ -749,25 +748,58 @@ router.post('/track-hackmap-visit', auth, async (req: Request, res: Response) =>
             showTaskGuide: true
           }
         },
-        { upsert: true }
+        { upsert: true, new: true }
       );
+    }
+
+    if (!wasAlreadyVisited) {
+      const taskList = getTaskList();
+      const hackmapTask = taskList.find(t => t.id === 'visit-hackmap');
       
-      await UserTaskProgress.findOneAndUpdate(
-        {
-          userId,
-          'completedTasks.taskId': { $ne: 'visit-hackmap' }
-        },
-        {
-          $push: {
-            completedTasks: {
-              taskId: 'visit-hackmap',
-              completedAt: new Date()
+      if (hackmapTask && hackmapTask.autoCompleteConditions) {
+        const user = await User.findById(userId).lean();
+        if (user) {
+          const updatedProgress = await UserTaskProgress.findOne({ userId });
+          const shouldAutoComplete = hackmapTask.autoCompleteConditions(user as any, updatedProgress ?? undefined);
+          
+          if (shouldAutoComplete) {
+            const isAlreadyCompleted = updatedProgress?.completedTasks?.some(
+              (task: any) => task.taskId === 'visit-hackmap'
+            );
+            
+            if (!isAlreadyCompleted) {
+              await UserTaskProgress.findOneAndUpdate(
+                { userId },
+                {
+                  $setOnInsert: {
+                    collectedTasks: [],
+                    skippedTasks: [],
+                    showTaskGuide: true
+                  }
+                },
+                { upsert: true }
+              );
+              
+              await UserTaskProgress.findOneAndUpdate(
+                {
+                  userId,
+                  'completedTasks.taskId': { $ne: 'visit-hackmap' }
+                },
+                {
+                  $push: {
+                    completedTasks: {
+                      taskId: 'visit-hackmap',
+                      completedAt: new Date()
+                    }
+                  },
+                  $set: { lastCompletedTaskId: 'visit-hackmap' }
+                },
+                { new: true }
+              );
             }
-          },
-          $set: { lastCompletedTaskId: 'visit-hackmap' }
-        },
-        { new: true }
-      );
+          }
+        }
+      }
     }
 
     res.json({ success: true, message: 'Hackmap visit tracked' });
