@@ -55,6 +55,7 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
   const [showInsufficientFundsModal, setShowInsufficientFundsModal] = useState(false);
   const [showBuildInProgressModal, setShowBuildInProgressModal] = useState(false);
   const [showLockedFeatureModal, setShowLockedFeatureModal] = useState(false);
+  const [blockedTaskId, setBlockedTaskId] = useState<string | null>(null);
 
   const taskList = data?.taskList || [];
   const completedTaskIds = new Set(data?.completedTaskIds || []);
@@ -130,11 +131,28 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
         
         if (!hasCompletedBuild100Guardians) {
           // Show locked feature modal and don't start the guided task
+          setBlockedTaskId(taskId);
           setShowLockedFeatureModal(true);
           return;
         }
         // Close modal and trigger highlight mode for free-hack-rig
         // Reuses visit-home flow for initial step (home location)
+        onClose();
+        setHighlightTaskId(taskId);
+      } else if (taskId === 'visit-hackmap') {
+        // Check if user has completed the "Free Hack Rig" task
+        // This ensures the Hack Rig is unlocked before guiding user to visit it
+        const freeHackRigTaskId = 'free-hack-rig';
+        const hasCompletedFreeHackRig = completedTaskIds.has(freeHackRigTaskId) || collectedTaskIds.has(freeHackRigTaskId);
+        
+        if (!hasCompletedFreeHackRig) {
+          // Show locked feature modal and don't start the guided task
+          setBlockedTaskId(taskId);
+          setShowLockedFeatureModal(true);
+          return;
+        }
+        // Close modal and trigger highlight mode for visit-hackmap
+        // Will pan to center on Home Location and animate border
         onClose();
         setHighlightTaskId(taskId);
       } else {
@@ -404,8 +422,15 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
       <LockedFeatureModal
         visible={showLockedFeatureModal}
         title="LOCKED FEATURE"
-        message="You need to complete the 'Build 100 Guardians' task before you can unlock the Hack Rig."
-        onClose={() => setShowLockedFeatureModal(false)}
+        message={
+          blockedTaskId === 'free-hack-rig'
+            ? "You need to complete the 'Build 100 Guardians' task before you can unlock the Hack Rig."
+            : "You need to complete the 'Free your Hack Rig' task before you can visit the Hackmap."
+        }
+        onClose={() => {
+          setShowLockedFeatureModal(false);
+          setBlockedTaskId(null);
+        }}
         closeButtonText="CLOSE"
       />
     </Modal>
