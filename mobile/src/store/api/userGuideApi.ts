@@ -14,7 +14,8 @@ import type {
   TrackThemeChangeResponse,
   TrackAvatarChangeResponse,
   TrackHomeVisitResponse,
-  TrackHackmapVisitResponse
+  TrackHackmapVisitResponse,
+  TrackDigitalBarracksVisitResponse
 } from '../../types/userGuide';
 
 export const userGuideApi = createApi({
@@ -159,6 +160,22 @@ export const userGuideApi = createApi({
         }
       },
     }),
+    trackDigitalBarracksVisit: builder.mutation<TrackDigitalBarracksVisitResponse, void>({
+      query: () => ({
+        url: '/api/users/user-guide/track-digital-barracks-visit',
+        method: 'POST',
+      }),
+      invalidatesTags: ['UserTaskProgress'],
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Invalidate to refetch current task and update UI
+          dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
+        } catch {
+          // Error handling is done by the mutation itself
+        }
+      },
+    }),
   }),
 });
 
@@ -171,6 +188,7 @@ export const {
   useTrackThemeChangeMutation,
   useTrackAvatarChangeMutation,
   useTrackHomeVisitMutation,
-  useTrackHackmapVisitMutation
+  useTrackHackmapVisitMutation,
+  useTrackDigitalBarracksVisitMutation
 } = userGuideApi;
 

@@ -30,7 +30,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
         new: true,
         setDefaultsOnInsert: true
       }
-    ).select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt').lean();
+    ).select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt').lean();
 
     if (!progress) {
       res.status(500).json({ error: 'Failed to initialize task progress' });
@@ -805,6 +805,90 @@ router.post('/track-hackmap-visit', auth, async (req: Request, res: Response) =>
     res.json({ success: true, message: 'Hackmap visit tracked' });
   } catch (error) {
     console.error('Error tracking hackmap visit:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/track-digital-barracks-visit', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const existingProgress = await UserTaskProgress.findOne({ userId });
+    const wasAlreadyVisited = existingProgress?.digitalBarracksVisitedAt;
+
+    if (!wasAlreadyVisited) {
+      await UserTaskProgress.findOneAndUpdate(
+        { userId },
+        {
+          $set: { digitalBarracksVisitedAt: new Date() },
+          $setOnInsert: {
+            completedTasks: [],
+            collectedTasks: [],
+            skippedTasks: [],
+            showTaskGuide: true
+          }
+        },
+        { upsert: true, new: true }
+      );
+    }
+
+    if (!wasAlreadyVisited) {
+      const taskList = getTaskList();
+      const digitalBarracksTask = taskList.find(t => t.id === 'visit-digital-barracks');
+      
+      if (digitalBarracksTask && digitalBarracksTask.autoCompleteConditions) {
+        const user = await User.findById(userId).lean();
+        if (user) {
+          const updatedProgress = await UserTaskProgress.findOne({ userId });
+          const shouldAutoComplete = digitalBarracksTask.autoCompleteConditions(user as any, updatedProgress ?? undefined);
+          
+          if (shouldAutoComplete) {
+            const isAlreadyCompleted = updatedProgress?.completedTasks?.some(
+              (task: any) => task.taskId === 'visit-digital-barracks'
+            );
+            
+            if (!isAlreadyCompleted) {
+              await UserTaskProgress.findOneAndUpdate(
+                { userId },
+                {
+                  $setOnInsert: {
+                    collectedTasks: [],
+                    skippedTasks: [],
+                    showTaskGuide: true
+                  }
+                },
+                { upsert: true }
+              );
+              
+              await UserTaskProgress.findOneAndUpdate(
+                {
+                  userId,
+                  'completedTasks.taskId': { $ne: 'visit-digital-barracks' }
+                },
+                {
+                  $push: {
+                    completedTasks: {
+                      taskId: 'visit-digital-barracks',
+                      completedAt: new Date()
+                    }
+                  },
+                  $set: { lastCompletedTaskId: 'visit-digital-barracks' }
+                },
+                { new: true }
+              );
+            }
+          }
+        }
+      }
+    }
+
+    res.json({ success: true, message: 'Digital Barracks visit tracked' });
+  } catch (error) {
+    console.error('Error tracking digital barracks visit:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

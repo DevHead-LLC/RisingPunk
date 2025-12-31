@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import { useThemeColors } from '../hooks/useThemeColors';
 import { useTheme } from '../context/ThemeContext';
 import { BotType } from '../types/bots';
 import { useFetchBotStatsQuery } from '../store/api/botsApi';
+import { useTrackDigitalBarracksVisitMutation as useTrackDigitalBarracksVisitMutationFromUserGuide } from '../store/api/userGuideApi';
+import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
 import { formatNumber } from '../utils/formatUtils';
 
 type MarkLevel = 1 | 2 | 3 | 4;
@@ -25,8 +27,27 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
   const { data: botStatsData, isLoading: botStatsLoading } = useFetchBotStatsQuery();
   const colors = useThemeColors();
   const { themeMode } = useTheme();
+  const [trackDigitalBarracksVisit] = useTrackDigitalBarracksVisitMutationFromUserGuide();
+  const { highlightTaskId, clearHighlight } = useTaskGuideHighlight();
+  const hasTrackedVisit = useRef(false);
+  const token = useAppSelector((state) => state.auth.token);
 
   const styles = useMemo(() => createStyles(colors, themeMode), [colors, themeMode]);
+
+  useEffect(() => {
+    if (token && !hasTrackedVisit.current) {
+      hasTrackedVisit.current = true;
+      trackDigitalBarracksVisit().then(() => {
+        if (highlightTaskId === 'visit-digital-barracks') {
+          clearHighlight();
+        }
+      }).catch(() => {
+        if (highlightTaskId === 'visit-digital-barracks') {
+          clearHighlight();
+        }
+      });
+    }
+  }, [token, highlightTaskId, trackDigitalBarracksVisit, clearHighlight]);
 
   const BotCard = ({ type }: { type: BotType }) => {
     const hackerLore = {
