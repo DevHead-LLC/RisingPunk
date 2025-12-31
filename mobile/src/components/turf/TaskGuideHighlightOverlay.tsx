@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useTaskGuideHighlight } from '../../contexts/TaskGuideHighlightContext';
 import { SIZING } from '../../styles/theme';
@@ -44,7 +44,7 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
   forDeployPurge = false
 }) => {
   const colors = useThemeColors();
-  const { highlightTaskId, highlightStep } = useTaskGuideHighlight();
+  const { highlightTaskId, highlightStep, clearHighlight } = useTaskGuideHighlight();
 
   const isThemeTask = highlightTaskId === 'use-hacker-mode' || highlightTaskId === 'use-business-mode';
   const isAvatarTask = highlightTaskId === 'change-avatar';
@@ -160,6 +160,10 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
   }
 
   const shouldShowOverlay = 
+    (isViewProfile && forProfile) ||
+    (isThemeTask && (forProfile || forSettings || forThemeToggle)) ||
+    (isAvatarTask && (forProfile || forSettings || forAvatarToggle)) ||
+    (isHideTaskListTask && (forProfile || forSettings || forTaskGuideToggle)) ||
     (isVisitHome && forHome) || 
     (isBuildGuardians && forHome && highlightStep === null) ||
     (isFreeHackRig && forHome && highlightStep === null) ||
@@ -178,9 +182,20 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
     ? [styles.overlay, { zIndex: 999 }]
     : styles.overlay;
 
+  const shouldBeClickable = false;
+
   return (
     <>
-      <View style={overlayStyle} pointerEvents="auto" />
+      {shouldBeClickable ? (
+        <TouchableOpacity 
+          style={overlayStyle} 
+          activeOpacity={1}
+          onPress={handleOverlayPress}
+          pointerEvents="auto"
+        />
+      ) : shouldShowOverlay ? (
+        <View style={overlayStyle} pointerEvents="auto" />
+      ) : null}
       {forProfile && (
         <View style={styles.clickHereContainerProfile} pointerEvents="none">
           <View style={[styles.clickHereBox, { backgroundColor: colors.background, borderColor: colors.primary }]}>

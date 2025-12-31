@@ -161,6 +161,9 @@ const TASK_LIST: Task[] = [
     title: 'Visit the Digital Barracks',
     description: 'Check out the Digital Barracks',
     order: 12,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.digitalBarracksVisitedAt);
+    },
     skipable: true,
     reward: { type: 'wallet', value: 20 }
   },
