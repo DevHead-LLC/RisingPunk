@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useTaskGuideHighlight } from '../../contexts/TaskGuideHighlightContext';
 import { SIZING } from '../../styles/theme';
@@ -44,7 +44,7 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
   forDeployPurge = false
 }) => {
   const colors = useThemeColors();
-  const { highlightTaskId, highlightStep, clearHighlight } = useTaskGuideHighlight();
+  const { highlightTaskId, highlightStep } = useTaskGuideHighlight();
 
   const isThemeTask = highlightTaskId === 'use-hacker-mode' || highlightTaskId === 'use-business-mode';
   const isAvatarTask = highlightTaskId === 'change-avatar';
@@ -182,18 +182,9 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
     ? [styles.overlay, { zIndex: 999 }]
     : styles.overlay;
 
-  const shouldBeClickable = false;
-
   return (
     <>
-      {shouldBeClickable ? (
-        <TouchableOpacity 
-          style={overlayStyle} 
-          activeOpacity={1}
-          onPress={handleOverlayPress}
-          pointerEvents="auto"
-        />
-      ) : shouldShowOverlay ? (
+      {shouldShowOverlay ? (
         <View style={overlayStyle} pointerEvents="auto" />
       ) : null}
       {forProfile && (
