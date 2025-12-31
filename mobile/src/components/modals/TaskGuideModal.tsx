@@ -155,6 +155,11 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
         // Will pan to center on Home Location and animate border
         onClose();
         setHighlightTaskId(taskId);
+      } else if (taskId === 'visit-digital-barracks') {
+        // Close modal and trigger highlight mode for visit-digital-barracks
+        // Will pan to center on Digital Barracks and animate border
+        onClose();
+        setHighlightTaskId(taskId);
       } else {
         // For other tasks, just close modal for now
         onClose();
