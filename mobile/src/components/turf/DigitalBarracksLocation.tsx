@@ -2,6 +2,7 @@ import React, {memo, useEffect, useState} from 'react';
 import {TouchableOpacity, View, Text, Image, StyleSheet, Animated} from 'react-native';
 import {COLORS, SIZING} from '../../styles/theme';
 import {useThemeColors} from '../../hooks/useThemeColors';
+import {useTaskGuideHighlight} from '../../contexts/TaskGuideHighlightContext';
 
 type DigitalBarracksLocationProps = {
   onPress: () => void;
@@ -10,55 +11,72 @@ type DigitalBarracksLocationProps = {
 
 export const DigitalBarracksLocation = memo(function DigitalBarracksLocation({ onPress, isIntroActive = false }: DigitalBarracksLocationProps) {
   const colors = useThemeColors();
+  const { highlightTaskId, clearHighlight } = useTaskGuideHighlight();
   const [currentColorIndex, setCurrentColorIndex] = useState(0);
   const animatedBorderColor = useState(new Animated.Value(0))[0];
   
   const introColors = [colors.primary, colors.secondary, colors.matrix];
+  const isVisitDigitalBarracks = highlightTaskId === 'visit-digital-barracks';
+  const isHighlighted = isIntroActive || isVisitDigitalBarracks;
+  
+  const handlePress = () => {
+    if (isVisitDigitalBarracks) {
+      clearHighlight();
+    }
+    onPress();
+  };
   
   useEffect(() => {
-    if (isIntroActive) {
+    if (isHighlighted) {
       const interval = setInterval(() => {
         setCurrentColorIndex(prev => (prev + 1) % introColors.length);
       }, 1000);
       
       return () => clearInterval(interval);
     }
-  }, [isIntroActive, introColors.length]);
+  }, [isHighlighted, introColors.length]);
   
   useEffect(() => {
-    if (isIntroActive) {
+    if (isHighlighted) {
       Animated.timing(animatedBorderColor, {
         toValue: currentColorIndex,
         duration: 500,
         useNativeDriver: false,
       }).start();
     }
-  }, [currentColorIndex, isIntroActive, animatedBorderColor]);
+  }, [currentColorIndex, isHighlighted, animatedBorderColor]);
   
   const animatedBorderColorValue = animatedBorderColor.interpolate({
     inputRange: [0, 1, 2],
     outputRange: introColors,
   });
   
+  
+  const locationStyle = isVisitDigitalBarracks
+    ? [styles.location, { top: 0, right: 0, transform: [] }] // Remove positioning when in elevated wrapper
+    : [styles.location, styles.barracksPosition];
+  
   return (
-    <TouchableOpacity
-      style={[styles.location, styles.barracksPosition]}
-      onPress={onPress}
-    >
-      <Animated.View style={[
-        styles.iconContainer, 
-        { 
-          borderWidth: isIntroActive ? 3 : 1,
-          borderColor: isIntroActive ? animatedBorderColorValue : colors.matrix
-        }
-      ]}>
-        <Image
-          source={require('../../assets/images/digital-barracks.png')}
-          style={styles.locationIcon}
-        />
-      </Animated.View>
-      <Text style={styles.locationLabel}>DIGITAL BARRACKS</Text>
-    </TouchableOpacity>
+    <View style={[...locationStyle, { zIndex: isHighlighted ? 10002 : 3 }]} pointerEvents="box-none">
+      <TouchableOpacity 
+        onPress={handlePress} 
+        style={{ zIndex: isHighlighted ? 10002 : 3, pointerEvents: 'auto' }}
+      >
+        <Animated.View style={[
+          styles.iconContainer, 
+          { 
+            borderWidth: isHighlighted ? 3 : 1,
+            borderColor: isHighlighted ? animatedBorderColorValue : colors.matrix
+          }
+        ]}>
+          <Image
+            source={require('../../assets/images/digital-barracks.png')}
+            style={styles.locationIcon}
+          />
+        </Animated.View>
+        <Text style={styles.locationLabel}>DIGITAL BARRACKS</Text>
+      </TouchableOpacity>
+    </View>
   );
 });
 
@@ -68,7 +86,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: SIZING.spacing.sm,
     backgroundColor: 'transparent',
-    zIndex: 3,
   },
   iconContainer: {
     width: 120,
@@ -102,6 +119,5 @@ const styles = StyleSheet.create({
     top: '50%',
     right: '25%',
     transform: [{translateX: 60}, {translateY: -80}],
-    zIndex: 3,
   },
 });

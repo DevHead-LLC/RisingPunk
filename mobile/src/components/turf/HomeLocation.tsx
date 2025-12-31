@@ -64,8 +64,13 @@ export const HomeLocation = memo(function HomeLocation({ onPress, isIntroActive 
     ? [styles.location, { top: 0, left: 0, transform: [] }]
     : [styles.location, styles.homePosition];
   
+  // For visit-hackmap, need higher z-index to be above TouchableOpacity overlay (10001)
+  const zIndexValue = isHighlighted 
+    ? (isVisitHackmap ? 10002 : 1000)
+    : 3;
+  
   return (
-    <View style={[...locationStyle, { zIndex: isHighlighted ? 1000 : 3 }]}>
+    <View style={[...locationStyle, { zIndex: zIndexValue }]}>
       <TouchableOpacity onPress={handlePress}>
         <Animated.View style={[
           styles.iconContainer, 
