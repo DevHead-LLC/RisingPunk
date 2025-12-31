@@ -160,6 +160,10 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
   }
 
   const shouldShowOverlay = 
+    (isViewProfile && forProfile) ||
+    (isThemeTask && (forProfile || forSettings || forThemeToggle)) ||
+    (isAvatarTask && (forProfile || forSettings || forAvatarToggle)) ||
+    (isHideTaskListTask && (forProfile || forSettings || forTaskGuideToggle)) ||
     (isVisitHome && forHome) || 
     (isBuildGuardians && forHome && highlightStep === null) ||
     (isFreeHackRig && forHome && highlightStep === null) ||
@@ -180,7 +184,9 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
 
   return (
     <>
-      <View style={overlayStyle} pointerEvents="auto" />
+      {shouldShowOverlay ? (
+        <View style={overlayStyle} pointerEvents="auto" />
+      ) : null}
       {forProfile && (
         <View style={styles.clickHereContainerProfile} pointerEvents="none">
           <View style={[styles.clickHereBox, { backgroundColor: colors.background, borderColor: colors.primary }]}>

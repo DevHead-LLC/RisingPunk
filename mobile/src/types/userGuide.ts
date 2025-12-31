@@ -86,3 +86,8 @@ export interface TrackHackmapVisitResponse {
   message?: string;
 }
 
+export interface TrackDigitalBarracksVisitResponse {
+  success: boolean;
+  message?: string;
+}
+
