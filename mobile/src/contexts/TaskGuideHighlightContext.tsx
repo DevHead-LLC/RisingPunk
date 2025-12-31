@@ -18,13 +18,9 @@ export const TaskGuideHighlightProvider: React.FC<{ children: ReactNode }> = ({ 
   const [highlightStep, setHighlightStep] = useState<HighlightStep>(null);
 
   const clearHighlight = useCallback(() => {
-    console.log('[TaskGuideHighlightContext] clearHighlight called');
-    console.log('[TaskGuideHighlightContext] Current highlightTaskId:', highlightTaskId);
-    console.log('[TaskGuideHighlightContext] Current highlightStep:', highlightStep);
     setHighlightTaskId(null);
     setHighlightStep(null);
-    console.log('[TaskGuideHighlightContext] Highlight cleared - highlightTaskId set to null');
-  }, [highlightTaskId, highlightStep]);
+  }, []);
 
   const advanceHighlightStep = useCallback(() => {
     const isBuildGuardians = highlightTaskId === 'build-100-guardians';

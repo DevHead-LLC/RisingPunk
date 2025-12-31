@@ -143,14 +143,6 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const isHomeHighlight = isVisitHome || isVisitHackmap || (isBuildGuardians && highlightStep === null) || (isFreeHackRig && highlightStep === null);
   const isDigitalBarracksHighlight = isVisitDigitalBarracks;
 
-  useEffect(() => {
-    if (isVisitHackmap) {
-      console.log('[TurfScreen] visit-hackmap task is active');
-      console.log('[TurfScreen] HomeLocation zIndex: 10002 (above overlay at 10001)');
-      console.log('[TurfScreen] TouchableOpacity overlay zIndex: 10001 (catches clicks outside HomeLocation)');
-      console.log('[TurfScreen] scrollWrapper zIndex: 1 (normal, not elevated)');
-    }
-  }, [isVisitHackmap]);
   const [currentScreen, setCurrentScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research' | 'investmentProperty'>('turf');
   const [battleId, setBattleId] = useState<string | null>(null);
   const [pendingNpcSlug, setPendingNpcSlug] = useState<string | null>(null);
@@ -1057,11 +1049,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                 style={styles.turfClickHandler}
                 activeOpacity={1}
                 onPress={() => {
-                  console.log('[TurfScreen] ❌ TouchableOpacity overlay pressed - clearing highlight');
                   clearHighlight();
-                }}
-                onPressIn={() => {
-                  console.log('[TurfScreen] ❌ TouchableOpacity overlay onPressIn - overlay received touch (clicking outside)');
                 }}
               />
             )}

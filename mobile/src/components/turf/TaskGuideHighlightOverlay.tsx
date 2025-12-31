@@ -208,7 +208,7 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
           pointerEvents="auto"
         />
       ) : shouldShowOverlay ? (
-        <View style={overlayStyle} pointerEvents="none" />
+        <View style={overlayStyle} pointerEvents="auto" />
       ) : null}
       {forProfile && (
         <View style={styles.clickHereContainerProfile} pointerEvents="none">
