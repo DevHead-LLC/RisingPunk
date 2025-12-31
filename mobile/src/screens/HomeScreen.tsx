@@ -559,13 +559,13 @@ export const HomeScreen = memo(function HomeScreen({
               onHackRigPress={isHackRigHighlight ? () => {} : handleHackRigPress}
               onNavigateToBattle={isHackRigHighlight ? () => {} : onNavigateToBattle}
             />
-            {!isHackRigHighlight && (
+            {!isHackRigHighlight && !isVisitHackmap && (
               <View style={styles.hackRigContainer} pointerEvents="box-none">
                 <View pointerEvents="auto">
                   <HackRigDisplay
                     onPress={handleHackRigPress}
                     onNavigateToBattle={onNavigateToBattle}
-                    isHighlighted={isVisitHackmap}
+                    isHighlighted={false}
                   />
                 </View>
               </View>
@@ -601,13 +601,24 @@ export const HomeScreen = memo(function HomeScreen({
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {isVisitHackmap && (
-        <View style={styles.homeScreenClickHandler} pointerEvents="box-none">
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={clearHighlight}
-          />
-        </View>
+        <>
+          <View style={styles.homeScreenClickHandler} pointerEvents="box-none">
+            <TouchableOpacity
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={clearHighlight}
+            />
+          </View>
+          <View style={styles.hackRigElevatedWrapper}>
+            <View pointerEvents="auto">
+              <HackRigDisplay
+                onPress={handleHackRigPress}
+                onNavigateToBattle={onNavigateToBattle}
+                isHighlighted={isVisitHackmap}
+              />
+            </View>
+          </View>
+        </>
       )}
       <View style={{ zIndex: (isGarageTabHighlight || isBotAssemblyHighlight || isHackRigHighlight) ? 3 : 1000, pointerEvents: (isGarageTabHighlight || isBotAssemblyHighlight || isHackRigHighlight) ? 'none' : 'auto' }}>
         <CloseButton onPress={onClose} />
@@ -838,7 +849,19 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 997,
+    zIndex: 998,
     backgroundColor: 'transparent',
+  },
+  hackRigElevatedWrapper: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: 500,
+    height: 375,
+    zIndex: 1000,
+    transform: [{ translateX: -250 }, { translateY: -187.5 }],
+    justifyContent: 'center',
+    alignItems: 'center',
+    pointerEvents: 'box-none',
   },
 });
