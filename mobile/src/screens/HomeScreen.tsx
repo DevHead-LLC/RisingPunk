@@ -854,12 +854,14 @@ const styles = StyleSheet.create({
   },
   hackRigElevatedWrapper: {
     position: 'absolute',
-    top: 235,
-    left: 820,
+    top: '50%',
+    left: '50%',
     width: 500,
     height: 375,
     zIndex: 1000,
     transform: [{ translateX: -250 }, { translateY: -187.5 }],
+    justifyContent: 'center',
+    alignItems: 'center',
     pointerEvents: 'box-none',
   },
 });
