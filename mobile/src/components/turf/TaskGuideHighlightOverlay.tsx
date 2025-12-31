@@ -11,7 +11,6 @@ interface TaskGuideHighlightOverlayProps {
   forAvatarToggle?: boolean;
   forTaskGuideToggle?: boolean;
   forHome?: boolean;
-  forDigitalBarracks?: boolean;
   forGarageTab?: boolean;
   forBotAssembly?: boolean;
   forGuardianSelection?: boolean;
@@ -32,7 +31,6 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
   forAvatarToggle = false,
   forTaskGuideToggle = false,
   forHome = false,
-  forDigitalBarracks = false,
   forGarageTab = false,
   forBotAssembly = false,
   forGuardianSelection = false,
@@ -53,11 +51,10 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
   const isHideTaskListTask = highlightTaskId === 'hide-task-list';
   const isViewProfile = highlightTaskId === 'view-profile';
   const isVisitHome = highlightTaskId === 'visit-home';
-  const isVisitDigitalBarracks = highlightTaskId === 'visit-digital-barracks';
   const isBuildGuardians = highlightTaskId === 'build-100-guardians';
   const isFreeHackRig = highlightTaskId === 'free-hack-rig';
 
-  if (!isViewProfile && !isThemeTask && !isAvatarTask && !isHideTaskListTask && !isVisitHome && !isVisitDigitalBarracks && !isBuildGuardians && !isFreeHackRig) {
+  if (!isViewProfile && !isThemeTask && !isAvatarTask && !isHideTaskListTask && !isVisitHome && !isBuildGuardians && !isFreeHackRig) {
     return null;
   }
 
@@ -66,10 +63,6 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
   }
 
   if (isVisitHome && !forHome) {
-    return null;
-  }
-
-  if (isVisitDigitalBarracks && !forDigitalBarracks) {
     return null;
   }
 
@@ -172,7 +165,6 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
     (isAvatarTask && (forProfile || forSettings || forAvatarToggle)) ||
     (isHideTaskListTask && (forProfile || forSettings || forTaskGuideToggle)) ||
     (isVisitHome && forHome) || 
-    (isVisitDigitalBarracks && forDigitalBarracks) ||
     (isBuildGuardians && forHome && highlightStep === null) ||
     (isFreeHackRig && forHome && highlightStep === null) ||
     (isBuildGuardians && forGarageTab && highlightStep === 'garage-tab') ||
@@ -190,13 +182,7 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
     ? [styles.overlay, { zIndex: 999 }]
     : styles.overlay;
 
-  const handleOverlayPress = () => {
-    if (isVisitDigitalBarracks) {
-      clearHighlight();
-    }
-  };
-
-  const shouldBeClickable = isVisitDigitalBarracks && shouldShowOverlay;
+  const shouldBeClickable = false;
 
   return (
     <>
