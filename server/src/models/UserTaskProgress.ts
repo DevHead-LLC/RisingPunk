@@ -16,6 +16,7 @@ export interface IUserTaskProgress extends Document {
   avatarChangedAt?: Date;
   taskGuideShownAt?: Date;
   homeVisitedAt?: Date;
+  hackmapVisitedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -73,6 +74,10 @@ const userTaskProgressSchema = new Schema({
     required: false
   },
   homeVisitedAt: {
+    type: Date,
+    required: false
+  },
+  hackmapVisitedAt: {
     type: Date,
     required: false
   }
