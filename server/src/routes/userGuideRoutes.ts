@@ -30,7 +30,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
         new: true,
         setDefaultsOnInsert: true
       }
-    ).select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt').lean();
+    ).select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt walletViewedAt').lean();
 
     if (!progress) {
       res.status(500).json({ error: 'Failed to initialize task progress' });
@@ -889,6 +889,90 @@ router.post('/track-digital-barracks-visit', auth, async (req: Request, res: Res
     res.json({ success: true, message: 'Digital Barracks visit tracked' });
   } catch (error) {
     console.error('Error tracking digital barracks visit:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/track-wallet-view', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const existingProgress = await UserTaskProgress.findOne({ userId });
+    const wasAlreadyViewed = existingProgress?.walletViewedAt;
+
+    if (!wasAlreadyViewed) {
+      await UserTaskProgress.findOneAndUpdate(
+        { userId },
+        {
+          $set: { walletViewedAt: new Date() },
+          $setOnInsert: {
+            completedTasks: [],
+            collectedTasks: [],
+            skippedTasks: [],
+            showTaskGuide: true
+          }
+        },
+        { upsert: true, new: true }
+      );
+    }
+
+    if (!wasAlreadyViewed) {
+      const taskList = getTaskList();
+      const walletTask = taskList.find(t => t.id === 'view-wallet');
+      
+      if (walletTask && walletTask.autoCompleteConditions) {
+        const user = await User.findById(userId).lean();
+        if (user) {
+          const updatedProgress = await UserTaskProgress.findOne({ userId });
+          const shouldAutoComplete = walletTask.autoCompleteConditions(user as any, updatedProgress ?? undefined);
+          
+          if (shouldAutoComplete) {
+            const isAlreadyCompleted = updatedProgress?.completedTasks?.some(
+              (task: any) => task.taskId === 'view-wallet'
+            );
+            
+            if (!isAlreadyCompleted) {
+              await UserTaskProgress.findOneAndUpdate(
+                { userId },
+                {
+                  $setOnInsert: {
+                    collectedTasks: [],
+                    skippedTasks: [],
+                    showTaskGuide: true
+                  }
+                },
+                { upsert: true }
+              );
+              
+              await UserTaskProgress.findOneAndUpdate(
+                {
+                  userId,
+                  'completedTasks.taskId': { $ne: 'view-wallet' }
+                },
+                {
+                  $push: {
+                    completedTasks: {
+                      taskId: 'view-wallet',
+                      completedAt: new Date()
+                    }
+                  },
+                  $set: { lastCompletedTaskId: 'view-wallet' }
+                },
+                { new: true }
+              );
+            }
+          }
+        }
+      }
+    }
+
+    res.json({ success: true, message: 'Wallet view tracked' });
+  } catch (error) {
+    console.error('Error tracking wallet view:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
