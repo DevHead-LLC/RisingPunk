@@ -1,14 +1,16 @@
-import React, {memo, useState, useEffect} from 'react';
+import React, {memo, useState, useEffect, useRef} from 'react';
 import {TouchableOpacity, View, Text, Image, StyleSheet, Modal, Animated} from 'react-native';
 import {SIZING} from '../../styles/theme';
 import {useThemeColors} from '../../hooks/useThemeColors';
 import { useUnlockResearchCenterMutation, useGetProfileQuery, useGetResearchCenterStatusQuery, useSpeedupResearchCenterConstructionMutation } from '../../store/api/authApi';
+import { userGuideApi } from '../../store/api/userGuideApi';
 import { useFetchBalanceQuery } from '../../store/api/balanceApi';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { updateBalance } from '../../store/slices/balanceSlice';
 import { BuildCountdownTimer } from './BuildCountdownTimer';
 import { LockedFeatureModal } from './index';
 import { SpeedupModal } from '../common/SpeedupModal';
+import { useTaskGuideHighlight } from '../../contexts/TaskGuideHighlightContext';
 
 type ResearchCenterLocationProps = {
   onPress?: () => void;
@@ -18,6 +20,7 @@ type ResearchCenterLocationProps = {
 
 export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onPress, onNavigateToResearch, isIntroActive = false }: ResearchCenterLocationProps) {
   const colors = useThemeColors();
+  const { highlightTaskId, clearHighlight } = useTaskGuideHighlight();
   const [showPopup, setShowPopup] = useState(false);
   const [showLoadingModal, setShowLoadingModal] = useState(false);
   const [showInsufficientFundsModal, setShowInsufficientFundsModal] = useState(false);
@@ -28,14 +31,21 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
   const animatedBorderColor = useState(new Animated.Value(0))[0];
   
   const introColors = [colors.primary, colors.secondary, colors.matrix];
+  const isBuildResearchCenter = highlightTaskId === 'build-research-center';
+  const isHighlighted = isIntroActive || isBuildResearchCenter;
   const [unlockResearchCenter] = useUnlockResearchCenterMutation();
   const [speedupResearchCenterConstruction] = useSpeedupResearchCenterConstructionMutation();
   const { data: profile, isLoading } = useGetProfileQuery();
-  const { data: buildStatus, isLoading: buildStatusLoading, refetch: refetchBuildStatus } = useGetResearchCenterStatusQuery();
+  const { data: buildStatus, isLoading: buildStatusLoading, refetch: refetchBuildStatus } = useGetResearchCenterStatusQuery(undefined, {
+    pollingInterval: (latestResult) => {
+      return latestResult?.buildStatus != null ? 5000 : 0;
+    },
+  });
   const { data: balanceData, isLoading: balanceLoading } = useFetchBalanceQuery();
   const dispatch = useAppDispatch();
   const reduxBalance = useAppSelector((state) => state.balance.total);
   const currentBalanceState = useAppSelector((state) => state.balance);
+  const previousIsUnlockedRef = useRef<boolean>(false);
   
   // Use both sources to ensure we have the most up-to-date balance
   const currentBalance = balanceData?.total ?? reduxBalance;
@@ -50,24 +60,31 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
   const hasSufficientFunds = numericBalance !== null && !isNaN(numericBalance as number) && numericBalance >= RESEARCH_CENTER_COST;
   
   useEffect(() => {
-    if (isIntroActive) {
+    if (isUnlocked && !previousIsUnlockedRef.current) {
+      dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
+    }
+    previousIsUnlockedRef.current = isUnlocked;
+  }, [isUnlocked, dispatch]);
+  
+  useEffect(() => {
+    if (isHighlighted) {
       const interval = setInterval(() => {
         setCurrentColorIndex(prev => (prev + 1) % introColors.length);
       }, 1000);
       
       return () => clearInterval(interval);
     }
-  }, [isIntroActive, introColors.length]);
+  }, [isHighlighted, introColors.length]);
   
   useEffect(() => {
-    if (isIntroActive) {
+    if (isHighlighted) {
       Animated.timing(animatedBorderColor, {
         toValue: currentColorIndex,
         duration: 500,
         useNativeDriver: false,
       }).start();
     }
-  }, [currentColorIndex, isIntroActive, animatedBorderColor]);
+  }, [currentColorIndex, isHighlighted, animatedBorderColor]);
   
   const animatedBorderColorValue = animatedBorderColor.interpolate({
     inputRange: [0, 1, 2],
@@ -88,6 +105,9 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
         return;
       }
       setShowPopup(true);
+    }
+    if (isBuildResearchCenter) {
+      clearHighlight();
     }
   };
 
@@ -164,17 +184,28 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
     return Math.max(0, completesAt - now);
   };
 
+  const zIndexValue = isHighlighted ? 10002 : 1;
+  
   return (
-    <View style={[styles.researchCenterContainer, { backgroundColor: colors.matrix + '0D', borderColor: colors.matrix + '33' }]}>
+    <View 
+      style={[styles.researchCenterContainer, { 
+        backgroundColor: colors.matrix + '0D', 
+        borderColor: colors.matrix + '33', 
+        zIndex: zIndexValue,
+        elevation: isHighlighted ? 10002 : 1
+      }]}
+      collapsable={false}
+    >
       <TouchableOpacity
         style={styles.location}
         onPress={handlePress}
+        activeOpacity={0.8}
       >
         <Animated.View style={[
           styles.iconContainer, 
           { 
-            borderColor: isIntroActive ? animatedBorderColorValue : colors.matrix,
-            borderWidth: isIntroActive ? 3 : 1
+            borderColor: isHighlighted ? animatedBorderColorValue : colors.matrix,
+            borderWidth: isHighlighted ? 3 : 1
           }
         ]}>
           <Image

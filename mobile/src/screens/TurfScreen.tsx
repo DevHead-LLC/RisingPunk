@@ -142,12 +142,15 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const isBuildGuardians = highlightTaskId === 'build-100-guardians';
   const isFreeHackRig = highlightTaskId === 'free-hack-rig';
   const isViewWallet = highlightTaskId === 'view-wallet';
+  const isBuildResearchCenter = highlightTaskId === 'build-research-center';
   const isHomeHighlight = isVisitHome || isVisitHackmap || (isBuildGuardians && highlightStep === null) || (isFreeHackRig && highlightStep === null);
   const isDigitalBarracksHighlight = isVisitDigitalBarracks;
+  const isResearchCenterHighlight = isBuildResearchCenter;
 
   const [currentScreen, setCurrentScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research' | 'investmentProperty'>('turf');
   const [battleId, setBattleId] = useState<string | null>(null);
   const [pendingNpcSlug, setPendingNpcSlug] = useState<string | null>(null);
+  const isAutoPanningRef = useRef(false);
   const [returnContext, setReturnContext] = useState<{ origin: 'hackRig' | 'map'; mapPan?: { x: number; y: number } } | null>(null);
   const [pendingNpcInstanceId, setPendingNpcInstanceId] = useState<string | null>(null);
   const [pendingDefenderUserId, setPendingDefenderUserId] = useState<string | null>(null);
@@ -278,8 +281,10 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     currentScrollPositionRef.current = { x: contentOffset.x, y: contentOffset.y };
     if (isViewWallet) {
       clearHighlight();
+    } else if (isResearchCenterHighlight && !isAutoPanningRef.current) {
+      clearHighlight();
     }
-  }, [isViewWallet, clearHighlight]);
+  }, [isViewWallet, isResearchCenterHighlight, clearHighlight]);
 
   // Android-specific pan gesture (only for Android) - Memoized for performance
   const panGesture = useMemo(() => {
@@ -749,6 +754,37 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     }
   }, [isDigitalBarracksHighlight, currentScreen, offsetX, offsetY]);
 
+  useEffect(() => {
+    if (isResearchCenterHighlight && currentScreen === 'turf') {
+      isAutoPanningRef.current = true;
+      setTimeout(() => {
+        const SCREEN_WIDTH = Dimensions.get('window').width;
+        const CONTENT_WIDTH = 2000;
+        const RESEARCH_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+        const RESEARCH_Y = 300;
+        
+        if (Platform.OS === 'android') {
+          offsetX.value = withTiming(-RESEARCH_X, { duration: 300 });
+          offsetY.value = withTiming(RESEARCH_Y, { duration: 300 });
+          setTimeout(() => {
+            isAutoPanningRef.current = false;
+          }, 350);
+        } else {
+          horizontalScrollRef.current?.scrollTo({
+            x: RESEARCH_X,
+            y: RESEARCH_Y,
+            animated: true,
+          });
+          setTimeout(() => {
+            isAutoPanningRef.current = false;
+          }, 350);
+        }
+      }, 100);
+    } else {
+      isAutoPanningRef.current = false;
+    }
+  }, [isResearchCenterHighlight, currentScreen, offsetX, offsetY]);
+
   const renderScreen = useCallback(() => {
     switch (currentScreen) {
       case 'hackRig':
@@ -889,8 +925,49 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
             </ErrorBoundary>
             <View style={styles.scrollWrapper}>
               {Platform.OS === 'ios' ? (
-                <ScrollViewMemo horizontalScrollRef={horizontalScrollRef} onScroll={handleTurfScroll} scrollEnabled={!isHomeHighlight && !isDigitalBarracksHighlight}>
-                  <View style={[styles.scrollContent, { backgroundColor: colors.background, borderColor: colors.secondary + '99' }]}>
+                <ScrollViewMemo 
+                  horizontalScrollRef={horizontalScrollRef} 
+                  onScroll={handleTurfScroll} 
+                  scrollEnabled={!isHomeHighlight && !isDigitalBarracksHighlight && !isResearchCenterHighlight}
+                >
+                  <View 
+                    style={[styles.scrollContent, { backgroundColor: colors.background, borderColor: colors.secondary + '99' }]}
+                    onStartShouldSetResponder={(evt) => {
+                      if (isResearchCenterHighlight) {
+                        const { pageX, pageY } = evt.nativeEvent;
+                        const SCREEN_WIDTH = Dimensions.get('window').width;
+                        const SCREEN_HEIGHT = Dimensions.get('window').height;
+                        const CONTENT_WIDTH = 2000;
+                        const CONTENT_HEIGHT = 2000;
+                        
+                        const scrollX = currentScrollPositionRef.current?.x || ((CONTENT_WIDTH - SCREEN_WIDTH) / 2);
+                        const scrollY = currentScrollPositionRef.current?.y || 300;
+                        
+                        const researchCenterContentLeft = (CONTENT_WIDTH / 2) - 150;
+                        const researchCenterContentRight = researchCenterContentLeft + 300;
+                        const researchCenterContentTop = CONTENT_HEIGHT * 0.2;
+                        const researchCenterContentBottom = researchCenterContentTop + (CONTENT_HEIGHT * 0.11);
+                        
+                        const researchCenterScreenLeft = researchCenterContentLeft - scrollX;
+                        const researchCenterScreenRight = researchCenterContentRight - scrollX;
+                        const researchCenterScreenTop = researchCenterContentTop - scrollY;
+                        const researchCenterScreenBottom = researchCenterContentBottom - scrollY;
+                        
+                        const isOnResearchCenter = pageX >= researchCenterScreenLeft && 
+                                                  pageX <= researchCenterScreenRight &&
+                                                  pageY >= researchCenterScreenTop && 
+                                                  pageY <= researchCenterScreenBottom;
+                        
+                        if (!isOnResearchCenter) {
+                          clearHighlight();
+                          return true;
+                        }
+                      }
+                      return false;
+                    }}
+                    onMoveShouldSetResponder={() => false}
+                    onResponderRelease={() => {}}
+                  >
                     <DiagonalLines colors={colors} />
                     <View style={[styles.digitalGround, { backgroundColor: colors.matrix + '0D', borderColor: colors.matrix + '33' }]}>
                       {!isHomeHighlight && <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />}
@@ -1092,7 +1169,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           </View>
         );
     }
-  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, highlightTaskId, clearHighlight]);
+  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, isResearchCenterHighlight, highlightTaskId, clearHighlight]);
 
   return (
     <>
