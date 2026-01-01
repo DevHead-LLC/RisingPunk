@@ -91,3 +91,8 @@ export interface TrackDigitalBarracksVisitResponse {
   message?: string;
 }
 
+export interface TrackWalletViewResponse {
+  success: boolean;
+  message?: string;
+}
+

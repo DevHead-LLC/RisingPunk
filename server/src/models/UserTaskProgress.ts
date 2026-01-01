@@ -18,6 +18,7 @@ export interface IUserTaskProgress extends Document {
   homeVisitedAt?: Date;
   hackmapVisitedAt?: Date;
   digitalBarracksVisitedAt?: Date;
+  walletViewedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -83,6 +84,10 @@ const userTaskProgressSchema = new Schema({
     required: false
   },
   digitalBarracksVisitedAt: {
+    type: Date,
+    required: false
+  },
+  walletViewedAt: {
     type: Date,
     required: false
   }
