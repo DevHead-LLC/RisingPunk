@@ -36,10 +36,9 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
   const [unlockResearchCenter] = useUnlockResearchCenterMutation();
   const [speedupResearchCenterConstruction] = useSpeedupResearchCenterConstructionMutation();
   const { data: profile, isLoading } = useGetProfileQuery();
+  const [isBuildingState, setIsBuildingState] = useState(false);
   const { data: buildStatus, isLoading: buildStatusLoading, refetch: refetchBuildStatus } = useGetResearchCenterStatusQuery(undefined, {
-    pollingInterval: (latestResult) => {
-      return latestResult?.buildStatus != null ? 5000 : 0;
-    },
+    pollingInterval: isBuildingState ? 5000 : 0,
   });
   const { data: balanceData, isLoading: balanceLoading } = useFetchBalanceQuery();
   const dispatch = useAppDispatch();
@@ -55,6 +54,10 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
 
   const isUnlocked = buildStatus?.isUnlocked || false;
   const isBuilding = buildStatus?.buildStatus != null;
+  
+  useEffect(() => {
+    setIsBuildingState(isBuilding);
+  }, [isBuilding]);
   const RESEARCH_CENTER_COST = 50000;
   
   const hasSufficientFunds = numericBalance !== null && !isNaN(numericBalance as number) && numericBalance >= RESEARCH_CENTER_COST;

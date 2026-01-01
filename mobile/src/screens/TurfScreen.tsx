@@ -292,7 +292,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       return Gesture.Pan()
         .minPointers(1)
         .maxPointers(1)
-        .enabled(!isHomeHighlight && !isDigitalBarracksHighlight)
+        .enabled(!isHomeHighlight && !isDigitalBarracksHighlight && !isResearchCenterHighlight)
         .onStart(() => {
           'worklet';
           startX.value = offsetX.value;
@@ -301,6 +301,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         .onBegin(() => {
           'worklet';
           if (isViewWallet) {
+            runOnJS(clearHighlight)();
+          } else if (isResearchCenterHighlight) {
             runOnJS(clearHighlight)();
           }
         })
@@ -339,7 +341,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         });
     }
     return null;
-  }, [offsetX, offsetY, startX, startY, boundsReady, minX, maxX, minY, maxY, withDecay, isHomeHighlight, isDigitalBarracksHighlight, isViewWallet, clearHighlight, runOnJS]);
+  }, [offsetX, offsetY, startX, startY, boundsReady, minX, maxX, minY, maxY, withDecay, isHomeHighlight, isDigitalBarracksHighlight, isResearchCenterHighlight, isViewWallet, clearHighlight, runOnJS]);
 
   // Fetch Property 1's status to determine Property 2's rendering
   const { data: property1Status } = useGetRentalHousingStatusQuery(1);
