@@ -1,7 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { BattleController } from '../controllers/BattleController';
 import auth from '../middleware/auth';
-import { Battle } from '../models/Battle'; // Fixed import for Battle model
+import { Battle } from '../models/Battle';
+import { UserTaskProgress } from '../models/UserTaskProgress';
+import { NPCService } from '../services/NPCService';
 
 interface StartBattleRequest extends Request {
   body: {
@@ -42,6 +44,34 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
       }
       
       const battle = await battleController.startBattle(req.user._id, defenderId || 'computer', screenWidth, screenHeight, userBattalions, defenderNpcSlug, unlockHackRigOnWin === true, defenderNpcInstanceId);
+      
+      const battleDoc = await Battle.findOne({ battleId: battle.battleId });
+      const actualDefenderNpcSlug = (battleDoc as any)?.defenderNpcSlug;
+      
+      if (actualDefenderNpcSlug) {
+        const npc = await NPCService.getNPCBySlug(actualDefenderNpcSlug);
+        if (npc && npc.userLevelAssociation === 1) {
+          const existingProgress = await UserTaskProgress.findOne({ userId: req.user._id });
+          const wasAlreadyAttacked = existingProgress?.attackedLevel1NpcAt;
+          
+          if (!wasAlreadyAttacked) {
+            await UserTaskProgress.findOneAndUpdate(
+              { userId: req.user._id },
+              {
+                $set: { attackedLevel1NpcAt: new Date() },
+                $setOnInsert: {
+                  completedTasks: [],
+                  collectedTasks: [],
+                  skippedTasks: [],
+                  showTaskGuide: true
+                }
+              },
+              { upsert: true, new: true }
+            );
+          }
+        }
+      }
+      
       res.status(201).json({ battleId: battle.battleId });
     } catch (error) {
       console.error('Start battle error:', error);

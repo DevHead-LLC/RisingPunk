@@ -12,6 +12,7 @@ export interface Task {
     type: string;
     value: number;
   };
+  howTo?: string;
 }
 
 let cachedTaskList: Task[] | null = null;
@@ -180,11 +181,15 @@ const TASK_LIST: Task[] = [
   },
   {
     id: 'hack-first-npc',
-    title: 'Hack your first NPC',
+    title: 'Hack a Level 1 NPC',
     description: 'Attack an NPC on the hack map',
     order: 14,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.attackedLevel1NpcAt);
+    },
     skipable: true,
-    reward: { type: 'wallet', value: 20 }
+    reward: { type: 'wallet', value: 20 },
+    howTo: 'Navigate: HomeLocation > HackRig > HackMap > LEVEL 1 NPC\n\nLook for the level indicator at the top right of the NPC tile.'
   },
   {
     id: 'build-research-center',
