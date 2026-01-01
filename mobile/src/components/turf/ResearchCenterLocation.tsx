@@ -95,6 +95,10 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
   });
 
   const handlePress = () => {
+    if (isBuildResearchCenter) {
+      clearHighlight();
+    }
+    
     if (isBuilding) {
       // Show speedup modal during build
       setShowSpeedupModal(true);
@@ -108,9 +112,6 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
         return;
       }
       setShowPopup(true);
-    }
-    if (isBuildResearchCenter) {
-      clearHighlight();
     }
   };
 

@@ -151,6 +151,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const [battleId, setBattleId] = useState<string | null>(null);
   const [pendingNpcSlug, setPendingNpcSlug] = useState<string | null>(null);
   const isAutoPanningRef = useRef(false);
+  const currentPanOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [returnContext, setReturnContext] = useState<{ origin: 'hackRig' | 'map'; mapPan?: { x: number; y: number } } | null>(null);
   const [pendingNpcInstanceId, setPendingNpcInstanceId] = useState<string | null>(null);
   const [pendingDefenderUserId, setPendingDefenderUserId] = useState<string | null>(null);
@@ -302,8 +303,6 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           'worklet';
           if (isViewWallet) {
             runOnJS(clearHighlight)();
-          } else if (isResearchCenterHighlight) {
-            runOnJS(clearHighlight)();
           }
         })
         .onUpdate((g: any) => {
@@ -322,6 +321,9 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           
           offsetX.value = x;
           offsetY.value = y;
+          runOnJS((xVal: number, yVal: number) => {
+            currentPanOffsetRef.current = { x: xVal, y: yVal };
+          })(x, y);
         })
         .onEnd((g: any) => {
           'worklet';
@@ -1052,6 +1054,45 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                       panGesture={panGesture}
                       colors={colors}
                     >
+                  <View
+                    style={StyleSheet.absoluteFill}
+                    onStartShouldSetResponder={(evt) => {
+                      if (isResearchCenterHighlight) {
+                        const { pageX, pageY } = evt.nativeEvent;
+                        const SCREEN_WIDTH = Dimensions.get('window').width;
+                        const SCREEN_HEIGHT = Dimensions.get('window').height;
+                        const CONTENT_WIDTH = 2000;
+                        const CONTENT_HEIGHT = 2000;
+                        
+                        const scrollX = -currentPanOffsetRef.current.x;
+                        const scrollY = currentPanOffsetRef.current.y;
+                        
+                        const researchCenterContentLeft = (CONTENT_WIDTH / 2) - 150;
+                        const researchCenterContentRight = researchCenterContentLeft + 300;
+                        const researchCenterContentTop = CONTENT_HEIGHT * 0.2;
+                        const researchCenterContentBottom = researchCenterContentTop + (CONTENT_HEIGHT * 0.11);
+                        
+                        const researchCenterScreenLeft = researchCenterContentLeft - scrollX;
+                        const researchCenterScreenRight = researchCenterContentRight - scrollX;
+                        const researchCenterScreenTop = researchCenterContentTop - scrollY;
+                        const researchCenterScreenBottom = researchCenterContentBottom - scrollY;
+                        
+                        const isOnResearchCenter = pageX >= researchCenterScreenLeft && 
+                                                  pageX <= researchCenterScreenRight &&
+                                                  pageY >= researchCenterScreenTop && 
+                                                  pageY <= researchCenterScreenBottom;
+                        
+                        if (!isOnResearchCenter) {
+                          clearHighlight();
+                          return true;
+                        }
+                      }
+                      return false;
+                    }}
+                    onMoveShouldSetResponder={() => false}
+                    onResponderRelease={() => {}}
+                    pointerEvents={isResearchCenterHighlight ? 'auto' : 'box-none'}
+                  />
                   <DiagonalLines colors={colors} />
                   <View style={[styles.digitalGround, { backgroundColor: colors.matrix + '0D', borderColor: colors.matrix + '33' }]}>
                     {!isHomeHighlight && <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />}
