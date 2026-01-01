@@ -77,7 +77,7 @@ export const Balance = memo(({ isIntroActive = false }: BalanceProps) => {
         backgroundColor: colors.accent, 
         borderColor: isHighlighted ? animatedBorderColorValue : colors.primary,
         borderWidth: isHighlighted ? 3 : 1,
-        zIndex: isHighlighted ? 1000 : 3
+        zIndex: isHighlighted ? 9999 : 3
       }
     ]}>
       <TouchableOpacity 
