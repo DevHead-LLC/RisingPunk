@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useState } from 'react';
+import React, { memo, useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { useAppSelector } from '../../store/hooks';
 import { getCurrentBalance } from '../../store/slices/balanceSlice';
@@ -27,6 +27,7 @@ export const Balance = memo(({ isIntroActive = false }: BalanceProps) => {
   const dispatch = useAppDispatch();
   const { highlightTaskId, clearHighlight } = useTaskGuideHighlight();
   const [trackWalletView] = useTrackWalletViewMutation();
+  const hasTrackedView = useRef(false);
   const [, setUpdateTrigger] = useState(0);
   const [currentColorIndex, setCurrentColorIndex] = useState(0);
   const animatedBorderColor = useState(new Animated.Value(0))[0];
@@ -83,10 +84,13 @@ export const Balance = memo(({ isIntroActive = false }: BalanceProps) => {
         style={styles.balanceContent}
         onPress={async () => {
           dispatch(setFinancialStatements(true));
-          try {
-            await trackWalletView().unwrap();
-          } catch (error) {
-            // Silent fail - don't block wallet opening
+          if (!hasTrackedView.current) {
+            hasTrackedView.current = true;
+            try {
+              await trackWalletView().unwrap();
+            } catch (error) {
+              // Silent fail - don't block wallet opening
+            }
           }
           if (isViewWalletTask) {
             clearHighlight();
