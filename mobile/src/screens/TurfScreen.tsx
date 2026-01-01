@@ -781,7 +781,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         } else {
           horizontalScrollRef.current?.scrollTo({
             x: RESEARCH_X,
-            y: RESEARCH_Y,
+            y: RESEARCH_Y, // Note: y parameter is ignored on horizontal-only ScrollView, but kept for consistency
             animated: true,
           });
           autoPanCompleteTimeoutRef.current = setTimeout(() => {
