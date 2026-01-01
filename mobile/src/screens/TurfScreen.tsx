@@ -155,6 +155,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const currentPanOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const autoPanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoPanCompleteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoPanUpdateIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [returnContext, setReturnContext] = useState<{ origin: 'hackRig' | 'map'; mapPan?: { x: number; y: number } } | null>(null);
   const [pendingNpcInstanceId, setPendingNpcInstanceId] = useState<string | null>(null);
   const [pendingDefenderUserId, setPendingDefenderUserId] = useState<string | null>(null);
@@ -775,8 +776,31 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         if (Platform.OS === 'android') {
           offsetX.value = withTiming(-RESEARCH_X, { duration: 300 });
           offsetY.value = withTiming(-RESEARCH_Y, { duration: 300 });
+          // Update ref during animation using a timer to sample values
+          const animationStartTime = Date.now();
+          autoPanUpdateIntervalRef.current = setInterval(() => {
+            const elapsed = Date.now() - animationStartTime;
+            if (elapsed < 300) {
+              // During animation, interpolate values
+              const progress = elapsed / 300;
+              const currentX = -RESEARCH_X * progress;
+              const currentY = -RESEARCH_Y * progress;
+              currentPanOffsetRef.current = { x: currentX, y: currentY };
+            } else {
+              // Animation complete, set final values
+              currentPanOffsetRef.current = { x: -RESEARCH_X, y: -RESEARCH_Y };
+              if (autoPanUpdateIntervalRef.current) {
+                clearInterval(autoPanUpdateIntervalRef.current);
+                autoPanUpdateIntervalRef.current = null;
+              }
+            }
+          }, 16); // Update ~60fps during animation
           autoPanCompleteTimeoutRef.current = setTimeout(() => {
             currentPanOffsetRef.current = { x: -RESEARCH_X, y: -RESEARCH_Y };
+            if (autoPanUpdateIntervalRef.current) {
+              clearInterval(autoPanUpdateIntervalRef.current);
+              autoPanUpdateIntervalRef.current = null;
+            }
             isAutoPanningRef.current = false;
           }, 350);
         } else {
@@ -803,21 +827,13 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         clearTimeout(autoPanCompleteTimeoutRef.current);
         autoPanCompleteTimeoutRef.current = null;
       }
+      if (autoPanUpdateIntervalRef.current) {
+        clearInterval(autoPanUpdateIntervalRef.current);
+        autoPanUpdateIntervalRef.current = null;
+      }
     };
   }, [isResearchCenterHighlight, currentScreen, offsetX, offsetY]);
 
-  // Update currentPanOffsetRef continuously during animations on Android
-  // This ensures touch detection uses current coordinates even during auto-pan animation
-  if (Platform.OS === 'android') {
-    useAnimatedReaction(
-      () => ({ x: offsetX.value, y: offsetY.value }),
-      (current) => {
-        runOnJS((xVal: number, yVal: number) => {
-          currentPanOffsetRef.current = { x: xVal, y: yVal };
-        })(current.x, current.y);
-      }
-    );
-  }
 
   const renderScreen = useCallback(() => {
     switch (currentScreen) {
