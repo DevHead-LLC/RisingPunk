@@ -152,6 +152,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const [pendingNpcSlug, setPendingNpcSlug] = useState<string | null>(null);
   const isAutoPanningRef = useRef(false);
   const currentPanOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const autoPanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoPanCompleteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [returnContext, setReturnContext] = useState<{ origin: 'hackRig' | 'map'; mapPan?: { x: number; y: number } } | null>(null);
   const [pendingNpcInstanceId, setPendingNpcInstanceId] = useState<string | null>(null);
   const [pendingDefenderUserId, setPendingDefenderUserId] = useState<string | null>(null);
@@ -761,7 +763,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   useEffect(() => {
     if (isResearchCenterHighlight && currentScreen === 'turf') {
       isAutoPanningRef.current = true;
-      setTimeout(() => {
+      autoPanTimeoutRef.current = setTimeout(() => {
         const SCREEN_WIDTH = Dimensions.get('window').width;
         const CONTENT_WIDTH = 2000;
         const RESEARCH_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
@@ -770,7 +772,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         if (Platform.OS === 'android') {
           offsetX.value = withTiming(-RESEARCH_X, { duration: 300 });
           offsetY.value = withTiming(RESEARCH_Y, { duration: 300 });
-          setTimeout(() => {
+          autoPanCompleteTimeoutRef.current = setTimeout(() => {
+            currentPanOffsetRef.current = { x: -RESEARCH_X, y: RESEARCH_Y };
             isAutoPanningRef.current = false;
           }, 350);
         } else {
@@ -779,7 +782,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
             y: RESEARCH_Y,
             animated: true,
           });
-          setTimeout(() => {
+          autoPanCompleteTimeoutRef.current = setTimeout(() => {
             isAutoPanningRef.current = false;
           }, 350);
         }
@@ -787,6 +790,17 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     } else {
       isAutoPanningRef.current = false;
     }
+    
+    return () => {
+      if (autoPanTimeoutRef.current) {
+        clearTimeout(autoPanTimeoutRef.current);
+        autoPanTimeoutRef.current = null;
+      }
+      if (autoPanCompleteTimeoutRef.current) {
+        clearTimeout(autoPanCompleteTimeoutRef.current);
+        autoPanCompleteTimeoutRef.current = null;
+      }
+    };
   }, [isResearchCenterHighlight, currentScreen, offsetX, offsetY]);
 
   const renderScreen = useCallback(() => {
