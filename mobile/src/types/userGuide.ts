@@ -18,6 +18,7 @@ export interface TaskListItem {
     type: string;
     value: number;
   };
+  howTo?: string;
 }
 
 export interface CurrentTaskResponse {

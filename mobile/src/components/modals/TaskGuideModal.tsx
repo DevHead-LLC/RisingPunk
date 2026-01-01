@@ -279,18 +279,32 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
                       }
                     ]}
                   >
-                    <Text 
-                      style={[
-                        styles.taskTitle, 
-                        { 
-                          color: colors.text.primary,
-                        }
-                      ]}
-                      numberOfLines={2}
-                      ellipsizeMode="tail"
-                    >
-                      {task.title || 'Untitled Task'}
-                    </Text>
+                    <View style={styles.taskContent}>
+                      <Text 
+                        style={[
+                          styles.taskTitle, 
+                          { 
+                            color: colors.text.primary,
+                          }
+                        ]}
+                        numberOfLines={2}
+                        ellipsizeMode="tail"
+                      >
+                        {task.title || 'Untitled Task'}
+                      </Text>
+                      {task.howTo && (
+                        <Text 
+                          style={[
+                            styles.taskHowTo, 
+                            { 
+                              color: colors.text.secondary,
+                            }
+                          ]}
+                        >
+                          {task.howTo}
+                        </Text>
+                      )}
+                    </View>
                     <View style={styles.rightSection}>
                       <Text 
                         style={[
@@ -365,18 +379,32 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
                           }
                         ]}
                       >
-                        <Text 
-                          style={[
-                            styles.taskTitle, 
-                            { 
-                              color: colors.text.primary,
-                            }
-                          ]}
-                          numberOfLines={2}
-                          ellipsizeMode="tail"
-                        >
-                          {task.title || 'Untitled Task'}
-                        </Text>
+                        <View style={styles.taskContent}>
+                          <Text 
+                            style={[
+                              styles.taskTitle, 
+                              { 
+                                color: colors.text.primary,
+                              }
+                            ]}
+                            numberOfLines={2}
+                            ellipsizeMode="tail"
+                          >
+                            {task.title || 'Untitled Task'}
+                          </Text>
+                          {task.howTo && (
+                            <Text 
+                              style={[
+                                styles.taskHowTo, 
+                                { 
+                                  color: colors.text.secondary,
+                                }
+                              ]}
+                            >
+                              {task.howTo}
+                            </Text>
+                          )}
+                        </View>
                         <View style={styles.rightSection}>
                           <Text 
                             style={[
@@ -538,13 +566,21 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     borderBottomWidth: 1,
     minHeight: 60,
   },
-  taskTitle: {
+  taskContent: {
     flex: 1,
-    fontSize: SIZING.font.body,
-    fontWeight: '600',
     marginRight: SIZING.spacing.md,
     flexShrink: 1,
     flexGrow: 1,
+  },
+  taskTitle: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
+    marginBottom: SIZING.spacing.xs,
+  },
+  taskHowTo: {
+    fontSize: SIZING.font.small,
+    lineHeight: SIZING.font.small * 1.4,
+    marginTop: SIZING.spacing.xs,
   },
   rightSection: {
     flexDirection: 'row',
