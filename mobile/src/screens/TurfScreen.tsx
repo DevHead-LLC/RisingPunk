@@ -874,9 +874,14 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         return (
           <View style={[styles.container, { backgroundColor: colors.background }]}>
             {isViewWallet && (
-              <Pressable
+              <View
                 style={[StyleSheet.absoluteFill, { zIndex: 999 }]}
-                onPress={clearHighlight}
+                onStartShouldSetResponder={() => true}
+                onMoveShouldSetResponder={() => false}
+                onResponderTerminationRequest={() => true}
+                onResponderRelease={() => {
+                  clearHighlight();
+                }}
               />
             )}
             <ErrorBoundary>
