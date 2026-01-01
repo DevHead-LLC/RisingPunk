@@ -160,6 +160,10 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
         // Will pan to center on Digital Barracks and animate border
         onClose();
         setHighlightTaskId(taskId);
+      } else if (taskId === 'view-wallet') {
+        // Close modal and trigger highlight mode for wallet balance
+        onClose();
+        setHighlightTaskId(taskId);
       } else {
         // For other tasks, just close modal for now
         onClose();
