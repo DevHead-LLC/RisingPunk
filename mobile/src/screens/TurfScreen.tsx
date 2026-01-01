@@ -29,7 +29,7 @@ import {TaskGuideHighlightOverlay} from '../components/turf/TaskGuideHighlightOv
 import {useTaskGuideHighlight} from '../contexts/TaskGuideHighlightContext';
 
 // Platform-specific imports - available on both platforms but only used on Android
-let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, withTiming: any, computePanBounds: any, runOnJS: any;
+let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, withTiming: any, computePanBounds: any, runOnJS: any, useAnimatedReaction: any;
 
 // Import on both platforms to avoid undefined function errors
 const gestureHandler = require('react-native-gesture-handler');
@@ -44,6 +44,7 @@ useAnimatedStyle = reanimated.useAnimatedStyle;
 withDecay = reanimated.withDecay;
 withTiming = reanimated.withTiming;
 runOnJS = reanimated.runOnJS;
+useAnimatedReaction = reanimated.useAnimatedReaction;
 computePanBounds = mapPanBounds.computePanBounds;
 
 const DiagonalLines = memo(({ colors }: { colors: any }) => (
@@ -804,6 +805,19 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       }
     };
   }, [isResearchCenterHighlight, currentScreen, offsetX, offsetY]);
+
+  // Update currentPanOffsetRef continuously during animations on Android
+  // This ensures touch detection uses current coordinates even during auto-pan animation
+  if (Platform.OS === 'android') {
+    useAnimatedReaction(
+      () => ({ x: offsetX.value, y: offsetY.value }),
+      (current) => {
+        runOnJS((xVal: number, yVal: number) => {
+          currentPanOffsetRef.current = { x: xVal, y: yVal };
+        })(current.x, current.y);
+      }
+    );
+  }
 
   const renderScreen = useCallback(() => {
     switch (currentScreen) {
