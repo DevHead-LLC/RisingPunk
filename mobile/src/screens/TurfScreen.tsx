@@ -774,21 +774,28 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         const RESEARCH_Y = 300;
         
         if (Platform.OS === 'android') {
-          offsetX.value = withTiming(-RESEARCH_X, { duration: 300 });
-          offsetY.value = withTiming(-RESEARCH_Y, { duration: 300 });
+          // Capture starting position before animation
+          const startX = offsetX.value;
+          const startY = offsetY.value;
+          const targetX = -RESEARCH_X;
+          const targetY = -RESEARCH_Y;
+          
+          offsetX.value = withTiming(targetX, { duration: 300 });
+          offsetY.value = withTiming(targetY, { duration: 300 });
+          
           // Update ref during animation using a timer to sample values
           const animationStartTime = Date.now();
           autoPanUpdateIntervalRef.current = setInterval(() => {
             const elapsed = Date.now() - animationStartTime;
             if (elapsed < 300) {
-              // During animation, interpolate values
+              // During animation, interpolate from start to target
               const progress = elapsed / 300;
-              const currentX = -RESEARCH_X * progress;
-              const currentY = -RESEARCH_Y * progress;
+              const currentX = startX + (targetX - startX) * progress;
+              const currentY = startY + (targetY - startY) * progress;
               currentPanOffsetRef.current = { x: currentX, y: currentY };
             } else {
               // Animation complete, set final values
-              currentPanOffsetRef.current = { x: -RESEARCH_X, y: -RESEARCH_Y };
+              currentPanOffsetRef.current = { x: targetX, y: targetY };
               if (autoPanUpdateIntervalRef.current) {
                 clearInterval(autoPanUpdateIntervalRef.current);
                 autoPanUpdateIntervalRef.current = null;
@@ -796,7 +803,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
             }
           }, 16); // Update ~60fps during animation
           autoPanCompleteTimeoutRef.current = setTimeout(() => {
-            currentPanOffsetRef.current = { x: -RESEARCH_X, y: -RESEARCH_Y };
+            currentPanOffsetRef.current = { x: targetX, y: targetY };
             if (autoPanUpdateIntervalRef.current) {
               clearInterval(autoPanUpdateIntervalRef.current);
               autoPanUpdateIntervalRef.current = null;
