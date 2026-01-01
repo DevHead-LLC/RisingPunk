@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useState } from 'react';
+import React, { memo, useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { useAppSelector } from '../../store/hooks';
 import { getCurrentBalance } from '../../store/slices/balanceSlice';
@@ -7,6 +7,8 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { useAppDispatch } from '../../store/hooks';
 import { setFinancialStatements } from '../../store/slices/uiSlice';
 import { roundToFloor } from '../../utils/currencyUtils';
+import { useTaskGuideHighlight } from '../../contexts/TaskGuideHighlightContext';
+import { useTrackWalletViewMutation } from '../../store/api/userGuideApi';
 
 // Utility function for formatting balance
 export function formatBalance(amount: number): string {
@@ -23,11 +25,16 @@ export const Balance = memo(({ isIntroActive = false }: BalanceProps) => {
   const colors = useThemeColors();
   const balance = useAppSelector(getCurrentBalance);
   const dispatch = useAppDispatch();
+  const { highlightTaskId, clearHighlight } = useTaskGuideHighlight();
+  const [trackWalletView] = useTrackWalletViewMutation();
+  const hasTrackedView = useRef(false);
   const [, setUpdateTrigger] = useState(0);
   const [currentColorIndex, setCurrentColorIndex] = useState(0);
   const animatedBorderColor = useState(new Animated.Value(0))[0];
   
   const introColors = [colors.primary, colors.secondary, colors.matrix];
+  const isHighlighted = isIntroActive || highlightTaskId === 'view-wallet';
+  const isViewWalletTask = highlightTaskId === 'view-wallet';
 
   // Force re-render every 10 seconds to update balance display
   useEffect(() => {
@@ -39,24 +46,24 @@ export const Balance = memo(({ isIntroActive = false }: BalanceProps) => {
   }, [balance]);
   
   useEffect(() => {
-    if (isIntroActive) {
+    if (isHighlighted) {
       const interval = setInterval(() => {
         setCurrentColorIndex(prev => (prev + 1) % introColors.length);
       }, 1000);
       
       return () => clearInterval(interval);
     }
-  }, [isIntroActive, introColors.length]);
+  }, [isHighlighted, introColors.length]);
   
   useEffect(() => {
-    if (isIntroActive) {
+    if (isHighlighted) {
       Animated.timing(animatedBorderColor, {
         toValue: currentColorIndex,
         duration: 500,
         useNativeDriver: false,
       }).start();
     }
-  }, [currentColorIndex, isIntroActive, animatedBorderColor]);
+  }, [currentColorIndex, isHighlighted, animatedBorderColor]);
   
   const animatedBorderColorValue = animatedBorderColor.interpolate({
     inputRange: [0, 1, 2],
@@ -68,14 +75,27 @@ export const Balance = memo(({ isIntroActive = false }: BalanceProps) => {
       styles.balanceContainer, 
       { 
         backgroundColor: colors.accent, 
-        borderColor: isIntroActive ? animatedBorderColorValue : colors.primary,
-        borderWidth: isIntroActive ? 3 : 1,
-        zIndex: isIntroActive ? 9999 : 3
+        borderColor: isHighlighted ? animatedBorderColorValue : colors.primary,
+        borderWidth: isHighlighted ? 3 : 1,
+        zIndex: isHighlighted ? 1000 : 3
       }
     ]}>
       <TouchableOpacity 
         style={styles.balanceContent}
-        onPress={() => dispatch(setFinancialStatements(true))} 
+        onPress={async () => {
+          dispatch(setFinancialStatements(true));
+          if (!hasTrackedView.current) {
+            hasTrackedView.current = true;
+            try {
+              await trackWalletView().unwrap();
+            } catch (error) {
+              // Silent fail - don't block wallet opening
+            }
+          }
+          if (isViewWalletTask) {
+            clearHighlight();
+          }
+        }} 
         activeOpacity={0.8}
       >
         <Text style={[styles.balanceLabel, { color: colors.text.secondary }]}>WALLET:</Text>
