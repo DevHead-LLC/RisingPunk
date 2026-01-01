@@ -162,6 +162,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const [turfViewPosition, setTurfViewPosition] = useState<{ x: number; y: number } | null>(null);
   const horizontalScrollRef = useRef<ScrollView>(null);
   const currentScrollPositionRef = useRef<{ x: number; y: number } | null>(null);
+  const scrollWrapperRef = useRef<View>(null);
+  const scrollWrapperOffsetY = useRef<number>(0);
   const dispatch = useAppDispatch();
 
   // Android-specific gesture state - always call hooks unconditionally
@@ -941,7 +943,15 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
             <ErrorBoundary>
               <Balance isIntroActive={currentIntroStep === 'wallet'} />
             </ErrorBoundary>
-            <View style={styles.scrollWrapper}>
+            <View 
+              ref={scrollWrapperRef}
+              style={styles.scrollWrapper}
+              onLayout={() => {
+                scrollWrapperRef.current?.measureInWindow((x, y) => {
+                  scrollWrapperOffsetY.current = y;
+                });
+              }}
+            >
               {Platform.OS === 'ios' ? (
                 <ScrollViewMemo 
                   horizontalScrollRef={horizontalScrollRef} 
@@ -954,7 +964,6 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                       if (isResearchCenterHighlight) {
                         const { pageX, pageY } = evt.nativeEvent;
                         const SCREEN_WIDTH = Dimensions.get('window').width;
-                        const SCREEN_HEIGHT = Dimensions.get('window').height;
                         const CONTENT_WIDTH = 2000;
                         const CONTENT_HEIGHT = 2000;
                         
@@ -968,13 +977,14 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                         
                         const researchCenterScreenLeft = researchCenterContentLeft - scrollX;
                         const researchCenterScreenRight = researchCenterContentRight - scrollX;
+                        const adjustedPageY = pageY - scrollWrapperOffsetY.current;
                         const researchCenterScreenTop = researchCenterContentTop - scrollY;
                         const researchCenterScreenBottom = researchCenterContentBottom - scrollY;
                         
                         const isOnResearchCenter = pageX >= researchCenterScreenLeft && 
                                                   pageX <= researchCenterScreenRight &&
-                                                  pageY >= researchCenterScreenTop && 
-                                                  pageY <= researchCenterScreenBottom;
+                                                  adjustedPageY >= researchCenterScreenTop && 
+                                                  adjustedPageY <= researchCenterScreenBottom;
                         
                         if (!isOnResearchCenter) {
                           clearHighlight();
@@ -1068,45 +1078,6 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                       panGesture={panGesture}
                       colors={colors}
                     >
-                  <View
-                    style={StyleSheet.absoluteFill}
-                    onStartShouldSetResponder={(evt) => {
-                      if (isResearchCenterHighlight) {
-                        const { pageX, pageY } = evt.nativeEvent;
-                        const SCREEN_WIDTH = Dimensions.get('window').width;
-                        const SCREEN_HEIGHT = Dimensions.get('window').height;
-                        const CONTENT_WIDTH = 2000;
-                        const CONTENT_HEIGHT = 2000;
-                        
-                        const scrollX = -currentPanOffsetRef.current.x;
-                        const scrollY = -currentPanOffsetRef.current.y;
-                        
-                        const researchCenterContentLeft = (CONTENT_WIDTH / 2) - 150;
-                        const researchCenterContentRight = researchCenterContentLeft + 300;
-                        const researchCenterContentTop = CONTENT_HEIGHT * 0.2;
-                        const researchCenterContentBottom = researchCenterContentTop + (CONTENT_HEIGHT * 0.11);
-                        
-                        const researchCenterScreenLeft = researchCenterContentLeft - scrollX;
-                        const researchCenterScreenRight = researchCenterContentRight - scrollX;
-                        const researchCenterScreenTop = researchCenterContentTop - scrollY;
-                        const researchCenterScreenBottom = researchCenterContentBottom - scrollY;
-                        
-                        const isOnResearchCenter = pageX >= researchCenterScreenLeft && 
-                                                  pageX <= researchCenterScreenRight &&
-                                                  pageY >= researchCenterScreenTop && 
-                                                  pageY <= researchCenterScreenBottom;
-                        
-                        if (!isOnResearchCenter) {
-                          clearHighlight();
-                          return true;
-                        }
-                      }
-                      return false;
-                    }}
-                    onMoveShouldSetResponder={() => false}
-                    onResponderRelease={() => {}}
-                    pointerEvents={isResearchCenterHighlight ? 'auto' : 'box-none'}
-                  />
                   <DiagonalLines colors={colors} />
                   <View style={[styles.digitalGround, { backgroundColor: colors.matrix + '0D', borderColor: colors.matrix + '33' }]}>
                     {!isHomeHighlight && <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />}
@@ -1182,6 +1153,45 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                       );
                     })()}
                     </DevelopmentZone>
+                  {isResearchCenterHighlight && (
+                    <View
+                      style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}
+                      onStartShouldSetResponder={(evt) => {
+                        const { pageX, pageY } = evt.nativeEvent;
+                        const SCREEN_WIDTH = Dimensions.get('window').width;
+                        const CONTENT_WIDTH = 2000;
+                        const CONTENT_HEIGHT = 2000;
+                        
+                        const scrollX = -currentPanOffsetRef.current.x;
+                        const scrollY = -currentPanOffsetRef.current.y;
+                        
+                        const researchCenterContentLeft = (CONTENT_WIDTH / 2) - 150;
+                        const researchCenterContentRight = researchCenterContentLeft + 300;
+                        const researchCenterContentTop = CONTENT_HEIGHT * 0.2;
+                        const researchCenterContentBottom = researchCenterContentTop + (CONTENT_HEIGHT * 0.11);
+                        
+                        const researchCenterScreenLeft = researchCenterContentLeft - scrollX;
+                        const researchCenterScreenRight = researchCenterContentRight - scrollX;
+                        const adjustedPageY = pageY - scrollWrapperOffsetY.current;
+                        const researchCenterScreenTop = researchCenterContentTop - scrollY;
+                        const researchCenterScreenBottom = researchCenterContentBottom - scrollY;
+                        
+                        const isOnResearchCenter = pageX >= researchCenterScreenLeft && 
+                                                  pageX <= researchCenterScreenRight &&
+                                                  adjustedPageY >= researchCenterScreenTop && 
+                                                  adjustedPageY <= researchCenterScreenBottom;
+                        
+                        if (!isOnResearchCenter) {
+                          clearHighlight();
+                          return true;
+                        }
+                        return false;
+                      }}
+                      onMoveShouldSetResponder={() => false}
+                      onResponderRelease={() => {}}
+                      pointerEvents="auto"
+                    />
+                  )}
                   </GesturePanView>
                 </View>
               )}
