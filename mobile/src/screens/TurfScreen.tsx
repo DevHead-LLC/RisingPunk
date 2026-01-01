@@ -771,9 +771,9 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         
         if (Platform.OS === 'android') {
           offsetX.value = withTiming(-RESEARCH_X, { duration: 300 });
-          offsetY.value = withTiming(RESEARCH_Y, { duration: 300 });
+          offsetY.value = withTiming(-RESEARCH_Y, { duration: 300 });
           autoPanCompleteTimeoutRef.current = setTimeout(() => {
-            currentPanOffsetRef.current = { x: -RESEARCH_X, y: RESEARCH_Y };
+            currentPanOffsetRef.current = { x: -RESEARCH_X, y: -RESEARCH_Y };
             isAutoPanningRef.current = false;
           }, 350);
         } else {
@@ -1079,7 +1079,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                         const CONTENT_HEIGHT = 2000;
                         
                         const scrollX = -currentPanOffsetRef.current.x;
-                        const scrollY = currentPanOffsetRef.current.y;
+                        const scrollY = -currentPanOffsetRef.current.y;
                         
                         const researchCenterContentLeft = (CONTENT_WIDTH / 2) - 150;
                         const researchCenterContentRight = researchCenterContentLeft + 300;
