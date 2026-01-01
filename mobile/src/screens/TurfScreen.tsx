@@ -1,5 +1,5 @@
 import React, {useState, useRef, useEffect, useCallback, memo, forwardRef, useImperativeHandle, useMemo} from 'react';
-import {View, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity} from 'react-native';
+import {View, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, Pressable} from 'react-native';
 import {Balance} from '../components/common/Balance';
 import {HomeScreen} from './HomeScreen';
 import {DigitalBarracksScreen} from './DigitalBarracksScreen';
@@ -29,7 +29,7 @@ import {TaskGuideHighlightOverlay} from '../components/turf/TaskGuideHighlightOv
 import {useTaskGuideHighlight} from '../contexts/TaskGuideHighlightContext';
 
 // Platform-specific imports - available on both platforms but only used on Android
-let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, withTiming: any, computePanBounds: any;
+let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, withTiming: any, computePanBounds: any, runOnJS: any;
 
 // Import on both platforms to avoid undefined function errors
 const gestureHandler = require('react-native-gesture-handler');
@@ -43,6 +43,7 @@ useSharedValue = reanimated.useSharedValue;
 useAnimatedStyle = reanimated.useAnimatedStyle;
 withDecay = reanimated.withDecay;
 withTiming = reanimated.withTiming;
+runOnJS = reanimated.runOnJS;
 computePanBounds = mapPanBounds.computePanBounds;
 
 const DiagonalLines = memo(({ colors }: { colors: any }) => (
@@ -140,6 +141,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const isVisitDigitalBarracks = highlightTaskId === 'visit-digital-barracks';
   const isBuildGuardians = highlightTaskId === 'build-100-guardians';
   const isFreeHackRig = highlightTaskId === 'free-hack-rig';
+  const isViewWallet = highlightTaskId === 'view-wallet';
   const isHomeHighlight = isVisitHome || isVisitHackmap || (isBuildGuardians && highlightStep === null) || (isFreeHackRig && highlightStep === null);
   const isDigitalBarracksHighlight = isVisitDigitalBarracks;
 
@@ -274,7 +276,10 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const handleTurfScroll = useCallback((event: any) => {
     const { contentOffset } = event.nativeEvent;
     currentScrollPositionRef.current = { x: contentOffset.x, y: contentOffset.y };
-  }, []);
+    if (isViewWallet) {
+      clearHighlight();
+    }
+  }, [isViewWallet, clearHighlight]);
 
   // Android-specific pan gesture (only for Android) - Memoized for performance
   const panGesture = useMemo(() => {
@@ -287,6 +292,12 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           'worklet';
           startX.value = offsetX.value;
           startY.value = offsetY.value;
+        })
+        .onBegin(() => {
+          'worklet';
+          if (isViewWallet) {
+            runOnJS(clearHighlight)();
+          }
         })
         .onUpdate((g: any) => {
           'worklet';
@@ -323,7 +334,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         });
     }
     return null;
-  }, [offsetX, offsetY, startX, startY, boundsReady, minX, maxX, minY, maxY, withDecay, isHomeHighlight, isDigitalBarracksHighlight]);
+  }, [offsetX, offsetY, startX, startY, boundsReady, minX, maxX, minY, maxY, withDecay, isHomeHighlight, isDigitalBarracksHighlight, isViewWallet, clearHighlight, runOnJS]);
 
   // Fetch Property 1's status to determine Property 2's rendering
   const { data: property1Status } = useGetRentalHousingStatusQuery(1);
@@ -862,6 +873,17 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       default:
         return (
           <View style={[styles.container, { backgroundColor: colors.background }]}>
+            {isViewWallet && (
+              <View
+                style={[StyleSheet.absoluteFill, { zIndex: 999 }]}
+                onStartShouldSetResponder={() => true}
+                onMoveShouldSetResponder={() => false}
+                onResponderTerminationRequest={() => true}
+                onResponderRelease={() => {
+                  clearHighlight();
+                }}
+              />
+            )}
             <ErrorBoundary>
               <Balance isIntroActive={currentIntroStep === 'wallet'} />
             </ErrorBoundary>

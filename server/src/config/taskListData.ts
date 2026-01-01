@@ -172,6 +172,9 @@ const TASK_LIST: Task[] = [
     title: 'View your wallet',
     description: 'Check your balance',
     order: 13,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.walletViewedAt);
+    },
     skipable: true,
     reward: { type: 'wallet', value: 20 }
   },
