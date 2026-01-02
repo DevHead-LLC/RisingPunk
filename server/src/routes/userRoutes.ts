@@ -1,5 +1,5 @@
 import express from 'express';
-import { User } from '../models/User';
+import { User, IUser } from '../models/User';
 import { ShieldService } from '../services/ShieldService';
 import auth from '../middleware/auth';
 import { Request, Response } from 'express';
@@ -204,7 +204,7 @@ router.post('/unlock-hack-rig', auth, async (req: Request, res: Response) => {
 
 router.get('/research-center-status', auth, async (req: Request, res: Response) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user: IUser | null = await User.findById(req.user._id);
     if (!user) {
       res.status(404).json({ message: 'User not found' });
       return;

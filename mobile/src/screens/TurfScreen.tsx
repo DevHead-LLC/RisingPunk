@@ -155,6 +155,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const currentPanOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const autoPanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoPanCompleteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const offsetTrackingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [returnContext, setReturnContext] = useState<{ origin: 'hackRig' | 'map'; mapPan?: { x: number; y: number } } | null>(null);
   const [pendingNpcInstanceId, setPendingNpcInstanceId] = useState<string | null>(null);
   const [pendingDefenderUserId, setPendingDefenderUserId] = useState<string | null>(null);
@@ -763,6 +764,23 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     }
   }, [isDigitalBarracksHighlight, currentScreen, offsetX, offsetY]);
 
+  // Continuously track offset values during research center highlight to catch decay animations
+  useEffect(() => {
+    if (Platform.OS === 'android' && isResearchCenterHighlight && currentScreen === 'turf') {
+      // Start continuous tracking of offset values
+      offsetTrackingIntervalRef.current = setInterval(() => {
+        currentPanOffsetRef.current = { x: offsetX.value, y: offsetY.value };
+      }, 16); // Update ~60fps
+      
+      return () => {
+        if (offsetTrackingIntervalRef.current) {
+          clearInterval(offsetTrackingIntervalRef.current);
+          offsetTrackingIntervalRef.current = null;
+        }
+      };
+    }
+  }, [isResearchCenterHighlight, currentScreen, offsetX, offsetY]);
+
   useEffect(() => {
     if (isResearchCenterHighlight && currentScreen === 'turf') {
       isAutoPanningRef.current = true;
@@ -773,10 +791,17 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         const RESEARCH_Y = 300;
         
         if (Platform.OS === 'android') {
-          offsetX.value = withTiming(-RESEARCH_X, { duration: 300 });
-          offsetY.value = withTiming(-RESEARCH_Y, { duration: 300 });
+          const targetX = -RESEARCH_X;
+          const targetY = -RESEARCH_Y;
+          
+          offsetX.value = withTiming(targetX, { duration: 300 });
+          offsetY.value = withTiming(targetY, { duration: 300 });
+          
+          // Continuous tracking interval already updates currentPanOffsetRef with actual eased values
+          // Just set the flag after animation completes
           autoPanCompleteTimeoutRef.current = setTimeout(() => {
-            currentPanOffsetRef.current = { x: -RESEARCH_X, y: -RESEARCH_Y };
+            // Final update to ensure we have the exact target values
+            currentPanOffsetRef.current = { x: targetX, y: targetY };
             isAutoPanningRef.current = false;
           }, 350);
         } else {
@@ -803,21 +828,13 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         clearTimeout(autoPanCompleteTimeoutRef.current);
         autoPanCompleteTimeoutRef.current = null;
       }
+      if (offsetTrackingIntervalRef.current) {
+        clearInterval(offsetTrackingIntervalRef.current);
+        offsetTrackingIntervalRef.current = null;
+      }
     };
   }, [isResearchCenterHighlight, currentScreen, offsetX, offsetY]);
 
-  // Update currentPanOffsetRef continuously during animations on Android
-  // This ensures touch detection uses current coordinates even during auto-pan animation
-  if (Platform.OS === 'android') {
-    useAnimatedReaction(
-      () => ({ x: offsetX.value, y: offsetY.value }),
-      (current) => {
-        runOnJS((xVal: number, yVal: number) => {
-          currentPanOffsetRef.current = { x: xVal, y: yVal };
-        })(current.x, current.y);
-      }
-    );
-  }
 
   const renderScreen = useCallback(() => {
     switch (currentScreen) {
