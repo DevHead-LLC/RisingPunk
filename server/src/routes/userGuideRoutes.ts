@@ -51,7 +51,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
     // This ensures tasks like 'reach-level-2' are auto-completed if user has already reached level 2
     // Note: Using .lean() to get plain JavaScript object, and explicitly selecting fields
     // If fields don't exist in database, they will be undefined (not default value)
-    const user = await User.findById(userId).select('totalGuardiansBuilt totalPhreaksBuilt totalBreachersBuilt unlockedFeatures.hackRig unlockedFeatures.researchCenter level').lean();
+    const user = await User.findById(userId).select('totalGuardiansBuilt totalPhreaksBuilt totalBreachersBuilt unlockedFeatures.hackRig unlockedFeatures.researchCenter unlockedFeatures.rentalHousing1 level').lean();
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;
