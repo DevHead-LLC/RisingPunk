@@ -1,4 +1,4 @@
-import React, { memo, useState, useEffect, useCallback } from 'react';
+import React, { memo, useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -7,6 +7,8 @@ import { useFetchBalanceQuery } from '../../store/api/balanceApi';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { updateBalance, getCurrentBalance } from '../../store/slices/balanceSlice';
 import { useGetRentalHousingStatusQuery, useUnlockRentalHousingMutation, useCompleteRentalHousingMutation, useSpeedupPropertyConstructionMutation } from '../../store/api/authApi';
+import { userGuideApi } from '../../store/api/userGuideApi';
+import { useTaskGuideHighlight } from '../../contexts/TaskGuideHighlightContext';
 import {
   DevelopmentIcon,
   DevelopmentLabel,
@@ -35,6 +37,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
 }: RentalHousingLocationProps) {
   const colors = useThemeColors();
   const { themeMode } = useTheme();
+  const { highlightTaskId, clearHighlight } = useTaskGuideHighlight();
   const currentBalanceState = useAppSelector((state) => state.balance);
   const [showPopup, setShowPopup] = useState(false);
   const [showLoadingModal, setShowLoadingModal] = useState(false);
@@ -46,12 +49,16 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
   const [forceUpdate, setForceUpdate] = useState(0);
   
   const { data: balanceData, isLoading: balanceLoading } = useFetchBalanceQuery();
-  const { data: rentalHousingStatus, isLoading: statusLoading, refetch } = useGetRentalHousingStatusQuery(propertyId);
+  const [isBuildingState, setIsBuildingState] = useState(false);
+  const { data: rentalHousingStatus, isLoading: statusLoading, refetch } = useGetRentalHousingStatusQuery(propertyId, {
+    pollingInterval: isBuildingState ? 5000 : 0,
+  });
   const [unlockRentalHousing, { isLoading: isUnlocking }] = useUnlockRentalHousingMutation();
   const [completeRentalHousing, { isLoading: isCompleting }] = useCompleteRentalHousingMutation();
   const [speedupPropertyConstruction] = useSpeedupPropertyConstructionMutation();
   
   const dispatch = useAppDispatch();
+  const previousIsUnlockedRef = useRef<boolean | undefined>(undefined);
   
   // Get balance from Redux store (always call hooks unconditionally)
   const reduxBalance = useAppSelector((state) => state.balance.total);
@@ -72,6 +79,21 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
   
   const hasSufficientFunds = numericBalance !== null && !isNaN(numericBalance as number) && numericBalance >= RENTAL_HOUSING_COST;
 
+  const isBuildInvestmentProperty = highlightTaskId === 'build-investment-property' && propertyId === 1;
+  const isHighlighted = isIntroActive || isBuildInvestmentProperty;
+  
+  useEffect(() => {
+    setIsBuildingState(isBuilding);
+  }, [isBuilding]);
+
+  useEffect(() => {
+    // Only invalidate cache when unlock state transitions from false to true (for property 1)
+    if (isUnlocked && previousIsUnlockedRef.current === false && propertyId === 1) {
+      dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
+    }
+    previousIsUnlockedRef.current = isUnlocked;
+  }, [isUnlocked, propertyId, dispatch]);
+
   // Update balance when build starts
   useEffect(() => {
     if (rentalHousingStatus?.buildStatus?.startedAt && !rentalHousingStatus?.buildStatus?.completesAt) {
@@ -81,6 +103,10 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
   }, [rentalHousingStatus, dispatch]);
 
   const handlePress = () => {
+    if (isBuildInvestmentProperty) {
+      clearHighlight();
+    }
+    
     if (isBuilding) {
       // Show speedup modal during build
       setShowSpeedupModal(true);
@@ -206,7 +232,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
   // Show loading state while fetching status
   if (statusLoading) {
     return (
-      <View style={styles.rentalHousingContainer}>
+      <View style={[styles.rentalHousingContainer, { zIndex: isHighlighted ? 10002 : 1 }]}>
         <View style={styles.iconWrapper}>
           <DevelopmentIcon
             isBuilding={false}
@@ -217,7 +243,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
             onPress={() => {}}
             size={100}
             iconSize={85}
-            isIntroActive={isIntroActive}
+            isIntroActive={isHighlighted}
           />
           <Text style={[styles.propertyNumber, { color: themeMode === 'light' ? '#FFFFFF' : colors.matrix }]}>{propertyId}</Text>
         </View>
@@ -225,8 +251,10 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
     );
   }
 
+  const zIndexValue = isHighlighted ? 10002 : 1;
+
   return (
-    <View style={styles.rentalHousingContainer}>
+    <View style={[styles.rentalHousingContainer, { zIndex: zIndexValue }]}>
       <View style={styles.iconWrapper}>
         <DevelopmentIcon
           isBuilding={isBuilding}
@@ -237,7 +265,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
           onPress={handlePress}
           size={100}
           iconSize={85}
-          isIntroActive={isIntroActive}
+          isIntroActive={isHighlighted}
         />
         <Text style={[styles.propertyNumber, { color: themeMode === 'light' ? '#FFFFFF' : colors.matrix }]}>{propertyId}</Text>
       </View>
