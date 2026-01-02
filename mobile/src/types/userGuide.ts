@@ -97,3 +97,12 @@ export interface TrackWalletViewResponse {
   message?: string;
 }
 
+export interface TrackAnotherUserProfileVisitRequest {
+  visitedUserId: string;
+}
+
+export interface TrackAnotherUserProfileVisitResponse {
+  success: boolean;
+  message?: string;
+}
+
