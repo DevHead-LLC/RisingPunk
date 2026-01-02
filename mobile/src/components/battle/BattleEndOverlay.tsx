@@ -7,6 +7,7 @@ import { LevelUpAnimation } from '../common/LevelUpAnimation';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useAppDispatch } from '../../store/hooks';
 import { authApi } from '../../store/api/authApi';
+import { userGuideApi } from '../../store/api/userGuideApi';
 
 interface BattleEndOverlayProps {
   winner: NodeOwner;
@@ -30,6 +31,10 @@ export const BattleEndOverlay: React.FC<BattleEndOverlayProps> = ({ winner, onCo
     if (battleEndData) {
       // Invalidate the User cache tag to force profile data refresh
       dispatch(authApi.util.invalidateTags(['User']));
+      // Invalidate task guide cache if user leveled up to ensure task list updates immediately
+      if (battleEndData.levelUp && battleEndData.levelUp.levelsGained > 0) {
+        dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
+      }
     }
   }, [battleEndData, dispatch]);
 
