@@ -21,6 +21,7 @@ export interface IUserTaskProgress extends Document {
   walletViewedAt?: Date;
   attackedLevel1NpcAt?: Date;
   visitedAnotherUserProfileAt?: Date;
+  homeDefenseUnlockedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -98,6 +99,10 @@ const userTaskProgressSchema = new Schema({
     required: false
   },
   visitedAnotherUserProfileAt: {
+    type: Date,
+    required: false
+  },
+  homeDefenseUnlockedAt: {
     type: Date,
     required: false
   }
