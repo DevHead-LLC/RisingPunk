@@ -315,10 +315,13 @@ router.post('/complete-feature-research', auth, async (req: Request, res: Respon
               const updatedProgress = await UserTaskProgress.findOne({ userId }).lean();
               const user = await User.findById(userId).lean();
               if (user && updatedProgress) {
-                const shouldAutoComplete = antivirusTask.autoCompleteConditions(user as any, updatedProgress as any);
-                if (shouldAutoComplete) {
-                  const completedTaskIds = new Set(updatedProgress.completedTasks.map(t => t.taskId));
-                  if (!completedTaskIds.has(taskId)) {
+                const completedTaskIds = new Set(updatedProgress.completedTasks.map(t => t.taskId));
+                const collectedTaskIds = new Set(updatedProgress.collectedTasks || []);
+                const skippedTaskIds = new Set(updatedProgress.skippedTasks || []);
+                
+                if (!collectedTaskIds.has(taskId) && !skippedTaskIds.has(taskId) && !completedTaskIds.has(taskId)) {
+                  const shouldAutoComplete = antivirusTask.autoCompleteConditions(user as any, updatedProgress as any);
+                  if (shouldAutoComplete) {
                     await UserTaskProgress.findOneAndUpdate(
                       {
                         userId,
@@ -591,10 +594,13 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
           if (antivirusTask && antivirusTask.autoCompleteConditions) {
             const updatedProgress = await UserTaskProgress.findOne({ userId }).lean();
             if (updatedProgress) {
-              const shouldAutoComplete = antivirusTask.autoCompleteConditions(updatedUser as any, updatedProgress as any);
-              if (shouldAutoComplete) {
-                const completedTaskIds = new Set(updatedProgress.completedTasks.map(t => t.taskId));
-                if (!completedTaskIds.has(taskId)) {
+              const completedTaskIds = new Set(updatedProgress.completedTasks.map(t => t.taskId));
+              const collectedTaskIds = new Set(updatedProgress.collectedTasks || []);
+              const skippedTaskIds = new Set(updatedProgress.skippedTasks || []);
+              
+              if (!collectedTaskIds.has(taskId) && !skippedTaskIds.has(taskId) && !completedTaskIds.has(taskId)) {
+                const shouldAutoComplete = antivirusTask.autoCompleteConditions(updatedUser as any, updatedProgress as any);
+                if (shouldAutoComplete) {
                   await UserTaskProgress.findOneAndUpdate(
                     {
                       userId,
