@@ -65,40 +65,26 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
         const userResearch = await ResearchUser.findOne({
           userId,
           researchId: homeDefenseResearch._id
-        }).populate('researchId');
+        });
         
         if (userResearch && userResearch.isUnlocked) {
-          const research = userResearch.researchId as any;
-          const levelMet = user.level >= research.levelRequirement;
+          await UserTaskProgress.findOneAndUpdate(
+            { userId },
+            {
+              $set: { homeDefenseUnlockedAt: userResearch.unlockedAt || new Date() },
+              $setOnInsert: {
+                completedTasks: [],
+                collectedTasks: [],
+                skippedTasks: [],
+                showTaskGuide: true
+              }
+            },
+            { upsert: true, new: true }
+          );
           
-          const allUserResearch = await ResearchUser.find({ userId }).populate('researchId');
-          const unlockedDependencies = allUserResearch
-            .filter(ur => research.dependencies.includes((ur.researchId as any)?.categoryId))
-            .map(ur => ur.isUnlocked);
-          const dependenciesMet = research.dependencies.length === 0 || 
-            (unlockedDependencies.length === research.dependencies.length && unlockedDependencies.every(unlocked => unlocked === true));
-          
-          const actuallyUnlocked = levelMet && dependenciesMet;
-          
-          if (actuallyUnlocked) {
-            await UserTaskProgress.findOneAndUpdate(
-              { userId },
-              {
-                $set: { homeDefenseUnlockedAt: userResearch.unlockedAt || new Date() },
-                $setOnInsert: {
-                  completedTasks: [],
-                  collectedTasks: [],
-                  skippedTasks: [],
-                  showTaskGuide: true
-                }
-              },
-              { upsert: true, new: true }
-            );
-            
-            const updatedProgress = await UserTaskProgress.findOne({ userId }).lean();
-            if (updatedProgress) {
-              progress = updatedProgress as any;
-            }
+          const updatedProgress = await UserTaskProgress.findOne({ userId }).lean();
+          if (updatedProgress) {
+            progress = updatedProgress as any;
           }
         }
       }
