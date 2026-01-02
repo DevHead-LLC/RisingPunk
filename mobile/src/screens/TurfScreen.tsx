@@ -999,7 +999,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                         const CONTENT_HEIGHT = 2000;
                         
                         const scrollX = currentScrollPositionRef.current?.x ?? ((CONTENT_WIDTH - SCREEN_WIDTH) / 2);
-                        const scrollY = currentScrollPositionRef.current?.y ?? 300;
+                        const scrollY = currentScrollPositionRef.current?.y ?? 0;
                         
                         const researchCenterContentLeft = (CONTENT_WIDTH / 2) - 150;
                         const researchCenterContentRight = researchCenterContentLeft + 300;
