@@ -231,6 +231,9 @@ const TASK_LIST: Task[] = [
     title: 'Build an Investment Property',
     description: 'Construct your first investment property',
     order: 18,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return user.unlockedFeatures?.rentalHousing1 === true;
+    },
     skipable: true,
     reward: { type: 'wallet', value: 30 }
   },

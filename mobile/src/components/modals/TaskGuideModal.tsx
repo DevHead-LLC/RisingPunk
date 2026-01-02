@@ -165,6 +165,11 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
         // Will pan to center on Research Center
         onClose();
         setHighlightTaskId(taskId);
+      } else if (taskId === 'build-investment-property') {
+        // Close modal and trigger highlight mode for build-investment-property
+        // Will pan to center on Investment Property 1
+        onClose();
+        setHighlightTaskId(taskId);
       } else if (taskId === 'view-wallet') {
         // Close modal and trigger highlight mode for wallet balance
         onClose();
