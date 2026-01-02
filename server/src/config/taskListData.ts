@@ -242,8 +242,12 @@ const TASK_LIST: Task[] = [
     title: 'Unlock Home Defense Category in Research Center',
     description: 'Unlock the Home Defense research category',
     order: 19,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.homeDefenseUnlockedAt);
+    },
     skipable: true,
-    reward: { type: 'wallet', value: 30 }
+    reward: { type: 'wallet', value: 30 },
+    howTo: 'Navigate: HomeLocation > Research Center > Home Defense Category\n\nRequirements: Level 2 and $10,000 wallet balance. If you don\'t meet these requirements yet, fight NPCs in the HackMap to level up and earn money.'
   },
   {
     id: 'unlock-antivirus',
