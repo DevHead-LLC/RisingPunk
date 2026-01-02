@@ -39,73 +39,77 @@ router.post('/unlock/:categoryId', auth, async (req: Request, res: Response) => 
     
     if (result.success) {
       if (categoryId === 'home-defense') {
-        const progress = await UserTaskProgress.findOne({ userId });
-        const wasAlreadyUnlocked = progress?.homeDefenseUnlockedAt;
-        
-        if (!wasAlreadyUnlocked) {
-          await UserTaskProgress.findOneAndUpdate(
-            { userId },
-            {
-              $set: { homeDefenseUnlockedAt: new Date() },
-              $setOnInsert: {
-                completedTasks: [],
-                collectedTasks: [],
-                skippedTasks: [],
-                showTaskGuide: true
-              }
-            },
-            { upsert: true, new: true }
-          );
+        try {
+          const progress = await UserTaskProgress.findOne({ userId });
+          const wasAlreadyUnlocked = progress?.homeDefenseUnlockedAt;
           
-          const taskList = getTaskList();
-          const taskId = 'unlock-home-defense';
-          const homeDefenseTask = taskList.find(t => t.id === taskId);
-          
-          if (homeDefenseTask && homeDefenseTask.autoCompleteConditions) {
-            const user = await User.findById(userId).lean();
-            if (user) {
-              const updatedProgress = await UserTaskProgress.findOne({ userId });
-              const shouldAutoComplete = homeDefenseTask.autoCompleteConditions(user as any, updatedProgress ?? undefined);
-              
-              if (shouldAutoComplete) {
-                const isAlreadyCompleted = updatedProgress?.completedTasks?.some(
-                  (task: any) => task.taskId === taskId
-                );
+          if (!wasAlreadyUnlocked) {
+            await UserTaskProgress.findOneAndUpdate(
+              { userId },
+              {
+                $set: { homeDefenseUnlockedAt: new Date() },
+                $setOnInsert: {
+                  completedTasks: [],
+                  collectedTasks: [],
+                  skippedTasks: [],
+                  showTaskGuide: true
+                }
+              },
+              { upsert: true, new: true }
+            );
+            
+            const taskList = getTaskList();
+            const taskId = 'unlock-home-defense';
+            const homeDefenseTask = taskList.find(t => t.id === taskId);
+            
+            if (homeDefenseTask && homeDefenseTask.autoCompleteConditions) {
+              const user = await User.findById(userId).lean();
+              if (user) {
+                const updatedProgress = await UserTaskProgress.findOne({ userId });
+                const shouldAutoComplete = homeDefenseTask.autoCompleteConditions(user as any, updatedProgress ?? undefined);
                 
-                if (!isAlreadyCompleted) {
-                  await UserTaskProgress.findOneAndUpdate(
-                    { userId },
-                    {
-                      $setOnInsert: {
-                        completedTasks: [],
-                        collectedTasks: [],
-                        skippedTasks: [],
-                        showTaskGuide: true
-                      }
-                    },
-                    { upsert: true }
+                if (shouldAutoComplete) {
+                  const isAlreadyCompleted = updatedProgress?.completedTasks?.some(
+                    (task: any) => task.taskId === taskId
                   );
                   
-                  await UserTaskProgress.findOneAndUpdate(
-                    {
-                      userId,
-                      'completedTasks.taskId': { $ne: taskId }
-                    },
-                    {
-                      $push: {
-                        completedTasks: {
-                          taskId: taskId,
-                          completedAt: new Date()
+                  if (!isAlreadyCompleted) {
+                    await UserTaskProgress.findOneAndUpdate(
+                      { userId },
+                      {
+                        $setOnInsert: {
+                          completedTasks: [],
+                          collectedTasks: [],
+                          skippedTasks: [],
+                          showTaskGuide: true
                         }
                       },
-                      $set: { lastCompletedTaskId: taskId }
-                    },
-                    { new: true }
-                  );
+                      { upsert: true }
+                    );
+                    
+                    await UserTaskProgress.findOneAndUpdate(
+                      {
+                        userId,
+                        'completedTasks.taskId': { $ne: taskId }
+                      },
+                      {
+                        $push: {
+                          completedTasks: {
+                            taskId: taskId,
+                            completedAt: new Date()
+                          }
+                        },
+                        $set: { lastCompletedTaskId: taskId }
+                      },
+                      { new: true }
+                    );
+                  }
                 }
               }
             }
           }
+        } catch (trackingError) {
+          console.error('Error tracking home-defense unlock for task completion:', trackingError);
         }
       }
       
