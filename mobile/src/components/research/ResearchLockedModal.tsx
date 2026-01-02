@@ -5,9 +5,10 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { CustomButton } from '../common/CustomButton';
 import { LockedFeatureModal } from '../turf/LockedFeatureModal';
 import { API_URL } from '../../config';
-import { useAppSelector } from '../../store/hooks';
+import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { getCurrentBalance } from '../../store/slices/balanceSlice';
 import { useGetUserFeaturesQuery } from '../../store/api/researchFeaturesApi';
+import { userGuideApi } from '../../store/api/userGuideApi';
 
 interface ResearchRequirements {
   categoryId: string;
@@ -58,6 +59,7 @@ export function ResearchLockedModal({
   const [showRequirementsNotMet, setShowRequirementsNotMet] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const token = useAppSelector(state => state.auth.token);
+  const dispatch = useAppDispatch();
   const currentLevel = useAppSelector(state => state.auth.user?.level || propCurrentLevel || 1);
   const currentBalance = useAppSelector(state => getCurrentBalance(state) || propCurrentBalance || 0);
   
@@ -148,6 +150,10 @@ export function ResearchLockedModal({
 
       if (data.success) {
         onUnlockSuccess(data.newBalance);
+        
+        if (requirements.categoryId === 'home-defense') {
+          dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
+        }
       } else {
         setShowUnlockError(true);
         setErrorMessage(data.message);

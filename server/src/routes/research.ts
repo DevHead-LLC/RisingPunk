@@ -6,6 +6,8 @@ import { Research } from '../models/Research';
 import { ResearchUser } from '../models/ResearchUser';
 import { getResearchFeatures } from '../config/researchFeatures';
 import { User } from '../models/User';
+import { UserTaskProgress } from '../models/UserTaskProgress';
+import { getTaskList } from '../config/taskListData';
 import mongoose from 'mongoose';
 
 const router = express.Router();
@@ -36,6 +38,77 @@ router.post('/unlock/:categoryId', auth, async (req: Request, res: Response) => 
     const result = await ResearchUnlockService.unlockResearch(userId, categoryId);
     
     if (result.success) {
+      if (categoryId === 'home-defense') {
+        const progress = await UserTaskProgress.findOne({ userId });
+        const wasAlreadyUnlocked = progress?.homeDefenseUnlockedAt;
+        
+        if (!wasAlreadyUnlocked) {
+          await UserTaskProgress.findOneAndUpdate(
+            { userId },
+            {
+              $set: { homeDefenseUnlockedAt: new Date() },
+              $setOnInsert: {
+                completedTasks: [],
+                collectedTasks: [],
+                skippedTasks: [],
+                showTaskGuide: true
+              }
+            },
+            { upsert: true, new: true }
+          );
+          
+          const taskList = getTaskList();
+          const taskId = 'unlock-home-defense';
+          const homeDefenseTask = taskList.find(t => t.id === taskId);
+          
+          if (homeDefenseTask && homeDefenseTask.autoCompleteConditions) {
+            const user = await User.findById(userId).lean();
+            if (user) {
+              const updatedProgress = await UserTaskProgress.findOne({ userId });
+              const shouldAutoComplete = homeDefenseTask.autoCompleteConditions(user as any, updatedProgress ?? undefined);
+              
+              if (shouldAutoComplete) {
+                const isAlreadyCompleted = updatedProgress?.completedTasks?.some(
+                  (task: any) => task.taskId === taskId
+                );
+                
+                if (!isAlreadyCompleted) {
+                  await UserTaskProgress.findOneAndUpdate(
+                    { userId },
+                    {
+                      $setOnInsert: {
+                        completedTasks: [],
+                        collectedTasks: [],
+                        skippedTasks: [],
+                        showTaskGuide: true
+                      }
+                    },
+                    { upsert: true }
+                  );
+                  
+                  await UserTaskProgress.findOneAndUpdate(
+                    {
+                      userId,
+                      'completedTasks.taskId': { $ne: taskId }
+                    },
+                    {
+                      $push: {
+                        completedTasks: {
+                          taskId: taskId,
+                          completedAt: new Date()
+                        }
+                      },
+                      $set: { lastCompletedTaskId: taskId }
+                    },
+                    { new: true }
+                  );
+                }
+              }
+            }
+          }
+        }
+      }
+      
       res.json({
         success: true,
         message: result.message,
