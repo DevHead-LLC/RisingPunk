@@ -160,6 +160,11 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
         // Will pan to center on Digital Barracks and animate border
         onClose();
         setHighlightTaskId(taskId);
+      } else if (taskId === 'build-research-center') {
+        // Close modal and trigger highlight mode for build-research-center
+        // Will pan to center on Research Center
+        onClose();
+        setHighlightTaskId(taskId);
       } else if (taskId === 'view-wallet') {
         // Close modal and trigger highlight mode for wallet balance
         onClose();

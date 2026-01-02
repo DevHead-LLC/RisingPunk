@@ -196,6 +196,9 @@ const TASK_LIST: Task[] = [
     title: 'Build the Research Center',
     description: 'Construct the Research Center building',
     order: 15,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return user.unlockedFeatures?.researchCenter === true;
+    },
     skipable: true,
     reward: { type: 'wallet', value: 30 }
   },

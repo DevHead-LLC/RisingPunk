@@ -1,11 +1,13 @@
 import express from 'express';
-import { User } from '../models/User';
+import { User, IUser } from '../models/User';
 import { ShieldService } from '../services/ShieldService';
 import auth from '../middleware/auth';
 import { Request, Response } from 'express';
 import { FinanceTier } from '../models/Finance';
 import { FinanceTemplate } from '../models/FinanceTemplate';
 import mongoose from 'mongoose';
+import { UserTaskProgress } from '../models/UserTaskProgress';
+import { getTaskList } from '../config/taskListData';
 
 interface UpdatePreferencesRequest extends Request {
   body: {
@@ -14,6 +16,50 @@ interface UpdatePreferencesRequest extends Request {
 }
 
 const router = express.Router();
+
+const markResearchCenterTaskCompleted = async (userId: string | mongoose.Types.ObjectId) => {
+  try {
+    const taskList = getTaskList();
+    const buildResearchCenterTask = taskList.find(task => task.id === 'build-research-center');
+    
+    if (!buildResearchCenterTask) {
+      return;
+    }
+
+    const userIdObjectId = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
+    const progress = await UserTaskProgress.findOne({ userId: userIdObjectId });
+    if (!progress) {
+      return;
+    }
+
+    const completedTaskIds = new Set(progress.completedTasks.map(t => t.taskId));
+    const collectedTaskIds = new Set(progress.collectedTasks || []);
+    const skippedTaskIds = new Set(progress.skippedTasks || []);
+
+    if (collectedTaskIds.has('build-research-center') || skippedTaskIds.has('build-research-center') || completedTaskIds.has('build-research-center')) {
+      return;
+    }
+
+    await UserTaskProgress.findOneAndUpdate(
+      {
+        userId: userIdObjectId,
+        'completedTasks.taskId': { $ne: 'build-research-center' }
+      },
+      {
+        $push: {
+          completedTasks: {
+            taskId: 'build-research-center',
+            completedAt: new Date()
+          }
+        },
+        $set: { lastCompletedTaskId: 'build-research-center' }
+      },
+      { new: true }
+    );
+  } catch (error) {
+    console.error('Error marking research center task as completed:', error);
+  }
+};
 
 router.get('/profile', auth, async (req: Request, res: Response) => {
   try {
@@ -158,7 +204,7 @@ router.post('/unlock-hack-rig', auth, async (req: Request, res: Response) => {
 
 router.get('/research-center-status', auth, async (req: Request, res: Response) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user: IUser | null = await User.findById(req.user._id);
     if (!user) {
       res.status(404).json({ message: 'User not found' });
       return;
@@ -179,6 +225,9 @@ router.get('/research-center-status', auth, async (req: Request, res: Response) 
         };
         await user.save();
         isUnlocked = true;
+        
+        // Mark the build-research-center task as completed
+        await markResearchCenterTaskCompleted(String(user._id));
       } else {
         // Build is still in progress
         buildStatus = {
@@ -302,6 +351,9 @@ router.post('/speedup-research-center-construction', auth, async (req: Request, 
 
       await userInTransaction.save({ session });
     });
+    
+    // Mark the build-research-center task as completed after transaction
+    await markResearchCenterTaskCompleted(req.user._id);
   } catch (error: any) {
     if (error.message === 'User not found') {
       res.status(404).json({ error: 'User not found' });
