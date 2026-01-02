@@ -272,7 +272,7 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
             ) : visibleTasks.length === 0 ? (
               <View style={styles.emptyState}>
                 <Text style={[styles.emptyStateText, { color: colors.text.secondary }]}>
-                  No tasks available
+                  More tasks coming soon
                 </Text>
               </View>
             ) : (
@@ -372,7 +372,7 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
                 ) : visibleTasks.length === 0 ? (
                   <View style={styles.emptyState}>
                     <Text style={[styles.emptyStateText, { color: colors.text.secondary }]}>
-                      No tasks available
+                      More tasks coming soon
                     </Text>
                   </View>
                 ) : (

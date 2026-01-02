@@ -67,8 +67,12 @@ export const TaskGuide = memo(({ currentScreen, onNavigateToProfile }: TaskGuide
     return null;
   }
 
-  // Always show "Next Task" as the title
-  const displayTitle = 'Next Task';
+  // Check if there are any tasks available (only after data has loaded)
+  const hasCurrentTask = !isLoading && !!data?.currentTask;
+  const hasNoTasks = !isLoading && data && !data.currentTask;
+  
+  // Show "Next Task" as title, or "More Tasks Coming Soon" if no tasks (but not while loading)
+  const displayTitle = hasNoTasks ? 'More Tasks Coming Soon' : 'Next Task';
   
   // Check if current task is completed (action done) but not collected (reward not given)
   const currentTaskId = data?.currentTask?.id;
@@ -79,10 +83,12 @@ export const TaskGuide = memo(({ currentScreen, onNavigateToProfile }: TaskGuide
     ? (completedTaskIds.has(currentTaskId) && !collectedTaskIds.has(currentTaskId))
     : false;
   
-  // Show "Collect Reward!" if task is completed, otherwise show description
-  const displayDescription = isCurrentTaskCompleted 
-    ? 'Collect Reward!' 
-    : (data?.currentTask?.description || 'Tap to view');
+  // Show "Collect Reward!" if task is completed, otherwise show description, or "more tasks coming soon"
+  const displayDescription = hasNoTasks
+    ? 'Tap to view'
+    : (isCurrentTaskCompleted 
+        ? 'Collect Reward!' 
+        : (data?.currentTask?.description || 'Tap to view'));
 
   const handlePress = () => {
     setModalVisible(true);

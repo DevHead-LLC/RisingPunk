@@ -2,6 +2,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
 import { RootState } from '../index';
 import { balanceApi } from './balanceApi';
+import { userGuideApi } from './userGuideApi';
 
 export interface ResearchFeatureStatus {
   featureId: string;
@@ -80,6 +81,16 @@ export const researchFeaturesApi = createApi({
       invalidatesTags: (result, error, { categoryId }) => [
         { type: 'ResearchFeatures', id: categoryId }
       ],
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Invalidate UserTaskProgress to update task guide when research completes
+          // This ensures tasks like unlock-antivirus update immediately when feature is unlocked
+          dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
+        } catch {
+          // Error handling is done by the mutation itself
+        }
+      },
     }),
     speedupFeatureResearch: builder.mutation<SpeedupFeatureResearchResponse, { categoryId: string; featureId: string }>({
       query: ({ categoryId, featureId }) => ({
@@ -100,6 +111,9 @@ export const researchFeaturesApi = createApi({
           await queryFulfilled;
           // Invalidate Balance tag from balanceApi to ensure fresh balance data
           dispatch(balanceApi.util.invalidateTags(['Balance']));
+          // Invalidate UserTaskProgress to update task guide when research completes
+          // This ensures tasks like unlock-antivirus update immediately when feature is unlocked
+          dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
         } catch {
           // Error handling is done by the mutation itself
         }
