@@ -88,7 +88,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
 
   useEffect(() => {
     // Only invalidate cache when unlock state transitions from false to true (for property 1)
-    if (isUnlocked && !previousIsUnlockedRef.current && propertyId === 1) {
+    if (isUnlocked && previousIsUnlockedRef.current === false && propertyId === 1) {
       dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
     }
     previousIsUnlockedRef.current = isUnlocked;
