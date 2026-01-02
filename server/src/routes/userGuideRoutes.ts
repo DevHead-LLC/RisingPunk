@@ -30,7 +30,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
         new: true,
         setDefaultsOnInsert: true
       }
-    ).select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt walletViewedAt attackedLevel1NpcAt').lean();
+    ).select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt walletViewedAt attackedLevel1NpcAt visitedAnotherUserProfileAt').lean();
 
     if (!progress) {
       res.status(500).json({ error: 'Failed to initialize task progress' });
@@ -105,7 +105,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
     // SECOND PASS: After auto-completing tasks, refresh progress and find the current task
     if (anyTaskAutoCompleted) {
       const updatedProgress = await UserTaskProgress.findOne({ userId })
-        .select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt walletViewedAt attackedLevel1NpcAt')
+        .select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt walletViewedAt attackedLevel1NpcAt visitedAnotherUserProfileAt')
         .lean();
       
       if (updatedProgress) {
@@ -457,6 +457,106 @@ router.post('/track-profile-visit', auth, async (req: Request, res: Response) =>
     res.json({ success: true, message: 'Profile visit tracked' });
   } catch (error) {
     console.error('Error tracking profile visit:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/track-another-user-profile-visit', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const { visitedUserId } = req.body;
+    
+    if (!visitedUserId) {
+      res.status(400).json({ error: 'Visited user ID is required' });
+      return;
+    }
+
+    const currentUserIdStr = String(userId);
+    const visitedUserIdStr = String(visitedUserId);
+
+    if (currentUserIdStr === visitedUserIdStr) {
+      res.json({ success: true, message: 'Cannot track visit to own profile' });
+      return;
+    }
+
+    const existingProgress = await UserTaskProgress.findOne({ userId });
+    const wasAlreadyVisited = existingProgress?.visitedAnotherUserProfileAt;
+
+    if (!wasAlreadyVisited) {
+      await UserTaskProgress.findOneAndUpdate(
+        { userId },
+        {
+          $set: { visitedAnotherUserProfileAt: new Date() },
+          $setOnInsert: {
+            completedTasks: [],
+            collectedTasks: [],
+            skippedTasks: [],
+            showTaskGuide: true
+          }
+        },
+        { upsert: true, new: true }
+      );
+    }
+
+    if (!wasAlreadyVisited) {
+      const taskList = getTaskList();
+      const taskId = 'view-member-profile';
+      const memberProfileTask = taskList.find(t => t.id === taskId);
+      
+      if (memberProfileTask && memberProfileTask.autoCompleteConditions) {
+        const user = await User.findById(userId).lean();
+        if (user) {
+          const updatedProgress = await UserTaskProgress.findOne({ userId });
+          const shouldAutoComplete = memberProfileTask.autoCompleteConditions(user as any, updatedProgress ?? undefined);
+          
+          if (shouldAutoComplete) {
+            const isAlreadyCompleted = updatedProgress?.completedTasks?.some(
+              (task: any) => task.taskId === taskId
+            );
+            
+            if (!isAlreadyCompleted) {
+              await UserTaskProgress.findOneAndUpdate(
+                { userId },
+                {
+                  $setOnInsert: {
+                    collectedTasks: [],
+                    skippedTasks: [],
+                    showTaskGuide: true
+                  }
+                },
+                { upsert: true }
+              );
+              
+              await UserTaskProgress.findOneAndUpdate(
+                {
+                  userId,
+                  'completedTasks.taskId': { $ne: taskId }
+                },
+                {
+                  $push: {
+                    completedTasks: {
+                      taskId: taskId,
+                      completedAt: new Date()
+                    }
+                  },
+                  $set: { lastCompletedTaskId: taskId }
+                },
+                { new: true }
+              );
+            }
+          }
+        }
+      }
+    }
+
+    res.json({ success: true, message: 'Another user profile visit tracked' });
+  } catch (error) {
+    console.error('Error tracking another user profile visit:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

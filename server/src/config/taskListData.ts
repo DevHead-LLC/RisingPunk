@@ -219,8 +219,12 @@ const TASK_LIST: Task[] = [
     title: "View another member's Profile",
     description: 'Visit another player\'s profile',
     order: 17,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.visitedAnotherUserProfileAt);
+    },
     skipable: true,
-    reward: { type: 'wallet', value: 30 }
+    reward: { type: 'wallet', value: 30 },
+    howTo: 'Navigate: HomeLocation > HackRig > HackMap\n\nClick on a player-owned cell on the map, then click "View Profile" to visit another player\'s profile.'
   },
   {
     id: 'build-investment-property',
