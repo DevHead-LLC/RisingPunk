@@ -48,9 +48,10 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
     // This ensures tasks like 'build-100-guardians' are auto-completed if user has already built 100+ guardians
     // This ensures tasks like 'free-hack-rig' are auto-completed if user has already unlocked Hack Rig
     // This ensures tasks like 'build-research-center' are auto-completed if user has already unlocked Research Center
+    // This ensures tasks like 'reach-level-2' are auto-completed if user has already reached level 2
     // Note: Using .lean() to get plain JavaScript object, and explicitly selecting fields
     // If fields don't exist in database, they will be undefined (not default value)
-    const user = await User.findById(userId).select('totalGuardiansBuilt totalPhreaksBuilt totalBreachersBuilt unlockedFeatures.hackRig unlockedFeatures.researchCenter').lean();
+    const user = await User.findById(userId).select('totalGuardiansBuilt totalPhreaksBuilt totalBreachersBuilt unlockedFeatures.hackRig unlockedFeatures.researchCenter level').lean();
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;

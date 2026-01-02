@@ -207,8 +207,12 @@ const TASK_LIST: Task[] = [
     title: 'Get to level 2',
     description: 'Level up to level 2',
     order: 16,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return user.level >= 2;
+    },
     skipable: true,
-    reward: { type: 'wallet', value: 30 }
+    reward: { type: 'wallet', value: 30 },
+    howTo: 'Navigate: HomeLocation > HackRig > HackMap\n\nGo through enough battles to advance to level 2. You can view your current level and progress in your profile.'
   },
   {
     id: 'view-member-profile',
