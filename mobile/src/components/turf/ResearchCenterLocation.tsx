@@ -44,7 +44,7 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
   const dispatch = useAppDispatch();
   const reduxBalance = useAppSelector((state) => state.balance.total);
   const currentBalanceState = useAppSelector((state) => state.balance);
-  const previousIsUnlockedRef = useRef<boolean>(false);
+  const previousIsUnlockedRef = useRef<boolean | undefined>(undefined);
   
   // Use both sources to ensure we have the most up-to-date balance
   const currentBalance = balanceData?.total ?? reduxBalance;
@@ -63,7 +63,8 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
   const hasSufficientFunds = numericBalance !== null && !isNaN(numericBalance as number) && numericBalance >= RESEARCH_CENTER_COST;
   
   useEffect(() => {
-    if (isUnlocked && !previousIsUnlockedRef.current) {
+    // Only invalidate cache when unlock state transitions from false to true
+    if (isUnlocked && previousIsUnlockedRef.current === false) {
       dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
     }
     previousIsUnlockedRef.current = isUnlocked;
