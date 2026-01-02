@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, SafeAreaView, Image, ScrollView, Platform } from 'react-native';
 import { ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { useGetUserProfileQuery } from '../../store/api/authApi';
+import { useAppSelector } from '../../store/hooks';
+import { useTrackAnotherUserProfileVisitMutation } from '../../store/api/userGuideApi';
 
 interface VisitingProfileModalProps {
   visible: boolean;
@@ -17,10 +19,31 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
   userId,
 }) => {
   const colors = useThemeColors();
+  const currentUser = useAppSelector((state) => state.auth.user);
   const { data: userProfile, isLoading, error } = useGetUserProfileQuery(userId, {
     skip: !visible || !userId,
   });
+  const [trackAnotherUserProfileVisit] = useTrackAnotherUserProfileVisitMutation();
+  const trackedUserIdRef = useRef<string | null>(null);
   const styles = createStyles(colors);
+
+  useEffect(() => {
+    if (visible && userProfile && currentUser && !isLoading && !error) {
+      const currentUserIdStr = String(currentUser._id || '').trim();
+      const visitedUserIdStr = String(userId || '').trim();
+      
+      if (currentUserIdStr !== visitedUserIdStr && trackedUserIdRef.current !== visitedUserIdStr) {
+        trackedUserIdRef.current = visitedUserIdStr;
+        trackAnotherUserProfileVisit({ visitedUserId: userId }).catch(() => {
+          // Silently fail if tracking fails
+        });
+      }
+    }
+    
+    if (!visible) {
+      trackedUserIdRef.current = null;
+    }
+  }, [visible, userProfile, currentUser, userId, isLoading, error, trackAnotherUserProfileVisit]);
 
   const profileImageSource = userProfile?.profileGender === 'female' 
     ? require('../../assets/images/profile-female.png')
