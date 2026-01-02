@@ -285,6 +285,66 @@ router.post('/complete-feature-research', auth, async (req: Request, res: Respon
     const result = await ResearchFeatureService.completeResearch(userId, categoryId, featureId);
     
     if (result.success) {
+      if (categoryId === 'home-defense' && featureId === 'antivirus') {
+        try {
+          const { UserTaskProgress } = await import('../models/UserTaskProgress');
+          const { getTaskList } = await import('../config/taskListData');
+          const progress = await UserTaskProgress.findOne({ userId });
+          const wasAlreadyUnlocked = progress?.antivirusUnlockedAt;
+          
+          if (!wasAlreadyUnlocked) {
+            await UserTaskProgress.findOneAndUpdate(
+              { userId },
+              {
+                $set: { antivirusUnlockedAt: result.unlockedAt || new Date() },
+                $setOnInsert: {
+                  completedTasks: [],
+                  collectedTasks: [],
+                  skippedTasks: [],
+                  showTaskGuide: true
+                }
+              },
+              { upsert: true, new: true }
+            );
+            
+            const taskList = getTaskList();
+            const taskId = 'unlock-antivirus';
+            const antivirusTask = taskList.find(t => t.id === taskId);
+            
+            if (antivirusTask && antivirusTask.autoCompleteConditions) {
+              const updatedProgress = await UserTaskProgress.findOne({ userId }).lean();
+              const user = await User.findById(userId).lean();
+              if (user && updatedProgress) {
+                const shouldAutoComplete = antivirusTask.autoCompleteConditions(user as any, updatedProgress as any);
+                if (shouldAutoComplete) {
+                  const completedTaskIds = new Set(updatedProgress.completedTasks.map(t => t.taskId));
+                  if (!completedTaskIds.has(taskId)) {
+                    await UserTaskProgress.findOneAndUpdate(
+                      {
+                        userId,
+                        'completedTasks.taskId': { $ne: taskId }
+                      },
+                      {
+                        $push: {
+                          completedTasks: {
+                            taskId,
+                            completedAt: new Date()
+                          }
+                        },
+                        $set: { lastCompletedTaskId: taskId }
+                      },
+                      { new: true }
+                    );
+                  }
+                }
+              }
+            }
+          }
+        } catch (trackingError) {
+          console.error('Error tracking antivirus unlock for task completion:', trackingError);
+        }
+      }
+      
       res.json({
         success: true,
         message: result.message,
@@ -500,6 +560,65 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
         message: 'Error retrieving updated user data'
       });
       return;
+    }
+
+    if (categoryId === 'home-defense' && featureId === 'antivirus') {
+      try {
+        const { UserTaskProgress } = await import('../models/UserTaskProgress');
+        const { getTaskList } = await import('../config/taskListData');
+        const progress = await UserTaskProgress.findOne({ userId });
+        const wasAlreadyUnlocked = progress?.antivirusUnlockedAt;
+        
+        if (!wasAlreadyUnlocked) {
+          await UserTaskProgress.findOneAndUpdate(
+            { userId },
+            {
+              $set: { antivirusUnlockedAt: new Date() },
+              $setOnInsert: {
+                completedTasks: [],
+                collectedTasks: [],
+                skippedTasks: [],
+                showTaskGuide: true
+              }
+            },
+            { upsert: true, new: true }
+          );
+          
+          const taskList = getTaskList();
+          const taskId = 'unlock-antivirus';
+          const antivirusTask = taskList.find(t => t.id === taskId);
+          
+          if (antivirusTask && antivirusTask.autoCompleteConditions) {
+            const updatedProgress = await UserTaskProgress.findOne({ userId }).lean();
+            if (updatedProgress) {
+              const shouldAutoComplete = antivirusTask.autoCompleteConditions(updatedUser as any, updatedProgress as any);
+              if (shouldAutoComplete) {
+                const completedTaskIds = new Set(updatedProgress.completedTasks.map(t => t.taskId));
+                if (!completedTaskIds.has(taskId)) {
+                  await UserTaskProgress.findOneAndUpdate(
+                    {
+                      userId,
+                      'completedTasks.taskId': { $ne: taskId }
+                    },
+                    {
+                      $push: {
+                        completedTasks: {
+                          taskId,
+                          completedAt: new Date()
+                        }
+                      },
+                      $set: { lastCompletedTaskId: taskId }
+                    },
+                    { new: true }
+                  );
+                }
+              }
+            }
+          }
+        }
+      } catch (trackingError) {
+        console.error('Error tracking antivirus unlock for task completion:', trackingError);
+      }
     }
 
     res.json({

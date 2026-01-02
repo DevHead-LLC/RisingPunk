@@ -254,8 +254,12 @@ const TASK_LIST: Task[] = [
     title: 'Unlock Antivirus Shielding Feature',
     description: 'Research and unlock Antivirus protection',
     order: 20,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.antivirusUnlockedAt);
+    },
     skipable: true,
-    reward: { type: 'wallet', value: 30 }
+    reward: { type: 'wallet', value: 30 },
+    howTo: 'Navigate: HomeLocation > Research Center > Home Defense Category > Antivirus Feature\n\nRequirements: Level 2 and $25,000 wallet balance. If you don\'t meet these requirements yet, fight NPCs in the HackMap to level up and earn money. Once you start research, it will take time to complete. You can speed it up for a fee if desired.'
   }
 ];
 

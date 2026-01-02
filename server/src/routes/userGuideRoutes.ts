@@ -32,7 +32,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
         new: true,
         setDefaultsOnInsert: true
       }
-    ).select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt walletViewedAt attackedLevel1NpcAt visitedAnotherUserProfileAt homeDefenseUnlockedAt').lean();
+    ).select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt walletViewedAt attackedLevel1NpcAt visitedAnotherUserProfileAt homeDefenseUnlockedAt antivirusUnlockedAt').lean();
 
     if (!progress) {
       res.status(500).json({ error: 'Failed to initialize task progress' });
@@ -86,6 +86,36 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
           if (updatedProgress) {
             progress = updatedProgress as any;
           }
+        }
+      }
+    }
+
+    if (!progress.antivirusUnlockedAt) {
+      const { UserResearchFeature } = await import('../models/UserResearchFeature');
+      const antivirusFeature = await UserResearchFeature.findOne({
+        userId,
+        categoryId: 'home-defense',
+        featureId: 'antivirus'
+      });
+      
+      if (antivirusFeature && antivirusFeature.isUnlocked) {
+        await UserTaskProgress.findOneAndUpdate(
+          { userId },
+          {
+            $set: { antivirusUnlockedAt: antivirusFeature.unlockedAt || new Date() },
+            $setOnInsert: {
+              completedTasks: [],
+              collectedTasks: [],
+              skippedTasks: [],
+              showTaskGuide: true
+            }
+          },
+          { upsert: true, new: true }
+        );
+        
+        const updatedProgress = await UserTaskProgress.findOne({ userId }).lean();
+        if (updatedProgress) {
+          progress = updatedProgress as any;
         }
       }
     }
