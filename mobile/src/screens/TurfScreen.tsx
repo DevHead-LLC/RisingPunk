@@ -353,7 +353,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         });
     }
     return null;
-  }, [offsetX, offsetY, startX, startY, boundsReady, minX, maxX, minY, maxY, withDecay, isHomeHighlight, isDigitalBarracksHighlight, isResearchCenterHighlight, isViewWallet, clearHighlight, runOnJS]);
+  }, [offsetX, offsetY, startX, startY, boundsReady, minX, maxX, minY, maxY, withDecay, isHomeHighlight, isDigitalBarracksHighlight, isResearchCenterHighlight, isInvestmentPropertyHighlight, isViewWallet, clearHighlight, runOnJS]);
 
   // Fetch Property 1's status to determine Property 2's rendering
   const { data: property1Status } = useGetRentalHousingStatusQuery(1);
