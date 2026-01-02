@@ -61,6 +61,50 @@ const markResearchCenterTaskCompleted = async (userId: string | mongoose.Types.O
   }
 };
 
+const markInvestmentPropertyTaskCompleted = async (userId: string | mongoose.Types.ObjectId) => {
+  try {
+    const taskList = getTaskList();
+    const buildInvestmentPropertyTask = taskList.find(task => task.id === 'build-investment-property');
+    
+    if (!buildInvestmentPropertyTask) {
+      return;
+    }
+
+    const userIdObjectId = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
+    const progress = await UserTaskProgress.findOne({ userId: userIdObjectId });
+    if (!progress) {
+      return;
+    }
+
+    const completedTaskIds = new Set(progress.completedTasks.map(t => t.taskId));
+    const collectedTaskIds = new Set(progress.collectedTasks || []);
+    const skippedTaskIds = new Set(progress.skippedTasks || []);
+
+    if (collectedTaskIds.has('build-investment-property') || skippedTaskIds.has('build-investment-property') || completedTaskIds.has('build-investment-property')) {
+      return;
+    }
+
+    await UserTaskProgress.findOneAndUpdate(
+      {
+        userId: userIdObjectId,
+        'completedTasks.taskId': { $ne: 'build-investment-property' }
+      },
+      {
+        $push: {
+          completedTasks: {
+            taskId: 'build-investment-property',
+            completedAt: new Date()
+          }
+        },
+        $set: { lastCompletedTaskId: 'build-investment-property' }
+      },
+      { new: true }
+    );
+  } catch (error) {
+    console.error('Error marking investment property task as completed:', error);
+  }
+};
+
 router.get('/profile', auth, async (req: Request, res: Response) => {
   try {
     const user = await User.findById(req.user._id).select('handle email level experience unlockedFeatures profileGender battleStats totalGuardiansBuilt');
@@ -625,6 +669,11 @@ router.post('/complete-rental-housing/:propertyId', auth, async (req, res): Prom
 
     await User.findByIdAndUpdate(userId, { $set: updateData });
 
+    // Mark the build-investment-property task as completed after transaction (only for property 1)
+    if (propertyId === 1) {
+      await markInvestmentPropertyTaskCompleted(userId);
+    }
+
     // Trigger a sync to ensure rental housing income is properly calculated
     const updatedUser = await User.findById(userId);
     if (updatedUser) {
@@ -700,6 +749,11 @@ router.post('/speedup-property-construction/:propertyId', auth, async (req, res)
 
       await userInTransaction.save({ session });
     });
+    
+    // Mark the build-investment-property task as completed after transaction (only for property 1)
+    if (propertyId === 1) {
+      await markInvestmentPropertyTaskCompleted(userId);
+    }
   } catch (error: any) {
     if (error.message === 'User not found') {
       res.status(404).json({ error: 'User not found' });
