@@ -24,7 +24,7 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
     skip: !visible || !userId,
   });
   const [trackAnotherUserProfileVisit] = useTrackAnotherUserProfileVisitMutation();
-  const hasTrackedRef = useRef(false);
+  const trackedUserIdRef = useRef<string | null>(null);
   const styles = createStyles(colors);
 
   useEffect(() => {
@@ -32,8 +32,8 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
       const currentUserIdStr = String(currentUser._id || '').trim();
       const visitedUserIdStr = String(userId || '').trim();
       
-      if (currentUserIdStr !== visitedUserIdStr && !hasTrackedRef.current) {
-        hasTrackedRef.current = true;
+      if (currentUserIdStr !== visitedUserIdStr && trackedUserIdRef.current !== visitedUserIdStr) {
+        trackedUserIdRef.current = visitedUserIdStr;
         trackAnotherUserProfileVisit({ visitedUserId: userId }).catch(() => {
           // Silently fail if tracking fails
         });
@@ -41,7 +41,7 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
     }
     
     if (!visible) {
-      hasTrackedRef.current = false;
+      trackedUserIdRef.current = null;
     }
   }, [visible, userProfile, currentUser, userId, isLoading, error, trackAnotherUserProfileVisit]);
 
