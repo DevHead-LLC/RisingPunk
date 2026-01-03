@@ -66,7 +66,6 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
     if (canAccessResearch(cardId)) {
       setCurrentScreen(cardId);
     } else {
-      refreshAfterUnlock();
       setSelectedResearch(cardId);
       setShowLockedModal(true);
     }
@@ -199,12 +198,6 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
   };
 
   const requirements = selectedResearch ? getResearchRequirements(selectedResearch) : null;
-  
-  useEffect(() => {
-    if (showLockedModal && selectedResearch) {
-      refreshAfterUnlock();
-    }
-  }, [showLockedModal, selectedResearch, refreshAfterUnlock]);
   
   return (
     <SafeAreaView style={styles.container}>
