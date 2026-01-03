@@ -100,6 +100,10 @@ function createMountainCluster(
       return false;
     }
     
+    if (cell.isOccupied && cell.occupiedBy === 'npc') {
+      return false;
+    }
+    
     return true;
   };
   

@@ -334,14 +334,13 @@ export class MapService {
       const npcTypesPlaced = new Set<string>();
       
       for (const npc of shuffled) {
-        if (npcsToPlace.length >= minCount) break;
         if (!npcTypesPlaced.has(npc.slug)) {
           npcsToPlace.push(npc);
           npcTypesPlaced.add(npc.slug);
         }
       }
 
-      const remaining = minCount - npcsToPlace.length;
+      const remaining = Math.max(0, minCount - npcsToPlace.length);
       for (let i = 0; i < remaining; i++) {
         const randomNPC = shuffled[Math.floor(Math.random() * shuffled.length)];
         npcsToPlace.push(randomNPC);
