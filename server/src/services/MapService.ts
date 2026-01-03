@@ -332,6 +332,7 @@ export class MapService {
       const npcTypesPlaced = new Set<string>();
       
       for (const npc of shuffled) {
+        if (npcsToPlace.length >= minCount) break;
         if (!npcTypesPlaced.has(npc.slug)) {
           npcsToPlace.push(npc);
           npcTypesPlaced.add(npc.slug);

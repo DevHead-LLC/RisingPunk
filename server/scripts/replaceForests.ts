@@ -204,7 +204,6 @@ async function replaceForests() {
       const waterCells = new Set<string>();
       const roadCells = new Set<string>();
       const mountainCells = new Set<string>();
-      const occupiedCells = new Set<string>();
       
       for (const cell of map.cells) {
         if (cell.terrain === 'water') {
@@ -215,9 +214,6 @@ async function replaceForests() {
         }
         if (cell.terrain === 'mountain') {
           mountainCells.add(`${cell.x},${cell.y}`);
-        }
-        if (cell.isOccupied) {
-          occupiedCells.add(`${cell.x},${cell.y}`);
         }
       }
 
