@@ -53,15 +53,16 @@ async function updateNPCs() {
     await MapService.updateNPCsOnMap('main');
 
     console.log('✅ NPCs updated successfully!');
-    console.log('📊 Map now has 95 NPCs distributed across 8 levels:');
-    console.log('   - Level 1: 20 NPCs');
-    console.log('   - Level 2: 15 NPCs');
-    console.log('   - Level 3: 15 NPCs');
-    console.log('   - Level 4: 15 NPCs');
-    console.log('   - Level 5: 10 NPCs');
-    console.log('   - Level 6: 10 NPCs');
-    console.log('   - Level 7: 5 NPCs');
-    console.log('   - Level 8: 5 NPCs\n');
+    console.log('📊 Map now has NPCs distributed across 8 levels:');
+    console.log('   - Level 1: 20 NPCs (minimum 5, at least 1 of each type)');
+    console.log('   - Level 2: 15 NPCs (minimum 5, at least 1 of each type)');
+    console.log('   - Level 3: 12 NPCs (minimum 5, at least 1 of each type)');
+    console.log('   - Level 4: 10 NPCs (minimum 5, at least 1 of each type)');
+    console.log('   - Level 5: 8 NPCs (minimum 5, at least 1 of each type)');
+    console.log('   - Level 6: 7 NPCs (minimum 5, at least 1 of each type)');
+    console.log('   - Level 7: 6 NPCs (minimum 5, at least 1 of each type)');
+    console.log('   - Level 8: 5 NPCs (minimum 5, at least 1 of each type)');
+    console.log('\n✅ All NPCs have regeneration timing configured (mapRecoverySeconds)\n');
 
     await mongoose.disconnect();
     console.log('✅ Disconnected from database');

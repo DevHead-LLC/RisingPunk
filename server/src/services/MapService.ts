@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { Map } from '../models/Map';
 import { User } from '../models/User';
 import seedrandom from 'seedrandom';
@@ -294,6 +295,16 @@ export class MapService {
       if (!npcsByLevel[level]) {
         npcsByLevel[level] = [];
       }
+      
+      if (typeof npc.mapRecoverySeconds !== 'number' || npc.mapRecoverySeconds <= 0) {
+        const npcCollection = mongoose.connection.collection('npcs');
+        await npcCollection.updateOne(
+          { _id: npc._id },
+          { $set: { mapRecoverySeconds: 300 } }
+        );
+        npc.mapRecoverySeconds = 300;
+      }
+      
       npcsByLevel[level].push(npc);
     }
 
@@ -315,17 +326,22 @@ export class MapService {
       let npcs = npcsByLevel[level] || [];
       if (npcs.length === 0) continue;
 
-      const targetCount = distribution[level] || 0;
-      if (targetCount === 0) continue;
+      const targetCount = distribution[level] || 5;
+      const minCount = Math.max(5, targetCount);
 
       const shuffled = [...npcs].sort(() => Math.random() - 0.5);
       const npcsToPlace: NPCDocument[] = [];
+      const npcTypesPlaced = new Set<string>();
       
-      for (let i = 0; i < Math.min(5, shuffled.length); i++) {
-        npcsToPlace.push(shuffled[i]);
+      for (const npc of shuffled) {
+        if (npcsToPlace.length >= minCount) break;
+        if (!npcTypesPlaced.has(npc.slug)) {
+          npcsToPlace.push(npc);
+          npcTypesPlaced.add(npc.slug);
+        }
       }
 
-      const remaining = targetCount - npcsToPlace.length;
+      const remaining = minCount - npcsToPlace.length;
       for (let i = 0; i < remaining; i++) {
         const randomNPC = shuffled[Math.floor(Math.random() * shuffled.length)];
         npcsToPlace.push(randomNPC);
