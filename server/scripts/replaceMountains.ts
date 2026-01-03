@@ -183,7 +183,7 @@ async function replaceMountains() {
       let dirtCreated = 0;
       
       for (const cell of map.cells) {
-        if (cell.terrain === 'mountain' && !cell.isOccupied) {
+        if (cell.terrain === 'mountain') {
           const newTerrain = Math.random() < 0.15 ? 'dirt' : 'grass';
           await MapModel.updateOne(
             { _id: map._id, cells: { $elemMatch: { x: cell.x, y: cell.y } } },
@@ -263,9 +263,10 @@ async function replaceMountains() {
         const [x, y] = cellKey.split(',').map(Number);
         const cell = getCellAt(cellMap, x, y, map.gridSize);
         if (cell) {
+          const updateFields: any = { 'cells.$.terrain': 'mountain', 'cells.$.canBeOccupied': false };
           await MapModel.updateOne(
             { _id: map._id, cells: { $elemMatch: { x, y } } },
-            { $set: { 'cells.$.terrain': 'mountain', 'cells.$.canBeOccupied': false } }
+            { $set: updateFields }
           );
           cell.terrain = 'mountain';
           cell.canBeOccupied = false;

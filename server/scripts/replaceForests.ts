@@ -227,7 +227,7 @@ async function replaceForests() {
       let dirtCreated = 0;
       
       for (const cell of map.cells) {
-        if (cell.terrain === 'forest' && !cell.isOccupied) {
+        if (cell.terrain === 'forest') {
           const newTerrain = Math.random() < 0.15 ? 'dirt' : 'grass';
           await MapModel.updateOne(
             { _id: map._id, cells: { $elemMatch: { x: cell.x, y: cell.y } } },
