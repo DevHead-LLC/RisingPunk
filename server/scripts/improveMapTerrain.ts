@@ -626,13 +626,9 @@ async function improveMapTerrain() {
         cellMap.set(`${cell.x},${cell.y}`, cell);
       }
 
-      const waterCells = new Set<string>();
       const occupiedCells = new Set<string>();
       
       for (const cell of map.cells) {
-        if (cell.terrain === 'water') {
-          waterCells.add(`${cell.x},${cell.y}`);
-        }
         if (cell.isOccupied) {
           occupiedCells.add(`${cell.x},${cell.y}`);
         }
@@ -656,6 +652,8 @@ async function improveMapTerrain() {
         }
       }
       console.log(`   ✅ Cleared ${waterCleared} existing water cells`);
+
+      const waterCells = new Set<string>();
 
       const existingWater = new Set<string>();
       let riversCreated = 0;
