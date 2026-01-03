@@ -23,7 +23,7 @@ export interface UnlockCosts {
 export class ResearchUnlockService {
   private static readonly UNLOCK_COSTS: UnlockCosts = {
     'home-defense': 10000,
-    'hack-ability': 20000,
+    'hack-ability': 50000,
     'financial': 20000,
     'hack-crew': 100000,
     'npc': 50000,
