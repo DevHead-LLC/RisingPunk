@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Alert } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -41,6 +41,7 @@ interface ResearchLockedModalProps {
   currentLevel: number;
   currentBalance: number;
   researchStatus: ResearchStatus[];
+  onRefreshResearchStatus?: () => void;
 }
 
 export function ResearchLockedModal({
@@ -51,6 +52,7 @@ export function ResearchLockedModal({
   currentLevel: propCurrentLevel,
   currentBalance: propCurrentBalance,
   researchStatus,
+  onRefreshResearchStatus,
 }: ResearchLockedModalProps): React.JSX.Element | null {
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [showAuthError, setShowAuthError] = useState(false);
@@ -62,6 +64,12 @@ export function ResearchLockedModal({
   const dispatch = useAppDispatch();
   const currentLevel = useAppSelector(state => state.auth.user?.level || propCurrentLevel || 1);
   const currentBalance = useAppSelector(state => getCurrentBalance(state) || propCurrentBalance || 0);
+
+  useEffect(() => {
+    if (visible && onRefreshResearchStatus) {
+      onRefreshResearchStatus();
+    }
+  }, [visible, currentLevel, onRefreshResearchStatus]);
   
   const colors = useThemeColors();
   const styles = createStyles(colors);
