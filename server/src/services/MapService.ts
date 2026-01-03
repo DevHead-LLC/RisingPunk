@@ -295,7 +295,6 @@ export class MapService {
       if (!npcsByLevel[level]) {
         npcsByLevel[level] = [];
       }
-      npcsByLevel[level].push(npc);
       
       if (typeof npc.mapRecoverySeconds !== 'number' || npc.mapRecoverySeconds <= 0) {
         const npcCollection = mongoose.connection.collection('npcs');
@@ -303,7 +302,10 @@ export class MapService {
           { _id: npc._id },
           { $set: { mapRecoverySeconds: 300 } }
         );
+        npc.mapRecoverySeconds = 300;
       }
+      
+      npcsByLevel[level].push(npc);
     }
 
     const pickValidCell = (): { x: number; y: number; index: number } | null => {

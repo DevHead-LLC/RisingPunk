@@ -187,13 +187,15 @@ async function replaceMountains() {
           const newTerrain = Math.random() < 0.15 ? 'dirt' : 'grass';
           await MapModel.updateOne(
             { _id: map._id, cells: { $elemMatch: { x: cell.x, y: cell.y } } },
-            { $set: { 'cells.$.terrain': newTerrain } }
+            { $set: { 'cells.$.terrain': newTerrain, 'cells.$.canBeOccupied': true } }
           );
           cell.terrain = newTerrain;
+          cell.canBeOccupied = true;
           const cellKey = `${cell.x},${cell.y}`;
           const cellInMap = cellMap.get(cellKey);
           if (cellInMap) {
             cellInMap.terrain = newTerrain;
+            cellInMap.canBeOccupied = true;
           }
           mountainsReplaced++;
           if (newTerrain === 'dirt') {
