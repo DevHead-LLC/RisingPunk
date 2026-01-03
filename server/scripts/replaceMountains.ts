@@ -100,6 +100,10 @@ function createMountainCluster(
       return false;
     }
     
+    if (cell.isOccupied) {
+      return false;
+    }
+    
     return true;
   };
   
