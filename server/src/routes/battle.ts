@@ -44,7 +44,9 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
         return;
       }
       
-      if (userBattalions && userBattalions.length > 2) {
+      const battalionCount = userBattalions ? userBattalions.length : 3;
+      
+      if (battalionCount > 2) {
         const battalionCFeature = await UserResearchFeature.findOne({
           userId: req.user._id,
           categoryId: 'hack-ability',
@@ -64,10 +66,10 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
         const now = new Date().getTime();
         const researchCompletesAt = battalionCFeature.researchCompletesAt 
           ? new Date(battalionCFeature.researchCompletesAt).getTime() 
-          : 0;
-        const remaining = Math.max(0, researchCompletesAt - now);
+          : null;
+        const remaining = researchCompletesAt !== null ? Math.max(0, researchCompletesAt - now) : null;
         const isActuallyUnlocked = battalionCFeature.isUnlocked || 
-          (battalionCFeature.isResearching && remaining === 0);
+          (battalionCFeature.isResearching && researchCompletesAt !== null && remaining === 0);
         
         if (!isActuallyUnlocked) {
           res.status(403).json({ 
