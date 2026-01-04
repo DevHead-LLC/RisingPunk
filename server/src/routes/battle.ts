@@ -44,9 +44,7 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
         return;
       }
       
-      const battalionCount = userBattalions ? userBattalions.length : 3;
-      
-      if (battalionCount > 2) {
+      if (userBattalions && userBattalions.length > 2) {
         const battalionCFeature = await UserResearchFeature.findOne({
           userId: req.user._id,
           categoryId: 'hack-ability',

@@ -35,7 +35,6 @@ export class BattleSetupService {
     const defaultUserBattalions = [
       { type: BotType.GUARDIAN, quantity: 10 },
       { type: BotType.BREACHER, quantity: 8 },
-      { type: BotType.PHREAK, quantity: 6 },
     ];
     const defaultEnemyBattalions = [
       { type: BotType.GUARDIAN, quantity: 12 },
