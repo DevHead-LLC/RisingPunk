@@ -428,10 +428,10 @@ router.post('/assign', auth, async (req, res) => {
       const now = new Date().getTime();
       const researchCompletesAt = battalionCFeature.researchCompletesAt 
         ? new Date(battalionCFeature.researchCompletesAt).getTime() 
-        : 0;
-      const remaining = Math.max(0, researchCompletesAt - now);
+        : null;
+      const remaining = researchCompletesAt !== null ? Math.max(0, researchCompletesAt - now) : null;
       const isActuallyUnlocked = battalionCFeature.isUnlocked || 
-        (battalionCFeature.isResearching && remaining === 0);
+        (battalionCFeature.isResearching && researchCompletesAt !== null && remaining === 0);
       
       if (!isActuallyUnlocked) {
         res.status(403).json({ error: 'Battalion C is locked. Complete the "Add Battalion C" research feature to unlock it.' });
