@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { SIZING } from '../styles/theme';
 import { Balance } from '../components/common/Balance';
@@ -35,8 +35,8 @@ const ALL_RESEARCH_CARDS: ResearchCard[] = [
   { id: 'investments', name: 'Investments', image: require('../assets/images/investmentResearch.png') },
 ];
 
-// Show Home Defense and Hack Crew categories
-const RESEARCH_CARDS: ResearchCard[] = ALL_RESEARCH_CARDS.filter(card => card.id === 'home-defense' || card.id === 'hack-crew');
+// Show Home Defense, Hack Crew, and Hack Ability categories
+const RESEARCH_CARDS: ResearchCard[] = ALL_RESEARCH_CARDS.filter(card => card.id === 'home-defense' || card.id === 'hack-crew' || card.id === 'hack-ability');
 
 const { width: screenWidth } = Dimensions.get('window');
 const cardSize = Math.min((screenWidth - SIZING.spacing.md * 3) / 2, 160);
@@ -66,7 +66,6 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
     if (canAccessResearch(cardId)) {
       setCurrentScreen(cardId);
     } else {
-      refreshAfterUnlock();
       setSelectedResearch(cardId);
       setShowLockedModal(true);
     }
@@ -212,6 +211,7 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
         currentLevel={userLevel}
         currentBalance={userBalance}
         researchStatus={researchStatus}
+        onRefreshResearchStatus={refreshAfterUnlock}
       />
       
       {/* ResearchUnlockModal is removed */}
