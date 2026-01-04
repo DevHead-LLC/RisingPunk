@@ -69,7 +69,7 @@ export function ResearchLockedModal({
     if (visible && onRefreshResearchStatus) {
       onRefreshResearchStatus();
     }
-  }, [visible, currentLevel, onRefreshResearchStatus]);
+  }, [visible, onRefreshResearchStatus]);
   
   const colors = useThemeColors();
   const styles = createStyles(colors);
