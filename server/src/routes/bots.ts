@@ -6,6 +6,10 @@ import mongoose from 'mongoose';
 
 const router = express.Router();
 
+const battalionAssignmentAttempts = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_WINDOW = 60000;
+const MAX_BATTALION_ASSIGNMENT_ATTEMPTS = 20;
+
 // Test bot creation
 router.post('/test', auth, async (req, res) => {
   try {
@@ -398,7 +402,25 @@ router.post('/speedup-build', auth, async (req, res) => {
 // Assign bots to battalion
 router.post('/assign', auth, async (req, res) => {
   try {
+    const userId = req.user._id.toString();
     const { botType, quantity, battalionId } = req.body;
+    
+    if (!battalionId || typeof battalionId !== 'string' || !/^[A-Z]$/.test(battalionId)) {
+      res.status(400).json({ error: 'Battalion ID must be a single uppercase letter (A-Z)' });
+      return;
+    }
+    
+    const now = Date.now();
+    const userAttempts = battalionAssignmentAttempts.get(userId);
+    if (userAttempts && userAttempts.resetAt > now) {
+      if (userAttempts.count >= MAX_BATTALION_ASSIGNMENT_ATTEMPTS) {
+        res.status(429).json({ error: 'Too many requests. Please try again later.' });
+        return;
+      }
+      userAttempts.count++;
+    } else {
+      battalionAssignmentAttempts.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    }
     
     
     // Use atomic operation with retry logic to handle race conditions
@@ -510,6 +532,10 @@ router.post('/assign', auth, async (req, res) => {
           updatedBot.battalionAssignments
             .filter((assignment: any) => assignment.botType === botType)
             .reduce((sum: number, assignment: any) => sum + assignment.quantity, 0);
+
+        if (battalionId === 'C') {
+          console.log(`[AUDIT] User ${userId} assigned ${quantity} ${botType} to Battalion C`);
+        }
 
         res.json({ 
           success: true,

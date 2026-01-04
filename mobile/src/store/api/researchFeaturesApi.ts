@@ -59,6 +59,7 @@ export const researchFeaturesApi = createApi({
       query: (categoryId) => `/user-features/${categoryId}`,
       transformResponse: (response: { success: boolean; data: any[] }) => response.data,
       providesTags: (result, error, categoryId) => [{ type: 'ResearchFeatures', id: categoryId }],
+      keepUnusedDataFor: 300,
     }),
     startResearch: builder.mutation<StartResearchResponse, { categoryId: string; featureId: string }>({
       query: ({ categoryId, featureId }) => ({

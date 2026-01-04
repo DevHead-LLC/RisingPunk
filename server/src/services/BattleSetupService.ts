@@ -45,6 +45,11 @@ export class BattleSetupService {
     
     const battalionConfigs = userBattalions || defaultUserBattalions;
     
+    const MAX_USER_BATTALIONS = 3;
+    if (battalionConfigs.length > MAX_USER_BATTALIONS) {
+      throw new Error(`Maximum ${MAX_USER_BATTALIONS} battalions allowed`);
+    }
+    
     // Check if defender is a user (not NPC)
     // A user defender is when we have a defenderId that's not 'computer-opponent' and doesn't look like an NPC ID
     const isUserDefender = defenderId !== 'computer-opponent' && 
