@@ -105,6 +105,11 @@ export function ResearchFeaturesList({
     // Filter out bot-trap for App Store submission - only show Antivirus
     if (feature.id === 'bot-trap') return false;
     
+    // For hack-ability, only show "battalions-per-battle"
+    if (categoryId === 'hack-ability') {
+      return feature.id === 'battalions-per-battle';
+    }
+    
     // For hack-crew, only show "crew-system-unlock"
     if (categoryId === 'hack-crew') {
       return feature.id === 'crew-system-unlock';
