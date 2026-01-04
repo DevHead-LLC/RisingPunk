@@ -4,6 +4,7 @@ import auth from '../middleware/auth';
 import { Battle } from '../models/Battle';
 import { UserTaskProgress } from '../models/UserTaskProgress';
 import { NPCService } from '../services/NPCService';
+import { UserResearchFeature } from '../models/UserResearchFeature';
 
 interface StartBattleRequest extends Request {
   body: {
@@ -41,6 +42,40 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
       if (!screenWidth || !screenHeight) {
         res.status(400).json({ success: false, error: 'Screen dimensions are required' });
         return;
+      }
+      
+      if (userBattalions && userBattalions.length > 2) {
+        const battalionCFeature = await UserResearchFeature.findOne({
+          userId: req.user._id,
+          categoryId: 'hack-ability',
+          featureId: 'battalions-per-battle'
+        })
+        .select('isUnlocked isResearching researchCompletesAt')
+        .lean();
+        
+        if (!battalionCFeature) {
+          res.status(403).json({ 
+            success: false, 
+            error: 'Battalion C is locked. Complete the "Add Battalion C" research feature to unlock it.' 
+          });
+          return;
+        }
+        
+        const now = new Date().getTime();
+        const researchCompletesAt = battalionCFeature.researchCompletesAt 
+          ? new Date(battalionCFeature.researchCompletesAt).getTime() 
+          : 0;
+        const remaining = Math.max(0, researchCompletesAt - now);
+        const isActuallyUnlocked = battalionCFeature.isUnlocked || 
+          (battalionCFeature.isResearching && remaining === 0);
+        
+        if (!isActuallyUnlocked) {
+          res.status(403).json({ 
+            success: false, 
+            error: 'Battalion C is locked. Complete the "Add Battalion C" research feature to unlock it.' 
+          });
+          return;
+        }
       }
       
       const battle = await battleController.startBattle(req.user._id, defenderId || 'computer', screenWidth, screenHeight, userBattalions, defenderNpcSlug, unlockHackRigOnWin === true, defenderNpcInstanceId);
