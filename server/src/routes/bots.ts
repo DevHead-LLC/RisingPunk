@@ -3,6 +3,7 @@ const Bot = require('../models/Bot');
 import auth from '../middleware/auth';
 import { User } from '../models/User';
 import mongoose from 'mongoose';
+import { UserResearchFeature } from '../models/UserResearchFeature';
 
 const router = express.Router();
 
@@ -410,16 +411,58 @@ router.post('/assign', auth, async (req, res) => {
       return;
     }
     
-    const now = Date.now();
-    const userAttempts = battalionAssignmentAttempts.get(userId);
-    if (userAttempts && userAttempts.resetAt > now) {
-      if (userAttempts.count >= MAX_BATTALION_ASSIGNMENT_ATTEMPTS) {
-        res.status(429).json({ error: 'Too many requests. Please try again later.' });
+    if (battalionId === 'C') {
+      const battalionCFeature = await UserResearchFeature.findOne({
+        userId: req.user._id,
+        categoryId: 'hack-ability',
+        featureId: 'battalions-per-battle'
+      })
+      .select('isUnlocked isResearching researchCompletesAt')
+      .lean();
+      
+      if (!battalionCFeature) {
+        res.status(403).json({ error: 'Battalion C is locked. Complete the "Add Battalion C" research feature to unlock it.' });
         return;
       }
-      userAttempts.count++;
+      
+      const now = new Date().getTime();
+      const researchCompletesAt = battalionCFeature.researchCompletesAt 
+        ? new Date(battalionCFeature.researchCompletesAt).getTime() 
+        : 0;
+      const remaining = Math.max(0, researchCompletesAt - now);
+      const isActuallyUnlocked = battalionCFeature.isUnlocked || 
+        (battalionCFeature.isResearching && remaining === 0);
+      
+      if (!isActuallyUnlocked) {
+        res.status(403).json({ error: 'Battalion C is locked. Complete the "Add Battalion C" research feature to unlock it.' });
+        return;
+      }
+    }
+    
+    const now = Date.now();
+    const userAttempts = battalionAssignmentAttempts.get(userId);
+    
+    if (userAttempts) {
+      if (userAttempts.resetAt <= now) {
+        battalionAssignmentAttempts.delete(userId);
+        battalionAssignmentAttempts.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+      } else {
+        if (userAttempts.count >= MAX_BATTALION_ASSIGNMENT_ATTEMPTS) {
+          res.status(429).json({ error: 'Too many requests. Please try again later.' });
+          return;
+        }
+        userAttempts.count++;
+      }
     } else {
       battalionAssignmentAttempts.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    }
+    
+    if (battalionAssignmentAttempts.size > 1000) {
+      for (const [key, value] of battalionAssignmentAttempts.entries()) {
+        if (value.resetAt <= now) {
+          battalionAssignmentAttempts.delete(key);
+        }
+      }
     }
     
     

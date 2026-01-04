@@ -431,7 +431,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
                     onPress={() => handleBattalionPress('C')}
                     assignment={assignments['C']}
                     isHighlighted={false}
-                    disabled={false}
+                    disabled={isBattalionAHighlight}
                   />
                   <BattalionSlot
                     name="D"

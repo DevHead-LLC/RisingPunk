@@ -280,17 +280,31 @@ router.post('/complete-feature-research', auth, async (req: Request, res: Respon
     
     const now = Date.now();
     const userAttempts = researchCompletionAttempts.get(userId);
-    if (userAttempts && userAttempts.resetAt > now) {
-      if (userAttempts.count >= MAX_RESEARCH_COMPLETION_ATTEMPTS) {
-        res.status(429).json({ 
-          success: false, 
-          message: 'Too many requests. Please try again later.' 
-        });
-        return;
+    
+    if (userAttempts) {
+      if (userAttempts.resetAt <= now) {
+        researchCompletionAttempts.delete(userId);
+        researchCompletionAttempts.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+      } else {
+        if (userAttempts.count >= MAX_RESEARCH_COMPLETION_ATTEMPTS) {
+          res.status(429).json({ 
+            success: false, 
+            message: 'Too many requests. Please try again later.' 
+          });
+          return;
+        }
+        userAttempts.count++;
       }
-      userAttempts.count++;
     } else {
       researchCompletionAttempts.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    }
+    
+    if (researchCompletionAttempts.size > 1000) {
+      for (const [key, value] of researchCompletionAttempts.entries()) {
+        if (value.resetAt <= now) {
+          researchCompletionAttempts.delete(key);
+        }
+      }
     }
     
     if (!categoryId || !featureId) {
