@@ -107,6 +107,9 @@ export class BattleSetupService {
     // Calculate total army health using new BotService
     let userTotal = 0;
     for (const battalion of userBattalions) {
+      if (!battalion.quantity || battalion.quantity <= 0) {
+        continue;
+      }
       const botType = battalion.type as BotType;
       const botConfig = await BotService.getUserBotStats(botType, userLevel);
       userTotal += botConfig.stats.health * battalion.quantity;
