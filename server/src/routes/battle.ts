@@ -55,6 +55,12 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
         return;
       }
       
+      const MAX_USER_BATTALIONS = 3;
+      if (userBattalions.length > MAX_USER_BATTALIONS) {
+        res.status(400).json({ success: false, error: `Maximum ${MAX_USER_BATTALIONS} battalions allowed` });
+        return;
+      }
+      
       if (userBattalions.length > 2) {
         const battalionCFeature = await UserResearchFeature.findOne({
           userId: req.user._id,
