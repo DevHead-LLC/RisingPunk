@@ -387,6 +387,9 @@ export class AccountDeletionService {
       { session }
     );
 
+    // Delete all chat messages for this crew
+    await CrewChatMessage.deleteMany({ crewId: crewId }, { session });
+
     // Delete the crew document (must be last to maintain referential integrity)
     await Crew.deleteOne({ _id: crewId }, { session });
     result.deletedRecords.crewsDisbanded++;
