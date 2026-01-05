@@ -44,9 +44,18 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
         return;
       }
       
-      const battalionCount = userBattalions ? userBattalions.length : 3;
+      if (!userBattalions || userBattalions.length === 0) {
+        res.status(400).json({ success: false, error: 'userBattalions is required and must contain at least one battalion' });
+        return;
+      }
       
-      if (battalionCount > 2) {
+      const hasValidBattalion = userBattalions.some(battalion => battalion.quantity && battalion.quantity > 0);
+      if (!hasValidBattalion) {
+        res.status(400).json({ success: false, error: 'userBattalions must contain at least one battalion with quantity > 0' });
+        return;
+      }
+      
+      if (userBattalions.length > 2) {
         const battalionCFeature = await UserResearchFeature.findOne({
           userId: req.user._id,
           categoryId: 'hack-ability',
