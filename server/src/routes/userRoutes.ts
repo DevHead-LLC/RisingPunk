@@ -857,6 +857,10 @@ router.put<{}, { success: boolean; message: string; profileGender: 'male' | 'fem
 );
 
 // Delete user account
+const deletionAttempts = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_WINDOW = 60000;
+const MAX_DELETION_ATTEMPTS = 3;
+
 router.delete('/account', auth, async (req: Request, res: Response) => {
   try {
     const userId = req.user?._id;
@@ -867,12 +871,44 @@ router.delete('/account', auth, async (req: Request, res: Response) => {
       return;
     }
 
+    if (!mongoose.Types.ObjectId.isValid(userId.toString())) {
+      res.status(400).json({ error: 'Invalid user ID format' });
+      return;
+    }
+
     if (!handle) {
       res.status(400).json({ error: 'Handle is required for account deletion' });
       return;
     }
 
-    const user = await User.findById(userId);
+    const userIdString = userId.toString();
+    const now = Date.now();
+    const userAttempts = deletionAttempts.get(userIdString);
+    
+    if (userAttempts) {
+      if (userAttempts.resetAt <= now) {
+        deletionAttempts.delete(userIdString);
+        deletionAttempts.set(userIdString, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+      } else {
+        if (userAttempts.count >= MAX_DELETION_ATTEMPTS) {
+          res.status(429).json({ error: 'Too many deletion attempts. Please try again later.' });
+          return;
+        }
+        userAttempts.count++;
+      }
+    } else {
+      deletionAttempts.set(userIdString, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    }
+
+    if (deletionAttempts.size > 1000) {
+      for (const [key, value] of deletionAttempts.entries()) {
+        if (value.resetAt <= now) {
+          deletionAttempts.delete(key);
+        }
+      }
+    }
+
+    const user = await User.findById(userId).select('handle').lean();
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;
@@ -883,14 +919,34 @@ router.delete('/account', auth, async (req: Request, res: Response) => {
       return;
     }
 
-    await User.findByIdAndDelete(userId);
+    const { AccountDeletionService } = await import('../services/AccountDeletionService');
+    const deletionResult = await AccountDeletionService.deleteAccount(userIdString);
     
-    res.json({
-      success: true,
-      message: 'Account deleted successfully'
-    });
-  } catch (error) {
+    if (deletionResult.success && deletionResult.errors.length === 0) {
+      res.json({
+        success: true,
+        message: deletionResult.message,
+        deletedRecords: deletionResult.deletedRecords
+      });
+    } else {
+      console.error('Account deletion completed with errors:', {
+        userId: userIdString,
+        errors: deletionResult.errors,
+        deletedRecords: deletionResult.deletedRecords
+      });
+      res.status(500).json({
+        success: false,
+        message: deletionResult.message || 'Account deletion completed with errors',
+        errors: deletionResult.errors,
+        deletedRecords: deletionResult.deletedRecords
+      });
+    }
+  } catch (error: any) {
     console.error('Error deleting user account:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message || 'An unexpected error occurred during account deletion'
+    });
   }
 });
