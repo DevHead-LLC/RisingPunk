@@ -289,6 +289,12 @@ export class AccountDeletionService {
     const executivesToPull: mongoose.Types.ObjectId[] = [];
     const membersToPull: mongoose.Types.ObjectId[] = [userIdObjectId];
 
+    // Check if the deleted president was also in the executives array
+    const wasPresidentAlsoExecutive = crew.executives.some((e: any) => e.toString() === userIdObjectId.toString());
+    if (wasPresidentAlsoExecutive) {
+      executivesToPull.push(userIdObjectId);
+    }
+
     if (isSuccessorExecutive) {
       executivesToPull.push(newPresidentId);
       const isSuccessorAlsoMember = eligibleMembers.some((m: any) => m._id.toString() === newPresidentId.toString());
