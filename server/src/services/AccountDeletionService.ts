@@ -61,13 +61,10 @@ export class AccountDeletionService {
       errors: []
     };
 
-    console.log(`[AUDIT] Account deletion started: userId=${userId}, timestamp=${new Date().toISOString()}`);
-
     try {
       const user = await User.findById(userIdObjectId).lean();
       if (!user) {
         result.message = 'User already deleted or not found';
-        console.log(`[AUDIT] Account deletion: userId=${userId}, user not found, returning success (idempotent)`);
         return result;
       }
 
@@ -77,13 +74,10 @@ export class AccountDeletionService {
       await this.handleCrewMemberships(userIdObjectId, result);
       await this.deleteCrewChatMessages(userIdObjectId, result);
       await this.deleteUserDocument(userIdObjectId, result);
-
-      console.log(`[AUDIT] Account deletion completed: userId=${userId}, success=true, deletedRecords=${JSON.stringify(result.deletedRecords)}`);
     } catch (error: any) {
       result.success = false;
       result.message = 'Account deletion completed with errors';
       result.errors.push(error.message || String(error));
-      console.error(`[AUDIT] Account deletion error: userId=${userId}, error=${error.message || String(error)}`);
     }
 
     return result;
@@ -336,66 +330,69 @@ export class AccountDeletionService {
     result: DeletionResult,
     session: mongoose.ClientSession
   ): Promise<void> {
-    try {
-      await Crew.updateMany(
-        { warWithCrewId: crewId },
-        {
-          $set: {
-            warWithCrewId: null,
-            warDeclaredAt: null
-          }
-        },
-        { session }
-      );
+    // Clear war references from other crews
+    await Crew.updateMany(
+      { warWithCrewId: crewId },
+      {
+        $set: {
+          warWithCrewId: null,
+          warDeclaredAt: null
+        }
+      },
+      { session }
+    );
 
-      await Crew.updateMany(
-        { allianceWithCrewIds: crewId },
-        { $pull: { allianceWithCrewIds: crewId } },
-        { session }
-      );
+    // Clear alliance references from other crews
+    await Crew.updateMany(
+      { allianceWithCrewIds: crewId },
+      { $pull: { allianceWithCrewIds: crewId } },
+      { session }
+    );
 
-      await Crew.updateMany(
-        { allianceRequestedToCrewIds: crewId },
-        { $pull: { allianceRequestedToCrewIds: crewId } },
-        { session }
-      );
+    await Crew.updateMany(
+      { allianceRequestedToCrewIds: crewId },
+      { $pull: { allianceRequestedToCrewIds: crewId } },
+      { session }
+    );
 
-      await Crew.updateMany(
-        { allianceRequestedFromCrewIds: crewId },
-        { $pull: { allianceRequestedFromCrewIds: crewId } },
-        { session }
-      );
+    await Crew.updateMany(
+      { allianceRequestedFromCrewIds: crewId },
+      { $pull: { allianceRequestedFromCrewIds: crewId } },
+      { session }
+    );
 
-      await CrewStatus.updateMany(
-        { crewId: crewId },
-        {
-          $set: {
-            isInCrew: false,
-            crewId: null,
-            crewIdentifier: null,
-            role: null
-          }
-        },
-        { session }
-      );
+    // Update all crew members' status
+    await CrewStatus.updateMany(
+      { crewId: crewId },
+      {
+        $set: {
+          isInCrew: false,
+          crewId: null,
+          crewIdentifier: null,
+          role: null
+        }
+      },
+      { session }
+    );
 
-      await CrewStatus.updateMany(
-        { appliedCrewId: crewId },
-        {
-          $set: {
-            appliedCrewId: null,
-            appliedCrewIdentifier: null
-          }
-        },
-        { session }
-      );
+    // Clear application references
+    await CrewStatus.updateMany(
+      { appliedCrewId: crewId },
+      {
+        $set: {
+          appliedCrewId: null,
+          appliedCrewIdentifier: null
+        }
+      },
+      { session }
+    );
 
-      await Crew.deleteOne({ _id: crewId }, { session });
-      result.deletedRecords.crewsDisbanded++;
-    } catch (error: any) {
-      result.errors.push(`Crew disband error: ${error.message || String(error)}`);
-      console.error('Error disbanding crew:', error);
-    }
+    // Delete the crew document (must be last to maintain referential integrity)
+    await Crew.deleteOne({ _id: crewId }, { session });
+    result.deletedRecords.crewsDisbanded++;
+    
+    // Note: Errors are not caught here - they propagate to abort the transaction
+    // The outer catch in handleCrewMemberships will handle logging and error tracking
   }
 
   private static async deleteCrewChatMessages(
