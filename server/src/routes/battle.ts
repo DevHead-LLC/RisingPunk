@@ -44,7 +44,12 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
         return;
       }
       
-      if (userBattalions && userBattalions.length > 2) {
+      if (!userBattalions || userBattalions.length === 0) {
+        res.status(400).json({ success: false, error: 'userBattalions is required and must contain at least one battalion' });
+        return;
+      }
+      
+      if (userBattalions.length > 2) {
         const battalionCFeature = await UserResearchFeature.findOne({
           userId: req.user._id,
           categoryId: 'hack-ability',
