@@ -271,6 +271,10 @@ export class ResearchFeatureService {
           { session }
         );
 
+        if (categoryId === 'hack-ability' && featureId === 'battalions-per-battle') {
+          console.log(`[AUDIT] User ${userId} unlocked Battalion C at ${unlockedAt.toISOString()}`);
+        }
+
         return {
           success: true,
           message: 'Research completed successfully',
@@ -301,7 +305,9 @@ export class ResearchFeatureService {
       const userFeatures = await UserResearchFeature.find({
         userId,
         categoryId
-      });
+      })
+      .select('featureId isUnlocked unlockedAt isResearching researchStartedAt researchCompletesAt researchTimeHours')
+      .lean();
 
       // Merge base features with user progress from UserResearchFeature collection
       const featuresWithStatus = baseFeatures.map(feature => {

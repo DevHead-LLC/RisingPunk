@@ -33,10 +33,11 @@ export const RESEARCH_FEATURES: Record<string, IResearchFeature[]> = {
   'hack-ability': [
     {
       id: 'battalions-per-battle',
-      name: 'Battalions per Battle',
-      description: 'Increase the number of battalions you can deploy in a single battle',
-      unlockCost: 10000,
-      levelRequirement: 3,
+      name: 'Add Battalion C',
+      description: 'Unlock a third battalion (Battalion C) to deploy in attacking battles',
+      unlockCost: 50000,
+      levelRequirement: 5,
+      researchTimeHours: 5,
       isUnlocked: false,
       effect: {
         type: 'improvement',
