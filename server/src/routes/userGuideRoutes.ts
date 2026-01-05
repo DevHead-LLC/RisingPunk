@@ -252,67 +252,59 @@ router.post('/complete-task', auth, async (req: Request, res: Response) => {
     const task = taskList.find(t => t.id === trimmedTaskId);
     const rewardAmount = task?.reward?.value || 0;
 
-    // Use transaction to ensure atomicity and prevent race conditions
+    // Use transaction with retry logic to handle write conflicts
+    // withTransaction has built-in retry for transient errors, but we add explicit handling
     const session = await mongoose.startSession();
-    session.startTransaction();
-
+    
     try {
-      // Check if already collected INSIDE transaction to prevent race conditions
-      let progress = await UserTaskProgress.findOne({ userId }).session(session);
-      const alreadyCollected = progress?.collectedTasks?.includes(trimmedTaskId);
+      await session.withTransaction(async () => {
+        // Check if already collected INSIDE transaction to prevent race conditions
+        let progress = await UserTaskProgress.findOne({ userId }).session(session);
+        const alreadyCollected = progress?.collectedTasks?.includes(trimmedTaskId);
 
-      if (alreadyCollected) {
-        await session.abortTransaction();
-        session.endSession();
-        // Task already collected, return success
-        res.json({
-          success: true,
-          message: 'Task already collected',
-          rewardAmount: 0
-        });
-        return;
-      }
+        if (alreadyCollected) {
+          // Task already collected - abort transaction and return early
+          throw new Error('TASK_ALREADY_COLLECTED');
+        }
 
-      // Ensure task is marked as completed (action done) before collecting reward
-      const isCompleted = progress?.completedTasks.some(t => t.taskId === trimmedTaskId);
-      if (!isCompleted) {
-        // Mark as completed first (action done, but reward not collected yet) - atomic operation
-        const updatedProgress = await UserTaskProgress.findOneAndUpdate(
-          { userId },
-          {
-            $addToSet: {
-              completedTasks: {
-                taskId: trimmedTaskId,
-                completedAt: new Date()
+        // Ensure task is marked as completed (action done) before collecting reward
+        const isCompleted = progress?.completedTasks.some(t => t.taskId === trimmedTaskId);
+        if (!isCompleted) {
+          // Mark as completed first (action done, but reward not collected yet) - atomic operation
+          const updatedProgress = await UserTaskProgress.findOneAndUpdate(
+            { userId },
+            {
+              $addToSet: {
+                completedTasks: {
+                  taskId: trimmedTaskId,
+                  completedAt: new Date()
+                }
+              },
+              $setOnInsert: {
+                collectedTasks: [],
+                skippedTasks: [],
+                showTaskGuide: true
               }
             },
-            $setOnInsert: {
-              collectedTasks: [],
-              skippedTasks: [],
-              showTaskGuide: true
-            }
-          },
-          { upsert: true, new: true, session }
-        );
-        // Reassign progress to reflect the updated state
-        progress = updatedProgress;
-      }
-
-      // Update user balance with reward (atomic with collectedTasks update)
-      if (rewardAmount > 0) {
-        const user = await User.findById(userId).session(session);
-        if (user) {
-          user.balance.total += rewardAmount;
-          user.balance.lastUpdated = new Date();
-          await user.save({ session });
+            { upsert: true, new: true, session }
+          );
+          // Reassign progress to reflect the updated state
+          progress = updatedProgress;
         }
-      }
 
-      // Mark task as collected (reward given) - atomic operation
-      // Use findOneAndUpdate with condition to atomically check and update
-      let updateResult;
-      try {
-        updateResult = await UserTaskProgress.findOneAndUpdate(
+        // Update user balance with reward (atomic with collectedTasks update)
+        if (rewardAmount > 0) {
+          const user = await User.findById(userId).session(session);
+          if (user) {
+            user.balance.total += rewardAmount;
+            user.balance.lastUpdated = new Date();
+            await user.save({ session });
+          }
+        }
+
+        // Mark task as collected (reward given) - atomic operation
+        // Use findOneAndUpdate with condition to atomically check and update
+        const updateResult = await UserTaskProgress.findOneAndUpdate(
           { 
             userId,
             collectedTasks: { $ne: trimmedTaskId } // Only update if not already collected
@@ -331,28 +323,15 @@ router.post('/complete-task', auth, async (req: Request, res: Response) => {
           },
           { upsert: true, new: true, session }
         );
-      } catch (error: any) {
-        // Handle race condition: if another request already collected the task,
-        // MongoDB may throw E11000 duplicate key error when trying to upsert
-        // because the query condition no longer matches and upsert tries to create duplicate userId
-        if (error.code === 11000 || error.codeName === 'DuplicateKey') {
-          await session.abortTransaction();
-          session.endSession();
-          res.json({
-            success: true,
-            message: 'Task already collected',
-            rewardAmount: 0
-          });
-          return;
-        }
-        throw error;
-      }
 
-      // If updateResult is null, task was already collected by another request
-      // (This shouldn't happen due to the $ne condition, but handle it defensively)
-      if (!updateResult) {
-        await session.abortTransaction();
-        session.endSession();
+        // If updateResult is null, task was already collected by another request
+        if (!updateResult) {
+          throw new Error('TASK_ALREADY_COLLECTED');
+        }
+      });
+    } catch (error: any) {
+      // Handle specific error cases
+      if (error.message === 'TASK_ALREADY_COLLECTED') {
         res.json({
           success: true,
           message: 'Task already collected',
@@ -361,12 +340,38 @@ router.post('/complete-task', auth, async (req: Request, res: Response) => {
         return;
       }
 
-      await session.commitTransaction();
-      session.endSession();
-    } catch (error) {
-      await session.abortTransaction();
-      session.endSession();
+      // Handle duplicate key error (race condition where task was already collected)
+      if (error.code === 11000 || error.codeName === 'DuplicateKey') {
+        res.json({
+          success: true,
+          message: 'Task already collected',
+          rewardAmount: 0
+        });
+        return;
+      }
+
+      // Check if it's a transient transaction error (WriteConflict)
+      // withTransaction should retry these automatically, but if it still fails, we handle it
+      const isTransientError = 
+        error.code === 112 || // WriteConflict
+        error.codeName === 'WriteConflict' ||
+        (error.errorLabels && error.errorLabels.includes('TransientTransactionError'));
+
+      if (isTransientError) {
+        // Log the error but return a user-friendly message
+        // The transaction was retried by withTransaction, so if we get here, it failed after retries
+        console.error('Write conflict after retries in task completion:', error);
+        res.status(500).json({ 
+          error: 'Task completion failed due to concurrent operation. Please try again.',
+          retryable: true
+        });
+        return;
+      }
+
+      // Re-throw other errors to be handled by outer catch
       throw error;
+    } finally {
+      await session.endSession();
     }
 
     res.json({
