@@ -177,7 +177,17 @@ export class AccountDeletionService {
     const session = await mongoose.startSession();
     
     try {
+      // Track counts locally to avoid inflation on transaction retries
+      const localCounts = {
+        crewsUpdated: 0,
+        crewsDisbanded: 0
+      };
+
       await session.withTransaction(async () => {
+        // Reset local counts at start of transaction (in case of retry)
+        localCounts.crewsUpdated = 0;
+        localCounts.crewsDisbanded = 0;
+
         const crewsWhereUserIsMember = await Crew.find({ members: userIdObjectId }).session(session);
         const crewsWhereUserIsExecutive = await Crew.find({ executives: userIdObjectId }).session(session);
         const crewsWhereUserIsApplicant = await Crew.find({ 'applicants.userId': userIdObjectId }).session(session);
@@ -199,7 +209,7 @@ export class AccountDeletionService {
           const isApplicant = crew.applicants.some((a: any) => a.userId.toString() === userIdObjectId.toString());
 
           if (isPresident) {
-            await this.handlePresidencyTransfer(crew, userIdObjectId, result, session);
+            await this.handlePresidencyTransfer(crew, userIdObjectId, localCounts, session);
           } else {
             const updateOps: any = {};
             if (isMember) {
@@ -221,11 +231,15 @@ export class AccountDeletionService {
 
             if (Object.keys(updateOps).length > 0) {
               await Crew.findByIdAndUpdate(crewId, updateOps, { session });
-              result.deletedRecords.crewsUpdated++;
+              localCounts.crewsUpdated++;
             }
           }
         }
       });
+
+      // Update result only after transaction commits successfully
+      result.deletedRecords.crewsUpdated += localCounts.crewsUpdated;
+      result.deletedRecords.crewsDisbanded += localCounts.crewsDisbanded;
     } catch (error: any) {
       result.errors.push(`Crew membership handling error: ${error.message || String(error)}`);
       console.error('Error handling crew memberships:', error);
@@ -237,14 +251,14 @@ export class AccountDeletionService {
   private static async handlePresidencyTransfer(
     crew: any,
     userIdObjectId: mongoose.Types.ObjectId,
-    result: DeletionResult,
+    localCounts: { crewsUpdated: number; crewsDisbanded: number },
     session: mongoose.ClientSession
   ): Promise<void> {
     const executives = (crew.executives || []).filter((e: any) => e.toString() !== userIdObjectId.toString());
     const members = (crew.members || []).filter((m: any) => m.toString() !== userIdObjectId.toString());
 
     if (executives.length === 0 && members.length === 0) {
-      await this.disbandCrew(crew._id, result, session);
+      await this.disbandCrew(crew._id, localCounts, session);
       return;
     }
 
@@ -282,7 +296,7 @@ export class AccountDeletionService {
     }
 
     if (!newPresidentId) {
-      await this.disbandCrew(crew._id, result, session);
+      await this.disbandCrew(crew._id, localCounts, session);
       return;
     }
 
@@ -328,12 +342,12 @@ export class AccountDeletionService {
       await newPresidentStatus.save({ session });
     }
 
-    result.deletedRecords.crewsUpdated++;
+    localCounts.crewsUpdated++;
   }
 
   private static async disbandCrew(
     crewId: mongoose.Types.ObjectId,
-    result: DeletionResult,
+    localCounts: { crewsUpdated: number; crewsDisbanded: number },
     session: mongoose.ClientSession
   ): Promise<void> {
     // Clear war references from other crews
@@ -398,7 +412,7 @@ export class AccountDeletionService {
 
     // Delete the crew document (must be last to maintain referential integrity)
     await Crew.deleteOne({ _id: crewId }, { session });
-    result.deletedRecords.crewsDisbanded++;
+    localCounts.crewsDisbanded++;
     
     // Note: Errors are not caught here - they propagate to abort the transaction
     // The outer catch in handleCrewMemberships will handle logging and error tracking
