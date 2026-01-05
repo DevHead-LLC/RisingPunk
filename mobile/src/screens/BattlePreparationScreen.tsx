@@ -107,6 +107,32 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       (antivirusFeature?.isResearching && remaining === 0);
   }, [antivirusFeature?.isUnlocked, antivirusFeature?.isResearching, antivirusFeature?.researchCompletesAt]);
 
+  // Get hack-ability research features for Battalion C unlock check
+  const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability');
+  
+  // Find and memoize the Battalion C feature
+  const battalionCFeature = useMemo(() => {
+    return hackAbilityFeatures?.find(f => f.id === 'battalions-per-battle');
+  }, [hackAbilityFeatures]);
+  
+  // Check if Battalion C is unlocked (same pattern as antivirus)
+  const isBattalionCUnlocked = useMemo(() => {
+    if (!battalionCFeature) return false;
+    
+    const now = new Date().getTime();
+    const researchCompletesAt = battalionCFeature.researchCompletesAt 
+      ? new Date(battalionCFeature.researchCompletesAt).getTime() 
+      : 0;
+    const remaining = Math.max(0, researchCompletesAt - now);
+    return battalionCFeature.isUnlocked || 
+      (battalionCFeature.isResearching && remaining === 0);
+  }, [battalionCFeature?.isUnlocked, battalionCFeature?.isResearching, battalionCFeature?.researchCompletesAt]);
+
+  // Memoize available battalions array (A and B always available)
+  const availableBattalions = useMemo(() => {
+    return ['A', 'B'];
+  }, []);
+
   // Calculate available bot counts by subtracting assigned quantities
   const availableBots = useMemo(() => {
     
@@ -192,14 +218,18 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
 
   const resetBattalions = React.useCallback(async () => {
     try {
-      await Promise.all([
+      const resetPromises = [
         assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'A' }),
         assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'B' }),
-      ]);
+      ];
+      if (isBattalionCUnlocked) {
+        resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'C' }));
+      }
+      await Promise.all(resetPromises);
     } catch (error) {
       console.error('Failed to reset battalions:', error);
     }
-  }, [assignToBattalion]);
+  }, [assignToBattalion, isBattalionCUnlocked]);
 
   // Convert assignments to battalion data format
   const convertAssignmentsToBattalionData = React.useCallback((assignments: Record<string, BattalionAssignment>) => {
@@ -392,8 +422,31 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
             </Animated.View>
             <View style={[styles.battalionsContainer, isBattalionAHighlight && { zIndex: 1001, elevation: 1001 }]}>
               {renderBattalionSlots(['E', 'F'], false, true)}
-              {renderBattalionSlots(['C', 'D'], false, true)}
-              {renderBattalionSlots(['A', 'B'])}
+              {isBattalionCUnlocked ? (
+                <View style={styles.battalionColumn}>
+                  <BattalionSlot
+                    name="C"
+                    isEnemy={false}
+                    isLocked={false}
+                    onPress={() => handleBattalionPress('C')}
+                    assignment={assignments['C']}
+                    isHighlighted={false}
+                    disabled={isBattalionAHighlight}
+                  />
+                  <BattalionSlot
+                    name="D"
+                    isEnemy={false}
+                    isLocked={true}
+                    onPress={undefined}
+                    assignment={undefined}
+                    isHighlighted={false}
+                    disabled={false}
+                  />
+                </View>
+              ) : (
+                renderBattalionSlots(['C', 'D'], false, true)
+              )}
+              {renderBattalionSlots(availableBattalions)}
               {renderCircleSlots(3)}
             </View>
           </View>

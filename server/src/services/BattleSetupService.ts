@@ -31,19 +31,14 @@ export class BattleSetupService {
       }
     }
     
-    // Calculate total army health based on expected battalion configurations
-    const defaultUserBattalions = [
-      { type: BotType.GUARDIAN, quantity: 10 },
-      { type: BotType.BREACHER, quantity: 8 },
-      { type: BotType.PHREAK, quantity: 6 },
-    ];
-    const defaultEnemyBattalions = [
-      { type: BotType.GUARDIAN, quantity: 12 },
-      { type: BotType.BREACHER, quantity: 10 },
-      { type: BotType.PHREAK, quantity: 8 },
-    ];
+    if (!userBattalions || userBattalions.length === 0) {
+      throw new Error('userBattalions is required and must contain at least one battalion');
+    }
     
-    const battalionConfigs = userBattalions || defaultUserBattalions;
+    const MAX_USER_BATTALIONS = 3;
+    if (userBattalions.length > MAX_USER_BATTALIONS) {
+      throw new Error(`Maximum ${MAX_USER_BATTALIONS} battalions allowed`);
+    }
     
     // Check if defender is a user (not NPC)
     // A user defender is when we have a defenderId that's not 'computer-opponent' and doesn't look like an NPC ID
@@ -111,7 +106,10 @@ export class BattleSetupService {
     
     // Calculate total army health using new BotService
     let userTotal = 0;
-    for (const battalion of battalionConfigs) {
+    for (const battalion of userBattalions) {
+      if (!battalion.quantity || battalion.quantity <= 0) {
+        continue;
+      }
       const botType = battalion.type as BotType;
       const botConfig = await BotService.getUserBotStats(botType, userLevel);
       userTotal += botConfig.stats.health * battalion.quantity;
