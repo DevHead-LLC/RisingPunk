@@ -12,6 +12,10 @@ import mongoose from 'mongoose';
 
 const router = express.Router();
 
+const researchCompletionAttempts = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_WINDOW = 60000;
+const MAX_RESEARCH_COMPLETION_ATTEMPTS = 10;
+
 router.get('/status', auth, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user._id;
@@ -271,8 +275,37 @@ router.post('/start-feature-research', auth, async (req: Request, res: Response)
 // Complete research for an individual feature
 router.post('/complete-feature-research', auth, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user._id;
+    const userId = (req as any).user._id.toString();
     const { categoryId, featureId } = req.body;
+    
+    const now = Date.now();
+    const userAttempts = researchCompletionAttempts.get(userId);
+    
+    if (userAttempts) {
+      if (userAttempts.resetAt <= now) {
+        researchCompletionAttempts.delete(userId);
+        researchCompletionAttempts.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+      } else {
+        if (userAttempts.count >= MAX_RESEARCH_COMPLETION_ATTEMPTS) {
+          res.status(429).json({ 
+            success: false, 
+            message: 'Too many requests. Please try again later.' 
+          });
+          return;
+        }
+        userAttempts.count++;
+      }
+    } else {
+      researchCompletionAttempts.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    }
+    
+    if (researchCompletionAttempts.size > 1000) {
+      for (const [key, value] of researchCompletionAttempts.entries()) {
+        if (value.resetAt <= now) {
+          researchCompletionAttempts.delete(key);
+        }
+      }
+    }
     
     if (!categoryId || !featureId) {
       res.status(400).json({
