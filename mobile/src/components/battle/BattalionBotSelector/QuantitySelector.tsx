@@ -17,6 +17,17 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
   const colors = useThemeColors();
   const { themeMode } = useTheme();
   const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability');
+  const [currentTime, setCurrentTime] = React.useState(() => Date.now());
+
+  React.useEffect(() => {
+    const battalionSizeFeature = hackAbilityFeatures?.find(f => f.id === 'increase-battalion-size');
+    if (battalionSizeFeature?.isResearching && battalionSizeFeature?.researchCompletesAt) {
+      const interval = setInterval(() => {
+        setCurrentTime(Date.now());
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [hackAbilityFeatures]);
 
   const battalionSizeFeature = React.useMemo(() => {
     return hackAbilityFeatures?.find(f => f.id === 'increase-battalion-size');
@@ -24,14 +35,14 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
 
   const isUnlocked = React.useMemo(() => {
     if (!battalionSizeFeature) return false;
-    const now = new Date().getTime();
+    const now = currentTime;
     const researchCompletesAt = battalionSizeFeature.researchCompletesAt 
       ? new Date(battalionSizeFeature.researchCompletesAt).getTime() 
       : null;
     const remaining = researchCompletesAt !== null ? Math.max(0, researchCompletesAt - now) : null;
     return battalionSizeFeature.isUnlocked || 
       (battalionSizeFeature.isResearching && researchCompletesAt !== null && remaining === 0);
-  }, [battalionSizeFeature?.isUnlocked, battalionSizeFeature?.isResearching, battalionSizeFeature?.researchCompletesAt]);
+  }, [battalionSizeFeature?.isUnlocked, battalionSizeFeature?.isResearching, battalionSizeFeature?.researchCompletesAt, currentTime]);
 
   const MAX_BATTALION_SIZE = isUnlocked ? 500 : 250;
   const maxQuantity = Math.min(available, MAX_BATTALION_SIZE);
