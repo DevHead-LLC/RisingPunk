@@ -27,10 +27,10 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
     const now = new Date().getTime();
     const researchCompletesAt = battalionSizeFeature.researchCompletesAt 
       ? new Date(battalionSizeFeature.researchCompletesAt).getTime() 
-      : 0;
-    const remaining = Math.max(0, researchCompletesAt - now);
+      : null;
+    const remaining = researchCompletesAt !== null ? Math.max(0, researchCompletesAt - now) : null;
     return battalionSizeFeature.isUnlocked || 
-      (battalionSizeFeature.isResearching && remaining === 0);
+      (battalionSizeFeature.isResearching && researchCompletesAt !== null && remaining === 0);
   }, [battalionSizeFeature?.isUnlocked, battalionSizeFeature?.isResearching, battalionSizeFeature?.researchCompletesAt]);
 
   const MAX_BATTALION_SIZE = isUnlocked ? 500 : 250;
