@@ -275,6 +275,10 @@ export class ResearchFeatureService {
           console.log(`[AUDIT] User ${userId} unlocked Battalion C at ${unlockedAt.toISOString()}`);
         }
 
+        if (categoryId === 'hack-ability' && featureId === 'increase-battalion-size') {
+          console.log(`[AUDIT] User ${userId} unlocked Battalion Size +250 at ${unlockedAt.toISOString()}`);
+        }
+
         return {
           success: true,
           message: 'Research completed successfully',

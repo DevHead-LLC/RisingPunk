@@ -17,6 +17,7 @@ export interface StartResearchResponse {
   researchStartedAt: string;
   researchCompletesAt: string;
   researchTimeHours: number;
+  newBalance?: number;
 }
 
 export interface CompleteResearchResponse {
@@ -67,10 +68,22 @@ export const researchFeaturesApi = createApi({
         method: 'POST',
         body: { categoryId, featureId },
       }),
-      transformResponse: (response: { success: boolean; data: StartResearchResponse }) => response.data,
+      transformResponse: (response: { success: boolean; data: StartResearchResponse; newBalance?: number }) => ({
+        ...response.data,
+        newBalance: response.newBalance
+      }),
       invalidatesTags: (result, error, { categoryId }) => [
         { type: 'ResearchFeatures', id: categoryId }
       ],
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Invalidate Balance tag from balanceApi to ensure fresh balance data
+          dispatch(balanceApi.util.invalidateTags(['Balance']));
+        } catch {
+          // Error handling is done by the mutation itself
+        }
+      },
     }),
     completeResearch: builder.mutation<CompleteResearchResponse, { categoryId: string; featureId: string }>({
       query: ({ categoryId, featureId }) => ({

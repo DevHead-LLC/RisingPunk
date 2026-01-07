@@ -4,6 +4,7 @@ import { SIZING } from '../../../styles/theme';
 import { useThemeColors } from '../../../hooks/useThemeColors';
 import { useTheme } from '../../../context/ThemeContext';
 import { KeyboardAwareInput } from '../../common/KeyboardAwareInput';
+import { useGetUserFeaturesQuery } from '../../../store/api/researchFeaturesApi';
 
 type Props = {
   quantity: number;
@@ -12,11 +13,27 @@ type Props = {
   disabled?: boolean;
 };
 
-const MAX_BATTALION_SIZE = 250;
-
 export const QuantitySelector = React.memo(({ quantity, available, onChangeQuantity, disabled = false }: Props) => {
   const colors = useThemeColors();
   const { themeMode } = useTheme();
+  const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability');
+
+  const battalionSizeFeature = React.useMemo(() => {
+    return hackAbilityFeatures?.find(f => f.id === 'increase-battalion-size');
+  }, [hackAbilityFeatures]);
+
+  const isUnlocked = React.useMemo(() => {
+    if (!battalionSizeFeature) return false;
+    const now = new Date().getTime();
+    const researchCompletesAt = battalionSizeFeature.researchCompletesAt 
+      ? new Date(battalionSizeFeature.researchCompletesAt).getTime() 
+      : null;
+    const remaining = researchCompletesAt !== null ? Math.max(0, researchCompletesAt - now) : null;
+    return battalionSizeFeature.isUnlocked || 
+      (battalionSizeFeature.isResearching && researchCompletesAt !== null && remaining === 0);
+  }, [battalionSizeFeature?.isUnlocked, battalionSizeFeature?.isResearching, battalionSizeFeature?.researchCompletesAt]);
+
+  const MAX_BATTALION_SIZE = isUnlocked ? 500 : 250;
   const maxQuantity = Math.min(available, MAX_BATTALION_SIZE);
 
   const adjustQuantity = React.useCallback((adjustment: number) => {
