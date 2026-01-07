@@ -41,6 +41,7 @@ interface FeatureCardProps {
 const BACKGROUND_IMAGE_MAP: Record<string, ImageSourcePropType> = {
   'antivirus': require('../../assets/images/antivirusResearch.png'),
   'battalions-per-battle': require('../../assets/images/researchCenter/increaseBattalions.png'),
+  'increase-battalion-size': require('../../assets/images/researchCenter/increaseBots250.png'),
   'bot-trap': require('../../assets/images/botTrapResearch.png'),
   'crew-system-unlock': require('../../assets/images/startCrew.png'),
 };

@@ -46,6 +46,20 @@ export const RESEARCH_FEATURES: Record<string, IResearchFeature[]> = {
       }
     },
     {
+      id: 'increase-battalion-size',
+      name: 'Battalion Size +250',
+      description: 'Increase maximum troops per battalion from 250 to 500',
+      unlockCost: 100000,
+      levelRequirement: 6,
+      researchTimeHours: 6,
+      isUnlocked: false,
+      effect: {
+        type: 'improvement',
+        value: 250,
+        target: 'battalion-size'
+      }
+    },
+    {
       id: 'starting-node',
       name: 'Starting Node',
       description: 'Choose your starting position on the battle grid',
@@ -333,7 +347,7 @@ export const RESEARCH_FEATURES: Record<string, IResearchFeature[]> = {
       description: 'Unlock the ability to form, join, and manage hack crews',
       unlockCost: 250000,
       levelRequirement: 5,
-      researchTimeHours: 5,
+      researchTimeHours: 7,
       isUnlocked: false,
       effect: {
         type: 'unlock',
