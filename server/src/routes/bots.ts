@@ -410,6 +410,42 @@ router.post('/assign', auth, async (req, res) => {
       res.status(400).json({ error: 'Battalion ID must be a single uppercase letter (A-Z)' });
       return;
     }
+
+    if (typeof quantity !== 'number' || !Number.isFinite(quantity) || !Number.isInteger(quantity)) {
+      res.status(400).json({ error: 'Quantity must be a valid integer' });
+      return;
+    }
+
+    if (quantity < 0) {
+      res.status(400).json({ error: 'Quantity must be greater than or equal to 0' });
+      return;
+    }
+
+    const battalionSizeFeature = await UserResearchFeature.findOne({
+      userId: req.user._id,
+      categoryId: 'hack-ability',
+      featureId: 'increase-battalion-size'
+    })
+    .select('isUnlocked isResearching researchCompletesAt')
+    .lean();
+
+    const now = Date.now();
+    const researchCompletesAt = battalionSizeFeature?.researchCompletesAt 
+      ? new Date(battalionSizeFeature.researchCompletesAt).getTime() 
+      : null;
+    const remaining = researchCompletesAt !== null ? Math.max(0, researchCompletesAt - now) : null;
+    const isActuallyUnlocked = battalionSizeFeature?.isUnlocked || 
+      (battalionSizeFeature?.isResearching && researchCompletesAt !== null && remaining === 0);
+
+    const maxLimit = isActuallyUnlocked ? 500 : 250;
+
+    if (quantity > maxLimit) {
+      const errorMessage = isActuallyUnlocked 
+        ? 'Maximum troops per battalion is 500.'
+        : 'Maximum troops per battalion is 250. Complete "Battalion Size +250" research to increase to 500.';
+      res.status(400).json({ error: errorMessage });
+      return;
+    }
     
     if (battalionId === 'C') {
       const battalionCFeature = await UserResearchFeature.findOne({
@@ -425,21 +461,18 @@ router.post('/assign', auth, async (req, res) => {
         return;
       }
       
-      const now = new Date().getTime();
-      const researchCompletesAt = battalionCFeature.researchCompletesAt 
+      const researchCompletesAtC = battalionCFeature.researchCompletesAt 
         ? new Date(battalionCFeature.researchCompletesAt).getTime() 
         : null;
-      const remaining = researchCompletesAt !== null ? Math.max(0, researchCompletesAt - now) : null;
-      const isActuallyUnlocked = battalionCFeature.isUnlocked || 
-        (battalionCFeature.isResearching && researchCompletesAt !== null && remaining === 0);
+      const remainingC = researchCompletesAtC !== null ? Math.max(0, researchCompletesAtC - now) : null;
+      const isActuallyUnlockedC = battalionCFeature.isUnlocked || 
+        (battalionCFeature.isResearching && researchCompletesAtC !== null && remainingC === 0);
       
-      if (!isActuallyUnlocked) {
+      if (!isActuallyUnlockedC) {
         res.status(403).json({ error: 'Battalion C is locked. Complete the "Add Battalion C" research feature to unlock it.' });
         return;
       }
     }
-    
-    const now = Date.now();
     const userAttempts = battalionAssignmentAttempts.get(userId);
     
     if (userAttempts) {
