@@ -1,42 +1,54 @@
-#root {
-  max-width: 1280px;
+/* App Container */
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Utility Classes */
+.container {
+  max-width: var(--container-max-width);
   margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  padding: 0 var(--container-padding-mobile);
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+@media (min-width: 768px) {
+  .container {
+    padding: 0 var(--container-padding-desktop);
+  }
 }
 
-@keyframes logo-spin {
+.section {
+  padding: var(--spacing-3xl) 0;
+}
+
+@media (min-width: 768px) {
+  .section {
+    padding: var(--spacing-4xl) 0;
+  }
+}
+
+/* Fade-in animation */
+@keyframes fadeInUp {
   from {
-    transform: rotate(0deg);
+    opacity: 0;
+    transform: translateY(20px);
   }
   to {
-    transform: rotate(360deg);
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
+.fade-in {
+  animation: fadeInUp 0.6s ease-out forwards;
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .fade-in {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
 }

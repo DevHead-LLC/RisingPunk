@@ -1,0 +1,96 @@
+.final-cta {
+  background: var(--bg-darkest);
+}
+
+.cta-content {
+  text-align: center;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.cta-headline {
+  font-size: clamp(32px, 5vw, 56px);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-md);
+}
+
+.cta-subheadline {
+  font-size: clamp(18px, 2vw, 24px);
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-xl);
+}
+
+.cta-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  align-items: center;
+  margin-bottom: var(--spacing-lg);
+}
+
+@media (min-width: 768px) {
+  .cta-buttons {
+    flex-direction: row;
+    justify-content: center;
+  }
+}
+
+.cta-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  min-height: 60px;
+  min-width: 200px;
+  padding: var(--spacing-md) var(--spacing-xl);
+  background: var(--accent-primary);
+  color: var(--bg-primary);
+  font-weight: 600;
+  font-size: 16px;
+  border-radius: 12px;
+  transition: all 0.2s ease-out;
+}
+
+.cta-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.cta-app-store .cta-icon {
+  font-size: 28px;
+}
+
+.cta-button:hover {
+  transform: scale(1.05);
+  background: #00E676;
+  color: var(--bg-primary);
+  box-shadow: 0 8px 24px rgba(0, 255, 136, 0.3);
+}
+
+.cta-button:active {
+  transform: scale(0.98);
+}
+
+.cta-google-play {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 2px solid var(--accent-primary);
+}
+
+.cta-google-play:hover {
+  background: var(--accent-primary);
+  color: var(--bg-primary);
+  border-color: var(--accent-primary);
+  box-shadow: 0 8px 24px rgba(0, 255, 136, 0.3);
+}
+
+.trust-signals {
+  margin-top: var(--spacing-lg);
+}
+
+.trust-text {
+  font-size: 14px;
+  color: var(--text-muted);
+  font-weight: 500;
+}

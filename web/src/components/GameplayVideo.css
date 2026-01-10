@@ -1,0 +1,45 @@
+.gameplay-video {
+  background: var(--bg-secondary);
+}
+
+.video-section-header {
+  text-align: center;
+  margin-bottom: var(--spacing-xl);
+}
+
+.video-title {
+  font-size: clamp(32px, 4vw, 48px);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-md);
+}
+
+.video-subtitle {
+  font-size: clamp(18px, 2vw, 20px);
+  color: var(--text-secondary);
+}
+
+.video-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.video-wrapper {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%; /* 16:9 aspect ratio */
+  height: 0;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--bg-tertiary);
+}
+
+.youtube-embed {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 16px;
+}

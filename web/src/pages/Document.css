@@ -1,0 +1,75 @@
+.document-page {
+  min-height: 100vh;
+  padding: var(--spacing-4xl) 0;
+  background: var(--bg-primary);
+}
+
+.document-header {
+  text-align: center;
+  margin-bottom: var(--spacing-3xl);
+  padding-bottom: var(--spacing-xl);
+  border-bottom: 2px solid var(--bg-tertiary);
+}
+
+.document-header h1 {
+  font-size: clamp(32px, 5vw, 48px);
+  margin-bottom: var(--spacing-md);
+  color: var(--text-primary);
+}
+
+.document-date {
+  font-size: 18px;
+  color: var(--text-secondary);
+}
+
+.document-content {
+  max-width: 900px;
+  margin: 0 auto;
+  line-height: 1.8;
+}
+
+.document-content h2 {
+  font-size: 24px;
+  margin-top: var(--spacing-3xl);
+  margin-bottom: var(--spacing-md);
+  color: var(--text-primary);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--bg-tertiary);
+}
+
+.document-content p {
+  margin-bottom: var(--spacing-md);
+  color: var(--text-secondary);
+}
+
+.document-content ul {
+  margin-left: var(--spacing-xl);
+  margin-bottom: var(--spacing-md);
+}
+
+.document-content li {
+  margin-bottom: var(--spacing-sm);
+  color: var(--text-secondary);
+}
+
+.document-content strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.contact-info {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: var(--spacing-lg);
+  margin-top: var(--spacing-lg);
+  border-left: 4px solid var(--accent-primary);
+  text-align: center;
+}
+
+.contact-info p {
+  margin-bottom: var(--spacing-xs);
+}
+
+.contact-info p:last-child {
+  margin-bottom: 0;
+}
