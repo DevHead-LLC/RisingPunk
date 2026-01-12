@@ -55,3 +55,30 @@
   color: var(--text-muted);
   line-height: 1.6;
 }
+
+.social-links {
+  margin-top: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.social-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  color: var(--text-secondary);
+  font-size: 14px;
+  transition: all 0.2s ease-out;
+  text-decoration: none;
+}
+
+.social-link:hover {
+  color: var(--accent-primary);
+  transform: translateX(4px);
+}
+
+.social-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}

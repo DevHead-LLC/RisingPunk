@@ -1,0 +1,151 @@
+.site-header {
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--bg-tertiary);
+  padding: var(--spacing-md) 0;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  backdrop-filter: blur(10px);
+  background: rgba(18, 18, 18, 0.95);
+}
+
+.header-container {
+  width: 100%;
+  max-width: var(--container-max-width);
+  margin: 0 auto;
+  padding: 0 var(--container-padding-mobile);
+}
+
+@media (min-width: 768px) {
+  .header-container {
+    padding: 0 var(--container-padding-desktop);
+  }
+}
+
+.header-logo-link {
+  display: inline-block;
+  text-decoration: none;
+  transition: transform 0.2s ease-out;
+}
+
+.header-logo-link:hover {
+  transform: scale(1.02);
+}
+
+.header-logo-link:active {
+  transform: scale(0.98);
+}
+
+.header-logo-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  position: relative;
+  width: auto;
+  min-height: 50px;
+}
+
+.header-logo-image {
+  height: 45px;
+  width: auto;
+  min-width: 100px;
+  object-fit: contain;
+  flex-shrink: 0;
+  z-index: 10;
+  display: block !important;
+  opacity: 1 !important;
+  max-width: 200px;
+  visibility: visible !important;
+  position: relative;
+  background: transparent;
+  margin: 0;
+  padding: 0;
+}
+
+@media (min-width: 768px) {
+  .header-logo-image {
+    height: 55px;
+    max-width: 250px;
+  }
+}
+
+/* Alternative: Oversized background text option */
+.header-logo-wrapper::before {
+  content: 'Ri$ingPunk';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: clamp(60px, 12vw, 120px);
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: rgba(162, 57, 202, 0.08);
+  white-space: nowrap;
+  z-index: 0;
+  pointer-events: none;
+  user-select: none;
+  display: none; /* Hidden by default, can be enabled for cool effect */
+}
+
+/* Uncomment to enable oversized background text effect */
+/*
+.header-logo-wrapper {
+  overflow: hidden;
+}
+
+.header-logo-wrapper::before {
+  display: block;
+}
+*/
+
+.brand-name-header {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1;
+  user-select: none;
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.brand-name-header .brand-rising {
+  display: inline-flex;
+  align-items: baseline;
+  font-size: clamp(24px, 3vw, 32px);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.brand-name-header .brand-ri,
+.brand-name-header .brand-ing {
+  color: #A239CA;
+}
+
+.brand-name-header .brand-dollar {
+  color: #00FF41;
+  font-size: 0.8em;
+  margin: 0 0.02em;
+  text-shadow: 
+    0 0 8px rgba(0, 255, 65, 0.6),
+    0 0 16px rgba(0, 255, 65, 0.4);
+  position: relative;
+  top: -0.08em;
+  font-weight: 700;
+  vertical-align: baseline;
+}
+
+@media (min-width: 768px) {
+  .brand-name-header .brand-dollar {
+    top: -0.1em;
+  }
+}
+
+.brand-name-header .brand-punk {
+  color: #4717F6;
+  font-size: clamp(24px, 3vw, 32px);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  margin-top: -0.15em;
+  margin-left: 0.05em;
+}

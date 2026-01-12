@@ -1,5 +1,4 @@
 import './Hero.css'
-import logo from '../assets/images/RisingPunkLogo.png'
 import loginImage from '../assets/images/login.png'
 import { FaApple } from 'react-icons/fa'
 import { SiGoogleplay } from 'react-icons/si'
@@ -9,7 +8,21 @@ function Hero() {
     <section className="hero">
       <div className="hero-container">
         <div className="hero-logo">
-          <img src={logo} alt="RisingPunk Logo" className="logo-image" />
+          <div className="hero-logo-wrapper">
+            <img 
+              src="/RisingPunkLogo.png" 
+              alt="RisingPunk Logo" 
+              className="hero-logo-image"
+            />
+            <div className="brand-name">
+              <span className="brand-rising">
+                <span className="brand-ri">Ri</span>
+                <span className="brand-dollar">$</span>
+                <span className="brand-ing">ing</span>
+              </span>
+              <span className="brand-punk">Punk</span>
+            </div>
+          </div>
         </div>
         <div className="hero-content">
           <div className="hero-text">

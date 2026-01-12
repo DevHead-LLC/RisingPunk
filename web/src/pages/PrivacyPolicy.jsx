@@ -1,9 +1,11 @@
+import Header from '../components/Header'
 import Footer from '../components/Footer'
 import './Document.css'
 
 function PrivacyPolicy() {
   return (
     <>
+      <Header />
       <div className="document-page">
         <div className="container">
           <div className="document-header">

@@ -19,15 +19,98 @@
   text-align: center;
 }
 
-.logo-image {
-  max-width: 200px;
-  height: auto;
-  width: 100%;
+.hero-logo-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.hero-logo-image {
+  height: 120px;
+  width: auto;
+  object-fit: contain;
+  flex-shrink: 0;
+  display: block;
+  max-width: 500px;
 }
 
 @media (min-width: 768px) {
-  .logo-image {
-    max-width: 250px;
+  .hero-logo-image {
+    height: 160px;
+    max-width: 600px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .hero-logo-image {
+    height: 200px;
+    max-width: 700px;
+  }
+}
+
+.brand-name {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1;
+  user-select: none;
+}
+
+.brand-rising {
+  display: inline-flex;
+  align-items: baseline;
+  font-size: clamp(56px, 9vw, 112px);
+  font-weight: 700;
+  letter-spacing: 0.15em;
+}
+
+.brand-ri,
+.brand-ing {
+  color: #A239CA;
+}
+
+.brand-dollar {
+  color: #00FF41;
+  font-size: 0.8em;
+  text-shadow: 
+    0 0 10px rgba(0, 255, 65, 0.6),
+    0 0 20px rgba(0, 255, 65, 0.4),
+    0 0 30px rgba(0, 255, 65, 0.2);
+  position: relative;
+  font-weight: 700;
+  vertical-align: baseline;
+}
+
+@media (min-width: 768px) {
+  .brand-dollar {
+    top: 0.02em;
+  }
+}
+
+@media (min-width: 1024px) {
+  .brand-dollar {
+    top: 0.02em;
+  }
+}
+
+.brand-punk {
+  color: #4717F6;
+  font-size: clamp(56px, 9vw, 112px);
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  margin-top: -0.2em;
+  margin-left: 0.1em;
+}
+
+@media (min-width: 768px) {
+  .brand-rising {
+    font-size: clamp(72px, 10vw, 140px);
+  }
+  
+  .brand-punk {
+    font-size: clamp(72px, 10vw, 140px);
   }
 }
 
