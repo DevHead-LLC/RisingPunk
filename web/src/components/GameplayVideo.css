@@ -1,17 +1,33 @@
 .gameplay-video {
-  background: var(--bg-secondary);
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(0, 255, 65, 0.05) 50%, var(--bg-secondary) 100%);
+  position: relative;
+}
+
+.gameplay-video::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(0, 255, 65, 0.1) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .video-section-header {
   text-align: center;
   margin-bottom: var(--spacing-xl);
+  position: relative;
+  z-index: 1;
 }
 
 .video-title {
   font-size: clamp(32px, 4vw, 48px);
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--accent-green);
   margin-bottom: var(--spacing-md);
+  text-shadow: 0 0 20px rgba(0, 255, 65, 0.6);
 }
 
 .video-subtitle {
@@ -22,6 +38,8 @@
 .video-container {
   max-width: 1200px;
   margin: 0 auto;
+  position: relative;
+  z-index: 1;
 }
 
 .video-wrapper {
@@ -32,6 +50,14 @@
   overflow: hidden;
   border-radius: 16px;
   background: var(--bg-tertiary);
+  border: 2px solid rgba(0, 255, 65, 0.3);
+  box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
+  transition: all 0.3s ease;
+}
+
+.video-wrapper:hover {
+  border-color: var(--accent-green);
+  box-shadow: 0 0 30px rgba(0, 255, 65, 0.4);
 }
 
 .youtube-embed {

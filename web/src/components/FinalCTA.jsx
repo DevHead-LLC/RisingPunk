@@ -7,7 +7,7 @@ function FinalCTA() {
   const [ref, isVisible] = useScrollAnimation()
   
   return (
-    <section className="final-cta section">
+    <section id="ready-to-dominate" className="final-cta section">
       <div className="container">
         <div className={`cta-content ${isVisible ? 'fade-in' : ''}`} ref={ref}>
           <h2 className="cta-headline">Ready to Dominate the Economy?</h2>

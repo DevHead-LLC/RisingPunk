@@ -1,16 +1,32 @@
 .social-features {
-  background: var(--bg-primary);
+  background: linear-gradient(135deg, var(--bg-primary) 0%, rgba(162, 57, 202, 0.05) 50%, var(--bg-primary) 100%);
+  position: relative;
+}
+
+.social-features::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(162, 57, 202, 0.1) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .social-content {
   text-align: center;
+  position: relative;
+  z-index: 1;
 }
 
 .social-title {
   font-size: clamp(32px, 4vw, 48px);
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--accent-pink);
   margin-bottom: var(--spacing-md);
+  text-shadow: 0 0 20px rgba(162, 57, 202, 0.5);
 }
 
 .social-subtitle {
@@ -38,18 +54,22 @@
   padding: var(--spacing-xl);
   text-align: left;
   transition: all 0.2s ease-out;
+  border: 1px solid rgba(162, 57, 202, 0.2);
 }
 
 .social-feature-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 24px rgba(162, 57, 202, 0.3);
+  border-color: var(--accent-pink);
+  background: rgba(162, 57, 202, 0.05);
 }
 
 .feature-card-title {
   font-size: 24px;
   font-weight: 700;
-  color: var(--accent-primary);
+  color: var(--accent-pink);
   margin-bottom: var(--spacing-sm);
+  text-shadow: 0 0 10px rgba(162, 57, 202, 0.5);
 }
 
 .feature-card-text {
@@ -68,12 +88,14 @@
   gap: var(--spacing-xs);
   font-size: 18px;
   font-weight: 600;
-  color: var(--accent-primary);
+  color: var(--accent-pink);
   transition: all 0.2s ease-out;
+  text-shadow: 0 0 8px rgba(162, 57, 202, 0.5);
 }
 
 .features-link:hover {
-  color: var(--accent-primary);
-  filter: brightness(1.2);
+  color: var(--accent-pink);
+  filter: brightness(1.3);
   transform: translateX(4px);
+  text-shadow: 0 0 12px rgba(162, 57, 202, 0.8);
 }

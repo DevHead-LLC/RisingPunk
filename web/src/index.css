@@ -16,7 +16,13 @@
   --text-secondary: #B0B0B0;
   --text-muted: #808080;
   
-  --accent-primary: #00FF88;
+  /* Mobile App Color Palette */
+  --accent-primary: #00FF88; /* Green - primary accent */
+  --accent-pink: #A239CA; /* Pink/Purple - "Rising" color */
+  --accent-blue: #4717F6; /* Blue - "Punk" color */
+  --accent-green: #00FF41; /* Matrix Green */
+  
+  /* Legacy support */
   --accent-secondary: #7C3AED;
   
   /* Spacing System (8px base unit) */
@@ -40,6 +46,7 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 80px; /* Offset for sticky header */
 }
 
 body {

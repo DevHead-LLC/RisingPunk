@@ -1,18 +1,34 @@
 .final-cta {
-  background: var(--bg-darkest);
+  background: linear-gradient(135deg, var(--bg-darkest) 0%, rgba(71, 23, 246, 0.1) 50%, var(--bg-darkest) 100%);
+  position: relative;
+}
+
+.final-cta::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(71, 23, 246, 0.15) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .cta-content {
   text-align: center;
   max-width: 800px;
   margin: 0 auto;
+  position: relative;
+  z-index: 1;
 }
 
 .cta-headline {
   font-size: clamp(32px, 5vw, 56px);
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--accent-blue);
   margin-bottom: var(--spacing-md);
+  text-shadow: 0 0 20px rgba(71, 23, 246, 0.6);
 }
 
 .cta-subheadline {
@@ -44,12 +60,13 @@
   min-height: 60px;
   min-width: 200px;
   padding: var(--spacing-md) var(--spacing-xl);
-  background: var(--accent-primary);
+  background: linear-gradient(135deg, var(--accent-blue), #5A2FFF);
   color: var(--bg-primary);
   font-weight: 600;
   font-size: 16px;
   border-radius: 12px;
   transition: all 0.2s ease-out;
+  box-shadow: 0 4px 16px rgba(71, 23, 246, 0.4);
 }
 
 .cta-icon {
@@ -63,9 +80,9 @@
 
 .cta-button:hover {
   transform: scale(1.05);
-  background: #00E676;
+  background: linear-gradient(135deg, #5A2FFF, var(--accent-blue));
   color: var(--bg-primary);
-  box-shadow: 0 8px 24px rgba(0, 255, 136, 0.3);
+  box-shadow: 0 8px 24px rgba(71, 23, 246, 0.5);
 }
 
 .cta-button:active {
@@ -75,14 +92,15 @@
 .cta-google-play {
   background: var(--bg-secondary);
   color: var(--text-primary);
-  border: 2px solid var(--accent-primary);
+  border: 2px solid var(--accent-blue);
+  box-shadow: 0 4px 16px rgba(71, 23, 246, 0.2);
 }
 
 .cta-google-play:hover {
-  background: var(--accent-primary);
+  background: linear-gradient(135deg, var(--accent-blue), #5A2FFF);
   color: var(--bg-primary);
-  border-color: var(--accent-primary);
-  box-shadow: 0 8px 24px rgba(0, 255, 136, 0.3);
+  border-color: var(--accent-blue);
+  box-shadow: 0 8px 24px rgba(71, 23, 246, 0.5);
 }
 
 .trust-signals {
