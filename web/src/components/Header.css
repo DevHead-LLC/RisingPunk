@@ -1,12 +1,19 @@
 .site-header {
   background: var(--bg-primary);
   border-bottom: 1px solid var(--bg-tertiary);
-  padding: var(--spacing-md) 0;
+  padding: var(--spacing-sm) 0;
   position: sticky;
   top: 0;
   z-index: 1000;
   backdrop-filter: blur(10px);
   background: rgba(18, 18, 18, 0.95);
+  margin-top: env(safe-area-inset-top);
+}
+
+@media (min-width: 768px) {
+  .site-header {
+    padding: var(--spacing-md) 0;
+  }
 }
 
 .header-container {
