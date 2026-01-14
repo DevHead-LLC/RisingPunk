@@ -1,10 +1,13 @@
 import './FinalCTA.css'
 import { useScrollAnimation } from '../hooks/useScrollAnimation'
+import { useLocation } from 'react-router-dom'
 import { FaApple } from 'react-icons/fa'
 import { SiGoogleplay } from 'react-icons/si'
 
 function FinalCTA() {
   const [ref, isVisible] = useScrollAnimation()
+  const location = useLocation()
+  const isOffersPage = location.pathname === '/offers'
   
   return (
     <section id="ready-to-dominate" className="final-cta section">
@@ -15,28 +18,30 @@ function FinalCTA() {
           <div className="cta-buttons">
             <a 
               href="https://apps.apple.com/us/app/risingpunk/id6749834469"
-              className="cta-button cta-app-store"
-              aria-label="Download on App Store"
+              className="cta-button cta-primary"
+              aria-label="Play Now on App Store"
               target="_blank"
               rel="noopener noreferrer"
             >
               <FaApple className="cta-icon" />
-              <span>Download on App Store</span>
+              <span>Play Now</span>
             </a>
             <a 
               href="https://play.google.com/store/apps/details?id=com.devheadllc.risingpunk&pcampaignid=web_share"
-              className="cta-button cta-google-play"
-              aria-label="Get it on Google Play"
+              className="cta-button cta-primary"
+              aria-label="Play Now on Google Play"
               target="_blank"
               rel="noopener noreferrer"
             >
               <SiGoogleplay className="cta-icon" />
-              <span>Get it on Google Play</span>
+              <span>Play Now</span>
             </a>
           </div>
-          <div className="trust-signals">
-            <p className="trust-text">Free to play</p>
-          </div>
+          {!isOffersPage && (
+            <a href="/offers" className="cta-offers-link">
+              Also available: Limited Time Offers
+            </a>
+          )}
         </div>
       </div>
     </section>

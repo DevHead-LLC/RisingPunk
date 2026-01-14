@@ -4,7 +4,7 @@ import { FaTrophy, FaTshirt, FaCoins, FaUsers } from 'react-icons/fa'
 
 function Level35Promotion() {
   const [timeRemaining, setTimeRemaining] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 })
-  const [spotsRemaining, setSpotsRemaining] = useState(10) // 10/10 available
+  const [spotsRemaining, setSpotsRemaining] = useState(3) // 3/3 available
 
   // Calculate time remaining until January 31, 11:59:59 PM
   const calculateTimeRemaining = () => {
@@ -111,22 +111,20 @@ function Level35Promotion() {
           <div className="availability-header">
             <FaUsers className="availability-icon" />
             <span className="availability-label">Spots Available</span>
-            <span className="availability-count">{spotsRemaining}/10</span>
+            <span className="availability-count">{spotsRemaining}/3</span>
           </div>
           <div className="availability-bar">
             <div 
               className="availability-fill" 
-              style={{ width: `${(spotsRemaining / 10) * 100}%` }}
+              style={{ width: `${(spotsRemaining / 3) * 100}%` }}
             />
           </div>
           <div className="availability-note">
             {spotsRemaining === 1 
               ? '⚡ Only 1 spot remaining!' 
-              : spotsRemaining <= 3 
-                ? `🔥 ${spotsRemaining} spots left - Race to level 35!` 
-                : spotsRemaining <= 7
-                  ? `⚡ ${spotsRemaining} spots available`
-                  : 'All 10 spots available - Start your journey!'}
+              : spotsRemaining === 2
+                ? `🔥 2 spots left - Race to level 35!` 
+                : 'All 3 spots available - Start your journey!'}
           </div>
         </div>
         
@@ -139,7 +137,7 @@ function Level35Promotion() {
             </div>
             <div className="requirement-item">
               <div className="requirement-number">2</div>
-              <div className="requirement-text">Be among the first 10 players to achieve this milestone</div>
+              <div className="requirement-text">Be among the first 3 players to achieve this milestone</div>
             </div>
             <div className="requirement-item">
               <div className="requirement-number">3</div>
@@ -161,7 +159,7 @@ function Level35Promotion() {
         
         <div className="promotion-footer">
           <p className="promotion-disclaimer">
-            Promotion ends January 31, 11:59:59 PM. First 10 players to reach Level 35 will receive both rewards.
+            Promotion ends January 31, 11:59:59 PM. First 3 players to reach Level 35 will receive both rewards.
           </p>
         </div>
       </div>

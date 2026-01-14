@@ -57,16 +57,30 @@
   align-items: center;
   justify-content: center;
   gap: var(--spacing-sm);
-  min-height: 60px;
-  min-width: 200px;
   padding: var(--spacing-md) var(--spacing-xl);
-  background: linear-gradient(135deg, var(--accent-blue), #5A2FFF);
-  color: var(--bg-primary);
   font-weight: 600;
-  font-size: 16px;
   border-radius: 12px;
-  transition: all 0.2s ease-out;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+.cta-primary {
+  min-height: 56px;
+  min-width: 200px;
+  font-size: 20px;
+  background: linear-gradient(135deg, var(--accent-blue), #5A2FFF);
+  color: white;
   box-shadow: 0 4px 16px rgba(71, 23, 246, 0.4);
+}
+
+@media (max-width: 768px) {
+  .cta-primary {
+    min-height: 52px;
+    font-size: 18px;
+    width: 100%;
+    max-width: 400px;
+  }
 }
 
 .cta-icon {
@@ -74,41 +88,27 @@
   flex-shrink: 0;
 }
 
-.cta-app-store .cta-icon {
-  font-size: 28px;
-}
-
-.cta-button:hover {
-  transform: scale(1.05);
+.cta-primary:hover {
+  transform: translateY(-2px);
   background: linear-gradient(135deg, #5A2FFF, var(--accent-blue));
-  color: var(--bg-primary);
-  box-shadow: 0 8px 24px rgba(71, 23, 246, 0.5);
+  box-shadow: 0 6px 16px rgba(71, 23, 246, 0.5);
 }
 
-.cta-button:active {
-  transform: scale(0.98);
+.cta-primary:active {
+  transform: translateY(0);
 }
 
-.cta-google-play {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 2px solid var(--accent-blue);
-  box-shadow: 0 4px 16px rgba(71, 23, 246, 0.2);
-}
-
-.cta-google-play:hover {
-  background: linear-gradient(135deg, var(--accent-blue), #5A2FFF);
-  color: var(--bg-primary);
-  border-color: var(--accent-blue);
-  box-shadow: 0 8px 24px rgba(71, 23, 246, 0.5);
-}
-
-.trust-signals {
+.cta-offers-link {
+  display: inline-block;
   margin-top: var(--spacing-lg);
+  font-size: clamp(14px, 1.2vw, 16px);
+  color: var(--accent-blue);
+  text-decoration: none;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
 }
 
-.trust-text {
-  font-size: 14px;
-  color: var(--text-muted);
-  font-weight: 500;
+.cta-offers-link:hover {
+  opacity: 1;
+  text-decoration: underline;
 }

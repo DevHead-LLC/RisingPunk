@@ -27,36 +27,42 @@ function Hero() {
         <div className="hero-content">
           <div className="hero-text">
             <h1 className="hero-title">
-              Earn money... or be a <span className="accent">Punk?!</span>
+              Outsmart. Outinvest. <span className="accent">Outplay.</span>
             </h1>
             <p className="hero-subtitle">
-              A competitive MMO where strategic financial thinking meets cyber warfare
+              The only MMO where financial strategy beats spending. Build wealth, defend it, dominate.
             </p>
-            <p className="hero-value-prop">
-              One currency. No diamonds. No gems. Just strategy.
-            </p>
+            <div className="hero-trust-signals">
+              <span className="trust-badge">✓ Hack. Build. Dominate.</span>
+              <span className="trust-badge">✓ Strategic Warfare</span>
+              <span className="trust-badge">✓ Financial Mastery</span>
+              <span className="trust-badge">✓ Fair Competition</span>
+            </div>
             <div className="hero-cta">
               <a 
                 href="https://apps.apple.com/us/app/risingpunk/id6749834469"
-                className="cta-button cta-app-store"
-                aria-label="Download on App Store"
+                className="cta-button cta-primary"
+                aria-label="Start Playing on App Store"
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 <FaApple className="cta-icon" />
-                <span>Download on App Store</span>
+                <span>Start Playing</span>
               </a>
               <a 
                 href="https://play.google.com/store/apps/details?id=com.devheadllc.risingpunk&pcampaignid=web_share"
-                className="cta-button cta-google-play"
-                aria-label="Get it on Google Play"
+                className="cta-button cta-primary"
+                aria-label="Start Playing on Google Play"
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 <SiGoogleplay className="cta-icon" />
-                <span>Get it on Google Play</span>
+                <span>Start Playing</span>
               </a>
             </div>
+            <a href="/offers" className="hero-offers-link">
+              Want exclusive rewards? View Offers →
+            </a>
           </div>
           <div className="hero-visual">
             <div className="hero-image-wrapper">
