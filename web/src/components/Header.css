@@ -57,6 +57,18 @@
   min-height: 50px;
 }
 
+/* Ensure icon and text are vertically aligned */
+.header-logo-wrapper .header-logo-image {
+  align-self: center;
+}
+
+.header-logo-wrapper .brand-name-header {
+  align-self: center;
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+}
+
 .header-logo-image {
   height: 55px;
   width: auto;
@@ -113,7 +125,7 @@
 .brand-name-header {
   display: inline-flex !important;
   flex-direction: row !important;
-  align-items: baseline;
+  align-items: center !important;
   gap: 0.1em;
   line-height: 1;
   user-select: none;
@@ -129,7 +141,7 @@
 
 .brand-name-header .brand-rising {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   font-size: clamp(26px, 3.5vw, 36px);
   font-weight: 700;
   letter-spacing: 0.1em;
