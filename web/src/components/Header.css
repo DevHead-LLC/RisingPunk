@@ -111,8 +111,8 @@
 */
 
 .brand-name-header {
-  display: inline-flex;
-  flex-direction: row;
+  display: inline-flex !important;
+  flex-direction: row !important;
   align-items: baseline;
   gap: 0.1em;
   line-height: 1;
@@ -120,6 +120,11 @@
   position: relative;
   z-index: 1;
   flex-shrink: 0;
+}
+
+/* Ensure header brand name overrides Hero.css .brand-name */
+.header-logo-wrapper .brand-name-header {
+  flex-direction: row !important;
 }
 
 .brand-name-header .brand-rising {
