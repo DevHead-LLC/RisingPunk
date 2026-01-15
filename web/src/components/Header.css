@@ -21,6 +21,10 @@
   max-width: var(--container-max-width);
   margin: 0 auto;
   padding: 0 var(--container-padding-mobile);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
 }
 
 @media (min-width: 768px) {
@@ -33,6 +37,7 @@
   display: inline-block;
   text-decoration: none;
   transition: transform 0.2s ease-out;
+  flex-shrink: 0;
 }
 
 .header-logo-link:hover {
@@ -46,14 +51,14 @@
 .header-logo-wrapper {
   display: flex;
   align-items: center;
-  gap: var(--spacing-md);
+  gap: var(--spacing-sm);
   position: relative;
   width: auto;
   min-height: 50px;
 }
 
 .header-logo-image {
-  height: 45px;
+  height: 55px;
   width: auto;
   min-width: 100px;
   object-fit: contain;
@@ -71,7 +76,7 @@
 
 @media (min-width: 768px) {
   .header-logo-image {
-    height: 55px;
+    height: 65px;
     max-width: 250px;
   }
 }
@@ -107,8 +112,9 @@
 
 .brand-name-header {
   display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.1em;
   line-height: 1;
   user-select: none;
   position: relative;
@@ -119,7 +125,7 @@
 .brand-name-header .brand-rising {
   display: inline-flex;
   align-items: baseline;
-  font-size: clamp(24px, 3vw, 32px);
+  font-size: clamp(26px, 3.5vw, 36px);
   font-weight: 700;
   letter-spacing: 0.1em;
 }
@@ -137,20 +143,109 @@
     0 0 8px rgba(0, 255, 65, 0.6),
     0 0 16px rgba(0, 255, 65, 0.4);
   position: relative;
-  top: -0.08em;
+  top: 0.02em;
   font-weight: 700;
   vertical-align: baseline;
 }
 
 @media (min-width: 768px) {
   .brand-name-header .brand-dollar {
-    top: -0.1em;
+    top: 0em;
   }
 }
 
 .brand-name-header .brand-punk {
   color: #4717F6;
-  font-size: clamp(24px, 3vw, 32px);
+  font-size: clamp(26px, 3.5vw, 36px);
   font-weight: 700;
   letter-spacing: 0.1em;
+}
+
+/* Header Download Links */
+.header-download-links {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
+.header-download-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+}
+
+.header-download-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.header-download-link:active {
+  transform: translateY(0);
+}
+
+.header-download-link:focus {
+  outline: 2px solid rgba(99, 102, 241, 0.5);
+  outline-offset: 2px;
+}
+
+.header-download-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+@media (min-width: 768px) {
+  .header-download-links {
+    gap: var(--spacing-sm);
+  }
+  
+  .header-download-link {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    border-radius: 8px;
+  }
+  
+  .header-download-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* Ensure header doesn't overflow on very small screens */
+@media (max-width: 360px) {
+  .header-container {
+    gap: var(--spacing-xs);
+  }
+  
+  .header-download-link {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+  }
+  
+  .header-download-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
 }

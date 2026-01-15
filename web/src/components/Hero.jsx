@@ -7,23 +7,6 @@ function Hero() {
   return (
     <section className="hero">
       <div className="hero-container">
-        <div className="hero-logo">
-          <div className="hero-logo-wrapper">
-            <img 
-              src="/RisingPunkLogo.png" 
-              alt="RisingPunk Logo" 
-              className="hero-logo-image"
-            />
-            <div className="brand-name">
-              <span className="brand-rising">
-                <span className="brand-ri">Ri</span>
-                <span className="brand-dollar">$</span>
-                <span className="brand-ing">ing</span>
-              </span>
-              <span className="brand-punk">Punk</span>
-            </div>
-          </div>
-        </div>
         <div className="hero-content">
           <div className="hero-text">
             <h1 className="hero-title">
