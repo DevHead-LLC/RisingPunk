@@ -20,23 +20,27 @@ export function renderPrivacyPolicyHTML(): string {
     }
     
     if (section.content) {
-      // Handle multi-line content
+      // Handle multi-line content with bullet points
       const lines = section.content.split('\n');
+      let inList = false;
       lines.forEach((line) => {
-        if (line.trim().startsWith('•')) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('•')) {
           // Convert bullet points to list items
-          if (!html.includes('<ul class="bullet-list">') || html.endsWith('</ul>')) {
+          if (!inList) {
             html += '<ul class="bullet-list">';
+            inList = true;
           }
-          html += `<li>${escapeHtml(line.trim().substring(1).trim())}</li>`;
-        } else if (line.trim()) {
-          if (html.includes('<ul class="bullet-list">') && !html.endsWith('</ul>')) {
+          html += `<li>${escapeHtml(trimmed.substring(1).trim())}</li>`;
+        } else if (trimmed) {
+          if (inList) {
             html += '</ul>';
+            inList = false;
           }
-          html += `<p>${escapeHtml(line.trim())}</p>`;
+          html += `<p>${escapeHtml(trimmed)}</p>`;
         }
       });
-      if (html.includes('<ul class="bullet-list">') && !html.endsWith('</ul>')) {
+      if (inList) {
         html += '</ul>';
       }
     }
