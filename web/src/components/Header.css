@@ -160,14 +160,14 @@
     0 0 8px rgba(0, 255, 65, 0.6),
     0 0 16px rgba(0, 255, 65, 0.4);
   position: relative;
-  top: 0.1em;
+  top: 0.05em;
   font-weight: 700;
   vertical-align: baseline;
 }
 
 @media (min-width: 768px) {
   .brand-name-header .brand-dollar {
-    top: 0.1em;
+    top: 0.05em;
   }
 }
 
