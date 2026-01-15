@@ -1,0 +1,133 @@
+.about-page {
+  min-height: 100vh;
+  background: var(--bg-darkest);
+  padding: var(--spacing-3xl) 0;
+  color: var(--text-primary);
+}
+
+.about-header {
+  text-align: center;
+  margin-bottom: var(--spacing-3xl);
+}
+
+.about-header h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-pink), var(--accent-green));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: var(--spacing-md);
+}
+
+.about-content {
+  max-width: 800px;
+  margin: 0 auto;
+  line-height: 1.8;
+}
+
+.story-section {
+  margin-bottom: var(--spacing-3xl);
+  padding-bottom: var(--spacing-2xl);
+  border-bottom: 1px solid rgba(71, 23, 246, 0.2);
+}
+
+.story-section:last-child {
+  border-bottom: none;
+}
+
+.story-section h2 {
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--accent-blue);
+  margin-bottom: var(--spacing-lg);
+  line-height: 1.3;
+}
+
+.story-section h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--accent-pink);
+  margin-top: var(--spacing-xl);
+  margin-bottom: var(--spacing-md);
+}
+
+.story-section p {
+  font-size: 1.1rem;
+  margin-bottom: var(--spacing-md);
+  color: var(--text-secondary);
+}
+
+.story-section ul,
+.story-section ol {
+  margin: var(--spacing-md) 0;
+  padding-left: var(--spacing-xl);
+  color: var(--text-secondary);
+}
+
+.story-section li {
+  font-size: 1.1rem;
+  margin-bottom: var(--spacing-xs);
+  line-height: 1.7;
+}
+
+.story-section .highlight {
+  background: rgba(71, 23, 246, 0.1);
+  border-left: 4px solid var(--accent-blue);
+  padding: var(--spacing-md);
+  margin: var(--spacing-lg) 0;
+  border-radius: 4px;
+  font-size: 1.15rem;
+  color: var(--text-primary);
+}
+
+.story-section strong {
+  color: var(--accent-green);
+  font-weight: 600;
+}
+
+.story-conclusion {
+  background: linear-gradient(135deg, rgba(71, 23, 246, 0.05), rgba(255, 20, 147, 0.05));
+  padding: var(--spacing-2xl);
+  border-radius: 8px;
+  border: 1px solid rgba(71, 23, 246, 0.2);
+}
+
+.story-conclusion .cta-text {
+  font-size: 1.3rem;
+  text-align: center;
+  margin: var(--spacing-xl) 0;
+  color: var(--accent-green);
+  font-weight: 600;
+}
+
+.story-conclusion .signature {
+  text-align: center;
+  font-style: italic;
+  color: var(--text-muted);
+  margin-top: var(--spacing-xl);
+  font-size: 1rem;
+}
+
+@media (max-width: 768px) {
+  .about-header h1 {
+    font-size: 2rem;
+  }
+
+  .story-section h2 {
+    font-size: 1.75rem;
+  }
+
+  .story-section h3 {
+    font-size: 1.25rem;
+  }
+
+  .story-section p,
+  .story-section li {
+    font-size: 1rem;
+  }
+
+  .story-conclusion {
+    padding: var(--spacing-lg);
+  }
+}

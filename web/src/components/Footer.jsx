@@ -7,8 +7,9 @@ function Footer() {
       <div className="container">
         <div className="footer-content">
           <div className="footer-column">
-            <h4 className="footer-heading">Legal</h4>
+            <h4 className="footer-heading">About</h4>
             <ul className="footer-links">
+              <li><a href="/about">Our Story</a></li>
               <li><a href="/features">Features</a></li>
               <li><a href="/documents/privacy-policy">Privacy Policy</a></li>
               <li><a href="/documents/terms-of-service">Terms of Service</a></li>
