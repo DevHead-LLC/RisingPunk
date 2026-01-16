@@ -397,11 +397,13 @@ userSchema.pre('save', async function(this: IUser, next: Function) {
       originalEmail = this.getDecryptedEmail();
     }
   } else if (this.email) {
-    // Email not modified, but we need to ensure emailHash exists
+    // Email not modified, but we need to ensure it's encrypted and emailHash exists
     if (EncryptionService.isEncrypted(this.email)) {
       originalEmail = this.getDecryptedEmail();
     } else {
+      // Email is plaintext but not marked as modified - encrypt it now
       originalEmail = this.email.trim().toLowerCase();
+      this.email = EncryptionService.encryptEmail(originalEmail);
     }
   } else {
     originalEmail = '';
@@ -435,6 +437,21 @@ userSchema.methods.getDecryptedEmail = function(): string {
 
 userSchema.methods.setEncryptedEmail = function(email: string): void {
   this.email = EncryptionService.encryptEmail(email);
+};
+
+userSchema.methods.getDecryptedEmailVerificationNewEmail = function(): string {
+  try {
+    if (!this.emailVerificationNewEmail) {
+      return '';
+    }
+    if (!EncryptionService.isEncrypted(this.emailVerificationNewEmail)) {
+      return this.emailVerificationNewEmail;
+    }
+    return EncryptionService.decryptEmail(this.emailVerificationNewEmail);
+  } catch (error) {
+    console.error('Failed to decrypt emailVerificationNewEmail:', error);
+    return '';
+  }
 };
 
 userSchema.statics.emailExists = async function(email: string): Promise<boolean> {
