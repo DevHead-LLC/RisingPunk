@@ -1221,7 +1221,7 @@ router.post('/send-verification', async (req: Request, res: Response): Promise<v
         res.status(400).json({ error: 'Please select a new email address or log into the existing account.' });
         return;
       }
-      user.emailVerificationNewEmail = normalizedIncomingEmail;
+      user.emailVerificationNewEmail = EncryptionService.encryptEmail(normalizedIncomingEmail);
     } else {
       user.emailVerificationNewEmail = undefined;
     }
@@ -1298,9 +1298,34 @@ router.get('/verify-email/:token', async (req: Request, res: Response): Promise<
     
     // If this was an email update, update the user's email
     if (user.emailVerificationNewEmail) {
-      user.email = user.emailVerificationNewEmail;
-      user.emailHash = EncryptionService.hashEmail(user.emailVerificationNewEmail);
-      user.emailVerificationNewEmail = undefined;
+      const decryptedNewEmail = user.getDecryptedEmailVerificationNewEmail();
+      if (decryptedNewEmail) {
+        user.setEncryptedEmail(decryptedNewEmail);
+        user.emailVerificationNewEmail = undefined;
+      } else {
+        console.error(`Failed to decrypt emailVerificationNewEmail for user ${user._id}. Email update aborted.`);
+        res.setHeader('Content-Type', 'text/html');
+        res.status(500).send(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Email Verification Error - RisingPunk</title>
+            <style>
+              body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #1a1a1a; color: #fff; }
+              .container { max-width: 500px; margin: 0 auto; }
+              .error { color: #ff6b6b; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h1>Email Verification Error</h1>
+              <p class="error">An error occurred while processing your email verification. Please request a new verification email from the app.</p>
+            </div>
+          </body>
+          </html>
+        `);
+        return;
+      }
     }
     
     await user.save();
