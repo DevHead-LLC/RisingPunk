@@ -118,7 +118,10 @@ async function encryptPlaintextEmails() {
     if (plaintextUsers.length > 0) {
       console.log('\n📋 Users with previously plaintext emails:');
       plaintextUsers.forEach(u => {
-        console.log(`  - ${u.handle} (${u.id}): ${u.email}`);
+        const redactedEmail = u.email.length > 3 
+          ? `${u.email.substring(0, 2)}***@${u.email.split('@')[1] || '***'}`
+          : '***';
+        console.log(`  - ${u.handle} (${u.id}): ${redactedEmail}`);
       });
     }
 
