@@ -1221,7 +1221,7 @@ router.post('/send-verification', async (req: Request, res: Response): Promise<v
         res.status(400).json({ error: 'Please select a new email address or log into the existing account.' });
         return;
       }
-      user.emailVerificationNewEmail = normalizedIncomingEmail;
+      user.emailVerificationNewEmail = EncryptionService.encryptEmail(normalizedIncomingEmail);
     } else {
       user.emailVerificationNewEmail = undefined;
     }
@@ -1298,8 +1298,10 @@ router.get('/verify-email/:token', async (req: Request, res: Response): Promise<
     
     // If this was an email update, update the user's email
     if (user.emailVerificationNewEmail) {
-      user.email = user.emailVerificationNewEmail;
-      user.emailHash = EncryptionService.hashEmail(user.emailVerificationNewEmail);
+      const decryptedNewEmail = user.getDecryptedEmailVerificationNewEmail();
+      if (decryptedNewEmail) {
+        user.setEncryptedEmail(decryptedNewEmail);
+      }
       user.emailVerificationNewEmail = undefined;
     }
     
