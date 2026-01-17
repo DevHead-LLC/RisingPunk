@@ -75,6 +75,7 @@ export interface IUser extends Document {
   lifetimeHighNetWorth?: number;
   verifyAccessKey(accessKey: string): Promise<boolean>;
   getDecryptedEmail(): string;
+  getDecryptedEmailVerificationNewEmail(): string;
   setEncryptedEmail(email: string): void;
   setCurrentToken(tokenId: string): void;
   isTokenValid(tokenId: string): boolean;
