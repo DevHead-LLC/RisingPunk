@@ -16,6 +16,7 @@ export interface BattleRewardResult {
     levelsGained: number;
     newLevel: number;
   };
+  lifetimeHighUpdated?: boolean;
   error?: string;
 }
 
@@ -109,6 +110,7 @@ export class BattleRewardService {
 
         // Update user balance
         moneyGained = npc.victoryReward;
+        let lifetimeHighUpdated = false;
         if (moneyGained) {
           const user = await User.findById(userId);
           if (user) {
@@ -117,8 +119,9 @@ export class BattleRewardService {
             
             // Check and update lifetime high net worth
             const { LifetimeHighNetWorthService } = await import('./LifetimeHighNetWorthService');
-            await LifetimeHighNetWorthService.checkAndUpdateLifetimeHigh(user);
+            lifetimeHighUpdated = LifetimeHighNetWorthService.checkAndUpdateLifetimeHigh(user);
             
+            // Save user (includes balance update and lifetime high if it was updated)
             await user.save();
           }
         }
@@ -129,7 +132,8 @@ export class BattleRewardService {
         experienceGained,
         moneyGained,
         botLosses,
-        levelUp
+        levelUp,
+        lifetimeHighUpdated
       };
             
       await battle.save();
@@ -139,7 +143,8 @@ export class BattleRewardService {
         experienceGained,
         moneyGained,
         botLosses,
-        levelUp
+        levelUp,
+        lifetimeHighUpdated
       };
 
     } catch (error) {

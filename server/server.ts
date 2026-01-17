@@ -255,7 +255,12 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
 
     // Check and update lifetime high net worth
     const { LifetimeHighNetWorthService } = await import('./src/services/LifetimeHighNetWorthService');
-    const lifetimeHighUpdated = await LifetimeHighNetWorthService.checkAndUpdateLifetimeHigh(user);
+    const lifetimeHighUpdated = LifetimeHighNetWorthService.checkAndUpdateLifetimeHigh(user);
+    
+    // Save user if lifetime high was updated (balance was already saved earlier if it changed)
+    if (lifetimeHighUpdated) {
+      await user.save();
+    }
 
     // Return updated balance (ratePerSecond already includes rental housing income)
     const currentBalance = {

@@ -8,15 +8,15 @@ export class LifetimeHighNetWorthService {
   /**
    * Check if current net worth exceeds lifetime high and update if needed
    * Returns true if lifetime high was updated, false otherwise
+   * Note: Does not save the user document - caller must save after calling this
    */
-  static async checkAndUpdateLifetimeHigh(user: IUser): Promise<boolean> {
+  static checkAndUpdateLifetimeHigh(user: IUser): boolean {
     const currentNetWorth = user.balance?.total || 0;
     const currentLifetimeHigh = user.lifetimeHighNetWorth || 0;
 
     // Only update if current net worth exceeds lifetime high
     if (currentNetWorth > currentLifetimeHigh) {
       user.lifetimeHighNetWorth = currentNetWorth;
-      await user.save();
       return true;
     }
 

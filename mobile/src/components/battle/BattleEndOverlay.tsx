@@ -54,13 +54,15 @@ export const BattleEndOverlay: React.FC<BattleEndOverlayProps> = ({ winner, onCo
             await gameCenterService.submitBotsDestroyedScore(profileResult.battleStats.botsDestroyed);
           }
           
-          // Submit lifetime net worth score if it was updated
-          // Server checks database first, so we only submit when server confirms update
-          const balanceResult = await dispatch(balanceApi.endpoints.fetchBalance.initiate()).unwrap();
-          if (balanceResult?.lifetimeHighUpdated && balanceResult?.lifetimeHighNetWorth !== undefined) {
-            // Force submission after battle since this is a significant event
-            // Server already checked database, so we can bypass throttling for battles
-            await gameCenterService.submitLifetimeNetWorthScore(balanceResult.lifetimeHighNetWorth, true);
+          // Submit lifetime net worth score if it was updated during battle
+          // Use battleEndData flag first (most reliable), fallback to balance API check
+          if (battleEndData.lifetimeHighUpdated) {
+            const balanceResult = await dispatch(balanceApi.endpoints.fetchBalance.initiate()).unwrap();
+            if (balanceResult?.lifetimeHighNetWorth !== undefined) {
+              // Force submission after battle since this is a significant event
+              // Server already checked database during battle rewards, so we can bypass throttling
+              await gameCenterService.submitLifetimeNetWorthScore(balanceResult.lifetimeHighNetWorth, true);
+            }
           }
         } catch (error) {
           // Silently fail - Game Center is optional
