@@ -318,6 +318,23 @@ router.post('/complete-feature-research', auth, async (req: Request, res: Respon
     const result = await ResearchFeatureService.completeResearch(userId, categoryId, featureId);
     
     if (result.success) {
+      // If rental profit research completed, trigger sync to update income rate
+      if (categoryId === 'investments' && featureId === 'rental-profit-increase') {
+        try {
+          const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
+          const user = await User.findById(userId);
+          if (user) {
+            // Force sync to recalculate rate with new research unlock
+            user.balance.rentalHousingIncomeLastSynced = null;
+            await user.save();
+            await RentalHousingSyncService.performSync(user);
+          }
+        } catch (error) {
+          console.error('Error syncing rental income after research completion:', error);
+          // Don't fail the request if sync fails
+        }
+      }
+      
       if (categoryId === 'home-defense' && featureId === 'antivirus') {
         try {
           const { UserTaskProgress } = await import('../models/UserTaskProgress');
@@ -590,6 +607,22 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
 
     // Reload user to get updated balance
     const updatedUser = await User.findById(userId);
+    
+    // If rental profit research was speeded up, trigger sync to update income rate
+    if (categoryId === 'investments' && featureId === 'rental-profit-increase') {
+      try {
+        const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
+        if (updatedUser) {
+          // Force sync to recalculate rate with new research unlock
+          updatedUser.balance.rentalHousingIncomeLastSynced = null;
+          await updatedUser.save();
+          await RentalHousingSyncService.performSync(updatedUser);
+        }
+      } catch (error) {
+        console.error('Error syncing rental income after speedup:', error);
+        // Don't fail the request if sync fails
+      }
+    }
     if (!updatedUser) {
       res.status(500).json({
         success: false,
