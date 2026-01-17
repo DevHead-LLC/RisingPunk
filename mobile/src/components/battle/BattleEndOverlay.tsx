@@ -5,9 +5,11 @@ import { BattleEndData } from '../../store/api/battleApi';
 import { BattleLossBreakdown } from './BattleLossBreakdown';
 import { LevelUpAnimation } from '../common/LevelUpAnimation';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { useAppDispatch } from '../../store/hooks';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { authApi } from '../../store/api/authApi';
 import { userGuideApi } from '../../store/api/userGuideApi';
+import { balanceApi } from '../../store/api/balanceApi';
+import gameCenterService from '../../services/gameCenterService';
 
 interface BattleEndOverlayProps {
   winner: NodeOwner;
@@ -19,6 +21,7 @@ export const BattleEndOverlay: React.FC<BattleEndOverlayProps> = ({ winner, onCo
   const colors = useThemeColors();
   const dispatch = useAppDispatch();
   const [showLevelUpAnimation, setShowLevelUpAnimation] = useState(false);
+  const token = useAppSelector((state) => state.auth.token);
 
   useEffect(() => {
     if (battleEndData?.levelUp && battleEndData.levelUp.levelsGained > 0) {
@@ -37,6 +40,37 @@ export const BattleEndOverlay: React.FC<BattleEndOverlayProps> = ({ winner, onCo
       }
     }
   }, [battleEndData, dispatch]);
+
+  // Submit Game Center scores when battle ends
+  useEffect(() => {
+    if (battleEndData && token) {
+      const submitGameCenterScores = async () => {
+        try {
+          // Fetch profile to get latest stats
+          const profileResult = await dispatch(authApi.endpoints.getProfile.initiate()).unwrap();
+          
+          // Submit bots destroyed score
+          if (profileResult?.battleStats?.botsDestroyed) {
+            await gameCenterService.submitBotsDestroyedScore(profileResult.battleStats.botsDestroyed);
+          }
+          
+          // Submit lifetime net worth score if it was updated during battle
+          // Use battleEndData flag first (most reliable), fallback to balance API check
+          if (battleEndData.lifetimeHighUpdated) {
+            const balanceResult = await dispatch(balanceApi.endpoints.fetchBalance.initiate()).unwrap();
+            if (balanceResult?.lifetimeHighNetWorth !== undefined) {
+              // Force submission after battle since this is a significant event
+              // Server already checked database during battle rewards, so we can bypass throttling
+              await gameCenterService.submitLifetimeNetWorthScore(balanceResult.lifetimeHighNetWorth, true);
+            }
+          }
+        } catch (error) {
+          // Silently fail - Game Center is optional
+        }
+      };
+      submitGameCenterScores();
+    }
+  }, [battleEndData, token, dispatch]);
 
   const handleLevelUpAnimationComplete = () => {
     setShowLevelUpAnimation(false);
