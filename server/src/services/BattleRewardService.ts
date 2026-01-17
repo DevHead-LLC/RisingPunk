@@ -75,6 +75,7 @@ export class BattleRewardService {
       let experienceGained: number | undefined;
       let moneyGained: number | undefined;
       let levelUp: { levelsGained: number; newLevel: number } | undefined;
+      let lifetimeHighUpdated = false;
 
       if (userWon) {
         // Check if this is a complete victory (enemy has 0 remaining battalions)
@@ -110,7 +111,6 @@ export class BattleRewardService {
 
         // Update user balance
         moneyGained = npc.victoryReward;
-        let lifetimeHighUpdated = false;
         if (moneyGained) {
           const user = await User.findById(userId);
           if (user) {
