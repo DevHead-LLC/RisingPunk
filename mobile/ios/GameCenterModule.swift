@@ -30,11 +30,21 @@ class GameCenterModule: NSObject {
     }
     
     var hasResolved = false
+    let lock = authLock
     
     localPlayer.authenticateHandler = { [weak self] viewController, error in
       guard let self = self else {
-        // Module was deallocated, reject promise to prevent hanging
-        reject("MODULE_DEALLOCATED", "Game Center module was deallocated during authentication", nil)
+        // Module was deallocated - check if promise already resolved before rejecting
+        lock.lock()
+        let alreadyResolved = hasResolved
+        if !alreadyResolved {
+          hasResolved = true
+        }
+        lock.unlock()
+        
+        if !alreadyResolved {
+          reject("MODULE_DEALLOCATED", "Game Center module was deallocated during authentication", nil)
+        }
         return
       }
       
@@ -108,8 +118,17 @@ class GameCenterModule: NSObject {
     
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
       guard let self = self else {
-        // Module was deallocated, reject promise to prevent hanging
-        reject("MODULE_DEALLOCATED", "Game Center module was deallocated during authentication", nil)
+        // Module was deallocated - check if promise already resolved before rejecting
+        lock.lock()
+        let alreadyResolved = hasResolved
+        if !alreadyResolved {
+          hasResolved = true
+        }
+        lock.unlock()
+        
+        if !alreadyResolved {
+          reject("MODULE_DEALLOCATED", "Game Center module was deallocated during authentication", nil)
+        }
         return
       }
       
