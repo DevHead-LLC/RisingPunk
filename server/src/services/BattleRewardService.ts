@@ -114,6 +114,11 @@ export class BattleRewardService {
           if (user) {
             user.balance.total += moneyGained;
             user.balance.lastUpdated = new Date();
+            
+            // Check and update lifetime high net worth
+            const { LifetimeHighNetWorthService } = await import('./LifetimeHighNetWorthService');
+            await LifetimeHighNetWorthService.checkAndUpdateLifetimeHigh(user);
+            
             await user.save();
           }
         }

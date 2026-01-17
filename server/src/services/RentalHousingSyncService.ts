@@ -120,6 +120,10 @@ export class RentalHousingSyncService {
     user.balance.rentalHousingIncomeLastSynced = syncResult.syncTimestamp;
     user.balance.lastUpdated = syncResult.syncTimestamp;
     
+    // Check and update lifetime high net worth
+    const { LifetimeHighNetWorthService } = await import('./LifetimeHighNetWorthService');
+    await LifetimeHighNetWorthService.checkAndUpdateLifetimeHigh(user);
+    
     await user.save();
 
     return {

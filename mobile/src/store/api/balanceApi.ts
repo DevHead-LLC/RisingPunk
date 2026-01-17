@@ -37,14 +37,38 @@ const balanceBaseQuery = async (args: any, api: any, extraOptions: any) => {
   return result;
 };
 
+export interface BalanceResponse {
+  total: number;
+  ratePerSecond: number;
+  lastUpdated: string | Date;
+  fractionalRemainder: number;
+  lifetimeHighNetWorth?: number;
+  lifetimeHighUpdated?: boolean;
+}
+
 export const balanceApi = createApi({
   reducerPath: 'balanceApi',
   baseQuery: balanceBaseQuery,
   tagTypes: ['Balance'],
   endpoints: (builder) => ({
-    fetchBalance: builder.query<{ total: number; ratePerSecond: number; lastUpdated: string | Date; fractionalRemainder: number }, void>({
+    fetchBalance: builder.query<BalanceResponse, void>({
       query: () => '/api/balance',
       providesTags: ['Balance'],
+      async onQueryStarted(arg, { queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          // Submit to Game Center only when server confirms lifetime high was updated
+          // Server checks database first, so this is the source of truth
+          // Throttling in gameCenterService prevents excessive submissions
+          if (data.lifetimeHighUpdated && data.lifetimeHighNetWorth !== undefined) {
+            const gameCenterService = (await import('../../services/gameCenterService')).default;
+            // Don't force - respect throttling since server already checked database
+            gameCenterService.submitLifetimeNetWorthScore(data.lifetimeHighNetWorth, false);
+          }
+        } catch (error) {
+          // Silently fail - Game Center submission is optional
+        }
+      },
     }),
   }),
 });
