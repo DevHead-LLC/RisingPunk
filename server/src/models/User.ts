@@ -72,6 +72,7 @@ export interface IUser extends Document {
   totalGuardiansBuilt?: number;
   totalPhreaksBuilt?: number;
   totalBreachersBuilt?: number;
+  lifetimeHighNetWorth?: number;
   verifyAccessKey(accessKey: string): Promise<boolean>;
   getDecryptedEmail(): string;
   setEncryptedEmail(email: string): void;
@@ -367,6 +368,11 @@ const userSchema = new Schema({
     default: 0,
     min: 0,
     max: 1000000
+  },
+  lifetimeHighNetWorth: {
+    type: Number,
+    default: 0,
+    min: 0
   },
   currentTokenId: {
     type: String,
