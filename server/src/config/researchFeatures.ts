@@ -808,6 +808,20 @@ export const RESEARCH_FEATURES: Record<string, IResearchFeature[]> = {
         value: 'accredited-investor-status',
         target: 'private-investments'
       }
+    },
+    {
+      id: 'rental-profit-increase',
+      name: 'Rental Profit +$0.01/Room',
+      description: 'Increase rental income by $0.01 per room per second for all rental properties',
+      unlockCost: 500000,
+      levelRequirement: 10,
+      isUnlocked: false,
+      researchTimeHours: 8,
+      effect: {
+        type: 'improvement',
+        value: 0.01,
+        target: 'rental-room-income'
+      }
     }
   ],
 
