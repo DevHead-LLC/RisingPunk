@@ -85,13 +85,41 @@ export class RentalHousingSyncService {
 
     // Calculate income from when balance was last updated
     const lastUpdated = user.balance.lastUpdated;
-    const secondsElapsed = (now.getTime() - lastUpdated.getTime()) / 1000;
     
-    // Calculate rental housing income that should have been earned (fixed amount per property)
-    const rentalIncomePerSecond = unlockedProperties.length * this.BASE_INCOME_PER_PROPERTY;
-    const historicalIncome = Math.floor(secondsElapsed * rentalIncomePerSecond);
+    // Get research unlock time to prevent retroactive bonus application
+    const researchUnlockTime = await RentalHousingIncomeService.getRentalProfitResearchUnlockTime(String(user._id));
+    
+    let historicalIncome = 0;
+    
+    if (researchUnlockTime && researchUnlockTime > lastUpdated && researchUnlockTime <= now) {
+      // Research was unlocked during the historical period - split calculation
+      // Calculate income BEFORE research unlock (old rate)
+      const secondsBeforeUnlock = (researchUnlockTime.getTime() - lastUpdated.getTime()) / 1000;
+      const incomeBeforeUnlock = await this.calculateIncomeForPeriod(user, unlockedProperties.length, false);
+      const incomeBefore = Math.floor(secondsBeforeUnlock * incomeBeforeUnlock);
+      
+      // Calculate income AFTER research unlock (new rate)
+      const secondsAfterUnlock = (now.getTime() - researchUnlockTime.getTime()) / 1000;
+      const incomeAfterUnlock = await this.calculateIncomeForPeriod(user, unlockedProperties.length, true);
+      const incomeAfter = Math.floor(secondsAfterUnlock * incomeAfterUnlock);
+      
+      historicalIncome = incomeBefore + incomeAfter;
+    } else {
+      // Research was unlocked before lastUpdated or not unlocked yet - use single rate
+      const secondsElapsed = (now.getTime() - lastUpdated.getTime()) / 1000;
+      const isResearchUnlocked = !!researchUnlockTime && researchUnlockTime <= lastUpdated;
+      const incomePerSecond = await this.calculateIncomeForPeriod(user, unlockedProperties.length, isResearchUnlocked);
+      historicalIncome = Math.floor(secondsElapsed * incomePerSecond);
+    }
     
     return historicalIncome;
+  }
+
+  private static async calculateIncomeForPeriod(user: IUser, propertyCount: number, isResearchUnlocked: boolean): Promise<number> {
+    const baseIncomePerProperty = 0.06; // $0.06 per property per second (base rate)
+    const researchBonusPerProperty = 0.04; // $0.04 bonus per property per second when research unlocked
+    const incomePerProperty = baseIncomePerProperty + (isResearchUnlocked ? researchBonusPerProperty : 0);
+    return propertyCount * incomePerProperty;
   }
 
   static async performSync(user: IUser): Promise<{ success: boolean; syncedAmount: number; newBalance: number }> {
@@ -110,8 +138,9 @@ export class RentalHousingSyncService {
     
     // Calculate total effective rate as baseRate + passiveIncome
     // Base rate is always $1.00, passive income is rental housing income
-    const baseRate = 1.0; // $1.00 base rate per second
-    const rentalIncomePerSecond = syncResult.totalUnlockedProperties * this.BASE_INCOME_PER_PROPERTY;
+    const baseRate = 1.0;
+    const rentalIncome = await RentalHousingIncomeService.calculateRentalHousingIncome(user);
+    const rentalIncomePerSecond = rentalIncome.totalIncomePerSecond;
     const totalEffectiveRate = baseRate + rentalIncomePerSecond;
     
     // Update user with new balance, effective rate, and sync timestamp
