@@ -104,16 +104,12 @@ export class RentalHousingSyncService {
       const incomeAfter = Math.floor(secondsAfterUnlock * incomeAfterUnlock);
       
       historicalIncome = incomeBefore + incomeAfter;
-      
-      console.log(`[RENTAL SYNC] Split historical income calculation: beforeUnlock=${incomeBefore} (${secondsBeforeUnlock}s @ ${incomeBeforeUnlock}/s), afterUnlock=${incomeAfter} (${secondsAfterUnlock}s @ ${incomeAfterUnlock}/s), total=${historicalIncome}`);
     } else {
       // Research was unlocked before lastUpdated or not unlocked yet - use single rate
       const secondsElapsed = (now.getTime() - lastUpdated.getTime()) / 1000;
       const isResearchUnlocked = !!researchUnlockTime && researchUnlockTime <= lastUpdated;
       const incomePerSecond = await this.calculateIncomeForPeriod(user, unlockedProperties.length, isResearchUnlocked);
       historicalIncome = Math.floor(secondsElapsed * incomePerSecond);
-      
-      console.log(`[RENTAL SYNC] Single rate historical income: ${historicalIncome} (${secondsElapsed}s @ ${incomePerSecond}/s, researchUnlocked=${isResearchUnlocked})`);
     }
     
     return historicalIncome;
@@ -146,8 +142,6 @@ export class RentalHousingSyncService {
     const rentalIncome = await RentalHousingIncomeService.calculateRentalHousingIncome(user);
     const rentalIncomePerSecond = rentalIncome.totalIncomePerSecond;
     const totalEffectiveRate = baseRate + rentalIncomePerSecond;
-    
-    console.log(`[RENTAL SYNC] User ${user._id}: rentalIncomePerSecond=${rentalIncomePerSecond}, totalEffectiveRate=${totalEffectiveRate}`);
     
     // Update user with new balance, effective rate, and sync timestamp
     user.balance.total = newBalance;

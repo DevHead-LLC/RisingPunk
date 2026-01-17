@@ -136,6 +136,13 @@ export const researchFeaturesApi = createApi({
           // Invalidate UserTaskProgress to update task guide when research completes
           // This ensures tasks like unlock-antivirus update immediately when feature is unlocked
           dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
+          
+          // If rental profit research was speeded up, invalidate balance and rental housing income cache
+          if (arg.categoryId === 'investments' && arg.featureId === 'rental-profit-increase') {
+            const { rentalHousingApi } = await import('./rentalHousingApi');
+            dispatch(balanceApi.util.invalidateTags(['Balance']));
+            dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
+          }
         } catch {
           // Error handling is done by the mutation itself
         }

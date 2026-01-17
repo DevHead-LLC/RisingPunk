@@ -320,22 +320,17 @@ router.post('/complete-feature-research', auth, async (req: Request, res: Respon
     if (result.success) {
       // If rental profit research completed, trigger sync to update income rate
       if (categoryId === 'investments' && featureId === 'rental-profit-increase') {
-        console.log(`[RESEARCH COMPLETE] Rental profit research completed for user ${userId}`);
         try {
           const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
           const user = await User.findById(userId);
           if (user) {
-            console.log(`[RESEARCH COMPLETE] User found, resetting sync timestamp and performing sync`);
             // Force sync to recalculate rate with new research unlock
             user.balance.rentalHousingIncomeLastSynced = null;
             await user.save();
-            const syncResult = await RentalHousingSyncService.performSync(user);
-            console.log(`[RESEARCH COMPLETE] Sync completed:`, syncResult);
-          } else {
-            console.error(`[RESEARCH COMPLETE] User ${userId} not found`);
+            await RentalHousingSyncService.performSync(user);
           }
         } catch (error) {
-          console.error('[RESEARCH COMPLETE] Error syncing rental income after research completion:', error);
+          console.error('Error syncing rental income after research completion:', error);
           // Don't fail the request if sync fails
         }
       }
@@ -615,21 +610,16 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
     
     // If rental profit research was speeded up, trigger sync to update income rate
     if (categoryId === 'investments' && featureId === 'rental-profit-increase') {
-      console.log(`[RESEARCH SPEEDUP] Rental profit research speeded up for user ${userId}`);
       try {
         const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
         if (updatedUser) {
-          console.log(`[RESEARCH SPEEDUP] Resetting sync timestamp and performing sync`);
           // Force sync to recalculate rate with new research unlock
           updatedUser.balance.rentalHousingIncomeLastSynced = null;
           await updatedUser.save();
-          const syncResult = await RentalHousingSyncService.performSync(updatedUser);
-          console.log(`[RESEARCH SPEEDUP] Sync completed:`, syncResult);
-        } else {
-          console.error(`[RESEARCH SPEEDUP] User ${userId} not found after speedup`);
+          await RentalHousingSyncService.performSync(updatedUser);
         }
       } catch (error) {
-        console.error('[RESEARCH SPEEDUP] Error syncing rental income after speedup:', error);
+        console.error('Error syncing rental income after speedup:', error);
         // Don't fail the request if sync fails
       }
     }
