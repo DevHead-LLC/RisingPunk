@@ -253,12 +253,23 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
     const { RentalHousingSyncService } = await import('./src/services/RentalHousingSyncService');
     await RentalHousingSyncService.performSync(user);
 
+    // Check and update lifetime high net worth
+    const { LifetimeHighNetWorthService } = await import('./src/services/LifetimeHighNetWorthService');
+    const lifetimeHighUpdated = LifetimeHighNetWorthService.checkAndUpdateLifetimeHigh(user);
+    
+    // Save user if lifetime high was updated (balance was already saved earlier if it changed)
+    if (lifetimeHighUpdated) {
+      await user.save();
+    }
+
     // Return updated balance (ratePerSecond already includes rental housing income)
     const currentBalance = {
       total: user.balance.total,
       ratePerSecond: user.balance.ratePerSecond,
       lastUpdated: user.balance.lastUpdated,
-      fractionalRemainder: user.balance.fractionalRemainder || 0
+      fractionalRemainder: user.balance.fractionalRemainder || 0,
+      lifetimeHighNetWorth: user.lifetimeHighNetWorth || 0,
+      lifetimeHighUpdated: lifetimeHighUpdated
     };
 
     res.json(currentBalance);
