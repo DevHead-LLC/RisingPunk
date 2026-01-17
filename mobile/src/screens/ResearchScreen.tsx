@@ -35,8 +35,8 @@ const ALL_RESEARCH_CARDS: ResearchCard[] = [
   { id: 'investments', name: 'Investments', image: require('../assets/images/investmentResearch.png') },
 ];
 
-// Show Home Defense, Hack Crew, and Hack Ability categories
-const RESEARCH_CARDS: ResearchCard[] = ALL_RESEARCH_CARDS.filter(card => card.id === 'home-defense' || card.id === 'hack-crew' || card.id === 'hack-ability');
+// Show Home Defense, Hack Crew, Hack Ability, and Investments categories
+const RESEARCH_CARDS: ResearchCard[] = ALL_RESEARCH_CARDS.filter(card => card.id === 'home-defense' || card.id === 'hack-crew' || card.id === 'hack-ability' || card.id === 'investments');
 
 const { width: screenWidth } = Dimensions.get('window');
 const cardSize = Math.min((screenWidth - SIZING.spacing.md * 3) / 2, 160);

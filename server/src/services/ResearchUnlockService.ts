@@ -11,7 +11,6 @@ export interface UnlockValidationResult {
     level?: boolean;
     balance?: boolean;
     dependencies?: string[];
-    rentalProperties?: boolean;
     antivirus?: boolean;
   };
 }
@@ -31,7 +30,7 @@ export class ResearchUnlockService {
     'construction': 50000,
     'battle-mechanics': 150000,
     'gear': 400000,
-    'investments': 500000
+    'investments': 250000
   };
 
   static async validateUnlockRequirements(
@@ -70,15 +69,6 @@ export class ResearchUnlockService {
       if (missingDependencies.length > 0) {
         reasons.push(`Missing dependencies: ${missingDependencies.join(', ')}`);
         missingRequirements.dependencies = missingDependencies;
-      }
-
-      // Special check for Investments (requires rental properties)
-      if (categoryId === 'investments') {
-        const hasAllRentalProperties = this.checkRentalProperties(user);
-        if (!hasAllRentalProperties) {
-          reasons.push('All rental properties (1-4) must be unlocked');
-          missingRequirements.rentalProperties = true;
-        }
       }
 
       // Special check for Hack Crew (requires Antivirus feature)
@@ -132,13 +122,6 @@ export class ResearchUnlockService {
   private static async getResearchIdsByCategoryIds(categoryIds: string[]): Promise<mongoose.Types.ObjectId[]> {
     const research = await Research.find({ categoryId: { $in: categoryIds } }, { _id: 1 });
     return research.map(r => r._id as mongoose.Types.ObjectId);
-  }
-
-  private static checkRentalProperties(user: any): boolean {
-    return user.unlockedFeatures?.rentalHousing1 &&
-           user.unlockedFeatures?.rentalHousing2 &&
-           user.unlockedFeatures?.rentalHousing3 &&
-           user.unlockedFeatures?.rentalHousing4;
   }
 
   private static async checkAntivirusFeature(userId: string): Promise<boolean> {
@@ -207,17 +190,6 @@ export class ResearchUnlockService {
             success: false,
             message: `Missing dependencies: ${missingDependencies.join(', ')}`
           };
-        }
-
-        // Special check for Investments (requires rental properties)
-        if (categoryId === 'investments') {
-          const hasAllRentalProperties = this.checkRentalProperties(user);
-          if (!hasAllRentalProperties) {
-            return {
-              success: false,
-              message: 'All rental properties (1-4) must be unlocked'
-            };
-          }
         }
 
         // Special check for Hack Crew (requires Antivirus feature)
