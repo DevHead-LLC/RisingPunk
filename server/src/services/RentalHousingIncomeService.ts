@@ -52,6 +52,27 @@ export class RentalHousingIncomeService {
     }
   }
 
+  static async getRentalProfitResearchUnlockTime(userId: string): Promise<Date | null> {
+    try {
+      const feature = await UserResearchFeature.findOne({
+        userId,
+        categoryId: 'investments',
+        featureId: 'rental-profit-increase'
+      })
+      .select('isUnlocked unlockedAt')
+      .lean();
+
+      if (!feature || !feature.isUnlocked || !feature.unlockedAt) {
+        return null;
+      }
+
+      return feature.unlockedAt;
+    } catch (error) {
+      console.error('[RENTAL INCOME] Error getting rental profit research unlock time:', error);
+      return null;
+    }
+  }
+
   static getRoomValuesWithResearch(isResearchUnlocked: boolean): { bathroom: number; kitchen: number; bedroom: number; livingRoom: number } {
     const researchBonus = isResearchUnlocked ? this.RESEARCH_BONUS_PER_ROOM : 0;
 
