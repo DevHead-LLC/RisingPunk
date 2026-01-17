@@ -6,6 +6,8 @@ import UIKit
 @objc(GameCenterModule)
 class GameCenterModule: NSObject {
   
+  private let authLock = NSLock()
+  
   @objc
   static func requiresMainQueueSetup() -> Bool {
     return true
@@ -29,11 +31,19 @@ class GameCenterModule: NSObject {
     
     var hasResolved = false
     
-    localPlayer.authenticateHandler = { viewController, error in
-      guard !hasResolved else { return }
+    localPlayer.authenticateHandler = { [weak self] viewController, error in
+      guard let self = self else { return }
+      
+      self.authLock.lock()
+      let alreadyResolved = hasResolved
+      if !alreadyResolved {
+        hasResolved = true
+      }
+      self.authLock.unlock()
+      
+      guard !alreadyResolved else { return }
       
       if let error = error {
-        hasResolved = true
         reject("AUTHENTICATION_FAILED", "Game Center authentication failed: \(error.localizedDescription)", error)
         return
       }
@@ -43,7 +53,6 @@ class GameCenterModule: NSObject {
           guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
                 let window = windowScene.windows.first,
                 let rootViewController = window.rootViewController else {
-            hasResolved = true
             reject("NO_ROOT_VIEW_CONTROLLER", "Could not find root view controller", nil)
             return
           }
@@ -53,7 +62,6 @@ class GameCenterModule: NSObject {
       }
       
       if localPlayer.isAuthenticated {
-        hasResolved = true
         let result: [String: Any] = [
           "authenticated": true,
           "playerID": localPlayer.gamePlayerID,
@@ -62,14 +70,21 @@ class GameCenterModule: NSObject {
         ]
         resolve(result)
       } else {
-        hasResolved = true
         reject("NOT_AUTHENTICATED", "Player is not authenticated", nil)
       }
     }
     
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-      if !hasResolved && localPlayer.isAuthenticated {
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+      guard let self = self else { return }
+      
+      self.authLock.lock()
+      let alreadyResolved = hasResolved
+      if !alreadyResolved && localPlayer.isAuthenticated {
         hasResolved = true
+      }
+      self.authLock.unlock()
+      
+      if !alreadyResolved && localPlayer.isAuthenticated {
         let result: [String: Any] = [
           "authenticated": true,
           "playerID": localPlayer.gamePlayerID,
