@@ -36,23 +36,28 @@ class GameCenterModule: NSObject {
       
       self.authLock.lock()
       let alreadyResolved = hasResolved
-      if !alreadyResolved {
-        hasResolved = true
-      }
       self.authLock.unlock()
       
       guard !alreadyResolved else { return }
       
       if let error = error {
+        self.authLock.lock()
+        hasResolved = true
+        self.authLock.unlock()
         reject("AUTHENTICATION_FAILED", "Game Center authentication failed: \(error.localizedDescription)", error)
         return
       }
       
       if let viewController = viewController {
+        // First call: Present sign-in UI, but don't resolve yet
+        // Handler will be called again after user completes sign-in
         DispatchQueue.main.async {
           guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
                 let window = windowScene.windows.first,
                 let rootViewController = window.rootViewController else {
+            self.authLock.lock()
+            hasResolved = true
+            self.authLock.unlock()
             reject("NO_ROOT_VIEW_CONTROLLER", "Could not find root view controller", nil)
             return
           }
@@ -61,7 +66,11 @@ class GameCenterModule: NSObject {
         return
       }
       
+      // Second call: User completed sign-in, now resolve or reject
       if localPlayer.isAuthenticated {
+        self.authLock.lock()
+        hasResolved = true
+        self.authLock.unlock()
         let result: [String: Any] = [
           "authenticated": true,
           "playerID": localPlayer.gamePlayerID,
@@ -70,6 +79,9 @@ class GameCenterModule: NSObject {
         ]
         resolve(result)
       } else {
+        self.authLock.lock()
+        hasResolved = true
+        self.authLock.unlock()
         reject("NOT_AUTHENTICATED", "Player is not authenticated", nil)
       }
     }
