@@ -87,9 +87,9 @@ export class RentalHousingSyncService {
     const lastUpdated = user.balance.lastUpdated;
     const secondsElapsed = (now.getTime() - lastUpdated.getTime()) / 1000;
     
-    // Calculate rental housing income that should have been earned (fixed amount per property)
-    const rentalIncomePerSecond = unlockedProperties.length * this.BASE_INCOME_PER_PROPERTY;
-    const historicalIncome = Math.floor(secondsElapsed * rentalIncomePerSecond);
+    // Calculate rental housing income using dynamic calculation from RentalHousingIncomeService
+    const rentalIncome = await RentalHousingIncomeService.calculateRentalHousingIncome(user);
+    const historicalIncome = Math.floor(secondsElapsed * rentalIncome.totalIncomePerSecond);
     
     return historicalIncome;
   }
@@ -110,9 +110,12 @@ export class RentalHousingSyncService {
     
     // Calculate total effective rate as baseRate + passiveIncome
     // Base rate is always $1.00, passive income is rental housing income
-    const baseRate = 1.0; // $1.00 base rate per second
-    const rentalIncomePerSecond = syncResult.totalUnlockedProperties * this.BASE_INCOME_PER_PROPERTY;
+    const baseRate = 1.0;
+    const rentalIncome = await RentalHousingIncomeService.calculateRentalHousingIncome(user);
+    const rentalIncomePerSecond = rentalIncome.totalIncomePerSecond;
     const totalEffectiveRate = baseRate + rentalIncomePerSecond;
+    
+    console.log(`[RENTAL SYNC] User ${user._id}: rentalIncomePerSecond=${rentalIncomePerSecond}, totalEffectiveRate=${totalEffectiveRate}`);
     
     // Update user with new balance, effective rate, and sync timestamp
     user.balance.total = newBalance;

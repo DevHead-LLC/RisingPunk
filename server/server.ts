@@ -294,7 +294,7 @@ app.get('/api/rental-housing/income', auth, async (req: Request, res: Response) 
     }
 
     const { RentalHousingIncomeService } = await import('./src/services/RentalHousingIncomeService');
-    const rentalIncome = RentalHousingIncomeService.calculateRentalHousingIncome(user);
+    const rentalIncome = await RentalHousingIncomeService.calculateRentalHousingIncome(user);
 
     res.json(rentalIncome);
   } catch (error: any) {

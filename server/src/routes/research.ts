@@ -318,6 +318,28 @@ router.post('/complete-feature-research', auth, async (req: Request, res: Respon
     const result = await ResearchFeatureService.completeResearch(userId, categoryId, featureId);
     
     if (result.success) {
+      // If rental profit research completed, trigger sync to update income rate
+      if (categoryId === 'investments' && featureId === 'rental-profit-increase') {
+        console.log(`[RESEARCH COMPLETE] Rental profit research completed for user ${userId}`);
+        try {
+          const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
+          const user = await User.findById(userId);
+          if (user) {
+            console.log(`[RESEARCH COMPLETE] User found, resetting sync timestamp and performing sync`);
+            // Force sync to recalculate rate with new research unlock
+            user.balance.rentalHousingIncomeLastSynced = null;
+            await user.save();
+            const syncResult = await RentalHousingSyncService.performSync(user);
+            console.log(`[RESEARCH COMPLETE] Sync completed:`, syncResult);
+          } else {
+            console.error(`[RESEARCH COMPLETE] User ${userId} not found`);
+          }
+        } catch (error) {
+          console.error('[RESEARCH COMPLETE] Error syncing rental income after research completion:', error);
+          // Don't fail the request if sync fails
+        }
+      }
+      
       if (categoryId === 'home-defense' && featureId === 'antivirus') {
         try {
           const { UserTaskProgress } = await import('../models/UserTaskProgress');
