@@ -1,8 +1,8 @@
 import express, { Request, Response } from 'express';
 import { detectOS } from '../utils/osDetection';
 import { 
-  APP_STORE_DEEP_LINK,
-  GOOGLE_PLAY_DEEP_LINK,
+  APP_STORE_WEB_URL,
+  GOOGLE_PLAY_WEB_URL,
   DESKTOP_LANDING_URL 
 } from '../config/env';
 
@@ -34,18 +34,29 @@ router.get('/go', (req: Request, res: Response) => {
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     
     // Determine redirect URL
+    // Use HTTPS URLs for mobile to preserve UTM tracking parameters
+    // iOS 18+ and Android will automatically redirect to native app stores
     let redirectUrl: string;
     
     if (os === 'ios') {
-      // itms-apps:// opens App Store app directly on iOS devices
-      redirectUrl = APP_STORE_DEEP_LINK;
+      // Use HTTPS URL - iOS 18+ automatically redirects to App Store app
+      // This preserves UTM parameters for campaign tracking
+      const url = new URL(APP_STORE_WEB_URL);
+      if (req.query.utm_source) url.searchParams.set('utm_source', req.query.utm_source as string);
+      if (req.query.utm_campaign) url.searchParams.set('utm_campaign', req.query.utm_campaign as string);
+      if (req.query.utm_medium) url.searchParams.set('utm_medium', req.query.utm_medium as string);
+      redirectUrl = url.toString();
     } else if (os === 'android') {
-      // market:// opens Play Store app directly on Android devices
-      redirectUrl = GOOGLE_PLAY_DEEP_LINK;
+      // Use HTTPS URL - preserves UTM parameters for campaign tracking
+      // Android can be configured to open Play Store app via App Links
+      const url = new URL(GOOGLE_PLAY_WEB_URL);
+      if (req.query.utm_source) url.searchParams.set('utm_source', req.query.utm_source as string);
+      if (req.query.utm_campaign) url.searchParams.set('utm_campaign', req.query.utm_campaign as string);
+      if (req.query.utm_medium) url.searchParams.set('utm_medium', req.query.utm_medium as string);
+      redirectUrl = url.toString();
     } else {
       // Desktop users get the web landing page with UTM parameters
       const url = new URL(DESKTOP_LANDING_URL);
-      // Only add UTM params if they exist (avoid unnecessary URL manipulation)
       if (req.query.utm_source) url.searchParams.set('utm_source', req.query.utm_source as string);
       if (req.query.utm_campaign) url.searchParams.set('utm_campaign', req.query.utm_campaign as string);
       if (req.query.utm_medium) url.searchParams.set('utm_medium', req.query.utm_medium as string);
