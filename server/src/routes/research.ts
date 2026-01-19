@@ -370,11 +370,18 @@ router.post('/complete-feature-research', auth, async (req: Request, res: Respon
               // Update balance and fractional remainder
               user.balance.total += wholeDollarsToAdd;
               user.balance.fractionalRemainder = totalWithRemainder - wholeDollarsToAdd;
+              
+              // CRITICAL: Update lastUpdated to unlock time to prevent retroactive bonus application
+              // Only update if unlockTime is after current lastUpdated (prevents moving timestamp backwards)
+              // This ensures the bonus only applies going forward from research completion
+              user.balance.lastUpdated = unlockTime;
+            } else if (unlockTime > user.balance.lastUpdated) {
+              // If unlockTime is after lastUpdated but secondsElapsed <= 0 (due to rounding),
+              // still update lastUpdated to prevent retroactive bonus
+              user.balance.lastUpdated = unlockTime;
             }
-            
-            // CRITICAL: Update lastUpdated to unlock time to prevent retroactive bonus application
-            // This ensures the bonus only applies going forward from research completion
-            user.balance.lastUpdated = unlockTime;
+            // If unlockTime is before or equal to lastUpdated, don't move timestamp backwards
+            // This prevents double-counting income from concurrent balance updates
             
             // Force sync to recalculate rate with new research unlock
             user.balance.rentalHousingIncomeLastSynced = null;
@@ -658,7 +665,7 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
     }
 
     // Reload user to get updated balance
-    const updatedUser = await User.findById(userId);
+    let updatedUser = await User.findById(userId);
     
     // If rental profit research was speeded up, trigger sync to update income rate
     if (categoryId === 'investments' && featureId === 'rental-profit-increase') {
@@ -710,20 +717,38 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
             // Update balance and fractional remainder
             updatedUser.balance.total += wholeDollarsToAdd;
             updatedUser.balance.fractionalRemainder = totalWithRemainder - wholeDollarsToAdd;
+            
+            // CRITICAL: Update lastUpdated to unlock time to prevent retroactive bonus application
+            // Only update if unlockTime is after current lastUpdated (prevents moving timestamp backwards)
+            // This ensures the bonus only applies going forward from research completion
+            updatedUser.balance.lastUpdated = unlockTime;
+          } else if (unlockTime > updatedUser.balance.lastUpdated) {
+            // If unlockTime is after lastUpdated but secondsElapsed <= 0 (due to rounding),
+            // still update lastUpdated to prevent retroactive bonus
+            updatedUser.balance.lastUpdated = unlockTime;
           }
-          
-          // CRITICAL: Update lastUpdated to unlock time to prevent retroactive bonus application
-          // This ensures the bonus only applies going forward from research completion
-          updatedUser.balance.lastUpdated = unlockTime;
+          // If unlockTime is before or equal to lastUpdated, don't move timestamp backwards
+          // This prevents double-counting income from concurrent balance updates
           
           // Force sync to recalculate rate with new research unlock
           updatedUser.balance.rentalHousingIncomeLastSynced = null;
           await updatedUser.save();
           await RentalHousingSyncService.performSync(updatedUser);
+          
+          // CRITICAL: Reload user after save to ensure response reflects actual database value
+          // This prevents showing incorrect balance if save() failed silently
+          const reloadedUser = await User.findById(userId);
+          if (reloadedUser) {
+            updatedUser = reloadedUser;
+          }
         }
       } catch (error) {
         console.error('Error syncing income rate after speedup:', error);
-        // Don't fail the request if sync fails
+        // Don't fail the request if sync fails, but reload user to ensure correct balance
+        const reloadedUser = await User.findById(userId);
+        if (reloadedUser) {
+          updatedUser = reloadedUser;
+        }
       }
     }
     
