@@ -21,8 +21,20 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
   const { data: userTiersData } = useFetchUserFinanceTiersQuery();
   const { data: rentalHousingData, error: rentalHousingError, isLoading: rentalHousingLoading } = useGetRentalHousingIncomeQuery();
   const currentCash = useAppSelector(getCurrentBalance);
+  const ratePerSecond = useAppSelector(state => state.balance.ratePerSecond);
   const { themeMode } = useTheme();
   const colors = useThemeColors();
+  
+  // Calculate base income rate (ratePerSecond minus rental income)
+  const baseIncomeRate = useMemo(() => {
+    const rentalIncomeRate = rentalHousingData?.totalIncomePerSecond || 0;
+    return Math.max(0, ratePerSecond - rentalIncomeRate);
+  }, [ratePerSecond, rentalHousingData?.totalIncomePerSecond]);
+  
+  // Calculate income rate bonus (amount above base $1.00/sec)
+  const incomeRateBonus = useMemo(() => {
+    return Math.max(0, baseIncomeRate - 1.0);
+  }, [baseIncomeRate]);
 
   const merged = useMemo(() => {
     const templates = templatesData?.templates || [];
@@ -36,6 +48,54 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
     // Default pick: barista (Tier 1) if present; else first template
     return byKey['barista'] || templates[0] || null;
   }, [templatesData, userTiersData]);
+  
+  // Calculate financial statement values (shared between Income Statement and Cash Flows)
+  const financialCalculations = useMemo(() => {
+    if (!merged) return null;
+    
+    const incomeStatementEntries = Object.entries(merged.incomeStatement || {});
+    
+    // Base gross income: $12.00 (constant for all accounts)
+    const baseGrossIncome = 12.00;
+    const grossIncome = baseGrossIncome + incomeRateBonus;
+    
+    // Calculate expenses (negative values only, excluding totals)
+    const expenseEntries = incomeStatementEntries.filter(([k, v]) => {
+      const num = Number(v);
+      const keyLower = k.toLowerCase().trim();
+      if (k === 'Gross Income' || k === 'Gross income' || k === 'gross income' ||
+          keyLower.includes('net income') || keyLower.includes('net cashflow') ||
+          keyLower === 'total expenses' || keyLower.includes('total expense') ||
+          keyLower === 'total' || keyLower.includes('calculated')) {
+        return false;
+      }
+      return num < 0;
+    });
+    
+    const totalExpenses = expenseEntries.reduce((sum, [, v]) => {
+      const num = Number(v);
+      if (num < 0) {
+        return sum + Math.abs(num);
+      }
+      return sum;
+    }, 0);
+    
+    // Calculate Net Income: Gross Income - Total Expenses
+    const netIncome = grossIncome - totalExpenses;
+    
+    // Calculate Net Cash Flow: Net Income + Passive Income
+    const passiveIncome = rentalHousingData?.totalIncomePerSecond || 0;
+    const netCashFlow = netIncome + passiveIncome;
+    
+    return {
+      grossIncome,
+      expenseEntries,
+      totalExpenses,
+      netIncome,
+      passiveIncome,
+      netCashFlow
+    };
+  }, [merged, incomeRateBonus, rentalHousingData?.totalIncomePerSecond]);
 
   const getStyles = () => ({
     container: {
@@ -178,32 +238,83 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
               <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <Text style={styles.placeholderTitle}>Income Statement</Text>
                 {merged?.tierName ? <Text style={styles.tierTitle}>{merged.tierName}</Text> : null}
-                {merged ? (
+                {merged && financialCalculations ? (
                   <View style={styles.listContainer}>
-                    {Object.entries(merged.incomeStatement || {}).map(([k, v]) => {
-                      const num = Number(v);
+                    {(() => {
+                      const { grossIncome, expenseEntries, totalExpenses, netIncome, passiveIncome, netCashFlow } = financialCalculations;
+                      
                       return (
-                        <View key={k} style={styles.row}><Text style={styles.keyText}>{k}</Text><Text style={styles.valText}>{num >= 0 ? `+${num.toFixed(2)}` : num.toFixed(2)}</Text></View>
+                        <>
+                          {/* Section 1: Gross Income */}
+                          <Text style={styles.sectionTitle}>Gross Income</Text>
+                          <View style={styles.row}>
+                            <Text style={styles.keyText}>Gross Income</Text>
+                            <Text style={styles.valText}>+${grossIncome.toFixed(2)}</Text>
+                          </View>
+                          
+                          {/* Section 2: Expenses */}
+                          <Text style={[styles.sectionTitle, { marginTop: SIZING.spacing.md }]}>Expenses</Text>
+                          {expenseEntries.map(([k, v]) => {
+                            const num = Number(v);
+                            const cleanLabel = k.replace(/\s*\([^)]*%[^)]*\)/g, '').trim();
+                            return (
+                              <View key={k} style={styles.row}>
+                                <Text style={styles.keyText}>{cleanLabel}</Text>
+                                <Text style={styles.valText}>${num.toFixed(2)}</Text>
+                              </View>
+                            );
+                          })}
+                          <View style={styles.row}>
+                            <Text style={styles.keyText}>Total Expenses</Text>
+                            <Text style={styles.valText}>-${totalExpenses.toFixed(2)}</Text>
+                          </View>
+                          
+                          {/* Section 3: Net Income Calculation */}
+                          <Text style={[styles.sectionTitle, { marginTop: SIZING.spacing.md }]}>Net Income</Text>
+                          <View style={styles.row}>
+                            <Text style={styles.keyText}>Gross Income</Text>
+                            <Text style={styles.valText}>+${grossIncome.toFixed(2)}</Text>
+                          </View>
+                          <View style={styles.row}>
+                            <Text style={styles.keyText}>Less: Total Expenses</Text>
+                            <Text style={styles.valText}>-${totalExpenses.toFixed(2)}</Text>
+                          </View>
+                          <View style={[styles.row, { marginTop: SIZING.spacing.xs }]}>
+                            <Text style={styles.keyText}>Net Income</Text>
+                            <Text style={styles.valText}>+${netIncome.toFixed(2)}</Text>
+                          </View>
+                          
+                          {/* Section 4: Net Cash Flow Calculation */}
+                          <Text style={[styles.sectionTitle, { marginTop: SIZING.spacing.md }]}>Net Cash Flow</Text>
+                          {rentalHousingLoading && (
+                            <View style={styles.row}>
+                              <Text style={styles.keyText}>Loading rental data...</Text>
+                              <Text style={styles.valText}>...</Text>
+                            </View>
+                          )}
+                          {rentalHousingError && (
+                            <View style={styles.row}>
+                              <Text style={styles.keyText}>Rental data error</Text>
+                              <Text style={styles.valText}>Error</Text>
+                            </View>
+                          )}
+                          {rentalHousingData && (
+                            <View style={styles.row}>
+                              <Text style={styles.keyText}>Investment Properties (Passive Income)</Text>
+                              <Text style={styles.valText}>+${rentalHousingData.totalIncomePerSecond.toFixed(2)}</Text>
+                            </View>
+                          )}
+                          <View style={styles.row}>
+                            <Text style={styles.keyText}>Net Income</Text>
+                            <Text style={styles.valText}>+${netIncome.toFixed(2)}</Text>
+                          </View>
+                          <View style={[styles.row, { marginTop: SIZING.spacing.xs }]}>
+                            <Text style={styles.keyText}>Net Cash Flow</Text>
+                            <Text style={styles.valText}>+${netCashFlow.toFixed(2)}</Text>
+                          </View>
+                        </>
                       );
-                    })}
-                    {rentalHousingLoading && (
-                      <View style={styles.row}>
-                        <Text style={styles.keyText}>Loading rental data...</Text>
-                        <Text style={styles.valText}>...</Text>
-                      </View>
-                    )}
-                    {rentalHousingError && (
-                      <View style={styles.row}>
-                        <Text style={styles.keyText}>Rental data error</Text>
-                        <Text style={styles.valText}>Error</Text>
-                      </View>
-                    )}
-                    {rentalHousingData && (
-                      <View style={styles.row}>
-                        <Text style={styles.keyText}>Investment Properties (Passive Income)</Text>
-                        <Text style={styles.valText}>+${rentalHousingData.totalIncomePerSecond.toFixed(2)}</Text>
-                      </View>
-                    )}
+                    })()}
                   </View>
                 ) : (
                   <Text style={styles.placeholderSubtitle}>Loading...</Text>
@@ -221,7 +332,7 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                     <Text style={styles.sectionTitle}>Assets</Text>
                     <View style={styles.row}>
                       <Text style={styles.keyText}>Cash Balance</Text>
-                      <Text style={styles.valText}>{`$${Number(currentCash).toFixed(2)}`}</Text>
+                      <Text style={styles.valText}>{`$${Math.round(Number(currentCash)).toLocaleString()}`}</Text>
                     </View>
                     {rentalHousingLoading && (
                       <View style={styles.row}>
@@ -246,12 +357,12 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                     <Text style={[styles.sectionTitle, { marginTop: SIZING.spacing.md }]}>Liabilities</Text>
                     <View style={styles.row}>
                       <Text style={styles.keyText}>None</Text>
-                      <Text style={styles.valText}>$0.00</Text>
+                      <Text style={styles.valText}>$0</Text>
                     </View>
                     <View style={[styles.row, { marginTop: SIZING.spacing.sm }]}>
                       <Text style={styles.keyText}>Net Worth</Text>
                       <Text style={styles.valText}>
-                        {`$${(Number(currentCash) + (rentalHousingData ? rentalHousingData.propertyBreakdown.filter(p => p.isUnlocked).length * 100000 : 0)).toFixed(2)}`}
+                        {`$${Math.round(Number(currentCash) + (rentalHousingData ? rentalHousingData.propertyBreakdown.filter(p => p.isUnlocked).length * 100000 : 0)).toLocaleString()}`}
                       </Text>
                     </View>
                   </View>
@@ -266,15 +377,36 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
               <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <Text style={styles.placeholderTitle}>Statement of Cash Flows</Text>
                 {merged?.tierName ? <Text style={styles.tierTitle}>{merged.tierName}</Text> : null}
-                {merged ? (
+                {merged && financialCalculations ? (
                   <View style={styles.listContainer}>
                     <Text style={styles.sectionTitle}>Operating</Text>
-                    {Object.entries(merged.cashFlows?.operating || {}).map(([k, v]) => {
-                      const num = Number(v);
+                    {(() => {
+                      const { grossIncome, totalExpenses, netIncome } = financialCalculations;
+                      
                       return (
-                        <View key={k} style={styles.row}><Text style={styles.keyText}>{k}</Text><Text style={styles.valText}>{num >= 0 ? `+${num.toFixed(2)}` : num.toFixed(2)}</Text></View>
+                        <>
+                          {/* 1. Job Income (matches Gross Income from Income Statement) */}
+                          <View style={styles.row}>
+                            <Text style={styles.keyText}>Job Income</Text>
+                            <Text style={styles.valText}>+${grossIncome.toFixed(2)}</Text>
+                          </View>
+                          
+                          {/* 2. Total Expenses (brief summary, matches Income Statement total) */}
+                          <View style={styles.row}>
+                            <Text style={styles.keyText}>Total Expenses</Text>
+                            <Text style={styles.valText}>-${totalExpenses.toFixed(2)}</Text>
+                          </View>
+                          
+                          {/* 3. Net from Operations (matches Net Income from Income Statement) */}
+                          <View style={[styles.row, { marginTop: SIZING.spacing.sm }]}>
+                            <Text style={styles.keyText}>Net from Operations</Text>
+                            <Text style={styles.valText}>+${netIncome.toFixed(2)}</Text>
+                          </View>
+                        </>
                       );
-                    })}
+                    })()}
+                    
+                    {/* 4. Investment Properties (Passive Income) */}
                     {rentalHousingLoading && (
                       <View style={styles.row}>
                         <Text style={styles.keyText}>Loading rental data...</Text>
@@ -293,12 +425,16 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                         <Text style={styles.valText}>+${rentalHousingData.totalIncomePerSecond.toFixed(2)}</Text>
                       </View>
                     )}
-                    <View style={[styles.row, { marginTop: SIZING.spacing.md }]}>
-                      <Text style={styles.keyText}>Total Cash Flow Rate</Text>
-                      <Text style={[styles.valText, { color: colors.matrix }]}>
-                        ${(1 + (rentalHousingData?.totalIncomePerSecond || 0)).toFixed(2)}/sec
-                      </Text>
-                    </View>
+                    
+                    {/* 5. Total Cash Flow Rate (matches Net Cash Flow from Income Statement) */}
+                    {financialCalculations && (
+                      <View style={[styles.row, { marginTop: SIZING.spacing.md }]}>
+                        <Text style={styles.keyText}>Total Cash Flow Rate</Text>
+                        <Text style={[styles.valText, { color: colors.matrix }]}>
+                          ${financialCalculations.netCashFlow.toFixed(2)}/sec
+                        </Text>
+                      </View>
+                    )}
                     <View style={[styles.row, { marginTop: SIZING.spacing.md }]}>
                       <Text style={styles.keyText}>Investing Activities</Text>
                       <Text style={styles.valText}>{(merged.cashFlows?.investing ?? 0) >= 0 ? `+${(merged.cashFlows?.investing ?? 0).toFixed(2)}` : (merged.cashFlows?.investing ?? 0).toFixed(2)}</Text>

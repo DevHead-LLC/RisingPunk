@@ -335,6 +335,23 @@ router.post('/complete-feature-research', auth, async (req: Request, res: Respon
         }
       }
       
+      // If income rate research completed, trigger sync to update income rate
+      if (categoryId === 'cash-flow' && featureId === 'increase-income-rate') {
+        try {
+          const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
+          const user = await User.findById(userId);
+          if (user) {
+            // Force sync to recalculate rate with new research unlock
+            user.balance.rentalHousingIncomeLastSynced = null;
+            await user.save();
+            await RentalHousingSyncService.performSync(user);
+          }
+        } catch (error) {
+          console.error('Error syncing income rate after research completion:', error);
+          // Don't fail the request if sync fails
+        }
+      }
+      
       if (categoryId === 'home-defense' && featureId === 'antivirus') {
         try {
           const { UserTaskProgress } = await import('../models/UserTaskProgress');
@@ -623,6 +640,23 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
         // Don't fail the request if sync fails
       }
     }
+    
+    // If income rate research was speeded up, trigger sync to update income rate
+    if (categoryId === 'cash-flow' && featureId === 'increase-income-rate') {
+      try {
+        const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
+        if (updatedUser) {
+          // Force sync to recalculate rate with new research unlock
+          updatedUser.balance.rentalHousingIncomeLastSynced = null;
+          await updatedUser.save();
+          await RentalHousingSyncService.performSync(updatedUser);
+        }
+      } catch (error) {
+        console.error('Error syncing income rate after speedup:', error);
+        // Don't fail the request if sync fails
+      }
+    }
+    
     if (!updatedUser) {
       res.status(500).json({
         success: false,

@@ -1,5 +1,6 @@
 import { IUser } from '../models/User';
 import { RentalHousingIncomeService } from './RentalHousingIncomeService';
+import { UserResearchFeature } from '../models/UserResearchFeature';
 
 export interface RentalHousingSyncResult {
   needsSync: boolean;
@@ -10,6 +11,7 @@ export interface RentalHousingSyncResult {
 
 export class RentalHousingSyncService {
   private static readonly BASE_INCOME_PER_PROPERTY = 0.06; // $0.06 per property per second
+  private static readonly BASE_INCOME_RATE_BONUS = 0.05; // $0.05 per second bonus when income rate research unlocked
 
   static async checkAndSyncRentalHousingIncome(user: IUser): Promise<RentalHousingSyncResult> {
     const now = new Date();
@@ -77,6 +79,49 @@ export class RentalHousingSyncService {
     return user.balance.rentalHousingIncomeLastSynced < oneHourAgo;
   }
 
+  static async isIncomeRateResearchUnlocked(userId: string): Promise<boolean> {
+    try {
+      const feature = await UserResearchFeature.findOne({
+        userId,
+        categoryId: 'cash-flow',
+        featureId: 'increase-income-rate'
+      })
+      .select('isUnlocked unlockedAt')
+      .lean();
+
+      if (!feature) {
+        return false;
+      }
+
+      const isUnlocked = !!feature.isUnlocked;
+      return isUnlocked;
+    } catch (error) {
+      console.error('[INCOME RATE] Error checking income rate research unlock status:', error);
+      return false;
+    }
+  }
+
+  static async getIncomeRateResearchUnlockTime(userId: string): Promise<Date | null> {
+    try {
+      const feature = await UserResearchFeature.findOne({
+        userId,
+        categoryId: 'cash-flow',
+        featureId: 'increase-income-rate'
+      })
+      .select('isUnlocked unlockedAt')
+      .lean();
+
+      if (!feature || !feature.isUnlocked || !feature.unlockedAt) {
+        return null;
+      }
+
+      return feature.unlockedAt;
+    } catch (error) {
+      console.error('[INCOME RATE] Error getting income rate research unlock time:', error);
+      return null;
+    }
+  }
+
   private static async calculateHistoricalIncome(user: IUser, now: Date): Promise<number> {
     const unlockedProperties = this.getUnlockedProperties(user);
     if (unlockedProperties.length === 0) {
@@ -137,11 +182,23 @@ export class RentalHousingSyncService {
     const newBalance = user.balance.total + syncResult.syncedAmount;
     
     // Calculate total effective rate as baseRate + passiveIncome
-    // Base rate is always $1.00, passive income is rental housing income
-    const baseRate = 1.0;
+    // Base rate is $1.00 + $0.05 bonus if income rate research unlocked, passive income is rental housing income
+    const isIncomeRateUnlocked = await this.isIncomeRateResearchUnlocked(String(user._id));
+    const baseRate = 1.0 + (isIncomeRateUnlocked ? this.BASE_INCOME_RATE_BONUS : 0);
+    
+    if (baseRate < 0) {
+      console.error('[INCOME RATE] Invalid baseRate calculated:', baseRate);
+      throw new Error('Invalid base rate calculation');
+    }
+    
     const rentalIncome = await RentalHousingIncomeService.calculateRentalHousingIncome(user);
     const rentalIncomePerSecond = rentalIncome.totalIncomePerSecond;
     const totalEffectiveRate = baseRate + rentalIncomePerSecond;
+    
+    if (totalEffectiveRate < 0) {
+      console.error('[INCOME RATE] Invalid totalEffectiveRate calculated:', totalEffectiveRate);
+      throw new Error('Invalid total effective rate calculation');
+    }
     
     // Update user with new balance, effective rate, and sync timestamp
     user.balance.total = newBalance;
