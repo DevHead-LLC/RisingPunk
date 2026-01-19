@@ -351,7 +351,28 @@ router.post('/complete-feature-research', auth, async (req: Request, res: Respon
             
             const unlockTime = researchFeature?.unlockedAt || new Date();
             
-            // CRITICAL: Update lastUpdated to unlock time to prevent retroactive income
+            // CRITICAL: Calculate and add income earned BEFORE research unlock (using old rate)
+            // This prevents income loss when we update lastUpdated to unlockTime
+            const secondsElapsed = (unlockTime.getTime() - user.balance.lastUpdated.getTime()) / 1000;
+            if (secondsElapsed > 0) {
+              // Round down to 10-second intervals to match balance endpoint logic
+              const roundedSecondsElapsed = Math.floor(secondsElapsed / 10) * 10;
+              
+              // Calculate income using current ratePerSecond (before research bonus applies)
+              const fullPrecisionIncome = roundedSecondsElapsed * user.balance.ratePerSecond;
+              
+              // Add to existing fractional remainder
+              const totalWithRemainder = (user.balance.fractionalRemainder || 0) + fullPrecisionIncome;
+              
+              // Calculate whole dollars to add
+              const wholeDollarsToAdd = Math.floor(totalWithRemainder);
+              
+              // Update balance and fractional remainder
+              user.balance.total += wholeDollarsToAdd;
+              user.balance.fractionalRemainder = totalWithRemainder - wholeDollarsToAdd;
+            }
+            
+            // CRITICAL: Update lastUpdated to unlock time to prevent retroactive bonus application
             // This ensures the bonus only applies going forward from research completion
             user.balance.lastUpdated = unlockTime;
             
@@ -670,7 +691,28 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
           
           const unlockTime = researchFeature?.unlockedAt || new Date();
           
-          // CRITICAL: Update lastUpdated to unlock time to prevent retroactive income
+          // CRITICAL: Calculate and add income earned BEFORE research unlock (using old rate)
+          // This prevents income loss when we update lastUpdated to unlockTime
+          const secondsElapsed = (unlockTime.getTime() - updatedUser.balance.lastUpdated.getTime()) / 1000;
+          if (secondsElapsed > 0) {
+            // Round down to 10-second intervals to match balance endpoint logic
+            const roundedSecondsElapsed = Math.floor(secondsElapsed / 10) * 10;
+            
+            // Calculate income using current ratePerSecond (before research bonus applies)
+            const fullPrecisionIncome = roundedSecondsElapsed * updatedUser.balance.ratePerSecond;
+            
+            // Add to existing fractional remainder
+            const totalWithRemainder = (updatedUser.balance.fractionalRemainder || 0) + fullPrecisionIncome;
+            
+            // Calculate whole dollars to add
+            const wholeDollarsToAdd = Math.floor(totalWithRemainder);
+            
+            // Update balance and fractional remainder
+            updatedUser.balance.total += wholeDollarsToAdd;
+            updatedUser.balance.fractionalRemainder = totalWithRemainder - wholeDollarsToAdd;
+          }
+          
+          // CRITICAL: Update lastUpdated to unlock time to prevent retroactive bonus application
           // This ensures the bonus only applies going forward from research completion
           updatedUser.balance.lastUpdated = unlockTime;
           
