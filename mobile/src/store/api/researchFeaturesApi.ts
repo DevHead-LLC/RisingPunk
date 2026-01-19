@@ -2,6 +2,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
 import { RootState } from '../index';
 import { balanceApi } from './balanceApi';
+import { userGuideApi } from './userGuideApi';
 
 export interface ResearchFeatureStatus {
   featureId: string;
@@ -16,6 +17,7 @@ export interface StartResearchResponse {
   researchStartedAt: string;
   researchCompletesAt: string;
   researchTimeHours: number;
+  newBalance?: number;
 }
 
 export interface CompleteResearchResponse {
@@ -58,6 +60,7 @@ export const researchFeaturesApi = createApi({
       query: (categoryId) => `/user-features/${categoryId}`,
       transformResponse: (response: { success: boolean; data: any[] }) => response.data,
       providesTags: (result, error, categoryId) => [{ type: 'ResearchFeatures', id: categoryId }],
+      keepUnusedDataFor: 300,
     }),
     startResearch: builder.mutation<StartResearchResponse, { categoryId: string; featureId: string }>({
       query: ({ categoryId, featureId }) => ({
@@ -65,10 +68,22 @@ export const researchFeaturesApi = createApi({
         method: 'POST',
         body: { categoryId, featureId },
       }),
-      transformResponse: (response: { success: boolean; data: StartResearchResponse }) => response.data,
+      transformResponse: (response: { success: boolean; data: StartResearchResponse; newBalance?: number }) => ({
+        ...response.data,
+        newBalance: response.newBalance
+      }),
       invalidatesTags: (result, error, { categoryId }) => [
         { type: 'ResearchFeatures', id: categoryId }
       ],
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Invalidate Balance tag from balanceApi to ensure fresh balance data
+          dispatch(balanceApi.util.invalidateTags(['Balance']));
+        } catch {
+          // Error handling is done by the mutation itself
+        }
+      },
     }),
     completeResearch: builder.mutation<CompleteResearchResponse, { categoryId: string; featureId: string }>({
       query: ({ categoryId, featureId }) => ({
@@ -80,6 +95,30 @@ export const researchFeaturesApi = createApi({
       invalidatesTags: (result, error, { categoryId }) => [
         { type: 'ResearchFeatures', id: categoryId }
       ],
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          // Invalidate UserTaskProgress to update task guide when research completes
+          // This ensures tasks like unlock-antivirus update immediately when feature is unlocked
+          dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
+          
+          // If rental profit research completed, invalidate balance and rental housing income cache
+          if (arg.categoryId === 'investments' && arg.featureId === 'rental-profit-increase') {
+            const { balanceApi } = await import('./balanceApi');
+            const { rentalHousingApi } = await import('./rentalHousingApi');
+            dispatch(balanceApi.util.invalidateTags(['Balance']));
+            dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
+          }
+          
+          // If income rate research completed, invalidate balance cache
+          if (arg.categoryId === 'cash-flow' && arg.featureId === 'increase-income-rate') {
+            const { balanceApi } = await import('./balanceApi');
+            dispatch(balanceApi.util.invalidateTags(['Balance']));
+          }
+        } catch {
+          // Error handling is done by the mutation itself
+        }
+      },
     }),
     speedupFeatureResearch: builder.mutation<SpeedupFeatureResearchResponse, { categoryId: string; featureId: string }>({
       query: ({ categoryId, featureId }) => ({
@@ -100,6 +139,21 @@ export const researchFeaturesApi = createApi({
           await queryFulfilled;
           // Invalidate Balance tag from balanceApi to ensure fresh balance data
           dispatch(balanceApi.util.invalidateTags(['Balance']));
+          // Invalidate UserTaskProgress to update task guide when research completes
+          // This ensures tasks like unlock-antivirus update immediately when feature is unlocked
+          dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
+          
+          // If rental profit research was speeded up, invalidate balance and rental housing income cache
+          if (arg.categoryId === 'investments' && arg.featureId === 'rental-profit-increase') {
+            const { rentalHousingApi } = await import('./rentalHousingApi');
+            dispatch(balanceApi.util.invalidateTags(['Balance']));
+            dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
+          }
+          
+          // If income rate research was speeded up, invalidate balance cache
+          if (arg.categoryId === 'cash-flow' && arg.featureId === 'increase-income-rate') {
+            dispatch(balanceApi.util.invalidateTags(['Balance']));
+          }
         } catch {
           // Error handling is done by the mutation itself
         }

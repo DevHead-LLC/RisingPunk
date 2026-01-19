@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Alert } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { CustomButton } from '../common/CustomButton';
 import { LockedFeatureModal } from '../turf/LockedFeatureModal';
 import { API_URL } from '../../config';
-import { useAppSelector } from '../../store/hooks';
+import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { getCurrentBalance } from '../../store/slices/balanceSlice';
+import { useGetUserFeaturesQuery } from '../../store/api/researchFeaturesApi';
+import { userGuideApi } from '../../store/api/userGuideApi';
 
 interface ResearchRequirements {
   categoryId: string;
@@ -14,6 +16,7 @@ interface ResearchRequirements {
   levelRequirement: number;
   balanceRequirement: number;
   dependencies: string[];
+  requiredFeatures?: string[];
   unlockCost: number;
   isUnlocked: boolean;
 }
@@ -38,6 +41,7 @@ interface ResearchLockedModalProps {
   currentLevel: number;
   currentBalance: number;
   researchStatus: ResearchStatus[];
+  onRefreshResearchStatus?: () => void;
 }
 
 export function ResearchLockedModal({
@@ -48,6 +52,7 @@ export function ResearchLockedModal({
   currentLevel: propCurrentLevel,
   currentBalance: propCurrentBalance,
   researchStatus,
+  onRefreshResearchStatus,
 }: ResearchLockedModalProps): React.JSX.Element | null {
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [showAuthError, setShowAuthError] = useState(false);
@@ -56,11 +61,68 @@ export function ResearchLockedModal({
   const [showRequirementsNotMet, setShowRequirementsNotMet] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const token = useAppSelector(state => state.auth.token);
+  const dispatch = useAppDispatch();
   const currentLevel = useAppSelector(state => state.auth.user?.level || propCurrentLevel || 1);
   const currentBalance = useAppSelector(state => getCurrentBalance(state) || propCurrentBalance || 0);
+  const previousLevelRef = useRef(currentLevel);
+
+  useEffect(() => {
+    if (visible && onRefreshResearchStatus) {
+      onRefreshResearchStatus();
+      previousLevelRef.current = currentLevel;
+    }
+  }, [visible, onRefreshResearchStatus]);
+
+  useEffect(() => {
+    if (visible && onRefreshResearchStatus && currentLevel !== previousLevelRef.current) {
+      onRefreshResearchStatus();
+      previousLevelRef.current = currentLevel;
+    }
+  }, [currentLevel, visible, onRefreshResearchStatus]);
   
   const colors = useThemeColors();
   const styles = createStyles(colors);
+
+  const { data: homeDefenseFeatures, isLoading: isLoadingHomeDefenseFeatures } = useGetUserFeaturesQuery('home-defense', {
+    skip: !requirements || requirements.categoryId !== 'hack-crew'
+  });
+
+  // Check if required features are unlocked (must be before early return)
+  const requiredFeaturesMet = useMemo(() => {
+    if (!requirements?.requiredFeatures || requirements.requiredFeatures.length === 0) {
+      return true;
+    }
+
+    if (requirements.categoryId === 'hack-crew') {
+      if (isLoadingHomeDefenseFeatures) {
+        return false;
+      }
+      
+      if (!homeDefenseFeatures) {
+        return false;
+      }
+      
+      return requirements.requiredFeatures.every(featureId => {
+        const feature = homeDefenseFeatures.find(f => f.id === featureId);
+        if (!feature) return false;
+        
+        if (feature.isUnlocked) {
+          return true;
+        }
+        
+        if (feature.isResearching && feature.researchCompletesAt) {
+          const now = new Date().getTime();
+          const researchCompletesAt = new Date(feature.researchCompletesAt).getTime();
+          const remaining = Math.max(0, researchCompletesAt - now);
+          return remaining === 0;
+        }
+        
+        return false;
+      });
+    }
+
+    return true;
+  }, [requirements?.requiredFeatures, requirements?.categoryId, homeDefenseFeatures, isLoadingHomeDefenseFeatures]);
 
   if (!requirements) return null;
 
@@ -73,7 +135,7 @@ export function ResearchLockedModal({
     return depResearch?.isUnlocked || false;
   });
   
-  const canUnlock = levelMet && balanceMet && dependenciesMet;
+  const canUnlock = levelMet && balanceMet && dependenciesMet && requiredFeaturesMet;
 
   const handleUnlock = async () => {
     if (!token) {
@@ -105,6 +167,10 @@ export function ResearchLockedModal({
 
       if (data.success) {
         onUnlockSuccess(data.newBalance);
+        
+        if (requirements.categoryId === 'home-defense') {
+          dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
+        }
       } else {
         setShowUnlockError(true);
         setErrorMessage(data.message);
@@ -172,6 +238,18 @@ export function ResearchLockedModal({
                     dependenciesMet ? styles.requirementMet : styles.requirementNotMet
                   ]}>
                     {requirements.dependencies.join(', ')}
+                  </Text>
+                </View>
+              )}
+
+              {requirements.requiredFeatures && requirements.requiredFeatures.length > 0 && (
+                <View style={styles.requirementRow}>
+                  <Text style={styles.requirementLabel}>Required Features:</Text>
+                  <Text style={[
+                    styles.requirementValue,
+                    requiredFeaturesMet ? styles.requirementMet : styles.requirementNotMet
+                  ]}>
+                    {requirements.requiredFeatures.map(f => f.charAt(0).toUpperCase() + f.slice(1)).join(', ')}
                   </Text>
                 </View>
               )}

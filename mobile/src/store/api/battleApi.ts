@@ -41,6 +41,9 @@ export interface BattleEndData {
     levelsGained: number;
     newLevel: number;
   };
+  lifetimeHighUpdated?: boolean;
+  isUserDefender?: boolean;
+  isPvPBattle?: boolean;
 }
 
 export interface BattleState {

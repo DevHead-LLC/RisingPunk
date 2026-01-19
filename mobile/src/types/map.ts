@@ -15,4 +15,10 @@ export interface CellData {
 
 export interface MapResponse {
   grid: CellData[][];
+  viewport?: {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+  };
 }

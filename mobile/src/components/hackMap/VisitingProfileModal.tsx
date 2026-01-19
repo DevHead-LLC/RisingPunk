@@ -1,8 +1,11 @@
-import React, { useCallback } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, Dimensions, Platform, Pressable } from 'react-native';
+import React, { useEffect, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, SafeAreaView, Image, ScrollView, Platform, Pressable, Dimensions } from 'react-native';
+import { ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { useGetUserProfileQuery } from '../../store/api/authApi';
+import { useAppSelector } from '../../store/hooks';
+import { useTrackAnotherUserProfileVisitMutation } from '../../store/api/userGuideApi';
 
 interface VisitingProfileModalProps {
   visible: boolean;
@@ -16,10 +19,31 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
   userId,
 }) => {
   const colors = useThemeColors();
+  const currentUser = useAppSelector((state) => state.auth.user);
   const { data: userProfile, isLoading, error } = useGetUserProfileQuery(userId, {
     skip: !visible || !userId,
   });
+  const [trackAnotherUserProfileVisit] = useTrackAnotherUserProfileVisitMutation();
+  const trackedUserIdRef = useRef<string | null>(null);
   const styles = createStyles(colors);
+
+  useEffect(() => {
+    if (visible && userProfile && currentUser && !isLoading && !error) {
+      const currentUserIdStr = String(currentUser._id || '').trim();
+      const visitedUserIdStr = String(userId || '').trim();
+      
+      if (currentUserIdStr !== visitedUserIdStr && trackedUserIdRef.current !== visitedUserIdStr) {
+        trackedUserIdRef.current = visitedUserIdStr;
+        trackAnotherUserProfileVisit({ visitedUserId: userId }).catch(() => {
+          // Silently fail if tracking fails
+        });
+      }
+    }
+    
+    if (!visible) {
+      trackedUserIdRef.current = null;
+    }
+  }, [visible, userProfile, currentUser, userId, isLoading, error, trackAnotherUserProfileVisit]);
 
   const profileImageSource = userProfile?.profileGender === 'female' 
     ? require('../../assets/images/profile-female.png')
@@ -34,6 +58,123 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
       onClose();
     }
   }, [onClose]);
+
+  const calculateWinPercentage = (successful: number, failed: number): string => {
+    const total = successful + failed;
+    if (total === 0) return 'N/A';
+    return `${Math.round((successful / total) * 100)}%`;
+  };
+
+  const profileContent = (
+    <View style={styles.profileContent}>
+      {isLoading ? (
+        <Text style={[styles.loadingText, { color: colors.text.secondary }]}>
+          Loading...
+        </Text>
+      ) : error ? (
+        <Text style={[styles.errorText, { color: colors.error }]}>
+          Failed to load profile
+        </Text>
+      ) : userProfile ? (
+        <>
+          <View style={[styles.avatarContainer, { borderColor: colors.secondary }]}>
+            <Image
+              source={profileImageSource}
+              style={styles.avatarImage}
+              resizeMode="contain"
+            />
+          </View>
+          <Text style={[styles.username, { color: colors.text.primary }]}>
+            {userProfile.handle}
+          </Text>
+          <View style={[styles.levelContainer, { backgroundColor: colors.surface, borderColor: colors.secondary }]}>
+            <Text style={[styles.levelLabel, { color: colors.text.secondary }]}>
+              Level
+            </Text>
+            <Text style={[styles.levelValue, { color: colors.text.primary }]}>
+              {userProfile.level}
+            </Text>
+          </View>
+
+          {userProfile.battleStats && (
+            <View style={styles.battleStatsSection}>
+              <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
+                BATTLE STATISTICS
+              </Text>
+              <View style={styles.battleStatsGrid}>
+                <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
+                  <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
+                    Bots Destroyed
+                  </Text>
+                  <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
+                    {userProfile.battleStats.botsDestroyed}
+                  </Text>
+                </View>
+                <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
+                  <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
+                    Bots Lost
+                  </Text>
+                  <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
+                    {userProfile.battleStats.botsLost}
+                  </Text>
+                </View>
+                <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
+                  <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
+                    Successful Attacks
+                  </Text>
+                  <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
+                    {userProfile.battleStats.successfulAttacks}
+                  </Text>
+                </View>
+                <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
+                  <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
+                    Failed Attacks
+                  </Text>
+                  <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
+                    {userProfile.battleStats.failedAttacks}
+                  </Text>
+                </View>
+                <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
+                  <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
+                    Successful Defenses
+                  </Text>
+                  <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
+                    {userProfile.battleStats.successfulDefenses}
+                  </Text>
+                </View>
+                <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
+                  <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
+                    Failed Defenses
+                  </Text>
+                  <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
+                    {userProfile.battleStats.failedDefenses}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.winPercentageContainer}>
+                <View style={[styles.winPercentageItem, { borderColor: colors.matrix }]}>
+                  <Text style={[styles.winPercentageLabel, { color: colors.text.secondary }]}>
+                    Attack Win %
+                  </Text>
+                  <Text style={[styles.winPercentageValue, { color: colors.matrix }]}>
+                    {calculateWinPercentage(userProfile.battleStats.successfulAttacks, userProfile.battleStats.failedAttacks)}
+                  </Text>
+                </View>
+                <View style={[styles.winPercentageItem, { borderColor: colors.matrix }]}>
+                  <Text style={[styles.winPercentageLabel, { color: colors.text.secondary }]}>
+                    Defense Win %
+                  </Text>
+                  <Text style={[styles.winPercentageValue, { color: colors.matrix }]}>
+                    {calculateWinPercentage(userProfile.battleStats.successfulDefenses, userProfile.battleStats.failedDefenses)}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+        </>
+      ) : null}
+    </View>
+  );
 
   return (
     <Modal
@@ -53,6 +194,8 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
       >
         <View
           style={[styles.modalContainer, { backgroundColor: colors.background, borderColor: colors.secondary }]}
+          onStartShouldSetResponder={() => true}
+          onMoveShouldSetResponder={() => false}
         >
           <Pressable
             style={({ pressed }) => [
@@ -73,38 +216,31 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
               </Text>
             </View>
 
-            <View style={styles.profileContent}>
-              {isLoading ? (
-                <Text style={[styles.loadingText, { color: colors.text.secondary }]}>
-                  Loading...
-                </Text>
-              ) : error ? (
-                <Text style={[styles.errorText, { color: colors.error }]}>
-                  Failed to load profile
-                </Text>
-              ) : userProfile ? (
-                <>
-                  <View style={[styles.avatarContainer, { borderColor: colors.secondary }]}>
-                    <Image
-                      source={profileImageSource}
-                      style={styles.avatarImage}
-                      resizeMode="contain"
-                    />
-                  </View>
-                  <Text style={[styles.username, { color: colors.text.primary }]}>
-                    {userProfile.handle}
-                  </Text>
-                  <View style={[styles.levelContainer, { backgroundColor: colors.surface, borderColor: colors.secondary }]}>
-                    <Text style={[styles.levelLabel, { color: colors.text.secondary }]}>
-                      Level
-                    </Text>
-                    <Text style={[styles.levelValue, { color: colors.text.primary }]}>
-                      {userProfile.level}
-                    </Text>
-                  </View>
-                </>
-              ) : null}
-            </View>
+            {Platform.OS === 'ios' ? (
+              <GestureScrollView 
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}
+                keyboardShouldPersistTaps="handled"
+                scrollEnabled={true}
+                bounces={true}
+              >
+                {profileContent}
+              </GestureScrollView>
+            ) : (
+              <ScrollView 
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}
+                keyboardShouldPersistTaps="handled"
+                scrollEnabled={true}
+                bounces={true}
+              >
+                {profileContent}
+              </ScrollView>
+            )}
           </View>
         </View>
       </TouchableOpacity>
@@ -233,6 +369,71 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: SIZING.font.body,
     textAlign: 'center',
     padding: SIZING.spacing.lg,
+  },
+  scrollView: {
+    maxHeight: '80%',
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  battleStatsSection: {
+    marginTop: SIZING.spacing.lg,
+    width: '100%',
+  },
+  sectionTitle: {
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.md,
+    textAlign: 'center',
+  },
+  battleStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: SIZING.spacing.sm,
+    marginBottom: SIZING.spacing.md,
+  },
+  battleStatCard: {
+    backgroundColor: colors.matrix + '1A',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: SIZING.spacing.sm,
+    alignItems: 'center',
+    minWidth: '30%',
+    flex: 1,
+    maxWidth: '48%',
+  },
+  battleStatLabel: {
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.xs,
+    textAlign: 'center',
+  },
+  battleStatValue: {
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
+  winPercentageContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    gap: SIZING.spacing.md,
+  },
+  winPercentageItem: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: SIZING.spacing.md,
+    alignItems: 'center',
+    flex: 1,
+  },
+  winPercentageLabel: {
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.xs,
+  },
+  winPercentageValue: {
+    fontSize: SIZING.font.h2,
+    fontWeight: 'bold',
   },
 });
 

@@ -159,6 +159,7 @@ export class BattleResponseService {
           experienceGained = (battle as any).processedRewards.experienceGained;
           hackerRewards = (battle as any).processedRewards.moneyGained;
           levelUp = (battle as any).processedRewards.levelUp;
+          // Note: lifetimeHighUpdated is handled separately in battleEndData
         } else {
           const { NPCService } = require('./NPCService');
           const npc = await NPCService.getNPCBySlug((battle as any).defenderNpcSlug);
@@ -186,6 +187,12 @@ export class BattleResponseService {
       battleDuration
     };
 
+    const isPvPBattle = battle.isUserDefender === true || 
+                       (!(battle as any).defenderNpcSlug && 
+                        battle.defenderId !== 'computer-opponent' && 
+                        !battle.defenderId.startsWith('npc-') && 
+                        !battle.defenderId.startsWith('computer'));
+
     const battleEndData = {
       battleId: battle.battleId,
       winner: battleLosses.winner,
@@ -194,7 +201,10 @@ export class BattleResponseService {
       phase: battle.phase,
       experienceGained,
       hackerRewards,
-      levelUp
+      levelUp,
+      lifetimeHighUpdated: (battle as any).processedRewards?.lifetimeHighUpdated || false,
+      isUserDefender: battle.isUserDefender || false,
+      isPvPBattle
     };
     
     return battleEndData;

@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 
@@ -10,6 +10,8 @@ type BotTypeCardProps = {
   isSelected: boolean;
   count?: number;
   onPress: () => void;
+  isHighlighted?: boolean;
+  isDisabled?: boolean;
 };
 
 export const BotTypeCard = React.memo(function BotTypeCard({
@@ -19,8 +21,39 @@ export const BotTypeCard = React.memo(function BotTypeCard({
   isSelected,
   count,
   onPress,
+  isHighlighted = false,
+  isDisabled = false,
 }: BotTypeCardProps) {
   const colors = useThemeColors();
+  const [currentColorIndex, setCurrentColorIndex] = useState(0);
+  const animatedBorderColor = useState(new Animated.Value(0))[0];
+  
+  const introColors = [colors.primary, colors.secondary, colors.matrix];
+  
+  useEffect(() => {
+    if (isHighlighted) {
+      const interval = setInterval(() => {
+        setCurrentColorIndex(prev => (prev + 1) % introColors.length);
+      }, 1000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [isHighlighted, introColors.length]);
+  
+  useEffect(() => {
+    if (isHighlighted) {
+      Animated.timing(animatedBorderColor, {
+        toValue: currentColorIndex,
+        duration: 500,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [currentColorIndex, isHighlighted, animatedBorderColor]);
+  
+  const animatedBorderColorValue = animatedBorderColor.interpolate({
+    inputRange: [0, 1, 2],
+    outputRange: introColors,
+  });
 
   const cardContent = (
     <View style={styles.botCardContent}>
@@ -53,23 +86,42 @@ export const BotTypeCard = React.memo(function BotTypeCard({
   }
 
   return (
-    <TouchableOpacity
-      style={[
-        styles.botCard,
-        isSelected && styles.botCardSelected,
-        {
-          backgroundColor: colors.accent + '30',
-          borderColor: colors.matrix + '40',
-        },
-        isSelected && {
-          backgroundColor: colors.accent + '60',
-          borderColor: colors.matrix + '80',
-        }
-      ]}
-      onPress={onPress}
-    >
-      {cardContent}
-    </TouchableOpacity>
+    <View style={{ zIndex: isHighlighted ? 1000 : 3, pointerEvents: isDisabled ? 'none' : 'auto' }}>
+      <TouchableOpacity
+        style={[
+          styles.botCard,
+          isSelected && !isHighlighted && styles.botCardSelected,
+          {
+            backgroundColor: colors.accent + '30',
+            borderColor: isHighlighted ? undefined : (isSelected ? colors.matrix + '80' : colors.matrix + '40'),
+          },
+          isSelected && !isHighlighted && {
+            backgroundColor: colors.accent + '60',
+          },
+          isHighlighted && {
+            borderWidth: 3,
+            overflow: 'hidden',
+          }
+        ]}
+        onPress={isDisabled ? () => {} : onPress}
+        disabled={isDisabled || isLocked}
+      >
+        {isHighlighted && (
+          <Animated.View 
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                borderWidth: 3,
+                borderColor: animatedBorderColorValue,
+                borderRadius: 4,
+              }
+            ]} 
+            pointerEvents="none"
+          />
+        )}
+        {cardContent}
+      </TouchableOpacity>
+    </View>
   );
 });
 

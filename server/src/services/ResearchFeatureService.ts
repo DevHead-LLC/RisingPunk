@@ -271,6 +271,29 @@ export class ResearchFeatureService {
           { session }
         );
 
+        if (categoryId === 'hack-ability' && featureId === 'battalions-per-battle') {
+          console.log(`[AUDIT] User ${userId} unlocked Battalion C at ${unlockedAt.toISOString()}`);
+        }
+
+        if (categoryId === 'hack-ability' && featureId === 'increase-battalion-size') {
+          console.log(`[AUDIT] User ${userId} unlocked Battalion Size +250 at ${unlockedAt.toISOString()}`);
+        }
+
+        if (categoryId === 'investments' && featureId === 'rental-profit-increase') {
+          console.log(`[AUDIT] User ${userId} unlocked Rental Profit +$0.01/Room at ${unlockedAt.toISOString()}`);
+          
+          const { RentalHousingSyncService } = await import('./RentalHousingSyncService');
+          const { User } = await import('../models/User');
+          
+          // Reload user to ensure we have latest state including unlocked research
+          const updatedUser = await User.findById(userId).session(session);
+          if (updatedUser) {
+            // Reset sync timestamp to force immediate recalculation
+            updatedUser.balance.rentalHousingIncomeLastSynced = null;
+            await updatedUser.save({ session });
+          }
+        }
+
         return {
           success: true,
           message: 'Research completed successfully',
@@ -301,7 +324,9 @@ export class ResearchFeatureService {
       const userFeatures = await UserResearchFeature.find({
         userId,
         categoryId
-      });
+      })
+      .select('featureId isUnlocked unlockedAt isResearching researchStartedAt researchCompletesAt researchTimeHours')
+      .lean();
 
       // Merge base features with user progress from UserResearchFeature collection
       const featuresWithStatus = baseFeatures.map(feature => {

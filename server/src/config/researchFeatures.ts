@@ -33,15 +33,30 @@ export const RESEARCH_FEATURES: Record<string, IResearchFeature[]> = {
   'hack-ability': [
     {
       id: 'battalions-per-battle',
-      name: 'Battalions per Battle',
-      description: 'Increase the number of battalions you can deploy in a single battle',
-      unlockCost: 10000,
-      levelRequirement: 3,
+      name: 'Add Battalion C',
+      description: 'Unlock a third battalion (Battalion C) to deploy in attacking battles',
+      unlockCost: 50000,
+      levelRequirement: 5,
+      researchTimeHours: 5,
       isUnlocked: false,
       effect: {
         type: 'improvement',
         value: 1,
         target: 'battalion-capacity'
+      }
+    },
+    {
+      id: 'increase-battalion-size',
+      name: 'Battalion Size +250',
+      description: 'Increase maximum troops per battalion from 250 to 500',
+      unlockCost: 100000,
+      levelRequirement: 6,
+      researchTimeHours: 6,
+      isUnlocked: false,
+      effect: {
+        type: 'improvement',
+        value: 250,
+        target: 'battalion-size'
       }
     },
     {
@@ -332,7 +347,7 @@ export const RESEARCH_FEATURES: Record<string, IResearchFeature[]> = {
       description: 'Unlock the ability to form, join, and manage hack crews',
       unlockCost: 250000,
       levelRequirement: 5,
-      researchTimeHours: 5,
+      researchTimeHours: 7,
       isUnlocked: false,
       effect: {
         type: 'unlock',
@@ -764,6 +779,20 @@ export const RESEARCH_FEATURES: Record<string, IResearchFeature[]> = {
         value: 'capital-expense-system',
         target: 'tax-optimization'
       }
+    },
+    {
+      id: 'increase-income-rate',
+      name: 'Increase Income Rate +$0.05/sec',
+      description: 'Increase your base income rate by $0.05 per second, improving overall cash flow',
+      unlockCost: 750000,
+      levelRequirement: 10,
+      researchTimeHours: 9,
+      isUnlocked: false,
+      effect: {
+        type: 'improvement',
+        value: 0.05,
+        target: 'base-income-rate'
+      }
     }
   ],
 
@@ -792,6 +821,20 @@ export const RESEARCH_FEATURES: Record<string, IResearchFeature[]> = {
         type: 'unlock',
         value: 'accredited-investor-status',
         target: 'private-investments'
+      }
+    },
+    {
+      id: 'rental-profit-increase',
+      name: 'Rental Profit +$0.01/Room',
+      description: 'Increase rental income by $0.01 per room per second for all rental properties',
+      unlockCost: 500000,
+      levelRequirement: 10,
+      isUnlocked: false,
+      researchTimeHours: 8,
+      effect: {
+        type: 'improvement',
+        value: 0.01,
+        target: 'rental-room-income'
       }
     }
   ],

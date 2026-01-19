@@ -1,5 +1,6 @@
 import { IUser } from '../models/User';
 import { RentalHousingIncomeService } from './RentalHousingIncomeService';
+import { UserResearchFeature } from '../models/UserResearchFeature';
 
 export interface RentalHousingSyncResult {
   needsSync: boolean;
@@ -10,6 +11,7 @@ export interface RentalHousingSyncResult {
 
 export class RentalHousingSyncService {
   private static readonly BASE_INCOME_PER_PROPERTY = 0.06; // $0.06 per property per second
+  private static readonly BASE_INCOME_RATE_BONUS = 0.05; // $0.05 per second bonus when income rate research unlocked
 
   static async checkAndSyncRentalHousingIncome(user: IUser): Promise<RentalHousingSyncResult> {
     const now = new Date();
@@ -77,6 +79,49 @@ export class RentalHousingSyncService {
     return user.balance.rentalHousingIncomeLastSynced < oneHourAgo;
   }
 
+  static async isIncomeRateResearchUnlocked(userId: string): Promise<boolean> {
+    try {
+      const feature = await UserResearchFeature.findOne({
+        userId,
+        categoryId: 'cash-flow',
+        featureId: 'increase-income-rate'
+      })
+      .select('isUnlocked unlockedAt')
+      .lean();
+
+      if (!feature) {
+        return false;
+      }
+
+      const isUnlocked = !!feature.isUnlocked;
+      return isUnlocked;
+    } catch (error) {
+      console.error('[INCOME RATE] Error checking income rate research unlock status:', error);
+      return false;
+    }
+  }
+
+  static async getIncomeRateResearchUnlockTime(userId: string): Promise<Date | null> {
+    try {
+      const feature = await UserResearchFeature.findOne({
+        userId,
+        categoryId: 'cash-flow',
+        featureId: 'increase-income-rate'
+      })
+      .select('isUnlocked unlockedAt')
+      .lean();
+
+      if (!feature || !feature.isUnlocked || !feature.unlockedAt) {
+        return null;
+      }
+
+      return feature.unlockedAt;
+    } catch (error) {
+      console.error('[INCOME RATE] Error getting income rate research unlock time:', error);
+      return null;
+    }
+  }
+
   private static async calculateHistoricalIncome(user: IUser, now: Date): Promise<number> {
     const unlockedProperties = this.getUnlockedProperties(user);
     if (unlockedProperties.length === 0) {
@@ -85,47 +130,94 @@ export class RentalHousingSyncService {
 
     // Calculate income from when balance was last updated
     const lastUpdated = user.balance.lastUpdated;
-    const secondsElapsed = (now.getTime() - lastUpdated.getTime()) / 1000;
     
-    // Calculate rental housing income that should have been earned (fixed amount per property)
-    const rentalIncomePerSecond = unlockedProperties.length * this.BASE_INCOME_PER_PROPERTY;
-    const historicalIncome = Math.floor(secondsElapsed * rentalIncomePerSecond);
+    // Get research unlock time to prevent retroactive bonus application
+    const researchUnlockTime = await RentalHousingIncomeService.getRentalProfitResearchUnlockTime(String(user._id));
+    
+    let historicalIncome = 0;
+    
+    if (researchUnlockTime && researchUnlockTime > lastUpdated && researchUnlockTime <= now) {
+      // Research was unlocked during the historical period - split calculation
+      // Calculate income BEFORE research unlock (old rate)
+      const secondsBeforeUnlock = (researchUnlockTime.getTime() - lastUpdated.getTime()) / 1000;
+      const incomeBeforeUnlock = await this.calculateIncomeForPeriod(user, unlockedProperties.length, false);
+      const incomeBefore = Math.floor(secondsBeforeUnlock * incomeBeforeUnlock);
+      
+      // Calculate income AFTER research unlock (new rate)
+      const secondsAfterUnlock = (now.getTime() - researchUnlockTime.getTime()) / 1000;
+      const incomeAfterUnlock = await this.calculateIncomeForPeriod(user, unlockedProperties.length, true);
+      const incomeAfter = Math.floor(secondsAfterUnlock * incomeAfterUnlock);
+      
+      historicalIncome = incomeBefore + incomeAfter;
+    } else {
+      // Research was unlocked before lastUpdated or not unlocked yet - use single rate
+      const secondsElapsed = (now.getTime() - lastUpdated.getTime()) / 1000;
+      const isResearchUnlocked = !!researchUnlockTime && researchUnlockTime <= lastUpdated;
+      const incomePerSecond = await this.calculateIncomeForPeriod(user, unlockedProperties.length, isResearchUnlocked);
+      historicalIncome = Math.floor(secondsElapsed * incomePerSecond);
+    }
     
     return historicalIncome;
+  }
+
+  private static async calculateIncomeForPeriod(user: IUser, propertyCount: number, isResearchUnlocked: boolean): Promise<number> {
+    const baseIncomePerProperty = 0.06; // $0.06 per property per second (base rate)
+    const researchBonusPerProperty = 0.04; // $0.04 bonus per property per second when research unlocked
+    const incomePerProperty = baseIncomePerProperty + (isResearchUnlocked ? researchBonusPerProperty : 0);
+    return propertyCount * incomePerProperty;
   }
 
   static async performSync(user: IUser): Promise<{ success: boolean; syncedAmount: number; newBalance: number }> {
     const syncResult = await this.checkAndSyncRentalHousingIncome(user);
     
-    if (!syncResult.needsSync) {
-      return {
-        success: true,
-        syncedAmount: 0,
-        newBalance: user.balance.total
-      };
-    }
-
-    // Add the synced amount to the user's balance
-    const newBalance = user.balance.total + syncResult.syncedAmount;
-    
+    // CRITICAL: Always calculate and update ratePerSecond, even if no rental properties exist
+    // This ensures income rate research bonuses are applied for all users
     // Calculate total effective rate as baseRate + passiveIncome
-    // Base rate is always $1.00, passive income is rental housing income
-    const baseRate = 1.0; // $1.00 base rate per second
-    const rentalIncomePerSecond = syncResult.totalUnlockedProperties * this.BASE_INCOME_PER_PROPERTY;
+    // Base rate is $1.00 + $0.05 bonus if income rate research unlocked, passive income is rental housing income
+    const isIncomeRateUnlocked = await this.isIncomeRateResearchUnlocked(String(user._id));
+    const baseRate = 1.0 + (isIncomeRateUnlocked ? this.BASE_INCOME_RATE_BONUS : 0);
+    
+    if (baseRate < 0) {
+      console.error('[INCOME RATE] Invalid baseRate calculated:', baseRate);
+      throw new Error('Invalid base rate calculation');
+    }
+    
+    const rentalIncome = await RentalHousingIncomeService.calculateRentalHousingIncome(user);
+    const rentalIncomePerSecond = rentalIncome.totalIncomePerSecond;
     const totalEffectiveRate = baseRate + rentalIncomePerSecond;
     
-    // Update user with new balance, effective rate, and sync timestamp
-    user.balance.total = newBalance;
+    if (totalEffectiveRate < 0) {
+      console.error('[INCOME RATE] Invalid totalEffectiveRate calculated:', totalEffectiveRate);
+      throw new Error('Invalid total effective rate calculation');
+    }
+    
+    // Update balance and timestamps only if rental sync occurred
+    // If no sync needed, preserve existing balance and lastUpdated (already handled by /api/balance)
+    if (syncResult.needsSync) {
+      const newBalance = user.balance.total + syncResult.syncedAmount;
+      user.balance.total = newBalance;
+      user.balance.rentalHousingIncomeLastSynced = syncResult.syncTimestamp;
+      // Only update lastUpdated if rental sync occurred (preserves income calculation from /api/balance)
+      user.balance.lastUpdated = syncResult.syncTimestamp;
+    } else {
+      // No rental sync, but still update rentalHousingIncomeLastSynced to current time
+      // This prevents unnecessary sync checks in the future
+      user.balance.rentalHousingIncomeLastSynced = syncResult.syncTimestamp;
+    }
+    
+    // Always update ratePerSecond to ensure research bonuses are applied
+    // This must happen even when needsSync is false to apply income rate research bonuses
     user.balance.ratePerSecond = totalEffectiveRate;
-    user.balance.rentalHousingIncomeLastSynced = syncResult.syncTimestamp;
-    user.balance.lastUpdated = syncResult.syncTimestamp;
+    
+    // Note: Lifetime high check is handled by the calling code (e.g., /api/balance endpoint)
+    // to avoid duplicate checks and ensure correct update flag
     
     await user.save();
 
     return {
       success: true,
       syncedAmount: syncResult.syncedAmount,
-      newBalance
+      newBalance: user.balance.total
     };
   }
 }

@@ -1,4 +1,5 @@
 import { IUser } from '../models/User';
+import { UserResearchFeature } from '../models/UserResearchFeature';
 
 export interface RentalHousingIncome {
   totalIncomePerSecond: number;
@@ -23,12 +24,71 @@ export class RentalHousingIncomeService {
     livingRoom: 0.02
   };
 
+  private static readonly RESEARCH_BONUS_PER_ROOM = 0.01;
   private static readonly TOTAL_ROOMS_PER_PROPERTY = 4;
-  private static readonly BASE_INCOME_PER_PROPERTY = 0.06; // $0.01 + $0.01 + $0.02 + $0.02
+  private static readonly BASE_INCOME_PER_PROPERTY = 0.06;
 
-  static calculateRentalHousingIncome(user: IUser): RentalHousingIncome {
+  static async isRentalProfitResearchUnlocked(userId: string): Promise<boolean> {
+    try {
+      const feature = await UserResearchFeature.findOne({
+        userId,
+        categoryId: 'investments',
+        featureId: 'rental-profit-increase'
+      })
+      .select('isUnlocked unlockedAt')
+      .lean();
+
+      if (!feature) {
+        return false;
+      }
+
+      const isUnlocked = !!feature.isUnlocked;
+      return isUnlocked;
+    } catch (error) {
+      console.error('[RENTAL INCOME] Error checking rental profit research unlock status:', error);
+      return false;
+    }
+  }
+
+  static async getRentalProfitResearchUnlockTime(userId: string): Promise<Date | null> {
+    try {
+      const feature = await UserResearchFeature.findOne({
+        userId,
+        categoryId: 'investments',
+        featureId: 'rental-profit-increase'
+      })
+      .select('isUnlocked unlockedAt')
+      .lean();
+
+      if (!feature || !feature.isUnlocked || !feature.unlockedAt) {
+        return null;
+      }
+
+      return feature.unlockedAt;
+    } catch (error) {
+      console.error('[RENTAL INCOME] Error getting rental profit research unlock time:', error);
+      return null;
+    }
+  }
+
+  static getRoomValuesWithResearch(isResearchUnlocked: boolean): { bathroom: number; kitchen: number; bedroom: number; livingRoom: number } {
+    const researchBonus = isResearchUnlocked ? this.RESEARCH_BONUS_PER_ROOM : 0;
+
+    return {
+      bathroom: this.ROOM_VALUES.bathroom + researchBonus,
+      kitchen: this.ROOM_VALUES.kitchen + researchBonus,
+      bedroom: this.ROOM_VALUES.bedroom + researchBonus,
+      livingRoom: this.ROOM_VALUES.livingRoom + researchBonus
+    };
+  }
+
+  static async calculateRentalHousingIncome(user: IUser): Promise<RentalHousingIncome> {
     const propertyBreakdown = [];
     let totalIncomePerSecond = 0;
+
+    const isResearchUnlocked = await this.isRentalProfitResearchUnlocked(String(user._id));
+    const roomValues = this.getRoomValuesWithResearch(isResearchUnlocked);
+    const incomePerProperty = roomValues.bathroom + roomValues.kitchen + roomValues.bedroom + roomValues.livingRoom;
 
     for (let propertyId = 1; propertyId <= 4; propertyId++) {
       const rentalHousingKey = `rentalHousing${propertyId}` as keyof typeof user.unlockedFeatures;
@@ -36,15 +96,8 @@ export class RentalHousingIncomeService {
       
       let incomePerSecond = 0;
       if (isUnlocked) {
-        incomePerSecond = this.BASE_INCOME_PER_PROPERTY; // Fixed amount per property
+        incomePerSecond = incomePerProperty;
       }
-
-      const roomValues = {
-        bathroom: this.ROOM_VALUES.bathroom, // Fixed room values
-        kitchen: this.ROOM_VALUES.kitchen,
-        bedroom: this.ROOM_VALUES.bedroom,
-        livingRoom: this.ROOM_VALUES.livingRoom
-      };
 
       propertyBreakdown.push({
         propertyId,
@@ -62,11 +115,15 @@ export class RentalHousingIncomeService {
     };
   }
 
-  static getRoomValue(roomType: 'bathroom' | 'kitchen' | 'bedroom' | 'livingRoom'): number {
-    return this.ROOM_VALUES[roomType]; // Fixed room values
+  static async getRoomValue(user: IUser, roomType: 'bathroom' | 'kitchen' | 'bedroom' | 'livingRoom'): Promise<number> {
+    const isResearchUnlocked = await this.isRentalProfitResearchUnlocked(String(user._id));
+    const roomValues = this.getRoomValuesWithResearch(isResearchUnlocked);
+    return roomValues[roomType];
   }
 
-  static getTotalPropertyIncome(): number {
-    return this.BASE_INCOME_PER_PROPERTY; // Fixed amount per property
+  static async getTotalPropertyIncome(user: IUser): Promise<number> {
+    const isResearchUnlocked = await this.isRentalProfitResearchUnlocked(String(user._id));
+    const roomValues = this.getRoomValuesWithResearch(isResearchUnlocked);
+    return roomValues.bathroom + roomValues.kitchen + roomValues.bedroom + roomValues.livingRoom;
   }
 }

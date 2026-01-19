@@ -142,13 +142,11 @@ export class BattalionService {
   }
 
   static async createUserBattalions(nodes: INode[], userLevel: number, userBattalions?: Array<{type: string, quantity: number}>): Promise<IBattalion[]> {
-    const defaultUserBattalions = [
-      { type: 'guardian' as BotType, quantity: 10 },
-      { type: 'breacher' as BotType, quantity: 8 },
-      { type: 'phreak' as BotType, quantity: 6 },
-    ];
+    if (!userBattalions || userBattalions.length === 0) {
+      return [];
+    }
     
-    const battalionConfigs = userBattalions || defaultUserBattalions;
+    const battalionConfigs = userBattalions;
     
     // Available user nodes (0, 1, 2) - allow multiple battalions at same node
     const availableUserNodes = [0, 1, 2];
@@ -156,6 +154,9 @@ export class BattalionService {
     const battalions: IBattalion[] = [];
     
     for (const battalion of battalionConfigs) {
+      if (!battalion.quantity || battalion.quantity <= 0) {
+        continue;
+      }
       const validatedBotType = this.validateBotType(battalion.type);
       
       // Get stats from BotService based on user level

@@ -105,9 +105,24 @@ export function ResearchFeaturesList({
     // Filter out bot-trap for App Store submission - only show Antivirus
     if (feature.id === 'bot-trap') return false;
     
+    // For hack-ability, show "battalions-per-battle" and "increase-battalion-size"
+    if (categoryId === 'hack-ability') {
+      return feature.id === 'battalions-per-battle' || feature.id === 'increase-battalion-size';
+    }
+    
     // For hack-crew, only show "crew-system-unlock"
     if (categoryId === 'hack-crew') {
       return feature.id === 'crew-system-unlock';
+    }
+    
+    // For cash-flow, only show "increase-income-rate"
+    if (categoryId === 'cash-flow') {
+      return feature.id === 'increase-income-rate';
+    }
+    
+    // For investments, only show "rental-profit-increase"
+    if (categoryId === 'investments') {
+      return feature.id === 'rental-profit-increase';
     }
     
     return true;

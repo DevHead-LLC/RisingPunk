@@ -1,11 +1,13 @@
 import express from 'express';
-import { User } from '../models/User';
+import { User, IUser } from '../models/User';
 import { ShieldService } from '../services/ShieldService';
 import auth from '../middleware/auth';
 import { Request, Response } from 'express';
 import { FinanceTier } from '../models/Finance';
 import { FinanceTemplate } from '../models/FinanceTemplate';
 import mongoose from 'mongoose';
+import { UserTaskProgress } from '../models/UserTaskProgress';
+import { getTaskList } from '../config/taskListData';
 
 interface UpdatePreferencesRequest extends Request {
   body: {
@@ -15,9 +17,97 @@ interface UpdatePreferencesRequest extends Request {
 
 const router = express.Router();
 
+const markResearchCenterTaskCompleted = async (userId: string | mongoose.Types.ObjectId) => {
+  try {
+    const taskList = getTaskList();
+    const buildResearchCenterTask = taskList.find(task => task.id === 'build-research-center');
+    
+    if (!buildResearchCenterTask) {
+      return;
+    }
+
+    const userIdObjectId = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
+    const progress = await UserTaskProgress.findOne({ userId: userIdObjectId });
+    if (!progress) {
+      return;
+    }
+
+    const completedTaskIds = new Set(progress.completedTasks.map(t => t.taskId));
+    const collectedTaskIds = new Set(progress.collectedTasks || []);
+    const skippedTaskIds = new Set(progress.skippedTasks || []);
+
+    if (collectedTaskIds.has('build-research-center') || skippedTaskIds.has('build-research-center') || completedTaskIds.has('build-research-center')) {
+      return;
+    }
+
+    await UserTaskProgress.findOneAndUpdate(
+      {
+        userId: userIdObjectId,
+        'completedTasks.taskId': { $ne: 'build-research-center' }
+      },
+      {
+        $push: {
+          completedTasks: {
+            taskId: 'build-research-center',
+            completedAt: new Date()
+          }
+        },
+        $set: { lastCompletedTaskId: 'build-research-center' }
+      },
+      { new: true }
+    );
+  } catch (error) {
+    console.error('Error marking research center task as completed:', error);
+  }
+};
+
+const markInvestmentPropertyTaskCompleted = async (userId: string | mongoose.Types.ObjectId) => {
+  try {
+    const taskList = getTaskList();
+    const buildInvestmentPropertyTask = taskList.find(task => task.id === 'build-investment-property');
+    
+    if (!buildInvestmentPropertyTask) {
+      return;
+    }
+
+    const userIdObjectId = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
+    const progress = await UserTaskProgress.findOne({ userId: userIdObjectId });
+    if (!progress) {
+      return;
+    }
+
+    const completedTaskIds = new Set(progress.completedTasks.map(t => t.taskId));
+    const collectedTaskIds = new Set(progress.collectedTasks || []);
+    const skippedTaskIds = new Set(progress.skippedTasks || []);
+
+    if (collectedTaskIds.has('build-investment-property') || skippedTaskIds.has('build-investment-property') || completedTaskIds.has('build-investment-property')) {
+      return;
+    }
+
+    await UserTaskProgress.findOneAndUpdate(
+      {
+        userId: userIdObjectId,
+        'completedTasks.taskId': { $ne: 'build-investment-property' }
+      },
+      {
+        $push: {
+          completedTasks: {
+            taskId: 'build-investment-property',
+            completedAt: new Date()
+          }
+        },
+        $set: { lastCompletedTaskId: 'build-investment-property' }
+      },
+      { new: true }
+    );
+  } catch (error) {
+    console.error('Error marking investment property task as completed:', error);
+  }
+};
+
 router.get('/profile', auth, async (req: Request, res: Response) => {
   try {
-    const user = await User.findById(req.user._id).select('handle email level experience unlockedFeatures profileGender');
+    const user = await User.findById(req.user._id).select('handle email level experience unlockedFeatures profileGender battleStats totalGuardiansBuilt');
     
     if (!user) {
       res.status(404).json({ message: 'User not found' });
@@ -40,7 +130,16 @@ router.get('/profile', auth, async (req: Request, res: Response) => {
       profileGender: user.profileGender || 'male',
       emailVerified: user.emailVerified || false,
       emailVerificationToken: user.emailVerificationToken || null,
-      emailVerificationPrompted: user.emailVerificationPrompted || false
+      emailVerificationPrompted: user.emailVerificationPrompted || false,
+      battleStats: {
+        botsDestroyed: user.battleStats?.botsDestroyed || 0,
+        botsLost: user.battleStats?.botsLost || 0,
+        successfulAttacks: user.battleStats?.successfulAttacks || 0,
+        failedAttacks: user.battleStats?.failedAttacks || 0,
+        successfulDefenses: user.battleStats?.successfulDefenses || 0,
+        failedDefenses: user.battleStats?.failedDefenses || 0
+      },
+      totalGuardiansBuilt: user.totalGuardiansBuilt || 0
     });
   } catch (error) {
     console.error('Server error:', error);
@@ -57,7 +156,7 @@ router.get('/profile/:userId', auth, async (req: Request, res: Response) => {
       return;
     }
 
-    const user = await User.findById(userId).select('handle level profileGender');
+    const user = await User.findById(userId).select('handle level profileGender battleStats');
     
     if (!user) {
       res.status(404).json({ error: 'User not found' });
@@ -68,7 +167,15 @@ router.get('/profile/:userId', auth, async (req: Request, res: Response) => {
       userId: String(user._id),
       handle: user.handle,
       level: user.level,
-      profileGender: user.profileGender || 'male'
+      profileGender: user.profileGender || 'male',
+      battleStats: {
+        botsDestroyed: user.battleStats?.botsDestroyed || 0,
+        botsLost: user.battleStats?.botsLost || 0,
+        successfulAttacks: user.battleStats?.successfulAttacks || 0,
+        failedAttacks: user.battleStats?.failedAttacks || 0,
+        successfulDefenses: user.battleStats?.successfulDefenses || 0,
+        failedDefenses: user.battleStats?.failedDefenses || 0
+      }
     });
   } catch (error) {
     console.error('Server error:', error);
@@ -141,7 +248,7 @@ router.post('/unlock-hack-rig', auth, async (req: Request, res: Response) => {
 
 router.get('/research-center-status', auth, async (req: Request, res: Response) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user: IUser | null = await User.findById(req.user._id);
     if (!user) {
       res.status(404).json({ message: 'User not found' });
       return;
@@ -162,6 +269,9 @@ router.get('/research-center-status', auth, async (req: Request, res: Response) 
         };
         await user.save();
         isUnlocked = true;
+        
+        // Mark the build-research-center task as completed
+        await markResearchCenterTaskCompleted(String(user._id));
       } else {
         // Build is still in progress
         buildStatus = {
@@ -285,6 +395,9 @@ router.post('/speedup-research-center-construction', auth, async (req: Request, 
 
       await userInTransaction.save({ session });
     });
+    
+    // Mark the build-research-center task as completed after transaction
+    await markResearchCenterTaskCompleted(req.user._id);
   } catch (error: any) {
     if (error.message === 'User not found') {
       res.status(404).json({ error: 'User not found' });
@@ -556,6 +669,11 @@ router.post('/complete-rental-housing/:propertyId', auth, async (req, res): Prom
 
     await User.findByIdAndUpdate(userId, { $set: updateData });
 
+    // Mark the build-investment-property task as completed after transaction (only for property 1)
+    if (propertyId === 1) {
+      await markInvestmentPropertyTaskCompleted(userId);
+    }
+
     // Trigger a sync to ensure rental housing income is properly calculated
     const updatedUser = await User.findById(userId);
     if (updatedUser) {
@@ -631,6 +749,11 @@ router.post('/speedup-property-construction/:propertyId', auth, async (req, res)
 
       await userInTransaction.save({ session });
     });
+    
+    // Mark the build-investment-property task as completed after transaction (only for property 1)
+    if (propertyId === 1) {
+      await markInvestmentPropertyTaskCompleted(userId);
+    }
   } catch (error: any) {
     if (error.message === 'User not found') {
       res.status(404).json({ error: 'User not found' });
@@ -734,6 +857,10 @@ router.put<{}, { success: boolean; message: string; profileGender: 'male' | 'fem
 );
 
 // Delete user account
+const deletionAttempts = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_WINDOW = 60000;
+const MAX_DELETION_ATTEMPTS = 3;
+
 router.delete('/account', auth, async (req: Request, res: Response) => {
   try {
     const userId = req.user?._id;
@@ -744,12 +871,44 @@ router.delete('/account', auth, async (req: Request, res: Response) => {
       return;
     }
 
+    if (!mongoose.Types.ObjectId.isValid(userId.toString())) {
+      res.status(400).json({ error: 'Invalid user ID format' });
+      return;
+    }
+
     if (!handle) {
       res.status(400).json({ error: 'Handle is required for account deletion' });
       return;
     }
 
-    const user = await User.findById(userId);
+    const userIdString = userId.toString();
+    const now = Date.now();
+    const userAttempts = deletionAttempts.get(userIdString);
+    
+    if (userAttempts) {
+      if (userAttempts.resetAt <= now) {
+        deletionAttempts.delete(userIdString);
+        deletionAttempts.set(userIdString, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+      } else {
+        if (userAttempts.count >= MAX_DELETION_ATTEMPTS) {
+          res.status(429).json({ error: 'Too many deletion attempts. Please try again later.' });
+          return;
+        }
+        userAttempts.count++;
+      }
+    } else {
+      deletionAttempts.set(userIdString, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    }
+
+    if (deletionAttempts.size > 1000) {
+      for (const [key, value] of deletionAttempts.entries()) {
+        if (value.resetAt <= now) {
+          deletionAttempts.delete(key);
+        }
+      }
+    }
+
+    const user = await User.findById(userId).select('handle').lean();
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;
@@ -760,14 +919,34 @@ router.delete('/account', auth, async (req: Request, res: Response) => {
       return;
     }
 
-    await User.findByIdAndDelete(userId);
+    const { AccountDeletionService } = await import('../services/AccountDeletionService');
+    const deletionResult = await AccountDeletionService.deleteAccount(userIdString);
     
-    res.json({
-      success: true,
-      message: 'Account deleted successfully'
-    });
-  } catch (error) {
+    if (deletionResult.success && deletionResult.errors.length === 0) {
+      res.json({
+        success: true,
+        message: deletionResult.message,
+        deletedRecords: deletionResult.deletedRecords
+      });
+    } else {
+      console.error('Account deletion completed with errors:', {
+        userId: userIdString,
+        errors: deletionResult.errors,
+        deletedRecords: deletionResult.deletedRecords
+      });
+      res.status(500).json({
+        success: false,
+        message: deletionResult.message || 'Account deletion completed with errors',
+        errors: deletionResult.errors,
+        deletedRecords: deletionResult.deletedRecords
+      });
+    }
+  } catch (error: any) {
     console.error('Error deleting user account:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message || 'An unexpected error occurred during account deletion'
+    });
   }
 });

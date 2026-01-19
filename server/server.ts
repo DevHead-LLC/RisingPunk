@@ -24,6 +24,9 @@ import testRoutes from './src/routes/test';
 import botsRoutes from './src/routes/bots';
 import crewRoutes from './src/routes/crew';
 import reportsRoutes from './src/routes/reports';
+import leaderboardRoutes from './src/routes/leaderboardRoutes';
+import userGuideRoutes from './src/routes/userGuideRoutes';
+import marketingRoutes from './src/routes/marketing';
 
 declare global {
   namespace Express {
@@ -188,6 +191,10 @@ app.get('/api/profile', async (req: Request, res: Response) => {
 
 app.use('/api/auth', authRoutes);
 
+// Marketing routes (smart redirects for YouTube promotion)
+// Register early to skip unnecessary middleware (activity logging, etc.)
+app.use('/', marketingRoutes);
+
 // Activity logging middleware for privacy policy compliance
 // This runs AFTER auth routes so req.user is available
 app.use(activityLogging);
@@ -251,12 +258,23 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
     const { RentalHousingSyncService } = await import('./src/services/RentalHousingSyncService');
     await RentalHousingSyncService.performSync(user);
 
+    // Check and update lifetime high net worth
+    const { LifetimeHighNetWorthService } = await import('./src/services/LifetimeHighNetWorthService');
+    const lifetimeHighUpdated = LifetimeHighNetWorthService.checkAndUpdateLifetimeHigh(user);
+    
+    // Save user if lifetime high was updated (balance was already saved earlier if it changed)
+    if (lifetimeHighUpdated) {
+      await user.save();
+    }
+
     // Return updated balance (ratePerSecond already includes rental housing income)
     const currentBalance = {
       total: user.balance.total,
       ratePerSecond: user.balance.ratePerSecond,
       lastUpdated: user.balance.lastUpdated,
-      fractionalRemainder: user.balance.fractionalRemainder || 0
+      fractionalRemainder: user.balance.fractionalRemainder || 0,
+      lifetimeHighNetWorth: user.lifetimeHighNetWorth || 0,
+      lifetimeHighUpdated: lifetimeHighUpdated
     };
 
     res.json(currentBalance);
@@ -281,7 +299,7 @@ app.get('/api/rental-housing/income', auth, async (req: Request, res: Response) 
     }
 
     const { RentalHousingIncomeService } = await import('./src/services/RentalHousingIncomeService');
-    const rentalIncome = RentalHousingIncomeService.calculateRentalHousingIncome(user);
+    const rentalIncome = await RentalHousingIncomeService.calculateRentalHousingIncome(user);
 
     res.json(rentalIncome);
   } catch (error: any) {
@@ -499,10 +517,12 @@ app.post('/api/antivirus-shield/deactivate', auth, async (req: Request, res: Res
 app.use('/api/map', mapRoutes);
 
 app.use('/api/users', userRoutes);
+app.use('/api/users/user-guide', userGuideRoutes);
 app.use('/api/battle', battleRoutes);
 app.use('/api/research', researchRoutes);
 app.use('/api/crew', crewRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/documents', documentsRoutes);
 
 // Test routes for privacy policy compliance verification

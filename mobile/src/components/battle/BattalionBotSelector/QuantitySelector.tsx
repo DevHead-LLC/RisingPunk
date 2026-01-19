@@ -4,18 +4,47 @@ import { SIZING } from '../../../styles/theme';
 import { useThemeColors } from '../../../hooks/useThemeColors';
 import { useTheme } from '../../../context/ThemeContext';
 import { KeyboardAwareInput } from '../../common/KeyboardAwareInput';
+import { useGetUserFeaturesQuery } from '../../../store/api/researchFeaturesApi';
 
 type Props = {
   quantity: number;
   available: number;
   onChangeQuantity: (value: number) => void;
+  disabled?: boolean;
 };
 
-const MAX_BATTALION_SIZE = 250;
-
-export const QuantitySelector = React.memo(({ quantity, available, onChangeQuantity }: Props) => {
+export const QuantitySelector = React.memo(({ quantity, available, onChangeQuantity, disabled = false }: Props) => {
   const colors = useThemeColors();
   const { themeMode } = useTheme();
+  const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability');
+  const [currentTime, setCurrentTime] = React.useState(() => Date.now());
+
+  React.useEffect(() => {
+    const battalionSizeFeature = hackAbilityFeatures?.find(f => f.id === 'increase-battalion-size');
+    if (battalionSizeFeature?.isResearching && battalionSizeFeature?.researchCompletesAt) {
+      const interval = setInterval(() => {
+        setCurrentTime(Date.now());
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [hackAbilityFeatures]);
+
+  const battalionSizeFeature = React.useMemo(() => {
+    return hackAbilityFeatures?.find(f => f.id === 'increase-battalion-size');
+  }, [hackAbilityFeatures]);
+
+  const isUnlocked = React.useMemo(() => {
+    if (!battalionSizeFeature) return false;
+    const now = currentTime;
+    const researchCompletesAt = battalionSizeFeature.researchCompletesAt 
+      ? new Date(battalionSizeFeature.researchCompletesAt).getTime() 
+      : null;
+    const remaining = researchCompletesAt !== null ? Math.max(0, researchCompletesAt - now) : null;
+    return battalionSizeFeature.isUnlocked || 
+      (battalionSizeFeature.isResearching && researchCompletesAt !== null && remaining === 0);
+  }, [battalionSizeFeature?.isUnlocked, battalionSizeFeature?.isResearching, battalionSizeFeature?.researchCompletesAt, currentTime]);
+
+  const MAX_BATTALION_SIZE = isUnlocked ? 500 : 250;
   const maxQuantity = Math.min(available, MAX_BATTALION_SIZE);
 
   const adjustQuantity = React.useCallback((adjustment: number) => {
@@ -24,8 +53,23 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
   }, [quantity, maxQuantity, onChangeQuantity]);
 
   const handleDirectInput = React.useCallback((text: string) => {
+    if (disabled) return;
     const value = parseInt(text) || 0;
     onChangeQuantity(Math.min(Math.max(0, value), maxQuantity));
+  }, [maxQuantity, onChangeQuantity, disabled]);
+
+  const handleMaxQuantity = React.useCallback(() => {
+    if (
+      typeof maxQuantity !== 'number' ||
+      !Number.isFinite(maxQuantity) ||
+      maxQuantity < 0 ||
+      maxQuantity > MAX_BATTALION_SIZE
+    ) {
+      return;
+    }
+    
+    const safeValue = Math.min(Math.max(0, maxQuantity), MAX_BATTALION_SIZE);
+    onChangeQuantity(safeValue);
   }, [maxQuantity, onChangeQuantity]);
 
   return (
@@ -36,9 +80,11 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
           <TouchableOpacity
             style={[styles.button, { 
               backgroundColor: themeMode === 'light' ? 'rgba(71, 23, 246, 0.15)' : 'rgba(71, 23, 246, 0.1)',
-              borderColor: colors.secondary 
+              borderColor: colors.secondary,
+              opacity: disabled ? 0.5 : 1
             }]}
             onPress={() => adjustQuantity(-25)}
+            disabled={disabled}
           >
             <Text style={[styles.buttonText, { color: colors.secondary }]}>-25</Text>
           </TouchableOpacity>
@@ -46,9 +92,11 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
           <TouchableOpacity
             style={[styles.button, { 
               backgroundColor: themeMode === 'light' ? 'rgba(71, 23, 246, 0.15)' : 'rgba(71, 23, 246, 0.1)',
-              borderColor: colors.secondary 
+              borderColor: colors.secondary,
+              opacity: disabled ? 0.5 : 1
             }]}
             onPress={() => adjustQuantity(-1)}
+            disabled={disabled}
           >
             <Text style={[styles.buttonText, { color: colors.secondary }]}>-1</Text>
           </TouchableOpacity>
@@ -61,20 +109,24 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
               style={[styles.input, { 
                 backgroundColor: themeMode === 'light' ? 'rgba(248, 246, 240, 0.8)' : 'rgba(0, 0, 0, 0.3)',
                 borderColor: colors.secondary,
-                color: colors.secondary 
+                color: colors.secondary,
+                opacity: disabled ? 0.5 : 1
               }]}
               containerStyle={styles.inputContainer}
               isLastInput={true}
               maxLength={3}
+              editable={!disabled}
             />
           </View>
 
           <TouchableOpacity
             style={[styles.button, { 
               backgroundColor: themeMode === 'light' ? 'rgba(71, 23, 246, 0.15)' : 'rgba(71, 23, 246, 0.1)',
-              borderColor: colors.secondary 
+              borderColor: colors.secondary,
+              opacity: disabled ? 0.5 : 1
             }]}
             onPress={() => adjustQuantity(1)}
+            disabled={disabled}
           >
             <Text style={[styles.buttonText, { color: colors.secondary }]}>+1</Text>
           </TouchableOpacity>
@@ -82,11 +134,25 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
           <TouchableOpacity
             style={[styles.button, { 
               backgroundColor: themeMode === 'light' ? 'rgba(71, 23, 246, 0.15)' : 'rgba(71, 23, 246, 0.1)',
-              borderColor: colors.secondary 
+              borderColor: colors.secondary,
+              opacity: disabled ? 0.5 : 1
             }]}
             onPress={() => adjustQuantity(25)}
+            disabled={disabled}
           >
             <Text style={[styles.buttonText, { color: colors.secondary }]}>+25</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, { 
+              backgroundColor: themeMode === 'light' ? 'rgba(71, 23, 246, 0.15)' : 'rgba(71, 23, 246, 0.1)',
+              borderColor: colors.secondary,
+              opacity: disabled ? 0.5 : 1
+            }]}
+            onPress={handleMaxQuantity}
+            disabled={disabled}
+          >
+            <Text style={[styles.buttonText, { color: colors.secondary }]}>MAX</Text>
           </TouchableOpacity>
         </View>
       </View>

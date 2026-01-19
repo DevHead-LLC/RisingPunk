@@ -1,0 +1,247 @@
+name: Auto-Promote Branches with Cursor Bug Checks
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+    branches:
+      - dev
+      - main
+      - staging
+      - prod
+
+env:
+  GH_TOKEN: ${{ secrets.GH_PAT }}
+
+jobs:
+  promote-branches:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      statuses: write
+      checks: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+          ref: ${{ github.event.pull_request.base.ref }}
+
+      - name: Fetch latest script from head branch
+        run: |
+          set +e
+          git fetch origin ${{ github.event.pull_request.head.ref }} > /tmp/fetch_output.txt 2>&1
+          FETCH_EXIT_CODE=$?
+          set -e
+          
+          if [ $FETCH_EXIT_CODE -eq 0 ]; then
+            if git show FETCH_HEAD:.github/scripts/promote-branches.sh > /tmp/promote-branches.sh 2>/dev/null; then
+              mv /tmp/promote-branches.sh .github/scripts/promote-branches.sh
+              chmod +x .github/scripts/promote-branches.sh
+              echo "✅ Updated script from head branch (${{ github.event.pull_request.head.ref }})"
+            else
+              echo "⚠️  Fetch succeeded but script not found in head branch. Using base branch script."
+            fi
+          else
+            echo "ℹ️  Could not fetch head branch (${{ github.event.pull_request.head.ref }}). Using script from base branch."
+            echo "   Fetch error: $(cat /tmp/fetch_output.txt 2>/dev/null || echo 'unknown')"
+          fi
+
+      - name: Setup GitHub CLI and tools
+        run: |
+          gh --version
+          sudo apt-get update && sudo apt-get install -y jq || echo "jq installation skipped"
+
+      - name: Wait for Cursor bot to complete
+        id: wait_for_cursor
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          HEAD_SHA=$(gh pr view $PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "")
+          
+          echo "Waiting for Cursor bot to appear and complete on PR #$PR_NUMBER before proceeding..."
+          
+          MAX_WAIT=1200
+          WAIT_INTERVAL=10
+          LOG_INTERVAL=60
+          ELAPSED=0
+          LAST_LOG_ELAPSED=0
+          CURSOR_CHECK_FOUND=false
+          CURSOR_CHECK_PASSED=false
+          CURSOR_CHECK_FAILED=false
+          
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            sleep $WAIT_INTERVAL
+            ELAPSED=$((ELAPSED + WAIT_INTERVAL))
+            
+            HEAD_SHA=$(gh pr view $PR_NUMBER --json headRefOid -q '.headRefOid' 2>/dev/null || echo "$HEAD_SHA")
+            
+            CHECKS_JSON=$(gh api repos/${{ github.repository }}/commits/$HEAD_SHA/check-runs 2>/dev/null || echo "{}")
+            
+            if command -v jq &> /dev/null; then
+              CURSOR_CHECK_NAME=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.name | ascii_downcase | contains("cursor")) | .name' | head -1 || echo "")
+              CURSOR_CHECK_STATUS=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.name | ascii_downcase | contains("cursor")) | .status // empty' | head -1 || echo "")
+              CURSOR_CHECK_CONCLUSION=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.name | ascii_downcase | contains("cursor")) | .conclusion // empty' | head -1 || echo "")
+            else
+              CURSOR_CHECK_NAME=$(echo "$CHECKS_JSON" | grep -i "cursor" -A 10 | grep -oP '"name":\s*"\K[^"]+' | head -1 || echo "")
+              CURSOR_CHECK_STATUS=$(echo "$CHECKS_JSON" | grep -i "cursor" -A 10 | grep -oP '"status":\s*"\K[^"]+' | head -1 || echo "")
+              CURSOR_CHECK_CONCLUSION=$(echo "$CHECKS_JSON" | grep -i "cursor" -A 10 | grep -oP '"conclusion":\s*"\K[^"]+' | head -1 || echo "")
+            fi
+            
+            SHOULD_LOG=false
+            if [ $((ELAPSED - LAST_LOG_ELAPSED)) -ge $LOG_INTERVAL ]; then
+              SHOULD_LOG=true
+              LAST_LOG_ELAPSED=$ELAPSED
+            fi
+            
+            if [ -n "$CURSOR_CHECK_NAME" ]; then
+              CURSOR_CHECK_FOUND=true
+              if [ "$SHOULD_LOG" = "true" ]; then
+                echo "Found Cursor check: $CURSOR_CHECK_NAME (status: ${CURSOR_CHECK_STATUS:-not set}, conclusion: ${CURSOR_CHECK_CONCLUSION:-not set})"
+              fi
+              
+              if [ "$CURSOR_CHECK_STATUS" = "completed" ]; then
+                if [ "$CURSOR_CHECK_CONCLUSION" = "success" ] || [ "$CURSOR_CHECK_CONCLUSION" = "neutral" ]; then
+                  echo "✅ Cursor bot check run completed (conclusion: $CURSOR_CHECK_CONCLUSION)"
+                  echo "🔍 Checking for actual bug reports in PR comments and check run output..."
+                  
+                  BUGS_REPORTED=0
+                  
+                  if command -v jq &> /dev/null; then
+                    CURSOR_CHECK_ID=$(echo "$CHECKS_JSON" | jq -r '.check_runs[] | select(.name | ascii_downcase | contains("cursor")) | .id' | head -1 || echo "")
+                    if [ -n "$CURSOR_CHECK_ID" ]; then
+                      CHECK_OUTPUT=$(gh api repos/${{ github.repository }}/check-runs/$CURSOR_CHECK_ID 2>/dev/null || echo "{}")
+                      CHECK_TEXT=$(echo "$CHECK_OUTPUT" | jq -r '.output.summary // .output.text // ""' 2>/dev/null || echo "")
+                      if echo "$CHECK_TEXT" | grep -qiE "(posted analysis results.*[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported|[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported)"; then
+                        BUGS_REPORTED=$(echo "$CHECK_TEXT" | grep -oE "([0-9]+)[[:space:]]+bug(s?)[[:space:]]+reported" | head -1 | grep -oE "[0-9]+" || echo "0")
+                        if [ "$BUGS_REPORTED" = "0" ]; then
+                          BUGS_REPORTED=$(echo "$CHECK_TEXT" | grep -oE "posted analysis results.*([0-9]+)[[:space:]]+bug" | grep -oE "[0-9]+" | head -1 || echo "0")
+                        fi
+                      fi
+                    fi
+                    
+                    ISSUE_COMMENTS=$(gh api repos/${{ github.repository }}/issues/$PR_NUMBER/comments 2>/dev/null || echo "[]")
+                    CURSOR_COMMENTS=$(echo "$ISSUE_COMMENTS" | jq -r '.[] | select(.user.login | ascii_downcase | contains("cursor")) | .body' 2>/dev/null || echo "")
+                    if [ -z "$BUGS_REPORTED" ] || [ "$BUGS_REPORTED" = "0" ]; then
+                      if [ -n "$CURSOR_COMMENTS" ]; then
+                        if echo "$CURSOR_COMMENTS" | grep -qiE "(posted analysis results.*[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported|[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported)"; then
+                          BUGS_REPORTED=$(echo "$CURSOR_COMMENTS" | grep -oE "([0-9]+)[[:space:]]+bug(s?)[[:space:]]+reported" | head -1 | grep -oE "[0-9]+" || echo "0")
+                          if [ "$BUGS_REPORTED" = "0" ]; then
+                            BUGS_REPORTED=$(echo "$CURSOR_COMMENTS" | grep -oE "posted analysis results.*([0-9]+)[[:space:]]+bug" | grep -oE "[0-9]+" | head -1 || echo "0")
+                          fi
+                        fi
+                      fi
+                    fi
+                  else
+                    ISSUE_COMMENTS=$(gh api repos/${{ github.repository }}/issues/$PR_NUMBER/comments 2>/dev/null || echo "[]")
+                    CURSOR_COMMENTS=$(echo "$ISSUE_COMMENTS" | grep -i "cursor" -A 20 | grep -oE '"body"[[:space:]]*:[[:space:]]*"[^"]+"' | sed -E 's/.*"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' || echo "")
+                    if [ -n "$CURSOR_COMMENTS" ]; then
+                      if echo "$CURSOR_COMMENTS" | grep -qiE "(posted analysis results.*[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported|[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported)"; then
+                        BUGS_REPORTED=$(echo "$CURSOR_COMMENTS" | grep -oE "([0-9]+)[[:space:]]+bug(s?)[[:space:]]+reported" | head -1 | grep -oE "[0-9]+" || echo "0")
+                        if [ "$BUGS_REPORTED" = "0" ]; then
+                          BUGS_REPORTED=$(echo "$CURSOR_COMMENTS" | grep -oE "posted analysis results.*([0-9]+)[[:space:]]+bug" | grep -oE "[0-9]+" | head -1 || echo "0")
+                        fi
+                      fi
+                    fi
+                  fi
+                  
+                  if [ -n "$BUGS_REPORTED" ] && [ "$BUGS_REPORTED" -gt 0 ] 2>/dev/null; then
+                    echo "=========================================="
+                    echo "❌ CRITICAL: Cursor bot reported $BUGS_REPORTED bug(s)"
+                    echo "❌ Actual bugs detected - workflow STOPPED"
+                    echo "❌ No PR will be merged. No promotion will occur."
+                    echo "=========================================="
+                    CURSOR_CHECK_FAILED=true
+                    break
+                  else
+                    echo "✅ No bugs reported (checked for 'X bug(s) reported' pattern)"
+                    echo "✅ Proceeding with promotion."
+                    CURSOR_CHECK_PASSED=true
+                    break
+                  fi
+                else
+                  echo "❌ Cursor bot completed with conclusion: $CURSOR_CHECK_CONCLUSION"
+                  echo "❌ Only 'success' or 'neutral' conclusions are allowed. Stopping workflow immediately."
+                  CURSOR_CHECK_FAILED=true
+                  break
+                fi
+              elif [ "$CURSOR_CHECK_STATUS" = "queued" ] || [ "$CURSOR_CHECK_STATUS" = "in_progress" ]; then
+                if [ "$SHOULD_LOG" = "true" ]; then
+                  echo "⏳ Cursor bot is running (status: $CURSOR_CHECK_STATUS). Waiting for completion..."
+                fi
+              fi
+            fi
+            
+            STATUS_CHECKS_JSON=$(gh api repos/${{ github.repository }}/commits/$HEAD_SHA/statuses 2>/dev/null || echo "[]")
+            
+            if command -v jq &> /dev/null; then
+              CURSOR_STATUS=$(echo "$STATUS_CHECKS_JSON" | jq -r '.[] | select(.context | ascii_downcase | contains("cursor")) | .state' | head -1 || echo "")
+            else
+              CURSOR_STATUS=$(echo "$STATUS_CHECKS_JSON" | grep -i "cursor" | grep -oP '"state":\s*"\K[^"]+' | head -1 || echo "")
+            fi
+            
+            if [ -n "$CURSOR_STATUS" ]; then
+              CURSOR_CHECK_FOUND=true
+              if [ "$CURSOR_STATUS" = "success" ]; then
+                echo "✅ Cursor bot passed (status check). Proceeding with promotion."
+                CURSOR_CHECK_PASSED=true
+                break
+              elif [ "$CURSOR_STATUS" = "failure" ] || [ "$CURSOR_STATUS" = "error" ]; then
+                echo "❌ Cursor bot failed (status check: $CURSOR_STATUS). Stopping workflow."
+                CURSOR_CHECK_FAILED=true
+                break
+              fi
+            fi
+            
+            if [ "$SHOULD_LOG" = "true" ]; then
+              if [ "$CURSOR_CHECK_FOUND" = "false" ]; then
+                echo "Waiting for Cursor bot to appear... (${ELAPSED}s/${MAX_WAIT}s)"
+              else
+                echo "Waiting for Cursor bot to complete... (${ELAPSED}s/${MAX_WAIT}s)"
+              fi
+            fi
+          done
+          
+          if [ "$CURSOR_CHECK_FAILED" = "true" ]; then
+            echo "=========================================="
+            echo "❌ CRITICAL: Cursor bot check FAILED"
+            echo "❌ Bugs detected - workflow STOPPED"
+            echo "❌ No PR will be merged. No promotion will occur."
+            echo "=========================================="
+            exit 1
+          fi
+          
+          if [ "$CURSOR_CHECK_PASSED" = "true" ]; then
+            echo "✅ Cursor bot check COMPLETE: conclusion = 'success' or 'neutral'"
+            echo "✅ Setting completion flag: cursor_completed=true"
+            echo "cursor_completed=true" >> $GITHUB_OUTPUT
+          elif [ "$CURSOR_CHECK_FOUND" = "false" ]; then
+            echo "=========================================="
+            echo "❌ CRITICAL: Cursor bot did not appear within timeout (${MAX_WAIT}s)"
+            echo "❌ Cannot verify no bugs - workflow STOPPED"
+            echo "❌ No PR will be merged. No promotion will occur."
+            echo "=========================================="
+            exit 1
+          else
+            echo "=========================================="
+            echo "❌ CRITICAL: Cursor bot did not complete within timeout (${MAX_WAIT}s)"
+            echo "❌ Cannot verify no bugs - workflow STOPPED"
+            echo "❌ No PR will be merged. No promotion will occur."
+            echo "=========================================="
+            exit 1
+          fi
+
+      - name: Process PR and create next stage PR
+        if: steps.wait_for_cursor.outputs.cursor_completed == 'true'
+        run: |
+          chmod +x .github/scripts/promote-branches.sh
+          .github/scripts/promote-branches.sh \
+            "${{ github.event.pull_request.number }}" \
+            "${{ github.event.pull_request.head.ref }}" \
+            "${{ github.event.pull_request.base.ref }}" \
+            "${{ github.repository }}"
+          echo "✅ This workflow run is complete"
+          echo "   The next workflow will be triggered automatically when the PR is created"

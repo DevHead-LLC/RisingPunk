@@ -61,8 +61,21 @@ export interface IUser extends Document {
     completesAt: Date | null;
     cooldownUntil: Date | null;
   };
+  battleStats?: {
+    botsDestroyed: number;
+    botsLost: number;
+    successfulAttacks: number;
+    failedAttacks: number;
+    successfulDefenses: number;
+    failedDefenses: number;
+  };
+  totalGuardiansBuilt?: number;
+  totalPhreaksBuilt?: number;
+  totalBreachersBuilt?: number;
+  lifetimeHighNetWorth?: number;
   verifyAccessKey(accessKey: string): Promise<boolean>;
   getDecryptedEmail(): string;
+  getDecryptedEmailVerificationNewEmail(): string;
   setEncryptedEmail(email: string): void;
   setCurrentToken(tokenId: string): void;
   isTokenValid(tokenId: string): boolean;
@@ -313,6 +326,55 @@ const userSchema = new Schema({
       default: null
     }
   },
+  battleStats: {
+    botsDestroyed: {
+      type: Number,
+      default: 0
+    },
+    botsLost: {
+      type: Number,
+      default: 0
+    },
+    successfulAttacks: {
+      type: Number,
+      default: 0
+    },
+    failedAttacks: {
+      type: Number,
+      default: 0
+    },
+    successfulDefenses: {
+      type: Number,
+      default: 0
+    },
+    failedDefenses: {
+      type: Number,
+      default: 0
+    }
+  },
+  totalGuardiansBuilt: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 1000000
+  },
+  totalPhreaksBuilt: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 1000000
+  },
+  totalBreachersBuilt: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 1000000
+  },
+  lifetimeHighNetWorth: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   currentTokenId: {
     type: String,
     required: false
@@ -342,11 +404,13 @@ userSchema.pre('save', async function(this: IUser, next: Function) {
       originalEmail = this.getDecryptedEmail();
     }
   } else if (this.email) {
-    // Email not modified, but we need to ensure emailHash exists
+    // Email not modified, but we need to ensure it's encrypted and emailHash exists
     if (EncryptionService.isEncrypted(this.email)) {
       originalEmail = this.getDecryptedEmail();
     } else {
+      // Email is plaintext but not marked as modified - encrypt it now
       originalEmail = this.email.trim().toLowerCase();
+      this.email = EncryptionService.encryptEmail(originalEmail);
     }
   } else {
     originalEmail = '';
@@ -380,6 +444,21 @@ userSchema.methods.getDecryptedEmail = function(): string {
 
 userSchema.methods.setEncryptedEmail = function(email: string): void {
   this.email = EncryptionService.encryptEmail(email);
+};
+
+userSchema.methods.getDecryptedEmailVerificationNewEmail = function(): string {
+  try {
+    if (!this.emailVerificationNewEmail) {
+      return '';
+    }
+    if (!EncryptionService.isEncrypted(this.emailVerificationNewEmail)) {
+      return this.emailVerificationNewEmail;
+    }
+    return EncryptionService.decryptEmail(this.emailVerificationNewEmail);
+  } catch (error) {
+    console.error('Failed to decrypt emailVerificationNewEmail:', error);
+    return '';
+  }
 };
 
 userSchema.statics.emailExists = async function(email: string): Promise<boolean> {
@@ -425,5 +504,8 @@ userSchema.methods.setCurrentToken = function(tokenId: string): void {
 userSchema.methods.isTokenValid = function(tokenId: string): boolean {
   return this.currentTokenId === tokenId;
 };
+
+userSchema.index({ 'battleStats.botsDestroyed': -1 });
+userSchema.index({ 'balance.total': -1 });
 
 export const User = mongoose.model<IUser, IUserModel>('User', userSchema); 

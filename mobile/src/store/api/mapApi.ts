@@ -16,8 +16,18 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
   })(args, api, extraOptions);
 
   if (result.error) {
-    // Check for account switched error first
-    if ((result.error as any)?.status === 401 && (result.error as any)?.data?.error === 'ACCOUNT_SWITCHED') {
+    const error = result.error as any;
+    
+    // Check for abort errors first - these are expected during fast map panning
+    const isAbortError = error?.name === 'AbortError' || 
+                         (error instanceof Error && error.name === 'AbortError');
+    
+    if (isAbortError) {
+      return result;
+    }
+    
+    // Check for account switched error
+    if (error?.status === 401 && error?.data?.error === 'ACCOUNT_SWITCHED') {
       // Always dispatch account switched action - the auth slice will handle showing banner appropriately
       api.dispatch({ type: 'auth/handleAccountSwitched' });
       
@@ -25,7 +35,7 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
       resetAllApiCaches(api);
       
       return result; // Return early to prevent other error handling
-    } else if ((result.error as any)?.status === 401 && (result.error as any)?.data?.error === 'Token expired') {
+    } else if (error?.status === 401 && error?.data?.error === 'Token expired') {
       // Dispatch logout action using action type to avoid circular dependency
       api.dispatch({ type: 'auth/logout' });
       return result;
@@ -46,6 +56,13 @@ export const mapApi = createApi({
       query: () => '/api/map/main',
       providesTags: ['Map'],
     }),
+    fetchMapViewport: builder.query<MapResponse, { x1: number; y1: number; x2: number; y2: number; minimal?: boolean }>({
+      query: ({ x1, y1, x2, y2, minimal }) => ({
+        url: '/api/map/main',
+        params: { x1, y1, x2, y2, minimal: minimal ? 'true' : undefined },
+      }),
+      providesTags: ['Map'],
+    }),
     updatePlayerPosition: builder.mutation<any, { x: number; y: number }>({
       query: (body) => ({
         url: '/api/map/player-position',
@@ -57,4 +74,4 @@ export const mapApi = createApi({
   }),
 });
 
-export const { useFetchMapQuery, useUpdatePlayerPositionMutation } = mapApi;
+export const { useFetchMapQuery, useFetchMapViewportQuery, useUpdatePlayerPositionMutation } = mapApi;

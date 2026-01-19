@@ -24,6 +24,16 @@ export class NPCService {
     const doc = await mongoose.connection.collection('npcs').findOne({ slug });
     return doc as NPCDocument | null;
   }
+
+  static async getAllNPCs(): Promise<NPCDocument[]> {
+    const docs = await mongoose.connection.collection('npcs').find({}).toArray();
+    return docs as NPCDocument[];
+  }
+
+  static async getNPCsByLevel(userLevelAssociation: number): Promise<NPCDocument[]> {
+    const docs = await mongoose.connection.collection('npcs').find({ userLevelAssociation }).toArray();
+    return docs as NPCDocument[];
+  }
 }
 
 

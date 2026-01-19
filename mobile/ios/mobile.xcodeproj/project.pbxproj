@@ -18,6 +18,8 @@
 		B923798D2E66385500A41223 /* client_213914599866-omj66uek6jte9rrge2secalb8sf4bacs.apps.googleusercontent.com.plist in Resources */ = {isa = PBXBuildFile; fileRef = B923798C2E66385500A41223 /* client_213914599866-omj66uek6jte9rrge2secalb8sf4bacs.apps.googleusercontent.com.plist */; };
 		B94813212E870AA50020DD49 /* AppleSignInModule.m in Sources */ = {isa = PBXBuildFile; fileRef = B948131F2E870AA50020DD49 /* AppleSignInModule.m */; };
 		B94813222E870AA50020DD49 /* AppleSignInModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = B94813202E870AA50020DD49 /* AppleSignInModule.swift */; };
+		B94813242E870BB50020DD49 /* GameCenterModule.m in Sources */ = {isa = PBXBuildFile; fileRef = B94813232E870BB50020DD49 /* GameCenterModule.m */; };
+		B94813252E870BB50020DD49 /* GameCenterModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = B94813262E870BB50020DD49 /* GameCenterModule.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -41,6 +43,7 @@
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = mobile/Info.plist; sourceTree = "<group>"; };
 		13B07FB71A68108700A75B9A /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = main.m; path = mobile/main.m; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = mobile/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		1C7C0F27D3539A04E58B4624 /* Pods-mobile-mobileTests.staging.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-mobile-mobileTests.staging.xcconfig"; path = "Target Support Files/Pods-mobile-mobileTests/Pods-mobile-mobileTests.staging.xcconfig"; sourceTree = "<group>"; };
 		285B0F629E022AD14ED188BB /* Pods-mobile.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-mobile.release.xcconfig"; path = "Target Support Files/Pods-mobile/Pods-mobile.release.xcconfig"; sourceTree = "<group>"; };
 		4489632C5AC26AE933EBB759 /* Pods-mobile.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-mobile.debug.xcconfig"; path = "Target Support Files/Pods-mobile/Pods-mobile.debug.xcconfig"; sourceTree = "<group>"; };
 		4DEDF646A9BAC4373D298301 /* Pods-mobile-mobileTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-mobile-mobileTests.debug.xcconfig"; path = "Target Support Files/Pods-mobile-mobileTests/Pods-mobile-mobileTests.debug.xcconfig"; sourceTree = "<group>"; };
@@ -51,9 +54,12 @@
 		B948131F2E870AA50020DD49 /* AppleSignInModule.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppleSignInModule.m; sourceTree = "<group>"; };
 		B94813202E870AA50020DD49 /* AppleSignInModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignInModule.swift; sourceTree = "<group>"; };
 		B94813232E870AE50020DD49 /* mobile-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "mobile-Bridging-Header.h"; sourceTree = "<group>"; };
+		B94813232E870BB50020DD49 /* GameCenterModule.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = GameCenterModule.m; sourceTree = "<group>"; };
+		B94813262E870BB50020DD49 /* GameCenterModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameCenterModule.swift; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F599974F14CA42588DDD5287 /* libPods-mobile.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-mobile.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		FB98BB62CA556C1EF5DBE2DA /* libPods-mobile-mobileTests.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-mobile-mobileTests.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		FE486BCC9CA1C85C49E25284 /* Pods-mobile.staging.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-mobile.staging.xcconfig"; path = "Target Support Files/Pods-mobile/Pods-mobile.staging.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -131,6 +137,8 @@
 			children = (
 				B948131F2E870AA50020DD49 /* AppleSignInModule.m */,
 				B94813202E870AA50020DD49 /* AppleSignInModule.swift */,
+				B94813232E870BB50020DD49 /* GameCenterModule.m */,
+				B94813262E870BB50020DD49 /* GameCenterModule.swift */,
 				13B07FAE1A68108700A75B9A /* mobile */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				00E356EF1AD99517003FC87E /* mobileTests */,
@@ -160,6 +168,8 @@
 				285B0F629E022AD14ED188BB /* Pods-mobile.release.xcconfig */,
 				4DEDF646A9BAC4373D298301 /* Pods-mobile-mobileTests.debug.xcconfig */,
 				571872373550C41BACEA24C5 /* Pods-mobile-mobileTests.release.xcconfig */,
+				FE486BCC9CA1C85C49E25284 /* Pods-mobile.staging.xcconfig */,
+				1C7C0F27D3539A04E58B4624 /* Pods-mobile-mobileTests.staging.xcconfig */,
 			);
 			path = Pods;
 			sourceTree = "<group>";
@@ -281,7 +291,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\n\n# Set ENVFILE for react-native-config\n# Priority: 1) ENVFILE from npm script (when running via npm run ios:dev), 2) ENVFILE from Xcode scheme, 3) API_ENV build setting, 4) default\n# When running via npm, ENVFILE is already set, so we respect that\nif [ -n \"$ENVFILE\" ]; then\n  # ENVFILE is already set (from npm script or Xcode scheme) - use it as-is\n  ENVFILE_VALUE=\"$ENVFILE\"\n  echo \"[React Native Bundle] Using existing ENVFILE: $ENVFILE_VALUE\"\nelif [ -n \"$API_ENV\" ]; then\n  # Fall back to API_ENV build setting (for Xcode-only builds without scheme ENVFILE)\n  case \"$API_ENV\" in\n    dev)\n      ENVFILE_VALUE=\".env.dev\"\n      ;;\n    staging)\n      ENVFILE_VALUE=\".env.staging\"\n      ;;\n    prod)\n      ENVFILE_VALUE=\".env.prod\"\n      ;;\n    *)\n      echo \"Warning: Unknown API_ENV value: $API_ENV, defaulting to .env\"\n      ENVFILE_VALUE=\".env\"\n      ;;\n  esac\n  echo \"[React Native Bundle] Using ENVFILE from API_ENV build setting: $ENVFILE_VALUE\"\nelse\n  echo \"Warning: Neither ENVFILE nor API_ENV is set, defaulting to .env\"\n  ENVFILE_VALUE=\".env\"\nfi\n\n# Write to /tmp/envfile (react-native-config checks this first)\necho \"$ENVFILE_VALUE\" > /tmp/envfile\n\n# Also export as environment variable (for react-native-config)\nexport ENVFILE=\"$ENVFILE_VALUE\"\n\necho \"[React Native Bundle] Final ENVFILE=$ENVFILE_VALUE\"\n\nWITH_ENVIRONMENT=\"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\nREACT_NATIVE_XCODE=\"$REACT_NATIVE_PATH/scripts/react-native-xcode.sh\"\n\n/bin/sh -c \"$WITH_ENVIRONMENT $REACT_NATIVE_XCODE\"\n";
+			shellScript = "set -e\n\n# Set ENVFILE for react-native-config\n# Priority: 1) ENVFILE from npm script (when running via npm run ios:dev), 2) /tmp/envfile from PreAction, 3) ENVFILE from Xcode scheme, 4) API_ENV build setting, 5) default\n# When running via npm, ENVFILE is already set, so we respect that\nif [ -n \"$ENVFILE\" ]; then\n  # ENVFILE is already set (from npm script or Xcode scheme) - use it as-is\n  ENVFILE_VALUE=\"$ENVFILE\"\n  echo \"[React Native Bundle] Using existing ENVFILE: $ENVFILE_VALUE\"\nelif [ -f /tmp/envfile ]; then\n  # Read from /tmp/envfile (set by PreAction in Xcode scheme)\n  ENVFILE_VALUE=$(cat /tmp/envfile | tr -d '[:space:]')\n  echo \"[React Native Bundle] Using ENVFILE from /tmp/envfile: $ENVFILE_VALUE\"\nelif [ -n \"$API_ENV\" ]; then\n  # Fall back to API_ENV build setting (for Xcode-only builds without scheme ENVFILE)\n  case \"$API_ENV\" in\n    dev)\n      ENVFILE_VALUE=\".env.dev\"\n      ;;\n    staging)\n      ENVFILE_VALUE=\".env.staging\"\n      ;;\n    prod)\n      ENVFILE_VALUE=\".env.prod\"\n      ;;\n    *)\n      echo \"Warning: Unknown API_ENV value: $API_ENV, defaulting to .env\"\n      ENVFILE_VALUE=\".env\"\n      ;;\n  esac\n  echo \"[React Native Bundle] Using ENVFILE from API_ENV build setting: $ENVFILE_VALUE\"\nelse\n  echo \"Warning: Neither ENVFILE nor API_ENV is set, defaulting to .env\"\n  ENVFILE_VALUE=\".env\"\nfi\n\n# Write to /tmp/envfile (react-native-config checks this first)\necho \"$ENVFILE_VALUE\" > /tmp/envfile\n\n# Also export as environment variable (for react-native-config)\nexport ENVFILE=\"$ENVFILE_VALUE\"\n\necho \"[React Native Bundle] Final ENVFILE=$ENVFILE_VALUE\"\n\nWITH_ENVIRONMENT=\"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\nREACT_NATIVE_XCODE=\"$REACT_NATIVE_PATH/scripts/react-native-xcode.sh\"\n\n/bin/sh -c \"$WITH_ENVIRONMENT $REACT_NATIVE_XCODE\"\n";
 		};
 		3891D4C06E52BD72996D991C /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -291,9 +301,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile-mobileTests/Pods-mobile-mobileTests-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile-mobileTests/Pods-mobile-mobileTests-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -308,9 +322,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile/Pods-mobile-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile/Pods-mobile-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -325,9 +343,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile-mobileTests/Pods-mobile-mobileTests-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile-mobileTests/Pods-mobile-mobileTests-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -386,9 +408,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile/Pods-mobile-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-mobile/Pods-mobile-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -412,6 +438,8 @@
 			files = (
 				B94813212E870AA50020DD49 /* AppleSignInModule.m in Sources */,
 				B94813222E870AA50020DD49 /* AppleSignInModule.swift in Sources */,
+				B94813242E870BB50020DD49 /* GameCenterModule.m in Sources */,
+				B94813252E870BB50020DD49 /* GameCenterModule.swift in Sources */,
 				13B07FBC1A68108700A75B9A /* AppDelegate.mm in Sources */,
 				13B07FC11A68108700A75B9A /* main.m in Sources */,
 			);
@@ -479,6 +507,30 @@
 			};
 			name = Release;
 		};
+		00E356F81AD99517003FC87F /* Staging */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1C7C0F27D3539A04E58B4624 /* Pods-mobile-mobileTests.staging.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COPY_PHASE_STRIP = NO;
+				INFOPLIST_FILE = mobileTests/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"-ObjC",
+					"-lc++",
+					"$(inherited)",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/mobile.app/mobile";
+			};
+			name = Staging;
+		};
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 4489632C5AC26AE933EBB759 /* Pods-mobile.debug.xcconfig */;
@@ -488,7 +540,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = mobile/mobile.entitlements;
-				CURRENT_PROJECT_VERSION = 29;
+				CURRENT_PROJECT_VERSION = 59;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 26522YLRG2;
 				ENABLE_BITCODE = NO;
@@ -500,7 +552,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.0.0;
+				MARKETING_VERSION = 2.2.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -525,7 +577,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = mobile/mobile.entitlements;
-				CURRENT_PROJECT_VERSION = 29;
+				CURRENT_PROJECT_VERSION = 59;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 26522YLRG2;
 				INFOPLIST_FILE = mobile/Info.plist;
@@ -536,7 +588,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.0.0;
+				MARKETING_VERSION = 2.2.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -549,6 +601,41 @@
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Release;
+		};
+		13B07F961A680F5B00A75B9B /* Staging */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = FE486BCC9CA1C85C49E25284 /* Pods-mobile.staging.xcconfig */;
+			buildSettings = {
+				API_ENV = staging;
+				"API_ENV[arch=*]" = staging;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = mobile/mobile.entitlements;
+				CURRENT_PROJECT_VERSION = 59;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 26522YLRG2;
+				INFOPLIST_FILE = mobile/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = RisingPunk;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 2.2.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+					"-lc++",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.devheadllc.risingpunk;
+				PRODUCT_NAME = mobile;
+				SWIFT_OBJC_BRIDGING_HEADER = "mobile-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Staging;
 		};
 		83CBBA201A601CBA00E9B192 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -619,10 +706,7 @@
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
 				);
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
@@ -691,16 +775,82 @@
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
 				);
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				USE_HERMES = true;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
+		};
+		83CBBA221A601CBA00E9B193 /* Staging */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				COPY_PHASE_STRIP = YES;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = "";
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					/usr/lib/swift,
+					"$(inherited)",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"\"$(SDKROOT)/usr/lib/swift\"",
+					"\"$(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)\"",
+					"\"$(inherited)\"",
+				);
+				MTL_ENABLE_DEBUG_INFO = NO;
+				OTHER_CPLUSPLUSFLAGS = (
+					"$(OTHER_CFLAGS)",
+					"-DFOLLY_NO_CONFIG",
+					"-DFOLLY_MOBILE=1",
+					"-DFOLLY_USE_LIBCPP=1",
+					"-DFOLLY_CFG_NO_COROUTINES=1",
+					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
+				);
+				OTHER_LDFLAGS = "$(inherited)";
+				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
+				SDKROOT = iphoneos;
+				USE_HERMES = true;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Staging;
 		};
 /* End XCBuildConfiguration section */
 
@@ -710,6 +860,7 @@
 			buildConfigurations = (
 				00E356F61AD99517003FC87E /* Debug */,
 				00E356F71AD99517003FC87E /* Release */,
+				00E356F81AD99517003FC87F /* Staging */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -719,6 +870,7 @@
 			buildConfigurations = (
 				13B07F941A680F5B00A75B9A /* Debug */,
 				13B07F951A680F5B00A75B9A /* Release */,
+				13B07F961A680F5B00A75B9B /* Staging */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -728,6 +880,7 @@
 			buildConfigurations = (
 				83CBBA201A601CBA00E9B192 /* Debug */,
 				83CBBA211A601CBA00E9B192 /* Release */,
+				83CBBA221A601CBA00E9B193 /* Staging */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

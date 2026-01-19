@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import { View, Text, StyleSheet, LayoutChangeEvent, Pressable, Image, Dimensions, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, LayoutChangeEvent, Pressable, Image, Dimensions, TouchableOpacity, ScrollView, unstable_batchedUpdates } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withDecay, runOnJS, useAnimatedReaction } from 'react-native-reanimated';
 import { CloseButton } from '../components/common/CloseButton';
@@ -12,7 +12,7 @@ import { VisitingProfileModal } from '../components/hackMap/VisitingProfileModal
 import { VisitCrewModal } from '../components/hackMap/VisitCrewModal';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { setGrid, setLoading } from '../store/slices/mapSlice';
-import { useFetchMapQuery } from '../store/api/mapApi';
+import { useFetchMapQuery, useFetchMapViewportQuery } from '../store/api/mapApi';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { useGetCrewStatusQuery, useGetUserCrewStatusQuery, useGetCrewDetailsQuery, useGetWarStatusQuery, useGetAllianceStatusQuery } from '../store/api/authApi';
@@ -23,15 +23,364 @@ import { useThemeColors } from '../hooks/useThemeColors';
 import { useTheme } from '../context/ThemeContext';
 import { SIZING } from '../styles/theme';
 
-const CELL_SIZE = 55;
+const CELL_SIZE = 75;
 const MARGIN_SIZE = 80;
 
+// Constants for viewport fetching and panning
+const VIEWPORT_FETCH_THRESHOLD = 5; // Cells to move before triggering viewport fetch
+const PAN_BUFFER = 8; // Buffer in cells for window range calculation
+const PAN_CHANGE_THRESHOLD = 4; // Minimum pan change in pixels to trigger update
+const MAX_CACHE_SIZE = 1000; // Maximum number of cached cell objects
+const PANNING_STOPPED_DEBOUNCE_MS = 200; // Debounce time for panning stopped detection
 
+/**
+ * Convert grid coordinates to pan coordinates (centers the cell on screen)
+ * @param gridX - Grid X coordinate (column)
+ * @param gridY - Grid Y coordinate (row)
+ * @param width - Container width
+ * @param height - Container height
+ * @returns Pan coordinates { x, y } to center the grid cell on screen
+ */
+const gridToPanCoordinates = (
+  gridX: number,
+  gridY: number,
+  width: number,
+  height: number
+): { x: number; y: number } => {
+  const x = (width / 2) - MARGIN_SIZE - ((gridX + 0.5) * CELL_SIZE);
+  const y = (height / 2) - MARGIN_SIZE - ((gridY + 0.5) * CELL_SIZE);
+  return { x, y };
+};
 
+/**
+ * Calculate viewport coordinates from pan position
+ * @param panX - Pan X coordinate
+ * @param panY - Pan Y coordinate
+ * @param width - Container width
+ * @param height - Container height
+ * @param gridSize - Grid size (for clamping)
+ * @param buffer - Optional buffer in cells (default: 0)
+ * @returns Viewport coordinates { startCol, endCol, startRow, endRow } clamped to grid bounds
+ */
+const calculateViewportFromPan = (
+  panX: number,
+  panY: number,
+  width: number,
+  height: number,
+  gridSize: number,
+  buffer: number = 0
+): { startCol: number; endCol: number; startRow: number; endRow: number } => {
+  const gridLeft = panX + MARGIN_SIZE;
+  const gridTop = panY + MARGIN_SIZE;
+  
+  // Convert screen coordinates to grid coordinates
+  const baseStartCol = Math.floor((-gridLeft) / CELL_SIZE);
+  const baseEndCol = Math.ceil((width - gridLeft) / CELL_SIZE);
+  const baseStartRow = Math.floor((-gridTop) / CELL_SIZE);
+  const baseEndRow = Math.ceil((height - gridTop) / CELL_SIZE);
+  
+  // Apply buffer and clamp to grid bounds
+  const startCol = Math.max(0, baseStartCol - buffer);
+  const endCol = Math.min(gridSize - 1, baseEndCol + buffer);
+  const startRow = Math.max(0, baseStartRow - buffer);
+  const endRow = Math.min(gridSize - 1, baseEndRow + buffer);
+  
+  return { startCol, endCol, startRow, endRow };
+};
+
+/**
+ * Generate Set of visible tile keys from viewport coordinates
+ * @param startCol - Start column
+ * @param endCol - End column
+ * @param startRow - Start row
+ * @param endRow - End row
+ * @returns Set of tile keys in format "x,y"
+ */
+const generateVisibleTileKeys = (
+  startCol: number,
+  endCol: number,
+  startRow: number,
+  endRow: number
+): Set<string> => {
+  const visibleTiles = new Set<string>();
+  for (let y = startRow; y <= endRow; y++) {
+    for (let x = startCol; x <= endCol; x++) {
+      visibleTiles.add(`${x},${y}`);
+    }
+  }
+  return visibleTiles;
+};
+
+/**
+ * Clean up empty cells from merged cache data
+ * Removes cache entries for cells that are now empty (entity removed)
+ * @param merged - The merged cache object to clean (will be mutated)
+ * @param grid - Grid data to check
+ * @param viewport - Viewport coordinates { x1, y1, x2, y2 }
+ * @returns Array of deleted keys (for tracking purposes, optional)
+ */
+const cleanupEmptyCells = (
+  merged: Record<string, any>,
+  grid: any[][],
+  viewport: { x1: number; y1: number; x2: number; y2: number }
+): string[] => {
+  const deletedKeys: string[] = [];
+  for (let y = viewport.y1; y <= viewport.y2; y++) {
+    const row = grid[y];
+    if (!row) continue;
+    for (let x = viewport.x1; x <= viewport.x2; x++) {
+      const cell = row[x];
+      const key = `${x},${y}`;
+      if (cell && cell.entity === 'empty' && merged[key]) {
+        delete merged[key];
+        deletedKeys.push(key);
+      }
+    }
+  }
+  return deletedKeys;
+};
+
+/**
+ * Get cells to check for cleanup operations
+ * Returns array of {x, y, cell} objects either from viewport or full grid
+ * @param grid - Grid data
+ * @param viewport - Optional viewport coordinates { x1, y1, x2, y2 }
+ * @returns Array of {x, y, cell} objects
+ */
+const getCellsToCheck = (
+  grid: any[][],
+  viewport?: { x1: number; y1: number; x2: number; y2: number }
+): Array<{ x: number; y: number; cell: any }> => {
+  const cells: Array<{ x: number; y: number; cell: any }> = [];
+  
+  if (viewport) {
+    // Viewport: only iterate through cells in viewport
+    for (let y = viewport.y1; y <= viewport.y2; y++) {
+      const row = grid[y];
+      if (!row) continue;
+      for (let x = viewport.x1; x <= viewport.x2; x++) {
+        const cell = row[x];
+        if (cell) cells.push({ x, y, cell });
+      }
+    }
+  } else {
+    // Full map: iterate through all cells
+    for (let y = 0; y < grid.length; y++) {
+      const row = grid[y];
+      if (!row) continue;
+      for (let x = 0; x < row.length; x++) {
+        const cell = row[x];
+        if (cell) cells.push({ x, y, cell });
+      }
+    }
+  }
+  
+  return cells;
+};
+
+/**
+ * Merge grid data from new grid into current grid for a specific viewport
+ * Creates a deep copy of current grid and merges new data within viewport bounds
+ * @param currentGrid - Current grid data (from gridRef or state)
+ * @param newGrid - New grid data to merge
+ * @param viewport - Viewport coordinates { x1, y1, x2, y2 }
+ * @param gridSize - Grid size (for fallback empty grid creation)
+ * @returns Merged grid (deep copy, safe to mutate)
+ */
+const mergeGridData = (
+  currentGrid: any[][],
+  newGrid: any[][],
+  viewport: { x1: number; y1: number; x2: number; y2: number },
+  gridSize: number
+): any[][] => {
+  // Create a deep copy to avoid mutating Redux state
+  const mergedGrid = (currentGrid.length > 0 ? currentGrid : Array.from({ length: gridSize }, () => 
+    Array.from({ length: gridSize }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
+  )).map(row => row ? [...row] : []);
+  
+  // Only update cells within viewport
+  for (let y = viewport.y1; y <= viewport.y2; y++) {
+    const row = newGrid[y];
+    if (!row) continue;
+    if (!mergedGrid[y]) {
+      mergedGrid[y] = [];
+    }
+    for (let x = viewport.x1; x <= viewport.x2; x++) {
+      const cell = row[x];
+      if (cell) {
+        if (!mergedGrid[y][x]) {
+          mergedGrid[y][x] = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityType };
+        }
+        mergedGrid[y][x] = { ...mergedGrid[y][x], ...cell };
+      }
+    }
+  }
+  
+  return mergedGrid;
+};
+
+/**
+ * Get grid size from grid array with fallback
+ * @param grid - Grid array
+ * @param fallback - Fallback size if grid is empty (default: 50)
+ * @returns Grid size
+ */
+const getGridSize = (grid: any[][] | null | undefined, fallback: number = 50): number => {
+  if (!grid || grid.length === 0) return fallback;
+  return grid.length;
+};
+
+/**
+ * Validate viewport coordinates
+ * @param viewport - Viewport coordinates { x1, y1, x2, y2 }
+ * @returns true if viewport is valid (all coordinates are valid numbers)
+ */
+const isValidViewport = (viewport: { x1: number; y1: number; x2: number; y2: number } | undefined): boolean => {
+  if (!viewport) return false;
+  const { x1, y1, x2, y2 } = viewport;
+  return !isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2) && 
+         x1 >= 0 && y1 >= 0 && x2 >= x1 && y2 >= y1;
+};
+
+/**
+ * Check if viewport has moved significantly outside the last fetched viewport
+ * @param newViewport - New viewport coordinates { x1, y1, x2, y2 }
+ * @param lastViewport - Last fetched viewport coordinates { x1, y1, x2, y2 } or null
+ * @param threshold - Movement threshold in cells (default: 5)
+ * @returns true if viewport should be fetched
+ */
+const shouldFetchViewport = (
+  newViewport: { x1: number; y1: number; x2: number; y2: number },
+  lastViewport: { x1: number; y1: number; x2: number; y2: number } | null,
+  threshold: number = VIEWPORT_FETCH_THRESHOLD
+): boolean => {
+  if (!lastViewport) return true;
+  return (
+    newViewport.x1 < lastViewport.x1 - threshold ||
+    newViewport.x2 > lastViewport.x2 + threshold ||
+    newViewport.y1 < lastViewport.y1 - threshold ||
+    newViewport.y2 > lastViewport.y2 + threshold
+  );
+};
+
+/**
+ * Trigger viewport fetch with minimal flag
+ * Prevents new requests while one is in flight to avoid cancelling requests
+ * @param newViewport - New viewport coordinates { x1, y1, x2, y2, minimal?: boolean }
+ * @param panningViewportMinimalRef - Ref to store minimal flag
+ * @param setPanningViewportParams - State setter for viewport params
+ * @param viewportRequestInFlightRef - Ref to track if request is in flight
+ * @param pendingViewportParamsRef - Ref to store pending viewport if request is in flight
+ */
+const triggerViewportFetch = (
+  newViewport: { x1: number; y1: number; x2: number; y2: number; minimal?: boolean },
+  panningViewportMinimalRef: React.MutableRefObject<boolean>,
+  setPanningViewportParams: React.Dispatch<React.SetStateAction<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>>,
+  viewportRequestInFlightRef: React.MutableRefObject<boolean>,
+  pendingViewportParamsRef: React.MutableRefObject<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>
+): void => {
+  if (viewportRequestInFlightRef.current) {
+    // Request already in flight - store this as pending instead of cancelling the current one
+    pendingViewportParamsRef.current = newViewport;
+    return;
+  }
+  
+  // No request in flight - start new request
+  viewportRequestInFlightRef.current = true;
+  panningViewportMinimalRef.current = true;
+  setPanningViewportParams(newViewport);
+};
 
 type Props = {
   onClose: () => void;
   restorePan?: { x: number; y: number };
+};
+
+/**
+ * Shared memo comparison function for Tile and PoolTile components
+ * Uses fast path (cell reference equality) with deep comparison fallback
+ */
+const tileMemoComparison = <T extends { 
+  x: number; 
+  y: number; 
+  cell: CellData; 
+  selected: boolean; 
+  currentUserHandle?: string | null; 
+  isShieldActive: boolean; 
+  isCrewMember?: boolean; 
+  isWarCrewMember?: boolean; 
+  isAllianceCrewMember?: boolean; 
+  dynamicEntityData: Record<string, any> 
+}>(prevProps: T, nextProps: T): boolean => {
+  // Phase 4: Enhanced memo comparison with fast path and deep fallback
+  // Fast path: Phase 2's stable cell references enable efficient reference equality check
+  if (prevProps.cell === nextProps.cell) {
+    // Same cell object reference - check other props that might affect rendering
+    return (
+      prevProps.x === nextProps.x &&
+      prevProps.y === nextProps.y &&
+      prevProps.selected === nextProps.selected &&
+      prevProps.currentUserHandle === nextProps.currentUserHandle &&
+      prevProps.isShieldActive === nextProps.isShieldActive &&
+      prevProps.isCrewMember === nextProps.isCrewMember &&
+      prevProps.isWarCrewMember === nextProps.isWarCrewMember &&
+      prevProps.isAllianceCrewMember === nextProps.isAllianceCrewMember &&
+      prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
+      nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
+    );
+  }
+  
+  // Deep comparison fallback: cell reference changed, check if cell data actually changed
+  return (
+    prevProps.x === nextProps.x &&
+    prevProps.y === nextProps.y &&
+    prevProps.selected === nextProps.selected &&
+    prevProps.cell.terrain === nextProps.cell.terrain &&
+    prevProps.cell.entity === nextProps.cell.entity &&
+    prevProps.cell.owner === nextProps.cell.owner &&
+    prevProps.cell.name === nextProps.cell.name &&
+    prevProps.cell.userId === nextProps.cell.userId &&
+    prevProps.cell.npcSlug === nextProps.cell.npcSlug &&
+    prevProps.cell.npcInstanceId === nextProps.cell.npcInstanceId &&
+    prevProps.cell.npcLevel === nextProps.cell.npcLevel &&
+    prevProps.cell.isShielded === nextProps.cell.isShielded &&
+    prevProps.currentUserHandle === nextProps.currentUserHandle &&
+    prevProps.isShieldActive === nextProps.isShieldActive &&
+    prevProps.isCrewMember === nextProps.isCrewMember &&
+    prevProps.isWarCrewMember === nextProps.isWarCrewMember &&
+    prevProps.isAllianceCrewMember === nextProps.isAllianceCrewMember &&
+    prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
+    nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
+  );
+};
+
+/**
+ * Shared memo comparison function for PanningTile and PanningPoolTile components
+ */
+const panningTileMemoComparison = <T extends {
+  x: number;
+  y: number;
+  terrain: TerrainType;
+  entityImage?: {
+    entity: EntityType;
+    owner?: string;
+    userId?: string;
+    npcSlug?: string;
+  };
+  currentUserId?: string | null;
+  isShieldActive: boolean;
+}>(prevProps: T, nextProps: T): boolean => {
+  return (
+    prevProps.x === nextProps.x &&
+    prevProps.y === nextProps.y &&
+    prevProps.terrain === nextProps.terrain &&
+    prevProps.entityImage?.entity === nextProps.entityImage?.entity &&
+    prevProps.entityImage?.owner === nextProps.entityImage?.owner &&
+    prevProps.entityImage?.userId === nextProps.entityImage?.userId &&
+    prevProps.entityImage?.npcSlug === nextProps.entityImage?.npcSlug &&
+    prevProps.currentUserId === nextProps.currentUserId &&
+    prevProps.isShieldActive === nextProps.isShieldActive
+  );
 };
 
 export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
@@ -87,16 +436,32 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   };
 
   const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember }) => {
+    const key = `${x},${y}`;
+    const dynamicEntity = dynamicEntityData[key];
+    const isShielded = dynamicEntity?.isShielded ?? (cell as any).isShielded;
+    const pressStartTimeRef = useRef<number>(0);
+    const pressStartCoordsRef = useRef<{ x: number; y: number } | null>(null);
+    
     const houseBgStyle = cell.entity === 'house'
       ? (cell.owner === 'player'
           ? (cell.name === currentUserHandle ? styles.userHouseBg : styles.otherUserHouseBg)
           : styles.enemyHouseBg)
       : null;
     
-    // Check for shield status in both grid data and dynamic entity data
-    const key = `${x},${y}`;
-    const dynamicEntity = dynamicEntityData[key];
-    const isShielded = dynamicEntity?.isShielded ?? (cell as any).isShielded;
+    const handlePress = useCallback(() => {
+      const now = Date.now();
+      const startTime = pressStartTimeRef.current;
+      const startCoords = pressStartCoordsRef.current;
+      
+      // Only trigger if it was a quick tap (less than 300ms)
+      if (startTime > 0 && now - startTime < 300 && startCoords) {
+        onPress(x, y, cell);
+      }
+      
+      pressStartTimeRef.current = 0;
+      pressStartCoordsRef.current = null;
+    }, [x, y, cell, onPress]);
+    
     return (
       <Pressable
         style={[
@@ -108,7 +473,24 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           !isWarCrewMember && isAllianceCrewMember && styles.allianceCrewMemberCell,
           !isWarCrewMember && !isAllianceCrewMember && isCrewMember && styles.crewMemberCell,
         ]}
-        onPress={() => onPress(x, y, cell)}
+        hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+        onPress={handlePress}
+        onPressIn={(e) => {
+          pressStartTimeRef.current = Date.now();
+          pressStartCoordsRef.current = { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY };
+        }}
+        onPressOut={(e) => {
+          const startTime = pressStartTimeRef.current;
+          const startCoords = pressStartCoordsRef.current;
+          if (startTime > 0 && startCoords) {
+            const moved = Math.abs(e.nativeEvent.locationX - startCoords.x) > 5 || 
+                         Math.abs(e.nativeEvent.locationY - startCoords.y) > 5;
+            if (moved) {
+              pressStartTimeRef.current = 0;
+              pressStartCoordsRef.current = null;
+            }
+          }
+        }}
       >
         <View style={[styles.cellContent, terrainStyleMap[cell.terrain], houseBgStyle]}>
           {cell.entity !== 'house' && getTerrainIcon(cell.terrain)}
@@ -158,24 +540,102 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         </View>
       </Pressable>
     );
-  }, (prevProps, nextProps) => {
-    // Custom comparison to prevent unnecessary re-renders
-    // Only re-render if essential props change
+  }, tileMemoComparison);
+
+  // Phase 3: Simplified tile component for panning (terrain + image only, no labels/levels/indicators)
+  type PanningTileProps = {
+    x: number;
+    y: number;
+    terrain: TerrainType;
+    entityImage?: {
+      entity: EntityType;
+      owner?: string;
+      userId?: string;
+      npcSlug?: string;
+    };
+    xStyle: any;
+    terrainStyleMap: Record<TerrainType, any>;
+    currentUserId?: string | null;
+    isShieldActive: boolean;
+    styles: any;
+  };
+
+  const PanningTile: React.FC<PanningTileProps> = React.memo(({ x, y, terrain, entityImage, xStyle, terrainStyleMap, currentUserId, isShieldActive, styles }) => {
+    const houseBgStyle = entityImage?.entity === 'house'
+      ? (entityImage.owner === 'player'
+          ? (entityImage.userId && entityImage.userId === currentUserId ? styles.userHouseBg : styles.otherUserHouseBg)
+          : styles.enemyHouseBg)
+      : null;
+
+    // For panning tiles, show shield only for current user's house (minimal data)
+    const isCurrentUserHouse = entityImage?.owner === 'player' && entityImage?.userId === currentUserId;
+    const showShield = isCurrentUserHouse && isShieldActive;
+
     return (
-      prevProps.x === nextProps.x &&
-      prevProps.y === nextProps.y &&
-      prevProps.selected === nextProps.selected &&
-      prevProps.cell === nextProps.cell &&
-      prevProps.currentUserHandle === nextProps.currentUserHandle &&
-      prevProps.isShieldActive === nextProps.isShieldActive &&
-      prevProps.isCrewMember === nextProps.isCrewMember &&
-      prevProps.isWarCrewMember === nextProps.isWarCrewMember &&
-      prevProps.isAllianceCrewMember === nextProps.isAllianceCrewMember &&
-      // Only check dynamicEntityData for this specific tile
-      prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
-      nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
+      <View
+        style={[
+          styles.cell,
+          xStyle,
+        ]}
+        pointerEvents="none"
+      >
+        <View style={[styles.cellContent, terrainStyleMap[terrain], houseBgStyle]}>
+          {entityImage?.entity !== 'house' && getTerrainIcon(terrain)}
+          {entityImage?.entity === 'house' && (
+            <>
+              {entityImage.owner === 'player' ? (
+                <Image 
+                  source={showShield
+                    ? require('../assets/images/hackMap/shielded.png')
+                    : require('../assets/images/home.png')
+                  } 
+                  style={styles.playerHomeIcon} 
+                  resizeMode="contain" 
+                />
+              ) : (
+                <>
+                  {(() => {
+                    const slug = entityImage.npcSlug;
+                    if (slug === 'npc-small-corporation') {
+                      return <Image source={require('../assets/images/fog-building.png')} style={styles.playerHomeIcon} resizeMode="contain" />;
+                    }
+                    return <Image source={require('../assets/images/fog-tall-building.png')} style={styles.playerHomeIcon} resizeMode="contain" />;
+                  })()}
+                </>
+              )}
+            </>
+          )}
+        </View>
+      </View>
     );
-  });
+  }, panningTileMemoComparison);
+
+  // Phase 3: Wrapper for PanningTile (adds yStyle positioning like PoolTile does for Tile)
+  type PanningPoolTileProps = {
+    x: number;
+    y: number;
+    terrain: TerrainType;
+    entityImage?: {
+      entity: EntityType;
+      owner?: string;
+      userId?: string;
+      npcSlug?: string;
+    };
+    xStyle: any;
+    yStyle: any;
+    terrainStyleMap: Record<TerrainType, any>;
+    currentUserId?: string | null;
+    isShieldActive: boolean;
+    styles: any;
+  };
+
+  const PanningPoolTile: React.FC<PanningPoolTileProps> = React.memo(({ x, y, terrain, entityImage, xStyle, yStyle, terrainStyleMap, currentUserId, isShieldActive, styles }) => {
+    return (
+      <View style={[yStyle]}>
+        <PanningTile x={x} y={y} terrain={terrain} entityImage={entityImage} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserId={currentUserId} isShieldActive={isShieldActive} styles={styles} />
+      </View>
+    );
+  }, panningTileMemoComparison);
 
   const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember }) => {
     return (
@@ -183,23 +643,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} isCrewMember={isCrewMember} isWarCrewMember={isWarCrewMember} isAllianceCrewMember={isAllianceCrewMember} />
       </View>
     );
-  }, (prevProps, nextProps) => {
-    // Custom comparison for PoolTile - only re-render if essential props change
-    return (
-      prevProps.x === nextProps.x &&
-      prevProps.y === nextProps.y &&
-      prevProps.selected === nextProps.selected &&
-      prevProps.cell === nextProps.cell &&
-      prevProps.currentUserHandle === nextProps.currentUserHandle &&
-      prevProps.isShieldActive === nextProps.isShieldActive &&
-      prevProps.isCrewMember === nextProps.isCrewMember &&
-      prevProps.isWarCrewMember === nextProps.isWarCrewMember &&
-      prevProps.isAllianceCrewMember === nextProps.isAllianceCrewMember &&
-      // Only check dynamicEntityData for this specific tile
-      prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
-      nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
-    );
-  });
+  }, tileMemoComparison);
 
   type RowProps = {
     y: number;
@@ -254,8 +698,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [showCrewOnboardingModal, setShowCrewOnboardingModal] = useState(false);
   const [showVisitingProfileModal, setShowVisitingProfileModal] = useState(false);
   const [visitingProfileUserId, setVisitingProfileUserId] = useState<string | null>(null);
-  const visitingProfileCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const visitCrewCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const visitingProfileCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const visitCrewCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showVisitCrewModal, setShowVisitCrewModal] = useState(false);
   const [visitCrewId, setVisitCrewId] = useState<string | null>(null);
   const [visitCrewName, setVisitCrewName] = useState<string | null>(null);
@@ -271,20 +715,66 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const boundsReady = useSharedValue(false);
   const initialDims = Dimensions.get('window');
   const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: initialDims.width, height: initialDims.height });
-  const [windowRange, setWindowRange] = useState<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>({ rowStart: 0, rowEnd: Math.min(14, (grid.length || 50) - 1), colStart: 0, colEnd: Math.min(14, (grid.length || 50) - 1) });
+  const [windowRange, setWindowRange] = useState<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>({ rowStart: 0, rowEnd: Math.min(14, getGridSize(grid) - 1), colStart: 0, colEnd: Math.min(14, getGridSize(grid) - 1) });
+  
+  // Phase 5: Use ref for windowRange during panning to reduce re-renders
+  const windowRangeRef = useRef<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>(windowRange);
+  
   const [isMapReady, setIsMapReady] = useState<boolean>(false);
   
   // Static vs Dynamic Data Separation
   const [staticTerrainData, setStaticTerrainData] = useState<Record<string, TerrainType>>({});
   const [dynamicEntityData, setDynamicEntityData] = useState<Record<string, any>>({});
+  // Phase 2: Separate entity images from entity details
+  const [entityImageData, setEntityImageData] = useState<Record<string, {
+    entity: EntityType;
+    owner?: string;
+    userId?: string;
+    npcSlug?: string;
+  }>>({});
   const [terrainDataLoaded, setTerrainDataLoaded] = useState<boolean>(false);
   
   // Shield status change tracking
   const [lastShieldStatus, setLastShieldStatus] = useState<boolean | null>(null);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
+  // Phase 1: Panning state management
+  const [isPanningJS, setIsPanningJS] = useState<boolean>(false);
+  const [panningStopped, setPanningStopped] = useState<boolean>(true);
+  
+  // Phase 5: Sync ref to state when panning stops
+  useEffect(() => {
+    if (!isPanningJS && panningStopped) {
+      const refRange = windowRangeRef.current;
+      const stateRange = windowRange;
+      
+      // Check if state and ref differ
+      const differs = stateRange.rowStart !== refRange.rowStart || stateRange.rowEnd !== refRange.rowEnd ||
+                      stateRange.colStart !== refRange.colStart || stateRange.colEnd !== refRange.colEnd;
+      
+      if (differs) {
+        // State and ref differ - sync state to ref (ref has latest panning data)
+        setWindowRange(refRange);
+        // Don't sync ref to state here - wait for state update to complete
+        // The next render will have state == ref, and we can safely sync if needed
+      } else {
+        // State and ref are equal - safe to keep ref in sync with state
+        // This handles cases where state is updated externally (not through this effect)
+        windowRangeRef.current = stateRange;
+      }
+    }
+  }, [panningStopped, isPanningJS, windowRange]);
+
   // Use ref for lastUpdateTime to avoid circular dependency
   const lastUpdateTimeRef = useRef(0);
+
+  // Phase 2: Cell cache to maintain stable object references
+  const cellCacheRef = useRef<Map<string, CellData>>(new Map());
+
+  // Phase 3: Shield status cache to track previous shield status per user
+  const shieldStatusCacheRef = useRef<Record<string, boolean>>({});
+  
+  const prevVisibleCellsCountRef = useRef<number>(0);
   
   // Update specific tile shield status without full map refresh
   const updateTileShieldStatus = useCallback(async (userId: string, currentShieldStatus: boolean) => {
@@ -309,6 +799,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         // Only update if the shield status actually changed
         if (actualShieldStatus !== currentShieldStatus) {
           lastUpdateTimeRef.current = now; // Update ref instead of state
+          
+          // Phase 3: Update shield status cache
+          shieldStatusCacheRef.current[userId] = actualShieldStatus;
+          
           setDynamicEntityData(prev => {
             const updated = { ...prev };
             let hasChanges = false;
@@ -417,38 +911,39 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const calculateVirtualViewport = useCallback((panX: number, panY: number, width: number, height: number) => {
     if (width <= 0 || height <= 0) return;
     
-    // Calculate the exact visible area in grid coordinates
-    const gridLeft = panX + MARGIN_SIZE;
-    const gridTop = panY + MARGIN_SIZE;
-    
-    // Convert screen coordinates to grid coordinates
-    const startCol = Math.floor((-gridLeft) / CELL_SIZE);
-    const endCol = Math.ceil((width - gridLeft) / CELL_SIZE);
-    const startRow = Math.floor((-gridTop) / CELL_SIZE);
-    const endRow = Math.ceil((height - gridTop) / CELL_SIZE);
-    
-    // Clamp to grid bounds
-    const gridSize = grid.length || 50;
-    const clampedStartCol = Math.max(0, startCol);
-    const clampedEndCol = Math.min(gridSize - 1, endCol);
-    const clampedStartRow = Math.max(0, startRow);
-    const clampedEndRow = Math.min(gridSize - 1, endRow);
+    // Calculate the exact visible area in grid coordinates (no buffer)
+    const gridSize = getGridSize(grid);
+    const { startCol: clampedStartCol, endCol: clampedEndCol, startRow: clampedStartRow, endRow: clampedEndRow } = 
+      calculateViewportFromPan(panX, panY, width, height, gridSize, 0);
     
     // Generate visible tile keys (only what's actually on screen)
-    const visibleTiles = new Set<string>();
-    for (let y = clampedStartRow; y <= clampedEndRow; y++) {
-      for (let x = clampedStartCol; x <= clampedEndCol; x++) {
-        visibleTiles.add(`${x},${y}`);
-      }
-    }
+    const visibleTiles = generateVisibleTileKeys(clampedStartCol, clampedEndCol, clampedStartRow, clampedEndRow);
     
-    // Update virtual viewport state
-    const totalTiles = (clampedEndRow - clampedStartRow + 1) * (clampedEndCol - clampedStartCol + 1);
-    setVirtualViewport(prev => ({
-      visibleTiles,
-      renderCount: visibleTiles.size,
-      totalTiles
-    }));
+    // Only update if Set contents actually changed (compare sizes and contents)
+    setVirtualViewport(prev => {
+      // Compare Set contents to avoid unnecessary updates
+      if (prev.visibleTiles.size === visibleTiles.size) {
+        let contentsMatch = true;
+        for (const tile of visibleTiles) {
+          if (!prev.visibleTiles.has(tile)) {
+            contentsMatch = false;
+            break;
+          }
+        }
+        if (contentsMatch) {
+          // Contents are identical, return previous state to avoid new Set reference
+          return prev;
+        }
+      }
+      
+      // Contents changed, update state
+      const totalTiles = (clampedEndRow - clampedStartRow + 1) * (clampedEndCol - clampedStartCol + 1);
+      return {
+        visibleTiles,
+        renderCount: visibleTiles.size,
+        totalTiles
+      };
+    });
   }, [grid]);
 
   const animatedMapStyle = useAnimatedStyle(() => {
@@ -465,6 +960,27 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       ],
     } as const;
   });
+
+  // Phase 1: Sync Reanimated isPanning to JS state
+  useAnimatedReaction(
+    () => isPanning.value,
+    (panning) => {
+      runOnJS(setIsPanningJS)(panning);
+    }
+  );
+
+
+  // Phase 1: Debounce panning stopped (200ms after pan ends)
+  useEffect(() => {
+    if (!isPanningJS) {
+      const timer = setTimeout(() => {
+        setPanningStopped(true);
+      }, 200);
+      return () => clearTimeout(timer);
+    } else {
+      setPanningStopped(false);
+    }
+  }, [isPanningJS]);
 
   useAnimatedReaction(
     () => {
@@ -488,6 +1004,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
   const panGesture = Gesture.Pan()
     .enabled(!showAntivirusModal && !showCrewModal && !showCrewOnboardingModal) // Disable pan gesture when any modal is open
+    .minDistance(10)
     .onStart(() => {
       startX.value = offsetX.value;
       startY.value = offsetY.value;
@@ -545,9 +1062,161 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     });
   const gridSize = grid.length || 50;
   const totalSize = gridSize * CELL_SIZE;
-  const { data: mapData, isLoading, refetch } = useFetchMapQuery();
-  const { data: shieldData } = useGetShieldStatusQuery(undefined, {
-    pollingInterval: 1000, // Poll every second for real-time updates
+  
+  // Phase 5: Two-step approach - fetch initial viewport, then full map if user not found
+  // Step 1: Fetch a reasonable initial viewport based on actual pan position (0,0) and visible area
+  const initialViewport = useMemo(() => {
+    if (containerSize.width === 0 || containerSize.height === 0) {
+      // Fallback to center if container not ready (shouldn't happen due to skip condition)
+      const buffer = 15;
+      const centerX = Math.floor(gridSize / 2);
+      const centerY = Math.floor(gridSize / 2);
+      return {
+        x1: Math.max(0, centerX - buffer),
+        y1: Math.max(0, centerY - buffer),
+        x2: Math.min(gridSize - 1, centerX + buffer),
+        y2: Math.min(gridSize - 1, centerY + buffer),
+      };
+    }
+    
+    // Calculate viewport from initial pan position (0,0) to match what's actually visible
+    const buffer = 15; // Larger buffer to increase chance of finding user
+    const initialPanX = 0;
+    const initialPanY = 0;
+    const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(
+      initialPanX,
+      initialPanY,
+      containerSize.width,
+      containerSize.height,
+      gridSize,
+      buffer
+    );
+    
+    return {
+      x1: startCol,
+      y1: startRow,
+      x2: endCol,
+      y2: endRow,
+    };
+  }, [gridSize, containerSize.width, containerSize.height]);
+  
+  const shouldSkipInitialQuery = containerSize.width === 0 || containerSize.height === 0;
+  const { data: initialViewportData, isLoading: isLoadingInitialViewport, refetch: refetchInitialViewport } = useFetchMapViewportQuery(
+    initialViewport,
+    { skip: shouldSkipInitialQuery }
+  );
+  
+  
+  // Step 2: Check if user's house is in initial viewport, if not, fetch full map
+  const [needsFullMap, setNeedsFullMap] = useState<boolean>(false);
+  const { data: fullMapData, isLoading: isLoadingFullMap, refetch: refetchFullMap } = useFetchMapQuery(undefined, {
+    skip: !needsFullMap,
+  });
+  
+  // Determine which data to use
+  const mapData = needsFullMap ? fullMapData : initialViewportData;
+  const isLoading = isLoadingInitialViewport || (needsFullMap && isLoadingFullMap);
+  
+  // Check if user's house is in initial viewport (check once per user)
+  const hasCheckedUserLocationRef = useRef<boolean>(false);
+  const lastCheckedUserHandleRef = useRef<string | null>(null);
+  useEffect(() => {
+    // Reset check if user handle changed
+    if (lastCheckedUserHandleRef.current !== currentUserHandle) {
+      hasCheckedUserLocationRef.current = false;
+      lastCheckedUserHandleRef.current = currentUserHandle || null;
+    }
+    
+    if (hasCheckedUserLocationRef.current) return; // Already checked for this user
+    if (!initialViewportData || !initialViewportData.grid || !currentUserHandle) return;
+    if (needsFullMap) return; // Already decided we need full map
+    
+    hasCheckedUserLocationRef.current = true; // Mark as checked before doing the check
+    
+    const viewport = initialViewportData.viewport || initialViewport;
+    let foundUser = false;
+    
+    for (let y = viewport.y1; y <= viewport.y2; y++) {
+      const row = initialViewportData.grid[y];
+      if (!row) continue;
+      for (let x = viewport.x1; x <= viewport.x2; x++) {
+        const cell = row[x];
+        if (cell && cell.entity === 'house' && cell.name === currentUserHandle) {
+          foundUser = true;
+          break;
+        }
+      }
+      if (foundUser) break;
+    }
+    
+    if (!foundUser) {
+      // User's house not in initial viewport, need full map
+      setNeedsFullMap(true);
+    }
+  }, [initialViewportData, currentUserHandle, needsFullMap, initialViewport]);
+  
+  // Refetch function - use appropriate query's refetch
+  const refetch = useCallback(() => {
+    if (needsFullMap) {
+      refetchFullMap();
+    } else {
+      refetchInitialViewport();
+    }
+  }, [needsFullMap, refetchFullMap, refetchInitialViewport]);
+  
+  // Phase 6: Viewport fetching during panning with minimal data
+  // Track the last viewport we fetched to avoid duplicate requests
+  const lastFetchedViewportRef = useRef<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const [panningViewportParams, setPanningViewportParams] = useState<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>(null);
+  // Phase 6: Track minimal flag in ref to avoid dependency issues
+  const panningViewportMinimalRef = useRef<boolean>(false);
+  // Track if a viewport request is currently in flight to prevent cancelling it
+  const viewportRequestInFlightRef = useRef<boolean>(false);
+  const pendingViewportParamsRef = useRef<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>(null);
+  
+  // Phase 6: Fetch viewport data during panning with minimal flag (terrain + images only, skip details)
+  // Allow query to run when restorePan is set even if terrainDataLoaded is false (returning from battle)
+  const shouldSkipPanningViewport = !panningViewportParams || (!terrainDataLoaded && !restorePan);
+  const { data: panningViewportData, isLoading: isLoadingPanningViewport, error: panningViewportError } = useFetchMapViewportQuery(
+    panningViewportParams!,
+    { skip: shouldSkipPanningViewport }
+  );
+  // Phase 5: Optimize shield status polling - increase interval and make viewport-aware
+  // Check if there are any player tiles in the visible viewport
+  // Phase 5: Use ref for windowRange during panning to reduce re-renders
+  const hasVisiblePlayerTiles = useMemo(() => {
+    if (!terrainDataLoaded) return false;
+    
+    // Check visible cells for player tiles
+    if (virtualViewport.visibleTiles.size > 0) {
+      for (const tileKey of virtualViewport.visibleTiles) {
+        const entity = dynamicEntityData[tileKey];
+        if (entity && entity.owner === 'player') {
+          return true;
+        }
+      }
+    } else {
+      // Phase 5: Use ref when panning, state when not panning
+      const currentWindowRange = isPanningJS ? windowRangeRef.current : windowRange;
+      // Fallback: check window range
+      for (let y = currentWindowRange.rowStart; y <= currentWindowRange.rowEnd; y++) {
+        for (let x = currentWindowRange.colStart; x <= currentWindowRange.colEnd; x++) {
+          const key = `${x},${y}`;
+          const entity = dynamicEntityData[key];
+          if (entity && entity.owner === 'player') {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }, [terrainDataLoaded, virtualViewport.visibleTiles, dynamicEntityData, windowRange, isPanningJS]);
+  
+  // Phase 5: Only poll when player tiles are visible, and increase interval to 5s
+  // Phase 8: Disable RTK Query polling - will use synchronized polling instead
+  const { data: shieldData, refetch: refetchShieldStatus } = useGetShieldStatusQuery(undefined, {
+    pollingInterval: 0, // Phase 8: Disabled - using synchronized polling
+    skip: !hasVisiblePlayerTiles && !currentUserId, // Skip if no player tiles visible and no current user
   });
   
   // Get research features data (same as ResearchFeaturesList)
@@ -559,15 +1228,16 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     skip: !crewStatus?.crewId || !crewStatus?.isInCrew,
   });
 
+  // Phase 8: Disable RTK Query polling - will use synchronized polling instead
   const { data: warStatusData, refetch: refetchWarStatus } = useGetWarStatusQuery(undefined, {
     skip: !crewStatus?.isInCrew,
-    pollingInterval: 3000,
+    pollingInterval: 0, // Phase 8: Disabled - using synchronized polling
     refetchOnMountOrArgChange: true,
   });
 
   const { data: allianceStatusData, refetch: refetchAllianceStatus } = useGetAllianceStatusQuery(undefined, {
     skip: !crewStatus?.isInCrew,
-    pollingInterval: 3000,
+    pollingInterval: 0, // Phase 8: Disabled - using synchronized polling
     refetchOnMountOrArgChange: true,
   });
 
@@ -789,67 +1459,302 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   
   const isShieldActive = shieldData?.isActive || false;
 
+  // Phase 7: Optimize shield status effect - only update tiles that actually changed
   // Trigger immediate updates for ALL users when current user's shield status changes
   useEffect(() => {
     if (lastShieldStatus !== null && lastShieldStatus !== isShieldActive && currentUserId) {
+      const cache = shieldStatusCacheRef.current;
+      const tilesToUpdate: Array<{ userId: string; currentStatus: boolean }> = [];
       
-      // First, immediately update ALL visible player tiles with fresh shield status
+      // Phase 7: Collect tiles that need updates (only those that changed)
       if (dynamicEntityData) {
         Object.keys(dynamicEntityData).forEach(key => {
           const entity = dynamicEntityData[key];
           if (entity && entity.owner === 'player' && entity.userId) {
-            // Update other users' tiles immediately
-            updateTileShieldStatus(entity.userId, entity.isShielded || false);
+            const userId = entity.userId;
+            const currentStatus = entity.isShielded || false;
+            const cachedStatus = cache[userId];
+            
+            // Only add to update list if status changed or first time seeing this user
+            if (cachedStatus === undefined || cachedStatus !== currentStatus) {
+              tilesToUpdate.push({ userId, currentStatus });
+            }
           }
         });
       }
       
-      // Then update the current user's tile
-      setDynamicEntityData(prev => {
-        const updated = { ...prev };
-        let found = false;
-        Object.keys(updated).forEach(key => {
-          const entity = updated[key];
-          if (entity && entity.userId === currentUserId && entity.owner === 'player') {
-            updated[key] = {
-              ...entity,
-              isShielded: isShieldActive
-            };
-            found = true;
-          }
+      // Phase 7: Batch updates for multiple changed tiles
+      if (tilesToUpdate.length > 0) {
+        unstable_batchedUpdates(() => {
+          // Update cache and trigger updates for changed tiles
+          tilesToUpdate.forEach(({ userId, currentStatus }) => {
+            cache[userId] = currentStatus;
+            updateTileShieldStatusRef.current(userId, currentStatus);
+          });
+          
+          // Update current user's tile
+          setDynamicEntityData(prev => {
+            const updated = { ...prev };
+            let found = false;
+            Object.keys(updated).forEach(key => {
+              const entity = updated[key];
+              if (entity && entity.userId === currentUserId && entity.owner === 'player') {
+                updated[key] = {
+                  ...entity,
+                  isShielded: isShieldActive
+                };
+                // Phase 7: Update cache for current user
+                cache[currentUserId] = isShieldActive;
+                found = true;
+              }
+            });
+            
+            return updated;
+          });
         });
-        
-        return updated;
-      });
+      } else {
+        // No other tiles to update, just update current user's tile
+        unstable_batchedUpdates(() => {
+          setDynamicEntityData(prev => {
+            const updated = { ...prev };
+            let found = false;
+            Object.keys(updated).forEach(key => {
+              const entity = updated[key];
+              if (entity && entity.userId === currentUserId && entity.owner === 'player') {
+                updated[key] = {
+                  ...entity,
+                  isShielded: isShieldActive
+                };
+                // Phase 7: Update cache for current user
+                cache[currentUserId] = isShieldActive;
+                found = true;
+              }
+            });
+            
+            return updated;
+          });
+        });
+      }
     }
     setLastShieldStatus(isShieldActive);
   }, [isShieldActive, lastShieldStatus, currentUserId]);
 
   // Store the latest updateTileShieldStatus function in a ref to avoid stale closures
   const updateTileShieldStatusRef = useRef(updateTileShieldStatus);
+  
+  // Bug Fix: Use ref to track latest grid value to avoid stale closures in viewport merging
+  // This ensures sequential viewport updates don't overwrite each other's changes
+  const gridRef = useRef(grid);
   updateTileShieldStatusRef.current = updateTileShieldStatus;
 
-  // Add frequent check for shield status changes on visible tiles
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (!isRefreshing) {
-        // Get current dynamicEntityData without depending on it in the dependency array
-        setDynamicEntityData(currentData => {
-          if (currentData) {
-            Object.values(currentData).forEach((entity: any) => {
-              if (entity && entity.owner === 'player' && entity.userId) {
-                // Use the ref to get the latest updateTileShieldStatus function
-                updateTileShieldStatusRef.current(entity.userId, entity.isShielded || false);
-              }
-            });
-          }
-          return currentData; // Return unchanged data
-        });
-      }
-    }, 3000); // Check every 3 seconds to reduce re-renders while maintaining responsiveness
+  // Phase 8: Synchronized polling hook
+  const useSynchronizedPolling = (intervalMs: number, callback: () => void, deps: React.DependencyList = []) => {
+    useEffect(() => {
+      const getTimeUntilNextSync = () => {
+        const now = Date.now();
+        const interval = intervalMs;
+        // Calculate time until next sync point (aligned to interval boundaries)
+        const timeSinceLastSync = now % interval;
+        return interval - timeSinceLastSync;
+      };
+      
+      const delay = getTimeUntilNextSync();
+      let intervalId: ReturnType<typeof setInterval> | null = null;
+      
+      const timeout = setTimeout(() => {
+        callback(); // First sync
+        intervalId = setInterval(callback, intervalMs); // Subsequent syncs
+      }, delay);
+      
+      return () => {
+        clearTimeout(timeout);
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
+      };
+    }, [intervalMs, ...deps]); // eslint-disable-line react-hooks/exhaustive-deps
+  };
 
-    return () => clearInterval(interval);
-  }, [isRefreshing]); // Only depend on isRefreshing, use ref for latest function
+  // Phase 3: Only update shield status when it actually changed
+  // Phase 8: 3-second polling group (Shield status + Shield interval check)
+  const checkShieldInterval = useCallback(() => {
+    if (!isRefreshing) {
+      // Get current dynamicEntityData without depending on it in the dependency array
+      setDynamicEntityData(currentData => {
+        if (currentData) {
+          const cache = shieldStatusCacheRef.current;
+          Object.values(currentData).forEach((entity: any) => {
+            if (entity && entity.owner === 'player' && entity.userId) {
+              const userId = entity.userId;
+              const currentStatus = entity.isShielded || false;
+              const cachedStatus = cache[userId];
+              
+              // Phase 3: Only update if shield status actually changed
+              if (cachedStatus === undefined || cachedStatus !== currentStatus) {
+                // Status changed or first time seeing this user - update cache and trigger update
+                cache[userId] = currentStatus;
+                // Use the ref to get the latest updateTileShieldStatus function
+                // updateTileShieldStatus already has change detection, so it will only update if needed
+                updateTileShieldStatusRef.current(userId, currentStatus);
+              }
+            }
+          });
+        }
+        return currentData; // Return unchanged data
+      });
+    }
+  }, [isRefreshing]);
+
+  // Store the latest checkShieldInterval function in a ref to avoid stale closures in polling
+  const checkShieldIntervalRef = useRef(checkShieldInterval);
+  useEffect(() => {
+    checkShieldIntervalRef.current = checkShieldInterval;
+  }, [checkShieldInterval]);
+
+  // Phase 8: Synchronized 3-second polling group
+  useSynchronizedPolling(3000, () => {
+    if (hasVisiblePlayerTiles || currentUserId) {
+      refetchShieldStatus();
+    }
+    // Use ref to get latest checkShieldInterval function (avoids stale closure)
+    checkShieldIntervalRef.current();
+  }, [hasVisiblePlayerTiles, currentUserId]);
+
+  // Phase 9: Check if NPCs are visible in viewport
+  const hasVisibleNPCs = useMemo(() => {
+    if (!terrainDataLoaded) return false;
+    
+    // Check visible cells for NPC tiles
+    if (virtualViewport.visibleTiles.size > 0) {
+      for (const tileKey of virtualViewport.visibleTiles) {
+        const entity = dynamicEntityData[tileKey];
+        if (entity && entity.npcSlug) {
+          return true;
+        }
+      }
+    } else {
+      // Phase 5: Use ref when panning, state when not panning
+      const currentWindowRange = isPanningJS ? windowRangeRef.current : windowRange;
+      // Fallback: check window range
+      for (let y = currentWindowRange.rowStart; y <= currentWindowRange.rowEnd; y++) {
+        for (let x = currentWindowRange.colStart; x <= currentWindowRange.colEnd; x++) {
+          const key = `${x},${y}`;
+          const entity = dynamicEntityData[key];
+          if (entity && entity.npcSlug) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }, [terrainDataLoaded, virtualViewport.visibleTiles, dynamicEntityData, windowRange, isPanningJS]);
+
+  // Phase 9: Check if any entities (NPCs or players) are visible
+  const hasVisibleEntities = useMemo(() => {
+    return hasVisiblePlayerTiles || hasVisibleNPCs;
+  }, [hasVisiblePlayerTiles, hasVisibleNPCs]);
+
+  // Phase 9: Viewport refresh for entity updates (NPCs, player positions, entity changes)
+  // The viewport API already includes all entity data, so we can refresh it to get updates
+  const [entityUpdateViewportParams, setEntityUpdateViewportParams] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const { data: entityUpdateViewportData } = useFetchMapViewportQuery(
+    entityUpdateViewportParams!,
+    { 
+      skip: !entityUpdateViewportParams || !terrainDataLoaded || !hasVisibleEntities,
+      refetchOnMountOrArgChange: true
+    }
+  );
+
+  // Phase 9: Process entity update viewport data
+  // Track processed viewport with timestamp to allow reprocessing for polling updates
+  const processedEntityUpdateViewportRef = useRef<{ viewportKey: string; timestamp: number } | null>(null);
+  useEffect(() => {
+    if (entityUpdateViewportData && entityUpdateViewportData.grid && entityUpdateViewportData.viewport) {
+      const viewport = entityUpdateViewportData.viewport;
+      const viewportKey = `${viewport.x1},${viewport.y1},${viewport.x2},${viewport.y2}`;
+      const now = Date.now();
+      
+      // Phase 9: Prevent duplicate processing within same render cycle, but allow reprocessing for polling
+      // Check if same viewport was processed very recently (< 1 second) to prevent infinite loops
+      // This allows 10-second polling to work while preventing rapid duplicate processing
+      if (processedEntityUpdateViewportRef.current?.viewportKey === viewportKey && 
+          now - processedEntityUpdateViewportRef.current.timestamp < 1000) {
+        return;
+      }
+      processedEntityUpdateViewportRef.current = { viewportKey, timestamp: now };
+      
+      const { terrain, entityImages, entityDetails } = separateStaticAndDynamicData(entityUpdateViewportData.grid, entityUpdateViewportData.viewport);
+      
+      // Phase 1: Batch state updates to reduce re-renders
+      unstable_batchedUpdates(() => {
+        // Update entity data (terrain already loaded, just update entities)
+        setEntityImageData(prev => {
+          const merged = { ...prev };
+          const updatedKeys: string[] = [];
+          Object.entries(entityImages).forEach(([key, value]) => {
+            if (prev[key] !== value) {
+              updatedKeys.push(key);
+            }
+            merged[key] = value;
+          });
+          
+          // Clean up entity image cache for cells that are now empty
+          const deletedKeys = cleanupEmptyCells(merged, entityUpdateViewportData.grid, viewport);
+          
+          return merged;
+        });
+        
+        setDynamicEntityData(prev => {
+          const merged = { ...prev };
+          Object.entries(entityDetails).forEach(([key, value]) => {
+            merged[key] = value;
+          });
+          
+          // Clean up entity details cache for cells that are now empty
+          cleanupEmptyCells(merged, entityUpdateViewportData.grid, viewport);
+          
+          return merged;
+        });
+        
+        // Update grid data - use ref to get latest grid value to avoid stale closures
+        const mergedGrid = mergeGridData(
+          gridRef.current,
+          entityUpdateViewportData.grid,
+          viewport,
+          gridSize
+        );
+        dispatch(setGrid(mergedGrid));
+        // Bug Fix: Update gridRef immediately to prevent race conditions
+        // If multiple effects run in the same cycle, they need to read the updated value
+        gridRef.current = mergedGrid;
+      });
+      
+      // Clear viewport params to allow next refresh
+      setEntityUpdateViewportParams(null);
+    }
+  }, [entityUpdateViewportData, dispatch, gridSize]);
+
+  // Phase 8: Synchronized 10-second polling group
+  // Phase 9: Added entity updates (NPCs, player positions, entity changes) to 10s group
+  useSynchronizedPolling(10000, () => {
+    if (crewStatus?.isInCrew) {
+      refetchWarStatus();
+      refetchAllianceStatus();
+    }
+    
+    // Phase 9: Refresh viewport data for entity updates if entities are visible
+    if (hasVisibleEntities && terrainDataLoaded) {
+      // Phase 5: Use ref when panning, state when not panning
+      const currentWindowRange = isPanningJS ? windowRangeRef.current : windowRange;
+      const currentViewport = {
+        x1: currentWindowRange.colStart,
+        y1: currentWindowRange.rowStart,
+        x2: currentWindowRange.colEnd,
+        y2: currentWindowRange.rowEnd,
+      };
+      setEntityUpdateViewportParams(currentViewport);
+    }
+  }, [crewStatus?.isInCrew, hasVisibleEntities, terrainDataLoaded, windowRange, isPanningJS]);
 
   // Precompute terrain style map and position style caches
   // Memoized with stable references to prevent unnecessary re-renders
@@ -881,73 +1786,140 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     [gridSize]
   );
 
+  // Phase 2: Stabilize cell object references using cache
+  const isPanningJSRef = useRef(isPanningJS);
+  useEffect(() => {
+    isPanningJSRef.current = isPanningJS;
+  }, [isPanningJS]);
+  
   const visibleCells = useMemo(() => {
     const cells: Array<{ x: number; y: number; cell: CellData }> = [];
     
-    // Only compute if terrain data is loaded
     if (!terrainDataLoaded) return cells;
+    
+    
+    // Use ref for panning state, but read data directly from state (not refs)
+    // This ensures we get the latest data even after cache clears
+    const currentIsPanningJS = isPanningJSRef.current;
+    const currentWindowRange = currentIsPanningJS ? windowRangeRef.current : windowRange;
+    
+    const cache = cellCacheRef.current;
+    
+    // Phase 2: Cell cache to maintain stable object references
+    // Bug Fix: Use entityImageData as fallback when dynamicEntityData is missing
+    // This prevents entities from disappearing when panning stops before full details are loaded
+    const getOrCreateCell = (x: number, y: number, terrain: TerrainType, entity: any, entityImage: any): CellData => {
+      // Include entityImage in cache key to ensure proper cache invalidation
+      const cacheKey = `${x},${y}-${terrain}-${entity?.entity || entityImage?.entity || 'empty'}-${entity?.owner || entityImage?.owner || ''}-${entity?.name || ''}-${entity?.userId || entityImage?.userId || ''}-${entity?.npcSlug || entityImage?.npcSlug || ''}-${entity?.npcInstanceId || entityImage?.npcInstanceId || ''}-${entity?.npcLevel || ''}-${entity?.isShielded || false}`;
+      
+      let cell = cache.get(cacheKey);
+      
+      // Check if cached cell matches current data (including entityImage fallback)
+      const currentEntity = entity?.entity || entityImage?.entity || 'empty';
+      const currentOwner = entity?.owner || entityImage?.owner;
+      const currentUserId = entity?.userId || entityImage?.userId;
+      const currentNpcSlug = entity?.npcSlug || entityImage?.npcSlug;
+      const currentNpcInstanceId = entity?.npcInstanceId || entityImage?.npcInstanceId;
+      
+      if (!cell || 
+          cell.terrain !== terrain ||
+          cell.entity !== currentEntity ||
+          cell.owner !== currentOwner ||
+          cell.name !== entity?.name ||
+          cell.userId !== currentUserId ||
+          cell.npcSlug !== currentNpcSlug ||
+          cell.npcInstanceId !== currentNpcInstanceId ||
+          cell.npcLevel !== entity?.npcLevel ||
+          cell.isShielded !== entity?.isShielded) {
+        const newCell: CellData = {
+          terrain,
+          entity: currentEntity,
+          owner: currentOwner,
+          name: entity?.name,
+          userId: currentUserId,
+          npcSlug: currentNpcSlug,
+          npcInstanceId: currentNpcInstanceId,
+          npcLevel: entity?.npcLevel,
+          isShielded: entity?.isShielded,
+        } as any;
+        
+        if (cache.size >= MAX_CACHE_SIZE) {
+          const firstKey = cache.keys().next().value;
+          if (firstKey !== undefined) {
+            cache.delete(firstKey);
+          }
+        }
+        cache.set(cacheKey, newCell);
+        cell = newCell;
+      }
+      
+      return cell;
+    };
     
     // Phase 7A: Virtual Scrolling - Only render tiles that are actually visible
     if (virtualViewport.visibleTiles.size > 0) {
       // Use virtual viewport for ultra-efficient rendering
       virtualViewport.visibleTiles.forEach(tileKey => {
         const [x, y] = tileKey.split(',').map(Number);
+        // Read directly from state to avoid ref timing issues after cache clears
         const terrain = staticTerrainData[tileKey];
         const entity = dynamicEntityData[tileKey];
+        // Bug Fix: Use entityImageData as fallback when dynamicEntityData is missing
+        // This prevents entities from disappearing when panning stops before full details are loaded
+        const entityImage = entityImageData[tileKey];
         
         if (!terrain) return;
         
-        // Create cell data by combining static terrain with dynamic entities
-        const cell: CellData = {
-          terrain,
-          entity: entity?.entity || 'empty',
-          owner: entity?.owner,
-          name: entity?.name,
-          userId: entity?.userId,
-          npcSlug: entity?.npcSlug,
-          npcInstanceId: entity?.npcInstanceId,
-          npcLevel: entity?.npcLevel,
-          isShielded: entity?.isShielded,
-        } as any;
-        
+        const cell = getOrCreateCell(x, y, terrain, entity, entityImage);
         cells.push({ x, y, cell });
       });
     } else {
-      // Fallback to original logic if virtual viewport not ready
-      for (let y = windowRange.rowStart; y <= windowRange.rowEnd; y++) {
-        for (let x = windowRange.colStart; x <= windowRange.colEnd; x++) {
+      // Phase 5: Use ref when panning, state when not panning
+      for (let y = currentWindowRange.rowStart; y <= currentWindowRange.rowEnd; y++) {
+        for (let x = currentWindowRange.colStart; x <= currentWindowRange.colEnd; x++) {
           const key = `${x},${y}`;
+          // Read directly from state to avoid ref timing issues after cache clears
           const terrain = staticTerrainData[key];
           const entity = dynamicEntityData[key];
+          // Bug Fix: Use entityImageData as fallback when dynamicEntityData is missing
+          // This prevents entities from disappearing when panning stops before full details are loaded
+          const entityImage = entityImageData[key];
           
           if (!terrain) continue;
           
-          // Create cell data by combining static terrain with dynamic entities
-          const cell: CellData = {
-            terrain,
-            entity: entity?.entity || 'empty',
-            owner: entity?.owner,
-            name: entity?.name,
-            userId: entity?.userId,
-            npcSlug: entity?.npcSlug,
-            npcInstanceId: entity?.npcInstanceId,
-            npcLevel: entity?.npcLevel,
-          } as any;
-          
+          const cell = getOrCreateCell(x, y, terrain, entity, entityImage);
           cells.push({ x, y, cell });
         }
       }
     }
     
+    // Logging: Track visibleCells count changes (only log if count actually changed)
+    if (prevVisibleCellsCountRef.current !== cells.length) {
+      prevVisibleCellsCountRef.current = cells.length;
+    }
+    
     return cells;
-  }, [virtualViewport.visibleTiles, virtualViewport.visibleTiles.size, windowRange.rowStart, windowRange.rowEnd, windowRange.colStart, windowRange.colEnd, staticTerrainData, dynamicEntityData, terrainDataLoaded]);
+  }, [virtualViewport.visibleTiles, windowRange.rowStart, windowRange.rowEnd, windowRange.colStart, windowRange.colEnd, staticTerrainData, dynamicEntityData, entityImageData, terrainDataLoaded]);
 
 
+
+  // Bug Fix: Keep gridRef in sync with Redux state to avoid stale closures
+  useEffect(() => {
+    gridRef.current = grid;
+  }, [grid]);
 
   // Separate static terrain data from dynamic entity data for optimal loading
-  const separateStaticAndDynamicData = useCallback((gridData: any[][]) => {
+  // Bug Fix: Support viewport filtering to only process cells within viewport bounds
+  // Phase 2: Split entities into entityImages (minimal) and entityDetails (full)
+  const separateStaticAndDynamicData = useCallback((gridData: any[][], viewport?: { x1: number; y1: number; x2: number; y2: number }) => {
     const terrain: Record<string, TerrainType> = {};
-    const entities: Record<string, any> = {};
+    const entityImages: Record<string, {
+      entity: EntityType;
+      owner?: string;
+      userId?: string;
+      npcSlug?: string;
+    }> = {};
+    const entityDetails: Record<string, any> = {};
     
     for (let y = 0; y < gridData.length; y++) {
       const row = gridData[y];
@@ -956,70 +1928,452 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         const cell = row[x];
         if (!cell) continue;
         
+        // Bug Fix: For viewport requests, only process cells within viewport bounds
+        // This prevents overwriting cached terrain outside viewport with 'plain'
+        if (viewport) {
+          // Bug Fix: Validate viewport coordinates are valid numbers (defensive check)
+          if (isValidViewport(viewport)) {
+            const isInViewport = x >= viewport.x1 && x <= viewport.x2 && y >= viewport.y1 && y <= viewport.y2;
+            if (!isInViewport) {
+              continue; // Skip cells outside viewport to preserve cached data
+            }
+          }
+        }
+        
         const key = `${x},${y}`;
         
         // Terrain is static - load once and cache
         terrain[key] = cell.terrain;
         
-        // Entities are dynamic - only load what's needed
+        // Phase 2: Split entities into images (minimal) and details (full)
         if (cell.entity !== 'empty') {
-          entities[key] = {
+          // EntityImages: minimal info for rendering images
+          entityImages[key] = {
+            entity: cell.entity,
+            owner: cell.owner,
+            userId: cell.userId,
+            npcSlug: cell.npcSlug,
+          };
+          
+          // EntityDetails: full info for interactions
+          // Keep entity and owner in details too for backward compatibility with existing rendering code
+          entityDetails[key] = {
             entity: cell.entity,
             owner: cell.owner,
             name: cell.name,
-            userId: cell.userId,
-            npcSlug: cell.npcSlug,
-            npcInstanceId: cell.npcInstanceId,
             npcLevel: cell.npcLevel,
             isShielded: cell.isShielded,
+            npcInstanceId: cell.npcInstanceId,
+            userId: cell.userId,
+            npcSlug: cell.npcSlug,
           };
         }
       }
     }
     
-    return { terrain, entities };
+    return { terrain, entityImages, entityDetails };
   }, []);
 
   useEffect(() => {
     dispatch(setLoading(isLoading));
     if (mapData && mapData.grid) {
-      // Separate static and dynamic data
-      const { terrain, entities } = separateStaticAndDynamicData(mapData.grid);
-      setStaticTerrainData(terrain);
-      setDynamicEntityData(entities);
-      setTerrainDataLoaded(true);
+      // Phase 4B: Merge new data with existing cache instead of replacing
+      // This ensures cached terrain data persists across refetches
+      // Bug Fix: For viewport requests, only process cells within viewport to preserve cached data outside
+      // Phase 2: Now returns three layers: terrain, entityImages, entityDetails
+      const { terrain, entityImages, entityDetails } = separateStaticAndDynamicData(mapData.grid, mapData.viewport);
       
-      dispatch(setGrid(mapData.grid));
+      // Phase 1: Batch state updates to reduce re-renders
+      unstable_batchedUpdates(() => {
+        setStaticTerrainData(prev => {
+          // Terrain is static - merge to preserve existing cached terrain
+          // Bug Fix: For viewport requests, only terrain within viewport is merged
+          return { ...prev, ...terrain };
+        });
+        
+        // Phase 2: Populate entityImageData (minimal info for rendering)
+        setEntityImageData(prev => {
+          const merged = { ...prev, ...entityImages };
+          
+          // Phase 2: Also clear entityImageData for cells that are now empty
+          // Bug Fix: Only iterate through cells that are in the viewport (if viewport provided)
+          if (mapData.viewport) {
+            // Viewport: use helper for efficient cleanup
+            cleanupEmptyCells(merged, mapData.grid, mapData.viewport);
+          } else {
+            // Full map: iterate through all cells
+            const cellsToCheck = getCellsToCheck(mapData.grid);
+            for (const { x, y, cell } of cellsToCheck) {
+              const key = `${x},${y}`;
+              if (cell.entity === 'empty' && merged[key]) {
+                delete merged[key];
+              }
+            }
+          }
+          
+          return merged;
+        });
+        
+        setDynamicEntityData(prev => {
+          // Entities are dynamic - merge to preserve existing cached entities
+          // Bug Fix #1: Also clear entity data for cells that are now empty
+          // When an entity is removed (NPC defeated, house destroyed), we need to delete it from cache
+          // Phase 2: Now using entityDetails instead of entities
+          const merged = { ...prev, ...entityDetails };
+          
+          // Bug Fix: Only iterate through cells that are in the viewport (if viewport provided)
+          // For full map requests, iterate all cells. For viewport requests, only viewport cells.
+          if (mapData.viewport) {
+            // Viewport: use helper for efficient cleanup
+            cleanupEmptyCells(merged, mapData.grid, mapData.viewport);
+          } else {
+            // Full map: iterate through all cells
+            const cellsToCheck = getCellsToCheck(mapData.grid);
+            for (const { x, y, cell } of cellsToCheck) {
+              const key = `${x},${y}`;
+              if (cell.entity === 'empty' && merged[key]) {
+                delete merged[key];
+              }
+            }
+          }
+          
+          return merged;
+        });
+        
+        setTerrainDataLoaded(true);
+        
+        // Bug Fix: For viewport requests, merge with existing grid instead of replacing
+        // This preserves cached data outside the viewport
+        if (mapData.viewport) {
+          // Bug Fix: Validate viewport coordinates are valid numbers (defensive check)
+          if (!isValidViewport(mapData.viewport)) {
+            // Invalid viewport - treat as full map request
+            dispatch(setGrid(mapData.grid));
+          } else {
+            // Viewport request - merge with existing grid
+            // Bug Fix: Read from ref to get latest grid value, avoiding stale closures
+            // This ensures sequential viewport updates don't overwrite each other's changes
+            const mergedGrid = mergeGridData(
+              gridRef.current,
+              mapData.grid,
+              mapData.viewport,
+              mapData.grid.length
+            );
+            
+            dispatch(setGrid(mergedGrid));
+            // Bug Fix: Update gridRef immediately to prevent race conditions
+            // If multiple effects run in the same cycle, they need to read the updated value
+            gridRef.current = mergedGrid;
+            // Phase 5 Fix: Initialize last fetched viewport to initial viewport bounds
+            lastFetchedViewportRef.current = mapData.viewport;
+          }
+        } else {
+          // Full map request - replace entire grid
+          dispatch(setGrid(mapData.grid));
+          // Bug Fix: Update gridRef immediately to prevent race conditions
+          gridRef.current = mapData.grid;
+          // Phase 5 Fix: Initialize last fetched viewport to full map bounds
+          lastFetchedViewportRef.current = { x1: 0, y1: 0, x2: gridSize - 1, y2: gridSize - 1 };
+        }
+      });
     }
-  }, [mapData, isLoading, dispatch, separateStaticAndDynamicData]);
-
-  // Update only dynamic entity data (NPCs, houses, etc.) without full grid refresh
-  const updateEntityData = useCallback((updates: Record<string, any>) => {
-    setDynamicEntityData(prev => ({
-      ...prev,
-      ...updates
-    }));
-  }, []);
+  }, [mapData, isLoading, dispatch, separateStaticAndDynamicData, gridSize]);
+  
+  // Phase 6: Process panning viewport data (minimal: terrain + images only, skip details)
+  // Track processed viewport to prevent infinite loops
+  const processedViewportRef = useRef<string | null>(null);
+  useEffect(() => {
+    // Mark request as complete (success or error)
+    if (panningViewportData || panningViewportError) {
+      viewportRequestInFlightRef.current = false;
+    }
+    
+    // Process current data first before handling pending requests
+    // This ensures non-minimal restorePan data isn't discarded when a panning request is pending
+    if (panningViewportData && panningViewportData.grid && panningViewportData.viewport) {
+      const viewport = panningViewportData.viewport;
+      const viewportKey = `${viewport.x1},${viewport.y1},${viewport.x2},${viewport.y2}`;
+      
+      // Phase 6: Prevent processing the same viewport twice
+      if (processedViewportRef.current === viewportKey) {
+        // Still handle pending requests even if this viewport was already processed
+        if (pendingViewportParamsRef.current) {
+          const pending = pendingViewportParamsRef.current;
+          pendingViewportParamsRef.current = null;
+          viewportRequestInFlightRef.current = true;
+          panningViewportMinimalRef.current = pending.minimal ?? true;
+          setPanningViewportParams(pending);
+        }
+        return;
+      }
+      processedViewportRef.current = viewportKey;
+      
+      const { terrain, entityImages, entityDetails } = separateStaticAndDynamicData(panningViewportData.grid, panningViewportData.viewport);
+      
+      // Phase 6: Check if this is a minimal request using ref (avoids dependency issues)
+      const isMinimalRequest = panningViewportMinimalRef.current;
+      
+      // Phase 1: Batch state updates to reduce re-renders
+      unstable_batchedUpdates(() => {
+        // Merge terrain data (always needed)
+        setStaticTerrainData(prev => {
+          const merged = { ...prev };
+          Object.entries(terrain).forEach(([key, value]) => {
+            merged[key] = value;
+          });
+          return merged;
+        });
+        
+        // Merge entity image data (always needed for rendering)
+        setEntityImageData(prev => {
+          const merged = { ...prev };
+          Object.entries(entityImages).forEach(([key, value]) => {
+            merged[key] = value;
+          });
+          
+          // Clean up entity image cache for cells that are now empty
+          cleanupEmptyCells(merged, panningViewportData.grid, viewport);
+          
+          return merged;
+        });
+        
+        // Phase 6: Only merge entity details if NOT a minimal request
+        // During panning, skip entity details (names, levels, shield status) for performance
+        if (!isMinimalRequest) {
+          setDynamicEntityData(prev => {
+            const merged = { ...prev };
+            Object.entries(entityDetails).forEach(([key, value]) => {
+              merged[key] = value;
+            });
+            
+            // Clean up entity details cache for cells that are now empty
+            cleanupEmptyCells(merged, panningViewportData.grid, viewport);
+            
+            return merged;
+          });
+        }
+        
+        // Merge grid data - use ref to get latest grid value to avoid stale closures
+        // Bug #13: Calculate gridSize from ref inside effect (not from outer scope)
+        const gridSize = getGridSize(gridRef.current);
+        const mergedGrid = mergeGridData(
+          gridRef.current,
+          panningViewportData.grid,
+          viewport,
+          gridSize
+        );
+        dispatch(setGrid(mergedGrid));
+        // Bug Fix: Update gridRef immediately to prevent race conditions
+        // If multiple effects run in the same cycle, they need to read the updated value
+        gridRef.current = mergedGrid;
+        
+        // Set terrainDataLoaded to true when processing restorePan viewport (non-minimal request)
+        // This ensures the map loads properly when returning from battle prep
+        if (!isMinimalRequest) {
+          setTerrainDataLoaded(true);
+        }
+      });
+      
+      // Update last fetched viewport (without minimal flag for comparison)
+      lastFetchedViewportRef.current = { x1: viewport.x1, y1: viewport.y1, x2: viewport.x2, y2: viewport.y2 };
+      
+      // Clear viewport params and reset minimal flag to allow next fetch
+      panningViewportMinimalRef.current = false;
+      setPanningViewportParams(null);
+    }
+    
+    // Handle pending requests after processing current data
+    // This ensures non-minimal restorePan data is processed even if a panning request is pending
+    if ((panningViewportData || panningViewportError) && pendingViewportParamsRef.current) {
+      const pending = pendingViewportParamsRef.current;
+      pendingViewportParamsRef.current = null;
+      viewportRequestInFlightRef.current = true;
+      // Respect the minimal flag from the pending request (restorePan uses minimal: false)
+      panningViewportMinimalRef.current = pending.minimal ?? true;
+      setPanningViewportParams(pending);
+    }
+  }, [panningViewportData, panningViewportError, separateStaticAndDynamicData, dispatch]);
+  
+  // Phase 7: Load entity details when panning stops
+  const [stoppedViewportParams, setStoppedViewportParams] = useState<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>(null);
+  const { data: stoppedViewportData, isLoading: isLoadingStoppedViewport } = useFetchMapViewportQuery(
+    stoppedViewportParams!,
+    { skip: !stoppedViewportParams || !terrainDataLoaded || !panningStopped }
+  );
+  
+  // Phase 7: Trigger entity details fetch when panning stops
+  const lastStoppedViewportRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (panningStopped && terrainDataLoaded && !isPanningJS) {
+      // Calculate current viewport from windowRange
+      const currentViewport = {
+        x1: windowRange.colStart,
+        y1: windowRange.rowStart,
+        x2: windowRange.colEnd,
+        y2: windowRange.rowEnd,
+      };
+      
+      const viewportKey = `${currentViewport.x1},${currentViewport.y1},${currentViewport.x2},${currentViewport.y2}`;
+      
+      // Check if we've already fetched details for this viewport
+      if (lastStoppedViewportRef.current === viewportKey) {
+        return;
+      }
+      
+      // Check if entity details are already loaded for visible tiles
+      let needsDetails = false;
+      for (let y = currentViewport.y1; y <= currentViewport.y2; y++) {
+        for (let x = currentViewport.x1; x <= currentViewport.x2; x++) {
+          const key = `${x},${y}`;
+          const hasEntityImage = entityImageData[key];
+          const hasEntityDetails = dynamicEntityData[key];
+          
+          // If we have an entity image but no details, we need to fetch details
+          if (hasEntityImage && !hasEntityDetails) {
+            needsDetails = true;
+            break;
+          }
+        }
+        if (needsDetails) break;
+      }
+      
+      if (needsDetails) {
+        lastStoppedViewportRef.current = viewportKey;
+        // Fetch full details (minimal: false)
+        setStoppedViewportParams({ ...currentViewport, minimal: false });
+      }
+    }
+  }, [panningStopped, terrainDataLoaded, isPanningJS, windowRange, entityImageData, dynamicEntityData]);
+  
+  // Phase 7: Process stopped viewport data (full details only)
+  // Track processed viewport to prevent infinite loops
+  const processedStoppedViewportRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (stoppedViewportData && stoppedViewportData.grid && stoppedViewportData.viewport) {
+      const viewport = stoppedViewportData.viewport;
+      const viewportKey = `${viewport.x1},${viewport.y1},${viewport.x2},${viewport.y2}`;
+      
+      // Phase 7: Prevent processing the same viewport twice
+      if (processedStoppedViewportRef.current === viewportKey) {
+        return;
+      }
+      processedStoppedViewportRef.current = viewportKey;
+      
+      const { terrain, entityImages, entityDetails } = separateStaticAndDynamicData(stoppedViewportData.grid, stoppedViewportData.viewport);
+      
+      // Phase 1: Batch state updates to reduce re-renders
+      unstable_batchedUpdates(() => {
+        // Phase 7: Only merge entity details (terrain and images already loaded)
+        setDynamicEntityData(prev => {
+          const merged = { ...prev };
+          Object.entries(entityDetails).forEach(([key, value]) => {
+            merged[key] = value;
+          });
+          return merged;
+        });
+        
+        // Merge grid data (update entity details in grid) - use ref to get latest grid value to avoid stale closures
+        const mergedGrid = mergeGridData(
+          gridRef.current,
+          stoppedViewportData.grid,
+          viewport,
+          gridSize
+        );
+        dispatch(setGrid(mergedGrid));
+        // Bug Fix: Update gridRef immediately to prevent race conditions
+        // If multiple effects run in the same cycle, they need to read the updated value
+        gridRef.current = mergedGrid;
+      });
+      
+      // Clear stopped viewport params to allow next fetch
+      setStoppedViewportParams(null);
+    }
+  }, [stoppedViewportData, separateStaticAndDynamicData, dispatch, gridSize]);
 
   // Force refresh map data when returning from battle to ensure NPCs are updated
+  // Phase 4B: Only clear cache when explicitly needed (restorePan = returning from battle)
   useEffect(() => {
-    if (restorePan) {
-      refetch();
+    if (restorePan && containerSize.width > 0 && containerSize.height > 0) {
+      const restoreKey = `${restorePan.x},${restorePan.y}`;
+      
+      // Prevent processing the same restorePan viewport multiple times
+      if (processedRestorePanViewportRef.current === restoreKey) {
+        return;
+      }
+      processedRestorePanViewportRef.current = restoreKey;
+      
+      // Calculate viewport around restorePan location instead of clearing everything
+      const buffer = 15;
+      const gridSize = getGridSize(grid, 50);
+      
+      // Convert restorePan grid coordinates to pan coordinates to calculate correct viewport
+      const { x: panX, y: panY } = gridToPanCoordinates(
+        restorePan.x,
+        restorePan.y,
+        containerSize.width,
+        containerSize.height
+      );
+      
+      const restoreViewport = calculateViewportFromPan(
+        panX,
+        panY,
+        containerSize.width,
+        containerSize.height,
+        gridSize,
+        buffer
+      );
+      
+      // Fetch viewport at restorePan location instead of initial viewport
+      // Mark request as in flight to prevent panning from overwriting restorePan request
+      // If a panning request is already in flight, store restorePan as pending
+      if (viewportRequestInFlightRef.current) {
+        pendingViewportParamsRef.current = {
+          x1: restoreViewport.startCol,
+          y1: restoreViewport.startRow,
+          x2: restoreViewport.endCol,
+          y2: restoreViewport.endRow,
+          minimal: false
+        };
+      } else {
+        // Reset minimal flag to ensure restorePan request is processed as non-minimal
+        // This prevents terrainDataLoaded from being incorrectly skipped
+        // Only set when starting a new request to avoid race condition with in-flight requests
+        panningViewportMinimalRef.current = false;
+        viewportRequestInFlightRef.current = true;
+        setPanningViewportParams({
+          x1: restoreViewport.startCol,
+          y1: restoreViewport.startRow,
+          x2: restoreViewport.endCol,
+          y2: restoreViewport.endRow,
+          minimal: false
+        });
+      }
+      
+      // Clear cache for the restorePan area only (not everything)
+      // This ensures fresh data for NPCs that may have been defeated
+      setStaticTerrainData({});
+      setDynamicEntityData({});
+      setEntityImageData({});
+      setTerrainDataLoaded(false);
+    } else if (!restorePan) {
+      // Clear processed ref when restorePan is cleared
+      processedRestorePanViewportRef.current = null;
     }
-  }, [restorePan, refetch]);
+  }, [restorePan, containerSize.width, containerSize.height, grid]);
 
   const computeWindow = useCallback((panX: number, panY: number, width: number, height: number) => {
     if (width <= 0 || height <= 0) {return;}
     
-    // Reduce throttle from 40ms to 16ms for 60fps responsiveness
+    // Phase 4: Conditional throttle - 33ms during panning (30fps), 16ms when not panning (60fps)
     const now = Date.now();
-    if (now - lastComputeTs.value < 16) {return;} // 60fps throttle
+    const throttleMs = isPanningJS ? 33 : 16; // 30fps during panning, 60fps when not panning
+    if (now - lastComputeTs.value < throttleMs) {return;}
     lastComputeTs.value = now;
     
     // Skip tiny pan changes to reduce churn
     const lx = lastComputedPan.value.x;
     const ly = lastComputedPan.value.y;
-    if (Math.abs(panX - lx) < 4 && Math.abs(panY - ly) < 4) { // Reduced from 8 to 4 for precision
+    if (Math.abs(panX - lx) < PAN_CHANGE_THRESHOLD && Math.abs(panY - ly) < PAN_CHANGE_THRESHOLD) {
       return;
     }
     lastComputedPan.value = { x: panX, y: panY };
@@ -1028,76 +2382,145 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     calculateVirtualViewport(panX, panY, width, height);
     
     // Simplified buffer calculation - removed complex velocity math
-    const baseBuffer = 8; // Reduced from 12 for better performance
-    const gridLeft = panX + MARGIN_SIZE;
-    const gridTop = panY + MARGIN_SIZE;
-    const baseStartCol = Math.floor((-gridLeft) / CELL_SIZE);
-    const baseEndCol = Math.ceil((width - gridLeft) / CELL_SIZE);
-    const baseStartRow = Math.floor((-gridTop) / CELL_SIZE);
-    const baseEndRow = Math.ceil((height - gridTop) / CELL_SIZE);
-    const startCol = Math.max(0, baseStartCol - baseBuffer);
-    const endCol = Math.min(gridSize - 1, baseEndCol + baseBuffer);
-    const startRow = Math.max(0, baseStartRow - baseBuffer);
-    const endRow = Math.min(gridSize - 1, baseEndRow + baseBuffer);
+    const baseBuffer = PAN_BUFFER;
+    const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(panX, panY, width, height, gridSize, baseBuffer);
     
-    setWindowRange(prev => {
-      const same = prev.rowStart === startRow && prev.rowEnd === endRow && prev.colStart === startCol && prev.colEnd === endCol;
-      if (same) return prev;
-      // Reduced small shift threshold from 2 to 1 for more responsive updates
-      const smallShift =
-        Math.abs(prev.rowStart - startRow) < 1 &&
-        Math.abs(prev.rowEnd - endRow) < 1 &&
-        Math.abs(prev.colStart - startCol) < 1 &&
-        Math.abs(prev.colEnd - endCol) < 1;
-      if (smallShift) return prev;
-      return { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
-    });
-  }, [gridSize, calculateVirtualViewport]);
+    // Phase 5: Use ref for windowRange during panning, state when not panning
+    const newWindowRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
+    
+    if (isPanningJS) {
+      // Phase 5: During panning, update ref only (no state update to reduce re-renders)
+      const prevRange = windowRangeRef.current;
+      const same = prevRange.rowStart === startRow && prevRange.rowEnd === endRow && prevRange.colStart === startCol && prevRange.colEnd === endCol;
+      if (!same) {
+        // Reduced small shift threshold from 2 to 1 for more responsive updates
+        const smallShift =
+          Math.abs(prevRange.rowStart - startRow) < 1 &&
+          Math.abs(prevRange.rowEnd - endRow) < 1 &&
+          Math.abs(prevRange.colStart - startCol) < 1 &&
+          Math.abs(prevRange.colEnd - endCol) < 1;
+        if (!smallShift) {
+          windowRangeRef.current = newWindowRange;
+          
+          // Phase 6: Trigger viewport fetch with minimal flag if we've moved significantly outside the last fetched viewport
+          const newViewport = { x1: startCol, y1: startRow, x2: endCol, y2: endRow, minimal: true };
+          if (shouldFetchViewport(newViewport, lastFetchedViewportRef.current)) {
+            triggerViewportFetch(newViewport, panningViewportMinimalRef, setPanningViewportParams, viewportRequestInFlightRef, pendingViewportParamsRef);
+          }
+        }
+      }
+    } else {
+      // Phase 5: When not panning, update state (triggers re-render for visual updates)
+      setWindowRange(prev => {
+        const same = prev.rowStart === startRow && prev.rowEnd === endRow && prev.colStart === startCol && prev.colEnd === endCol;
+        if (same) return prev;
+        // Reduced small shift threshold from 2 to 1 for more responsive updates
+        const smallShift =
+          Math.abs(prev.rowStart - startRow) < 1 &&
+          Math.abs(prev.rowEnd - endRow) < 1 &&
+          Math.abs(prev.colStart - startCol) < 1 &&
+          Math.abs(prev.colEnd - endCol) < 1;
+        if (smallShift) return prev;
+        
+        // Phase 5: Keep ref in sync with state
+        windowRangeRef.current = newWindowRange;
+        
+        // Phase 6: Trigger viewport fetch with minimal flag if we've moved significantly outside the last fetched viewport
+        const newViewport = { x1: startCol, y1: startRow, x2: endCol, y2: endRow, minimal: true };
+        if (shouldFetchViewport(newViewport, lastFetchedViewportRef.current)) {
+          triggerViewportFetch(newViewport, panningViewportMinimalRef, setPanningViewportParams, viewportRequestInFlightRef, pendingViewportParamsRef);
+        }
+        
+        return newWindowRange;
+      });
+    }
+  }, [gridSize, calculateVirtualViewport, isPanningJS]);
 
   // Restore pan position if provided (now safe, computeWindow is defined)
+  // Track restored position to prevent re-restoring when user pans
+  const restoredPanRef = useRef<{ x: number; y: number } | null>(null);
+  const processedRestorePanViewportRef = useRef<string | null>(null);
+  
+  // Track bounds ready state in JS to trigger effect when bounds become ready
+  const [boundsReadyJS, setBoundsReadyJS] = useState(false);
+  useAnimatedReaction(
+    () => boundsReady.value,
+    (ready) => {
+      if (ready) {
+        runOnJS(setBoundsReadyJS)(true);
+      }
+    }
+  );
+  
   useEffect(() => {
-    if (restorePan && containerSize.width > 0 && containerSize.height > 0 && boundsReady.value) {
+    if (restorePan && containerSize.width > 0 && containerSize.height > 0 && boundsReadyJS) {
+      // Only restore if this is a new restorePan value (not already restored)
+      const restoreKey = `${restorePan.x},${restorePan.y}`;
+      const lastRestoredKey = restoredPanRef.current ? `${restoredPanRef.current.x},${restoredPanRef.current.y}` : null;
+      
+      if (restoreKey === lastRestoredKey) {
+        // Already restored this position - don't restore again
+        return;
+      }
+      
       // Validate grid coordinates are within bounds
-      const gridSize = grid.length || 50;
-      if (restorePan.x < 0 || restorePan.x >= gridSize || restorePan.y < 0 || restorePan.y >= gridSize) {
+      // y represents row index, validate against number of rows
+      if (!grid || restorePan.y < 0 || restorePan.y >= grid.length) {
+        return;
+      }
+      // x represents column index, validate against number of columns in that row
+      const row = grid[restorePan.y];
+      if (!row || restorePan.x < 0 || restorePan.x >= row.length) {
         return;
       }
       
       // Convert grid coordinates to pan coordinates (center the cell on screen)
-      const targetX = (containerSize.width / 2) - MARGIN_SIZE - ((restorePan.x + 0.5) * CELL_SIZE);
-      const targetY = (containerSize.height / 2) - MARGIN_SIZE - ((restorePan.y + 0.5) * CELL_SIZE);
+      const { x: targetX, y: targetY } = gridToPanCoordinates(restorePan.x, restorePan.y, containerSize.width, containerSize.height);
       
-      // Clamp to valid pan bounds
+      // Clamp to valid pan bounds (read SharedValues directly)
       const clampedX = Math.min(maxX.value, Math.max(minX.value, targetX));
       const clampedY = Math.min(maxY.value, Math.max(minY.value, targetY));
       
       offsetX.value = clampedX;
       offsetY.value = clampedY;
-      lastComputedPan.value = { x: clampedX, y: clampedY };
+      
+      // Mark this position as restored
+      restoredPanRef.current = { x: restorePan.x, y: restorePan.y };
       
       // Force tile loading by properly calculating the new window range
+      // Reset throttle timestamp to ensure computeWindow runs immediately
+      lastComputeTs.value = 0;
+      
+      // Calculate the correct window range for the restored position
+      const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(
+        clampedX, 
+        clampedY, 
+        containerSize.width, 
+        containerSize.height, 
+        gridSize, 
+        PAN_BUFFER
+      );
+      
+      // Calculate virtual viewport for visible tiles
+      calculateVirtualViewport(clampedX, clampedY, containerSize.width, containerSize.height);
+      
+      // Force window range update immediately (bypass computeWindow throttling)
+      const newWindowRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
+      windowRangeRef.current = newWindowRange;
+      setWindowRange(newWindowRange);
+      
+      // Update lastComputedPan after setting window range to ensure computeWindow can run if needed
+      lastComputedPan.value = { x: clampedX, y: clampedY };
+      
+      // Force computeWindow to run to trigger any additional updates (viewport fetch, etc.)
       requestAnimationFrame(() => {
-        // First compute the window at the restored position
         computeWindow(clampedX, clampedY, containerSize.width, containerSize.height);
-        
-        // Calculate the correct window range for the restored position
-        const gridLeft = clampedX + MARGIN_SIZE;
-        const gridTop = clampedY + MARGIN_SIZE;
-        const startCol = Math.max(0, Math.floor((-gridLeft) / CELL_SIZE));
-        const endCol = Math.min(gridSize - 1, Math.ceil((containerSize.width - gridLeft) / CELL_SIZE));
-        const startRow = Math.max(0, Math.floor((-gridTop) / CELL_SIZE));
-        const endRow = Math.min(gridSize - 1, Math.ceil((containerSize.height - gridTop) / CELL_SIZE));
-        
-        // Force tile loading by setting the correct window range
-        setWindowRange({
-          rowStart: startRow,
-          rowEnd: endRow,
-          colStart: startCol,
-          colEnd: endCol
-        });
       });
+    } else if (!restorePan) {
+      // Clear restored ref when restorePan is cleared (user navigated away)
+      restoredPanRef.current = null;
     }
-  }, [restorePan, containerSize.width, containerSize.height, computeWindow, offsetX, offsetY, maxX, maxY, grid]);
+  }, [restorePan, containerSize.width, containerSize.height, computeWindow, grid, boundsReadyJS, gridSize, calculateVirtualViewport]);
 
   useEffect(() => {
     // Only compute initial window after bounds are ready and container is set
@@ -1177,8 +2600,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             if (homeX != null) break;
           }
           if (homeX != null && homeY != null) {
-            const targetX = (containerSize.width / 2) - MARGIN_SIZE - ((homeX + 0.5) * CELL_SIZE);
-            const targetY = (containerSize.height / 2) - MARGIN_SIZE - ((homeY + 0.5) * CELL_SIZE);
+            const { x: targetX, y: targetY } = gridToPanCoordinates(homeX, homeY, containerSize.width, containerSize.height);
             const cx = Math.min(maxX.value, Math.max(minX.value, targetX));
             const cy = Math.min(maxY.value, Math.max(minY.value, targetY));
             offsetX.value = cx;
@@ -1225,34 +2647,117 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     hasCenteredOnHome.value = true;
   }, [grid, currentUserHandle, restorePan, containerSize.width, containerSize.height, minX, maxX, boundsReady, computeWindow, offsetX, offsetY]);
 
+  const handleCellPressRef = useRef<((x: number, y: number, cellData: CellData) => Promise<void>) | null>(null);
+  const lastPressTimeRef = useRef<number>(0);
+  const lastPressCoordsRef = useRef<{ x: number; y: number } | null>(null);
+  const PRESS_DEBOUNCE_MS = 300;
+  const DOUBLE_PRESS_THRESHOLD_MS = 500;
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   const handleCellPress = useCallback(async (x: number, y: number, cellData: CellData) => {
-    // Allow clicking even while panning - this provides immediate feedback
-    // The modal will still work, and the pan will continue if user keeps dragging
+    // Security: Validate coordinates
+    // y represents row index, validate against number of rows
+    if (y < 0 || !grid || y >= grid.length) {
+      return;
+    }
+    // x represents column index, validate against number of columns in that row
+    const row = grid[y];
+    if (!row || x < 0 || x >= row.length) {
+      return;
+    }
+    
+    // Security: Validate cellData structure
+    if (!cellData || typeof cellData !== 'object') {
+      return;
+    }
+    if (typeof cellData.terrain !== 'string' || typeof cellData.entity !== 'string') {
+      return;
+    }
+    
+    const now = Date.now();
+    const lastPress = lastPressTimeRef.current;
+    const lastCoords = lastPressCoordsRef.current;
+    
+    // Don't handle presses if we're currently panning
+    if (isPanningJS) {
+      return;
+    }
+    
+    // Debounce: ignore if pressed too soon after last press (but only if same coordinates)
+    if (lastCoords && lastCoords.x === x && lastCoords.y === y && now - lastPress < PRESS_DEBOUNCE_MS) {
+      return;
+    }
+    
+    // Prevent double-clicks from same location
+    if (lastCoords && lastCoords.x === x && lastCoords.y === y && now - lastPress < DOUBLE_PRESS_THRESHOLD_MS) {
+      return;
+    }
+    
+    lastPressTimeRef.current = now;
+    lastPressCoordsRef.current = { x, y };
     
     // If clicking on another player, fetch their current shield status
     if (cellData.owner === 'player' && cellData.userId && cellData.name !== currentUserHandle) {
+      // Security: Validate userId
+      const userId = cellData.userId;
+      if (!userId || typeof userId !== 'string' || userId.trim().length === 0) {
+        setSelectedCell({x, y, info: cellData});
+        return;
+      }
+      
+      // Security: Validate token
+      if (!token || typeof token !== 'string') {
+        setSelectedCell({x, y, info: cellData});
+        return;
+      }
+      
+      // Performance: Cancel previous request if new one starts
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+      
       try {
-        const response = await fetch(`${API_URL}/api/users/shield-status/${cellData.userId}`, {
+        const response = await fetch(`${API_URL}/api/users/shield-status/${userId}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
+          signal: abortControllerRef.current.signal,
         });
-        if (response.ok) {
-          const userData = await response.json();
-          const updatedCellData = {
-            ...cellData,
-            isShielded: userData.antivirusShield?.active || false
-          };
-          setSelectedCell({x, y, info: updatedCellData});
+        
+        // Security: Validate API response
+        if (!response.ok) {
+          setSelectedCell({x, y, info: cellData});
           return;
         }
-      } catch (error) {
+        
+        const userData = await response.json();
+        if (!userData || typeof userData !== 'object') {
+          setSelectedCell({x, y, info: cellData});
+          return;
+        }
+        
+        const updatedCellData = {
+          ...cellData,
+          isShielded: userData.antivirusShield?.active || false
+        };
+        setSelectedCell({x, y, info: updatedCellData});
+        return;
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          return;
+        }
         console.error('Failed to fetch shield status:', error);
+        setSelectedCell({x, y, info: cellData});
+        return;
       }
     }
     
     setSelectedCell({x, y, info: cellData});
-  }, [currentUserHandle, token]);
+  }, [currentUserHandle, token, isPanningJS, grid]);
+
+  // Store handler in ref for stable reference
+  handleCellPressRef.current = handleCellPress;
 
   const centerOnUserHome = useCallback(() => {
     if (!currentUserHandle || !grid.length) return;
@@ -1353,6 +2858,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       if (visitCrewCloseTimeoutRef.current) {
         clearTimeout(visitCrewCloseTimeoutRef.current);
         visitCrewCloseTimeoutRef.current = null;
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
       }
     };
   }, []);
@@ -1527,7 +3036,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                           clearTimeout(visitingProfileCloseTimeoutRef.current);
                           visitingProfileCloseTimeoutRef.current = null;
                         }
-                        setVisitingProfileUserId(selectedCell.info.userId);
+                        setVisitingProfileUserId(selectedCell.info.userId || null);
                         setShowVisitingProfileModal(true);
                       }}
                     >
@@ -1669,40 +3178,65 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           <View style={[styles.gridArea, { width: totalSize, height: totalSize }]}>
             {visibleCells.map((assignment, i) => {
               const { x, y, cell } = assignment;
-              const selected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
-              const isCrewMember = cell.owner === 'player' && 
-                                   cell.userId && 
-                                   crewMemberUserIds.has(String(cell.userId));
-              const isWarCrewMember = cell.owner === 'player' && 
+              const key = `${x},${y}`;
+              const terrain = staticTerrainData[key];
+              const entityImage = entityImageData[key];
+              
+              // Phase 3: Conditional rendering based on panning state
+              if (isPanningJS) {
+                // During panning: render simplified tile (terrain + image only, no interactions)
+                return (
+                  <PanningPoolTile
+                    key={`${x}-${y}`}
+                    x={x}
+                    y={y}
+                    terrain={terrain || cell.terrain}
+                    entityImage={entityImage}
+                    xStyle={xPosStyles[x]}
+                    yStyle={yPosStyles[y]}
+                    terrainStyleMap={terrainStyleMap}
+                    currentUserId={currentUserId}
+                    isShieldActive={isShieldActive}
+                    styles={styles}
+                  />
+                );
+              } else {
+                // When not panning: render full tile with all details and interactions
+                const selected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
+                const isCrewMember = !!(cell.owner === 'player' && 
                                      cell.userId && 
-                                     warCrewMemberUserIds.has(String(cell.userId));
-              // Only show yellow border for allies, not our own crew members
-              const isAllianceCrewMember = cell.owner === 'player' && 
-                                           cell.userId && 
-                                           !isCrewMember && // Exclude our own crew members
-                                           allianceCrewMemberUserIds.has(String(cell.userId));
-              return (
-                <PoolTile
-                  key={`${x}-${y}`}
-                  x={x}
-                  y={y}
-                  cell={cell}
-                  selected={selected}
-                  onPress={handleCellPress}
-                  xStyle={xPosStyles[x]}
-                  yStyle={yPosStyles[y]}
-                  terrainStyleMap={terrainStyleMap}
-                  currentUserHandle={currentUserHandle}
-                  colors={colors}
-                  themeMode={themeMode}
-                  styles={styles}
-                  dynamicEntityData={dynamicEntityData}
-                  isShieldActive={isShieldActive}
-                  isCrewMember={isCrewMember}
-                  isWarCrewMember={isWarCrewMember}
-                  isAllianceCrewMember={isAllianceCrewMember}
-                />
-              );
+                                     crewMemberUserIds.has(String(cell.userId)));
+                const isWarCrewMember = !!(cell.owner === 'player' && 
+                                       cell.userId && 
+                                       warCrewMemberUserIds.has(String(cell.userId)));
+                // Only show yellow border for allies, not our own crew members
+                const isAllianceCrewMember = !!(cell.owner === 'player' && 
+                                             cell.userId && 
+                                             !isCrewMember && // Exclude our own crew members
+                                             allianceCrewMemberUserIds.has(String(cell.userId)));
+                return (
+                  <PoolTile
+                    key={`${x}-${y}`}
+                    x={x}
+                    y={y}
+                    cell={cell}
+                    selected={selected}
+                    onPress={handleCellPress}
+                    xStyle={xPosStyles[x]}
+                    yStyle={yPosStyles[y]}
+                    terrainStyleMap={terrainStyleMap}
+                    currentUserHandle={currentUserHandle}
+                    colors={colors}
+                    themeMode={themeMode}
+                    styles={styles}
+                    dynamicEntityData={dynamicEntityData}
+                    isShieldActive={isShieldActive}
+                    isCrewMember={isCrewMember}
+                    isWarCrewMember={isWarCrewMember}
+                    isAllianceCrewMember={isAllianceCrewMember}
+                  />
+                );
+              }
             })}
           </View>
         </Animated.View>

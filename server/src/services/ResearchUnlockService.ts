@@ -1,6 +1,7 @@
 import { User } from '../models/User';
 import { Research } from '../models/Research';
 import { ResearchUser } from '../models/ResearchUser';
+import { UserResearchFeature } from '../models/UserResearchFeature';
 import mongoose from 'mongoose';
 
 export interface UnlockValidationResult {
@@ -10,7 +11,7 @@ export interface UnlockValidationResult {
     level?: boolean;
     balance?: boolean;
     dependencies?: string[];
-    rentalProperties?: boolean;
+    antivirus?: boolean;
   };
 }
 
@@ -21,7 +22,7 @@ export interface UnlockCosts {
 export class ResearchUnlockService {
   private static readonly UNLOCK_COSTS: UnlockCosts = {
     'home-defense': 10000,
-    'hack-ability': 20000,
+    'hack-ability': 50000,
     'financial': 20000,
     'hack-crew': 100000,
     'npc': 50000,
@@ -29,7 +30,7 @@ export class ResearchUnlockService {
     'construction': 50000,
     'battle-mechanics': 150000,
     'gear': 400000,
-    'investments': 500000
+    'investments': 250000
   };
 
   static async validateUnlockRequirements(
@@ -70,12 +71,12 @@ export class ResearchUnlockService {
         missingRequirements.dependencies = missingDependencies;
       }
 
-      // Special check for Investments (requires rental properties)
-      if (categoryId === 'investments') {
-        const hasAllRentalProperties = this.checkRentalProperties(user);
-        if (!hasAllRentalProperties) {
-          reasons.push('All rental properties (1-4) must be unlocked');
-          missingRequirements.rentalProperties = true;
+      // Special check for Hack Crew (requires Antivirus feature)
+      if (categoryId === 'hack-crew') {
+        const hasAntivirus = await this.checkAntivirusFeature(userId);
+        if (!hasAntivirus) {
+          reasons.push('Antivirus feature must be unlocked');
+          missingRequirements.antivirus = true;
         }
       }
 
@@ -123,11 +124,28 @@ export class ResearchUnlockService {
     return research.map(r => r._id as mongoose.Types.ObjectId);
   }
 
-  private static checkRentalProperties(user: any): boolean {
-    return user.unlockedFeatures?.rentalHousing1 &&
-           user.unlockedFeatures?.rentalHousing2 &&
-           user.unlockedFeatures?.rentalHousing3 &&
-           user.unlockedFeatures?.rentalHousing4;
+  private static async checkAntivirusFeature(userId: string): Promise<boolean> {
+    const antivirusFeature = await UserResearchFeature.findOne({
+      userId,
+      categoryId: 'home-defense',
+      featureId: 'antivirus'
+    });
+    
+    if (!antivirusFeature) {
+      return false;
+    }
+
+    if (antivirusFeature.isUnlocked) {
+      return true;
+    }
+
+    if (antivirusFeature.isResearching && antivirusFeature.researchCompletesAt) {
+      const now = new Date();
+      const completesAt = antivirusFeature.researchCompletesAt;
+      return now >= completesAt;
+    }
+
+    return false;
   }
 
   static getUnlockCost(categoryId: string): number {
@@ -174,13 +192,13 @@ export class ResearchUnlockService {
           };
         }
 
-        // Special check for Investments (requires rental properties)
-        if (categoryId === 'investments') {
-          const hasAllRentalProperties = this.checkRentalProperties(user);
-          if (!hasAllRentalProperties) {
+        // Special check for Hack Crew (requires Antivirus feature)
+        if (categoryId === 'hack-crew') {
+          const hasAntivirus = await this.checkAntivirusFeature(userId);
+          if (!hasAntivirus) {
             return {
               success: false,
-              message: 'All rental properties (1-4) must be unlocked'
+              message: 'Antivirus feature must be unlocked'
             };
           }
         }
@@ -234,7 +252,7 @@ export class ResearchUnlockService {
     if (!user) return [];
 
     const allResearch = await Research.find();
-    const userResearch = await ResearchUser.find({ userId })
+    let userResearch = await ResearchUser.find({ userId })
       .populate('researchId')
       .sort({ 'researchId.categoryId': 1 });
 
@@ -259,47 +277,12 @@ export class ResearchUnlockService {
 
       await ResearchUser.insertMany(newResearchUserEntries);
 
-      const updatedUserResearch = await ResearchUser.find({ userId })
+      userResearch = await ResearchUser.find({ userId })
         .populate('researchId')
         .sort({ 'researchId.categoryId': 1 });
-
-      return updatedUserResearch.map(ur => {
-        const research = ur.researchId as any;
-        const dbUnlocked = ur.isUnlocked;
-        
-        const levelMet = user.level >= research.levelRequirement;
-        
-        const unlockedDependencies = updatedUserResearch
-          .filter(ur2 => research.dependencies.includes((ur2.researchId as any)?.categoryId))
-          .map(ur2 => ur2.isUnlocked);
-        const dependenciesMet = research.dependencies.length === 0 || 
-          (unlockedDependencies.length === research.dependencies.length && unlockedDependencies.every(unlocked => unlocked === true));
-        
-        const actuallyUnlocked = dbUnlocked ? (levelMet && dependenciesMet) : false;
-
-        if (!actuallyUnlocked && dbUnlocked) {
-          ResearchUser.findOneAndUpdate(
-            { userId, researchId: research._id },
-            { isUnlocked: false, unlockedAt: null },
-            { new: false }
-          ).catch(err => console.error('Error correcting unlock status:', err));
-        }
-
-        return {
-          categoryId: research.categoryId,
-          name: research.name,
-          isUnlocked: actuallyUnlocked,
-          unlockedAt: actuallyUnlocked ? ur.unlockedAt : null,
-          unlockCost: this.getUnlockCost(research.categoryId),
-          levelRequirement: research.levelRequirement,
-          balanceRequirement: research.balanceRequirement,
-          dependencies: research.dependencies,
-          image: research.image
-        };
-      });
     }
 
-    return userResearch.map(ur => {
+    const results = await Promise.all(userResearch.map(async (ur) => {
       const research = ur.researchId as any;
       const dbUnlocked = ur.isUnlocked;
       
@@ -321,7 +304,7 @@ export class ResearchUnlockService {
         ).catch(err => console.error('Error correcting unlock status:', err));
       }
 
-      return {
+      const result: any = {
         categoryId: research.categoryId,
         name: research.name,
         isUnlocked: actuallyUnlocked,
@@ -332,6 +315,14 @@ export class ResearchUnlockService {
         dependencies: research.dependencies,
         image: research.image
       };
-    });
+
+      if (research.categoryId === 'hack-crew') {
+        result.requiredFeatures = ['antivirus'];
+      }
+
+      return result;
+    }));
+
+    return results;
   }
 }

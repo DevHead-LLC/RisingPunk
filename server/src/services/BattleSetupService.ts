@@ -31,19 +31,14 @@ export class BattleSetupService {
       }
     }
     
-    // Calculate total army health based on expected battalion configurations
-    const defaultUserBattalions = [
-      { type: BotType.GUARDIAN, quantity: 10 },
-      { type: BotType.BREACHER, quantity: 8 },
-      { type: BotType.PHREAK, quantity: 6 },
-    ];
-    const defaultEnemyBattalions = [
-      { type: BotType.GUARDIAN, quantity: 12 },
-      { type: BotType.BREACHER, quantity: 10 },
-      { type: BotType.PHREAK, quantity: 8 },
-    ];
+    if (!userBattalions || userBattalions.length === 0) {
+      throw new Error('userBattalions is required and must contain at least one battalion');
+    }
     
-    const battalionConfigs = userBattalions || defaultUserBattalions;
+    const MAX_USER_BATTALIONS = 3;
+    if (userBattalions.length > MAX_USER_BATTALIONS) {
+      throw new Error(`Maximum ${MAX_USER_BATTALIONS} battalions allowed`);
+    }
     
     // Check if defender is a user (not NPC)
     // A user defender is when we have a defenderId that's not 'computer-opponent' and doesn't look like an NPC ID
@@ -52,8 +47,15 @@ export class BattleSetupService {
                           !defenderId.startsWith('computer');
     
     
-    // Validate defender inventory for user-vs-user battles
+    // Validate defender exists and has inventory for user-vs-user battles
     if (isUserDefender) {
+      // First check if defender user exists
+      const defender = await User.findById(defenderId);
+      if (!defender) {
+        throw new Error(`Defender user ${defenderId} not found. Cannot create battle with non-existent user.`);
+      }
+      
+      // User exists, validate inventory
       const inventoryValidation = await BattleInventorySettlementService.validateDefenderInventory(defenderId);
       if (!inventoryValidation.valid) {
         console.warn(`Defender ${defenderId} has no bots available for defense: ${inventoryValidation.error}`);
@@ -62,10 +64,29 @@ export class BattleSetupService {
     }
     
     // Optionally load NPC for enemy side (only for NPC battles)
-    const npc = !isUserDefender && defenderNpcSlug ? await NPCService.getNPCBySlug(defenderNpcSlug) : null;
+    let npc = !isUserDefender && defenderNpcSlug ? await NPCService.getNPCBySlug(defenderNpcSlug) : null;
+    let actualDefenderNpcSlug = defenderNpcSlug;
+    
+    // If NPC lookup failed or no slug provided, select a random level 1 NPC
+    // This handles cases like the first HackRig battle where NPC doesn't exist or isn't specified
+    if (!isUserDefender && defenderId === 'computer-opponent' && !npc) {
+      const level1NPCs = await NPCService.getNPCsByLevel(1);
+      if (level1NPCs.length === 0) {
+        throw new Error('No level 1 NPCs found in database. Cannot create battle without NPC configuration.');
+      }
+      // Select random level 1 NPC
+      const randomIndex = Math.floor(Math.random() * level1NPCs.length);
+      npc = level1NPCs[randomIndex];
+      actualDefenderNpcSlug = npc.slug;
+    }
+    
+    // Ensure we have an NPC for computer-opponent battles (no defaults allowed)
+    if (!isUserDefender && defenderId === 'computer-opponent' && !npc) {
+      throw new Error('Computer-opponent battle requires an NPC configuration. No NPC found or specified.');
+    }
     
     // Validate that NPC instance exists on map if instance ID is provided (only for NPC battles)
-    if (!isUserDefender && defenderNpcInstanceId && defenderNpcSlug) {
+    if (!isUserDefender && defenderNpcInstanceId && actualDefenderNpcSlug) {
       const mapDoc = await MapModel.findOne({ name: 'main' });
       if (!mapDoc) {
         throw new Error('Map not found');
@@ -73,7 +94,7 @@ export class BattleSetupService {
       
       const npcCell = mapDoc.cells.find((cell: any) => 
         cell.npcInstanceId === defenderNpcInstanceId && 
-        cell.npcSlug === defenderNpcSlug &&
+        cell.npcSlug === actualDefenderNpcSlug &&
         cell.isOccupied && 
         cell.occupiedBy === 'npc'
       );
@@ -85,7 +106,10 @@ export class BattleSetupService {
     
     // Calculate total army health using new BotService
     let userTotal = 0;
-    for (const battalion of battalionConfigs) {
+    for (const battalion of userBattalions) {
+      if (!battalion.quantity || battalion.quantity <= 0) {
+        continue;
+      }
       const botType = battalion.type as BotType;
       const botConfig = await BotService.getUserBotStats(botType, userLevel);
       userTotal += botConfig.stats.health * battalion.quantity;
@@ -94,34 +118,27 @@ export class BattleSetupService {
     let enemyTotal = 0;
     if (isUserDefender) {
       // For user defenders, calculate total health based on their inventory and level
-      try {
-        const defender = await User.findById(defenderId);
-        if (!defender) {
-          throw new Error(`Defender user ${defenderId} not found`);
-        }
-        
-        const defenderLevel = defender.level || 1;
-        const BotModel = mongoose.model('Bot');
-        const defenderBots = await BotModel.findOne({ userId: defenderId });
-        
-        // Calculate total health for all available bots in defender's inventory
-        if (defenderBots && defenderBots.bots) {
-          for (const [botType, quantity] of Object.entries(defenderBots.bots)) {
-            if (typeof quantity === 'number' && quantity > 0) {
-              const botConfig = await BotService.getUserBotStats(botType as BotType, defenderLevel);
-              enemyTotal += botConfig.stats.health * quantity;
-            }
+      // Defender existence already validated above - will throw error if not found
+      const defender = await User.findById(defenderId);
+      if (!defender) {
+        // This should never happen due to validation above, but include for safety
+        throw new Error(`Defender user ${defenderId} not found. Cannot calculate enemy total.`);
+      }
+      
+      const defenderLevel = defender.level || 1;
+      const BotModel = mongoose.model('Bot');
+      const defenderBots = await BotModel.findOne({ userId: defenderId });
+      
+      // Calculate total health for all available bots in defender's inventory
+      if (defenderBots && defenderBots.bots) {
+        for (const [botType, quantity] of Object.entries(defenderBots.bots)) {
+          if (typeof quantity === 'number' && quantity > 0) {
+            const botConfig = await BotService.getUserBotStats(botType as BotType, defenderLevel);
+            enemyTotal += botConfig.stats.health * quantity;
           }
         }
-      } catch (error) {
-        console.warn('Could not fetch defender inventory, using default enemy total:', error);
-        // Fallback to default enemy total if defender data can't be fetched
-        for (const battalion of defaultEnemyBattalions) {
-          const botType = battalion.type as BotType;
-          const botConfig = await BotService.getEnemyBotStats(botType, userLevel);
-          enemyTotal += botConfig.stats.health * battalion.quantity;
-        }
       }
+      // If no bots found, enemyTotal remains 0 - defender won't be able to deploy
     } else if (npc) {
       // Use NPC's userLevelAssociation for bot stat scaling instead of statMultipliers
       const npcLevel = npc.userLevelAssociation || 1;
@@ -131,11 +148,8 @@ export class BattleSetupService {
         enemyTotal += botConfig.stats.health * battalion.quantity;
       }
     } else {
-      for (const battalion of defaultEnemyBattalions) {
-        const botType = battalion.type as BotType;
-        const botConfig = await BotService.getEnemyBotStats(botType, userLevel);
-        enemyTotal += botConfig.stats.health * battalion.quantity;
-      }
+      // This should never happen - we should have either a user defender, NPC, or have thrown an error
+      throw new Error('Cannot create battle: No valid defender configuration found. Must have either a user defender, NPC, or computer-opponent with NPC.');
     }
     
     const totalArmyHealth = userTotal + enemyTotal;
@@ -157,7 +171,8 @@ export class BattleSetupService {
         statMultipliers: { health: 1, speed: 1, offense: 1, defense: 1, range: 1 }, // Legacy parameter, not used
       });
     } else {
-      enemyBattalions = await BattalionService.createEnemyBattalions(nodes, userLevel);
+      // This should never happen - we should have either a user defender or NPC
+      throw new Error('Cannot create enemy battalions: No valid defender configuration found. Must have either a user defender or NPC.');
     }
     const battalions = [...userBattalionsList, ...enemyBattalions];
     
@@ -187,7 +202,7 @@ export class BattleSetupService {
       screenWidth,
       screenHeight,
       ...(unlockHackRigOnWin ? { unlockHackRigOnWin: true } as any : {}),
-      ...(defenderNpcSlug ? { defenderNpcSlug } as any : {}),
+      ...(actualDefenderNpcSlug ? { defenderNpcSlug: actualDefenderNpcSlug } as any : {}),
       ...(defenderNpcInstanceId ? { defenderNpcInstanceId } as any : {}),
       ...(isUserDefender ? { 
         isUserDefender: true,

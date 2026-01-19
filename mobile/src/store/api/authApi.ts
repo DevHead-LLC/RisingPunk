@@ -53,6 +53,7 @@ export interface ProfileResponse {
     researchCenter: boolean;
   };
   profileGender: 'male' | 'female';
+  totalGuardiansBuilt?: number;
 }
 
 export interface UserProfileResponse {
@@ -60,6 +61,14 @@ export interface UserProfileResponse {
   handle: string;
   level: number;
   profileGender: 'male' | 'female';
+  battleStats?: {
+    botsDestroyed: number;
+    botsLost: number;
+    successfulAttacks: number;
+    failedAttacks: number;
+    successfulDefenses: number;
+    failedDefenses: number;
+  };
 }
 
 export interface UnlockResearchCenterResponse {

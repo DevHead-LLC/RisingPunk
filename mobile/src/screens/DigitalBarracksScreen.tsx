@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import { useThemeColors } from '../hooks/useThemeColors';
 import { useTheme } from '../context/ThemeContext';
 import { BotType } from '../types/bots';
 import { useFetchBotStatsQuery } from '../store/api/botsApi';
+import { useTrackDigitalBarracksVisitMutation as useTrackDigitalBarracksVisitMutationFromUserGuide } from '../store/api/userGuideApi';
+import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
 import { formatNumber } from '../utils/formatUtils';
 
 type MarkLevel = 1 | 2 | 3 | 4;
@@ -25,8 +27,27 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
   const { data: botStatsData, isLoading: botStatsLoading } = useFetchBotStatsQuery();
   const colors = useThemeColors();
   const { themeMode } = useTheme();
+  const [trackDigitalBarracksVisit] = useTrackDigitalBarracksVisitMutationFromUserGuide();
+  const { highlightTaskId, clearHighlight } = useTaskGuideHighlight();
+  const hasTrackedVisit = useRef(false);
+  const token = useAppSelector((state) => state.auth.token);
 
   const styles = useMemo(() => createStyles(colors, themeMode), [colors, themeMode]);
+
+  useEffect(() => {
+    if (token && !hasTrackedVisit.current) {
+      hasTrackedVisit.current = true;
+      trackDigitalBarracksVisit().then(() => {
+        if (highlightTaskId === 'visit-digital-barracks') {
+          clearHighlight();
+        }
+      }).catch(() => {
+        if (highlightTaskId === 'visit-digital-barracks') {
+          clearHighlight();
+        }
+      });
+    }
+  }, [token, highlightTaskId, trackDigitalBarracksVisit, clearHighlight]);
 
   const BotCard = ({ type }: { type: BotType }) => {
     const hackerLore = {
@@ -42,26 +63,16 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
       return botStats?.role || 'Unknown';
     };
 
-    const getBotAdvantage = (_type: BotType): string => {
-      if (!botStats || !allBotStats) {
-        return 'Stats not available';
-      }
-
-      const stats = botStats.stats;
-      const maxRange = Math.max(...Object.values(allBotStats).map((bot: any) => bot.stats.range));
-      const maxOffense = Math.max(...Object.values(allBotStats).map((bot: any) => bot.stats.offense));
-      const maxDefense = Math.max(...Object.values(allBotStats).map((bot: any) => bot.stats.defense));
-
-      if (stats.range === maxRange) {
-        return 'Long-range specialist with superior attack distance';
-      } else if (stats.offense === maxOffense) {
-        return 'High damage output for aggressive tactics';
-      } else if (stats.defense === maxDefense) {
-        return 'Tank unit with maximum survivability';
-      } else {
-        return 'Balanced unit with versatile capabilities';
-      }
+    const getTypeMatchups = (botType: BotType): { strongAgainst: string; weakAgainst: string } | null => {
+      const matchups: Record<BotType, { strongAgainst: string; weakAgainst: string }> = {
+        guardian: { strongAgainst: 'Breacher', weakAgainst: 'Phreak' },
+        breacher: { strongAgainst: 'Phreak', weakAgainst: 'Guardian' },
+        phreak: { strongAgainst: 'Guardian', weakAgainst: 'Breacher' },
+      };
+      return matchups[botType] || null;
     };
+
+    const matchups = getTypeMatchups(type);
 
     return (
       <View style={styles.botCard}>
@@ -82,7 +93,14 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
           <View style={styles.infoContainer}>
             <View style={styles.loreContainer}>
               <Text style={styles.hackerLore}>{hackerLore[type]}</Text>
-              <Text style={styles.advantageText}>{getBotAdvantage(type)}</Text>
+              {matchups ? (
+                <>
+                  <Text style={styles.strongText}>Strong vs: {matchups.strongAgainst}</Text>
+                  <Text style={styles.weakText}>Weak vs: {matchups.weakAgainst}</Text>
+                </>
+              ) : (
+                <Text style={styles.lockedText}>Matchup data not available</Text>
+              )}
             </View>
 
             <View style={styles.statsContainer}>
@@ -360,11 +378,17 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'lig
     paddingLeft: SIZING.spacing.xs,
     marginBottom: SIZING.spacing.lg,
   },
-  advantageText: {
-    color: colors.text.secondary,
+  strongText: {
+    color: themeMode === 'light' ? '#006400' : '#00ff41',
     fontSize: SIZING.font.small,
-    fontStyle: 'italic',
-    paddingLeft: SIZING.spacing.xs,
+    fontWeight: 'bold',
+    marginTop: SIZING.spacing.xs,
+  },
+  weakText: {
+    color: themeMode === 'light' ? '#8B0000' : '#ff6b6b',
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+    marginTop: SIZING.spacing.xs,
   },
   statsContainer: {
     flex: 2,

@@ -3,6 +3,7 @@ import {TouchableOpacity, View, Text, Image, StyleSheet, Animated} from 'react-n
 import {SIZING} from '../../styles/theme';
 import {useThemeColors} from '../../hooks/useThemeColors';
 import {useAppSelector} from '../../store/hooks';
+import {useTaskGuideHighlight} from '../../contexts/TaskGuideHighlightContext';
 
 type ProfileLocationProps = {
   onPress: () => void;
@@ -12,34 +13,46 @@ type ProfileLocationProps = {
 export const ProfileLocation = memo(function ProfileLocation({ onPress, isIntroActive = false }: ProfileLocationProps) {
   const colors = useThemeColors();
   const profileGender = useAppSelector((state) => state.preferences.profileGender);
+  const { highlightTaskId, highlightStep, advanceHighlightStep } = useTaskGuideHighlight();
   const [currentColorIndex, setCurrentColorIndex] = useState(0);
   const animatedBorderColor = useState(new Animated.Value(0))[0];
   
   const introColors = [colors.primary, colors.secondary, colors.matrix];
+  const isThemeTask = highlightTaskId === 'use-hacker-mode' || highlightTaskId === 'use-business-mode';
+  const isAvatarTask = highlightTaskId === 'change-avatar';
+  const isHideTaskListTask = highlightTaskId === 'hide-task-list';
+  const isHighlighted = isIntroActive || highlightTaskId === 'view-profile' || (isThemeTask && highlightStep === null) || (isAvatarTask && highlightStep === null) || (isHideTaskListTask && highlightStep === null);
+  
+  const handlePress = () => {
+    if ((isThemeTask || isAvatarTask || isHideTaskListTask) && highlightStep === null) {
+      advanceHighlightStep();
+    }
+    onPress();
+  };
 
   const profileImageSource = profileGender === 'female' 
     ? require('../../assets/images/profile-female.png')
     : require('../../assets/images/profile.png');
   
   useEffect(() => {
-    if (isIntroActive) {
+    if (isHighlighted) {
       const interval = setInterval(() => {
         setCurrentColorIndex(prev => (prev + 1) % introColors.length);
       }, 1000);
       
       return () => clearInterval(interval);
     }
-  }, [isIntroActive, introColors.length]);
+  }, [isHighlighted, introColors.length]);
   
   useEffect(() => {
-    if (isIntroActive) {
+    if (isHighlighted) {
       Animated.timing(animatedBorderColor, {
         toValue: currentColorIndex,
         duration: 500,
         useNativeDriver: false,
       }).start();
     }
-  }, [currentColorIndex, isIntroActive, animatedBorderColor]);
+  }, [currentColorIndex, isHighlighted, animatedBorderColor]);
   
   const animatedBorderColorValue = animatedBorderColor.interpolate({
     inputRange: [0, 1, 2],
@@ -49,11 +62,12 @@ export const ProfileLocation = memo(function ProfileLocation({ onPress, isIntroA
   return (
     <Animated.View
       style={[styles.location, styles.profilePosition, { 
-        borderColor: isIntroActive ? animatedBorderColorValue : colors.primary,
-        borderWidth: isIntroActive ? 3 : 1
+        borderColor: isHighlighted ? animatedBorderColorValue : colors.primary,
+        borderWidth: isHighlighted ? 3 : 1,
+        zIndex: isHighlighted ? 1000 : 3
       }]}
     >
-      <TouchableOpacity onPress={onPress}>
+      <TouchableOpacity onPress={handlePress}>
         <View style={styles.profileContainer}>
           <Image
             source={profileImageSource}
@@ -70,7 +84,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     alignItems: 'center',
     backgroundColor: 'transparent',
-    zIndex: 3,
   },
   profileContainer: {
     width: 60,

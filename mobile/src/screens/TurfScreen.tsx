@@ -1,5 +1,5 @@
 import React, {useState, useRef, useEffect, useCallback, memo, forwardRef, useImperativeHandle, useMemo} from 'react';
-import {View, StyleSheet, ScrollView, Dimensions, Platform} from 'react-native';
+import {View, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, Pressable} from 'react-native';
 import {Balance} from '../components/common/Balance';
 import {HomeScreen} from './HomeScreen';
 import {DigitalBarracksScreen} from './DigitalBarracksScreen';
@@ -24,9 +24,12 @@ import {mapApi} from '../store/api/mapApi';
 import {useGetRentalHousingStatusQuery, useCompleteRentalHousingMutation, useCompleteOnboardingMutation, authApi} from '../store/api/authApi';
 import {OnboardingSlides} from '../components/onboarding';
 import {TurfIntro} from '../components/turf-intro';
+import {TaskGuide} from '../components/turf/TaskGuide';
+import {TaskGuideHighlightOverlay} from '../components/turf/TaskGuideHighlightOverlay';
+import {useTaskGuideHighlight} from '../contexts/TaskGuideHighlightContext';
 
 // Platform-specific imports - available on both platforms but only used on Android
-let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, withTiming: any, computePanBounds: any;
+let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, withTiming: any, computePanBounds: any, runOnJS: any, useAnimatedReaction: any;
 
 // Import on both platforms to avoid undefined function errors
 const gestureHandler = require('react-native-gesture-handler');
@@ -40,6 +43,8 @@ useSharedValue = reanimated.useSharedValue;
 useAnimatedStyle = reanimated.useAnimatedStyle;
 withDecay = reanimated.withDecay;
 withTiming = reanimated.withTiming;
+runOnJS = reanimated.runOnJS;
+useAnimatedReaction = reanimated.useAnimatedReaction;
 computePanBounds = mapPanBounds.computePanBounds;
 
 const DiagonalLines = memo(({ colors }: { colors: any }) => (
@@ -56,10 +61,12 @@ const ScrollViewMemo = memo(function ScrollViewMemo({
   children,
   horizontalScrollRef,
   onScroll,
+  scrollEnabled = true,
 }: {
   children: React.ReactNode;
   horizontalScrollRef: React.RefObject<ScrollView>;
   onScroll?: (event: any) => void;
+  scrollEnabled?: boolean;
 }) {
   const SCREEN_WIDTH = Dimensions.get('window').width;
   const CONTENT_WIDTH = 2000;
@@ -72,7 +79,7 @@ const ScrollViewMemo = memo(function ScrollViewMemo({
       showsHorizontalScrollIndicator={false}
       showsVerticalScrollIndicator={false}
       contentOffset={{ x: CENTER_X, y: 0 }}
-      scrollEnabled={true}
+      scrollEnabled={scrollEnabled}
       maximumZoomScale={1}
       minimumZoomScale={1}
       bounces={false}
@@ -129,9 +136,28 @@ const GesturePanView = memo(function GesturePanView({
 
 export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element => {
   const colors = useThemeColors();
+  const { highlightTaskId, highlightStep, clearHighlight } = useTaskGuideHighlight();
+  const isVisitHome = highlightTaskId === 'visit-home';
+  const isVisitHackmap = highlightTaskId === 'visit-hackmap';
+  const isVisitDigitalBarracks = highlightTaskId === 'visit-digital-barracks';
+  const isBuildGuardians = highlightTaskId === 'build-100-guardians';
+  const isFreeHackRig = highlightTaskId === 'free-hack-rig';
+  const isViewWallet = highlightTaskId === 'view-wallet';
+  const isBuildResearchCenter = highlightTaskId === 'build-research-center';
+  const isBuildInvestmentProperty = highlightTaskId === 'build-investment-property';
+  const isHomeHighlight = isVisitHome || isVisitHackmap || (isBuildGuardians && highlightStep === null) || (isFreeHackRig && highlightStep === null);
+  const isDigitalBarracksHighlight = isVisitDigitalBarracks;
+  const isResearchCenterHighlight = isBuildResearchCenter;
+  const isInvestmentPropertyHighlight = isBuildInvestmentProperty;
+
   const [currentScreen, setCurrentScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research' | 'investmentProperty'>('turf');
   const [battleId, setBattleId] = useState<string | null>(null);
   const [pendingNpcSlug, setPendingNpcSlug] = useState<string | null>(null);
+  const isAutoPanningRef = useRef(false);
+  const currentPanOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const autoPanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoPanCompleteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const offsetTrackingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [returnContext, setReturnContext] = useState<{ origin: 'hackRig' | 'map'; mapPan?: { x: number; y: number } } | null>(null);
   const [pendingNpcInstanceId, setPendingNpcInstanceId] = useState<string | null>(null);
   const [pendingDefenderUserId, setPendingDefenderUserId] = useState<string | null>(null);
@@ -140,6 +166,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const [turfViewPosition, setTurfViewPosition] = useState<{ x: number; y: number } | null>(null);
   const horizontalScrollRef = useRef<ScrollView>(null);
   const currentScrollPositionRef = useRef<{ x: number; y: number } | null>(null);
+  const scrollWrapperRef = useRef<View>(null);
+  const scrollWrapperOffsetY = useRef<number>(0);
   const dispatch = useAppDispatch();
 
   // Android-specific gesture state - always call hooks unconditionally
@@ -260,7 +288,14 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const handleTurfScroll = useCallback((event: any) => {
     const { contentOffset } = event.nativeEvent;
     currentScrollPositionRef.current = { x: contentOffset.x, y: contentOffset.y };
-  }, []);
+    if (isViewWallet) {
+      clearHighlight();
+    } else if (isResearchCenterHighlight && !isAutoPanningRef.current) {
+      clearHighlight();
+    } else if (isInvestmentPropertyHighlight && !isAutoPanningRef.current) {
+      clearHighlight();
+    }
+  }, [isViewWallet, isResearchCenterHighlight, isInvestmentPropertyHighlight, clearHighlight]);
 
   // Android-specific pan gesture (only for Android) - Memoized for performance
   const panGesture = useMemo(() => {
@@ -268,10 +303,17 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       return Gesture.Pan()
         .minPointers(1)
         .maxPointers(1)
+        .enabled(!isHomeHighlight && !isDigitalBarracksHighlight && !isResearchCenterHighlight && !isInvestmentPropertyHighlight)
         .onStart(() => {
           'worklet';
           startX.value = offsetX.value;
           startY.value = offsetY.value;
+        })
+        .onBegin(() => {
+          'worklet';
+          if (isViewWallet) {
+            runOnJS(clearHighlight)();
+          }
         })
         .onUpdate((g: any) => {
           'worklet';
@@ -289,6 +331,9 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           
           offsetX.value = x;
           offsetY.value = y;
+          runOnJS((xVal: number, yVal: number) => {
+            currentPanOffsetRef.current = { x: xVal, y: yVal };
+          })(x, y);
         })
         .onEnd((g: any) => {
           'worklet';
@@ -308,7 +353,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         });
     }
     return null;
-  }, [offsetX, offsetY, startX, startY, boundsReady, minX, maxX, minY, maxY, withDecay]);
+  }, [offsetX, offsetY, startX, startY, boundsReady, minX, maxX, minY, maxY, withDecay, isHomeHighlight, isDigitalBarracksHighlight, isResearchCenterHighlight, isInvestmentPropertyHighlight, isViewWallet, clearHighlight, runOnJS]);
 
   // Fetch Property 1's status to determine Property 2's rendering
   const { data: property1Status } = useGetRentalHousingStatusQuery(1);
@@ -681,6 +726,182 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     }
   }, [currentScreen]);
 
+  useEffect(() => {
+    if (isHomeHighlight && currentScreen === 'turf') {
+      setTimeout(() => {
+        const SCREEN_WIDTH = Dimensions.get('window').width;
+        const CONTENT_WIDTH = 2000;
+        const CENTER_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+        
+        if (Platform.OS === 'android') {
+          offsetX.value = withTiming(-CENTER_X, { duration: 300 });
+          offsetY.value = withTiming(0, { duration: 300 });
+        } else {
+          horizontalScrollRef.current?.scrollTo({
+            x: CENTER_X,
+            y: 0,
+            animated: true,
+          });
+        }
+      }, 100);
+    }
+  }, [isHomeHighlight, currentScreen, offsetX, offsetY]);
+
+  useEffect(() => {
+    if (isDigitalBarracksHighlight && currentScreen === 'turf') {
+      setTimeout(() => {
+        const SCREEN_WIDTH = Dimensions.get('window').width;
+        const CONTENT_WIDTH = 2000;
+        const BARRACKS_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2 + 150;
+        
+        if (Platform.OS === 'android') {
+          offsetX.value = withTiming(-BARRACKS_X, { duration: 300 });
+          offsetY.value = withTiming(0, { duration: 300 });
+        } else {
+          horizontalScrollRef.current?.scrollTo({
+            x: BARRACKS_X,
+            y: 0,
+            animated: true,
+          });
+        }
+      }, 100);
+    }
+  }, [isDigitalBarracksHighlight, currentScreen, offsetX, offsetY]);
+
+  // Continuously track offset values during research center highlight to catch decay animations
+  useEffect(() => {
+    if (Platform.OS === 'android' && isResearchCenterHighlight && currentScreen === 'turf') {
+      // Start continuous tracking of offset values
+      offsetTrackingIntervalRef.current = setInterval(() => {
+        currentPanOffsetRef.current = { x: offsetX.value, y: offsetY.value };
+      }, 16); // Update ~60fps
+      
+      return () => {
+        if (offsetTrackingIntervalRef.current) {
+          clearInterval(offsetTrackingIntervalRef.current);
+          offsetTrackingIntervalRef.current = null;
+        }
+      };
+    }
+  }, [isResearchCenterHighlight, currentScreen, offsetX, offsetY]);
+
+  useEffect(() => {
+    if (isResearchCenterHighlight && currentScreen === 'turf') {
+      isAutoPanningRef.current = true;
+      autoPanTimeoutRef.current = setTimeout(() => {
+        const SCREEN_WIDTH = Dimensions.get('window').width;
+        const CONTENT_WIDTH = 2000;
+        const RESEARCH_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2;
+        const RESEARCH_Y = 300;
+        
+        if (Platform.OS === 'android') {
+          const targetX = -RESEARCH_X;
+          const targetY = -RESEARCH_Y;
+          
+          offsetX.value = withTiming(targetX, { duration: 300 });
+          offsetY.value = withTiming(targetY, { duration: 300 });
+          
+          // Continuous tracking interval already updates currentPanOffsetRef with actual eased values
+          // Just set the flag after animation completes
+          autoPanCompleteTimeoutRef.current = setTimeout(() => {
+            // Final update to ensure we have the exact target values
+            currentPanOffsetRef.current = { x: targetX, y: targetY };
+            isAutoPanningRef.current = false;
+          }, 350);
+        } else {
+          horizontalScrollRef.current?.scrollTo({
+            x: RESEARCH_X,
+            y: RESEARCH_Y, // Note: y parameter is ignored on horizontal-only ScrollView, but kept for consistency
+            animated: true,
+          });
+          autoPanCompleteTimeoutRef.current = setTimeout(() => {
+            isAutoPanningRef.current = false;
+          }, 350);
+        }
+      }, 100);
+    } else {
+      isAutoPanningRef.current = false;
+    }
+    
+    return () => {
+      if (autoPanTimeoutRef.current) {
+        clearTimeout(autoPanTimeoutRef.current);
+        autoPanTimeoutRef.current = null;
+      }
+      if (autoPanCompleteTimeoutRef.current) {
+        clearTimeout(autoPanCompleteTimeoutRef.current);
+        autoPanCompleteTimeoutRef.current = null;
+      }
+      if (offsetTrackingIntervalRef.current) {
+        clearInterval(offsetTrackingIntervalRef.current);
+        offsetTrackingIntervalRef.current = null;
+      }
+    };
+  }, [isResearchCenterHighlight, currentScreen, offsetX, offsetY]);
+
+  useEffect(() => {
+    if (Platform.OS === 'android' && isInvestmentPropertyHighlight && currentScreen === 'turf') {
+      offsetTrackingIntervalRef.current = setInterval(() => {
+        currentPanOffsetRef.current = { x: offsetX.value, y: offsetY.value };
+      }, 16);
+      
+      return () => {
+        if (offsetTrackingIntervalRef.current) {
+          clearInterval(offsetTrackingIntervalRef.current);
+          offsetTrackingIntervalRef.current = null;
+        }
+      };
+    }
+  }, [isInvestmentPropertyHighlight, currentScreen, offsetX, offsetY]);
+
+  useEffect(() => {
+    if (isInvestmentPropertyHighlight && currentScreen === 'turf') {
+      isAutoPanningRef.current = true;
+      autoPanTimeoutRef.current = setTimeout(() => {
+        const SCREEN_WIDTH = Dimensions.get('window').width;
+        const CONTENT_WIDTH = 2000;
+        const INVESTMENT_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2 - 390;
+        const INVESTMENT_Y = 725;
+        
+        if (Platform.OS === 'android') {
+          const targetX = -INVESTMENT_X;
+          const targetY = -INVESTMENT_Y;
+          
+          offsetX.value = withTiming(targetX, { duration: 300 });
+          offsetY.value = withTiming(targetY, { duration: 300 });
+          
+          autoPanCompleteTimeoutRef.current = setTimeout(() => {
+            currentPanOffsetRef.current = { x: targetX, y: targetY };
+            isAutoPanningRef.current = false;
+          }, 350);
+        } else {
+          horizontalScrollRef.current?.scrollTo({
+            x: INVESTMENT_X,
+            y: INVESTMENT_Y,
+            animated: true,
+          });
+          autoPanCompleteTimeoutRef.current = setTimeout(() => {
+            isAutoPanningRef.current = false;
+          }, 350);
+        }
+      }, 100);
+    } else {
+      isAutoPanningRef.current = false;
+    }
+    
+    return () => {
+      if (autoPanTimeoutRef.current) {
+        clearTimeout(autoPanTimeoutRef.current);
+        autoPanTimeoutRef.current = null;
+      }
+      if (autoPanCompleteTimeoutRef.current) {
+        clearTimeout(autoPanCompleteTimeoutRef.current);
+        autoPanCompleteTimeoutRef.current = null;
+      }
+    };
+  }, [isInvestmentPropertyHighlight, currentScreen, offsetX, offsetY]);
+
+
   const renderScreen = useCallback(() => {
     switch (currentScreen) {
       case 'hackRig':
@@ -805,17 +1026,106 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       default:
         return (
           <View style={[styles.container, { backgroundColor: colors.background }]}>
+            {isViewWallet && (
+              <View
+                style={[StyleSheet.absoluteFill, { zIndex: 999 }]}
+                onStartShouldSetResponder={() => true}
+                onMoveShouldSetResponder={() => false}
+                onResponderTerminationRequest={() => true}
+                onResponderRelease={() => {
+                  clearHighlight();
+                }}
+              />
+            )}
             <ErrorBoundary>
               <Balance isIntroActive={currentIntroStep === 'wallet'} />
             </ErrorBoundary>
-            <View style={styles.scrollWrapper}>
+            <View 
+              ref={scrollWrapperRef}
+              style={styles.scrollWrapper}
+              onLayout={() => {
+                scrollWrapperRef.current?.measureInWindow((x, y) => {
+                  scrollWrapperOffsetY.current = y;
+                });
+              }}
+            >
               {Platform.OS === 'ios' ? (
-                <ScrollViewMemo horizontalScrollRef={horizontalScrollRef} onScroll={handleTurfScroll}>
-                  <View style={[styles.scrollContent, { backgroundColor: colors.background, borderColor: colors.secondary + '99' }]}>
+                <ScrollViewMemo 
+                  horizontalScrollRef={horizontalScrollRef} 
+                  onScroll={handleTurfScroll} 
+                  scrollEnabled={!isHomeHighlight && !isDigitalBarracksHighlight && !isResearchCenterHighlight && !isInvestmentPropertyHighlight}
+                >
+                  <View 
+                    style={[styles.scrollContent, { backgroundColor: colors.background, borderColor: colors.secondary + '99' }]}
+                    onStartShouldSetResponder={(evt) => {
+                      if (isResearchCenterHighlight) {
+                        const { pageX, pageY } = evt.nativeEvent;
+                        const SCREEN_WIDTH = Dimensions.get('window').width;
+                        const CONTENT_WIDTH = 2000;
+                        const CONTENT_HEIGHT = 2000;
+                        
+                        const scrollX = currentScrollPositionRef.current?.x ?? ((CONTENT_WIDTH - SCREEN_WIDTH) / 2);
+                        const scrollY = currentScrollPositionRef.current?.y ?? 0;
+                        
+                        const researchCenterContentLeft = (CONTENT_WIDTH / 2) - 150;
+                        const researchCenterContentRight = researchCenterContentLeft + 300;
+                        const researchCenterContentTop = CONTENT_HEIGHT * 0.2;
+                        const researchCenterContentBottom = researchCenterContentTop + (CONTENT_HEIGHT * 0.11);
+                        
+                        const researchCenterScreenLeft = researchCenterContentLeft - scrollX;
+                        const researchCenterScreenRight = researchCenterContentRight - scrollX;
+                        const adjustedPageY = pageY - scrollWrapperOffsetY.current;
+                        const researchCenterScreenTop = researchCenterContentTop - scrollY;
+                        const researchCenterScreenBottom = researchCenterContentBottom - scrollY;
+                        
+                        const isOnResearchCenter = pageX >= researchCenterScreenLeft && 
+                                                  pageX <= researchCenterScreenRight &&
+                                                  adjustedPageY >= researchCenterScreenTop && 
+                                                  adjustedPageY <= researchCenterScreenBottom;
+                        
+                        if (!isOnResearchCenter) {
+                          clearHighlight();
+                          return true;
+                        }
+                      } else if (isInvestmentPropertyHighlight) {
+                        const { pageX, pageY } = evt.nativeEvent;
+                        const SCREEN_WIDTH = Dimensions.get('window').width;
+                        const CONTENT_WIDTH = 2000;
+                        const CONTENT_HEIGHT = 2000;
+                        
+                        const scrollX = currentScrollPositionRef.current?.x ?? ((CONTENT_WIDTH - SCREEN_WIDTH) / 2 - 390);
+                        const scrollY = currentScrollPositionRef.current?.y ?? 725;
+                        
+                        const investmentPropertyContentLeft = 540;
+                        const investmentPropertyContentRight = investmentPropertyContentLeft + 120;
+                        const investmentPropertyContentTop = 930;
+                        const investmentPropertyContentBottom = investmentPropertyContentTop + 120;
+                        
+                        const investmentPropertyScreenLeft = investmentPropertyContentLeft - scrollX;
+                        const investmentPropertyScreenRight = investmentPropertyContentRight - scrollX;
+                        const adjustedPageY = pageY - scrollWrapperOffsetY.current;
+                        const investmentPropertyScreenTop = investmentPropertyContentTop - scrollY;
+                        const investmentPropertyScreenBottom = investmentPropertyContentBottom - scrollY;
+                        
+                        const isOnInvestmentProperty = pageX >= investmentPropertyScreenLeft && 
+                                                      pageX <= investmentPropertyScreenRight &&
+                                                      adjustedPageY >= investmentPropertyScreenTop && 
+                                                      adjustedPageY <= investmentPropertyScreenBottom;
+                        
+                        if (!isOnInvestmentProperty) {
+                          clearHighlight();
+                          return true;
+                        }
+                      }
+                      return false;
+                    }}
+                    onMoveShouldSetResponder={() => false}
+                    onResponderRelease={() => {}}
+                  >
                     <DiagonalLines colors={colors} />
                     <View style={[styles.digitalGround, { backgroundColor: colors.matrix + '0D', borderColor: colors.matrix + '33' }]}>
-                      <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />
-                      <DigitalBarracksLocation onPress={() => navigateToScreen('barracks')} isIntroActive={currentIntroStep === 'barracks'} />
+                      {!isHomeHighlight && <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />}
+                      {!isDigitalBarracksHighlight && <DigitalBarracksLocation onPress={() => navigateToScreen('barracks')} isIntroActive={currentIntroStep === 'barracks'} />}
                     </View>
                     <ResearchCenterLocation 
                       onNavigateToResearch={() => {
@@ -885,18 +1195,19 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                   </View>
                 </ScrollViewMemo>
               ) : (
-                <GesturePanView 
-                  horizontalScrollRef={horizontalScrollRef} 
-                  onScroll={handleTurfScroll}
-                  offsetX={offsetX}
-                  offsetY={offsetY}
-                  panGesture={panGesture}
-                  colors={colors}
-                >
+                <View>
+                  <GesturePanView 
+                      horizontalScrollRef={horizontalScrollRef} 
+                      onScroll={handleTurfScroll}
+                      offsetX={offsetX}
+                      offsetY={offsetY}
+                      panGesture={panGesture}
+                      colors={colors}
+                    >
                   <DiagonalLines colors={colors} />
                   <View style={[styles.digitalGround, { backgroundColor: colors.matrix + '0D', borderColor: colors.matrix + '33' }]}>
-                    <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />
-                    <DigitalBarracksLocation onPress={() => navigateToScreen('barracks')} isIntroActive={currentIntroStep === 'barracks'} />
+                    {!isHomeHighlight && <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />}
+                    {!isDigitalBarracksHighlight && <DigitalBarracksLocation onPress={() => navigateToScreen('barracks')} isIntroActive={currentIntroStep === 'barracks'} />}
                   </View>
                   <ResearchCenterLocation 
                     onNavigateToResearch={() => {
@@ -967,15 +1278,130 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                         <FutureBuildingPlaceholder propertyNumber={4} />
                       );
                     })()}
-                  </DevelopmentZone>
-                </GesturePanView>
+                    </DevelopmentZone>
+                  {isResearchCenterHighlight && (
+                    <View
+                      style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}
+                      onStartShouldSetResponder={(evt) => {
+                        const { pageX, pageY } = evt.nativeEvent;
+                        const SCREEN_WIDTH = Dimensions.get('window').width;
+                        const CONTENT_WIDTH = 2000;
+                        const CONTENT_HEIGHT = 2000;
+                        
+                        const scrollX = -currentPanOffsetRef.current.x;
+                        const scrollY = -currentPanOffsetRef.current.y;
+                        
+                        const researchCenterContentLeft = (CONTENT_WIDTH / 2) - 150;
+                        const researchCenterContentRight = researchCenterContentLeft + 300;
+                        const researchCenterContentTop = CONTENT_HEIGHT * 0.2;
+                        const researchCenterContentBottom = researchCenterContentTop + (CONTENT_HEIGHT * 0.11);
+                        
+                        const researchCenterScreenLeft = researchCenterContentLeft - scrollX;
+                        const researchCenterScreenRight = researchCenterContentRight - scrollX;
+                        const adjustedPageY = pageY - scrollWrapperOffsetY.current;
+                        const researchCenterScreenTop = researchCenterContentTop - scrollY;
+                        const researchCenterScreenBottom = researchCenterContentBottom - scrollY;
+                        
+                        const isOnResearchCenter = pageX >= researchCenterScreenLeft && 
+                                                  pageX <= researchCenterScreenRight &&
+                                                  adjustedPageY >= researchCenterScreenTop && 
+                                                  adjustedPageY <= researchCenterScreenBottom;
+                        
+                        if (!isOnResearchCenter) {
+                          clearHighlight();
+                          return true;
+                        }
+                        return false;
+                      }}
+                      onMoveShouldSetResponder={() => false}
+                      onResponderRelease={() => {}}
+                      pointerEvents="auto"
+                    />
+                  )}
+                  {isInvestmentPropertyHighlight && (
+                    <View
+                      style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}
+                      onStartShouldSetResponder={(evt) => {
+                        const { pageX, pageY } = evt.nativeEvent;
+                        const SCREEN_WIDTH = Dimensions.get('window').width;
+                        const CONTENT_WIDTH = 2000;
+                        const CONTENT_HEIGHT = 2000;
+                        
+                        const scrollX = -currentPanOffsetRef.current.x;
+                        const scrollY = -currentPanOffsetRef.current.y;
+                        
+                        const investmentPropertyContentLeft = 540;
+                        const investmentPropertyContentRight = investmentPropertyContentLeft + 120;
+                        const investmentPropertyContentTop = 930;
+                        const investmentPropertyContentBottom = investmentPropertyContentTop + 120;
+                        
+                        const investmentPropertyScreenLeft = investmentPropertyContentLeft - scrollX;
+                        const investmentPropertyScreenRight = investmentPropertyContentRight - scrollX;
+                        const adjustedPageY = pageY - scrollWrapperOffsetY.current;
+                        const investmentPropertyScreenTop = investmentPropertyContentTop - scrollY;
+                        const investmentPropertyScreenBottom = investmentPropertyContentBottom - scrollY;
+                        
+                        const isOnInvestmentProperty = pageX >= investmentPropertyScreenLeft && 
+                                                      pageX <= investmentPropertyScreenRight &&
+                                                      adjustedPageY >= investmentPropertyScreenTop && 
+                                                      adjustedPageY <= investmentPropertyScreenBottom;
+                        
+                        if (!isOnInvestmentProperty) {
+                          clearHighlight();
+                          return true;
+                        }
+                        return false;
+                      }}
+                      onMoveShouldSetResponder={() => false}
+                      onResponderRelease={() => {}}
+                      pointerEvents="auto"
+                    />
+                  )}
+                  </GesturePanView>
+                </View>
               )}
             </View>
+            {isHomeHighlight && (
+              <>
+                <View style={styles.homeLocationElevatedWrapper}>
+                  <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />
+                </View>
+                <TaskGuideHighlightOverlay forHome={true} />
+              </>
+            )}
             <ProfileLocation onPress={() => navigateToScreen('profile')} isIntroActive={currentIntroStep === 'profile'} />
+            <TaskGuide 
+              currentScreen={currentScreen} 
+              onNavigateToProfile={() => navigateToScreen('profile')}
+            />
+            <TaskGuideHighlightOverlay forProfile={true} />
+            {isVisitHackmap && (
+              <TouchableOpacity
+                style={styles.turfClickHandler}
+                activeOpacity={1}
+                onPress={() => {
+                  clearHighlight();
+                }}
+              />
+            )}
+            {isVisitDigitalBarracks && (
+              <>
+                <TouchableOpacity
+                  style={styles.turfClickHandler}
+                  activeOpacity={1}
+                  onPress={() => {
+                    clearHighlight();
+                  }}
+                />
+                <View style={styles.digitalBarracksElevatedWrapper}>
+                  <DigitalBarracksLocation onPress={() => navigateToScreen('barracks')} isIntroActive={currentIntroStep === 'barracks'} />
+                </View>
+              </>
+            )}
           </View>
         );
     }
-  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep]);
+  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, isResearchCenterHighlight, highlightTaskId, clearHighlight]);
 
   return (
     <>
@@ -1031,9 +1457,30 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     zIndex: 1,
   },
+  homeLocationElevatedWrapper: {
+    position: 'absolute',
+    top: '53%',
+    left: '35%',
+    width: 120,
+    height: 120,
+    zIndex: 10002, // Above TouchableOpacity overlay (10001) for visit-hackmap
+    transform: [{ translateX: -60 }, { translateY: -80 }],
+    pointerEvents: 'box-none',
+  },
+  digitalBarracksElevatedWrapper: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: 120,
+    height: 120,
+    zIndex: 10002, // Above TouchableOpacity overlay (10001) for visit-digital-barracks
+    transform: [{ translateX: -60 }, { translateY: -70 }],
+    pointerEvents: 'box-none',
+  },
   scrollWrapper: {
     flex: 1,
     backgroundColor: 'transparent',
+    zIndex: 1,
   },
   scrollContent: {
     width: 2000,
@@ -1090,5 +1537,14 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '75deg' }],
     top: '70%',
     left: '-50%',
+  },
+  turfClickHandler: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 10001,
+    backgroundColor: 'transparent',
   },
 });

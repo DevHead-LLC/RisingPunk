@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
@@ -42,7 +43,7 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
 }) => {
   const colors = useThemeColors();
   const currentUser = useAppSelector((state) => state.auth.user);
-  const currentUserId = currentUser?._id;
+  const currentUserId = currentUser?._id || (currentUser as any)?.id;
   const currentUsername = currentUser?.handle || 'You';
 
   const [messageInput, setMessageInput] = useState('');
@@ -72,14 +73,19 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
     timestamp: new Date(msg.timestamp),
   })) || [];
 
-  // Auto-scroll to bottom when messages change
+  // Track if we've scrolled on this modal open session
+  const hasScrolledOnOpen = useRef(false);
+  const lastVisibleState = useRef(false);
+  
+  // Reset scroll flag and report modal state when modal closes
   useEffect(() => {
-    if (messages.length > 0 && scrollViewRef.current) {
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+    if (!visible && lastVisibleState.current) {
+      hasScrolledOnOpen.current = false;
+      setShowReportModal(false);
+      setReportedMessage(null);
     }
-  }, [messages.length]);
+    lastVisibleState.current = visible;
+  }, [visible]);
 
   const handleSendMessage = async () => {
     const trimmedMessage = messageInput.trim();
@@ -107,6 +113,7 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
       }).unwrap();
       
       setMessageInput('');
+      Keyboard.dismiss();
     } catch (error: any) {
       // Silent error handling - mutation will show error state if needed
     }
@@ -114,21 +121,26 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
 
   const handleClose = () => {
     setMessageInput('');
+    setShowReportModal(false);
+    setReportedMessage(null);
     onClose();
   };
 
-  const isCurrentUser = (userId: string) => {
-    const currentId = currentUser?._id || (currentUser as any)?.id;
-    if (!currentId || !userId) return false;
-    // Normalize both IDs to strings and compare
-    const currentIdStr = String(currentId).trim();
+  const isCurrentUser = useCallback((userId: string) => {
+    if (!userId || !currentUser) return false;
+    if (!currentUserId) return false;
+    
+    const currentIdStr = String(currentUserId || '').trim();
     const messageIdStr = String(userId).trim();
-    return currentIdStr === messageIdStr;
-  };
+    const currentIdAlt = String(currentUser._id || (currentUser as any)?.id || '').trim();
+    return currentIdStr === messageIdStr || currentIdAlt === messageIdStr;
+  }, [currentUserId, currentUser]);
 
   const handleReportMessage = (message: ChatMessage) => {
-    // Capture message data immediately before potential deletion
-    // Ensure timestamp is a Date object (API returns string, we convert it)
+    if (isCurrentUser(message.userId)) {
+      return;
+    }
+    
     const timestamp = message.timestamp instanceof Date 
       ? message.timestamp 
       : new Date(message.timestamp);
@@ -151,6 +163,7 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
   const styles = createStyles(colors);
 
   return (
+    <>
     <Modal
       visible={visible}
       transparent={true}
@@ -184,6 +197,16 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
             style={styles.messagesContainer}
             contentContainerStyle={styles.messagesContent}
             showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
+            scrollEnabled={true}
+            onContentSizeChange={() => {
+              if (visible && !hasScrolledOnOpen.current && messages.length > 0 && !isLoadingMessages) {
+                hasScrolledOnOpen.current = true;
+                setTimeout(() => {
+                  scrollViewRef.current?.scrollToEnd({ animated: false });
+                }, 50);
+              }
+            }}
           >
             {fetchError ? (
               <View style={styles.errorState}>
@@ -325,18 +348,18 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
           </View>
         </SafeAreaView>
       </KeyboardAvoidingView>
-
-      {currentUser && reportedMessage && (
+      
+      {currentUser && reportedMessage && showReportModal && (
         <UserReportModal
           visible={showReportModal}
           onClose={handleCloseReportModal}
           reportedUserId={reportedMessage.userId}
           reportedUsername={reportedMessage.username}
-          reportingUserId={currentUser._id}
+          reportingUserId={String(currentUser._id || (currentUser as any)?.id || '')}
           reportingUsername={currentUser.handle || 'Unknown'}
           context="chat-message"
           contextData={{
-            message: reportedMessage.message, // Server will look up original content from database
+            message: reportedMessage.message,
             messageId: reportedMessage.id,
             timestamp: (reportedMessage.timestamp instanceof Date 
               ? reportedMessage.timestamp 
@@ -344,9 +367,11 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
             crewId: crewId,
           }}
           maxDescriptionLength={1000}
+          renderAsOverlay={true}
         />
       )}
     </Modal>
+    </>
   );
 };
 

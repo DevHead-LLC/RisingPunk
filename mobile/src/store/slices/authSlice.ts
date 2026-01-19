@@ -25,6 +25,7 @@ export interface User {
     enableDataRefresh: boolean;
     enableDebugLogs: boolean;
   };
+  totalGuardiansBuilt?: number;
 }
 
 export interface AuthState {
@@ -1200,6 +1201,7 @@ export const authSlice = createSlice({
           state.user.profileGender = action.payload.profileGender;
           state.user.onboardingCompleted = action.payload.onboardingCompleted;
           state.user.needsHandleSelection = action.payload.needsHandleSelection;
+          state.user.totalGuardiansBuilt = action.payload.totalGuardiansBuilt || 0;
           
           // Reset email verification prompted flag if email is now verified
           if (action.payload.emailVerified) {

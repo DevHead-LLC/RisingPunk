@@ -1,7 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { BattleController } from '../controllers/BattleController';
 import auth from '../middleware/auth';
-import { Battle } from '../models/Battle'; // Fixed import for Battle model
+import { Battle } from '../models/Battle';
+import { UserTaskProgress } from '../models/UserTaskProgress';
+import { NPCService } from '../services/NPCService';
+import { UserResearchFeature } from '../models/UserResearchFeature';
 
 interface StartBattleRequest extends Request {
   body: {
@@ -41,7 +44,90 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
         return;
       }
       
+      if (!userBattalions || userBattalions.length === 0) {
+        res.status(400).json({ success: false, error: 'userBattalions is required and must contain at least one battalion' });
+        return;
+      }
+      
+      const hasValidBattalion = userBattalions.some(battalion => battalion.quantity && battalion.quantity > 0);
+      if (!hasValidBattalion) {
+        res.status(400).json({ success: false, error: 'userBattalions must contain at least one battalion with quantity > 0' });
+        return;
+      }
+      
+      const MAX_USER_BATTALIONS = 3;
+      if (userBattalions.length > MAX_USER_BATTALIONS) {
+        res.status(400).json({ success: false, error: `Maximum ${MAX_USER_BATTALIONS} battalions allowed` });
+        return;
+      }
+      
+      if (userBattalions.length > 2) {
+        const battalionCFeature = await UserResearchFeature.findOne({
+          userId: req.user._id,
+          categoryId: 'hack-ability',
+          featureId: 'battalions-per-battle'
+        })
+        .select('isUnlocked isResearching researchCompletesAt')
+        .lean();
+        
+        if (!battalionCFeature) {
+          res.status(403).json({ 
+            success: false, 
+            error: 'Battalion C is locked. Complete the "Add Battalion C" research feature to unlock it.' 
+          });
+          return;
+        }
+        
+        const now = new Date().getTime();
+        const researchCompletesAt = battalionCFeature.researchCompletesAt 
+          ? new Date(battalionCFeature.researchCompletesAt).getTime() 
+          : null;
+        const remaining = researchCompletesAt !== null ? Math.max(0, researchCompletesAt - now) : null;
+        const isActuallyUnlocked = battalionCFeature.isUnlocked || 
+          (battalionCFeature.isResearching && researchCompletesAt !== null && remaining === 0);
+        
+        if (!isActuallyUnlocked) {
+          res.status(403).json({ 
+            success: false, 
+            error: 'Battalion C is locked. Complete the "Add Battalion C" research feature to unlock it.' 
+          });
+          return;
+        }
+      }
+      
       const battle = await battleController.startBattle(req.user._id, defenderId || 'computer', screenWidth, screenHeight, userBattalions, defenderNpcSlug, unlockHackRigOnWin === true, defenderNpcInstanceId);
+      
+      try {
+        const battleDoc = await Battle.findOne({ battleId: battle.battleId });
+        const actualDefenderNpcSlug = (battleDoc as any)?.defenderNpcSlug;
+        
+        if (actualDefenderNpcSlug) {
+          const npc = await NPCService.getNPCBySlug(actualDefenderNpcSlug);
+          if (npc && npc.userLevelAssociation === 1) {
+            const existingProgress = await UserTaskProgress.findOne({ userId: req.user._id });
+            const wasAlreadyAttacked = existingProgress?.attackedLevel1NpcAt;
+            
+            if (!wasAlreadyAttacked) {
+              await UserTaskProgress.findOneAndUpdate(
+                { userId: req.user._id },
+                {
+                  $set: { attackedLevel1NpcAt: new Date() },
+                  $setOnInsert: {
+                    completedTasks: [],
+                    collectedTasks: [],
+                    skippedTasks: [],
+                    showTaskGuide: true
+                  }
+                },
+                { upsert: true, new: true }
+              );
+            }
+          }
+        }
+      } catch (taskTrackingError) {
+        console.error('Error tracking Level 1 NPC attack for task guide:', taskTrackingError);
+      }
+      
       res.status(201).json({ battleId: battle.battleId });
     } catch (error) {
       console.error('Start battle error:', error);

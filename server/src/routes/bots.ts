@@ -3,8 +3,13 @@ const Bot = require('../models/Bot');
 import auth from '../middleware/auth';
 import { User } from '../models/User';
 import mongoose from 'mongoose';
+import { UserResearchFeature } from '../models/UserResearchFeature';
 
 const router = express.Router();
+
+const battalionAssignmentAttempts = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_WINDOW = 60000;
+const MAX_BATTALION_ASSIGNMENT_ATTEMPTS = 20;
 
 // Test bot creation
 router.post('/test', auth, async (req, res) => {
@@ -176,17 +181,68 @@ router.get('/build-state', auth, async (req, res) => {
 
     // If build is complete
     if (progress >= 100) {
-      const finalType = bot.buildQueue.type;
-      const remainingBots = bot.buildQueue.quantity - bot.buildQueue.botsBuilt;
-      if (remainingBots > 0) {
-        bot.bots[finalType] += remainingBots;
+      // Use transaction to ensure atomicity: counter increment and buildQueue clearing must both succeed
+      // This prevents double-counting if bot.save() fails after counter increment
+      // Re-fetch bot inside transaction to prevent race conditions from concurrent requests
+      const session = await mongoose.startSession();
+      try {
+        await session.withTransaction(async () => {
+          // Re-fetch bot within transaction to get latest state
+          // If another concurrent request already cleared buildQueue, this will be null
+          const botInTransaction = await Bot.findOne({ userId: req.user._id }).session(session);
+          
+          if (!botInTransaction || !botInTransaction.buildQueue) {
+            // Build queue was already cleared by another concurrent request, skip increment
+            return;
+          }
+          
+          // Use values from botInTransaction (not stale bot object) to ensure correctness
+          const finalTypeInTransaction = botInTransaction.buildQueue.type;
+          const fullQuantityBuilt = botInTransaction.buildQueue.quantity;
+          const remainingBotsInTransaction = botInTransaction.buildQueue.quantity - botInTransaction.buildQueue.botsBuilt;
+          
+          // Add remaining bots to inventory (if any)
+          if (remainingBotsInTransaction > 0) {
+            botInTransaction.bots[finalTypeInTransaction] += remainingBotsInTransaction;
+          }
+          
+          // Increment user counters with FULL quantity built (not just remaining)
+          // By the time progress reaches 100%, botsBuilt equals quantity due to incremental updates,
+          // so remainingBots would be 0. We need to count the full quantity to match speedup behavior.
+          if (fullQuantityBuilt > 0) {
+            // Use atomic $inc operator to prevent race conditions when concurrent builds complete
+            // This ensures that if multiple builds complete simultaneously, all increments are applied
+            const updateField = finalTypeInTransaction === 'guardian' ? 'totalGuardiansBuilt' : 
+                               finalTypeInTransaction === 'phreak' ? 'totalPhreaksBuilt' : 'totalBreachersBuilt';
+            
+            // First, increment the counter (atomic operation)
+            await User.updateOne(
+              { _id: req.user._id },
+              { $inc: { [updateField]: fullQuantityBuilt } },
+              { session }
+            );
+            
+            // Then, cap it at 1,000,000 if needed (within same transaction)
+            await User.updateOne(
+              { _id: req.user._id, [updateField]: { $gt: 1000000 } },
+              { $set: { [updateField]: 1000000 } },
+              { session }
+            );
+          }
+          
+          // Clear build queue within transaction - if this fails, counter increment is rolled back
+          botInTransaction.buildQueue = null;
+          await botInTransaction.save({ session });
+        });
+      } finally {
+        await session.endSession();
       }
-      bot.buildQueue = null;
-      await bot.save();
 
+      // Re-fetch bot to get updated state after transaction
+      const updatedBot = await Bot.findOne({ userId: req.user._id });
       res.json({
         buildQueue: null,
-        bots: bot.bots
+        bots: updatedBot?.bots || bot.bots
       });
       return;
     }
@@ -258,11 +314,36 @@ router.post('/speedup-build', auth, async (req, res) => {
           throw new Error('Insufficient funds');
         }
 
-        // Calculate remaining bots to add
+        // Calculate remaining bots to add to inventory
         const remainingBotsToAdd = botInTransaction.buildQueue.quantity - (botInTransaction.buildQueue.botsBuilt || 0);
         
         // Add remaining bots to inventory
         botInTransaction.bots[botInTransaction.buildQueue.type] += remainingBotsToAdd;
+        
+        // Increment lifetime bot build counters (capped at 1,000,000)
+        // When speedup is used, we count the FULL quantity built, not just remaining
+        // This ensures all bots are counted even if some were already built naturally
+        const fullQuantityBuilt = botInTransaction.buildQueue.quantity;
+        if (fullQuantityBuilt > 0) {
+          const botType = botInTransaction.buildQueue.type;
+          const updateField = botType === 'guardian' ? 'totalGuardiansBuilt' : 
+                             botType === 'phreak' ? 'totalPhreaksBuilt' : 'totalBreachersBuilt';
+          
+          // Use atomic $inc operator within transaction to prevent race conditions
+          // This ensures that if multiple builds complete simultaneously, all increments are applied
+          await User.updateOne(
+            { _id: req.user._id },
+            { $inc: { [updateField]: fullQuantityBuilt } },
+            { session }
+          );
+          
+          // Then, cap it at 1,000,000 if needed (within same transaction)
+          await User.updateOne(
+            { _id: req.user._id, [updateField]: { $gt: 1000000 } },
+            { $set: { [updateField]: 1000000 } },
+            { session }
+          );
+        }
         
         // Clear build queue
         botInTransaction.buildQueue = null;
@@ -322,7 +403,100 @@ router.post('/speedup-build', auth, async (req, res) => {
 // Assign bots to battalion
 router.post('/assign', auth, async (req, res) => {
   try {
+    const userId = req.user._id.toString();
     const { botType, quantity, battalionId } = req.body;
+    
+    if (!battalionId || typeof battalionId !== 'string' || !/^[A-Z]$/.test(battalionId)) {
+      res.status(400).json({ error: 'Battalion ID must be a single uppercase letter (A-Z)' });
+      return;
+    }
+
+    if (typeof quantity !== 'number' || !Number.isFinite(quantity) || !Number.isInteger(quantity)) {
+      res.status(400).json({ error: 'Quantity must be a valid integer' });
+      return;
+    }
+
+    if (quantity < 0) {
+      res.status(400).json({ error: 'Quantity must be greater than or equal to 0' });
+      return;
+    }
+
+    const battalionSizeFeature = await UserResearchFeature.findOne({
+      userId: req.user._id,
+      categoryId: 'hack-ability',
+      featureId: 'increase-battalion-size'
+    })
+    .select('isUnlocked isResearching researchCompletesAt')
+    .lean();
+
+    const now = Date.now();
+    const researchCompletesAt = battalionSizeFeature?.researchCompletesAt 
+      ? new Date(battalionSizeFeature.researchCompletesAt).getTime() 
+      : null;
+    const remaining = researchCompletesAt !== null ? Math.max(0, researchCompletesAt - now) : null;
+    const isActuallyUnlocked = battalionSizeFeature?.isUnlocked || 
+      (battalionSizeFeature?.isResearching && researchCompletesAt !== null && remaining === 0);
+
+    const maxLimit = isActuallyUnlocked ? 500 : 250;
+
+    if (quantity > maxLimit) {
+      const errorMessage = isActuallyUnlocked 
+        ? 'Maximum troops per battalion is 500.'
+        : 'Maximum troops per battalion is 250. Complete "Battalion Size +250" research to increase to 500.';
+      res.status(400).json({ error: errorMessage });
+      return;
+    }
+    
+    if (battalionId === 'C') {
+      const battalionCFeature = await UserResearchFeature.findOne({
+        userId: req.user._id,
+        categoryId: 'hack-ability',
+        featureId: 'battalions-per-battle'
+      })
+      .select('isUnlocked isResearching researchCompletesAt')
+      .lean();
+      
+      if (!battalionCFeature) {
+        res.status(403).json({ error: 'Battalion C is locked. Complete the "Add Battalion C" research feature to unlock it.' });
+        return;
+      }
+      
+      const researchCompletesAtC = battalionCFeature.researchCompletesAt 
+        ? new Date(battalionCFeature.researchCompletesAt).getTime() 
+        : null;
+      const remainingC = researchCompletesAtC !== null ? Math.max(0, researchCompletesAtC - now) : null;
+      const isActuallyUnlockedC = battalionCFeature.isUnlocked || 
+        (battalionCFeature.isResearching && researchCompletesAtC !== null && remainingC === 0);
+      
+      if (!isActuallyUnlockedC) {
+        res.status(403).json({ error: 'Battalion C is locked. Complete the "Add Battalion C" research feature to unlock it.' });
+        return;
+      }
+    }
+    const userAttempts = battalionAssignmentAttempts.get(userId);
+    
+    if (userAttempts) {
+      if (userAttempts.resetAt <= now) {
+        battalionAssignmentAttempts.delete(userId);
+        battalionAssignmentAttempts.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+      } else {
+        if (userAttempts.count >= MAX_BATTALION_ASSIGNMENT_ATTEMPTS) {
+          res.status(429).json({ error: 'Too many requests. Please try again later.' });
+          return;
+        }
+        userAttempts.count++;
+      }
+    } else {
+      battalionAssignmentAttempts.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    }
+    
+    if (battalionAssignmentAttempts.size > 1000) {
+      for (const [key, value] of battalionAssignmentAttempts.entries()) {
+        if (value.resetAt <= now) {
+          battalionAssignmentAttempts.delete(key);
+        }
+      }
+    }
     
     
     // Use atomic operation with retry logic to handle race conditions
@@ -434,6 +608,10 @@ router.post('/assign', auth, async (req, res) => {
           updatedBot.battalionAssignments
             .filter((assignment: any) => assignment.botType === botType)
             .reduce((sum: number, assignment: any) => sum + assignment.quantity, 0);
+
+        if (battalionId === 'C') {
+          console.log(`[AUDIT] User ${userId} assigned ${quantity} ${botType} to Battalion C`);
+        }
 
         res.json({ 
           success: true,

@@ -1,11 +1,15 @@
 import React, {memo, useRef, useEffect, useState, useMemo, useCallback} from 'react';
-import {View, StyleSheet, ScrollView, Dimensions, Text, TouchableOpacity, Platform} from 'react-native';
+import {View, StyleSheet, ScrollView, Dimensions, Text, TouchableOpacity, Platform, Animated as RNAnimated} from 'react-native';
 import { SIZING } from '../styles/theme';
 import { CloseButton } from '../components/common/CloseButton';
 import { HackRigDisplay } from '../components/home/HackRigDisplay';
 import { BotAssembly } from '../components/home/BotAssembly';
 import { HomeFloorPlan } from '../components/home/HomeFloorPlan';
 import { useThemeColors } from '../hooks/useThemeColors';
+import { useTrackHomeVisitMutation, useTrackHackmapVisitMutation } from '../store/api/userGuideApi';
+import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
+import { useAppSelector } from '../store/hooks';
+import { TaskGuideHighlightOverlay } from '../components/turf/TaskGuideHighlightOverlay';
 
 let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, computePanBounds: any;
 
@@ -20,8 +24,6 @@ useSharedValue = reanimated.useSharedValue;
 useAnimatedStyle = reanimated.useAnimatedStyle;
 withDecay = reanimated.withDecay;
 computePanBounds = mapPanBounds.computePanBounds;
-
-type TabType = 'floorPlan' | 'garage';
 
 type HomeScreenProps = {
   onClose: () => void;
@@ -72,6 +74,95 @@ function GesturePanView({
   );
 }
 
+type TabType = 'floorPlan' | 'garage';
+
+const TabButton = memo(({ 
+  label, 
+  tab, 
+  isActive, 
+  isHighlighted,
+  colors,
+  onPress,
+  advanceHighlightStep
+}: { 
+  label: string; 
+  tab: TabType; 
+  isActive: boolean;
+  isHighlighted: boolean;
+  colors: any;
+  onPress: (tab: TabType) => void;
+  advanceHighlightStep: () => void;
+}) => {
+  const [currentColorIndex, setCurrentColorIndex] = useState(0);
+  const animatedBorderColor = useState(new RNAnimated.Value(0))[0];
+  
+  const introColors = [colors.primary, colors.secondary, colors.matrix];
+  
+  useEffect(() => {
+    if (isHighlighted) {
+      const interval = setInterval(() => {
+        setCurrentColorIndex(prev => (prev + 1) % introColors.length);
+      }, 1000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [isHighlighted, introColors.length]);
+  
+  useEffect(() => {
+    if (isHighlighted) {
+      RNAnimated.timing(animatedBorderColor, {
+        toValue: currentColorIndex,
+        duration: 500,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [currentColorIndex, isHighlighted, animatedBorderColor]);
+  
+  const animatedBorderColorValue = animatedBorderColor.interpolate({
+    inputRange: [0, 1, 2],
+    outputRange: introColors,
+  });
+  
+  const handlePress = () => {
+    onPress(tab);
+    if (isHighlighted) {
+      advanceHighlightStep();
+    }
+  };
+  
+  return (
+    <View style={{ zIndex: isHighlighted ? 1000 : 3 }}>
+      <TouchableOpacity
+        onPress={handlePress}
+        style={[
+          styles.tabButton, 
+          isActive && styles.tabButtonActive, 
+          isHighlighted && { 
+            borderWidth: 3, 
+            borderColor: undefined,
+            overflow: 'hidden',
+          }
+        ]}
+      >
+        {isHighlighted && (
+          <RNAnimated.View 
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                borderWidth: 3,
+                borderColor: animatedBorderColorValue,
+                borderRadius: 6,
+              }
+            ]} 
+            pointerEvents="none"
+          />
+        )}
+        <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{label}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+});
+
 export const HomeScreen = memo(function HomeScreen({
   onClose,
   onNavigateToMap,
@@ -79,9 +170,22 @@ export const HomeScreen = memo(function HomeScreen({
   onNavigateToBattle,
 }: HomeScreenProps): React.JSX.Element {
   const colors = useThemeColors();
+  const token = useAppSelector((state) => state.auth.token);
   const [activeTab, setActiveTab] = useState<TabType>('floorPlan');
   const scrollViewRef = useRef<ScrollView>(null);
   const garageScrollViewRef = useRef<ScrollView>(null);
+  const [trackHomeVisit] = useTrackHomeVisitMutation();
+  const [trackHackmapVisit] = useTrackHackmapVisitMutation();
+  const { highlightTaskId, highlightStep, clearHighlight, advanceHighlightStep } = useTaskGuideHighlight();
+  const hasTrackedVisit = useRef(false);
+  const hasTrackedHackmapVisit = useRef(false);
+  
+  const isBuildGuardians = highlightTaskId === 'build-100-guardians';
+  const isFreeHackRig = highlightTaskId === 'free-hack-rig';
+  const isVisitHackmap = highlightTaskId === 'visit-hackmap';
+  const isGarageTabHighlight = isBuildGuardians && highlightStep === 'garage-tab';
+  const isBotAssemblyHighlight = isBuildGuardians && highlightStep === 'bot-assembly';
+  const isHackRigHighlight = isFreeHackRig && highlightStep === 'hack-rig';
 
   const FLOOR_PLAN_WIDTH = 1250;
   const FLOOR_PLAN_HEIGHT = 950;
@@ -125,6 +229,41 @@ export const HomeScreen = memo(function HomeScreen({
     floorPlanOffsetX.value = x;
     floorPlanOffsetY.value = y;
   }, [floorPlanOffsetX, floorPlanOffsetY, FLOOR_PLAN_WIDTH, floorPlanBoundsReady, floorPlanMinX, floorPlanMaxX, floorPlanMinY, floorPlanMaxY]);
+
+  const centerOnHackRig = useCallback(() => {
+    const SCREEN_WIDTH = Dimensions.get('window').width;
+    const SCREEN_HEIGHT = Dimensions.get('window').height;
+    
+    // Hack Rig container position
+    const HACK_RIG_LEFT = 820;
+    const HACK_RIG_TOP = 235;
+    const HACK_RIG_WIDTH = 500;
+    const HACK_RIG_HEIGHT = 375;
+    
+    // Transform offsets (from hackRigContainer style)
+    const TRANSFORM_X = -250;
+    const TRANSFORM_Y = -187.5;
+    
+    // Calculate visual center position (accounting for transform)
+    // The transform centers the element on its anchor point
+    const HACK_RIG_CENTER_X = HACK_RIG_LEFT + (HACK_RIG_WIDTH / 2) + TRANSFORM_X;
+    const HACK_RIG_CENTER_Y = HACK_RIG_TOP + (HACK_RIG_HEIGHT / 2) + TRANSFORM_Y;
+    
+    // Calculate offset to center on screen
+    const TARGET_X = (SCREEN_WIDTH / 2) - HACK_RIG_CENTER_X;
+    const TARGET_Y = (SCREEN_HEIGHT / 2) - HACK_RIG_CENTER_Y;
+    
+    let x = TARGET_X;
+    let y = TARGET_Y;
+    
+    if (floorPlanBoundsReady.value) {
+      x = Math.min(floorPlanMaxX.value, Math.max(floorPlanMinX.value, x));
+      y = Math.min(floorPlanMaxY.value, Math.max(floorPlanMinY.value, y));
+    }
+    
+    floorPlanOffsetX.value = x;
+    floorPlanOffsetY.value = y;
+  }, [floorPlanOffsetX, floorPlanOffsetY, floorPlanBoundsReady, floorPlanMinX, floorPlanMaxX, floorPlanMinY, floorPlanMaxY]);
 
   const centerGarage = useCallback(() => {
     const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -263,6 +402,7 @@ export const HomeScreen = memo(function HomeScreen({
     return Gesture.Pan()
       .minPointers(1)
       .maxPointers(1)
+      .enabled(!isGarageTabHighlight && !isBotAssemblyHighlight && !isHackRigHighlight)
       .onStart(() => {
         'worklet';
         floorPlanStartX.value = floorPlanOffsetX.value;
@@ -296,7 +436,7 @@ export const HomeScreen = memo(function HomeScreen({
           });
         }
       });
-  }, [floorPlanOffsetX, floorPlanOffsetY, floorPlanStartX, floorPlanStartY, floorPlanBoundsReady, floorPlanMinX, floorPlanMaxX, floorPlanMinY, floorPlanMaxY, withDecay]);
+  }, [floorPlanOffsetX, floorPlanOffsetY, floorPlanStartX, floorPlanStartY, floorPlanBoundsReady, floorPlanMinX, floorPlanMaxX, floorPlanMinY, floorPlanMaxY, withDecay, isGarageTabHighlight, isBotAssemblyHighlight, isHackRigHighlight]);
 
   const garagePanGesture = useMemo(() => {
     if (!Gesture) {
@@ -305,6 +445,7 @@ export const HomeScreen = memo(function HomeScreen({
     return Gesture.Pan()
       .minPointers(1)
       .maxPointers(1)
+      .enabled(!isGarageTabHighlight && !isBotAssemblyHighlight && !isHackRigHighlight)
       .onStart(() => {
         'worklet';
         garageStartX.value = garageOffsetX.value;
@@ -338,7 +479,7 @@ export const HomeScreen = memo(function HomeScreen({
           });
         }
       });
-  }, [garageOffsetX, garageOffsetY, garageStartX, garageStartY, garageBoundsReady, garageMinX, garageMaxX, garageMinY, garageMaxY, withDecay]);
+  }, [garageOffsetX, garageOffsetY, garageStartX, garageStartY, garageBoundsReady, garageMinX, garageMaxX, garageMinY, garageMaxY, withDecay, isGarageTabHighlight, isBotAssemblyHighlight, isHackRigHighlight]);
 
   useEffect(() => {
     if (activeTab === 'garage') {
@@ -360,29 +501,80 @@ export const HomeScreen = memo(function HomeScreen({
     }
   }, [activeTab, centerGarage, centerFloorPlan, floorPlanStartX, floorPlanStartY, floorPlanOffsetX, floorPlanOffsetY, garageStartX, garageStartY, garageOffsetX, garageOffsetY]);
 
-  const renderFloorPlan = () => (
-    <View style={styles.scrollView}>
-      <GesturePanView 
-        offsetX={floorPlanOffsetX}
-        offsetY={floorPlanOffsetY}
-        panGesture={floorPlanPanGesture}
-        style={styles.scrollContent}
-      >
-        <View style={[styles.floorPlanContainer, { borderColor: colors.matrix }]}>
-          <HomeFloorPlan
-            onHackRigPress={onNavigateToMap}
-            onNavigateToBattle={onNavigateToBattle}
-          />
-          <View style={styles.hackRigContainer}>
-            <HackRigDisplay
-              onPress={onNavigateToMap}
-              onNavigateToBattle={onNavigateToBattle}
+  useEffect(() => {
+    if (token && !hasTrackedVisit.current) {
+      hasTrackedVisit.current = true;
+      trackHomeVisit().then(() => {
+        if (highlightTaskId === 'visit-home') {
+          clearHighlight();
+        }
+      }).catch(() => {
+        if (highlightTaskId === 'visit-home') {
+          clearHighlight();
+        }
+      });
+    }
+  }, [token, highlightTaskId, trackHomeVisit, clearHighlight]);
+
+  useEffect(() => {
+    if (isHackRigHighlight && floorPlanBoundsReady.value && activeTab === 'floorPlan') {
+      centerOnHackRig();
+    }
+  }, [isHackRigHighlight, floorPlanBoundsReady.value, activeTab, centerOnHackRig]);
+
+  useEffect(() => {
+    if (isVisitHackmap && floorPlanBoundsReady.value && activeTab === 'floorPlan') {
+      centerOnHackRig();
+    }
+  }, [isVisitHackmap, floorPlanBoundsReady.value, activeTab, centerOnHackRig]);
+
+  const handleHackRigPress = useCallback(async () => {
+    if (!hasTrackedHackmapVisit.current) {
+      hasTrackedHackmapVisit.current = true;
+      try {
+        await trackHackmapVisit().unwrap();
+      } catch (error) {
+      }
+    }
+    if (isVisitHackmap) {
+      clearHighlight();
+    }
+    onNavigateToMap();
+  }, [trackHackmapVisit, onNavigateToMap, isVisitHackmap, clearHighlight]);
+
+  const renderFloorPlan = () => {
+    const scrollViewZIndex = isHackRigHighlight ? 1000 : undefined;
+    const hackRigContainerZIndex = isHackRigHighlight ? 1000 : undefined;
+    
+    return (
+      <View style={[styles.scrollView, scrollViewZIndex && { zIndex: scrollViewZIndex }]}>
+        <GesturePanView 
+          offsetX={floorPlanOffsetX}
+          offsetY={floorPlanOffsetY}
+          panGesture={isHackRigHighlight ? undefined : floorPlanPanGesture}
+          style={styles.scrollContent}
+        >
+          <View style={[styles.floorPlanContainer, { borderColor: colors.matrix }, isHackRigHighlight && { pointerEvents: 'none' }]}>
+            <HomeFloorPlan
+              onHackRigPress={isHackRigHighlight ? () => {} : handleHackRigPress}
+              onNavigateToBattle={isHackRigHighlight ? () => {} : onNavigateToBattle}
             />
+            {!isHackRigHighlight && !isVisitHackmap && (
+              <View style={styles.hackRigContainer} pointerEvents="box-none">
+                <View pointerEvents="auto">
+                  <HackRigDisplay
+                    onPress={handleHackRigPress}
+                    onNavigateToBattle={onNavigateToBattle}
+                    isHighlighted={false}
+                  />
+                </View>
+              </View>
+            )}
           </View>
-        </View>
-      </GesturePanView>
-    </View>
-  );
+        </GesturePanView>
+      </View>
+    );
+  };
 
   const renderGarage = () => (
     <View style={styles.scrollView}>
@@ -392,30 +584,48 @@ export const HomeScreen = memo(function HomeScreen({
         panGesture={garagePanGesture}
         style={styles.garageScrollContent}
       >
-        <View style={[styles.garageContainer, { borderColor: colors.matrix }]}>
+        <View style={[styles.garageContainer, { borderColor: colors.matrix }, (isGarageTabHighlight || isBotAssemblyHighlight) && { pointerEvents: 'none' }]}>
           <View style={styles.botAssemblyContainer}>
-            <BotAssembly onPress={onNavigateToBotAssembly} />
+            {!isBotAssemblyHighlight && (
+              <BotAssembly 
+                onPress={isGarageTabHighlight ? () => {} : onNavigateToBotAssembly} 
+                isHighlighted={false}
+              />
+            )}
           </View>
         </View>
       </GesturePanView>
     </View>
   );
 
-  const TabButton = ({ label, tab, isActive }: { label: string; tab: TabType; isActive: boolean }) => (
-    <TouchableOpacity
-      onPress={() => setActiveTab(tab)}
-      style={[styles.tabButton, isActive && styles.tabButtonActive]}
-    >
-      <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{label}</Text>
-    </TouchableOpacity>
-  );
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <CloseButton onPress={onClose} />
+      {isVisitHackmap && (
+        <>
+          <View style={styles.homeScreenClickHandler} pointerEvents="box-none">
+            <TouchableOpacity
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={clearHighlight}
+            />
+          </View>
+          <View style={styles.hackRigElevatedWrapper}>
+            <View pointerEvents="auto">
+              <HackRigDisplay
+                onPress={handleHackRigPress}
+                onNavigateToBattle={onNavigateToBattle}
+                isHighlighted={isVisitHackmap}
+              />
+            </View>
+          </View>
+        </>
+      )}
+      <View style={{ zIndex: (isGarageTabHighlight || isBotAssemblyHighlight || isHackRigHighlight) ? 3 : 1000, pointerEvents: (isGarageTabHighlight || isBotAssemblyHighlight || isHackRigHighlight) ? 'none' : 'auto' }}>
+        <CloseButton onPress={onClose} />
+      </View>
       
       {/* Fixed pill at top center of screen */}
-      <View style={styles.fixedHomePillWrapper}>
+      <View style={[styles.fixedHomePillWrapper, { zIndex: (isGarageTabHighlight || isBotAssemblyHighlight || isHackRigHighlight) ? 3 : 1000 }]}>
         <View style={[styles.fixedHomePill, { backgroundColor: '#2E7D32' }]}>
           <Text style={styles.fixedHomeText}>{activeTab === 'floorPlan' ? 'Main Floor' : 'Garage'}</Text>
         </View>
@@ -433,10 +643,82 @@ export const HomeScreen = memo(function HomeScreen({
       )}
       
       {/* Tab Navigation - Fixed at bottom */}
-      <View style={styles.tabContainer}>
-        <TabButton label="Main Floor" tab="floorPlan" isActive={activeTab === 'floorPlan'} />
-        <TabButton label="Garage" tab="garage" isActive={activeTab === 'garage'} />
+      <View style={[styles.tabContainer, isGarageTabHighlight && { zIndex: 1000 }]}>
+        <TabButton 
+          label="Main Floor" 
+          tab="floorPlan" 
+          isActive={activeTab === 'floorPlan'}
+          isHighlighted={false}
+          colors={colors}
+          onPress={setActiveTab}
+          advanceHighlightStep={advanceHighlightStep}
+        />
+        <TabButton 
+          label="Garage" 
+          tab="garage" 
+          isActive={activeTab === 'garage'}
+          isHighlighted={isGarageTabHighlight}
+          colors={colors}
+          onPress={setActiveTab}
+          advanceHighlightStep={advanceHighlightStep}
+        />
       </View>
+      {isBuildGuardians && (
+        <TaskGuideHighlightOverlay 
+          forGarageTab={isGarageTabHighlight}
+          forBotAssembly={isBotAssemblyHighlight}
+        />
+      )}
+      {isFreeHackRig && (
+        <>
+          <TaskGuideHighlightOverlay 
+            forHackRig={isHackRigHighlight}
+          />
+          {isHackRigHighlight && (() => {
+            const SCREEN_WIDTH = Dimensions.get('window').width;
+            const SCREEN_HEIGHT = Dimensions.get('window').height;
+            const HACK_RIG_WIDTH = 500;
+            const HACK_RIG_HEIGHT = 375;
+            
+            return (
+              <View 
+                style={{
+                  position: 'absolute',
+                  top: (SCREEN_HEIGHT / 2) - (HACK_RIG_HEIGHT / 2),
+                  left: (SCREEN_WIDTH / 2) - (HACK_RIG_WIDTH / 2),
+                  width: HACK_RIG_WIDTH,
+                  height: HACK_RIG_HEIGHT,
+                  zIndex: 1001,
+                  pointerEvents: 'box-none',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <HackRigDisplay
+                  onPress={onNavigateToMap}
+                  onNavigateToBattle={() => {
+                    advanceHighlightStep();
+                    onNavigateToBattle();
+                  }}
+                  isHighlighted={true}
+                  onHighlightPress={() => {}}
+                />
+              </View>
+            );
+          })()}
+        </>
+      )}
+      {isBotAssemblyHighlight && (
+        <View style={styles.botAssemblyElevatedWrapper}>
+          <BotAssembly 
+            onPress={() => {
+              advanceHighlightStep();
+              onNavigateToBotAssembly();
+            }} 
+            isHighlighted={true}
+          />
+        </View>
+      )}
     </View>
   );
 });
@@ -549,5 +831,37 @@ const styles = StyleSheet.create({
     height: 375,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  botAssemblyElevatedWrapper: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -250 }, { translateY: -187.5 }],
+    width: 500,
+    height: 375,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  homeScreenClickHandler: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 998,
+    backgroundColor: 'transparent',
+  },
+  hackRigElevatedWrapper: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: 500,
+    height: 375,
+    zIndex: 1000,
+    transform: [{ translateX: -250 }, { translateY: -187.5 }],
+    justifyContent: 'center',
+    alignItems: 'center',
+    pointerEvents: 'box-none',
   },
 });

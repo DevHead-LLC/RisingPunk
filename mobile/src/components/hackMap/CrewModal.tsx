@@ -17,6 +17,7 @@ import { WarManagementModal } from './WarManagementModal';
 import { AllianceManagementModal } from './AllianceManagementModal';
 import { EditableCrewRules } from './EditableCrewRules';
 import { CrewChatModal } from './CrewChatModal';
+import { LeaderboardModal } from './LeaderboardModal';
 import { UserReportModal } from '../modals/UserReportModal';
 import { FilteredTextInput } from '../common/FilteredTextInput';
 import { FilteredText } from '../common/FilteredText';
@@ -77,6 +78,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const [showWarManagementModal, setShowWarManagementModal] = useState(false);
   const [showAllianceManagementModal, setShowAllianceManagementModal] = useState(false);
   const [showCrewChatModal, setShowCrewChatModal] = useState(false);
+  const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
   const [viewingProfileUserId, setViewingProfileUserId] = useState<string | null>(null);
   const [promotingUserId, setPromotingUserId] = useState<string | null>(null);
   const [demotingUserId, setDemotingUserId] = useState<string | null>(null);
@@ -118,7 +120,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const currentBalanceState = useAppSelector((state) => state.balance);
   
   const userRole = crewStatus?.role;
-  const currentUserId = currentUser?._id;
+  const currentUserId = currentUser?._id || (currentUser as any)?.id;
   
   const { data: crewDetails, refetch: refetchCrewDetails } = useGetCrewDetailsQuery(
     crewStatus?.crewId || '',
@@ -248,7 +250,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
 
   const getVisibleCategories = (): typeof CATEGORIES => {
     const userRole = crewStatus?.role;
-    const currentUserId = currentUser?._id;
+    const currentUserId = currentUser?._id || (currentUser as any)?.id;
     const executives = activeCrewDetails?.crew?.executives || [];
     const isExecutive = currentUserId && executives.some(exec => String(exec.userId) === String(currentUserId));
     
@@ -586,15 +588,24 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     return (
       <View style={styles.crewModalContainer}>
         <View style={styles.header}>
-          {crewStatus?.crewId && (
+          <View style={styles.headerLeft}>
+            {crewStatus?.crewId && (
+              <TouchableOpacity
+                style={styles.chatIconButton}
+                onPress={() => setShowCrewChatModal(true)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.chatIconText}>💬</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
-              style={styles.chatIconButton}
-              onPress={() => setShowCrewChatModal(true)}
+              style={styles.leaderboardIconButton}
+              onPress={() => setShowLeaderboardModal(true)}
               activeOpacity={0.7}
             >
-              <Text style={styles.chatIconText}>💬</Text>
+              <Text style={styles.leaderboardIconText}>📈</Text>
             </TouchableOpacity>
-          )}
+          </View>
           <Text style={styles.title}>{title}</Text>
           <TouchableOpacity
             style={styles.closeButton}
@@ -651,6 +662,29 @@ export const CrewModal: React.FC<CrewModalProps> = ({
               )}
             </View>
           </ScrollView>
+          {activeCrewDetails?.crew && currentUser && (currentUser?._id || (currentUser as any)?.id) && activeCrewDetails.crew.president?.userId && String(currentUser._id || (currentUser as any)?.id || '') !== String(activeCrewDetails.crew.president.userId) && (
+            <TouchableOpacity
+              onPress={() => {
+                // Capture crew name/identifier data and president info immediately before potential changes
+                const president = activeCrewDetails.crew.president;
+                if (!president) return;
+                setCrewNameReportData({
+                  crewName: activeCrewDetails.crew.crewName,
+                  crewIdentifier: activeCrewDetails.crew.crewIdentifier,
+                  crewId: activeCrewDetails.crew.id,
+                  reportedUserId: president.userId,
+                  reportedUsername: president.handle,
+                });
+                setShowCrewNameReportModal(true);
+              }}
+              activeOpacity={0.7}
+              style={[styles.crewReportButton, { backgroundColor: colors.background + 'E6' }]}
+            >
+              <Text style={[styles.crewReportButtonText, { color: colors.text.secondary }]}>
+                Report
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
@@ -1438,17 +1472,19 @@ export const CrewModal: React.FC<CrewModalProps> = ({
               <>
                 <View style={styles.internalMessageHeader}>
                   <View style={styles.internalMessageHeaderSpacer} />
-                  {currentUser?._id && activeCrewDetails?.crew?.president?.userId && String(currentUser._id) !== String(activeCrewDetails.crew.president.userId) && (
+                  {currentUser && (currentUser?._id || (currentUser as any)?.id) && activeCrewDetails?.crew?.president?.userId && String(currentUser._id || (currentUser as any)?.id || '') !== String(activeCrewDetails.crew.president.userId) && (
                     <TouchableOpacity
                       onPress={() => {
                         // Capture message data and president info immediately before potential changes
                         // Note: Original content is not exposed in API for security.
                         // Server will look up original content from database when processing report.
+                        const president = activeCrewDetails.crew.president;
+                        if (!president) return;
                         setInternalMessageReportData({
                           message: currentMessage, // Use filtered content; server will enrich with original
                           crewId: activeCrewDetails.crew.id,
-                          reportedUserId: activeCrewDetails.crew.president?.userId || '',
-                          reportedUsername: activeCrewDetails.crew.president?.handle || '',
+                          reportedUserId: president.userId,
+                          reportedUsername: president.handle,
                         });
                         setShowInternalMessageReportModal(true);
                       }}
@@ -1585,17 +1621,19 @@ export const CrewModal: React.FC<CrewModalProps> = ({
               <>
                 <View style={styles.externalMessageHeader}>
                   <View style={styles.externalMessageHeaderSpacer} />
-                  {currentUser?._id && activeCrewDetails?.crew?.president?.userId && String(currentUser._id) !== String(activeCrewDetails.crew.president.userId) && (
+                  {currentUser && (currentUser?._id || (currentUser as any)?.id) && activeCrewDetails?.crew?.president?.userId && String(currentUser._id || (currentUser as any)?.id || '') !== String(activeCrewDetails.crew.president.userId) && (
                     <TouchableOpacity
                       onPress={() => {
                         // Capture message data and president info immediately before potential changes
                         // Note: Original content is not exposed in API for security.
                         // Server will look up original content from database when processing report.
+                        const president = activeCrewDetails.crew.president;
+                        if (!president) return;
                         setExternalMessageReportData({
                           message: currentMessage, // Use filtered content; server will enrich with original
                           crewId: activeCrewDetails.crew.id,
-                          reportedUserId: activeCrewDetails.crew.president?.userId || '',
-                          reportedUsername: activeCrewDetails.crew.president?.handle || '',
+                          reportedUserId: president.userId,
+                          reportedUsername: president.handle,
                         });
                         setShowExternalMessageReportModal(true);
                       }}
@@ -1676,8 +1714,6 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                     handleResignPress();
                   } else if (isDisbandCrew) {
                     handleDisbandCrewPress();
-                  } else {
-                    console.log(`${buttonText} pressed`);
                   }
                 }}
                 activeOpacity={0.7}
@@ -1870,6 +1906,11 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         />
       )}
 
+      <LeaderboardModal
+        visible={showLeaderboardModal}
+        onClose={() => setShowLeaderboardModal(false)}
+      />
+
       {activeCrewDetails?.crew && currentUser && activeCrewDetails.crew.president && (
         <>
           {externalMessageReportData && (
@@ -1881,7 +1922,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
               }}
               reportedUserId={externalMessageReportData.reportedUserId}
               reportedUsername={externalMessageReportData.reportedUsername}
-              reportingUserId={currentUser._id}
+              reportingUserId={String(currentUser._id || (currentUser as any)?.id || '')}
               reportingUsername={currentUser.handle || 'Unknown'}
               context="external-message-board"
               contextData={{
@@ -1900,7 +1941,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
               }}
               reportedUserId={internalMessageReportData.reportedUserId}
               reportedUsername={internalMessageReportData.reportedUsername}
-              reportingUserId={currentUser._id}
+              reportingUserId={String(currentUser._id || (currentUser as any)?.id || '')}
               reportingUsername={currentUser.handle || 'Unknown'}
               context="internal-message-board"
               contextData={{
@@ -1919,7 +1960,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
               }}
               reportedUserId={crewNameReportData.reportedUserId}
               reportedUsername={crewNameReportData.reportedUsername}
-              reportingUserId={currentUser._id}
+              reportingUserId={String(currentUser._id || (currentUser as any)?.id || '')}
               reportingUsername={currentUser.handle || 'Unknown'}
               context="crew-name"
               contextData={{
@@ -1966,6 +2007,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     gap: SIZING.spacing.sm,
   },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   chatIconButton: {
     width: 44,
     height: 44,
@@ -1978,6 +2023,20 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginRight: SIZING.spacing.sm,
   },
   chatIconText: {
+    fontSize: 20,
+  },
+  leaderboardIconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primary,
+    borderColor: colors.secondary,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SIZING.spacing.sm,
+  },
+  leaderboardIconText: {
     fontSize: 20,
   },
   title: {
@@ -2533,7 +2592,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     lineHeight: SIZING.font.body * 1.4,
   },
   warStatusInternalTitle: {
-    fontSize: SIZING.font.body,
+    fontSize: SIZING.font.large,
     fontWeight: 'bold',
     marginBottom: SIZING.spacing.sm,
   },

@@ -11,6 +11,7 @@ export interface ResearchStatus {
   levelRequirement: number;
   balanceRequirement: number;
   dependencies: string[];
+  requiredFeatures?: string[];
   image: string;
 }
 
@@ -27,10 +28,11 @@ export function useResearchStatus() {
       setLoading(true);
       setError(null);
       
-      const response = await fetch(`${API_URL}/api/research/status`, {
+      const response = await fetch(`${API_URL}/api/research/status?t=${Date.now()}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
+        cache: 'no-store',
       });
 
       if (!response.ok) {
@@ -66,6 +68,7 @@ export function useResearchStatus() {
       levelRequirement: research.levelRequirement,
       balanceRequirement: research.balanceRequirement,
       dependencies: research.dependencies,
+      requiredFeatures: research.requiredFeatures || [],
       unlockCost: research.unlockCost,
       isUnlocked: research.isUnlocked
     };
