@@ -45,6 +45,7 @@ const BACKGROUND_IMAGE_MAP: Record<string, ImageSourcePropType> = {
   'bot-trap': require('../../assets/images/botTrapResearch.png'),
   'crew-system-unlock': require('../../assets/images/startCrew.png'),
   'rental-profit-increase': require('../../assets/images/researchCenter/rentalPropertyIncrease.png'),
+  'increase-income-rate': require('../../assets/images/researchCenter/incomeIncrease.png'),
 };
 
 export function FeatureCard({

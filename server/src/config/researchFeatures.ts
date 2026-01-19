@@ -779,6 +779,20 @@ export const RESEARCH_FEATURES: Record<string, IResearchFeature[]> = {
         value: 'capital-expense-system',
         target: 'tax-optimization'
       }
+    },
+    {
+      id: 'increase-income-rate',
+      name: 'Increase Income Rate +$0.05/sec',
+      description: 'Increase your base income rate by $0.05 per second, improving overall cash flow',
+      unlockCost: 750000,
+      levelRequirement: 10,
+      researchTimeHours: 9,
+      isUnlocked: false,
+      effect: {
+        type: 'improvement',
+        value: 0.05,
+        target: 'base-income-rate'
+      }
     }
   ],
 

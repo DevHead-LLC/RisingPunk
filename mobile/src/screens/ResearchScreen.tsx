@@ -28,15 +28,15 @@ const ALL_RESEARCH_CARDS: ResearchCard[] = [
   { id: 'financial', name: 'Financial', image: require('../assets/images/financialResearchMale.png') },
   { id: 'hack-crew', name: 'Hack Crew', image: require('../assets/images/hackCrewResearch.png') },
   { id: 'npc', name: 'NPC', image: require('../assets/images/npcResearch.png') },
-  { id: 'cash-flow', name: 'Cash Flow', image: require('../assets/images/cashFlowResearch.png') },
   { id: 'construction', name: 'Construction', image: require('../assets/images/constructionResearch.png') },
   { id: 'battle-mechanics', name: 'Battle Mechanics', image: require('../assets/images/battleMechanicsResearch.png') },
   { id: 'gear', name: 'Gear', image: require('../assets/images/hackerGearResearch.png') },
   { id: 'investments', name: 'Investments', image: require('../assets/images/investmentResearch.png') },
+  { id: 'cash-flow', name: 'Cash Flow', image: require('../assets/images/cashFlowResearch.png') },
 ];
 
-// Show Home Defense, Hack Crew, Hack Ability, and Investments categories
-const RESEARCH_CARDS: ResearchCard[] = ALL_RESEARCH_CARDS.filter(card => card.id === 'home-defense' || card.id === 'hack-crew' || card.id === 'hack-ability' || card.id === 'investments');
+// Show Home Defense, Hack Crew, Hack Ability, Cash Flow, and Investments categories
+const RESEARCH_CARDS: ResearchCard[] = ALL_RESEARCH_CARDS.filter(card => card.id === 'home-defense' || card.id === 'hack-crew' || card.id === 'hack-ability' || card.id === 'cash-flow' || card.id === 'investments');
 
 const { width: screenWidth } = Dimensions.get('window');
 const cardSize = Math.min((screenWidth - SIZING.spacing.md * 3) / 2, 160);
