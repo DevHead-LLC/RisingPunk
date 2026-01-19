@@ -1,7 +1,9 @@
 export type DetectedOS = 'ios' | 'android' | 'desktop';
 
 // Pre-compile regex patterns for better performance (compiled once, reused)
-const IOS_PATTERN = /iphone|ipad|ipod|ios/i;
+// iOS: Match iPhone, iPad, or iPod (real iOS devices always include one of these)
+// Note: "ios" substring removed to avoid false positives (e.g., "Studios", "Axios")
+const IOS_PATTERN = /iphone|ipad|ipod/i;
 const ANDROID_PATTERN = /android/i;
 
 /**
