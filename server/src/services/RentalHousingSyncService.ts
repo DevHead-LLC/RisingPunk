@@ -170,17 +170,11 @@ export class RentalHousingSyncService {
   static async performSync(user: IUser): Promise<{ success: boolean; syncedAmount: number; newBalance: number }> {
     const syncResult = await this.checkAndSyncRentalHousingIncome(user);
     
-    if (!syncResult.needsSync) {
-      return {
-        success: true,
-        syncedAmount: 0,
-        newBalance: user.balance.total
-      };
-    }
-
-    // Add the synced amount to the user's balance
+    // Add the synced amount to the user's balance (0 if no sync needed)
     const newBalance = user.balance.total + syncResult.syncedAmount;
     
+    // CRITICAL: Always calculate and update ratePerSecond, even if no rental properties exist
+    // This ensures income rate research bonuses are applied for all users
     // Calculate total effective rate as baseRate + passiveIncome
     // Base rate is $1.00 + $0.05 bonus if income rate research unlocked, passive income is rental housing income
     const isIncomeRateUnlocked = await this.isIncomeRateResearchUnlocked(String(user._id));
@@ -201,6 +195,7 @@ export class RentalHousingSyncService {
     }
     
     // Update user with new balance, effective rate, and sync timestamp
+    // Always update ratePerSecond to ensure research bonuses are applied
     user.balance.total = newBalance;
     user.balance.ratePerSecond = totalEffectiveRate;
     user.balance.rentalHousingIncomeLastSynced = syncResult.syncTimestamp;

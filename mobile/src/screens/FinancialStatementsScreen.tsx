@@ -257,10 +257,12 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                           {expenseEntries.map(([k, v]) => {
                             const num = Number(v);
                             const cleanLabel = k.replace(/\s*\([^)]*%[^)]*\)/g, '').trim();
+                            // Format negative values consistently: -$X.XX (not $-X.XX)
+                            const formattedValue = num < 0 ? `-$${Math.abs(num).toFixed(2)}` : `$${num.toFixed(2)}`;
                             return (
                               <View key={k} style={styles.row}>
                                 <Text style={styles.keyText}>{cleanLabel}</Text>
-                                <Text style={styles.valText}>${num.toFixed(2)}</Text>
+                                <Text style={styles.valText}>{formattedValue}</Text>
                               </View>
                             );
                           })}
