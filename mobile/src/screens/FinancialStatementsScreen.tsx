@@ -23,8 +23,9 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
   const { data: rentalHousingData, error: rentalHousingError, isLoading: rentalHousingLoading } = useGetRentalHousingIncomeQuery();
   const { data: balanceData } = useFetchBalanceQuery();
   const currentCash = useAppSelector(getCurrentBalance);
+  const ratePerSecondFromState = useAppSelector(state => state.balance.ratePerSecond);
   // Use balanceData from query if available (fresh data), otherwise fall back to Redux state
-  const ratePerSecond = balanceData?.ratePerSecond ?? useAppSelector(state => state.balance.ratePerSecond);
+  const ratePerSecond = balanceData?.ratePerSecond ?? ratePerSecondFromState;
   const { themeMode } = useTheme();
   const colors = useThemeColors();
   
