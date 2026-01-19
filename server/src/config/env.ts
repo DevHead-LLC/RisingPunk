@@ -45,3 +45,12 @@ export const APPLE_CLIENT_ID: string = process.env.APPLE_CLIENT_ID || 'com.devhe
 export const APPLE_TEAM_ID: string = process.env.APPLE_TEAM_ID || '';
 export const APPLE_KEY_ID: string = process.env.APPLE_KEY_ID || '';
 export const APPLE_PRIVATE_KEY: string = process.env.APPLE_PRIVATE_KEY || '';
+
+// Marketing redirect URLs
+// Deep links - open native app store apps directly on mobile devices
+export const APP_STORE_DEEP_LINK = process.env.APP_STORE_DEEP_LINK || 'itms-apps://itunes.apple.com/app/id123456789';
+export const GOOGLE_PLAY_DEEP_LINK = process.env.GOOGLE_PLAY_DEEP_LINK || 'market://details?id=com.risingpunk.app';
+// Web URLs (optional - for reference or fallback)
+export const APP_STORE_WEB_URL = process.env.APP_STORE_WEB_URL || 'https://apps.apple.com/app/risingpunk/id123456789';
+export const GOOGLE_PLAY_WEB_URL = process.env.GOOGLE_PLAY_WEB_URL || 'https://play.google.com/store/apps/details?id=com.risingpunk.app';
+export const DESKTOP_LANDING_URL = process.env.DESKTOP_LANDING_URL || 'https://risingpunk.com';
