@@ -11,11 +11,11 @@ const router = express.Router();
 /**
  * Smart redirect endpoint: /go
  * For YouTube promotion - detects user OS and redirects appropriately
- * Uses deep links to open native app stores directly on mobile devices
+ * Uses HTTPS URLs to preserve UTM tracking parameters for campaign attribution
  * 
  * Performance optimized: minimal processing, proper cache headers, no unnecessary middleware
  * 
- * Usage: https://risingpunk.com/go?utm_source=youtube&utm_campaign=trailer
+ * Usage: https://api.risingpunk.com/go?utm_source=youtube&utm_campaign=trailer
  */
 router.get('/go', (req: Request, res: Response) => {
   try {

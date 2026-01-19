@@ -335,6 +335,65 @@ router.post('/complete-feature-research', auth, async (req: Request, res: Respon
         }
       }
       
+      // If income rate research completed, trigger sync to update income rate
+      if (categoryId === 'cash-flow' && featureId === 'increase-income-rate') {
+        try {
+          const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
+          const { UserResearchFeature } = await import('../models/UserResearchFeature');
+          const user = await User.findById(userId);
+          if (user) {
+            // Get the research unlock time to prevent retroactive bonus application
+            const researchFeature = await UserResearchFeature.findOne({
+              userId,
+              categoryId: 'cash-flow',
+              featureId: 'increase-income-rate'
+            }).select('unlockedAt').lean();
+            
+            const unlockTime = researchFeature?.unlockedAt || new Date();
+            
+            // CRITICAL: Calculate and add income earned BEFORE research unlock (using old rate)
+            // This prevents income loss when we update lastUpdated to unlockTime
+            const secondsElapsed = (unlockTime.getTime() - user.balance.lastUpdated.getTime()) / 1000;
+            if (secondsElapsed > 0) {
+              // Round down to 10-second intervals to match balance endpoint logic
+              const roundedSecondsElapsed = Math.floor(secondsElapsed / 10) * 10;
+              
+              // Calculate income using current ratePerSecond (before research bonus applies)
+              const fullPrecisionIncome = roundedSecondsElapsed * user.balance.ratePerSecond;
+              
+              // Add to existing fractional remainder
+              const totalWithRemainder = (user.balance.fractionalRemainder || 0) + fullPrecisionIncome;
+              
+              // Calculate whole dollars to add
+              const wholeDollarsToAdd = Math.floor(totalWithRemainder);
+              
+              // Update balance and fractional remainder
+              user.balance.total += wholeDollarsToAdd;
+              user.balance.fractionalRemainder = totalWithRemainder - wholeDollarsToAdd;
+              
+              // CRITICAL: Update lastUpdated to unlock time to prevent retroactive bonus application
+              // Only update if unlockTime is after current lastUpdated (prevents moving timestamp backwards)
+              // This ensures the bonus only applies going forward from research completion
+              user.balance.lastUpdated = unlockTime;
+            } else if (unlockTime > user.balance.lastUpdated) {
+              // If unlockTime is after lastUpdated but secondsElapsed <= 0 (due to rounding),
+              // still update lastUpdated to prevent retroactive bonus
+              user.balance.lastUpdated = unlockTime;
+            }
+            // If unlockTime is before or equal to lastUpdated, don't move timestamp backwards
+            // This prevents double-counting income from concurrent balance updates
+            
+            // Force sync to recalculate rate with new research unlock
+            user.balance.rentalHousingIncomeLastSynced = null;
+            await user.save();
+            await RentalHousingSyncService.performSync(user);
+          }
+        } catch (error) {
+          console.error('Error syncing income rate after research completion:', error);
+          // Don't fail the request if sync fails
+        }
+      }
+      
       if (categoryId === 'home-defense' && featureId === 'antivirus') {
         try {
           const { UserTaskProgress } = await import('../models/UserTaskProgress');
@@ -606,7 +665,7 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
     }
 
     // Reload user to get updated balance
-    const updatedUser = await User.findById(userId);
+    let updatedUser = await User.findById(userId);
     
     // If rental profit research was speeded up, trigger sync to update income rate
     if (categoryId === 'investments' && featureId === 'rental-profit-increase') {
@@ -623,6 +682,76 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
         // Don't fail the request if sync fails
       }
     }
+    
+    // If income rate research was speeded up, trigger sync to update income rate
+    if (categoryId === 'cash-flow' && featureId === 'increase-income-rate') {
+      try {
+        const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
+        const { UserResearchFeature } = await import('../models/UserResearchFeature');
+        if (updatedUser) {
+          // Get the research unlock time to prevent retroactive bonus application
+          const researchFeature = await UserResearchFeature.findOne({
+            userId,
+            categoryId: 'cash-flow',
+            featureId: 'increase-income-rate'
+          }).select('unlockedAt').lean();
+          
+          const unlockTime = researchFeature?.unlockedAt || new Date();
+          
+          // CRITICAL: Calculate and add income earned BEFORE research unlock (using old rate)
+          // This prevents income loss when we update lastUpdated to unlockTime
+          const secondsElapsed = (unlockTime.getTime() - updatedUser.balance.lastUpdated.getTime()) / 1000;
+          if (secondsElapsed > 0) {
+            // Round down to 10-second intervals to match balance endpoint logic
+            const roundedSecondsElapsed = Math.floor(secondsElapsed / 10) * 10;
+            
+            // Calculate income using current ratePerSecond (before research bonus applies)
+            const fullPrecisionIncome = roundedSecondsElapsed * updatedUser.balance.ratePerSecond;
+            
+            // Add to existing fractional remainder
+            const totalWithRemainder = (updatedUser.balance.fractionalRemainder || 0) + fullPrecisionIncome;
+            
+            // Calculate whole dollars to add
+            const wholeDollarsToAdd = Math.floor(totalWithRemainder);
+            
+            // Update balance and fractional remainder
+            updatedUser.balance.total += wholeDollarsToAdd;
+            updatedUser.balance.fractionalRemainder = totalWithRemainder - wholeDollarsToAdd;
+            
+            // CRITICAL: Update lastUpdated to unlock time to prevent retroactive bonus application
+            // Only update if unlockTime is after current lastUpdated (prevents moving timestamp backwards)
+            // This ensures the bonus only applies going forward from research completion
+            updatedUser.balance.lastUpdated = unlockTime;
+          } else if (unlockTime > updatedUser.balance.lastUpdated) {
+            // If unlockTime is after lastUpdated but secondsElapsed <= 0 (due to rounding),
+            // still update lastUpdated to prevent retroactive bonus
+            updatedUser.balance.lastUpdated = unlockTime;
+          }
+          // If unlockTime is before or equal to lastUpdated, don't move timestamp backwards
+          // This prevents double-counting income from concurrent balance updates
+          
+          // Force sync to recalculate rate with new research unlock
+          updatedUser.balance.rentalHousingIncomeLastSynced = null;
+          await updatedUser.save();
+          await RentalHousingSyncService.performSync(updatedUser);
+          
+          // CRITICAL: Reload user after save to ensure response reflects actual database value
+          // This prevents showing incorrect balance if save() failed silently
+          const reloadedUser = await User.findById(userId);
+          if (reloadedUser) {
+            updatedUser = reloadedUser;
+          }
+        }
+      } catch (error) {
+        console.error('Error syncing income rate after speedup:', error);
+        // Don't fail the request if sync fails, but reload user to ensure correct balance
+        const reloadedUser = await User.findById(userId);
+        if (reloadedUser) {
+          updatedUser = reloadedUser;
+        }
+      }
+    }
+    
     if (!updatedUser) {
       res.status(500).json({
         success: false,
