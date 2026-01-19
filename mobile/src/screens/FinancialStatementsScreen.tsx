@@ -428,15 +428,13 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                       </View>
                     )}
                     
-                    {/* 5. Total Cash Flow Rate (matches Net Cash Flow from Income Statement) */}
-                    {financialCalculations && (
-                      <View style={[styles.row, { marginTop: SIZING.spacing.md }]}>
-                        <Text style={styles.keyText}>Total Cash Flow Rate</Text>
-                        <Text style={[styles.valText, { color: colors.matrix }]}>
-                          {financialCalculations.netCashFlow >= 0 ? `+$${financialCalculations.netCashFlow.toFixed(2)}` : `$${financialCalculations.netCashFlow.toFixed(2)}`}/sec
-                        </Text>
-                      </View>
-                    )}
+                    {/* 5. Total Cash Flow Rate (uses actual ratePerSecond from balance state) */}
+                    <View style={[styles.row, { marginTop: SIZING.spacing.md }]}>
+                      <Text style={styles.keyText}>Total Cash Flow Rate</Text>
+                      <Text style={[styles.valText, { color: colors.matrix }]}>
+                        {ratePerSecond >= 0 ? `+$${ratePerSecond.toFixed(2)}` : `$${ratePerSecond.toFixed(2)}`}/sec
+                      </Text>
+                    </View>
                     <View style={[styles.row, { marginTop: SIZING.spacing.md }]}>
                       <Text style={styles.keyText}>Investing Activities</Text>
                       <Text style={styles.valText}>{(merged.cashFlows?.investing ?? 0) >= 0 ? `+${(merged.cashFlows?.investing ?? 0).toFixed(2)}` : (merged.cashFlows?.investing ?? 0).toFixed(2)}</Text>

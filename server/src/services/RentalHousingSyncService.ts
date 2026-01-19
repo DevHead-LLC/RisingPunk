@@ -170,9 +170,6 @@ export class RentalHousingSyncService {
   static async performSync(user: IUser): Promise<{ success: boolean; syncedAmount: number; newBalance: number }> {
     const syncResult = await this.checkAndSyncRentalHousingIncome(user);
     
-    // Add the synced amount to the user's balance (0 if no sync needed)
-    const newBalance = user.balance.total + syncResult.syncedAmount;
-    
     // CRITICAL: Always calculate and update ratePerSecond, even if no rental properties exist
     // This ensures income rate research bonuses are applied for all users
     // Calculate total effective rate as baseRate + passiveIncome
@@ -194,12 +191,23 @@ export class RentalHousingSyncService {
       throw new Error('Invalid total effective rate calculation');
     }
     
-    // Update user with new balance, effective rate, and sync timestamp
+    // Update balance and timestamps only if rental sync occurred
+    // If no sync needed, preserve existing balance and lastUpdated (already handled by /api/balance)
+    if (syncResult.needsSync) {
+      const newBalance = user.balance.total + syncResult.syncedAmount;
+      user.balance.total = newBalance;
+      user.balance.rentalHousingIncomeLastSynced = syncResult.syncTimestamp;
+      // Only update lastUpdated if rental sync occurred (preserves income calculation from /api/balance)
+      user.balance.lastUpdated = syncResult.syncTimestamp;
+    } else {
+      // No rental sync, but still update rentalHousingIncomeLastSynced to current time
+      // This prevents unnecessary sync checks in the future
+      user.balance.rentalHousingIncomeLastSynced = syncResult.syncTimestamp;
+    }
+    
     // Always update ratePerSecond to ensure research bonuses are applied
-    user.balance.total = newBalance;
+    // This must happen even when needsSync is false to apply income rate research bonuses
     user.balance.ratePerSecond = totalEffectiveRate;
-    user.balance.rentalHousingIncomeLastSynced = syncResult.syncTimestamp;
-    user.balance.lastUpdated = syncResult.syncTimestamp;
     
     // Note: Lifetime high check is handled by the calling code (e.g., /api/balance endpoint)
     // to avoid duplicate checks and ensure correct update flag
@@ -209,7 +217,7 @@ export class RentalHousingSyncService {
     return {
       success: true,
       syncedAmount: syncResult.syncedAmount,
-      newBalance
+      newBalance: user.balance.total
     };
   }
 }
