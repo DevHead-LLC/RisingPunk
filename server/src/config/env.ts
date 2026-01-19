@@ -45,3 +45,11 @@ export const APPLE_CLIENT_ID: string = process.env.APPLE_CLIENT_ID || 'com.devhe
 export const APPLE_TEAM_ID: string = process.env.APPLE_TEAM_ID || '';
 export const APPLE_KEY_ID: string = process.env.APPLE_KEY_ID || '';
 export const APPLE_PRIVATE_KEY: string = process.env.APPLE_PRIVATE_KEY || '';
+
+// Marketing redirect URLs
+// Using HTTPS URLs to preserve UTM tracking parameters for campaign attribution
+// iOS 18+ automatically redirects apps.apple.com links to App Store app
+// Android can be configured to open Play Store app via App Links
+export const APP_STORE_WEB_URL = process.env.APP_STORE_WEB_URL || 'https://apps.apple.com/app/risingpunk/id6749834469';
+export const GOOGLE_PLAY_WEB_URL = process.env.GOOGLE_PLAY_WEB_URL || 'https://play.google.com/store/apps/details?id=com.devheadllc.risingpunk';
+export const DESKTOP_LANDING_URL = process.env.DESKTOP_LANDING_URL || 'https://risingpunk.com';

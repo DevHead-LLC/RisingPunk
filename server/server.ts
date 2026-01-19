@@ -26,6 +26,7 @@ import crewRoutes from './src/routes/crew';
 import reportsRoutes from './src/routes/reports';
 import leaderboardRoutes from './src/routes/leaderboardRoutes';
 import userGuideRoutes from './src/routes/userGuideRoutes';
+import marketingRoutes from './src/routes/marketing';
 
 declare global {
   namespace Express {
@@ -189,6 +190,10 @@ app.get('/api/profile', async (req: Request, res: Response) => {
 });
 
 app.use('/api/auth', authRoutes);
+
+// Marketing routes (smart redirects for YouTube promotion)
+// Register early to skip unnecessary middleware (activity logging, etc.)
+app.use('/', marketingRoutes);
 
 // Activity logging middleware for privacy policy compliance
 // This runs AFTER auth routes so req.user is available
