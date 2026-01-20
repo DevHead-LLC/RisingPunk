@@ -1,31 +1,32 @@
 version: 1
-frontend:
-  phases:
-    preBuild:
-      commands:
-        - cd web
-        - npm ci
-    build:
-      commands:
-        - npm run build
-  artifacts:
-    baseDirectory: web/dist
-    files:
-      - '**/*'
-  cache:
-    paths:
-      - web/node_modules/**/*
-  customHeaders:
-    - pattern: '/go*'
-      headers:
-        - key: 'Cache-Control'
-          value: 'no-cache, no-store, must-revalidate'
-        - key: 'X-Robots-Tag'
-          value: 'noindex, nofollow'
-  customRedirects:
-    - source: '/go'
-      target: '/go/index.html'
-      status: '200'
-    - source: '/go/'
-      target: '/go/index.html'
-      status: '200'
+applications:
+  - appRoot: web
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - npm ci
+        build:
+          commands:
+            - npm run build
+      artifacts:
+        baseDirectory: dist
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - node_modules/**/*
+      customHeaders:
+        - pattern: '/go*'
+          headers:
+            - key: 'Cache-Control'
+              value: 'no-cache, no-store, must-revalidate'
+            - key: 'X-Robots-Tag'
+              value: 'noindex, nofollow'
+      customRedirects:
+        - source: '/go'
+          target: '/go/index.html'
+          status: '200'
+        - source: '/go/'
+          target: '/go/index.html'
+          status: '200'
