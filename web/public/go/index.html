@@ -6,19 +6,61 @@
   <title>RisingPunk - Redirecting...</title>
   <meta name="description" content="Download RisingPunk - Strategic Social Warfare MMO">
   
-  <!-- Immediate redirect to API endpoint, preserving all UTM parameters -->
+  <!-- Google Analytics 4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-1MPJG37M1F"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-1MPJG37M1F');
+  </script>
+  
+  <!-- Redirect with GA4 tracking -->
   <script>
     (function() {
+      // Detect OS from User-Agent (matches server-side detection logic)
+      function detectOS(userAgent) {
+        if (!userAgent) return 'desktop';
+        const ua = userAgent.toLowerCase();
+        if (/iphone|ipad|ipod/.test(ua)) return 'ios';
+        if (/android/.test(ua)) return 'android';
+        return 'desktop';
+      }
+      
+      // Get OS type
+      const osType = detectOS(navigator.userAgent);
+      
       // Get all query parameters from current URL
       const params = new URLSearchParams(window.location.search);
+      
+      // Extract UTM parameters for tracking
+      const utmSource = params.get('utm_source') || '';
+      const utmCampaign = params.get('utm_campaign') || '';
+      const utmMedium = params.get('utm_medium') || '';
+      
+      // Track redirect event in GA4
+      // Using sendBeacon for reliable delivery even if page unloads quickly
+      if (window.gtag) {
+        gtag('event', 'smart_redirect', {
+          event_category: 'marketing',
+          event_label: osType,
+          os_type: osType,
+          utm_source: utmSource,
+          utm_campaign: utmCampaign,
+          utm_medium: utmMedium,
+          value: 1
+        });
+      }
       
       // Build redirect URL to API endpoint
       const apiUrl = 'https://api.risingpunk.com/go';
       const queryString = params.toString();
       const redirectUrl = queryString ? `${apiUrl}?${queryString}` : apiUrl;
       
-      // Redirect immediately (no delay for best UX)
-      window.location.href = redirectUrl;
+      // Small delay to ensure GA4 event is sent (50ms is imperceptible to users)
+      setTimeout(function() {
+        window.location.href = redirectUrl;
+      }, 50);
     })();
   </script>
   
