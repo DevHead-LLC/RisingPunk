@@ -25,7 +25,7 @@ frontend:
   customRedirects:
     - source: '/go'
       target: '/go/index.html'
-      status: '200-rewrite'
+      status: '200'
     - source: '/go/'
       target: '/go/index.html'
-      status: '200-rewrite'
+      status: '200'
