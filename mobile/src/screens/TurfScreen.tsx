@@ -338,11 +338,11 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         .minPointers(1)
         .maxPointers(1)
         .enabled(!isHomeHighlight && !isDigitalBarracksHighlight && !isResearchCenterHighlight && !isInvestmentPropertyHighlight)
-        // CRITICAL: Make gesture IMMEDIATELY active to prevent any competition
+        // Balance between tap detection and smooth panning
         .manualActivation(false)  // Don't require manual activation
-        .minDistance(0)  // Activate immediately with ANY movement
+        .minDistance(8)  // Require 8px of movement before activating (allows taps to pass through)
         // Use HORIZONTAL-ONLY activation to avoid conflict with vertical swipe-to-home
-        .activeOffsetX([-1, 1])      // Activate after just 1px horizontal movement
+        .activeOffsetX([-8, 8])      // Activate after 8px horizontal movement
         .failOffsetY([-10000, 10000])  // Never fail on vertical movement (allow both directions)
         .shouldCancelWhenOutside(false) // Don't cancel when touch moves outside
         .onStart((event: any) => {
