@@ -70,15 +70,6 @@ export const AntivirusModal: React.FC<AntivirusModalProps> = ({
   const balance = useAppSelector(getCurrentBalance);
   const styles = createStyles(colors);
   
-  useEffect(() => {
-    if (visible) {
-      console.log('[AntivirusModal] ✅ Modal opened - visible=true');
-      console.log('[AntivirusModal] Platform:', Platform.OS);
-      console.log('[AntivirusModal] Screen dimensions:', { width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
-    } else {
-      console.log('[AntivirusModal] Modal closed - visible=false');
-    }
-  }, [visible]);
   
   const { data: shieldData, refetch, error: shieldError, isLoading: shieldLoading } = useGetShieldStatusQuery(undefined, {
     pollingInterval: 1000,
@@ -86,38 +77,25 @@ export const AntivirusModal: React.FC<AntivirusModalProps> = ({
   
   useEffect(() => {
     if (shieldError) {
-      console.error('[AntivirusModal] ❌ Shield status query error:', shieldError);
+      console.error('[AntivirusModal] Shield status query error:', shieldError);
     }
-    if (shieldData) {
-      console.log('[AntivirusModal] ✅ Shield status loaded:', {
-        isActive: shieldData.isActive,
-        hasShieldStatus: !!shieldData.shieldStatus,
-        hasCooldownStatus: !!shieldData.cooldownStatus
-      });
-    }
-  }, [shieldData, shieldError]);
+  }, [shieldError]);
   
   const [activateShield, { isLoading: isActivating, error: activateError }] = useActivateShieldMutation();
   
   useEffect(() => {
     if (activateError) {
-      console.error('[AntivirusModal] ❌ Activate shield mutation error:', activateError);
+      console.error('[AntivirusModal] Activate shield mutation error:', activateError);
     }
-    if (isActivating) {
-      console.log('[AntivirusModal] ⏳ Activating shield...');
-    }
-  }, [isActivating, activateError]);
+  }, [activateError]);
   
   const { data: researchFeatures, error: researchError } = useGetUserFeaturesQuery('home-defense');
   
   useEffect(() => {
     if (researchError) {
-      console.error('[AntivirusModal] ❌ Research features query error:', researchError);
+      console.error('[AntivirusModal] Research features query error:', researchError);
     }
-    if (researchFeatures) {
-      console.log('[AntivirusModal] ✅ Research features loaded, count:', researchFeatures.length);
-    }
-  }, [researchFeatures, researchError]);
+  }, [researchError]);
   
   const antivirusFeature = researchFeatures?.find(f => f.id === 'antivirus');
   
@@ -127,14 +105,6 @@ export const AntivirusModal: React.FC<AntivirusModalProps> = ({
   const isActuallyUnlocked = antivirusFeature?.isUnlocked || 
     (antivirusFeature?.isResearching && remaining === 0);
 
-  useEffect(() => {
-    console.log('[AntivirusModal] Unlock status:', {
-      isUnlocked: antivirusFeature?.isUnlocked,
-      isResearching: antivirusFeature?.isResearching,
-      remaining,
-      isActuallyUnlocked
-    });
-  }, [isActuallyUnlocked, antivirusFeature, remaining]);
 
   const isActive = shieldData?.isActive || false;
   const shieldStatus = shieldData?.shieldStatus;
@@ -142,51 +112,32 @@ export const AntivirusModal: React.FC<AntivirusModalProps> = ({
   const isInCooldown = !!cooldownStatus;
 
   const handleActivate = async (option: ShieldOption) => {
-    console.log('[AntivirusModal] 🎯 handleActivate called for option:', option.id);
-    console.log('[AntivirusModal] Current balance:', balance);
-    console.log('[AntivirusModal] Option price:', option.price);
-    console.log('[AntivirusModal] Is activating:', isActivating);
-    console.log('[AntivirusModal] Is active:', isActive);
-    console.log('[AntivirusModal] Is in cooldown:', isInCooldown);
-    
     if (isActive || isInCooldown) {
-      console.warn('[AntivirusModal] ⚠️ Cannot activate - shield is active or in cooldown');
       return;
     }
     
     if (balance < option.price) {
-      console.error('[AntivirusModal] ❌ Insufficient balance:', { balance, required: option.price });
       return;
     }
     
     try {
-      console.log('[AntivirusModal] ⏳ Calling activateShield mutation...');
-      const result = await activateShield({ optionId: option.id }).unwrap();
-      console.log('[AntivirusModal] ✅ Shield activated successfully:', result);
+      await activateShield({ optionId: option.id }).unwrap();
       refetch();
     } catch (error: any) {
-      console.error('[AntivirusModal] ❌ Failed to activate shield:', error);
-      console.error('[AntivirusModal] Error details:', {
-        message: error?.message,
-        status: error?.status,
-        data: error?.data
-      });
+      console.error('[AntivirusModal] Failed to activate shield:', error);
     }
   };
 
   const handleShieldComplete = () => {
-    console.log('[AntivirusModal] ✅ Shield completed, refetching status');
     refetch();
   };
 
   const handleClose = useCallback(() => {
-    console.log('[AntivirusModal] 🎯 Close button pressed - calling onClose');
     onClose();
   }, [onClose]);
 
   const handleClosePressOut = useCallback(() => {
     if (Platform.OS === 'android') {
-      console.log('[AntivirusModal] 🎯 Close button onPressOut (Android) - calling onClose');
       onClose();
     }
   }, [onClose]);
@@ -200,10 +151,7 @@ export const AntivirusModal: React.FC<AntivirusModalProps> = ({
       visible={visible}
       transparent={true}
       animationType="fade"
-      onRequestClose={() => {
-        console.log('[AntivirusModal] 📱 Android back button pressed - closing modal');
-        onClose();
-      }}
+      onRequestClose={onClose}
       statusBarTranslucent={true}
       supportedOrientations={['landscape']}
       hardwareAccelerated={true}
@@ -236,9 +184,6 @@ export const AntivirusModal: React.FC<AntivirusModalProps> = ({
               ]}
               onPress={handleClose}
               onPressOut={handleClosePressOut}
-              onPressIn={() => {
-                console.log('[AntivirusModal] 🎯 Close button onPressIn');
-              }}
             >
               <Text style={styles.closeButtonText}>×</Text>
             </Pressable>
@@ -256,34 +201,6 @@ export const AntivirusModal: React.FC<AntivirusModalProps> = ({
             pointerEvents="auto" // Explicitly enable touch events
             scrollEnabled={true} // Explicitly enable scrolling
             keyboardShouldPersistTaps="handled" // Prevent keyboard from interfering
-            onLayout={(event) => {
-              const { height, width } = event.nativeEvent.layout;
-              console.log('[AntivirusModal] 📏 ScrollView onLayout:', { height, width });
-            }}
-            onContentSizeChange={(contentWidth, contentHeight) => {
-              console.log('[AntivirusModal] 📏 ScrollView onContentSizeChange:', { contentWidth, contentHeight });
-            }}
-            onScrollBeginDrag={() => {
-              console.log('[AntivirusModal] 📜 ScrollView onScrollBeginDrag');
-            }}
-            onScrollEndDrag={() => {
-              console.log('[AntivirusModal] 📜 ScrollView onScrollEndDrag');
-            }}
-            onScroll={(event) => {
-              const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-              console.log('[AntivirusModal] 📜 ScrollView onScroll:', {
-                offsetY: contentOffset.y,
-                contentHeight: contentSize.height,
-                viewportHeight: layoutMeasurement.height,
-                canScroll: contentSize.height > layoutMeasurement.height
-              });
-            }}
-            onMomentumScrollBegin={() => {
-              console.log('[AntivirusModal] 📜 ScrollView momentum scroll begin');
-            }}
-            onMomentumScrollEnd={() => {
-              console.log('[AntivirusModal] 📜 ScrollView momentum scroll end');
-            }}
           >
             <TouchableOpacity activeOpacity={1} style={{ flex: 1 }}>
               <View style={styles.statusContainer}>
@@ -314,14 +231,12 @@ export const AntivirusModal: React.FC<AntivirusModalProps> = ({
               {SHIELD_OPTIONS.map((option) => {
                 const handleOptionPress = () => {
                   if (!isActive && !isInCooldown && !isActivating) {
-                    console.log('[AntivirusModal] 🎯 Shield option button onPress:', option.id);
                     handleActivate(option);
                   }
                 };
 
                 const handleOptionPressOut = () => {
                   if (Platform.OS === 'android' && !isActive && !isInCooldown && !isActivating) {
-                    console.log('[AntivirusModal] 🎯 Shield option button onPressOut (Android) - calling handleActivate');
                     handleActivate(option);
                   }
                 };
@@ -337,9 +252,6 @@ export const AntivirusModal: React.FC<AntivirusModalProps> = ({
                     onPress={handleOptionPress}
                     onPressOut={handleOptionPressOut}
                     disabled={isActive || isInCooldown || isActivating}
-                    onPressIn={() => {
-                      console.log('[AntivirusModal] 🎯 Shield option button onPressIn:', option.id);
-                    }}
                   >
                   <View style={styles.optionContent}>
                     <View style={styles.optionHeader}>

@@ -37,3 +37,7 @@ current-task.md
 *.swo
 *~
 .DS_Store
+
+# Deployment files
+deployments/
+*.aab

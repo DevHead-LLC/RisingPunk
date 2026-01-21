@@ -26,11 +26,11 @@
     "android:build:release:win": "cd android && gradlew.bat assembleRelease",
     "android:build:release:mac": "cd android && ./gradlew assembleRelease",
     "android:build:bundle": "node -e \"process.platform==='win32'?process.exit(require('child_process').spawnSync('npm.cmd',['run','android:build:bundle:win'],{stdio:'inherit'}).status):process.exit(require('child_process').spawnSync('npm',['run','android:build:bundle:mac'],{stdio:'inherit'}).status)\"",
-    "android:build:bundle:win": "cd android && gradlew.bat bundleRelease",
-    "android:build:bundle:mac": "cd android && ./gradlew bundleRelease",
+    "android:build:bundle:win": "cd android && gradlew.bat bundleRelease && cd ../.. && mkdir -p deployments/client/mobile/prod && cp mobile/android/app/build/outputs/bundle/release/app-release.aab deployments/client/mobile/prod/rising-punk-prod.aab && echo \"✅ Production AAB ready: deployments/client/mobile/prod/rising-punk-prod.aab\"",
+    "android:build:bundle:mac": "cd android && ./gradlew bundleRelease && cd ../.. && mkdir -p deployments/client/mobile/prod && cp mobile/android/app/build/outputs/bundle/release/app-release.aab deployments/client/mobile/prod/rising-punk-prod.aab && echo \"✅ Production AAB ready: deployments/client/mobile/prod/rising-punk-prod.aab\"",
     "android:build:bundle:staging": "node -e \"process.platform==='win32'?process.exit(require('child_process').spawnSync('npm.cmd',['run','android:build:bundle:staging:win'],{stdio:'inherit'}).status):process.exit(require('child_process').spawnSync('npm',['run','android:build:bundle:staging:mac'],{stdio:'inherit'}).status)\"",
     "android:build:bundle:staging:win": "node -e \"var env=Object.assign({},process.env);env.ENVFILE='.env.staging';var proc=require('child_process').spawnSync(process.platform==='win32'?'npm.cmd':'npm',['run','android:build:bundle:win'],{stdio:'inherit',env:env});process.exit(proc.status||0)\"",
-    "android:build:bundle:staging:mac": "ENVFILE=.env.staging cd android && ./gradlew bundleRelease"
+    "android:build:bundle:staging:mac": "cd android && ENVFILE=.env.staging ./gradlew bundleRelease && cd ../.. && mkdir -p deployments/client/mobile/staging && cp mobile/android/app/build/outputs/bundle/release/app-release.aab deployments/client/mobile/staging/rising-punk-staging.aab && echo \"✅ Staging AAB ready: deployments/client/mobile/staging/rising-punk-staging.aab\""
   },
   "dependencies": {
     "@invertase/react-native-apple-authentication": "^2.4.1",
