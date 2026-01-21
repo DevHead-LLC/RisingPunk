@@ -112,6 +112,11 @@ const GesturePanView = memo(function GesturePanView({
   panGesture: any;
   colors: any;
 }) {
+  // Log when GesturePanView mounts
+  useEffect(() => {
+    console.log('[ANDROID_GESTURE] 🎨 GesturePanView mounted, panGesture:', panGesture ? 'configured' : 'NULL');
+  }, [panGesture]);
+
   const animatedStyle: any = useAnimatedStyle(() => {
     'worklet';
     const transform = [
@@ -127,7 +132,10 @@ const GesturePanView = memo(function GesturePanView({
 
   return (
     <GestureDetector gesture={panGesture}>
-      <Animated.View style={[styles.scrollContent, { borderColor: colors.secondary + '99' }, animatedStyle]}>
+      <Animated.View 
+        style={[styles.scrollContent, { borderColor: colors.secondary + '99' }, animatedStyle]}
+        collapsable={false}
+      >
         {children}
       </Animated.View>
     </GestureDetector>
@@ -136,6 +144,17 @@ const GesturePanView = memo(function GesturePanView({
 
 export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element => {
   const colors = useThemeColors();
+  
+  // Log component mount for Android debugging
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      console.log('[ANDROID_GESTURE] 🎭 TurfScreen mounted on Android');
+      return () => {
+        console.log('[ANDROID_GESTURE] 👋 TurfScreen unmounted on Android');
+      };
+    }
+  }, []);
+  
   const { highlightTaskId, highlightStep, clearHighlight } = useTaskGuideHighlight();
   const isVisitHome = highlightTaskId === 'visit-home';
   const isVisitHackmap = highlightTaskId === 'visit-hackmap';
@@ -218,12 +237,22 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   // Android-specific bounds calculation (only for Android)
   useEffect(() => {
     if (Platform.OS === 'android' && computePanBounds) {
+      console.log('[ANDROID_GESTURE] 📐 Calculating bounds...');
+      
       const WINDOW_WIDTH = Dimensions.get('window').width;
       const WINDOW_HEIGHT = Dimensions.get('window').height;
       const SCREEN_WIDTH = Dimensions.get('screen').width;
       const SCREEN_HEIGHT = Dimensions.get('screen').height;
       const CONTENT_SIZE = 2000;
       const MARGIN_SIZE = 0; // No margin for turf screen
+      
+      console.log('[ANDROID_GESTURE] 📏 Dimensions', {
+        windowWidth: WINDOW_WIDTH,
+        windowHeight: WINDOW_HEIGHT,
+        screenWidth: SCREEN_WIDTH,
+        screenHeight: SCREEN_HEIGHT,
+        contentSize: CONTENT_SIZE,
+      });
       
       // Hybrid approach: window for top/bottom, screen for left/right
       const ADJUSTED_WIDTH = SCREEN_WIDTH;  // Use screen width for left/right
@@ -235,6 +264,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         containerHeight: ADJUSTED_HEIGHT,
         marginSize: MARGIN_SIZE,
       });
+
+      console.log('[ANDROID_GESTURE] 📊 Computed bounds (before adjustment)', bounds);
 
       // Calculate Android header/toolbar height for landscape mode
       // Status bar is hidden, but we need to account for the space it would take
@@ -250,12 +281,15 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         minY: bounds.minY - ANDROID_HEADER_HEIGHT // Allow scroll past bottom by header height
       };
 
+      console.log('[ANDROID_GESTURE] ✅ Final adjusted bounds', adjustedBounds);
 
       minX.value = adjustedBounds.minX;
       maxX.value = adjustedBounds.maxX;
       minY.value = adjustedBounds.minY;
       maxY.value = adjustedBounds.maxY;
       boundsReady.value = true;
+      
+      console.log('[ANDROID_GESTURE] 🎯 Bounds ready set to true');
     }
   }, [minX, maxX, minY, maxY, boundsReady, computePanBounds]);
 
@@ -300,43 +334,127 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   // Android-specific pan gesture (only for Android) - Memoized for performance
   const panGesture = useMemo(() => {
     if (Platform.OS === 'android') {
-      return Gesture.Pan()
+      const basePanGesture = Gesture.Pan()
         .minPointers(1)
         .maxPointers(1)
         .enabled(!isHomeHighlight && !isDigitalBarracksHighlight && !isResearchCenterHighlight && !isInvestmentPropertyHighlight)
-        .onStart(() => {
+        // CRITICAL: Make gesture IMMEDIATELY active to prevent any competition
+        .manualActivation(false)  // Don't require manual activation
+        .minDistance(0)  // Activate immediately with ANY movement
+        // Use HORIZONTAL-ONLY activation to avoid conflict with vertical swipe-to-home
+        .activeOffsetX([-1, 1])      // Activate after just 1px horizontal movement
+        .failOffsetY([-10000, 10000])  // Never fail on vertical movement (allow both directions)
+        .shouldCancelWhenOutside(false) // Don't cancel when touch moves outside
+        .onStart((event: any) => {
           'worklet';
+          console.log('[ANDROID_GESTURE] 🚀 Pan gesture STARTED', {
+            x: event.x,
+            y: event.y,
+            absoluteX: event.absoluteX,
+            absoluteY: event.absoluteY,
+            timestamp: Date.now(),
+          });
+          console.log('[ANDROID_GESTURE] 💪 Setting start values...');
           startX.value = offsetX.value;
           startY.value = offsetY.value;
+          console.log('[ANDROID_GESTURE] ✓ Start values set', {
+            startX: startX.value,
+            startY: startY.value,
+          });
         })
-        .onBegin(() => {
+        .onBegin((event: any) => {
           'worklet';
+          console.log('[ANDROID_GESTURE] 🎬 Pan gesture BEGIN', {
+            x: event.x,
+            y: event.y,
+            timestamp: Date.now(),
+          });
           if (isViewWallet) {
+            console.log('[ANDROID_GESTURE] 🎯 Clearing wallet highlight...');
             runOnJS(clearHighlight)();
           }
         })
+        .onTouchesDown((event: any) => {
+          'worklet';
+          console.log('[ANDROID_GESTURE] 👆 TOUCHES DOWN', {
+            numberOfTouches: event.numberOfTouches,
+            timestamp: Date.now(),
+          });
+        })
+        .onTouchesMove((event: any) => {
+          'worklet';
+          console.log('[ANDROID_GESTURE] 👉 TOUCHES MOVE', {
+            numberOfTouches: event.numberOfTouches,
+            timestamp: Date.now(),
+          });
+        })
+        .onTouchesUp((event: any) => {
+          'worklet';
+          console.log('[ANDROID_GESTURE] 👆 TOUCHES UP', {
+            numberOfTouches: event.numberOfTouches,
+            timestamp: Date.now(),
+          });
+        })
+        .onTouchesCancelled((event: any) => {
+          'worklet';
+          console.log('[ANDROID_GESTURE] ❌ TOUCHES CANCELLED', {
+            numberOfTouches: event.numberOfTouches,
+            timestamp: Date.now(),
+          });
+        })
         .onUpdate((g: any) => {
           'worklet';
-          let x = startX.value + g.translationX;
-          let y = startY.value + g.translationY;
+          console.log('[ANDROID_GESTURE] 🔄 Pan gesture UPDATE ENTRY', {
+            translationX: g.translationX,
+            translationY: g.translationY,
+          });
           
-          // Always enforce bounds if ready (hard stops)
-          if (boundsReady.value) {
-            const originalX = x;
-            const originalY = y;
-            x = Math.min(maxX.value, Math.max(minX.value, x));
-            y = Math.min(maxY.value, Math.max(minY.value, y));
+          try {
+            let x = startX.value + g.translationX;
+            let y = startY.value + g.translationY;
             
+            console.log('[ANDROID_GESTURE] 📍 Calculated position', {
+              x: x,
+              y: y,
+            });
+            
+            // Always enforce bounds if ready (hard stops)
+            if (boundsReady.value) {
+              const originalX = x;
+              const originalY = y;
+              x = Math.min(maxX.value, Math.max(minX.value, x));
+              y = Math.min(maxY.value, Math.max(minY.value, y));
+              
+              // Log if bounds were hit
+              if (x !== originalX || y !== originalY) {
+                console.log('[ANDROID_GESTURE] 🛑 Bounds enforced');
+              }
+            }
+            
+            console.log('[ANDROID_GESTURE] 💾 Setting offset values...');
+            offsetX.value = x;
+            offsetY.value = y;
+            console.log('[ANDROID_GESTURE] ✓ Offset values set');
+            
+            // REMOVED PROBLEMATIC runOnJS call - this was crashing the app!
+            // We don't actually need to update currentPanOffsetRef during pan
+            // Only needed for certain highlights which can use the shared values directly
+            
+            console.log('[ANDROID_GESTURE] 🔄 UPDATE complete');
+          } catch (error: any) {
+            console.log('[ANDROID_GESTURE] ❌ ERROR in onUpdate:', error.message);
           }
-          
-          offsetX.value = x;
-          offsetY.value = y;
-          runOnJS((xVal: number, yVal: number) => {
-            currentPanOffsetRef.current = { x: xVal, y: yVal };
-          })(x, y);
         })
         .onEnd((g: any) => {
           'worklet';
+          console.log('[ANDROID_GESTURE] 🏁 Pan gesture END', {
+            translationX: g.translationX.toFixed(2),
+            translationY: g.translationY.toFixed(2),
+            velocityX: g.velocityX.toFixed(2),
+            velocityY: g.velocityY.toFixed(2),
+            timestamp: Date.now(),
+          });
+          
           if (boundsReady.value) {
             // Apply decay with boundary enforcement
             offsetX.value = withDecay({ 
@@ -350,7 +468,26 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
               clamp: [minY.value, maxY.value]
             });
           }
+        })
+        .onFinalize((event: any, success: boolean) => {
+          'worklet';
+          console.log('[ANDROID_GESTURE] ✅ Pan gesture FINALIZE', {
+            success: success,
+            timestamp: Date.now(),
+            state: event.state,
+            handlerTag: event.handlerTag,
+          });
+          
+          // Log failure for debugging
+          if (!success) {
+            console.log('[ANDROID_GESTURE] ⚠️ GESTURE FAILED - Likely system gesture conflict');
+          }
         });
+      
+      // Return the gesture directly (not wrapped)
+      // Testing if Gesture.Exclusive() is causing crashes
+      console.log('[ANDROID_GESTURE] 🎯 Returning base pan gesture (no Exclusive wrapper)');
+      return basePanGesture;
     }
     return null;
   }, [offsetX, offsetY, startX, startY, boundsReady, minX, maxX, minY, maxY, withDecay, isHomeHighlight, isDigitalBarracksHighlight, isResearchCenterHighlight, isInvestmentPropertyHighlight, isViewWallet, clearHighlight, runOnJS]);
@@ -1195,15 +1332,14 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                   </View>
                 </ScrollViewMemo>
               ) : (
-                <View>
-                  <GesturePanView 
-                      horizontalScrollRef={horizontalScrollRef} 
-                      onScroll={handleTurfScroll}
-                      offsetX={offsetX}
-                      offsetY={offsetY}
-                      panGesture={panGesture}
-                      colors={colors}
-                    >
+                <GesturePanView 
+                    horizontalScrollRef={horizontalScrollRef} 
+                    onScroll={handleTurfScroll}
+                    offsetX={offsetX}
+                    offsetY={offsetY}
+                    panGesture={panGesture}
+                    colors={colors}
+                  >
                   <DiagonalLines colors={colors} />
                   <View style={[styles.digitalGround, { backgroundColor: colors.matrix + '0D', borderColor: colors.matrix + '33' }]}>
                     {!isHomeHighlight && <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />}
@@ -1358,7 +1494,6 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                     />
                   )}
                   </GesturePanView>
-                </View>
               )}
             </View>
             {isHomeHighlight && (
