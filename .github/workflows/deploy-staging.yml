@@ -38,9 +38,9 @@ jobs:
       - name: Build (ts -> dist)
         run: npm run build
 
-      - name: Create Procfile
+      - name: Create Procfile for staging
         run: |
-          echo 'web: node dist/server.js' > Procfile
+          echo 'web: NODE_ENV=staging node dist/server.js' > Procfile
 
       - name: Zip artifact (dist + runtime files)
         run: |
