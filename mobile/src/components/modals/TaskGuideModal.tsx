@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ScrollView,
   Platform,
   Dimensions,
+  Pressable,
 } from 'react-native';
 import { ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -181,6 +182,16 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
     }
   };
 
+  const handleClose = useCallback(() => {
+    onClose();
+  }, [onClose]);
+
+  const handleClosePressOut = useCallback(() => {
+    if (Platform.OS === 'android') {
+      onClose();
+    }
+  }, [onClose]);
+
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   // Show next 10 tasks that are either incomplete or completed but not yet collected
@@ -207,37 +218,32 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
       visible={visible}
       transparent={true}
       animationType="fade"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
       statusBarTranslucent={true}
       hardwareAccelerated={true}
       supportedOrientations={['landscape']}
       presentationStyle="overFullScreen"
     >
       <View style={styles.overlay}>
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={onClose}
-          style={styles.overlayTouchable}
+        <View
+          style={[styles.modalContainer, { backgroundColor: colors.background, borderColor: colors.secondary }]}
         >
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={() => {}}
+          <View style={[styles.header, { borderBottomColor: colors.secondary }]}>
+            <Text style={[styles.title, { color: colors.text.primary }]}>
+              Task Guide
+            </Text>
+          </View>
+          <Pressable
+            style={({ pressed }) => [
+              styles.closeButton,
+              { backgroundColor: colors.primary, borderColor: colors.secondary },
+              pressed && { opacity: 0.7 }
+            ]}
+            onPress={handleClose}
+            onPressOut={handleClosePressOut}
           >
-            <View
-              style={[styles.modalContainer, { backgroundColor: colors.background, borderColor: colors.secondary }]}
-            >
-            <View style={[styles.header, { borderBottomColor: colors.secondary }]}>
-              <Text style={[styles.title, { color: colors.text.primary }]}>
-                Task Guide
-              </Text>
-              <TouchableOpacity
-                style={[styles.closeButton, { backgroundColor: colors.primary, borderColor: colors.secondary }]}
-                onPress={onClose}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.closeButtonText, { color: colors.background }]}>×</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={[styles.closeButtonText, { color: colors.background }]}>×</Text>
+          </Pressable>
 
             <View style={[styles.tableHeader, { borderBottomColor: colors.secondary, backgroundColor: colors.secondary + '20' }]}>
               <Text style={[styles.headerText, styles.headerTaskTitle, { color: colors.text.primary }]}>Task</Text>
@@ -326,21 +332,21 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
                       >
                         ${rewardValue}
                       </Text>
-                      <TouchableOpacity
-                        style={[
+                      <Pressable
+                        style={({ pressed }) => [
                           styles.actionButton,
                           {
                             backgroundColor: completed ? colors.matrix : colors.primary,
                             borderColor: completed ? colors.matrix : colors.secondary,
-                          }
+                          },
+                          pressed && { opacity: 0.7 }
                         ]}
                         onPress={() => handleTaskAction(task.id)}
-                        activeOpacity={0.7}
                       >
                         <Text style={[styles.actionButtonText, { color: colors.background }]}>
                           {completed ? 'Collect' : "Let's Go!"}
                         </Text>
-                      </TouchableOpacity>
+                      </Pressable>
                     </View>
                   </View>
                 );
@@ -426,21 +432,26 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
                           >
                             ${rewardValue}
                           </Text>
-                          <TouchableOpacity
-                            style={[
+                          <Pressable
+                            style={({ pressed }) => [
                               styles.actionButton,
                               {
                                 backgroundColor: completed ? colors.matrix : colors.primary,
                                 borderColor: completed ? colors.matrix : colors.secondary,
-                              }
+                              },
+                              pressed && { opacity: 0.7 }
                             ]}
                             onPress={() => handleTaskAction(task.id)}
-                            activeOpacity={0.7}
+                            onPressOut={() => {
+                              if (Platform.OS === 'android') {
+                                handleTaskAction(task.id);
+                              }
+                            }}
                           >
                             <Text style={[styles.actionButtonText, { color: colors.background }]}>
                               {completed ? 'Collect' : "Let's Go!"}
                             </Text>
-                          </TouchableOpacity>
+                          </Pressable>
                         </View>
                       </View>
                     );
@@ -448,9 +459,7 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
                 )}
               </ScrollView>
             )}
-          </View>
-        </TouchableOpacity>
-      </TouchableOpacity>
+        </View>
       </View>
       <LockedFeatureModal
         visible={showInsufficientFundsModal}
@@ -486,47 +495,61 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   overlay: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: SIZING.spacing.lg,
-    paddingVertical: SIZING.spacing.lg,
-  },
-  overlayTouchable: {
-    flex: 1,
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: SIZING.spacing.lg,
   },
   modalContainer: {
     width: SCREEN_WIDTH * 0.75,
     maxWidth: 900,
     minWidth: 600,
     maxHeight: SCREEN_HEIGHT * 0.80,
+    height: '80%',
     borderRadius: 8,
     borderWidth: 2,
-    overflow: 'hidden',
+    overflow: 'visible',
     flexDirection: 'column',
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 12,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     padding: SIZING.spacing.md,
     borderBottomWidth: 1,
+    flexShrink: 0,
   },
   title: {
     fontSize: SIZING.font.large,
     fontWeight: 'bold',
   },
   closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
+    position: 'absolute',
+    top: -20,
+    right: -20,
+    width: 40,
+    height: 40,
+    borderRadius: 24,
+    borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 1000,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   closeButtonText: {
     fontSize: 24,
@@ -534,11 +557,10 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontWeight: 'bold',
   },
   scrollView: {
-    maxHeight: '100%',
+    flex: 1,
   },
   scrollContent: {
     paddingBottom: SIZING.spacing.lg,
-    flexGrow: 1,
   },
   tableHeader: {
     flexDirection: 'row',

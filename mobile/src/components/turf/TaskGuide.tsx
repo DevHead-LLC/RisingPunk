@@ -134,7 +134,9 @@ const createTaskGuideStyles = (colors: ReturnType<typeof useThemeColors>) => Sty
   touchableContainer: {
     position: 'absolute',
     bottom: SIZING.spacing.lg,
-    left: SIZING.spacing.lg,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
     zIndex: 500,
   },
   taskGuideContainer: {
