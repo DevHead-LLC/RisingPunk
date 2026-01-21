@@ -33,11 +33,11 @@
     "android:build:release:mac": "cd android && ./gradlew assembleRelease",
     "// PRODUCTION AAB BUILD - Builds production AAB bundle for Google Play Store (uploads to Production track)": "",
     "android:build:bundle": "node -e \"process.platform==='win32'?process.exit(require('child_process').spawnSync('npm.cmd',['run','android:build:bundle:win'],{stdio:'inherit'}).status):process.exit(require('child_process').spawnSync('npm',['run','android:build:bundle:mac'],{stdio:'inherit'}).status)\"",
-    "android:build:bundle:win": "cd android && set ENVFILE=.env.prod && gradlew.bat bundleRelease && cd .. && cd .. && if not exist deployments\\client\\mobile\\prod mkdir deployments\\client\\mobile\\prod && copy mobile\\android\\app\\build\\outputs\\bundle\\release\\app-release.aab deployments\\client\\mobile\\prod\\rising-punk-prod.aab && echo ✅ Production AAB ready: deployments/client/mobile/prod/rising-punk-prod.aab",
+    "android:build:bundle:win": "cd android && set ENVFILE=.env.prod&& gradlew.bat bundleRelease && cd .. && cd .. && if not exist deployments\\client\\mobile\\prod mkdir deployments\\client\\mobile\\prod && copy mobile\\android\\app\\build\\outputs\\bundle\\release\\app-release.aab deployments\\client\\mobile\\prod\\rising-punk-prod.aab && echo ✅ Production AAB ready: deployments/client/mobile/prod/rising-punk-prod.aab",
     "android:build:bundle:mac": "cd android && ENVFILE=.env.prod ./gradlew bundleRelease && cd ../.. && mkdir -p deployments/client/mobile/prod && cp mobile/android/app/build/outputs/bundle/release/app-release.aab deployments/client/mobile/prod/rising-punk-prod.aab && echo \"✅ Production AAB ready: deployments/client/mobile/prod/rising-punk-prod.aab\"",
     "// STAGING AAB BUILD - Builds staging AAB bundle for Google Play Console Internal Testing track": "",
     "android:build:bundle:staging": "node -e \"process.platform==='win32'?process.exit(require('child_process').spawnSync('npm.cmd',['run','android:build:bundle:staging:win'],{stdio:'inherit'}).status):process.exit(require('child_process').spawnSync('npm',['run','android:build:bundle:staging:mac'],{stdio:'inherit'}).status)\"",
-    "android:build:bundle:staging:win": "cd android && set ENVFILE=.env.staging && gradlew.bat bundleRelease && cd .. && cd .. && if not exist deployments\\client\\mobile\\staging mkdir deployments\\client\\mobile\\staging && copy mobile\\android\\app\\build\\outputs\\bundle\\release\\app-release.aab deployments\\client\\mobile\\staging\\rising-punk-staging.aab && echo ✅ Staging AAB ready: deployments/client/mobile/staging/rising-punk-staging.aab",
+    "android:build:bundle:staging:win": "cd android && set ENVFILE=.env.staging&& gradlew.bat bundleRelease && cd .. && cd .. && if not exist deployments\\client\\mobile\\staging mkdir deployments\\client\\mobile\\staging && copy mobile\\android\\app\\build\\outputs\\bundle\\release\\app-release.aab deployments\\client\\mobile\\staging\\rising-punk-staging.aab && echo ✅ Staging AAB ready: deployments/client/mobile/staging/rising-punk-staging.aab",
     "android:build:bundle:staging:mac": "cd android && ENVFILE=.env.staging ./gradlew bundleRelease && cd ../.. && mkdir -p deployments/client/mobile/staging && cp mobile/android/app/build/outputs/bundle/release/app-release.aab deployments/client/mobile/staging/rising-punk-staging.aab && echo \"✅ Staging AAB ready: deployments/client/mobile/staging/rising-punk-staging.aab\""
   },
   "dependencies": {
@@ -50,7 +50,7 @@
     "react-native": "0.76.6",
     "react-native-config": "^1.5.9",
     "react-native-gesture-handler": "^2.28.0",
-    "react-native-reanimated": "^3.17.1",
+    "react-native-reanimated": "^3.17.5",
     "react-native-svg": "^15.11.1",
     "react-redux": "^9.2.0"
   },

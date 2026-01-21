@@ -92,8 +92,15 @@ android {
         applicationId "com.devheadllc.risingpunk"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 42
+        versionCode 43
         versionName "1.0"
+    }
+    
+    // Configure packaging options for 16 KB page size support
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = false
+        }
     }
     signingConfigs {
         debug {
@@ -120,6 +127,8 @@ android {
             minifyEnabled enableProguardInReleaseBuilds
             shrinkResources enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+            // Enable 16 KB page size support (required for Android 15+ / Google Play)
+            // Note: React Native 0.76.6 may need upgrade to 0.77+ for full automatic support
         }
     }
     bundle {
@@ -144,6 +153,15 @@ afterEvaluate {
         task.doFirst {
             if (!keystorePropertiesFile.exists()) {
                 throw new GradleException("Release signing requires keystore.properties file at ${keystorePropertiesFile.absolutePath}")
+            }
+        }
+    }
+    
+    // Log NDK version being used (for verification)
+    tasks.whenTaskAdded { task ->
+        if (task.name.contains("Release") && task.name.contains("Native")) {
+            task.doFirst {
+                println "Using NDK version: ${rootProject.ext.ndkVersion}"
             }
         }
     }
