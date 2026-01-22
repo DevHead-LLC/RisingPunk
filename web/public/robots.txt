@@ -4,5 +4,8 @@
 User-agent: *
 Allow: /
 
+# Disallow marketing redirect endpoint (should not be indexed)
+Disallow: /go
+
 # Sitemap location
 Sitemap: https://risingpunk.com/sitemap.xml

@@ -8,6 +8,18 @@ function FinalCTA() {
   const [ref, isVisible] = useScrollAnimation()
   const location = useLocation()
   const isOffersPage = location.pathname === '/offers'
+
+  const handleDownloadClick = (platform) => {
+    // Track download click in GA4
+    if (window.gtag) {
+      const eventName = platform === 'ios' ? 'clicked_ios_download' : 'clicked_android_download'
+      window.gtag('event', eventName, {
+        event_category: 'engagement',
+        event_label: 'final_cta_download',
+        value: 1
+      })
+    }
+  }
   
   return (
     <section id="ready-to-dominate" className="final-cta section">
@@ -22,6 +34,7 @@ function FinalCTA() {
               aria-label="Play Now on App Store"
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => handleDownloadClick('ios')}
             >
               <FaApple className="cta-icon" />
               <span>Play Now</span>
@@ -32,6 +45,7 @@ function FinalCTA() {
               aria-label="Play Now on Google Play"
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => handleDownloadClick('android')}
             >
               <SiGoogleplay className="cta-icon" />
               <span>Play Now</span>
