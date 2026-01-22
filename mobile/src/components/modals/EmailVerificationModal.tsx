@@ -10,6 +10,8 @@ import {
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
+  Dimensions,
+  Pressable,
 } from 'react-native';
 import { SIZING, styleGuide } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -39,6 +41,14 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
   const colors = useThemeColors();
   const token = useAppSelector((state) => state.auth.token);
   const hasInitialized = useRef(false);
+  const isClosingRef = useRef(false); // Prevent duplicate close calls on Android
+  const isSubmittingRef = useRef(false); // Prevent duplicate submit calls on Android
+  
+  // Dynamic screen dimensions for rotation support
+  const [screenDimensions, setScreenDimensions] = useState(() => {
+    const { width, height } = Dimensions.get('window');
+    return { width, height };
+  });
 
   const markUserAsPrompted = useCallback(async () => {
     try {
@@ -54,6 +64,17 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
     }
   }, [token]);
 
+  // Listen for dimension changes (rotation, split-screen, etc.)
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenDimensions({ width: window.width, height: window.height });
+    });
+    
+    return () => {
+      subscription?.remove();
+    };
+  }, []);
+
   // Reset state when modal opens
   useEffect(() => {
     if (visible && !hasInitialized.current) {
@@ -61,8 +82,13 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
       setError('');
       setIsLoading(false);
       hasInitialized.current = true;
+      isClosingRef.current = false; // Reset close guard
+      isSubmittingRef.current = false; // Reset submit guard
+      
     } else if (!visible) {
       hasInitialized.current = false;
+      isClosingRef.current = false; // Reset close guard when modal closes
+      isSubmittingRef.current = false; // Reset submit guard when modal closes
     }
   }, [visible, userEmail]);
 
@@ -113,12 +139,18 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
   }, [onVerificationSent, onClose]);
 
   const handleSubmit = useCallback(async () => {
+    // Prevent duplicate calls on Android (both onPress and onPressOut may fire)
+    if (isSubmittingRef.current) {
+      return;
+    }
+    
     const validationError = validateEmail(email);
     if (validationError) {
       setError(validationError);
       return;
     }
 
+    isSubmittingRef.current = true;
     setError('');
     setIsLoading(true);
 
@@ -126,6 +158,7 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
       await sendVerificationEmail(email.trim());
     } finally {
       setIsLoading(false);
+      isSubmittingRef.current = false; // Reset submit guard after completion
     }
   }, [email, validateEmail, sendVerificationEmail]);
 
@@ -136,6 +169,42 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
       setError('');
     }
   }, [error]);
+
+  const handleClose = useCallback(() => {
+    // Prevent duplicate calls on Android (both onPress and onPressOut fire)
+    if (isClosingRef.current) {
+      return;
+    }
+    
+    isClosingRef.current = true;
+    
+    if (onClose) {
+      markUserAsPrompted();
+      onClose();
+    }
+  }, [onClose, markUserAsPrompted]);
+
+  const handleSkipPress = useCallback(() => {
+    handleClose();
+  }, [handleClose]);
+
+  const handleSkipPressOut = useCallback(() => {
+    // On Android, onPressOut fires reliably when onPress may not
+    // Handle action here for Android, ref guard prevents duplicates
+    if (Platform.OS === 'android') {
+      handleClose();
+    }
+    // On iOS, onPress fires reliably, so this is a no-op
+  }, [handleClose]);
+
+  const handleClosePressOut = useCallback(() => {
+    // On Android, onPressOut fires reliably when onPress may not
+    // Handle action here for Android, ref guard prevents duplicates
+    if (Platform.OS === 'android') {
+      handleClose();
+    }
+    // On iOS, onPress fires reliably, so this is a no-op
+  }, [handleClose]);
 
   const getErrorMessage = (errorCode: string): string => {
     switch (errorCode) {
@@ -158,31 +227,33 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
         We need to verify your email address to ensure you can recover your account if needed.
       </Text>
 
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={[
-            styles.input,
-            { 
-              color: colors.text.primary,
-              borderColor: error ? colors.error : colors.matrix,
-              backgroundColor: colors.inputBg || colors.background,
-            }
-          ]}
-          value={email}
-          onChangeText={handleTextChange}
-          placeholder="Enter your email address..."
-          placeholderTextColor={colors.secondary}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="email-address"
-          editable={!isLoading}
-        />
-        {error ? (
-          <Text style={[styles.errorText, { color: colors.error }]}>
-            {getErrorMessage(error)}
-          </Text>
-        ) : null}
-      </View>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={[
+              styles.input,
+              { 
+                color: colors.text.primary,
+                borderColor: error ? colors.error : colors.matrix,
+                backgroundColor: colors.inputBg || colors.background,
+              }
+            ]}
+            value={email}
+            onChangeText={handleTextChange}
+            placeholder="Enter your email address..."
+            placeholderTextColor={colors.secondary}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            editable={!isLoading}
+          />
+          {error ? (
+            <Text style={[styles.errorText, { color: colors.error }]}>
+              {getErrorMessage(error)}
+            </Text>
+          ) : null}
+        </View>
+      </TouchableWithoutFeedback>
 
       <View style={styles.warningContainer}>
         <Text style={[styles.warningText, { color: colors.error }]}>
@@ -192,42 +263,59 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
 
       <View style={styles.buttonContainer}>
         {!isRequired && onClose && (
-          <TouchableOpacity
-            style={[
+          <Pressable
+            style={({ pressed }) => [
               styles.cancelButton,
               { 
                 backgroundColor: colors.background + 'CC',
                 borderColor: colors.text.secondary,
-              }
+              },
+              pressed && { opacity: 0.7 }
             ]}
             onPress={() => {
-              markUserAsPrompted();
-              onClose();
+              // On Android, onPressOut handles the action, but call here too in case it fires
+              // Ref guard prevents duplicate calls
+              if (Platform.OS === 'ios') {
+                handleSkipPress();
+              }
             }}
+            onPressOut={handleSkipPressOut}
           >
             <Text style={[styles.cancelText, { color: colors.text.secondary }]}>
               SKIP FOR NOW
             </Text>
-          </TouchableOpacity>
+          </Pressable>
         )}
         
-        <TouchableOpacity
-          style={[
+        <Pressable
+          style={({ pressed }) => [
             styles.submitButton,
             { 
               backgroundColor: isLoading || !!validateEmail(email) ? colors.buttonDisabled : colors.buttonBg,
               borderColor: colors.matrix,
               flex: isRequired ? 1 : 0.6,
-            }
+            },
+            pressed && { opacity: 0.7 }
           ]}
-          onPress={handleSubmit}
+          onPress={() => {
+            // On Android, onPressOut handles the action, but call here too in case it fires
+            // Ref guard prevents duplicate calls
+            if (Platform.OS === 'ios') {
+              handleSubmit();
+            }
+          }}
+          onPressOut={() => {
+            if (Platform.OS === 'android') {
+              handleSubmit();
+            }
+          }}
           disabled={isLoading || !!validateEmail(email)}
         >
           <Text style={[styles.submitText, { color: '#FFFFFF' }]}>
             {isLoading ? 'SENDING...' : 'SEND VERIFICATION'}
           </Text>
           <View style={[styles.buttonCorner, { borderColor: colors.matrix }]} />
-        </TouchableOpacity>
+        </Pressable>
       </View>
     </>
   );
@@ -238,46 +326,147 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
       visible={visible}
       transparent={true}
       animationType="fade"
+      onRequestClose={handleClose}
       statusBarTranslucent={true}
+      hardwareAccelerated={true}
       supportedOrientations={['landscape']}
+      presentationStyle="overFullScreen"
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={styles.overlay}>
+      <View 
+        style={[styles.overlay, { width: screenDimensions.width, height: screenDimensions.height }]} 
+        pointerEvents="box-none"
+      >
+        {Platform.OS === 'ios' ? (
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ flex: 1, justifyContent: 'center' }}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+            behavior="padding"
+            style={styles.keyboardAvoidingView}
+            keyboardVerticalOffset={0}
           >
-            <TouchableWithoutFeedback onPress={() => {}}>
-              <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-                <View style={[styles.modalContent, { borderColor: colors.matrix }]}>
-                  {renderEmailInput()}
-                </View>
+            <View 
+              style={[
+                styles.modalContainer, 
+                { 
+                  backgroundColor: colors.background, 
+                  borderColor: colors.matrix,
+                  width: Math.min(screenDimensions.width * 0.9, 500),
+                }
+              ]}
+              pointerEvents="auto"
+            >
+              <Pressable
+                style={({ pressed }) => [
+                  styles.closeButton,
+                  { backgroundColor: colors.primary, borderColor: colors.secondary },
+                  pressed && { opacity: 0.7 }
+                ]}
+                onPress={() => {
+                  console.log('📱 EmailVerificationModal - Close button onPress (iOS)');
+                  handleClose();
+                }}
+                onPressIn={() => {
+                  console.log('📱 EmailVerificationModal - Close button onPressIn (iOS)');
+                }}
+                onPressOut={handleClosePressOut}
+              >
+                <Text style={[styles.closeButtonText, { color: colors.background }]}>×</Text>
+              </Pressable>
+              <View style={styles.modalContent}>
+                {renderEmailInput()}
               </View>
-            </TouchableWithoutFeedback>
+            </View>
           </KeyboardAvoidingView>
-        </View>
-      </TouchableWithoutFeedback>
+        ) : (
+          <View 
+            style={[
+              styles.modalContainer, 
+              { 
+                backgroundColor: colors.background, 
+                borderColor: colors.matrix,
+                width: Math.min(screenDimensions.width * 0.9, 500),
+              }
+            ]}
+            pointerEvents="auto"
+          >
+            <Pressable
+              style={({ pressed }) => [
+                styles.closeButton,
+                { backgroundColor: colors.primary, borderColor: colors.secondary },
+                pressed && { opacity: 0.7 }
+              ]}
+              onPress={() => {
+                // On Android, onPressOut handles the action, but call here too in case it fires
+                // Ref guard prevents duplicate calls
+                if (Platform.OS === 'ios') {
+                  handleClose();
+                }
+              }}
+              onPressOut={handleClosePressOut}
+            >
+              <Text style={[styles.closeButtonText, { color: colors.background }]}>×</Text>
+            </Pressable>
+            <View style={styles.modalContent}>
+              {renderEmailInput()}
+            </View>
+          </View>
+        )}
+      </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    // width and height set dynamically via inline style for rotation support
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: SIZING.spacing.lg,
+    zIndex: 10000, // Higher than onboarding zIndex: 1000
+  },
+  keyboardAvoidingView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContainer: {
-    width: '100%',
+    // width set dynamically via inline style for rotation support
     maxWidth: 500,
     borderRadius: 8,
     borderWidth: 2,
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 12,
   },
   modalContent: {
     padding: SIZING.spacing.lg,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: -20,
+    right: -20,
+    width: 40,
+    height: 40,
+    borderRadius: 24,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  closeButtonText: {
+    fontSize: 24,
+    lineHeight: 24,
+    fontWeight: 'bold',
   },
   title: {
     fontSize: SIZING.font.h2,

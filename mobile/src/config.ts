@@ -28,9 +28,30 @@ const getApiUrl = () => {
       }
     }
     
-    // Log warning but don't crash - use staging as fallback for production builds
-    console.error(`
-🚨 WARNING: Environment detection failed!
+    // Check if this is a production build
+    const isProductionBuild = !__DEV__;
+    
+    if (isProductionBuild) {
+      // Production build with undefined API_ENV is a critical error
+      console.error(`
+🚨 CRITICAL: API_ENV is undefined in production build!
+
+Expected: API_ENV to be set during build
+Actual: API_ENV is undefined
+Config object: ${JSON.stringify(Config, null, 2)}
+
+This is a build configuration error that must be fixed:
+- Check that ENVFILE is set in package.json scripts (should use -DENVFILE=.env.prod for Android builds)
+- Verify .env.prod file exists and contains API_ENV=prod
+- Ensure react-native-config is properly configured
+- Rebuild the app with correct environment configuration
+
+Falling back to staging server for now, but this should NEVER happen in production!
+      `);
+    } else {
+      // Dev/staging builds can fall back to staging for development convenience
+      console.warn(`
+⚠️ WARNING: Environment detection failed in development build
 
 Expected: API_ENV to be set during build
 Actual: API_ENV is undefined
@@ -42,9 +63,10 @@ This indicates a build configuration problem:
 - Check that ENVFILE is set in package.json scripts
 - Verify .env files exist and contain API_ENV
 - Ensure react-native-config is properly configured
-    `);
+      `);
+    }
     
-    // Fallback to staging for production builds to prevent crashes
+    // Fallback to staging (for dev convenience, but should be fixed for production)
     return Config.API_URL || 'https://api.risingpunk.dev';
   } catch (error) {
     console.error('🚨 CRITICAL: Error reading config:', error);
