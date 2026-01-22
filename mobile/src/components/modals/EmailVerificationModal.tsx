@@ -18,8 +18,6 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { API_URL } from '../../config';
 import { useAppSelector } from '../../store/hooks';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
 interface EmailVerificationModalProps {
   visible: boolean;
   userEmail?: string;
@@ -44,6 +42,13 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
   const token = useAppSelector((state) => state.auth.token);
   const hasInitialized = useRef(false);
   const isClosingRef = useRef(false); // Prevent duplicate close calls on Android
+  const isSubmittingRef = useRef(false); // Prevent duplicate submit calls on Android
+  
+  // Dynamic screen dimensions for rotation support
+  const [screenDimensions, setScreenDimensions] = useState(() => {
+    const { width, height } = Dimensions.get('window');
+    return { width, height };
+  });
 
   const markUserAsPrompted = useCallback(async () => {
     try {
@@ -59,6 +64,17 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
     }
   }, [token]);
 
+  // Listen for dimension changes (rotation, split-screen, etc.)
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenDimensions({ width: window.width, height: window.height });
+    });
+    
+    return () => {
+      subscription?.remove();
+    };
+  }, []);
+
   // Reset state when modal opens
   useEffect(() => {
     if (visible && !hasInitialized.current) {
@@ -67,10 +83,12 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
       setIsLoading(false);
       hasInitialized.current = true;
       isClosingRef.current = false; // Reset close guard
+      isSubmittingRef.current = false; // Reset submit guard
       
     } else if (!visible) {
       hasInitialized.current = false;
       isClosingRef.current = false; // Reset close guard when modal closes
+      isSubmittingRef.current = false; // Reset submit guard when modal closes
     }
   }, [visible, userEmail]);
 
@@ -121,12 +139,18 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
   }, [onVerificationSent, onClose]);
 
   const handleSubmit = useCallback(async () => {
+    // Prevent duplicate calls on Android (both onPress and onPressOut may fire)
+    if (isSubmittingRef.current) {
+      return;
+    }
+    
     const validationError = validateEmail(email);
     if (validationError) {
       setError(validationError);
       return;
     }
 
+    isSubmittingRef.current = true;
     setError('');
     setIsLoading(true);
 
@@ -134,6 +158,7 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
       await sendVerificationEmail(email.trim());
     } finally {
       setIsLoading(false);
+      isSubmittingRef.current = false; // Reset submit guard after completion
     }
   }, [email, validateEmail, sendVerificationEmail]);
 
@@ -180,14 +205,6 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
     }
     // On iOS, onPress fires reliably, so this is a no-op
   }, [handleClose]);
-
-  const handleOverlayLayout = useCallback((event: any) => {
-    // Layout callback - no action needed
-  }, []);
-
-  const handleModalContainerLayout = useCallback((event: any) => {
-    // Layout callback - no action needed
-  }, []);
 
   const getErrorMessage = (errorCode: string): string => {
     switch (errorCode) {
@@ -280,7 +297,18 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
             },
             pressed && { opacity: 0.7 }
           ]}
-          onPress={handleSubmit}
+          onPress={() => {
+            // On Android, onPressOut handles the action, but call here too in case it fires
+            // Ref guard prevents duplicate calls
+            if (Platform.OS === 'ios') {
+              handleSubmit();
+            }
+          }}
+          onPressOut={() => {
+            if (Platform.OS === 'android') {
+              handleSubmit();
+            }
+          }}
           disabled={isLoading || !!validateEmail(email)}
         >
           <Text style={[styles.submitText, { color: '#FFFFFF' }]}>
@@ -304,7 +332,10 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
       supportedOrientations={['landscape']}
       presentationStyle="overFullScreen"
     >
-      <View style={styles.overlay} onLayout={handleOverlayLayout} pointerEvents="box-none">
+      <View 
+        style={[styles.overlay, { width: screenDimensions.width, height: screenDimensions.height }]} 
+        pointerEvents="box-none"
+      >
         {Platform.OS === 'ios' ? (
           <KeyboardAvoidingView
             behavior="padding"
@@ -312,8 +343,14 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
             keyboardVerticalOffset={0}
           >
             <View 
-              style={[styles.modalContainer, { backgroundColor: colors.background, borderColor: colors.matrix }]}
-              onLayout={handleModalContainerLayout}
+              style={[
+                styles.modalContainer, 
+                { 
+                  backgroundColor: colors.background, 
+                  borderColor: colors.matrix,
+                  width: Math.min(screenDimensions.width * 0.9, 500),
+                }
+              ]}
               pointerEvents="auto"
             >
               <Pressable
@@ -340,8 +377,14 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
           </KeyboardAvoidingView>
         ) : (
           <View 
-            style={[styles.modalContainer, { backgroundColor: colors.background, borderColor: colors.matrix }]}
-            onLayout={handleModalContainerLayout}
+            style={[
+              styles.modalContainer, 
+              { 
+                backgroundColor: colors.background, 
+                borderColor: colors.matrix,
+                width: Math.min(screenDimensions.width * 0.9, 500),
+              }
+            ]}
             pointerEvents="auto"
           >
             <Pressable
@@ -376,8 +419,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
+    // width and height set dynamically via inline style for rotation support
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -390,7 +432,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContainer: {
-    width: Math.min(SCREEN_WIDTH * 0.9, 500),
+    // width set dynamically via inline style for rotation support
     maxWidth: 500,
     borderRadius: 8,
     borderWidth: 2,

@@ -18,8 +18,6 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { API_URL } from '../../config';
 import { containsBadWordsForHandle } from '../../utils/contentModeration';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
 interface HandleSelectionModalProps {
   visible: boolean;
   onSubmit: (handle: string) => Promise<void>;
@@ -41,6 +39,12 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
   const [isHandleAvailable, setIsHandleAvailable] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const colors = useThemeColors();
+  
+  // Dynamic screen dimensions for rotation support
+  const [screenDimensions, setScreenDimensions] = useState(() => {
+    const { width, height } = Dimensions.get('window');
+    return { width, height };
+  });
   
   // Ref to track the current handle being checked
   const currentHandleRef = useRef('');
@@ -315,6 +319,17 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
     }
   };
 
+  // Listen for dimension changes (rotation, split-screen, etc.)
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenDimensions({ width: window.width, height: window.height });
+    });
+    
+    return () => {
+      subscription?.remove();
+    };
+  }, []);
+
   // Cleanup on unmount or when modal closes
   useEffect(() => {
     if (!visible) {
@@ -335,14 +350,6 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
     }
   }, [visible]);
 
-  const handleOverlayLayout = useCallback((event: any) => {
-    // Layout callback for overlay (no logging needed)
-  }, []);
-
-  const handleModalContainerLayout = useCallback((event: any) => {
-    // Layout callback for modal container (no logging needed)
-  }, []);
-
   return (
     <Modal
       visible={visible}
@@ -355,8 +362,7 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
       presentationStyle="overFullScreen"
     >
       <View 
-        style={styles.overlay} 
-        onLayout={handleOverlayLayout} 
+        style={[styles.overlay, { width: screenDimensions.width, height: screenDimensions.height }]} 
         pointerEvents="box-none"
       >
         {Platform.OS === 'ios' ? (
@@ -366,8 +372,14 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
             keyboardVerticalOffset={0}
           >
             <View 
-              style={[styles.modalContainer, { backgroundColor: colors.background, borderColor: colors.matrix }]}
-              onLayout={handleModalContainerLayout}
+              style={[
+                styles.modalContainer, 
+                { 
+                  backgroundColor: colors.background, 
+                  borderColor: colors.matrix,
+                  width: Math.min(screenDimensions.width * 0.9, 400),
+                }
+              ]}
               pointerEvents="auto"
             >
               <View style={styles.modalContent}>
@@ -494,8 +506,14 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
           </KeyboardAvoidingView>
         ) : (
           <View 
-            style={[styles.modalContainer, { backgroundColor: colors.background, borderColor: colors.matrix }]}
-            onLayout={handleModalContainerLayout}
+            style={[
+              styles.modalContainer, 
+              { 
+                backgroundColor: colors.background, 
+                borderColor: colors.matrix,
+                width: Math.min(screenDimensions.width * 0.9, 400),
+              }
+            ]}
             pointerEvents="auto"
           >
             <View style={styles.modalContent}>
@@ -636,8 +654,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
+    // width and height set dynamically via inline style for rotation support
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -650,7 +667,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContainer: {
-    width: Math.min(SCREEN_WIDTH * 0.9, 400),
+    // width set dynamically via inline style for rotation support
     maxWidth: 400,
     borderRadius: 8,
     borderWidth: 2,
