@@ -10,11 +10,15 @@ import {
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
+  Dimensions,
+  Pressable,
 } from 'react-native';
 import { SIZING, styleGuide } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { API_URL } from '../../config';
 import { useAppSelector } from '../../store/hooks';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface EmailVerificationModalProps {
   visible: boolean;
@@ -61,6 +65,11 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
       setError('');
       setIsLoading(false);
       hasInitialized.current = true;
+      
+      // Debug logging for positioning
+      console.log('📧 EmailVerificationModal - Modal opened');
+      console.log('📧 Screen dimensions:', { width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
+      console.log('📧 Modal visible:', visible);
     } else if (!visible) {
       hasInitialized.current = false;
     }
@@ -137,6 +146,44 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
     }
   }, [error]);
 
+  const handleClose = useCallback(() => {
+    console.log('📧 handleClose called');
+    if (onClose) {
+      markUserAsPrompted();
+      onClose();
+    }
+  }, [onClose, markUserAsPrompted]);
+
+  const handleSkipPress = useCallback(() => {
+    console.log('📧 SKIP FOR NOW button pressed');
+    handleClose();
+  }, [handleClose]);
+
+  const handleSkipPressOut = useCallback(() => {
+    if (Platform.OS === 'android') {
+      console.log('📧 SKIP FOR NOW button pressOut (Android)');
+      handleClose();
+    }
+  }, [handleClose]);
+
+  const handleClosePressOut = useCallback(() => {
+    if (Platform.OS === 'android' && onClose) {
+      markUserAsPrompted();
+      onClose();
+    }
+  }, [onClose, markUserAsPrompted]);
+
+  const handleOverlayLayout = useCallback((event: any) => {
+    const { width, height, x, y } = event.nativeEvent.layout;
+    console.log('📧 Overlay layout:', { width, height, x, y, screenWidth: SCREEN_WIDTH, screenHeight: SCREEN_HEIGHT });
+  }, []);
+
+  const handleModalContainerLayout = useCallback((event: any) => {
+    const { width, height, x, y } = event.nativeEvent.layout;
+    console.log('📧 Modal container layout:', { width, height, x, y });
+    console.log('📧 Expected center X:', SCREEN_WIDTH / 2, 'Actual X:', x, 'Difference:', Math.abs((SCREEN_WIDTH / 2) - (x + width / 2)));
+  }, []);
+
   const getErrorMessage = (errorCode: string): string => {
     switch (errorCode) {
       case 'EMAIL_REQUIRED':
@@ -158,31 +205,33 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
         We need to verify your email address to ensure you can recover your account if needed.
       </Text>
 
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={[
-            styles.input,
-            { 
-              color: colors.text.primary,
-              borderColor: error ? colors.error : colors.matrix,
-              backgroundColor: colors.inputBg || colors.background,
-            }
-          ]}
-          value={email}
-          onChangeText={handleTextChange}
-          placeholder="Enter your email address..."
-          placeholderTextColor={colors.secondary}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="email-address"
-          editable={!isLoading}
-        />
-        {error ? (
-          <Text style={[styles.errorText, { color: colors.error }]}>
-            {getErrorMessage(error)}
-          </Text>
-        ) : null}
-      </View>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={[
+              styles.input,
+              { 
+                color: colors.text.primary,
+                borderColor: error ? colors.error : colors.matrix,
+                backgroundColor: colors.inputBg || colors.background,
+              }
+            ]}
+            value={email}
+            onChangeText={handleTextChange}
+            placeholder="Enter your email address..."
+            placeholderTextColor={colors.secondary}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            editable={!isLoading}
+          />
+          {error ? (
+            <Text style={[styles.errorText, { color: colors.error }]}>
+              {getErrorMessage(error)}
+            </Text>
+          ) : null}
+        </View>
+      </TouchableWithoutFeedback>
 
       <View style={styles.warningContainer}>
         <Text style={[styles.warningText, { color: colors.error }]}>
@@ -192,33 +241,33 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
 
       <View style={styles.buttonContainer}>
         {!isRequired && onClose && (
-          <TouchableOpacity
-            style={[
+          <Pressable
+            style={({ pressed }) => [
               styles.cancelButton,
               { 
                 backgroundColor: colors.background + 'CC',
                 borderColor: colors.text.secondary,
-              }
+              },
+              pressed && { opacity: 0.7 }
             ]}
-            onPress={() => {
-              markUserAsPrompted();
-              onClose();
-            }}
+            onPress={handleSkipPress}
+            onPressOut={handleSkipPressOut}
           >
             <Text style={[styles.cancelText, { color: colors.text.secondary }]}>
               SKIP FOR NOW
             </Text>
-          </TouchableOpacity>
+          </Pressable>
         )}
         
-        <TouchableOpacity
-          style={[
+        <Pressable
+          style={({ pressed }) => [
             styles.submitButton,
             { 
               backgroundColor: isLoading || !!validateEmail(email) ? colors.buttonDisabled : colors.buttonBg,
               borderColor: colors.matrix,
               flex: isRequired ? 1 : 0.6,
-            }
+            },
+            pressed && { opacity: 0.7 }
           ]}
           onPress={handleSubmit}
           disabled={isLoading || !!validateEmail(email)}
@@ -227,7 +276,7 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
             {isLoading ? 'SENDING...' : 'SEND VERIFICATION'}
           </Text>
           <View style={[styles.buttonCorner, { borderColor: colors.matrix }]} />
-        </TouchableOpacity>
+        </Pressable>
       </View>
     </>
   );
@@ -238,46 +287,127 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
       visible={visible}
       transparent={true}
       animationType="fade"
+      onRequestClose={handleClose}
       statusBarTranslucent={true}
+      hardwareAccelerated={true}
       supportedOrientations={['landscape']}
+      presentationStyle="overFullScreen"
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={styles.overlay}>
+      <View style={styles.overlay} onLayout={handleOverlayLayout}>
+        {Platform.OS === 'ios' ? (
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ flex: 1, justifyContent: 'center' }}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+            behavior="padding"
+            style={styles.keyboardAvoidingView}
+            keyboardVerticalOffset={0}
           >
-            <TouchableWithoutFeedback onPress={() => {}}>
-              <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-                <View style={[styles.modalContent, { borderColor: colors.matrix }]}>
-                  {renderEmailInput()}
-                </View>
+            <View 
+              style={[styles.modalContainer, { backgroundColor: colors.background, borderColor: colors.matrix }]}
+              onLayout={handleModalContainerLayout}
+            >
+              <Pressable
+                style={({ pressed }) => [
+                  styles.closeButton,
+                  { backgroundColor: colors.primary, borderColor: colors.secondary },
+                  pressed && { opacity: 0.7 }
+                ]}
+                onPress={handleClose}
+                onPressOut={handleClosePressOut}
+              >
+                <Text style={[styles.closeButtonText, { color: colors.background }]}>×</Text>
+              </Pressable>
+              <View style={styles.modalContent}>
+                {renderEmailInput()}
               </View>
-            </TouchableWithoutFeedback>
+            </View>
           </KeyboardAvoidingView>
-        </View>
-      </TouchableWithoutFeedback>
+        ) : (
+          <View style={styles.keyboardAvoidingView}>
+            <View 
+              style={[styles.modalContainer, { backgroundColor: colors.background, borderColor: colors.matrix }]}
+              onLayout={handleModalContainerLayout}
+            >
+              <Pressable
+                style={({ pressed }) => [
+                  styles.closeButton,
+                  { backgroundColor: colors.primary, borderColor: colors.secondary },
+                  pressed && { opacity: 0.7 }
+                ]}
+                onPress={handleClose}
+                onPressOut={handleClosePressOut}
+              >
+                <Text style={[styles.closeButtonText, { color: colors.background }]}>×</Text>
+              </Pressable>
+              <View style={styles.modalContent}>
+                {renderEmailInput()}
+              </View>
+            </View>
+          </View>
+        )}
+      </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: SIZING.spacing.lg,
+    paddingHorizontal: SIZING.spacing.lg,
+    paddingVertical: SIZING.spacing.lg,
+    zIndex: 10000, // Higher than onboarding zIndex: 1000
+  },
+  keyboardAvoidingView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: SCREEN_WIDTH,
   },
   modalContainer: {
-    width: '100%',
+    width: Math.min(SCREEN_WIDTH * 0.9, 500),
     maxWidth: 500,
     borderRadius: 8,
     borderWidth: 2,
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 12,
+    alignSelf: 'center',
+    marginHorizontal: 'auto',
   },
   modalContent: {
     padding: SIZING.spacing.lg,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: -20,
+    right: -20,
+    width: 40,
+    height: 40,
+    borderRadius: 24,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  closeButtonText: {
+    fontSize: 24,
+    lineHeight: 24,
+    fontWeight: 'bold',
   },
   title: {
     fontSize: SIZING.font.h2,

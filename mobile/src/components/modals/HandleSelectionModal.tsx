@@ -40,6 +40,12 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
   
   // Ref to track the current handle being checked
   const currentHandleRef = useRef('');
+  // Ref to store AbortController for cancelling network requests
+  const abortControllerRef = useRef<AbortController | null>(null);
+  // Ref to store typing debounce timer
+  const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Ref to store bad words check debounce timer
+  const badWordsTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   // Track individual requirements
   const [requirements, setRequirements] = useState({
@@ -68,33 +74,60 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
     return '';
   }, []);
 
-  // Check individual requirements
+  // Check individual requirements (without bad words check - that's debounced separately)
   const checkRequirements = useCallback((value: string) => {
-    const newRequirements = {
+    setRequirements(prev => ({
+      ...prev,
       minLength: value.length >= 5,
       validChars: /^[a-zA-Z0-9!&%^*_]+$/.test(value),
-      noBadWords: !containsBadWordsForHandle(value),
-      unique: false // Will be set by availability check
-    };
-    setRequirements(newRequirements);
+      // Keep noBadWords and unique from previous state - they're updated separately
+    }));
   }, []);
 
-  // Check handle availability in database
+  // Check handle availability in database with timeout and cancellation
   const checkHandleAvailability = useCallback(async (handleToCheck: string) => {
     if (!handleToCheck.trim() || validateHandle(handleToCheck)) {
       setIsHandleAvailable(false);
       return;
     }
 
+    // Cancel any existing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new AbortController for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     try {
       setIsCheckingAvailability(true);
-      const response = await fetch(`${API_URL}/api/auth/check-handle`, {
+      
+      // Create timeout promise (10 seconds)
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          abortController.abort();
+          reject(new Error('Request timeout'));
+        }, 10000);
+      });
+
+      // Create fetch promise
+      const fetchPromise = fetch(`${API_URL}/api/auth/check-handle`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ handle: handleToCheck }),
+        signal: abortController.signal,
       });
+
+      // Race between fetch and timeout
+      const response = await Promise.race([fetchPromise, timeoutPromise]);
+
+      // Check if request was aborted
+      if (abortController.signal.aborted) {
+        return;
+      }
 
       if (response.ok) {
         const data = await response.json();
@@ -105,43 +138,94 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
         setIsHandleAvailable(false);
         setRequirements(prev => ({ ...prev, unique: false }));
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Ignore abort errors
+      if (error.name === 'AbortError' || error.message === 'Request timeout') {
+        return;
+      }
       setIsHandleAvailable(false);
+      setRequirements(prev => ({ ...prev, unique: false }));
     } finally {
-      setIsCheckingAvailability(false);
-      setIsTyping(false);
+      // Only update state if this is still the current request
+      if (abortControllerRef.current === abortController) {
+        setIsCheckingAvailability(false);
+        setIsTyping(false);
+      }
     }
   }, [validateHandle]);
 
   // Real-time requirements checking and availability checking with debouncing
   useEffect(() => {
-    // Check requirements on every keystroke
+    // Clear existing timers
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
+    }
+    if (badWordsTimerRef.current) {
+      clearTimeout(badWordsTimerRef.current);
+    }
+
+    // Check basic requirements on every keystroke (fast checks only)
     checkRequirements(handle);
     
     if (!handle.trim()) {
       setIsHandleAvailable(false);
-      setRequirements(prev => ({ ...prev, unique: false }));
+      setRequirements(prev => ({ 
+        ...prev, 
+        unique: false,
+        noBadWords: true // Empty handle is considered valid for bad words
+      }));
+      setIsTyping(false);
       return;
     }
 
     const validationError = validateHandle(handle);
     if (validationError) {
       setIsHandleAvailable(false);
-      setRequirements(prev => ({ ...prev, unique: false }));
+      setRequirements(prev => ({ 
+        ...prev, 
+        unique: false,
+        // Keep noBadWords as is - don't check if other validation fails
+      }));
+      setIsTyping(false);
       return;
     }
 
     // Update ref to track current handle
     currentHandleRef.current = handle;
 
-    // Debounce the check to avoid excessive API calls
-    const timer = setTimeout(() => {
+    // Debounce bad words check (expensive operation) - only after user stops typing
+    badWordsTimerRef.current = setTimeout(() => {
+      if (currentHandleRef.current === handle) {
+        const hasBadWords = containsBadWordsForHandle(handle);
+        setRequirements(prev => ({ ...prev, noBadWords: !hasBadWords }));
+      }
+    }, 500); // Check after 500ms of no typing
+
+    // Debounce the availability check to avoid excessive API calls
+    const availabilityTimer = setTimeout(() => {
       if (currentHandleRef.current === handle) {
         checkHandleAvailability(handle);
       }
     }, 1000); // Check after 1 second of no typing
 
-    return () => clearTimeout(timer);
+    // Clear typing flag after user stops typing
+    typingTimerRef.current = setTimeout(() => {
+      if (currentHandleRef.current === handle) {
+        setIsTyping(false);
+      }
+    }, 600); // Clear typing flag after 600ms
+
+    return () => {
+      if (availabilityTimer) {
+        clearTimeout(availabilityTimer);
+      }
+      if (typingTimerRef.current) {
+        clearTimeout(typingTimerRef.current);
+      }
+      if (badWordsTimerRef.current) {
+        clearTimeout(badWordsTimerRef.current);
+      }
+    };
   }, [handle, validateHandle, checkHandleAvailability, checkRequirements]);
 
   const handleSubmit = useCallback(async () => {
@@ -165,6 +249,7 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
     if (error) {
       setError('');
     }
+    // Don't update noBadWords here - let the debounced check handle it
   }, [error]);
 
   const getErrorMessage = (errorCode: string): string => {
@@ -185,6 +270,26 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
         return 'Invalid handle';
     }
   };
+
+  // Cleanup on unmount or when modal closes
+  useEffect(() => {
+    if (!visible) {
+      // Cancel any in-flight requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      // Clear all timers
+      if (typingTimerRef.current) {
+        clearTimeout(typingTimerRef.current);
+        typingTimerRef.current = null;
+      }
+      if (badWordsTimerRef.current) {
+        clearTimeout(badWordsTimerRef.current);
+        badWordsTimerRef.current = null;
+      }
+    }
+  }, [visible]);
 
   return (
     <Modal
