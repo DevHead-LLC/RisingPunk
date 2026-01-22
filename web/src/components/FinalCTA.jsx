@@ -3,11 +3,16 @@ import { useScrollAnimation } from '../hooks/useScrollAnimation'
 import { useLocation } from 'react-router-dom'
 import { FaApple } from 'react-icons/fa'
 import { SiGoogleplay } from 'react-icons/si'
+import { trackDownloadClick } from '../utils/trackDownloadClick'
 
 function FinalCTA() {
   const [ref, isVisible] = useScrollAnimation()
   const location = useLocation()
   const isOffersPage = location.pathname === '/offers'
+
+  const handleDownloadClick = (platform) => {
+    trackDownloadClick(platform, 'final_cta_download')
+  }
   
   return (
     <section id="ready-to-dominate" className="final-cta section">
@@ -22,6 +27,7 @@ function FinalCTA() {
               aria-label="Play Now on App Store"
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => handleDownloadClick('ios')}
             >
               <FaApple className="cta-icon" />
               <span>Play Now</span>
@@ -32,6 +38,7 @@ function FinalCTA() {
               aria-label="Play Now on Google Play"
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => handleDownloadClick('android')}
             >
               <SiGoogleplay className="cta-icon" />
               <span>Play Now</span>

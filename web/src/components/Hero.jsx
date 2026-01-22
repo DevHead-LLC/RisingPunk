@@ -2,8 +2,13 @@ import './Hero.css'
 import loginImage from '../assets/images/login.png'
 import { FaApple } from 'react-icons/fa'
 import { SiGoogleplay } from 'react-icons/si'
+import { trackDownloadClick } from '../utils/trackDownloadClick'
 
 function Hero() {
+  const handleDownloadClick = (platform) => {
+    trackDownloadClick(platform, 'hero_download')
+  }
+
   return (
     <section className="hero">
       <div className="hero-container">
@@ -28,6 +33,7 @@ function Hero() {
                 aria-label="Start Playing on App Store"
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => handleDownloadClick('ios')}
               >
                 <FaApple className="cta-icon" />
                 <span>Start Playing</span>
@@ -38,6 +44,7 @@ function Hero() {
                 aria-label="Start Playing on Google Play"
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => handleDownloadClick('android')}
               >
                 <SiGoogleplay className="cta-icon" />
                 <span>Start Playing</span>

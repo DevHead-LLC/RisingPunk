@@ -39,12 +39,12 @@
       const utmMedium = params.get('utm_medium') || '';
       
       // Track redirect event in GA4
-      // Using sendBeacon for reliable delivery even if page unloads quickly
       if (window.gtag) {
         gtag('event', 'smart_redirect', {
           event_category: 'marketing',
           event_label: osType,
           os_type: osType,
+          redirect_destination: osType === 'ios' ? 'app_store' : osType === 'android' ? 'play_store' : 'landing_page',
           utm_source: utmSource,
           utm_campaign: utmCampaign,
           utm_medium: utmMedium,
@@ -57,10 +57,10 @@
       const queryString = params.toString();
       const redirectUrl = queryString ? `${apiUrl}?${queryString}` : apiUrl;
       
-      // Small delay to ensure GA4 event is sent (50ms is imperceptible to users)
+      // Delay to ensure GA4 event is sent (150ms for reliable delivery)
       setTimeout(function() {
         window.location.href = redirectUrl;
-      }, 50);
+      }, 150);
     })();
   </script>
   
