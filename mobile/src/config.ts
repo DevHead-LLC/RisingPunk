@@ -41,7 +41,7 @@ Actual: API_ENV is undefined
 Config object: ${JSON.stringify(Config, null, 2)}
 
 This is a build configuration error that must be fixed:
-- Check that ENVFILE is set in package.json scripts (should use -PENVFILE=.env.prod)
+- Check that ENVFILE is set in package.json scripts (should use -DENVFILE=.env.prod for Android builds)
 - Verify .env.prod file exists and contains API_ENV=prod
 - Ensure react-native-config is properly configured
 - Rebuild the app with correct environment configuration

@@ -43,6 +43,7 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
   const colors = useThemeColors();
   const token = useAppSelector((state) => state.auth.token);
   const hasInitialized = useRef(false);
+  const isClosingRef = useRef(false); // Prevent duplicate close calls on Android
 
   const markUserAsPrompted = useCallback(async () => {
     try {
@@ -65,13 +66,11 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
       setError('');
       setIsLoading(false);
       hasInitialized.current = true;
+      isClosingRef.current = false; // Reset close guard
       
-      // Debug logging for positioning
-      console.log('📧 EmailVerificationModal - Modal opened');
-      console.log('📧 Screen dimensions:', { width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
-      console.log('📧 Modal visible:', visible);
     } else if (!visible) {
       hasInitialized.current = false;
+      isClosingRef.current = false; // Reset close guard when modal closes
     }
   }, [visible, userEmail]);
 
@@ -147,7 +146,13 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
   }, [error]);
 
   const handleClose = useCallback(() => {
-    console.log('📧 handleClose called');
+    // Prevent duplicate calls on Android (both onPress and onPressOut fire)
+    if (isClosingRef.current) {
+      return;
+    }
+    
+    isClosingRef.current = true;
+    
     if (onClose) {
       markUserAsPrompted();
       onClose();
@@ -155,33 +160,33 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
   }, [onClose, markUserAsPrompted]);
 
   const handleSkipPress = useCallback(() => {
-    console.log('📧 SKIP FOR NOW button pressed');
     handleClose();
   }, [handleClose]);
 
   const handleSkipPressOut = useCallback(() => {
+    // On Android, onPressOut fires reliably when onPress may not
+    // Handle action here for Android, ref guard prevents duplicates
     if (Platform.OS === 'android') {
-      console.log('📧 SKIP FOR NOW button pressOut (Android)');
       handleClose();
     }
+    // On iOS, onPress fires reliably, so this is a no-op
   }, [handleClose]);
 
   const handleClosePressOut = useCallback(() => {
-    if (Platform.OS === 'android' && onClose) {
-      markUserAsPrompted();
-      onClose();
+    // On Android, onPressOut fires reliably when onPress may not
+    // Handle action here for Android, ref guard prevents duplicates
+    if (Platform.OS === 'android') {
+      handleClose();
     }
-  }, [onClose, markUserAsPrompted]);
+    // On iOS, onPress fires reliably, so this is a no-op
+  }, [handleClose]);
 
   const handleOverlayLayout = useCallback((event: any) => {
-    const { width, height, x, y } = event.nativeEvent.layout;
-    console.log('📧 Overlay layout:', { width, height, x, y, screenWidth: SCREEN_WIDTH, screenHeight: SCREEN_HEIGHT });
+    // Layout callback - no action needed
   }, []);
 
   const handleModalContainerLayout = useCallback((event: any) => {
-    const { width, height, x, y } = event.nativeEvent.layout;
-    console.log('📧 Modal container layout:', { width, height, x, y });
-    console.log('📧 Expected center X:', SCREEN_WIDTH / 2, 'Actual X:', x, 'Difference:', Math.abs((SCREEN_WIDTH / 2) - (x + width / 2)));
+    // Layout callback - no action needed
   }, []);
 
   const getErrorMessage = (errorCode: string): string => {
@@ -250,7 +255,13 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
               },
               pressed && { opacity: 0.7 }
             ]}
-            onPress={handleSkipPress}
+            onPress={() => {
+              // On Android, onPressOut handles the action, but call here too in case it fires
+              // Ref guard prevents duplicate calls
+              if (Platform.OS === 'ios') {
+                handleSkipPress();
+              }
+            }}
             onPressOut={handleSkipPressOut}
           >
             <Text style={[styles.cancelText, { color: colors.text.secondary }]}>
@@ -293,7 +304,7 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
       supportedOrientations={['landscape']}
       presentationStyle="overFullScreen"
     >
-      <View style={styles.overlay} onLayout={handleOverlayLayout}>
+      <View style={styles.overlay} onLayout={handleOverlayLayout} pointerEvents="box-none">
         {Platform.OS === 'ios' ? (
           <KeyboardAvoidingView
             behavior="padding"
@@ -303,6 +314,7 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
             <View 
               style={[styles.modalContainer, { backgroundColor: colors.background, borderColor: colors.matrix }]}
               onLayout={handleModalContainerLayout}
+              pointerEvents="auto"
             >
               <Pressable
                 style={({ pressed }) => [
@@ -310,7 +322,13 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
                   { backgroundColor: colors.primary, borderColor: colors.secondary },
                   pressed && { opacity: 0.7 }
                 ]}
-                onPress={handleClose}
+                onPress={() => {
+                  console.log('📱 EmailVerificationModal - Close button onPress (iOS)');
+                  handleClose();
+                }}
+                onPressIn={() => {
+                  console.log('📱 EmailVerificationModal - Close button onPressIn (iOS)');
+                }}
                 onPressOut={handleClosePressOut}
               >
                 <Text style={[styles.closeButtonText, { color: colors.background }]}>×</Text>
@@ -321,25 +339,30 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
             </View>
           </KeyboardAvoidingView>
         ) : (
-          <View style={styles.keyboardAvoidingView}>
-            <View 
-              style={[styles.modalContainer, { backgroundColor: colors.background, borderColor: colors.matrix }]}
-              onLayout={handleModalContainerLayout}
+          <View 
+            style={[styles.modalContainer, { backgroundColor: colors.background, borderColor: colors.matrix }]}
+            onLayout={handleModalContainerLayout}
+            pointerEvents="auto"
+          >
+            <Pressable
+              style={({ pressed }) => [
+                styles.closeButton,
+                { backgroundColor: colors.primary, borderColor: colors.secondary },
+                pressed && { opacity: 0.7 }
+              ]}
+              onPress={() => {
+                // On Android, onPressOut handles the action, but call here too in case it fires
+                // Ref guard prevents duplicate calls
+                if (Platform.OS === 'ios') {
+                  handleClose();
+                }
+              }}
+              onPressOut={handleClosePressOut}
             >
-              <Pressable
-                style={({ pressed }) => [
-                  styles.closeButton,
-                  { backgroundColor: colors.primary, borderColor: colors.secondary },
-                  pressed && { opacity: 0.7 }
-                ]}
-                onPress={handleClose}
-                onPressOut={handleClosePressOut}
-              >
-                <Text style={[styles.closeButtonText, { color: colors.background }]}>×</Text>
-              </Pressable>
-              <View style={styles.modalContent}>
-                {renderEmailInput()}
-              </View>
+              <Text style={[styles.closeButtonText, { color: colors.background }]}>×</Text>
+            </Pressable>
+            <View style={styles.modalContent}>
+              {renderEmailInput()}
             </View>
           </View>
         )}
@@ -353,22 +376,18 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
-    right: 0,
-    bottom: 0,
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: SIZING.spacing.lg,
-    paddingVertical: SIZING.spacing.lg,
+    padding: SIZING.spacing.lg,
     zIndex: 10000, // Higher than onboarding zIndex: 1000
   },
   keyboardAvoidingView: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    width: SCREEN_WIDTH,
   },
   modalContainer: {
     width: Math.min(SCREEN_WIDTH * 0.9, 500),
@@ -381,8 +400,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 12,
-    alignSelf: 'center',
-    marginHorizontal: 'auto',
   },
   modalContent: {
     padding: SIZING.spacing.lg,
