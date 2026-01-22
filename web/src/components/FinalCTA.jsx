@@ -3,6 +3,7 @@ import { useScrollAnimation } from '../hooks/useScrollAnimation'
 import { useLocation } from 'react-router-dom'
 import { FaApple } from 'react-icons/fa'
 import { SiGoogleplay } from 'react-icons/si'
+import { trackDownloadClick } from '../utils/trackDownloadClick'
 
 function FinalCTA() {
   const [ref, isVisible] = useScrollAnimation()
@@ -10,15 +11,7 @@ function FinalCTA() {
   const isOffersPage = location.pathname === '/offers'
 
   const handleDownloadClick = (platform) => {
-    // Track download click in GA4
-    if (window.gtag) {
-      const eventName = platform === 'ios' ? 'clicked_ios_download' : 'clicked_android_download'
-      window.gtag('event', eventName, {
-        event_category: 'engagement',
-        event_label: 'final_cta_download',
-        value: 1
-      })
-    }
+    trackDownloadClick(platform, 'final_cta_download')
   }
   
   return (

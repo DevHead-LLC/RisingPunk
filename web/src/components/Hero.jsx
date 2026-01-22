@@ -2,18 +2,11 @@ import './Hero.css'
 import loginImage from '../assets/images/login.png'
 import { FaApple } from 'react-icons/fa'
 import { SiGoogleplay } from 'react-icons/si'
+import { trackDownloadClick } from '../utils/trackDownloadClick'
 
 function Hero() {
   const handleDownloadClick = (platform) => {
-    // Track download click in GA4
-    if (window.gtag) {
-      const eventName = platform === 'ios' ? 'clicked_ios_download' : 'clicked_android_download'
-      window.gtag('event', eventName, {
-        event_category: 'engagement',
-        event_label: 'hero_download',
-        value: 1
-      })
-    }
+    trackDownloadClick(platform, 'hero_download')
   }
 
   return (
