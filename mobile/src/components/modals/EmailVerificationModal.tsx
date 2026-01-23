@@ -18,6 +18,10 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { API_URL } from '../../config';
 import { useAppSelector } from '../../store/hooks';
 
+// Module-level constants for screen dimensions (like TaskGuideModal)
+// This ensures dimensions are always available, even on first render in production builds
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
 interface EmailVerificationModalProps {
   visible: boolean;
   userEmail?: string;
@@ -333,7 +337,10 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
       presentationStyle="overFullScreen"
     >
       <View 
-        style={[styles.overlay, { width: screenDimensions.width, height: screenDimensions.height }]} 
+        style={[styles.overlay, { 
+          width: screenDimensions.width || SCREEN_WIDTH, 
+          height: screenDimensions.height || SCREEN_HEIGHT 
+        }]} 
         pointerEvents="box-none"
       >
         {Platform.OS === 'ios' ? (
@@ -348,7 +355,7 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
                 { 
                   backgroundColor: colors.background, 
                   borderColor: colors.matrix,
-                  width: Math.min(screenDimensions.width * 0.9, 500),
+                  width: Math.min((screenDimensions.width || SCREEN_WIDTH) * 0.9, 500),
                 }
               ]}
               pointerEvents="auto"
@@ -382,7 +389,7 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
               { 
                 backgroundColor: colors.background, 
                 borderColor: colors.matrix,
-                width: Math.min(screenDimensions.width * 0.9, 500),
+                width: Math.min((screenDimensions.width || SCREEN_WIDTH) * 0.9, 500),
               }
             ]}
             pointerEvents="auto"
@@ -419,7 +426,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
+    right: 0,
+    bottom: 0,
     // width and height set dynamically via inline style for rotation support
+    // Fallback to constants if state not initialized (production builds)
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
