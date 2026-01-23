@@ -32,7 +32,6 @@ import { PrivacyPolicyModal } from '../components/profile/PrivacyPolicyModal';
 import { TermsOfServiceModal } from '../components/profile/TermsOfServiceModal';
 import { DeleteAccountModal } from '../components/profile/DeleteAccountModal';
 import { HandleSelectionModal } from '../components/modals/HandleSelectionModal';
-import { BuildInfoCard } from '../components/profile/BuildInfoCard';
 
 interface BotStats {
   role: string;
@@ -1215,9 +1214,6 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                   </TouchableOpacity>
                 </Animated.View>
               </View>
-
-              {/* Build Information Section */}
-              <BuildInfoCard />
             </ScrollView>
           ) : activeTab === 'account' ? (
             <ScrollView style={styles.settingsContainer} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContentContainer}>

@@ -82,38 +82,45 @@ const AppContent = memo(() => {
   useEffect(() => {
     dispatch(loadStoredAuth());
     
-    // Log environment and build info on app startup
+    // Log environment and build info on app startup (development only for verbose logs)
     const logStartupInfo = async () => {
       try {
         const envInfo = getEnvironmentInfo();
         const buildInfo = await getBuildInfo();
         
-        console.log('========================================');
-        console.log('🚀 APP STARTUP - BUILD & ENVIRONMENT INFO');
-        console.log('========================================');
-        console.log('Build Info:');
-        console.log(`  - Version Code: ${buildInfo.versionCode}`);
-        console.log(`  - Version Name: ${buildInfo.versionName}`);
-        console.log(`  - Debug Build: ${buildInfo.debug}`);
-        console.log('Environment Info:');
-        console.log(`  - API_ENV: ${envInfo.apiEnv}`);
-        console.log(`  - API_URL: ${envInfo.apiUrl}`);
-        console.log(`  - Production Build: ${envInfo.isProductionBuild}`);
-        console.log(`  - Dev Mode: ${envInfo.isDevMode}`);
-        console.log('Config Object:');
-        console.log(JSON.stringify(envInfo.configObject, null, 2));
+        // Verbose logging only in development
+        if (__DEV__) {
+          console.log('========================================');
+          console.log('🚀 APP STARTUP - BUILD & ENVIRONMENT INFO');
+          console.log('========================================');
+          console.log('Build Info:');
+          console.log(`  - Version Code: ${buildInfo.versionCode}`);
+          console.log(`  - Version Name: ${buildInfo.versionName}`);
+          console.log(`  - Debug Build: ${buildInfo.debug}`);
+          console.log('Environment Info:');
+          console.log(`  - API_ENV: ${envInfo.apiEnv}`);
+          console.log(`  - API_URL: ${envInfo.apiUrl}`);
+          console.log(`  - Production Build: ${envInfo.isProductionBuild}`);
+          console.log(`  - Dev Mode: ${envInfo.isDevMode}`);
+          console.log('Config Object:');
+          console.log(JSON.stringify(envInfo.configObject, null, 2));
+        }
         
-        // Critical warning for production builds
+        // Critical warning for production builds (always log errors)
         if (envInfo.isProductionBuild) {
           if (envInfo.apiEnv !== 'prod' || !envInfo.apiUrl.includes('risingpunk.com')) {
             console.error('🚨🚨🚨 CRITICAL: Production build NOT using production environment!');
             console.error(`Expected: API_ENV=prod, API_URL=https://api.risingpunk.com`);
             console.error(`Actual: API_ENV=${envInfo.apiEnv}, API_URL=${envInfo.apiUrl}`);
-          } else {
+          } else if (__DEV__) {
+            // Only log success in development to reduce production console noise
             console.log('✅ Production build verified: Using production environment');
           }
         }
-        console.log('========================================');
+        
+        if (__DEV__) {
+          console.log('========================================');
+        }
       } catch (error) {
         console.error('Failed to log startup info:', error);
       }

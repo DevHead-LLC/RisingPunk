@@ -227,31 +227,33 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
         We need to verify your email address to ensure you can recover your account if needed.
       </Text>
 
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={[
-            styles.input,
-            { 
-              color: colors.text.primary,
-              borderColor: error ? colors.error : colors.matrix,
-              backgroundColor: colors.inputBg || colors.background,
-            }
-          ]}
-          value={email}
-          onChangeText={handleTextChange}
-          placeholder="Enter your email address..."
-          placeholderTextColor={colors.secondary}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="email-address"
-          editable={!isLoading}
-        />
-        {error ? (
-          <Text style={[styles.errorText, { color: colors.error }]}>
-            {getErrorMessage(error)}
-          </Text>
-        ) : null}
-      </View>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={[
+              styles.input,
+              { 
+                color: colors.text.primary,
+                borderColor: error ? colors.error : colors.matrix,
+                backgroundColor: colors.inputBg || colors.background,
+              }
+            ]}
+            value={email}
+            onChangeText={handleTextChange}
+            placeholder="Enter your email address..."
+            placeholderTextColor={colors.secondary}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            editable={!isLoading}
+          />
+          {error ? (
+            <Text style={[styles.errorText, { color: colors.error }]}>
+              {getErrorMessage(error)}
+            </Text>
+          ) : null}
+        </View>
+      </TouchableWithoutFeedback>
 
       <View style={styles.warningContainer}>
         <Text style={[styles.warningText, { color: colors.error }]}>

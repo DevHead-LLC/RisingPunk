@@ -178,12 +178,6 @@ android {
         }
     }
     
-    // Configure packaging options for 16 KB page size support
-    packagingOptions {
-        jniLibs {
-            useLegacyPackaging = false
-        }
-    }
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
@@ -226,10 +220,14 @@ android {
     }
     
     // CRITICAL: Explicitly configure native library packaging for 16 KB page size support
+    // This is the NEW API (AGP 8.6+) - replaces deprecated packagingOptions
     // This works in conjunction with android.bundle.enableUncompressedNativeLibs=true in gradle.properties
+    // 
+    // NOTE: packagingOptions (deprecated) was removed to avoid duplication.
+    // The new 'packaging' block is the correct API for AGP 8.6+ and React Native 0.76.6+
     packaging {
         jniLibs {
-            useLegacyPackaging = false  // Required for 16 KB page size support
+            useLegacyPackaging = false  // Required for 16 KB page size support - must be false
         }
     }
 }
@@ -245,31 +243,36 @@ afterEvaluate {
                 throw new GradleException("Release signing requires keystore.properties file at ${keystorePropertiesFile.absolutePath}")
             }
             
-            // CRITICAL: Verify environment file is set correctly for production builds
+            // CRITICAL: Verify environment file is set correctly for ALL release builds (both bundle and assemble)
             // Read ENVFILE the same way react-native-config does
             def taskEnvFile = System.env['ENVFILE'] ?: System.getProperty('ENVFILE') ?: project.findProperty("ENVFILE")
             def isBundleRelease = name.contains("bundle") && name.contains("release")
+            def isAssembleRelease = name.contains("assemble") && name.contains("release")
+            def isReleaseBuild = isBundleRelease || isAssembleRelease
             
-            if (isBundleRelease) {
+            // Run validation for ALL release builds (both AAB and APK)
+            if (isReleaseBuild) {
                 println ""
                 println "=========================================="
                 println "🔍 BUILD ENVIRONMENT VERIFICATION (Execution Phase)"
                 println "=========================================="
                 println "Task: ${task.name}"
+                println "Build Type: ${isBundleRelease ? 'AAB (Bundle)' : 'APK (Assemble)'}"
                 println "ENVFILE from System.env: ${System.env['ENVFILE'] ?: 'NOT SET'}"
                 println "ENVFILE from System.getProperty: ${System.getProperty('ENVFILE') ?: 'NOT SET'}"
                 println "ENVFILE from project property: ${project.findProperty('ENVFILE') ?: 'NOT SET'}"
                 println "ENVFILE resolved: ${taskEnvFile ?: 'NOT SET'}"
                 
                 if (!taskEnvFile) {
+                    def taskType = isBundleRelease ? "bundleRelease" : "assembleRelease"
                     throw new GradleException("""
-🚨 CRITICAL ERROR: ENVFILE is not set for release bundle build!
+🚨 CRITICAL ERROR: ENVFILE is not set for release build!
 
 For PRODUCTION builds, you MUST use:
-  ./gradlew bundleRelease -DENVFILE=.env.prod
+  ./gradlew ${taskType} -DENVFILE=.env.prod
 
 For STAGING builds, you MUST use:
-  ./gradlew bundleRelease -DENVFILE=.env.staging
+  ./gradlew ${taskType} -DENVFILE=.env.staging
 
 Current ENVFILE: ${taskEnvFile ?: 'NOT SET'}
 This build will FAIL to prevent incorrect environment deployment.
@@ -361,8 +364,11 @@ Actual: API_ENV=${apiEnv} in ${taskEnvFile}
                     warnings.add("android.bundle.enableUncompressedNativeLibs is not 'true' in gradle.properties")
                     configOk = false
                 }
-                if (!rootProject.ext.ndkVersion.startsWith("27.") && !rootProject.ext.ndkVersion.startsWith("28.")) {
-                    warnings.add("NDK version ${rootProject.ext.ndkVersion} is not r27+ (required for 16 KB support)")
+                // Parse NDK version to check if it's r27+ (required for 16 KB page size support)
+                def ndkVersionParts = rootProject.ext.ndkVersion.split("\\.")
+                def ndkMajorVersion = ndkVersionParts[0].toInteger()
+                if (ndkMajorVersion < 27) {
+                    warnings.add("NDK version ${rootProject.ext.ndkVersion} is not r27+ (required for 16 KB support). Current major version: ${ndkMajorVersion}")
                     configOk = false
                 }
                 if (rootProject.ext.targetSdkVersion < 35) {

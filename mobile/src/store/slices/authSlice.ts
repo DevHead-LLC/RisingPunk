@@ -154,12 +154,14 @@ export const registerUser = createAsyncThunk(
   'auth/register',
   async (credentials: { email: string; accessKey: string }, { rejectWithValue }) => {
     try {
-      // CRITICAL: Log the API URL being used for registration
-      console.log('🔴 REGISTRATION API CALL:');
-      console.log(`  - API_URL: ${API_URL}`);
-      console.log(`  - Full URL: ${API_URL}/api/auth/register`);
-      console.log(`  - Config.API_ENV: ${Config.API_ENV || 'undefined'}`);
-      console.log(`  - Config.API_URL: ${Config.API_URL || 'undefined'}`);
+      // CRITICAL: Log the API URL being used for registration (development only)
+      if (__DEV__) {
+        console.log('🔴 REGISTRATION API CALL:');
+        console.log(`  - API_URL: ${API_URL}`);
+        console.log(`  - Full URL: ${API_URL}/api/auth/register`);
+        console.log(`  - Config.API_ENV: ${Config.API_ENV || 'undefined'}`);
+        console.log(`  - Config.API_URL: ${Config.API_URL || 'undefined'}`);
+      }
       
       const response = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
@@ -275,12 +277,14 @@ export const googleSignUpUser = createAsyncThunk(
   'auth/googleSignUp',
   async (idToken: string, { rejectWithValue, dispatch }) => {
     try {
-      // CRITICAL: Log the API URL being used for Google sign-up
-      console.log('🔴 GOOGLE SIGN-UP API CALL:');
-      console.log(`  - API_URL: ${API_URL}`);
-      console.log(`  - Full URL: ${API_URL}/api/auth/google-signup`);
-      console.log(`  - Config.API_ENV: ${Config.API_ENV || 'undefined'}`);
-      console.log(`  - Config.API_URL: ${Config.API_URL || 'undefined'}`);
+      // CRITICAL: Log the API URL being used for Google sign-up (development only)
+      if (__DEV__) {
+        console.log('🔴 GOOGLE SIGN-UP API CALL:');
+        console.log(`  - API_URL: ${API_URL}`);
+        console.log(`  - Full URL: ${API_URL}/api/auth/google-signup`);
+        console.log(`  - Config.API_ENV: ${Config.API_ENV || 'undefined'}`);
+        console.log(`  - Config.API_URL: ${Config.API_URL || 'undefined'}`);
+      }
       
       const response = await fetch(`${API_URL}/api/auth/google-signup`, {
         method: 'POST',
