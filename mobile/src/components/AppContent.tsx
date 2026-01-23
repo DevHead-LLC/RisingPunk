@@ -112,10 +112,9 @@ const AppContent = memo(() => {
             console.error('🚨🚨🚨 CRITICAL: Production build NOT using production environment!');
             console.error(`Expected: API_ENV=prod, API_URL=https://api.risingpunk.com`);
             console.error(`Actual: API_ENV=${envInfo.apiEnv}, API_URL=${envInfo.apiUrl}`);
-          } else if (__DEV__) {
-            // Only log success in development to reduce production console noise
-            console.log('✅ Production build verified: Using production environment');
           }
+          // Note: Success case is intentionally not logged in production to reduce console noise
+          // Errors are always logged to help diagnose production issues
         }
         
         if (__DEV__) {
