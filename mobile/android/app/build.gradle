@@ -3,8 +3,50 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 apply plugin: "com.google.gms.google-services"
 
+// CRITICAL: Set ENVFILE before react-native-config loads it
+// This ensures dotenv.gradle reads the correct file
+def envFile = System.env['ENVFILE'] ?: System.getProperty('ENVFILE') ?: project.findProperty("ENVFILE")
+if (envFile) {
+    // Make sure ENVFILE is available to react-native-config
+    System.setProperty('ENVFILE', envFile)
+    project.ext.set('ENVFILE', envFile)
+    println "🔧 Setting ENVFILE for react-native-config: ${envFile}"
+} else {
+    println "⚠️ WARNING: ENVFILE not set before react-native-config load!"
+    println "   This may cause react-native-config to use default .env file"
+}
+
 // react-native-config configuration
 apply from: project(':react-native-config').projectDir.getPath() + "/dotenv.gradle"
+
+// Log environment info after react-native-config loads it (configuration phase)
+gradle.projectsEvaluated {
+    // Reuse envFile from outer scope, or read it again if not set
+    def configEnvFile = envFile ?: System.env['ENVFILE'] ?: System.getProperty('ENVFILE') ?: project.findProperty("ENVFILE")
+    if (configEnvFile) {
+        println ""
+        println "=========================================="
+        println "🔍 ENVIRONMENT FILE DETECTED (Configuration Phase)"
+        println "=========================================="
+        println "ENVFILE: ${configEnvFile}"
+        
+        // Verify the .env file exists and read its contents
+        def envFilePath = new File(project.rootDir.parent, configEnvFile)
+        if (envFilePath.exists()) {
+            def envProps = new Properties()
+            envFilePath.withInputStream { envProps.load(it) }
+            def apiEnv = envProps.getProperty("API_ENV", "").trim()
+            def apiUrl = envProps.getProperty("API_URL", "").trim()
+            println "Environment file: ${envFilePath.absolutePath}"
+            println "API_ENV: ${apiEnv}"
+            println "API_URL: ${apiUrl}"
+        } else {
+            println "⚠️ WARNING: Environment file not found at ${envFilePath.absolutePath}"
+        }
+        println "=========================================="
+        println ""
+    }
+}
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -92,16 +134,50 @@ android {
         applicationId "com.devheadllc.risingpunk"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 46
+        versionCode 51
         versionName "1.0"
-    }
-    
-    // Configure packaging options for 16 KB page size support
-    packagingOptions {
-        jniLibs {
-            useLegacyPackaging = false
+        
+        // CRITICAL: Verify react-native-config values are being set
+        // These should be set by dotenv.gradle, but we verify here
+        if (project.hasProperty('env')) {
+            println ""
+            println "✅ react-native-config env loaded: ${project.env.size()} variables"
+            project.env.each { k, v ->
+                // Only show first 50 chars of value for security
+                def displayValue = v.length() > 50 ? v.substring(0, 50) + "..." : v
+                println "  - ${k}: ${displayValue}"
+            }
+            println ""
+            
+            // CRITICAL: Verify API_ENV is set correctly
+            if (project.env.containsKey('API_ENV')) {
+                def apiEnv = project.env['API_ENV']
+                println "✅ API_ENV will be set in BuildConfig: ${apiEnv}"
+                if (apiEnv != 'prod' && apiEnv != 'staging' && apiEnv != 'dev') {
+                    println "⚠️ WARNING: API_ENV has unexpected value: ${apiEnv}"
+                }
+            } else {
+                println "🚨 CRITICAL ERROR: API_ENV not found in env variables!"
+                println "   This will cause the app to use wrong environment!"
+            }
+            
+            // Verify API_URL is set
+            if (project.env.containsKey('API_URL')) {
+                def apiUrl = project.env['API_URL']
+                println "✅ API_URL will be set in BuildConfig: ${apiUrl}"
+            } else {
+                println "⚠️ WARNING: API_URL not found in env variables!"
+            }
+            println ""
+        } else {
+            println ""
+            println "🚨 CRITICAL ERROR: react-native-config env not found!"
+            println "   BuildConfig will NOT have environment variables!"
+            println "   The app will fail to determine correct API URL!"
+            println ""
         }
     }
+    
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
@@ -142,6 +218,18 @@ android {
             enableSplit = true
         }
     }
+    
+    // CRITICAL: Explicitly configure native library packaging for 16 KB page size support
+    // This is the NEW API (AGP 8.6+) - replaces deprecated packagingOptions
+    // This works in conjunction with android.bundle.enableUncompressedNativeLibs=true in gradle.properties
+    // 
+    // NOTE: packagingOptions (deprecated) was removed to avoid duplication.
+    // The new 'packaging' block is the correct API for AGP 8.6+ and React Native 0.76.6+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false  // Required for 16 KB page size support - must be false
+        }
+    }
 }
 
 afterEvaluate {
@@ -153,6 +241,153 @@ afterEvaluate {
         task.doFirst {
             if (!keystorePropertiesFile.exists()) {
                 throw new GradleException("Release signing requires keystore.properties file at ${keystorePropertiesFile.absolutePath}")
+            }
+            
+            // CRITICAL: Verify environment file is set correctly for ALL release builds (both bundle and assemble)
+            // Read ENVFILE the same way react-native-config does
+            def taskEnvFile = System.env['ENVFILE'] ?: System.getProperty('ENVFILE') ?: project.findProperty("ENVFILE")
+            def isBundleRelease = name.contains("bundle") && name.contains("release")
+            def isAssembleRelease = name.contains("assemble") && name.contains("release")
+            def isReleaseBuild = isBundleRelease || isAssembleRelease
+            
+            // Run validation for ALL release builds (both AAB and APK)
+            if (isReleaseBuild) {
+                println ""
+                println "=========================================="
+                println "🔍 BUILD ENVIRONMENT VERIFICATION (Execution Phase)"
+                println "=========================================="
+                println "Task: ${task.name}"
+                println "Build Type: ${isBundleRelease ? 'AAB (Bundle)' : 'APK (Assemble)'}"
+                println "ENVFILE from System.env: ${System.env['ENVFILE'] ?: 'NOT SET'}"
+                println "ENVFILE from System.getProperty: ${System.getProperty('ENVFILE') ?: 'NOT SET'}"
+                println "ENVFILE from project property: ${project.findProperty('ENVFILE') ?: 'NOT SET'}"
+                println "ENVFILE resolved: ${taskEnvFile ?: 'NOT SET'}"
+                
+                if (!taskEnvFile) {
+                    def taskType = isBundleRelease ? "bundleRelease" : "assembleRelease"
+                    throw new GradleException("""
+🚨 CRITICAL ERROR: ENVFILE is not set for release build!
+
+For PRODUCTION builds, you MUST use:
+  ./gradlew ${taskType} -DENVFILE=.env.prod
+
+For STAGING builds, you MUST use:
+  ./gradlew ${taskType} -DENVFILE=.env.staging
+
+Current ENVFILE: ${taskEnvFile ?: 'NOT SET'}
+This build will FAIL to prevent incorrect environment deployment.
+                    """)
+                }
+                
+                // Verify the .env file exists
+                def envFilePath = new File(project.rootDir.parent, taskEnvFile)
+                if (!envFilePath.exists()) {
+                    throw new GradleException("""
+🚨 CRITICAL ERROR: Environment file not found!
+
+Expected file: ${envFilePath.absolutePath}
+ENVFILE specified: ${taskEnvFile}
+
+Please verify the .env file exists in the mobile/ directory.
+                    """)
+                }
+                
+                // Read and verify API_ENV from the file
+                def envProps = new Properties()
+                envFilePath.withInputStream { envProps.load(it) }
+                def apiEnv = envProps.getProperty("API_ENV", "").trim()
+                def apiUrl = envProps.getProperty("API_URL", "").trim()
+                
+                println "Environment file: ${envFilePath.absolutePath}"
+                println "API_ENV from file: ${apiEnv}"
+                println "API_URL from file: ${apiUrl}"
+                
+                // Verify production builds use production environment
+                if (taskEnvFile.contains("prod") || taskEnvFile.contains(".env.prod")) {
+                    if (apiEnv != "prod") {
+                        throw new GradleException("""
+🚨 CRITICAL ERROR: Production build using wrong environment!
+
+Expected: API_ENV=prod in .env.prod
+Actual: API_ENV=${apiEnv} in ${taskEnvFile}
+
+This will cause the app to connect to the wrong server!
+                        """)
+                    }
+                    if (!apiUrl.contains("risingpunk.com")) {
+                        throw new GradleException("""
+🚨 CRITICAL ERROR: Production build using wrong API URL!
+
+Expected: API_URL=https://api.risingpunk.com in .env.prod
+Actual: API_URL=${apiUrl} in ${taskEnvFile}
+
+This will cause the app to connect to the wrong server!
+                        """)
+                    }
+                    println "✅ PRODUCTION BUILD VERIFIED"
+                    println "   - API_ENV: ${apiEnv}"
+                    println "   - API_URL: ${apiUrl}"
+                } else if (taskEnvFile.contains("staging") || taskEnvFile.contains(".env.staging")) {
+                    if (apiEnv != "staging") {
+                        throw new GradleException("""
+🚨 CRITICAL ERROR: Staging build using wrong environment!
+
+Expected: API_ENV=staging in .env.staging
+Actual: API_ENV=${apiEnv} in ${taskEnvFile}
+                        """)
+                    }
+                    println "✅ STAGING BUILD VERIFIED"
+                    println "   - API_ENV: ${apiEnv}"
+                    println "   - API_URL: ${apiUrl}"
+                }
+                
+                println "Version Code: ${defaultConfig.versionCode}"
+                println "Version Name: ${defaultConfig.versionName}"
+                
+                // CRITICAL: Verify 16 KB page size configuration
+                println ""
+                println "🔍 16 KB PAGE SIZE CONFIGURATION VERIFICATION"
+                println "=========================================="
+                // Read from gradle.properties (project properties are automatically loaded)
+                def enableUncompressedNativeLibs = project.findProperty('android.bundle.enableUncompressedNativeLibs')
+                
+                println "android.bundle.enableUncompressedNativeLibs: ${enableUncompressedNativeLibs ?: 'NOT SET (check gradle.properties)'}"
+                println "packaging.jniLibs.useLegacyPackaging: false (configured in build.gradle)"
+                println "NDK Version: ${rootProject.ext.ndkVersion}"
+                println "targetSdkVersion: ${rootProject.ext.targetSdkVersion}"
+                println "compileSdkVersion: ${rootProject.ext.compileSdkVersion}"
+                
+                def configOk = true
+                def warnings = []
+                
+                if (enableUncompressedNativeLibs != 'true') {
+                    warnings.add("android.bundle.enableUncompressedNativeLibs is not 'true' in gradle.properties")
+                    configOk = false
+                }
+                // Parse NDK version to check if it's r27+ (required for 16 KB page size support)
+                def ndkVersionParts = rootProject.ext.ndkVersion.split("\\.")
+                def ndkMajorVersion = ndkVersionParts[0].toInteger()
+                if (ndkMajorVersion < 27) {
+                    warnings.add("NDK version ${rootProject.ext.ndkVersion} is not r27+ (required for 16 KB support). Current major version: ${ndkMajorVersion}")
+                    configOk = false
+                }
+                if (rootProject.ext.targetSdkVersion < 35) {
+                    warnings.add("targetSdkVersion ${rootProject.ext.targetSdkVersion} is less than 35 (Android 15)")
+                    configOk = false
+                }
+                
+                if (configOk) {
+                    println "✅ 16 KB page size configuration verified - All settings correct"
+                } else {
+                    println "🚨 WARNING: 16 KB page size configuration has issues!"
+                    warnings.each { warning ->
+                        println "   - ${warning}"
+                    }
+                    println "   Google Play Console may reject this build!"
+                    println "   See taskItems/android/deployment/16kb-page-size-fix.md for fix guide"
+                }
+                println "=========================================="
+                println ""
             }
         }
     }

@@ -20,6 +20,8 @@ import { GlobalErrorModal } from './modals/GlobalErrorModal';
 import { AccountSwitchedModal } from './modals/AccountSwitchedModal';
 import { NotificationBanner } from './common/NotificationBanner';
 import { globalErrorHandler } from '../services/GlobalErrorHandler';
+import { getEnvironmentInfo } from '../config';
+import { getBuildInfo } from '../utils/BuildInfo';
 
 const AppContent = memo(() => {
   const dispatch = useAppDispatch();
@@ -79,6 +81,51 @@ const AppContent = memo(() => {
 
   useEffect(() => {
     dispatch(loadStoredAuth());
+    
+    // Log environment and build info on app startup (development only for verbose logs)
+    const logStartupInfo = async () => {
+      try {
+        const envInfo = getEnvironmentInfo();
+        const buildInfo = await getBuildInfo();
+        
+        // Verbose logging only in development
+        if (__DEV__) {
+          console.log('========================================');
+          console.log('🚀 APP STARTUP - BUILD & ENVIRONMENT INFO');
+          console.log('========================================');
+          console.log('Build Info:');
+          console.log(`  - Version Code: ${buildInfo.versionCode}`);
+          console.log(`  - Version Name: ${buildInfo.versionName}`);
+          console.log(`  - Debug Build: ${buildInfo.debug}`);
+          console.log('Environment Info:');
+          console.log(`  - API_ENV: ${envInfo.apiEnv}`);
+          console.log(`  - API_URL: ${envInfo.apiUrl}`);
+          console.log(`  - Production Build: ${envInfo.isProductionBuild}`);
+          console.log(`  - Dev Mode: ${envInfo.isDevMode}`);
+          console.log('Config Object:');
+          console.log(JSON.stringify(envInfo.configObject, null, 2));
+        }
+        
+        // Critical warning for production builds (always log errors)
+        if (envInfo.isProductionBuild) {
+          if (envInfo.apiEnv !== 'prod' || !envInfo.apiUrl.includes('risingpunk.com')) {
+            console.error('🚨🚨🚨 CRITICAL: Production build NOT using production environment!');
+            console.error(`Expected: API_ENV=prod, API_URL=https://api.risingpunk.com`);
+            console.error(`Actual: API_ENV=${envInfo.apiEnv}, API_URL=${envInfo.apiUrl}`);
+          }
+          // Note: Success case is intentionally not logged in production to reduce console noise
+          // Errors are always logged to help diagnose production issues
+        }
+        
+        if (__DEV__) {
+          console.log('========================================');
+        }
+      } catch (error) {
+        console.error('Failed to log startup info:', error);
+      }
+    };
+    
+    logStartupInfo();
   }, [dispatch]);
 
   // Initialize GlobalErrorHandler with Redux callbacks (only once)

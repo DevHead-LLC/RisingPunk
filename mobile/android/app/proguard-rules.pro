@@ -37,6 +37,12 @@
 -keep class com.lugg.RNCConfig.** { *; }
 -dontwarn com.lugg.RNCConfig.**
 
+# CRITICAL: Keep BuildConfig fields (including API_ENV, API_URL from react-native-config)
+-keepclassmembers class **.BuildConfig {
+    public static final java.lang.String *;
+}
+-keep class **.BuildConfig { *; }
+
 # Firebase
 -keep class com.google.firebase.** { *; }
 -keep class com.google.android.gms.** { *; }

@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Config from 'react-native-config';
 import { API_URL } from '../../config';
 import { updateBalance } from './balanceSlice';
 import { setBots, setBuildState } from './botsSlice';
@@ -153,6 +154,15 @@ export const registerUser = createAsyncThunk(
   'auth/register',
   async (credentials: { email: string; accessKey: string }, { rejectWithValue }) => {
     try {
+      // CRITICAL: Log the API URL being used for registration (development only)
+      if (__DEV__) {
+        console.log('🔴 REGISTRATION API CALL:');
+        console.log(`  - API_URL: ${API_URL}`);
+        console.log(`  - Full URL: ${API_URL}/api/auth/register`);
+        console.log(`  - Config.API_ENV: ${Config.API_ENV || 'undefined'}`);
+        console.log(`  - Config.API_URL: ${Config.API_URL || 'undefined'}`);
+      }
+      
       const response = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         headers: {
@@ -267,6 +277,15 @@ export const googleSignUpUser = createAsyncThunk(
   'auth/googleSignUp',
   async (idToken: string, { rejectWithValue, dispatch }) => {
     try {
+      // CRITICAL: Log the API URL being used for Google sign-up (development only)
+      if (__DEV__) {
+        console.log('🔴 GOOGLE SIGN-UP API CALL:');
+        console.log(`  - API_URL: ${API_URL}`);
+        console.log(`  - Full URL: ${API_URL}/api/auth/google-signup`);
+        console.log(`  - Config.API_ENV: ${Config.API_ENV || 'undefined'}`);
+        console.log(`  - Config.API_URL: ${Config.API_URL || 'undefined'}`);
+      }
+      
       const response = await fetch(`${API_URL}/api/auth/google-signup`, {
         method: 'POST',
         headers: {

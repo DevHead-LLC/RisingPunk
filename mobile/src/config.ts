@@ -77,6 +77,69 @@ This indicates a build configuration problem:
 
 export const API_URL = getApiUrl();
 
+// Export environment info for debugging
+export const getEnvironmentInfo = () => {
+  const apiEnv = Config.API_ENV;
+  const apiUrl = API_URL;
+  const isProductionBuild = !__DEV__;
+  
+  return {
+    apiEnv: apiEnv || 'undefined',
+    apiUrl,
+    isProductionBuild,
+    isDevMode: __DEV__,
+    configObject: {
+      API_ENV: Config.API_ENV,
+      API_URL: Config.API_URL,
+      DEV_URL_ANDROID: Config.DEV_URL_ANDROID,
+      DEV_URL_IOS: Config.DEV_URL_IOS,
+    },
+  };
+};
+
+// Log environment info on module load (for debugging)
+if (__DEV__) {
+  const envInfo = getEnvironmentInfo();
+  console.log('🔍 Environment Configuration:', JSON.stringify(envInfo, null, 2));
+} else {
+  // In production, log critical info to help diagnose issues
+  const envInfo = getEnvironmentInfo();
+  console.log('🔍 Production Build Environment Info:', {
+    apiEnv: envInfo.apiEnv,
+    apiUrl: envInfo.apiUrl,
+    apiEnvFromConfig: Config.API_ENV,
+  });
+  
+  // Critical warning if production build is not using production environment
+  if (envInfo.apiEnv !== 'prod' || !envInfo.apiUrl.includes('risingpunk.com')) {
+    console.error(`
+🚨🚨🚨 CRITICAL PRODUCTION BUILD ERROR 🚨🚨🚨
+
+This is a PRODUCTION build but it's NOT configured for production!
+
+Expected:
+  - API_ENV: prod
+  - API_URL: https://api.risingpunk.com
+
+Actual:
+  - API_ENV: ${envInfo.apiEnv}
+  - API_URL: ${envInfo.apiUrl}
+
+This build will connect to the WRONG server!
+This is a build configuration error that MUST be fixed before deployment!
+
+Build configuration:
+  - Check that ENVFILE=.env.prod is set during build
+  - Verify .env.prod contains API_ENV=prod and API_URL=https://api.risingpunk.com
+  - Rebuild with correct environment configuration
+
+🚨🚨🚨 END CRITICAL ERROR 🚨🚨🚨
+    `);
+  } else {
+    console.log('✅ Production build verified: Using production environment');
+  }
+}
+
 // Animation timing constants
 export const ANIMATION_CONFIG = {
   // Frame rate timing
