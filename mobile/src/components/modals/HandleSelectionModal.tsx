@@ -398,32 +398,35 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
                     This will be your identity across the network
                   </Text>
 
-                  <View style={styles.inputContainer}>
-                    <TextInput
-                      ref={textInputRef}
-                      style={[
-                        styles.input,
-                        { 
-                          color: colors.text.primary,
-                          borderColor: error ? colors.error : colors.matrix,
-                          backgroundColor: colors.inputBg || colors.background,
-                        }
-                      ]}
-                      value={handle}
-                      onChangeText={handleTextChange}
-                      placeholder="Enter handle..."
-                      placeholderTextColor={colors.secondary}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      maxLength={15}
-                      editable={!isLoading}
-                    />
-                    {error ? (
-                      <Text style={[styles.errorText, { color: colors.error }]}>
-                        {getErrorMessage(error)}
-                      </Text>
-                    ) : null}
-                  </View>
+                  <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                    <View style={styles.inputContainer}>
+                      <TextInput
+                        ref={textInputRef}
+                        style={[
+                          styles.input,
+                          { 
+                            color: colors.text.primary,
+                            borderColor: error ? colors.error : colors.matrix,
+                            backgroundColor: colors.inputBg || colors.background,
+                          }
+                        ]}
+                        value={handle}
+                        onChangeText={handleTextChange}
+                        placeholder="Enter handle..."
+                        placeholderTextColor={colors.secondary}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        maxLength={15}
+                        editable={!isLoading}
+                        onKeyPress={handleKeyPress}
+                      />
+                      {error ? (
+                        <Text style={[styles.errorText, { color: colors.error }]}>
+                          {getErrorMessage(error)}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </TouchableWithoutFeedback>
                   
                   {/* Requirements Checklist */}
                   <View style={styles.requirementsContainer}>
@@ -532,38 +535,35 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
                     This will be your identity across the network
                   </Text>
 
-                  <Pressable
-                    style={styles.inputContainer}
-                    onPress={() => {
-                      textInputRef.current?.focus();
-                    }}
-                  >
-                    <TextInput
-                      ref={textInputRef}
-                      style={[
-                        styles.input,
-                        { 
-                          color: colors.text.primary,
-                          borderColor: error ? colors.error : colors.matrix,
-                          backgroundColor: colors.inputBg || colors.background,
-                        }
-                      ]}
-                      value={handle}
-                      onChangeText={handleTextChange}
-                      placeholder="Enter handle..."
-                      placeholderTextColor={colors.secondary}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      maxLength={15}
-                      editable={!isLoading}
-                      onKeyPress={handleKeyPress}
-                    />
-                    {error ? (
-                      <Text style={[styles.errorText, { color: colors.error }]}>
-                        {getErrorMessage(error)}
-                      </Text>
-                    ) : null}
-                  </Pressable>
+                  <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                    <View style={styles.inputContainer}>
+                      <TextInput
+                        ref={textInputRef}
+                        style={[
+                          styles.input,
+                          { 
+                            color: colors.text.primary,
+                            borderColor: error ? colors.error : colors.matrix,
+                            backgroundColor: colors.inputBg || colors.background,
+                          }
+                        ]}
+                        value={handle}
+                        onChangeText={handleTextChange}
+                        placeholder="Enter handle..."
+                        placeholderTextColor={colors.secondary}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        maxLength={15}
+                        editable={!isLoading}
+                        onKeyPress={handleKeyPress}
+                      />
+                      {error ? (
+                        <Text style={[styles.errorText, { color: colors.error }]}>
+                          {getErrorMessage(error)}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </TouchableWithoutFeedback>
                   
                   {/* Requirements Checklist */}
                   <View style={styles.requirementsContainer}>

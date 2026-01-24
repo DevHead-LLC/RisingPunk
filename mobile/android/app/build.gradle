@@ -134,7 +134,7 @@ android {
         applicationId "com.devheadllc.risingpunk"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 53
+        versionCode 54
         versionName "2.2.0"
         
         // CRITICAL: Verify react-native-config values are being set
