@@ -16,6 +16,43 @@ const researchCompletionAttempts = new Map<string, { count: number; resetAt: num
 const RATE_LIMIT_WINDOW = 60000;
 const MAX_RESEARCH_COMPLETION_ATTEMPTS = 10;
 
+/**
+ * Calculates and applies income earned before research unlock to prevent retroactive bonus application.
+ * This ensures income is calculated using the old rate before the research bonus applies.
+ * 
+ * @param user - The user object with balance information
+ * @param unlockTime - The time when the research feature was unlocked
+ * @returns void - Modifies the user object in place
+ */
+function applyPreUnlockIncome(user: any, unlockTime: Date): void {
+  // CRITICAL: Calculate and add income earned BEFORE research unlock (using old rate)
+  // This prevents income loss when we update lastUpdated to unlockTime
+  const secondsElapsed = (unlockTime.getTime() - user.balance.lastUpdated.getTime()) / 1000;
+  if (secondsElapsed > 0) {
+    // Round down to 10-second intervals to match balance endpoint logic
+    const roundedSecondsElapsed = Math.floor(secondsElapsed / 10) * 10;
+    
+    // Calculate income using current ratePerSecond (before research bonus applies)
+    const fullPrecisionIncome = roundedSecondsElapsed * user.balance.ratePerSecond;
+    
+    // Add to existing fractional remainder
+    const totalWithRemainder = (user.balance.fractionalRemainder || 0) + fullPrecisionIncome;
+    
+    // Calculate whole dollars to add
+    const wholeDollarsToAdd = Math.floor(totalWithRemainder);
+    
+    // Update balance and fractional remainder
+    user.balance.total += wholeDollarsToAdd;
+    user.balance.fractionalRemainder = totalWithRemainder - wholeDollarsToAdd;
+    
+    // CRITICAL: Update lastUpdated to unlock time to prevent retroactive bonus application
+    // This ensures the bonus only applies going forward from research completion
+    user.balance.lastUpdated = unlockTime;
+  }
+  // If unlockTime is before or equal to lastUpdated (secondsElapsed <= 0),
+  // don't move timestamp backwards to prevent double-counting income from concurrent balance updates
+}
+
 router.get('/status', auth, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user._id;
@@ -351,9 +388,8 @@ router.post('/complete-feature-research', auth, async (req: Request, res: Respon
             
             const unlockTime = researchFeature?.unlockedAt || new Date();
             
-            // CRITICAL: Update lastUpdated to unlock time to prevent retroactive income
-            // This ensures the bonus only applies going forward from research completion
-            user.balance.lastUpdated = unlockTime;
+            // Calculate and apply income earned before research unlock
+            applyPreUnlockIncome(user, unlockTime);
             
             // Force sync to recalculate rate with new research unlock
             user.balance.rentalHousingIncomeLastSynced = null;
@@ -637,7 +673,7 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
     }
 
     // Reload user to get updated balance
-    const updatedUser = await User.findById(userId);
+    let updatedUser = await User.findById(userId);
     
     // If rental profit research was speeded up, trigger sync to update income rate
     if (categoryId === 'investments' && featureId === 'rental-profit-increase') {
@@ -670,18 +706,28 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
           
           const unlockTime = researchFeature?.unlockedAt || new Date();
           
-          // CRITICAL: Update lastUpdated to unlock time to prevent retroactive income
-          // This ensures the bonus only applies going forward from research completion
-          updatedUser.balance.lastUpdated = unlockTime;
+          // Calculate and apply income earned before research unlock
+          applyPreUnlockIncome(updatedUser, unlockTime);
           
           // Force sync to recalculate rate with new research unlock
           updatedUser.balance.rentalHousingIncomeLastSynced = null;
           await updatedUser.save();
           await RentalHousingSyncService.performSync(updatedUser);
+          
+          // CRITICAL: Reload user after save to ensure response reflects actual database value
+          // This prevents showing incorrect balance if save() failed silently
+          const reloadedUser = await User.findById(userId);
+          if (reloadedUser) {
+            updatedUser = reloadedUser;
+          }
         }
       } catch (error) {
         console.error('Error syncing income rate after speedup:', error);
-        // Don't fail the request if sync fails
+        // Don't fail the request if sync fails, but reload user to ensure correct balance
+        const reloadedUser = await User.findById(userId);
+        if (reloadedUser) {
+          updatedUser = reloadedUser;
+        }
       }
     }
     

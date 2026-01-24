@@ -134,8 +134,15 @@ android {
         applicationId "com.devheadllc.risingpunk"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 51
-        versionName "1.0"
+        versionCode 56
+        versionName "2.2.0"
+        
+        // CRITICAL: 16 KB Page Size Fix - Restrict to 64-bit ABIs only
+        // React Native 0.76.6's 32-bit libraries (armeabi-v7a, x86) are NOT 16 KB aligned
+        // Excluding them fixes the Google Play Console rejection without upgrading React Native
+        ndk {
+            abiFilters "arm64-v8a", "x86_64"
+        }
         
         // CRITICAL: Verify react-native-config values are being set
         // These should be set by dotenv.gradle, but we verify here
@@ -161,12 +168,18 @@ android {
                 println "   This will cause the app to use wrong environment!"
             }
             
-            // Verify API_URL is set
+            // Verify API_URL is set (only required for staging/prod, not dev)
+            def apiEnv = project.env.containsKey('API_ENV') ? project.env['API_ENV'] : null
             if (project.env.containsKey('API_URL')) {
                 def apiUrl = project.env['API_URL']
                 println "✅ API_URL will be set in BuildConfig: ${apiUrl}"
             } else {
-                println "⚠️ WARNING: API_URL not found in env variables!"
+                // Only warn if this is staging or prod build (dev uses DEV_URL_ANDROID/DEV_URL_IOS)
+                if (apiEnv == 'staging' || apiEnv == 'prod') {
+                    println "⚠️ WARNING: API_URL not found in env variables! (Required for ${apiEnv} builds)"
+                } else {
+                    println "ℹ️ INFO: API_URL not set (expected for dev builds - using DEV_URL_ANDROID/DEV_URL_IOS instead)"
+                }
             }
             println ""
         } else {
@@ -352,39 +365,83 @@ Actual: API_ENV=${apiEnv} in ${taskEnvFile}
                 def enableUncompressedNativeLibs = project.findProperty('android.bundle.enableUncompressedNativeLibs')
                 
                 println "android.bundle.enableUncompressedNativeLibs: ${enableUncompressedNativeLibs ?: 'NOT SET (check gradle.properties)'}"
-                println "packaging.jniLibs.useLegacyPackaging: false (configured in build.gradle)"
+                println "packaging.jniLibs.useLegacyPackaging: false (configured in build.gradle - verify manually if build fails)"
                 println "NDK Version: ${rootProject.ext.ndkVersion}"
                 println "targetSdkVersion: ${rootProject.ext.targetSdkVersion}"
                 println "compileSdkVersion: ${rootProject.ext.compileSdkVersion}"
                 
                 def configOk = true
-                def warnings = []
+                def errors = []
                 
                 if (enableUncompressedNativeLibs != 'true') {
-                    warnings.add("android.bundle.enableUncompressedNativeLibs is not 'true' in gradle.properties")
+                    errors.add("android.bundle.enableUncompressedNativeLibs is not 'true' in gradle.properties")
                     configOk = false
                 }
                 // Parse NDK version to check if it's r27+ (required for 16 KB page size support)
                 def ndkVersionParts = rootProject.ext.ndkVersion.split("\\.")
                 def ndkMajorVersion = ndkVersionParts[0].toInteger()
                 if (ndkMajorVersion < 27) {
-                    warnings.add("NDK version ${rootProject.ext.ndkVersion} is not r27+ (required for 16 KB support). Current major version: ${ndkMajorVersion}")
+                    errors.add("NDK version ${rootProject.ext.ndkVersion} is not r27+ (required for 16 KB support). Current major version: ${ndkMajorVersion}")
                     configOk = false
                 }
                 if (rootProject.ext.targetSdkVersion < 35) {
-                    warnings.add("targetSdkVersion ${rootProject.ext.targetSdkVersion} is less than 35 (Android 15)")
+                    errors.add("targetSdkVersion ${rootProject.ext.targetSdkVersion} is less than 35 (Android 15)")
                     configOk = false
                 }
                 
+                
                 if (configOk) {
                     println "✅ 16 KB page size configuration verified - All settings correct"
+                    println ""
+                    println "✅ 64-bit ABI filter applied (arm64-v8a, x86_64 only)"
+                    println "   This excludes 32-bit libraries that cause 16 KB alignment issues"
+                    println "   with React Native 0.76.6's pre-built libraries"
                 } else {
-                    println "🚨 WARNING: 16 KB page size configuration has issues!"
-                    warnings.each { warning ->
-                        println "   - ${warning}"
+                    // FAIL THE BUILD - Don't waste time uploading to Google Play Console
+                    def errorMessage = """
+🚨 BUILD FAILED: 16 KB Page Size Configuration is INCORRECT!
+
+Google Play Console will REJECT this build with error:
+"Your app does not support 16 KB memory page sizes"
+
+Configuration Issues Found:
+"""
+                    errors.each { error ->
+                        errorMessage += "   ❌ ${error}\n"
                     }
-                    println "   Google Play Console may reject this build!"
-                    println "   See taskItems/android/deployment/16kb-page-size-fix.md for fix guide"
+                    errorMessage += """
+==========================================
+HOW TO FIX:
+==========================================
+
+1. Fix android.bundle.enableUncompressedNativeLibs:
+   - Open: mobile/android/gradle.properties
+   - Ensure this line exists: android.bundle.enableUncompressedNativeLibs=true
+   - If missing, add it (see taskItems/android/deployment/16kb-page-size-fix.md)
+
+2. Fix NDK Version (if needed):
+   - Open: mobile/android/build.gradle
+   - Ensure: ndkVersion = "27.0.12077973" (or newer r27+ version)
+   - Install NDK r27+ via Android Studio SDK Manager if not installed
+
+3. Fix targetSdkVersion (if needed):
+   - Open: mobile/android/build.gradle
+   - Ensure: targetSdkVersion = 35
+
+4. Verify packaging configuration:
+   - Open: mobile/android/app/build.gradle
+   - Ensure packaging block has: useLegacyPackaging = false
+   - (This should already be configured correctly)
+
+After fixing, rebuild:
+  cd mobile
+  npm run android:clean
+  npm run android:build:bundle
+
+See: taskItems/android/deployment/16kb-page-size-fix.md for complete guide
+==========================================
+"""
+                    throw new GradleException(errorMessage)
                 }
                 println "=========================================="
                 println ""

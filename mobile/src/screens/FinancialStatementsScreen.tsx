@@ -6,6 +6,7 @@ import { useAppSelector } from '../store/hooks';
 import { getCurrentBalance } from '../store/slices/balanceSlice';
 import { useFetchFinanceTemplatesQuery, useFetchUserFinanceTiersQuery } from '../store/api/userFinanceApi';
 import { useGetRentalHousingIncomeQuery } from '../store/api/rentalHousingApi';
+import { useFetchBalanceQuery } from '../store/api/balanceApi';
 import { useTheme } from '../context/ThemeContext';
 import { useThemeColors } from '../hooks/useThemeColors';
 
@@ -20,8 +21,11 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
   const { data: templatesData } = useFetchFinanceTemplatesQuery();
   const { data: userTiersData } = useFetchUserFinanceTiersQuery();
   const { data: rentalHousingData, error: rentalHousingError, isLoading: rentalHousingLoading } = useGetRentalHousingIncomeQuery();
+  const { data: balanceData } = useFetchBalanceQuery();
   const currentCash = useAppSelector(getCurrentBalance);
-  const ratePerSecond = useAppSelector(state => state.balance.ratePerSecond);
+  const ratePerSecondFromState = useAppSelector(state => state.balance.ratePerSecond);
+  // Use balanceData from query if available (fresh data), otherwise fall back to Redux state
+  const ratePerSecond = balanceData?.ratePerSecond ?? ratePerSecondFromState;
   const { themeMode } = useTheme();
   const colors = useThemeColors();
   
@@ -283,7 +287,7 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                           </View>
                           <View style={[styles.row, { marginTop: SIZING.spacing.xs }]}>
                             <Text style={styles.keyText}>Net Income</Text>
-                            <Text style={styles.valText}>{netIncome >= 0 ? `+$${netIncome.toFixed(2)}` : `$${netIncome.toFixed(2)}`}</Text>
+                            <Text style={styles.valText}>{netIncome >= 0 ? `+$${netIncome.toFixed(2)}` : `-$${Math.abs(netIncome).toFixed(2)}`}</Text>
                           </View>
                           
                           {/* Section 4: Net Cash Flow Calculation */}
@@ -308,11 +312,11 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                           )}
                           <View style={styles.row}>
                             <Text style={styles.keyText}>Net Income</Text>
-                            <Text style={styles.valText}>{netIncome >= 0 ? `+$${netIncome.toFixed(2)}` : `$${netIncome.toFixed(2)}`}</Text>
+                            <Text style={styles.valText}>{netIncome >= 0 ? `+$${netIncome.toFixed(2)}` : `-$${Math.abs(netIncome).toFixed(2)}`}</Text>
                           </View>
                           <View style={[styles.row, { marginTop: SIZING.spacing.xs }]}>
                             <Text style={styles.keyText}>Net Cash Flow</Text>
-                            <Text style={styles.valText}>{netCashFlow >= 0 ? `+$${netCashFlow.toFixed(2)}` : `$${netCashFlow.toFixed(2)}`}</Text>
+                            <Text style={styles.valText}>{netCashFlow >= 0 ? `+$${netCashFlow.toFixed(2)}` : `-$${Math.abs(netCashFlow).toFixed(2)}`}</Text>
                           </View>
                         </>
                       );
@@ -402,7 +406,7 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                           {/* 3. Net from Operations (matches Net Income from Income Statement) */}
                           <View style={[styles.row, { marginTop: SIZING.spacing.sm }]}>
                             <Text style={styles.keyText}>Net from Operations</Text>
-                            <Text style={styles.valText}>{netIncome >= 0 ? `+$${netIncome.toFixed(2)}` : `$${netIncome.toFixed(2)}`}</Text>
+                            <Text style={styles.valText}>{netIncome >= 0 ? `+$${netIncome.toFixed(2)}` : `-$${Math.abs(netIncome).toFixed(2)}`}</Text>
                           </View>
                         </>
                       );
@@ -432,7 +436,7 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                     <View style={[styles.row, { marginTop: SIZING.spacing.md }]}>
                       <Text style={styles.keyText}>Total Cash Flow Rate</Text>
                       <Text style={[styles.valText, { color: colors.matrix }]}>
-                        {ratePerSecond >= 0 ? `+$${ratePerSecond.toFixed(2)}` : `$${ratePerSecond.toFixed(2)}`}/sec
+                        {ratePerSecond >= 0 ? `+$${ratePerSecond.toFixed(2)}` : `-$${Math.abs(ratePerSecond).toFixed(2)}`}/sec
                       </Text>
                     </View>
                     <View style={[styles.row, { marginTop: SIZING.spacing.md }]}>
