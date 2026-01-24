@@ -372,16 +372,11 @@ router.post('/complete-feature-research', auth, async (req: Request, res: Respon
               user.balance.fractionalRemainder = totalWithRemainder - wholeDollarsToAdd;
               
               // CRITICAL: Update lastUpdated to unlock time to prevent retroactive bonus application
-              // Only update if unlockTime is after current lastUpdated (prevents moving timestamp backwards)
               // This ensures the bonus only applies going forward from research completion
               user.balance.lastUpdated = unlockTime;
-            } else if (unlockTime > user.balance.lastUpdated) {
-              // If unlockTime is after lastUpdated but secondsElapsed <= 0 (due to rounding),
-              // still update lastUpdated to prevent retroactive bonus
-              user.balance.lastUpdated = unlockTime;
             }
-            // If unlockTime is before or equal to lastUpdated, don't move timestamp backwards
-            // This prevents double-counting income from concurrent balance updates
+            // If unlockTime is before or equal to lastUpdated (secondsElapsed <= 0),
+            // don't move timestamp backwards to prevent double-counting income from concurrent balance updates
             
             // Force sync to recalculate rate with new research unlock
             user.balance.rentalHousingIncomeLastSynced = null;
@@ -719,16 +714,11 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
             updatedUser.balance.fractionalRemainder = totalWithRemainder - wholeDollarsToAdd;
             
             // CRITICAL: Update lastUpdated to unlock time to prevent retroactive bonus application
-            // Only update if unlockTime is after current lastUpdated (prevents moving timestamp backwards)
             // This ensures the bonus only applies going forward from research completion
             updatedUser.balance.lastUpdated = unlockTime;
-          } else if (unlockTime > updatedUser.balance.lastUpdated) {
-            // If unlockTime is after lastUpdated but secondsElapsed <= 0 (due to rounding),
-            // still update lastUpdated to prevent retroactive bonus
-            updatedUser.balance.lastUpdated = unlockTime;
           }
-          // If unlockTime is before or equal to lastUpdated, don't move timestamp backwards
-          // This prevents double-counting income from concurrent balance updates
+          // If unlockTime is before or equal to lastUpdated (secondsElapsed <= 0),
+          // don't move timestamp backwards to prevent double-counting income from concurrent balance updates
           
           // Force sync to recalculate rate with new research unlock
           updatedUser.balance.rentalHousingIncomeLastSynced = null;
