@@ -535,7 +535,7 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
                     This will be your identity across the network
                   </Text>
 
-                  <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                  <Pressable onPress={() => textInputRef.current?.focus()}>
                     <View style={styles.inputContainer}>
                       <TextInput
                         ref={textInputRef}
@@ -563,7 +563,7 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
                         </Text>
                       ) : null}
                     </View>
-                  </TouchableWithoutFeedback>
+                  </Pressable>
                   
                   {/* Requirements Checklist */}
                   <View style={styles.requirementsContainer}>
