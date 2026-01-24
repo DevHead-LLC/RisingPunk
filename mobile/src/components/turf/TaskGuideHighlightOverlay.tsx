@@ -159,7 +159,16 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
     }
   }
 
-  const shouldShowOverlay = 
+  // Determine if we're at the final step where user needs to interact with the highlighted element
+  // At final step, we should NOT show the overlay at all - just the highlighted border on the element
+  const isFinalStep = 
+    (isThemeTask && forThemeToggle && highlightStep === 'theme-toggle') ||
+    (isAvatarTask && forAvatarToggle && highlightStep === 'avatar-toggle') ||
+    (isHideTaskListTask && forTaskGuideToggle && highlightStep === 'task-guide-toggle');
+  
+  // Don't show overlay at final step - user needs to interact with the highlighted element
+  // Show overlay at intermediate steps to guide user and block clicks elsewhere
+  const shouldShowOverlay = !isFinalStep && (
     (isViewProfile && forProfile) ||
     (isThemeTask && (forProfile || forSettings || forThemeToggle)) ||
     (isAvatarTask && (forProfile || forSettings || forAvatarToggle)) ||
@@ -177,7 +186,9 @@ export const TaskGuideHighlightOverlay: React.FC<TaskGuideHighlightOverlayProps>
     (isFreeHackRig && forBattalionA && highlightStep === 'battalion-a') ||
     (isFreeHackRig && forGuardiansSelection && highlightStep === 'guardians-selection') ||
     (isFreeHackRig && forAssignBots && highlightStep === 'assign-bots') ||
-    (isFreeHackRig && forDeployPurge && highlightStep === 'deploy-purge');
+    (isFreeHackRig && forDeployPurge && highlightStep === 'deploy-purge')
+  );
+  
   const overlayStyle = shouldShowOverlay
     ? [styles.overlay, { zIndex: 999 }]
     : styles.overlay;
