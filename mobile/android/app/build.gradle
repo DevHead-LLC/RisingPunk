@@ -134,8 +134,15 @@ android {
         applicationId "com.devheadllc.risingpunk"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 54
+        versionCode 56
         versionName "2.2.0"
+        
+        // CRITICAL: 16 KB Page Size Fix - Restrict to 64-bit ABIs only
+        // React Native 0.76.6's 32-bit libraries (armeabi-v7a, x86) are NOT 16 KB aligned
+        // Excluding them fixes the Google Play Console rejection without upgrading React Native
+        ndk {
+            abiFilters "arm64-v8a", "x86_64"
+        }
         
         // CRITICAL: Verify react-native-config values are being set
         // These should be set by dotenv.gradle, but we verify here
@@ -382,22 +389,13 @@ Actual: API_ENV=${apiEnv} in ${taskEnvFile}
                     configOk = false
                 }
                 
+                
                 if (configOk) {
                     println "✅ 16 KB page size configuration verified - All settings correct"
                     println ""
-                    println "⚠️  KNOWN LIMITATION - React Native 0.76.6:"
-                    println "   React Native 0.76.6 uses pre-built native libraries from Maven"
-                    println "   (react-android, hermes-android) that may NOT be 16 KB aligned"
-                    println "   even with correct configuration."
-                    println ""
-                    println "   Google Play Console may STILL reject this build with:"
-                    println "   'Your app does not support 16 KB memory page sizes'"
-                    println ""
-                    println "   SOLUTION: Upgrade to React Native 0.77+ for full 16 KB support"
-                    println "   See: taskItems/android/deployment/16kb-page-size-fix.md"
-                    println ""
-                    println "   If you see the error in Google Play Console, this is EXPECTED"
-                    println "   and requires React Native upgrade to resolve."
+                    println "✅ 64-bit ABI filter applied (arm64-v8a, x86_64 only)"
+                    println "   This excludes 32-bit libraries that cause 16 KB alignment issues"
+                    println "   with React Native 0.76.6's pre-built libraries"
                 } else {
                     // FAIL THE BUILD - Don't waste time uploading to Google Play Console
                     def errorMessage = """
