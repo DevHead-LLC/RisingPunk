@@ -351,6 +351,10 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       
       // Then start the battle
       const result = await startBattle(battleStartData).unwrap();
+      
+      // Track first battle (only tracks once per device)
+      await trackFirstBattle();
+      
       onBattleStart(result.battleId);
     } catch (error) {
       console.error('Failed to deactivate shield or start battle:', error);
