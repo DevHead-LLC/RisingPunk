@@ -7,6 +7,7 @@ import { userGuideApi } from '../../store/api/userGuideApi';
 import { useFetchBalanceQuery } from '../../store/api/balanceApi';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { updateBalance } from '../../store/slices/balanceSlice';
+import { trackFirstConstruct } from '../../services/analyticsService';
 import { BuildCountdownTimer } from './BuildCountdownTimer';
 import { LockedFeatureModal } from './index';
 import { SpeedupModal } from '../common/SpeedupModal';
@@ -36,8 +37,10 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
   const [unlockResearchCenter] = useUnlockResearchCenterMutation();
   const [speedupResearchCenterConstruction] = useSpeedupResearchCenterConstructionMutation();
   const { data: profile, isLoading } = useGetProfileQuery();
+  const token = useAppSelector((state) => state.auth.token);
   const [isBuildingState, setIsBuildingState] = useState(false);
   const { data: buildStatus, isLoading: buildStatusLoading, refetch: refetchBuildStatus } = useGetResearchCenterStatusQuery(undefined, {
+    skip: !token, // Don't query if user isn't logged in
     pollingInterval: isBuildingState ? 5000 : 0,
   });
   const { data: balanceData, isLoading: balanceLoading } = useFetchBalanceQuery();
@@ -63,12 +66,27 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
   const hasSufficientFunds = numericBalance !== null && !isNaN(numericBalance as number) && numericBalance >= RESEARCH_CENTER_COST;
   
   useEffect(() => {
-    // Only invalidate cache when unlock state transitions from false to true
-    if (isUnlocked && previousIsUnlockedRef.current === false) {
+    // Only track and invalidate cache when unlock state transitions from false to true
+    // AND we have valid profile data (user is logged in)
+    // AND we have a token (user is authenticated)
+    // AND this is actually a transition (not initial mount with cached data)
+    if (
+      isUnlocked && 
+      previousIsUnlockedRef.current === false &&
+      profile && // Ensure user is logged in
+      token && // Ensure user is authenticated
+      !isLoading && // Ensure we're not still loading
+      buildStatus !== undefined // Ensure we have actual data (not undefined from skip)
+    ) {
       dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
+      // Track first construction
+      trackFirstConstruct('research_center');
     }
-    previousIsUnlockedRef.current = isUnlocked;
-  }, [isUnlocked, dispatch]);
+    // Only update ref if we have valid data (not on initial mount with undefined)
+    if (buildStatus !== undefined && token) {
+      previousIsUnlockedRef.current = isUnlocked;
+    }
+  }, [isUnlocked, dispatch, profile, isLoading, buildStatus, token]);
   
   useEffect(() => {
     if (isHighlighted) {
