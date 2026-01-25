@@ -179,11 +179,13 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
       const result = await completeRentalHousing(propertyId).unwrap();
       
       if (result.success) {
-        // Track first construction
-        await trackFirstConstruct('rental_property', propertyId);
-        
-        // Force a re-render to update the UI
+        // Force a re-render to update the UI (don't block on analytics)
         setForceUpdate(prev => prev + 1);
+        
+        // Track first construction (fire-and-forget, don't block UI updates)
+        trackFirstConstruct('rental_property', propertyId).catch((error) => {
+          console.error('[Analytics] Error tracking first_construct:', error);
+        });
         const refetchResult = await refetch();
       }
     } catch (error: any) {

@@ -328,10 +328,13 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       // Otherwise proceed directly with battle start
       const result = await startBattle(battleStartData).unwrap();
       
-      // Track first battle (only tracks once per device)
-      await trackFirstBattle();
-      
+      // Update UI immediately (don't block on analytics)
       onBattleStart(result.battleId);
+      
+      // Track first battle (fire-and-forget, don't block UI updates)
+      trackFirstBattle().catch((error) => {
+        console.error('[Analytics] Error tracking first_battle:', error);
+      });
     } catch (error) {
       console.error('Failed to start battle:', error);
       onBattleStart();
@@ -352,10 +355,13 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       // Then start the battle
       const result = await startBattle(battleStartData).unwrap();
       
-      // Track first battle (only tracks once per device)
-      await trackFirstBattle();
-      
+      // Update UI immediately (don't block on analytics)
       onBattleStart(result.battleId);
+      
+      // Track first battle (fire-and-forget, don't block UI updates)
+      trackFirstBattle().catch((error) => {
+        console.error('[Analytics] Error tracking first_battle:', error);
+      });
     } catch (error) {
       console.error('Failed to deactivate shield or start battle:', error);
       onBattleStart();
