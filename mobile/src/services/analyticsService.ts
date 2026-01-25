@@ -60,9 +60,6 @@ export const trackFirstBots = async (buildType: string) => {
       return;
     }
 
-    // Mark that user has built bots before
-    await AsyncStorage.setItem('has_built_bots_before', 'true');
-
     const analytics = getAnalyticsInstance();
     if (!analytics) {
       return; // Analytics not available, skip tracking
@@ -71,6 +68,9 @@ export const trackFirstBots = async (buildType: string) => {
       build_type: buildType,
       timestamp: new Date().toISOString(),
     });
+    
+    // Mark that user has built bots before (only after successful event logging)
+    await AsyncStorage.setItem('has_built_bots_before', 'true');
   } catch (error) {
     console.error('[Analytics] Error tracking first_bots:', error);
   }
@@ -88,9 +88,6 @@ export const trackFirstConstruct = async (constructType: 'rental_property' | 're
       return;
     }
 
-    // Mark that user has constructed before
-    await AsyncStorage.setItem('has_constructed_before', 'true');
-
     const analytics = getAnalyticsInstance();
     if (!analytics) {
       return; // Analytics not available, skip tracking
@@ -100,7 +97,9 @@ export const trackFirstConstruct = async (constructType: 'rental_property' | 're
       property_id: propertyId,
       timestamp: new Date().toISOString(),
     });
-    console.log(`[Analytics] first_construct tracked (type: ${constructType}, property: ${propertyId})`);
+    
+    // Mark that user has constructed before (only after successful event logging)
+    await AsyncStorage.setItem('has_constructed_before', 'true');
   } catch (error) {
     console.error('[Analytics] Error tracking first_construct:', error);
   }
@@ -118,9 +117,6 @@ export const trackHackmapVisited = async () => {
       return;
     }
 
-    // Mark that user has visited hackmap
-    await AsyncStorage.setItem('has_visited_hackmap', 'true');
-
     const analytics = getAnalyticsInstance();
     if (!analytics) {
       return; // Analytics not available, skip tracking
@@ -128,6 +124,9 @@ export const trackHackmapVisited = async () => {
     await logEvent(analytics, 'hackmap_visited', {
       timestamp: new Date().toISOString(),
     });
+    
+    // Mark that user has visited hackmap (only after successful event logging)
+    await AsyncStorage.setItem('has_visited_hackmap', 'true');
   } catch (error) {
     console.error('[Analytics] Error tracking hackmap_visited:', error);
   }
@@ -145,9 +144,6 @@ export const trackFirstResearch = async (categoryId: string, featureId: string) 
       return;
     }
 
-    // Mark that user has researched before
-    await AsyncStorage.setItem('has_researched_before', 'true');
-
     const analytics = getAnalyticsInstance();
     if (!analytics) {
       return; // Analytics not available, skip tracking
@@ -157,6 +153,9 @@ export const trackFirstResearch = async (categoryId: string, featureId: string) 
       feature_id: featureId,
       timestamp: new Date().toISOString(),
     });
+    
+    // Mark that user has researched before (only after successful event logging)
+    await AsyncStorage.setItem('has_researched_before', 'true');
   } catch (error) {
     console.error('[Analytics] Error tracking first_research:', error);
   }
@@ -174,9 +173,6 @@ export const trackFirstBattle = async () => {
       return;
     }
 
-    // Mark that user has battled before
-    await AsyncStorage.setItem('has_battled_before', 'true');
-
     const analytics = getAnalyticsInstance();
     if (!analytics) {
       return; // Analytics not available, skip tracking
@@ -184,6 +180,9 @@ export const trackFirstBattle = async () => {
     await logEvent(analytics, 'first_battle', {
       timestamp: new Date().toISOString(),
     });
+    
+    // Mark that user has battled before (only after successful event logging)
+    await AsyncStorage.setItem('has_battled_before', 'true');
   } catch (error) {
     console.error('[Analytics] Error tracking first_battle:', error);
   }
