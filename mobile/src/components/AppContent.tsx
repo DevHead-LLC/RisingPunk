@@ -115,12 +115,6 @@ const AppContent = memo(() => {
           // Continue even if this fails
         }
         
-        // Check if this is first open (for our own tracking)
-        const hasOpenedBefore = await AsyncStorage.getItem('has_opened_app');
-        if (!hasOpenedBefore) {
-          await AsyncStorage.setItem('has_opened_app', 'true');
-        }
-        
         // Log a custom test event to verify analytics is working
         try {
           await logEvent(analytics, 'analytics_initialized', {
