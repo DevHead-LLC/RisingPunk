@@ -127,9 +127,6 @@ const AppContent = memo(() => {
             platform: Platform.OS,
             timestamp: new Date().toISOString(),
           });
-          
-          // Store a flag that analytics is ready
-          await AsyncStorage.setItem('firebase_analytics_ready', 'true');
         } catch (error) {
           console.error('[Firebase Analytics] Error logging test event:', error);
         }
