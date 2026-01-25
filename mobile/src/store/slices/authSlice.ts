@@ -5,7 +5,7 @@ import { updateBalance } from './balanceSlice';
 import { setBots, setBuildState } from './botsSlice';
 import { resetAllApiCaches } from '../api/resetApiCaches';
 import { authApi } from '../api/authApi';
-import { trackAccountCreated } from '../../services/analyticsService';
+import { trackAccountCreated, clearFirstTimeTrackingFlags } from '../../services/analyticsService';
 
 // Types
 export interface User {
@@ -622,6 +622,8 @@ export const logoutUser = createAsyncThunk(
   async (_, { dispatch }) => {
     await AsyncStorage.removeItem('token');
     await AsyncStorage.removeItem('user');
+    // Clear first-time tracking flags so next user on same device can have their events tracked
+    await clearFirstTimeTrackingFlags();
     resetAllApiCaches({ dispatch } as any);
   }
 );
