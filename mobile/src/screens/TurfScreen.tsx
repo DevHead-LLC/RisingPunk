@@ -626,6 +626,11 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     setPreviousScreen(currentScreen);
     setCurrentScreen(screen);
     
+    // Track screen view (React Native Firebase doesn't do this automatically)
+    import('../services/analyticsService').then(({ trackScreenView }) => {
+      trackScreenView(screen);
+    });
+    
     // If returning to turf, handle different behaviors based on previous screen
     if (screen === 'turf') {
       // Home, Digital Barracks, and Profile should always center on home/digital barracks

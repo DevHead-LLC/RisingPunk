@@ -12,6 +12,7 @@ import { BotType } from '../types/bots';
 import { useAppSelector } from '../store/hooks';
 import { useAssignToBattalionMutation } from '../store/api/botsApi';
 import { useStartBattleMutation } from '../store/api/battleApi';
+import { trackFirstBattle } from '../services/analyticsService';
 import { useGetShieldStatusQuery, useDeactivateShieldMutation } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { API_URL } from '../config';
@@ -326,6 +327,10 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
     try {
       // Otherwise proceed directly with battle start
       const result = await startBattle(battleStartData).unwrap();
+      
+      // Track first battle (only tracks once per device)
+      await trackFirstBattle();
+      
       onBattleStart(result.battleId);
     } catch (error) {
       console.error('Failed to start battle:', error);

@@ -45,6 +45,10 @@ support@risingpunk.com (forwarded and hosted through Google Workspace)`
           {
             label: 'User-generated content',
             text: 'messages and content you post in the in-app chat system. This content is stored to provide the chat functionality and may be reviewed for moderation purposes.'
+          },
+          {
+            label: 'Analytics and usage data',
+            text: 'we use Google Firebase Analytics to collect anonymous usage statistics, including app opens, screen views, and in-game actions (such as account creation, builds, and battles). This data helps us improve the app experience. Analytics data is processed by Google and is subject to Google\'s Privacy Policy. No personally identifiable information is collected through analytics.'
           }
         ]
       },

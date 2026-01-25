@@ -383,6 +383,8 @@ const panningTileMemoComparison = <T extends {
   );
 };
 
+import { trackHackmapVisited } from '../services/analyticsService';
+
 export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const dispatch = useAppDispatch();
   const grid = useAppSelector((state) => state.map.grid);
@@ -392,6 +394,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const token = useAppSelector((state) => state.auth.token);
   const colors = useThemeColors();
   const { themeMode } = useTheme();
+
+  // Track first visit to HackMap
+  useEffect(() => {
+    trackHackmapVisited();
+  }, []);
 
   // Memoize the styles object to prevent unnecessary re-renders
   const memoizedStyles = useMemo(() => getStyles(colors, themeMode), [colors, themeMode]);

@@ -9,6 +9,7 @@ import { updateBalance, getCurrentBalance } from '../../store/slices/balanceSlic
 import { useGetRentalHousingStatusQuery, useUnlockRentalHousingMutation, useCompleteRentalHousingMutation, useSpeedupPropertyConstructionMutation } from '../../store/api/authApi';
 import { userGuideApi } from '../../store/api/userGuideApi';
 import { useTaskGuideHighlight } from '../../contexts/TaskGuideHighlightContext';
+import { trackFirstConstruct } from '../../services/analyticsService';
 import {
   DevelopmentIcon,
   DevelopmentLabel,
@@ -178,6 +179,9 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
       const result = await completeRentalHousing(propertyId).unwrap();
       
       if (result.success) {
+        // Track first construction
+        await trackFirstConstruct('rental_property', propertyId);
+        
         // Force a re-render to update the UI
         setForceUpdate(prev => prev + 1);
         const refetchResult = await refetch();

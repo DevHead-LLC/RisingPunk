@@ -20,6 +20,9 @@ import { GlobalErrorModal } from './modals/GlobalErrorModal';
 import { AccountSwitchedModal } from './modals/AccountSwitchedModal';
 import { NotificationBanner } from './common/NotificationBanner';
 import { globalErrorHandler } from '../services/GlobalErrorHandler';
+import { getAnalytics, setAnalyticsCollectionEnabled, setUserProperty, logEvent } from '@react-native-firebase/analytics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { trackAppReturned } from '../services/analyticsService';
 
 const AppContent = memo(() => {
   const dispatch = useAppDispatch();
@@ -29,6 +32,7 @@ const AppContent = memo(() => {
   const balanceDisplayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const turfScreenRef = useRef<any>(null);
   const previousTokenRef = useRef<string | null>(null);
+  const appStateRef = useRef(AppState.currentState);
   const { isConnected, isInternetReachable } = useNetworkConnectivity();
 
   // Function to center the turf view to home/digital barracks position
@@ -80,6 +84,63 @@ const AppContent = memo(() => {
   useEffect(() => {
     dispatch(loadStoredAuth());
   }, [dispatch]);
+
+  // Initialize Firebase Analytics
+  // Note: Firebase automatically logs 'first_open' and 'app_open' events
+  // We just need to enable analytics collection
+  useEffect(() => {
+    const initializeFirebaseAnalytics = async () => {
+      try {
+        // Get analytics instance using modular API
+        let analytics;
+        try {
+          analytics = getAnalytics();
+        } catch (error) {
+          console.error('[Firebase Analytics] Error getting analytics instance:', error);
+          return;
+        }
+        
+        // Enable analytics collection
+        try {
+          await setAnalyticsCollectionEnabled(analytics, true);
+        } catch (error) {
+          console.error('[Firebase Analytics] Error enabling collection:', error);
+          return;
+        }
+        
+        // Set user property for platform to make filtering easier
+        try {
+          await setUserProperty(analytics, 'platform', Platform.OS);
+        } catch (error) {
+          // Continue even if this fails
+        }
+        
+        // Check if this is first open (for our own tracking)
+        const hasOpenedBefore = await AsyncStorage.getItem('has_opened_app');
+        if (!hasOpenedBefore) {
+          await AsyncStorage.setItem('has_opened_app', 'true');
+        }
+        
+        // Log a custom test event to verify analytics is working
+        try {
+          await logEvent(analytics, 'analytics_initialized', {
+            platform: Platform.OS,
+            timestamp: new Date().toISOString(),
+          });
+          
+          // Store a flag that analytics is ready
+          await AsyncStorage.setItem('firebase_analytics_ready', 'true');
+        } catch (error) {
+          console.error('[Firebase Analytics] Error logging test event:', error);
+        }
+      } catch (error) {
+        console.error('[Firebase Analytics] Initialization error:', error);
+        // Don't throw - analytics errors shouldn't break the app
+      }
+    };
+    
+    initializeFirebaseAnalytics();
+  }, []);
 
   // Initialize GlobalErrorHandler with Redux callbacks (only once)
   useEffect(() => {
@@ -155,8 +216,20 @@ const AppContent = memo(() => {
   }, [buildStateData, dispatch]);
 
   // Refresh user data when app comes back to foreground (e.g., after email verification)
+  // Also track app return for analytics
   useEffect(() => {
     const handleAppStateChange = (nextAppState: string) => {
+      // Track when app returns from background to foreground
+      if (
+        appStateRef.current.match(/inactive|background/) &&
+        nextAppState === 'active'
+      ) {
+        // User returned to app from background
+        trackAppReturned();
+      }
+      
+      appStateRef.current = nextAppState;
+      
       if (nextAppState === 'active' && token && user) {
         // Refresh user data when app becomes active
         dispatch(refreshUserData());

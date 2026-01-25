@@ -94,6 +94,11 @@ export function FeatureModal({
     if (canAfford && meetsLevelRequirement && !isCurrentlyResearching) {
       try {
         const result = await startResearch({ categoryId, featureId: feature.id }).unwrap();
+        
+        // Track first research
+        const { trackFirstResearch } = await import('../../services/analyticsService');
+        await trackFirstResearch(categoryId, feature.id);
+        
         setIsResearching(true);
         onResearchStarted?.();
         onClose(); // Close modal after starting research

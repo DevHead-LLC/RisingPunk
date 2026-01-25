@@ -63,7 +63,7 @@ export const botsApi = createApi({
         method: 'POST',
         body,
       }),
-      async onQueryStarted({ totalCost }, { dispatch, queryFulfilled, getState }) {
+      async onQueryStarted({ totalCost, type }, { dispatch, queryFulfilled, getState }) {
         // Get current balance state before any updates
         const state = getState() as any;
         const currentBalance = state.balance?.total;
@@ -87,6 +87,10 @@ export const botsApi = createApi({
 
         try {
           await queryFulfilled;
+          
+          // Track first bots build (only tracks once per device)
+          const { trackFirstBots } = await import('../../services/analyticsService');
+          await trackFirstBots(type);
         } catch {
           // If the build fails, revert the optimistic balance update
           patchResult.undo();
