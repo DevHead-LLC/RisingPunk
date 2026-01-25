@@ -15,6 +15,7 @@ import { useStartResearchMutation, useCompleteResearchMutation, useSpeedupFeatur
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { updateBalance } from '../../store/slices/balanceSlice';
 import { LockedFeatureModal } from '../turf/LockedFeatureModal';
+import { trackFirstResearch } from '../../services/analyticsService';
 
 interface FeatureModalProps {
   visible: boolean;
@@ -94,9 +95,19 @@ export function FeatureModal({
     if (canAfford && meetsLevelRequirement && !isCurrentlyResearching) {
       try {
         const result = await startResearch({ categoryId, featureId: feature.id }).unwrap();
+        
+        // Update UI immediately after successful mutation
         setIsResearching(true);
         onResearchStarted?.();
         onClose(); // Close modal after starting research
+        
+        // Track first research (fire-and-forget, don't block UI updates)
+        try {
+          await trackFirstResearch(categoryId, feature.id);
+        } catch (analyticsError) {
+          // Analytics failure should not affect user experience
+          console.error('[Analytics] Error tracking first_research:', analyticsError);
+        }
       } catch (error) {
         console.error('Failed to start research:', error);
       }

@@ -12,6 +12,7 @@ import { BotType } from '../types/bots';
 import { useAppSelector } from '../store/hooks';
 import { useAssignToBattalionMutation } from '../store/api/botsApi';
 import { useStartBattleMutation } from '../store/api/battleApi';
+import { trackFirstBattle } from '../services/analyticsService';
 import { useGetShieldStatusQuery, useDeactivateShieldMutation } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { API_URL } from '../config';
@@ -326,7 +327,14 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
     try {
       // Otherwise proceed directly with battle start
       const result = await startBattle(battleStartData).unwrap();
+      
+      // Update UI immediately (don't block on analytics)
       onBattleStart(result.battleId);
+      
+      // Track first battle (fire-and-forget, don't block UI updates)
+      trackFirstBattle().catch((error) => {
+        console.error('[Analytics] Error tracking first_battle:', error);
+      });
     } catch (error) {
       console.error('Failed to start battle:', error);
       onBattleStart();
@@ -346,7 +354,14 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       
       // Then start the battle
       const result = await startBattle(battleStartData).unwrap();
+      
+      // Update UI immediately (don't block on analytics)
       onBattleStart(result.battleId);
+      
+      // Track first battle (fire-and-forget, don't block UI updates)
+      trackFirstBattle().catch((error) => {
+        console.error('[Analytics] Error tracking first_battle:', error);
+      });
     } catch (error) {
       console.error('Failed to deactivate shield or start battle:', error);
       onBattleStart();
