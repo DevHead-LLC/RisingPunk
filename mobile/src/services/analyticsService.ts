@@ -10,7 +10,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 let analyticsInstance: ReturnType<typeof getAnalytics> | null = null;
 let initializationAttempted = false;
 
-const getAnalyticsInstance = () => {
+const getAnalyticsInstance = (): ReturnType<typeof getAnalytics> | null => {
+  // If initialization was already attempted and failed, don't retry
+  if (initializationAttempted && !analyticsInstance) {
+    return null;
+  }
+
   if (!analyticsInstance) {
     try {
       analyticsInstance = getAnalytics();
@@ -18,7 +23,7 @@ const getAnalyticsInstance = () => {
     } catch (error) {
       console.error('[Analytics] Failed to create analytics instance:', error);
       initializationAttempted = true;
-      throw error;
+      return null; // Return null instead of throwing to prevent retries
     }
   }
   return analyticsInstance;
@@ -31,6 +36,9 @@ const getAnalyticsInstance = () => {
 export const trackAccountCreated = async (method: 'email' | 'google' | 'apple') => {
   try {
     const analytics = getAnalyticsInstance();
+    if (!analytics) {
+      return; // Analytics not available, skip tracking
+    }
     await logEvent(analytics, 'account_created', {
       signup_method: method,
       timestamp: new Date().toISOString(),
@@ -56,6 +64,9 @@ export const trackFirstBots = async (buildType: string) => {
     await AsyncStorage.setItem('has_built_bots_before', 'true');
 
     const analytics = getAnalyticsInstance();
+    if (!analytics) {
+      return; // Analytics not available, skip tracking
+    }
     await logEvent(analytics, 'first_bots', {
       build_type: buildType,
       timestamp: new Date().toISOString(),
@@ -81,6 +92,9 @@ export const trackFirstConstruct = async (constructType: 'rental_property' | 're
     await AsyncStorage.setItem('has_constructed_before', 'true');
 
     const analytics = getAnalyticsInstance();
+    if (!analytics) {
+      return; // Analytics not available, skip tracking
+    }
     await logEvent(analytics, 'first_construct', {
       construct_type: constructType,
       property_id: propertyId,
@@ -108,6 +122,9 @@ export const trackHackmapVisited = async () => {
     await AsyncStorage.setItem('has_visited_hackmap', 'true');
 
     const analytics = getAnalyticsInstance();
+    if (!analytics) {
+      return; // Analytics not available, skip tracking
+    }
     await logEvent(analytics, 'hackmap_visited', {
       timestamp: new Date().toISOString(),
     });
@@ -132,6 +149,9 @@ export const trackFirstResearch = async (categoryId: string, featureId: string) 
     await AsyncStorage.setItem('has_researched_before', 'true');
 
     const analytics = getAnalyticsInstance();
+    if (!analytics) {
+      return; // Analytics not available, skip tracking
+    }
     await logEvent(analytics, 'first_research', {
       category_id: categoryId,
       feature_id: featureId,
@@ -158,44 +178,14 @@ export const trackFirstBattle = async () => {
     await AsyncStorage.setItem('has_battled_before', 'true');
 
     const analytics = getAnalyticsInstance();
+    if (!analytics) {
+      return; // Analytics not available, skip tracking
+    }
     await logEvent(analytics, 'first_battle', {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
     console.error('[Analytics] Error tracking first_battle:', error);
-  }
-};
-
-/**
- * Track property build completion
- * Call this when a user completes building a property
- */
-export const trackPropertyBuilt = async (propertyId: number) => {
-  try {
-    const analytics = getAnalyticsInstance();
-    await logEvent(analytics, 'property_built', {
-      property_id: propertyId,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    console.error('[Analytics] Error tracking property_built:', error);
-  }
-};
-
-/**
- * Track battle completion
- * Call this when a user completes a battle
- */
-export const trackBattleCompleted = async (battleResult: 'win' | 'loss') => {
-  try {
-    const analytics = getAnalyticsInstance();
-    await logEvent(analytics, 'battle_completed', {
-      result: battleResult,
-      timestamp: new Date().toISOString(),
-    });
-    console.log(`[Analytics] battle_completed tracked (result: ${battleResult})`);
-  } catch (error) {
-    console.error('[Analytics] Error tracking battle_completed:', error);
   }
 };
 
@@ -207,6 +197,9 @@ export const trackBattleCompleted = async (battleResult: 'win' | 'loss') => {
 export const trackAppReturned = async () => {
   try {
     const analytics = getAnalyticsInstance();
+    if (!analytics) {
+      return; // Analytics not available, skip tracking
+    }
     await logEvent(analytics, 'app_returned', {
       timestamp: new Date().toISOString(),
     });
@@ -215,33 +208,3 @@ export const trackAppReturned = async () => {
   }
 };
 
-/**
- * Track screen view
- * Call this when user navigates to a screen
- * React Native Firebase does NOT automatically track screen views
- */
-export const trackScreenView = async (screenName: string, screenClass?: string) => {
-  try {
-    // Check if Firebase Analytics is ready
-    const isReady = await AsyncStorage.getItem('firebase_analytics_ready');
-    if (!isReady) {
-      return;
-    }
-    
-    const analytics = getAnalyticsInstance();
-    
-    // Verify analytics instance is valid
-    if (!analytics) {
-      return;
-    }
-    
-    // Use logEvent with screen_view event name (Firebase standard)
-    await logEvent(analytics, 'screen_view', {
-      screen_name: screenName,
-      screen_class: screenClass || screenName,
-    });
-  } catch (error) {
-    console.error('[Analytics] Error tracking screen_view:', error);
-    // Don't re-throw - we don't want analytics errors to break the app
-  }
-};

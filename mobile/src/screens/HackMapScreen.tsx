@@ -22,6 +22,7 @@ import { CellData, TerrainType, EntityType } from '../types/map';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useTheme } from '../context/ThemeContext';
 import { SIZING } from '../styles/theme';
+import { trackHackmapVisited } from '../services/analyticsService';
 
 const CELL_SIZE = 75;
 const MARGIN_SIZE = 80;
@@ -382,8 +383,6 @@ const panningTileMemoComparison = <T extends {
     prevProps.isShieldActive === nextProps.isShieldActive
   );
 };
-
-import { trackHackmapVisited } from '../services/analyticsService';
 
 export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const dispatch = useAppDispatch();

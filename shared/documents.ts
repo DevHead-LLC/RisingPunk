@@ -2,12 +2,12 @@
  * Shared document data for Privacy Policy and Terms of Service
  * Used by web, mobile, and server applications
  * 
- * Last Updated: January 15, 2026
+ * Last Updated: January 24, 2026
  */
 
 export const DOCUMENTS = {
   privacyPolicy: {
-    effectiveDate: 'January 15, 2026',
+    effectiveDate: 'January 24, 2026',
     sections: [
       {
         title: 'Data Controller',
@@ -47,8 +47,16 @@ support@risingpunk.com (forwarded and hosted through Google Workspace)`
             text: 'messages and content you post in the in-app chat system. This content is stored to provide the chat functionality and may be reviewed for moderation purposes.'
           },
           {
-            label: 'Analytics and usage data',
-            text: 'we use Google Firebase Analytics to collect anonymous usage statistics, including app opens, screen views, and in-game actions (such as account creation, builds, and battles). This data helps us improve the app experience. Analytics data is processed by Google and is subject to Google\'s Privacy Policy. No personally identifiable information is collected through analytics.'
+            label: 'Analytics and usage data (Mobile App)',
+            text: 'we use Google Firebase Analytics to collect anonymous usage statistics in our mobile app, including app opens, screen views, and in-game actions (such as account creation, builds, battles, and feature usage). This data helps us improve the app experience and understand how users interact with the game. Analytics data is processed by Google and is subject to Google\'s Privacy Policy. No personally identifiable information (such as email addresses or usernames) is collected through Firebase Analytics. All analytics data is anonymized and aggregated.'
+          },
+          {
+            label: 'Website analytics and tracking',
+            text: 'if you visit our website, we use Google Analytics, Google Search Console, and Microsoft Clarity to understand website usage, improve our website experience, and analyze user behavior. These services may collect information such as page views, time on site, device information, and general location data (country/city level). This data is processed by Google and Microsoft respectively and is subject to their privacy policies. Website analytics are separate from app analytics and do not track your in-app behavior.'
+          },
+          {
+            label: 'Advertising and attribution data',
+            text: 'we use advertising platforms (Google Ads, YouTube Ads, and Apple Search Ads) to promote our app. These platforms may collect data about ad interactions, conversions, and device identifiers for attribution purposes (to understand which ads led to app installs). This data is used solely for measuring advertising effectiveness and is processed by the respective advertising platforms according to their privacy policies. We do not use this data to track individual users across apps or websites for advertising purposes.'
           }
         ]
       },
@@ -135,6 +143,26 @@ support@risingpunk.com (forwarded and hosted through Google Workspace)`
           {
             label: 'Mailchimp',
             text: 'newsletter management and email delivery for subscribers who opt-in through our website. Mailchimp operates under their own privacy policy and data processing agreement.'
+          },
+          {
+            label: 'Google Firebase Analytics',
+            text: 'collects anonymous app usage statistics and in-game event data. Data is processed according to Google\'s Privacy Policy and is not used to identify individual users.'
+          },
+          {
+            label: 'Google Analytics (Website)',
+            text: 'collects website usage statistics when you visit our website. Data is processed according to Google\'s Privacy Policy.'
+          },
+          {
+            label: 'Microsoft Clarity (Website)',
+            text: 'provides website analytics and user behavior insights when you visit our website. Data is processed according to Microsoft\'s Privacy Policy.'
+          },
+          {
+            label: 'Google Ads / YouTube Ads',
+            text: 'used for advertising and attribution tracking to measure ad effectiveness. Data is processed according to Google\'s Privacy Policy.'
+          },
+          {
+            label: 'Apple Search Ads',
+            text: 'used for advertising and attribution tracking to measure ad effectiveness. Data is processed according to Apple\'s Privacy Policy.'
           }
         ],
         note: 'Each processor operates under a written data‑processing agreement.'

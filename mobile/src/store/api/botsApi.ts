@@ -5,6 +5,7 @@ import { balanceApi } from './balanceApi';
 import { subtractFromBalance, addToBalance } from '../slices/balanceSlice';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 import { resetAllApiCaches } from './resetApiCaches';
+import { trackFirstBots } from '../../services/analyticsService';
 
 // Custom base query with error handling for botsApi
 const botsBaseQuery = async (args: any, api: any, extraOptions: any) => {
@@ -89,8 +90,13 @@ export const botsApi = createApi({
           await queryFulfilled;
           
           // Track first bots build (only tracks once per device)
-          const { trackFirstBots } = await import('../../services/analyticsService');
-          await trackFirstBots(type);
+          // Analytics tracking is non-blocking - failures shouldn't affect the mutation
+          try {
+            await trackFirstBots(type);
+          } catch (analyticsError) {
+            // Log analytics error but don't fail the mutation
+            console.error('[Analytics] Failed to track first bots build:', analyticsError);
+          }
         } catch {
           // If the build fails, revert the optimistic balance update
           patchResult.undo();
