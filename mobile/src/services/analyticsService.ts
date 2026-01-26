@@ -207,3 +207,26 @@ export const trackAppReturned = async () => {
   }
 };
 
+/**
+ * Clear all first-time tracking flags from AsyncStorage
+ * Call this when a user logs out to ensure the next user on the same device
+ * can have their first-time events tracked correctly
+ */
+export const clearFirstTimeTrackingFlags = async () => {
+  try {
+    const keysToRemove = [
+      'has_built_bots_before',
+      'has_constructed_before',
+      'has_visited_hackmap',
+      'has_researched_before',
+      'has_battled_before',
+    ];
+    
+    await Promise.all(
+      keysToRemove.map(key => AsyncStorage.removeItem(key))
+    );
+  } catch (error) {
+    console.error('[Analytics] Error clearing first-time tracking flags:', error);
+  }
+};
+
