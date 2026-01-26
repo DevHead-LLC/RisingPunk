@@ -285,13 +285,11 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
 
   // Track if onChangeText is working (for production debugging/fallback)
   const lastChangeTimeRef = useRef<number>(0);
-  const expectedValueRef = useRef<string>('');
   
   const handleTextChange = useCallback((text: string) => {
     setHandle(text);
     setIsTyping(true);
     lastChangeTimeRef.current = Date.now();
-    expectedValueRef.current = text;
     if (error) {
       setError('');
     }
@@ -309,7 +307,6 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
       const newValue = handle.slice(0, -1);
       setHandle(newValue);
       setIsTyping(true);
-      expectedValueRef.current = newValue;
       if (error) {
         setError('');
       }
@@ -328,7 +325,6 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
           const newValue = handle + key;
           setHandle(newValue);
           setIsTyping(true);
-          expectedValueRef.current = newValue;
           if (error) {
             setError('');
           }

@@ -366,13 +366,8 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
                   { backgroundColor: colors.primary, borderColor: colors.secondary },
                   pressed && { opacity: 0.7 }
                 ]}
-                onPress={() => {
-                  console.log('📱 EmailVerificationModal - Close button onPress (iOS)');
-                  handleClose();
-                }}
-                onPressIn={() => {
-                  console.log('📱 EmailVerificationModal - Close button onPressIn (iOS)');
-                }}
+                onPress={handleClose}
+                onPressIn={() => {}}
                 onPressOut={handleClosePressOut}
               >
                 <Text style={[styles.closeButtonText, { color: colors.background }]}>×</Text>

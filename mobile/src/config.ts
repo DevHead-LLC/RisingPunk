@@ -97,20 +97,11 @@ export const getEnvironmentInfo = () => {
   };
 };
 
-// Log environment info on module load (for debugging)
-if (__DEV__) {
-  const envInfo = getEnvironmentInfo();
-  console.log('🔍 Environment Configuration:', JSON.stringify(envInfo, null, 2));
-} else {
-  // In production, log critical info to help diagnose issues
-  const envInfo = getEnvironmentInfo();
-  console.log('🔍 Production Build Environment Info:', {
-    apiEnv: envInfo.apiEnv,
-    apiUrl: envInfo.apiUrl,
-    apiEnvFromConfig: Config.API_ENV,
-  });
-  
-  // Critical warning if production build is not using production environment
+// Check environment configuration on module load
+const envInfo = getEnvironmentInfo();
+
+// Critical warning if production build is not using production environment
+if (envInfo.isProductionBuild) {
   if (envInfo.apiEnv !== 'prod' || !envInfo.apiUrl.includes('risingpunk.com')) {
     console.error(`
 🚨🚨🚨 CRITICAL PRODUCTION BUILD ERROR 🚨🚨🚨
@@ -135,8 +126,6 @@ Build configuration:
 
 🚨🚨🚨 END CRITICAL ERROR 🚨🚨🚨
     `);
-  } else {
-    console.log('✅ Production build verified: Using production environment');
   }
 }
 
