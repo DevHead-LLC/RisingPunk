@@ -283,23 +283,52 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
     }
   }, [handle, onSubmit, validateHandle]);
 
+  // Track if onChangeText is working (for production debugging/fallback)
+  const lastChangeTimeRef = useRef<number>(0);
+  
   const handleTextChange = useCallback((text: string) => {
     setHandle(text);
     setIsTyping(true);
+    lastChangeTimeRef.current = Date.now();
     if (error) {
       setError('');
     }
     // Don't update noBadWords here - let the debounced check handle it
   }, [error]);
 
+  // Enhanced key press handler for Android production builds
+  // onChangeText can be unreliable in production, so we use onKeyPress as fallback
   const handleKeyPress = useCallback((event: any) => {
-    // Handle Backspace manually on Android since onChangeText doesn't fire reliably
-    if (event.nativeEvent.key === 'Backspace' && handle.length > 0) {
+    const key = event.nativeEvent.key;
+    const now = Date.now();
+    
+    // Handle Backspace - always handle this manually on Android
+    if (key === 'Backspace' && handle.length > 0) {
       const newValue = handle.slice(0, -1);
       setHandle(newValue);
       setIsTyping(true);
       if (error) {
         setError('');
+      }
+      return;
+    }
+    
+    // For Android production: Fallback character input handler
+    // Only use if onChangeText hasn't fired recently (within 100ms)
+    // This prevents double input when onChangeText IS working
+    if (Platform.OS === 'android' && key && key.length === 1 && /^[a-zA-Z0-9!&%^*_]$/.test(key)) {
+      // Check if onChangeText fired recently - if so, don't duplicate
+      const timeSinceLastChange = now - lastChangeTimeRef.current;
+      if (timeSinceLastChange > 100) {
+        // onChangeText didn't fire, use fallback
+        if (handle.length < 15) {
+          const newValue = handle + key;
+          setHandle(newValue);
+          setIsTyping(true);
+          if (error) {
+            setError('');
+          }
+        }
       }
     }
   }, [handle, error]);
@@ -419,6 +448,21 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
                         maxLength={15}
                         editable={!isLoading}
                         onKeyPress={handleKeyPress}
+                        {...(Platform.OS === 'android' && {
+                          // Android-specific props to ensure reliable text input in production
+                          includeFontPadding: false,
+                          textAlignVertical: 'center',
+                          // Disable autofill to prevent interference
+                          autoComplete: 'off',
+                          importantForAutofill: 'no',
+                          // Ensure keyboard shows properly
+                          keyboardType: 'default',
+                          returnKeyType: 'done',
+                          // Prevent text selection issues
+                          selectTextOnFocus: false,
+                          // Ensure input is properly focusable
+                          focusable: true,
+                        })}
                       />
                       {error ? (
                         <Text style={[styles.errorText, { color: colors.error }]}>
@@ -556,6 +600,21 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
                         maxLength={15}
                         editable={!isLoading}
                         onKeyPress={handleKeyPress}
+                        {...(Platform.OS === 'android' && {
+                          // Android-specific props to ensure reliable text input in production
+                          includeFontPadding: false,
+                          textAlignVertical: 'center',
+                          // Disable autofill to prevent interference
+                          autoComplete: 'off',
+                          importantForAutofill: 'no',
+                          // Ensure keyboard shows properly
+                          keyboardType: 'default',
+                          returnKeyType: 'done',
+                          // Prevent text selection issues
+                          selectTextOnFocus: false,
+                          // Ensure input is properly focusable
+                          focusable: true,
+                        })}
                       />
                       {error ? (
                         <Text style={[styles.errorText, { color: colors.error }]}>

@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
+import android.view.WindowManager
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.ReactRootView
@@ -39,6 +40,48 @@ class MainActivity : ReactActivity() {
         or View.SYSTEM_UI_FLAG_FULLSCREEN
         or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
       )
+    }
+  }
+
+  /**
+   * Handle activity resumption after system dialogs (like autofill save prompts).
+   * This prevents black screen issues when Samsung Pass or Google Autofill dialogs are dismissed.
+   */
+  override fun onResume() {
+    super.onResume()
+    // Ensure window is properly focused and visible after system dialogs
+    window?.let {
+      it.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+      // Ensure immersive mode is maintained without showing/hiding bars
+      // This prevents flickering and black screen issues
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        window.insetsController?.hide(WindowInsets.Type.systemBars())
+      }
+    }
+  }
+
+  /**
+   * Handle window focus changes to prevent black screen after autofill dialogs.
+   * When autofill dialogs appear, the window loses focus. When they're dismissed,
+   * we need to ensure the app properly regains focus.
+   */
+  override fun onWindowFocusChanged(hasFocus: Boolean) {
+    super.onWindowFocusChanged(hasFocus)
+    if (hasFocus) {
+      // Window regained focus - ensure proper display
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        window.insetsController?.hide(WindowInsets.Type.systemBars())
+      } else {
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = (
+          View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+          or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+          or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+          or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+          or View.SYSTEM_UI_FLAG_FULLSCREEN
+          or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        )
+      }
     }
   }
 

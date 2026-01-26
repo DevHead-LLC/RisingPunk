@@ -1,6 +1,7 @@
 import React, { memo, useEffect, useRef, useCallback } from 'react';
 import { View, Text, Dimensions, AppState, Platform } from 'react-native';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
+import { useThemeColors } from '../hooks/useThemeColors';
 import { loadStoredAuth, updateHandle, setShowEmailVerification, setShowEmailVerificationBanner, refreshUserData, logoutUser, setShowAccountSwitched, setShowAccountSwitchedBanner } from '../store/slices/authSlice';
 import { updateBalance, triggerUpdate } from '../store/slices/balanceSlice';
 import { setBots, setBuildState } from '../store/slices/botsSlice';
@@ -25,9 +26,11 @@ import { getBuildInfo } from '../utils/BuildInfo';
 
 const AppContent = memo(() => {
   const dispatch = useAppDispatch();
+  const colors = useThemeColors();
   const showFinancials = useAppSelector((state) => state.ui.modals.financialStatements);
   const showGlobalError = useAppSelector((state) => state.ui.modals.globalError);
   const { token, isLoading, showHandleSelection, showEmailVerification, showEmailVerificationBanner, showAccountSwitched, showAccountSwitchedBanner, user } = useAppSelector((state) => state.auth);
+  
   const balanceDisplayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const turfScreenRef = useRef<any>(null);
   const previousTokenRef = useRef<string | null>(null);
@@ -82,29 +85,10 @@ const AppContent = memo(() => {
   useEffect(() => {
     dispatch(loadStoredAuth());
     
-    // Log environment and build info on app startup (development only for verbose logs)
+    // Check environment configuration on app startup
     const logStartupInfo = async () => {
       try {
         const envInfo = getEnvironmentInfo();
-        const buildInfo = await getBuildInfo();
-        
-        // Verbose logging only in development
-        if (__DEV__) {
-          console.log('========================================');
-          console.log('🚀 APP STARTUP - BUILD & ENVIRONMENT INFO');
-          console.log('========================================');
-          console.log('Build Info:');
-          console.log(`  - Version Code: ${buildInfo.versionCode}`);
-          console.log(`  - Version Name: ${buildInfo.versionName}`);
-          console.log(`  - Debug Build: ${buildInfo.debug}`);
-          console.log('Environment Info:');
-          console.log(`  - API_ENV: ${envInfo.apiEnv}`);
-          console.log(`  - API_URL: ${envInfo.apiUrl}`);
-          console.log(`  - Production Build: ${envInfo.isProductionBuild}`);
-          console.log(`  - Dev Mode: ${envInfo.isDevMode}`);
-          console.log('Config Object:');
-          console.log(JSON.stringify(envInfo.configObject, null, 2));
-        }
         
         // Critical warning for production builds (always log errors)
         if (envInfo.isProductionBuild) {
@@ -113,15 +97,9 @@ const AppContent = memo(() => {
             console.error(`Expected: API_ENV=prod, API_URL=https://api.risingpunk.com`);
             console.error(`Actual: API_ENV=${envInfo.apiEnv}, API_URL=${envInfo.apiUrl}`);
           }
-          // Note: Success case is intentionally not logged in production to reduce console noise
-          // Errors are always logged to help diagnose production issues
-        }
-        
-        if (__DEV__) {
-          console.log('========================================');
         }
       } catch (error) {
-        console.error('Failed to log startup info:', error);
+        console.error('Failed to check startup configuration:', error);
       }
     };
     
@@ -270,8 +248,9 @@ const AppContent = memo(() => {
   const shouldShowConnectivityOverlay = isConnected === false && isInternetReachable === false;
 
   // Show loading state while checking stored auth or fetching data
+  // Return a View with background color instead of null to prevent black screen
   if (isLoading || (token && (balanceLoading || botsLoading || buildStateLoading))) {
-    return null; // or a loading component
+    return <View style={{ flex: 1, backgroundColor: colors.background }} />;
   }
 
   if (!token) {

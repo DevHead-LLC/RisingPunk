@@ -20,6 +20,8 @@
     "android:pixel4a-staging": "lsof -ti:8081 | xargs kill -9 2>/dev/null || true && cd android && ./gradlew assembleDebug -DENVFILE=.env.staging && cd .. && adb -s 0B171JECB16773 install -r android/app/build/outputs/apk/debug/app-debug.apk && adb -s 0B171JECB16773 reverse tcp:8081 tcp:8081 && ENVFILE=.env.staging react-native start",
     "// DEVICE TESTING - Build and install debug APK on Pixel 4a 5G with PRODUCTION environment (device ID: 0B171JECB16773) - Use this to verify production env vars work before deploying AAB to Play Store": "",
     "android:pixel4a-prod": "lsof -ti:8081 | xargs kill -9 2>/dev/null || true && cd android && ./gradlew assembleDebug -DENVFILE=.env.prod && cd .. && adb -s 0B171JECB16773 install -r android/app/build/outputs/apk/debug/app-debug.apk && adb -s 0B171JECB16773 reverse tcp:8081 tcp:8081 && ENVFILE=.env.prod react-native start",
+    "// DEVICE TESTING - Build and install debug APK on Samsung Galaxy S25 FE with PRODUCTION environment (device ID: R5GYC441Q1R) - Use this to test production builds on S25 FE": "",
+    "android:s25fe-prod": "lsof -ti:8081 | xargs kill -9 2>/dev/null || true && cd android && ./gradlew assembleDebug -DENVFILE=.env.prod && cd .. && adb -s R5GYC441Q1R install -r android/app/build/outputs/apk/debug/app-debug.apk && adb -s R5GYC441Q1R reverse tcp:8081 tcp:8081 && sleep 2 && ENVFILE=.env.prod react-native start --reset-cache",
     "// WINDOWS SETUP SCRIPTS - PowerShell setup scripts for Windows development (dev/staging/prod)": "",
     "android:dev:setup": "powershell -ExecutionPolicy Bypass -File android-dev.ps1",
     "android:staging:setup": "powershell -ExecutionPolicy Bypass -File android-staging.ps1",

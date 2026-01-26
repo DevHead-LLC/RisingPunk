@@ -124,7 +124,7 @@ export const LoginScreen = () => {
           })).unwrap();
         }
       } catch (err) {
-        console.error('🔴 LOGIN: Form submission error:', err);
+        console.error('Form submission error:', err);
         // Convert technical errors to user-friendly messages
         let userMessage = 'ACCESS_DENIED: ';
 

@@ -50,8 +50,23 @@ export const loginUser = createAsyncThunk(
   'auth/login',
   async (credentials: { handle: string; accessKey: string }, { rejectWithValue, dispatch }) => {
     try {
+      // Test basic connectivity first
+      try {
+        const healthController = new AbortController();
+        const healthTimeout = setTimeout(() => healthController.abort(), 5000);
+        await fetch(`${API_URL}/api/health`, {
+          method: 'GET',
+          signal: healthController.signal,
+        });
+        clearTimeout(healthTimeout);
+      } catch (connectivityError: any) {
+        // Continue anyway - health endpoint might not exist
+      }
+      
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, 10000);
       
       let response;
       try {
@@ -63,6 +78,11 @@ export const loginUser = createAsyncThunk(
           body: JSON.stringify(credentials),
           signal: controller.signal,
         });
+      } catch (fetchError: any) {
+        if (fetchError.name === 'AbortError') {
+          return rejectWithValue('Request timeout: Server did not respond within 10 seconds');
+        }
+        throw fetchError;
       } finally {
         clearTimeout(timeoutId);
       }
@@ -154,29 +174,60 @@ export const registerUser = createAsyncThunk(
   'auth/register',
   async (credentials: { email: string; accessKey: string }, { rejectWithValue }) => {
     try {
-      // CRITICAL: Log the API URL being used for registration (development only)
-      if (__DEV__) {
-        console.log('🔴 REGISTRATION API CALL:');
-        console.log(`  - API_URL: ${API_URL}`);
-        console.log(`  - Full URL: ${API_URL}/api/auth/register`);
-        console.log(`  - Config.API_ENV: ${Config.API_ENV || 'undefined'}`);
-        console.log(`  - Config.API_URL: ${Config.API_URL || 'undefined'}`);
+      // Test basic connectivity first
+      try {
+        const healthController = new AbortController();
+        const healthTimeout = setTimeout(() => healthController.abort(), 5000);
+        await fetch(`${API_URL}/api/health`, {
+          method: 'GET',
+          signal: healthController.signal,
+        });
+        clearTimeout(healthTimeout);
+      } catch (connectivityError: any) {
+        // Continue anyway - health endpoint might not exist
       }
       
-      const response = await fetch(`${API_URL}/api/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(credentials),
-      });
+      // Create timeout controller AFTER connectivity test to ensure full 10s for actual request
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, 10000);
+      
+      let response;
+      try {
+        response = await fetch(`${API_URL}/api/auth/register`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(credentials),
+          signal: controller.signal,
+        });
+      } catch (fetchError: any) {
+        if (fetchError.name === 'AbortError') {
+          return rejectWithValue('Request timeout: Server did not respond within 10 seconds');
+        }
+        throw fetchError; // Re-throw to be caught by outer catch
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Registration failed' }));
+        let error;
+        try {
+          error = await response.json();
+        } catch (parseError) {
+          error = { error: 'Registration failed' };
+        }
         return rejectWithValue(error.error || 'Registration failed');
       }
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        return rejectWithValue('Invalid response from server');
+      }
 
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
@@ -186,6 +237,9 @@ export const registerUser = createAsyncThunk(
     } catch (error) {
       if (error instanceof TypeError && error.message.includes('Network request failed')) {
         return rejectWithValue('Network error: Cannot connect to server');
+      }
+      if ((error as any)?.name === 'AbortError') {
+        return rejectWithValue('Request timeout: Server did not respond');
       }
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
     }
@@ -277,15 +331,6 @@ export const googleSignUpUser = createAsyncThunk(
   'auth/googleSignUp',
   async (idToken: string, { rejectWithValue, dispatch }) => {
     try {
-      // CRITICAL: Log the API URL being used for Google sign-up (development only)
-      if (__DEV__) {
-        console.log('🔴 GOOGLE SIGN-UP API CALL:');
-        console.log(`  - API_URL: ${API_URL}`);
-        console.log(`  - Full URL: ${API_URL}/api/auth/google-signup`);
-        console.log(`  - Config.API_ENV: ${Config.API_ENV || 'undefined'}`);
-        console.log(`  - Config.API_URL: ${Config.API_URL || 'undefined'}`);
-      }
-      
       const response = await fetch(`${API_URL}/api/auth/google-signup`, {
         method: 'POST',
         headers: {
@@ -678,7 +723,7 @@ export const loadStoredAuth = createAsyncThunk(
         user: userData.user,
       };
     } catch (error) {
-      console.error('🔴 LOAD STORED AUTH: Error verifying token:', error);
+      console.error('Error verifying token:', error);
       // On error (including network errors), clear stored data to force re-authentication
       await AsyncStorage.multiRemove(['token', 'user']);
       return null;

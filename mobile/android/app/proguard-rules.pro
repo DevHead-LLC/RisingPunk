@@ -177,6 +177,16 @@
     @com.facebook.react.uimanager.annotations.ReactPropGroup <methods>;
 }
 
+# CRITICAL: Keep TextInput event handlers for production builds
+# Prevents onChangeText and onKeyPress from being stripped by ProGuard/R8
+-keepclassmembers class com.facebook.react.views.textinput.ReactTextInputManager {
+    *;
+}
+-keepclassmembers class com.facebook.react.views.textinput.ReactEditText {
+    *;
+}
+-keep class com.facebook.react.views.textinput.** { *; }
+
 # Preserve JavaScript names for native modules
 -keepclassmembers class * {
     @com.facebook.react.bridge.ReactMethod <methods>;
