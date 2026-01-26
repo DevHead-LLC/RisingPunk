@@ -40,6 +40,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
   const { themeMode } = useTheme();
   const { highlightTaskId, clearHighlight } = useTaskGuideHighlight();
   const currentBalanceState = useAppSelector((state) => state.balance);
+  const userId = useAppSelector((state) => state.auth.user?._id);
   const [showPopup, setShowPopup] = useState(false);
   const [showLoadingModal, setShowLoadingModal] = useState(false);
   const [showInsufficientFundsModal, setShowInsufficientFundsModal] = useState(false);
@@ -183,9 +184,11 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
         setForceUpdate(prev => prev + 1);
         
         // Track first construction (fire-and-forget, don't block UI updates)
-        trackFirstConstruct('rental_property', propertyId).catch((error) => {
-          console.error('[Analytics] Error tracking first_construct:', error);
-        });
+        if (userId) {
+          trackFirstConstruct('rental_property', userId, propertyId).catch((error) => {
+            console.error('[Analytics] Error tracking first_construct:', error);
+          });
+        }
         const refetchResult = await refetch();
       }
     } catch (error: any) {

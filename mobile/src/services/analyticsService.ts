@@ -52,9 +52,10 @@ export const trackAccountCreated = async (method: 'email' | 'google' | 'apple') 
  * Track first bots build
  * Call this when a user builds bots for the first time
  */
-export const trackFirstBots = async (buildType: string) => {
+export const trackFirstBots = async (buildType: string, userId: string) => {
   try {
-    const hasBuiltBotsBefore = await AsyncStorage.getItem('has_built_bots_before');
+    const key = `has_built_bots_before_${userId}`;
+    const hasBuiltBotsBefore = await AsyncStorage.getItem(key);
     if (hasBuiltBotsBefore) {
       // Not first bots build, don't track
       return;
@@ -70,7 +71,7 @@ export const trackFirstBots = async (buildType: string) => {
     });
     
     // Mark that user has built bots before (only after successful event logging)
-    await AsyncStorage.setItem('has_built_bots_before', 'true');
+    await AsyncStorage.setItem(key, 'true');
   } catch (error) {
     console.error('[Analytics] Error tracking first_bots:', error);
   }
@@ -80,9 +81,10 @@ export const trackFirstBots = async (buildType: string) => {
  * Track first construction
  * Call this when a user constructs their first rental property or research center
  */
-export const trackFirstConstruct = async (constructType: 'rental_property' | 'research_center', propertyId?: number) => {
+export const trackFirstConstruct = async (constructType: 'rental_property' | 'research_center', userId: string, propertyId?: number) => {
   try {
-    const hasConstructedBefore = await AsyncStorage.getItem('has_constructed_before');
+    const key = `has_constructed_before_${userId}`;
+    const hasConstructedBefore = await AsyncStorage.getItem(key);
     if (hasConstructedBefore) {
       // Not first construction, don't track
       return;
@@ -99,7 +101,7 @@ export const trackFirstConstruct = async (constructType: 'rental_property' | 're
     });
     
     // Mark that user has constructed before (only after successful event logging)
-    await AsyncStorage.setItem('has_constructed_before', 'true');
+    await AsyncStorage.setItem(key, 'true');
   } catch (error) {
     console.error('[Analytics] Error tracking first_construct:', error);
   }
@@ -109,9 +111,10 @@ export const trackFirstConstruct = async (constructType: 'rental_property' | 're
  * Track HackMap visit
  * Call this when a user visits the HackMapScreen for the first time
  */
-export const trackHackmapVisited = async () => {
+export const trackHackmapVisited = async (userId: string) => {
   try {
-    const hasVisitedHackmap = await AsyncStorage.getItem('has_visited_hackmap');
+    const key = `has_visited_hackmap_${userId}`;
+    const hasVisitedHackmap = await AsyncStorage.getItem(key);
     if (hasVisitedHackmap) {
       // Not first visit, don't track
       return;
@@ -126,7 +129,7 @@ export const trackHackmapVisited = async () => {
     });
     
     // Mark that user has visited hackmap (only after successful event logging)
-    await AsyncStorage.setItem('has_visited_hackmap', 'true');
+    await AsyncStorage.setItem(key, 'true');
   } catch (error) {
     console.error('[Analytics] Error tracking hackmap_visited:', error);
   }
@@ -136,9 +139,10 @@ export const trackHackmapVisited = async () => {
  * Track first research
  * Call this when a user starts their first research feature
  */
-export const trackFirstResearch = async (categoryId: string, featureId: string) => {
+export const trackFirstResearch = async (categoryId: string, featureId: string, userId: string) => {
   try {
-    const hasResearchedBefore = await AsyncStorage.getItem('has_researched_before');
+    const key = `has_researched_before_${userId}`;
+    const hasResearchedBefore = await AsyncStorage.getItem(key);
     if (hasResearchedBefore) {
       // Not first research, don't track
       return;
@@ -155,7 +159,7 @@ export const trackFirstResearch = async (categoryId: string, featureId: string) 
     });
     
     // Mark that user has researched before (only after successful event logging)
-    await AsyncStorage.setItem('has_researched_before', 'true');
+    await AsyncStorage.setItem(key, 'true');
   } catch (error) {
     console.error('[Analytics] Error tracking first_research:', error);
   }
@@ -165,9 +169,10 @@ export const trackFirstResearch = async (categoryId: string, featureId: string) 
  * Track first battle
  * Call this when a user participates in their first battle
  */
-export const trackFirstBattle = async () => {
+export const trackFirstBattle = async (userId: string) => {
   try {
-    const hasBattledBefore = await AsyncStorage.getItem('has_battled_before');
+    const key = `has_battled_before_${userId}`;
+    const hasBattledBefore = await AsyncStorage.getItem(key);
     if (hasBattledBefore) {
       // Not first battle, don't track
       return;
@@ -182,7 +187,7 @@ export const trackFirstBattle = async () => {
     });
     
     // Mark that user has battled before (only after successful event logging)
-    await AsyncStorage.setItem('has_battled_before', 'true');
+    await AsyncStorage.setItem(key, 'true');
   } catch (error) {
     console.error('[Analytics] Error tracking first_battle:', error);
   }
@@ -208,18 +213,17 @@ export const trackAppReturned = async () => {
 };
 
 /**
- * Clear all first-time tracking flags from AsyncStorage
- * Call this when a user logs out to ensure the next user on the same device
- * can have their first-time events tracked correctly
+ * Clear first-time tracking flags for a specific user from AsyncStorage
+ * Call this when a user logs out to clear their flags
  */
-export const clearFirstTimeTrackingFlags = async () => {
+export const clearFirstTimeTrackingFlags = async (userId: string) => {
   try {
     const keysToRemove = [
-      'has_built_bots_before',
-      'has_constructed_before',
-      'has_visited_hackmap',
-      'has_researched_before',
-      'has_battled_before',
+      `has_built_bots_before_${userId}`,
+      `has_constructed_before_${userId}`,
+      `has_visited_hackmap_${userId}`,
+      `has_researched_before_${userId}`,
+      `has_battled_before_${userId}`,
     ];
     
     await Promise.all(
@@ -227,6 +231,27 @@ export const clearFirstTimeTrackingFlags = async () => {
     );
   } catch (error) {
     console.error('[Analytics] Error clearing first-time tracking flags:', error);
+  }
+};
+
+/**
+ * Check if user changed and clear previous user's flags if needed
+ * Call this on login/loadStoredAuth to handle user switching
+ */
+export const handleUserSwitch = async (newUserId: string) => {
+  try {
+    const lastUserIdKey = 'last_analytics_user_id';
+    const lastUserId = await AsyncStorage.getItem(lastUserIdKey);
+    
+    // If there's a previous user and it's different, clear their flags
+    if (lastUserId && lastUserId !== newUserId) {
+      await clearFirstTimeTrackingFlags(lastUserId);
+    }
+    
+    // Update the last user ID
+    await AsyncStorage.setItem(lastUserIdKey, newUserId);
+  } catch (error) {
+    console.error('[Analytics] Error handling user switch:', error);
   }
 };
 

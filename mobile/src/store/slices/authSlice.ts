@@ -5,7 +5,7 @@ import { updateBalance } from './balanceSlice';
 import { setBots, setBuildState } from './botsSlice';
 import { resetAllApiCaches } from '../api/resetApiCaches';
 import { authApi } from '../api/authApi';
-import { trackAccountCreated, clearFirstTimeTrackingFlags } from '../../services/analyticsService';
+import { trackAccountCreated, clearFirstTimeTrackingFlags, handleUserSwitch } from '../../services/analyticsService';
 
 // Types
 export interface User {
@@ -619,11 +619,18 @@ export const unlockHackRig = createAsyncThunk(
 
 export const logoutUser = createAsyncThunk(
   'auth/logout',
-  async (_, { dispatch }) => {
+  async (_, { dispatch, getState }) => {
+    const state = getState() as { auth: AuthState };
+    const userId = state.auth.user?._id;
+    
     await AsyncStorage.removeItem('token');
     await AsyncStorage.removeItem('user');
-    // Clear first-time tracking flags so next user on same device can have their events tracked
-    await clearFirstTimeTrackingFlags();
+    
+    // Clear first-time tracking flags for this user
+    if (userId) {
+      await clearFirstTimeTrackingFlags(userId);
+    }
+    
     resetAllApiCaches({ dispatch } as any);
   }
 );
@@ -964,6 +971,11 @@ export const authSlice = createSlice({
         state.showEmailVerification = false;
         state.showEmailVerificationBanner = false;
         state.isInitialized = true; // Mark as initialized after successful login
+        
+        // Handle user switch for analytics (fire-and-forget)
+        handleUserSwitch(action.payload.user._id).catch((error) => {
+          console.error('[Analytics] Error handling user switch:', error);
+        });
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.isLoading = false;
@@ -987,6 +999,11 @@ export const authSlice = createSlice({
       state.showOnboarding = !action.payload.user.onboardingCompleted;
       state.showHandleSelection = action.payload.user.needsHandleSelection;
       state.isInitialized = true; // Mark as initialized after successful registration
+      
+      // Handle user switch for analytics (fire-and-forget)
+      handleUserSwitch(action.payload.user._id).catch((error) => {
+        console.error('[Analytics] Error handling user switch:', error);
+      });
     })
       .addCase(registerUser.rejected, (state, action) => {
         state.isLoading = false;
@@ -1012,6 +1029,11 @@ export const authSlice = createSlice({
         state.showEmailVerification = false;
         state.showEmailVerificationBanner = false;
         state.isInitialized = true; // Mark as initialized after successful Google Sign-In
+        
+        // Handle user switch for analytics (fire-and-forget)
+        handleUserSwitch(action.payload.user._id).catch((error) => {
+          console.error('[Analytics] Error handling user switch:', error);
+        });
       })
       .addCase(googleSignInUser.rejected, (state, action) => {
         state.isLoading = false;
@@ -1033,6 +1055,11 @@ export const authSlice = createSlice({
       // Store needsHandleSelection but don't show modal yet - wait for onboarding + turf intro to complete
       state.showHandleSelection = false; // Will be set to true after turf intro completes
       state.showEmailVerification = false;
+      
+      // Handle user switch for analytics (fire-and-forget)
+      handleUserSwitch(action.payload.user._id).catch((error) => {
+        console.error('[Analytics] Error handling user switch:', error);
+      });
       state.showEmailVerificationBanner = false;
       state.isInitialized = true; // Mark as initialized after successful Google Sign-Up
     })
@@ -1057,6 +1084,11 @@ export const authSlice = createSlice({
         state.showEmailVerification = false;
         state.showEmailVerificationBanner = false;
         state.isInitialized = true; // Mark as initialized after successful Apple Sign-In
+        
+        // Handle user switch for analytics (fire-and-forget)
+        handleUserSwitch(action.payload.user._id).catch((error) => {
+          console.error('[Analytics] Error handling user switch:', error);
+        });
       })
       .addCase(appleSignInUser.rejected, (state, action) => {
         state.isLoading = false;
@@ -1074,6 +1106,11 @@ export const authSlice = createSlice({
         state.token = action.payload.token;
         state.user = action.payload.user;
         state.error = null;
+        
+        // Handle user switch for analytics (fire-and-forget)
+        handleUserSwitch(action.payload.user._id).catch((error) => {
+          console.error('[Analytics] Error handling user switch:', error);
+        });
         state.showOnboarding = !action.payload.user.onboardingCompleted;
         // Store needsHandleSelection but don't show modal yet - wait for onboarding + turf intro to complete
         state.showHandleSelection = false; // Will be set to true after turf intro completes
@@ -1157,6 +1194,11 @@ export const authSlice = createSlice({
           state.showTurfIntro = false; // Always start with false, will be set by onboarding flow if needed
           state.showHandleSelection = user.needsHandleSelection && user.onboardingCompleted;
           state.isInitialized = true; // Mark that initial database verification is complete
+          
+          // Handle user switch for analytics (fire-and-forget)
+          handleUserSwitch(user._id).catch((error) => {
+            console.error('[Analytics] Error handling user switch:', error);
+          });
           
           // Force fetch fresh balance and bot data immediately after auth
         } else {
