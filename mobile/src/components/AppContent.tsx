@@ -247,37 +247,15 @@ const AppContent = memo(() => {
   // Only show when we're definitely disconnected (both flags are false)
   const shouldShowConnectivityOverlay = isConnected === false && isInternetReachable === false;
 
-  // Log state changes for debugging
-  useEffect(() => {
-    console.log('🔴 APP CONTENT: Auth state changed', {
-      hasToken: !!token,
-      isLoading,
-      hasUser: !!user,
-      userHandle: user?.handle,
-      showHandleSelection,
-      showEmailVerification,
-      showOnboarding: user?.onboardingCompleted === false,
-      balanceLoading,
-      botsLoading,
-      buildStateLoading,
-    });
-  }, [token, isLoading, user, showHandleSelection, showEmailVerification, balanceLoading, botsLoading, buildStateLoading]);
+  // Note: Debug logging removed - was used for troubleshooting black screen issue
 
   // Show loading state while checking stored auth or fetching data
   // Return a View with background color instead of null to prevent black screen
   if (isLoading || (token && (balanceLoading || botsLoading || buildStateLoading))) {
-    console.log('🔴 APP CONTENT: Rendering loading state', {
-      isLoading,
-      hasToken: !!token,
-      balanceLoading,
-      botsLoading,
-      buildStateLoading,
-    });
     return <View style={{ flex: 1, backgroundColor: colors.background }} />;
   }
 
   if (!token) {
-    console.log('🔴 APP CONTENT: Rendering LoginScreen (no token)');
     return (
       <>
         <LoginScreen />
@@ -292,14 +270,6 @@ const AppContent = memo(() => {
       </>
     );
   }
-
-  console.log('🔴 APP CONTENT: Rendering TurfScreen (authenticated)', {
-    hasToken: !!token,
-    hasUser: !!user,
-    userHandle: user?.handle,
-    showHandleSelection,
-    showEmailVerification,
-  });
 
   return (
     <>

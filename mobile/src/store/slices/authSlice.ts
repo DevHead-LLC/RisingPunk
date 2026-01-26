@@ -174,11 +174,6 @@ export const registerUser = createAsyncThunk(
   'auth/register',
   async (credentials: { email: string; accessKey: string }, { rejectWithValue }) => {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => {
-        controller.abort();
-      }, 10000);
-      
       // Test basic connectivity first
       try {
         const healthController = new AbortController();
@@ -191,6 +186,13 @@ export const registerUser = createAsyncThunk(
       } catch (connectivityError: any) {
         // Continue anyway - health endpoint might not exist
       }
+      
+      // CRITICAL: Create timeout controller AFTER health check to ensure full 10s for actual request
+      // If timeout is created before health check, the health check (up to 5s) eats into the 10s timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, 10000);
       
       let response;
       try {
@@ -1027,18 +1029,10 @@ export const authSlice = createSlice({
     // Register
     builder
       .addCase(registerUser.pending, (state) => {
-        console.log('🔴 REGISTRATION REDUCER: Pending - setting isLoading=true');
         state.isLoading = true;
         state.error = null;
       })
           .addCase(registerUser.fulfilled, (state, action) => {
-      console.log('🔴 REGISTRATION REDUCER: Fulfilled - updating state', {
-        hasToken: !!action.payload.token,
-        hasUser: !!action.payload.user,
-        userHandle: action.payload.user?.handle,
-        needsHandleSelection: action.payload.user?.needsHandleSelection,
-        onboardingCompleted: action.payload.user?.onboardingCompleted,
-      });
       state.isLoading = false;
       state.token = action.payload.token;
       state.user = action.payload.user;
@@ -1046,19 +1040,8 @@ export const authSlice = createSlice({
       state.showOnboarding = !action.payload.user.onboardingCompleted;
       state.showHandleSelection = action.payload.user.needsHandleSelection;
       state.isInitialized = true; // Mark as initialized after successful registration
-      console.log('🔴 REGISTRATION REDUCER: State updated', {
-        isLoading: state.isLoading,
-        hasToken: !!state.token,
-        hasUser: !!state.user,
-        showOnboarding: state.showOnboarding,
-        showHandleSelection: state.showHandleSelection,
-        isInitialized: state.isInitialized,
-      });
     })
       .addCase(registerUser.rejected, (state, action) => {
-        console.log('🔴 REGISTRATION REDUCER: Rejected', {
-          error: action.payload,
-        });
         state.isLoading = false;
         state.error = action.payload as string;
         state.token = null;

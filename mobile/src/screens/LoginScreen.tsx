@@ -110,28 +110,21 @@ export const LoginScreen = () => {
 
     if (validateForm()) {
       try {
-        console.log('🔴 LOGIN SCREEN: Starting form submission', {
-          formType,
-        });
         setLoading(true);
         
         if (formType === 'login') {
-          console.log('🔴 LOGIN SCREEN: Dispatching loginUser...');
           await dispatch(loginUser({
             handle: formData.handle,
             accessKey: formData.accessKey,
           })).unwrap();
-          console.log('🔴 LOGIN SCREEN: loginUser completed successfully');
         } else {
-          console.log('🔴 LOGIN SCREEN: Dispatching registerUser...');
           await dispatch(registerUser({
             email: formData.email,
             accessKey: formData.accessKey,
           })).unwrap();
-          console.log('🔴 LOGIN SCREEN: registerUser completed successfully');
         }
       } catch (err) {
-        console.error('🔴 LOGIN SCREEN: Form submission error', err);
+        console.error('Form submission error:', err);
         // Convert technical errors to user-friendly messages
         let userMessage = 'ACCESS_DENIED: ';
 
