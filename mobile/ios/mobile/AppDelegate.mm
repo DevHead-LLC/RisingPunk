@@ -1,11 +1,45 @@
 #import "AppDelegate.h"
 
 #import <React/RCTBundleURLProvider.h>
+#import <FirebaseCore/FirebaseCore.h>
 
 @implementation AppDelegate
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
+  // Initialize Firebase before React Native bridge
+  [FIRApp configure];
+  
+#if DEBUG
+  // Enable Firebase Analytics debug mode for DebugView (iOS only)
+  // This allows events to appear in Firebase Console → Analytics → DebugView
+  // Method 1: Xcode scheme argument -FIRAnalyticsDebugEnabled (most reliable)
+  // Method 2: UserDefaults (fallback if scheme argument doesn't work)
+  
+  // Set Firebase debug mode via UserDefaults
+  [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"/google/firebase/debug_mode"];
+  
+  // Also set Analytics debug mode (required for DebugView)
+  Class APMUserDefaults = NSClassFromString(@"APMUserDefaults");
+  if (APMUserDefaults) {
+    SEL standardSelector = NSSelectorFromString(@"standardUserDefaults");
+    if ([APMUserDefaults respondsToSelector:standardSelector]) {
+      #pragma clang diagnostic push
+      #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+      id apmDefaults = [APMUserDefaults performSelector:standardSelector];
+      if (apmDefaults) {
+        SEL setObjectSelector = NSSelectorFromString(@"setObject:forKey:");
+        if ([apmDefaults respondsToSelector:setObjectSelector]) {
+          [apmDefaults performSelector:setObjectSelector withObject:@YES withObject:@"/google/measurement/debug_mode"];
+        }
+      }
+      #pragma clang diagnostic pop
+    }
+  }
+  
+  [[NSUserDefaults standardUserDefaults] synchronize];
+#endif
+  
   self.moduleName = @"mobile";
   // You can add your custom initial props in the dictionary below.
   // They will be passed down to the ViewController used by React Native.
