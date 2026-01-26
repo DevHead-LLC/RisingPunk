@@ -9,6 +9,7 @@ import { updateBalance, getCurrentBalance } from '../../store/slices/balanceSlic
 import { useGetRentalHousingStatusQuery, useUnlockRentalHousingMutation, useCompleteRentalHousingMutation, useSpeedupPropertyConstructionMutation } from '../../store/api/authApi';
 import { userGuideApi } from '../../store/api/userGuideApi';
 import { useTaskGuideHighlight } from '../../contexts/TaskGuideHighlightContext';
+import { trackFirstConstruct } from '../../services/analyticsService';
 import {
   DevelopmentIcon,
   DevelopmentLabel,
@@ -39,6 +40,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
   const { themeMode } = useTheme();
   const { highlightTaskId, clearHighlight } = useTaskGuideHighlight();
   const currentBalanceState = useAppSelector((state) => state.balance);
+  const userId = useAppSelector((state) => state.auth.user?._id);
   const [showPopup, setShowPopup] = useState(false);
   const [showLoadingModal, setShowLoadingModal] = useState(false);
   const [showInsufficientFundsModal, setShowInsufficientFundsModal] = useState(false);
@@ -178,15 +180,22 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
       const result = await completeRentalHousing(propertyId).unwrap();
       
       if (result.success) {
-        // Force a re-render to update the UI
+        // Force a re-render to update the UI (don't block on analytics)
         setForceUpdate(prev => prev + 1);
+        
+        // Track first construction (fire-and-forget, don't block UI updates)
+        if (userId) {
+          trackFirstConstruct('rental_property', userId, propertyId).catch((error) => {
+            console.error('[Analytics] Error tracking first_construct:', error);
+          });
+        }
         const refetchResult = await refetch();
       }
     } catch (error: any) {
       console.error('Error completing rental housing build:', error);
       setShowCompletionErrorModal(true);
     }
-  }, [propertyId, completeRentalHousing, refetch]);
+  }, [propertyId, completeRentalHousing, refetch, userId]);
 
   const handleSpeedup = useCallback(async () => {
     try {

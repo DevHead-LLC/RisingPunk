@@ -5,6 +5,7 @@ import { balanceApi } from './balanceApi';
 import { subtractFromBalance, addToBalance } from '../slices/balanceSlice';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 import { resetAllApiCaches } from './resetApiCaches';
+import { trackFirstBots } from '../../services/analyticsService';
 
 // Custom base query with error handling for botsApi
 const botsBaseQuery = async (args: any, api: any, extraOptions: any) => {
@@ -63,7 +64,7 @@ export const botsApi = createApi({
         method: 'POST',
         body,
       }),
-      async onQueryStarted({ totalCost }, { dispatch, queryFulfilled, getState }) {
+      async onQueryStarted({ totalCost, type }, { dispatch, queryFulfilled, getState }) {
         // Get current balance state before any updates
         const state = getState() as any;
         const currentBalance = state.balance?.total;
@@ -87,6 +88,21 @@ export const botsApi = createApi({
 
         try {
           await queryFulfilled;
+          
+          // Track first bots build (only tracks once per user)
+          // Analytics tracking is non-blocking - failures shouldn't affect the mutation
+          try {
+            const state = getState() as any;
+            const userId = state?.auth?.user?._id;
+            if (userId) {
+              trackFirstBots(type, userId).catch((analyticsError) => {
+                console.error('[Analytics] Failed to track first bots build:', analyticsError);
+              });
+            }
+          } catch (analyticsError) {
+            // Log analytics error but don't fail the mutation
+            console.error('[Analytics] Failed to track first bots build:', analyticsError);
+          }
         } catch {
           // If the build fails, revert the optimistic balance update
           patchResult.undo();

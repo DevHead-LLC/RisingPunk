@@ -134,7 +134,7 @@ android {
         applicationId "com.devheadllc.risingpunk"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 58
+        versionCode 59
         versionName "2.2.0"
         
         // CRITICAL: 16 KB Page Size Fix - Restrict to 64-bit ABIs only
@@ -191,6 +191,16 @@ android {
         }
     }
     
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    
+    kotlinOptions {
+        jvmTarget = "17"
+        // Skip Kotlin metadata version check to work around Firebase BOM 34.7.0 requiring Kotlin 2.1.0+
+        freeCompilerArgs += ["-Xskip-metadata-version-check"]
+    }
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
