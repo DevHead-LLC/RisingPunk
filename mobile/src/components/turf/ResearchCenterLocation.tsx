@@ -81,7 +81,9 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
     ) {
       dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
       // Track first construction
-      trackFirstConstruct('research_center');
+      if (userId) {
+        trackFirstConstruct('research_center', userId);
+      }
     }
     // Only update ref if we have valid data (not on initial mount with undefined)
     if (buildStatus !== undefined && token) {

@@ -195,7 +195,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
       console.error('Error completing rental housing build:', error);
       setShowCompletionErrorModal(true);
     }
-  }, [propertyId, completeRentalHousing, refetch]);
+  }, [propertyId, completeRentalHousing, refetch, userId]);
 
   const handleSpeedup = useCallback(async () => {
     try {
