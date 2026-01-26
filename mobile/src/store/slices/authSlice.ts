@@ -5,7 +5,7 @@ import { updateBalance } from './balanceSlice';
 import { setBots, setBuildState } from './botsSlice';
 import { resetAllApiCaches } from '../api/resetApiCaches';
 import { authApi } from '../api/authApi';
-import { trackAccountCreated, clearFirstTimeTrackingFlags } from '../../services/analyticsService';
+import { trackAccountCreated } from '../../services/analyticsService';
 
 // Types
 export interface User {
@@ -622,8 +622,12 @@ export const logoutUser = createAsyncThunk(
   async (_, { dispatch }) => {
     await AsyncStorage.removeItem('token');
     await AsyncStorage.removeItem('user');
-    // Clear first-time tracking flags so next user on same device can have their events tracked
-    await clearFirstTimeTrackingFlags();
+    
+    // Note: We do NOT clear first-time tracking flags on logout.
+    // With user-scoped keys (e.g., has_built_bots_before_${userId}), flags should
+    // persist across sessions so the same user doesn't get duplicate first-time events.
+    // Each user's flags are independent and don't interfere with other users.
+    
     resetAllApiCaches({ dispatch } as any);
   }
 );

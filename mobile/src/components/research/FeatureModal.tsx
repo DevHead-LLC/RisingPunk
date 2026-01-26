@@ -39,6 +39,7 @@ export function FeatureModal({
   const colors = useThemeColors();
   const dispatch = useAppDispatch();
   const currentBalanceState = useAppSelector((state) => state.balance);
+  const userId = useAppSelector((state) => state.auth.user?._id);
   const [isResearching, setIsResearching] = useState(false);
   const [researchTimeRemaining, setResearchTimeRemaining] = useState(0);
   const [isSpeedupLoading, setIsSpeedupLoading] = useState(false);
@@ -102,11 +103,11 @@ export function FeatureModal({
         onClose(); // Close modal after starting research
         
         // Track first research (fire-and-forget, don't block UI updates)
-        try {
-          await trackFirstResearch(categoryId, feature.id);
-        } catch (analyticsError) {
-          // Analytics failure should not affect user experience
-          console.error('[Analytics] Error tracking first_research:', analyticsError);
+        if (userId) {
+          trackFirstResearch(categoryId, feature.id, userId).catch((analyticsError) => {
+            // Analytics failure should not affect user experience
+            console.error('[Analytics] Error tracking first_research:', analyticsError);
+          });
         }
       } catch (error) {
         console.error('Failed to start research:', error);

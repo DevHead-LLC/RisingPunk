@@ -80,6 +80,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
   const [shieldCheckModalVisible, setShieldCheckModalVisible] = useState(false);
   const [isStartingBattle, setIsStartingBattle] = useState(false);
   const token = useAppSelector((state) => state.auth.token);
+  const userId = useAppSelector((state) => state.auth.user?._id);
   const botCounts = useAppSelector((state) => state.bots.botCounts);
   const [assignToBattalion] = useAssignToBattalionMutation();
   const [startBattle] = useStartBattleMutation();
@@ -332,16 +333,18 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       onBattleStart(result.battleId);
       
       // Track first battle (fire-and-forget, don't block UI updates)
-      trackFirstBattle().catch((error) => {
-        console.error('[Analytics] Error tracking first_battle:', error);
-      });
+      if (userId) {
+        trackFirstBattle(userId).catch((error) => {
+          console.error('[Analytics] Error tracking first_battle:', error);
+        });
+      }
     } catch (error) {
       console.error('Failed to start battle:', error);
       onBattleStart();
     } finally {
       setIsStartingBattle(false);
     }
-  }, [assignments, isActuallyUnlocked, shieldData?.isActive, defenderId, defenderNpcSlug, battleStartData, startBattle, onBattleStart, validateDeployment, isStartingBattle, isDeployPurgeHighlight, clearHighlight]);
+  }, [assignments, isActuallyUnlocked, shieldData?.isActive, defenderId, defenderNpcSlug, battleStartData, startBattle, onBattleStart, validateDeployment, isStartingBattle, isDeployPurgeHighlight, clearHighlight, userId]);
 
   // Handle continue from shield modal - deactivate shield and proceed to battle
   const handleShieldModalContinue = React.useCallback(async () => {
@@ -359,16 +362,18 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       onBattleStart(result.battleId);
       
       // Track first battle (fire-and-forget, don't block UI updates)
-      trackFirstBattle().catch((error) => {
-        console.error('[Analytics] Error tracking first_battle:', error);
-      });
+      if (userId) {
+        trackFirstBattle(userId).catch((error) => {
+          console.error('[Analytics] Error tracking first_battle:', error);
+        });
+      }
     } catch (error) {
       console.error('Failed to deactivate shield or start battle:', error);
       onBattleStart();
     } finally {
       setIsStartingBattle(false);
     }
-  }, [battleStartData, startBattle, onBattleStart, deactivateShield]);
+  }, [battleStartData, startBattle, onBattleStart, deactivateShield, userId]);
 
   // Reset assignments when component mounts - start fresh each battle prep session
   useEffect(() => {

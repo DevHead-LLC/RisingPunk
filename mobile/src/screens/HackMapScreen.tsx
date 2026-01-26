@@ -396,8 +396,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
   // Track first visit to HackMap
   useEffect(() => {
-    trackHackmapVisited();
-  }, []);
+    if (currentUserId) {
+      trackHackmapVisited(currentUserId);
+    }
+  }, [currentUserId]);
 
   // Memoize the styles object to prevent unnecessary re-renders
   const memoizedStyles = useMemo(() => getStyles(colors, themeMode), [colors, themeMode]);
