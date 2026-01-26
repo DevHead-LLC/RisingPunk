@@ -89,10 +89,16 @@ export const botsApi = createApi({
         try {
           await queryFulfilled;
           
-          // Track first bots build (only tracks once per device)
+          // Track first bots build (only tracks once per user)
           // Analytics tracking is non-blocking - failures shouldn't affect the mutation
           try {
-            await trackFirstBots(type);
+            const state = getState() as any;
+            const userId = state?.auth?.user?._id;
+            if (userId) {
+              trackFirstBots(type, userId).catch((analyticsError) => {
+                console.error('[Analytics] Failed to track first bots build:', analyticsError);
+              });
+            }
           } catch (analyticsError) {
             // Log analytics error but don't fail the mutation
             console.error('[Analytics] Failed to track first bots build:', analyticsError);

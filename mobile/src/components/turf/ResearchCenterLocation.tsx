@@ -38,6 +38,7 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
   const [speedupResearchCenterConstruction] = useSpeedupResearchCenterConstructionMutation();
   const { data: profile, isLoading } = useGetProfileQuery();
   const token = useAppSelector((state) => state.auth.token);
+  const userId = useAppSelector((state) => state.auth.user?._id);
   const [isBuildingState, setIsBuildingState] = useState(false);
   const { data: buildStatus, isLoading: buildStatusLoading, refetch: refetchBuildStatus } = useGetResearchCenterStatusQuery(undefined, {
     skip: !token, // Don't query if user isn't logged in
@@ -80,13 +81,15 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
     ) {
       dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
       // Track first construction
-      trackFirstConstruct('research_center');
+      if (userId) {
+        trackFirstConstruct('research_center', userId);
+      }
     }
     // Only update ref if we have valid data (not on initial mount with undefined)
     if (buildStatus !== undefined && token) {
       previousIsUnlockedRef.current = isUnlocked;
     }
-  }, [isUnlocked, dispatch, profile, isLoading, buildStatus, token]);
+  }, [isUnlocked, dispatch, profile, isLoading, buildStatus, token, userId]);
   
   useEffect(() => {
     if (isHighlighted) {
