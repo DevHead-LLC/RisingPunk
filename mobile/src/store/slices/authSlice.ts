@@ -5,7 +5,7 @@ import { updateBalance } from './balanceSlice';
 import { setBots, setBuildState } from './botsSlice';
 import { resetAllApiCaches } from '../api/resetApiCaches';
 import { authApi } from '../api/authApi';
-import { trackAccountCreated, clearFirstTimeTrackingFlags, handleUserSwitch } from '../../services/analyticsService';
+import { trackAccountCreated, handleUserSwitch } from '../../services/analyticsService';
 
 // Types
 export interface User {
@@ -619,17 +619,15 @@ export const unlockHackRig = createAsyncThunk(
 
 export const logoutUser = createAsyncThunk(
   'auth/logout',
-  async (_, { dispatch, getState }) => {
-    const state = getState() as { auth: AuthState };
-    const userId = state.auth.user?._id;
-    
+  async (_, { dispatch }) => {
     await AsyncStorage.removeItem('token');
     await AsyncStorage.removeItem('user');
     
-    // Clear first-time tracking flags for this user
-    if (userId) {
-      await clearFirstTimeTrackingFlags(userId);
-    }
+    // Note: We do NOT clear first-time tracking flags on logout.
+    // With user-scoped keys (e.g., has_built_bots_before_${userId}), flags should
+    // persist across sessions so the same user doesn't get duplicate first-time events.
+    // The handleUserSwitch function handles clearing previous user's flags when a
+    // different user logs in.
     
     resetAllApiCaches({ dispatch } as any);
   }

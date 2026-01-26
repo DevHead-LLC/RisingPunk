@@ -214,7 +214,9 @@ export const trackAppReturned = async () => {
 
 /**
  * Clear first-time tracking flags for a specific user from AsyncStorage
- * Call this when a user logs out to clear their flags
+ * Note: This function is typically not needed because user-scoped flags should
+ * persist across sessions. Only use for debugging or special cases where you
+ * need to reset a user's first-time tracking state.
  */
 export const clearFirstTimeTrackingFlags = async (userId: string) => {
   try {
@@ -235,20 +237,19 @@ export const clearFirstTimeTrackingFlags = async (userId: string) => {
 };
 
 /**
- * Check if user changed and clear previous user's flags if needed
- * Call this on login/loadStoredAuth to handle user switching
+ * Track the current user ID for analytics
+ * Call this on login/loadStoredAuth to track user sessions
+ * Note: We don't clear previous user's flags because with user-scoped keys
+ * (e.g., has_battled_before_${userId}), each user's flags are independent
+ * and should persist across sessions to prevent duplicate first-time events.
  */
 export const handleUserSwitch = async (newUserId: string) => {
   try {
     const lastUserIdKey = 'last_analytics_user_id';
-    const lastUserId = await AsyncStorage.getItem(lastUserIdKey);
     
-    // If there's a previous user and it's different, clear their flags
-    if (lastUserId && lastUserId !== newUserId) {
-      await clearFirstTimeTrackingFlags(lastUserId);
-    }
-    
-    // Update the last user ID
+    // Update the last user ID (for tracking purposes only)
+    // We don't clear previous user's flags because they're user-scoped
+    // and should persist to prevent duplicate events when the same user logs back in
     await AsyncStorage.setItem(lastUserIdKey, newUserId);
   } catch (error) {
     console.error('[Analytics] Error handling user switch:', error);
