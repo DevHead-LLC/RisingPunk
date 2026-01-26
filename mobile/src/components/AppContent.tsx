@@ -247,6 +247,8 @@ const AppContent = memo(() => {
   // Only show when we're definitely disconnected (both flags are false)
   const shouldShowConnectivityOverlay = isConnected === false && isInternetReachable === false;
 
+  // Note: Debug logging removed - was used for troubleshooting black screen issue
+
   // Show loading state while checking stored auth or fetching data
   // Return a View with background color instead of null to prevent black screen
   if (isLoading || (token && (balanceLoading || botsLoading || buildStateLoading))) {

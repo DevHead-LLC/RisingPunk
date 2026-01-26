@@ -187,7 +187,8 @@ export const registerUser = createAsyncThunk(
         // Continue anyway - health endpoint might not exist
       }
       
-      // Create timeout controller AFTER connectivity test to ensure full 10s for actual request
+      // CRITICAL: Create timeout controller AFTER health check to ensure full 10s for actual request
+      // If timeout is created before health check, the health check (up to 5s) eats into the 10s timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
         controller.abort();
@@ -207,7 +208,7 @@ export const registerUser = createAsyncThunk(
         if (fetchError.name === 'AbortError') {
           return rejectWithValue('Request timeout: Server did not respond within 10 seconds');
         }
-        throw fetchError; // Re-throw to be caught by outer catch
+        throw fetchError;
       } finally {
         clearTimeout(timeoutId);
       }
