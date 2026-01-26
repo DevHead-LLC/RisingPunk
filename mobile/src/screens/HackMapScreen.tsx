@@ -22,6 +22,7 @@ import { CellData, TerrainType, EntityType } from '../types/map';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useTheme } from '../context/ThemeContext';
 import { SIZING } from '../styles/theme';
+import { trackHackmapVisited } from '../services/analyticsService';
 
 const CELL_SIZE = 75;
 const MARGIN_SIZE = 80;
@@ -392,6 +393,13 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const token = useAppSelector((state) => state.auth.token);
   const colors = useThemeColors();
   const { themeMode } = useTheme();
+
+  // Track first visit to HackMap
+  useEffect(() => {
+    if (currentUserId) {
+      trackHackmapVisited(currentUserId);
+    }
+  }, [currentUserId]);
 
   // Memoize the styles object to prevent unnecessary re-renders
   const memoizedStyles = useMemo(() => getStyles(colors, themeMode), [colors, themeMode]);
