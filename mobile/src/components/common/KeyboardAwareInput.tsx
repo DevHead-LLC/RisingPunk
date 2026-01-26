@@ -60,6 +60,25 @@ export const KeyboardAwareInput = forwardRef<TextInput, KeyboardAwareInputProps>
       return isLastInput ? 'done' : 'next';
     };
 
+    // Android autofill configuration
+    // Disable autofill for password fields to prevent Samsung Pass/Google Autofill
+    // from causing black screen issues when save dialogs appear
+    const androidAutofillProps = Platform.OS === 'android' ? {
+      includeFontPadding: false,
+      textAlignVertical: 'center' as const,
+      // Disable autofill for password fields to prevent system dialogs
+      // that cause black screen issues on Samsung devices
+      ...(secureTextEntry ? {
+        autoComplete: 'off' as const,
+        textContentType: undefined,
+        importantForAutofill: 'no' as const,
+      } : {
+        // For non-password fields, allow autofill but with proper hints
+        autoComplete: keyboardType === 'email-address' ? 'email' as const : 'username' as const,
+        importantForAutofill: 'yes' as const,
+      }),
+    } : {};
+
     return (
       <View style={[styles.container, containerStyle]}>
         <TextInput
@@ -87,10 +106,7 @@ export const KeyboardAwareInput = forwardRef<TextInput, KeyboardAwareInputProps>
           blurOnSubmit={blurOnSubmit}
           editable={editable}
           maxLength={maxLength}
-          {...(Platform.OS === 'android' && {
-            includeFontPadding: false,
-            textAlignVertical: 'center',
-          })}
+          {...androidAutofillProps}
         />
         <View style={[styles.corner, { borderColor: colors.primary }]} />
       </View>

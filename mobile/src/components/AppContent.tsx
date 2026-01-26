@@ -1,6 +1,7 @@
 import React, { memo, useEffect, useRef, useCallback } from 'react';
 import { View, Text, Dimensions, AppState, Platform } from 'react-native';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
+import { useThemeColors } from '../hooks/useThemeColors';
 import { loadStoredAuth, updateHandle, setShowEmailVerification, setShowEmailVerificationBanner, refreshUserData, logoutUser, setShowAccountSwitched, setShowAccountSwitchedBanner } from '../store/slices/authSlice';
 import { updateBalance, triggerUpdate } from '../store/slices/balanceSlice';
 import { setBots, setBuildState } from '../store/slices/botsSlice';
@@ -25,9 +26,23 @@ import { getBuildInfo } from '../utils/BuildInfo';
 
 const AppContent = memo(() => {
   const dispatch = useAppDispatch();
+  const colors = useThemeColors();
   const showFinancials = useAppSelector((state) => state.ui.modals.financialStatements);
   const showGlobalError = useAppSelector((state) => state.ui.modals.globalError);
   const { token, isLoading, showHandleSelection, showEmailVerification, showEmailVerificationBanner, showAccountSwitched, showAccountSwitchedBanner, user } = useAppSelector((state) => state.auth);
+  
+  // Log state changes for debugging
+  useEffect(() => {
+    console.log('🔴 APP CONTENT: Auth state changed', {
+      hasToken: !!token,
+      isLoading,
+      hasUser: !!user,
+      userHandle: user?.handle,
+      showHandleSelection,
+      showEmailVerification,
+      showOnboarding: user?.onboardingCompleted === false,
+    });
+  }, [token, isLoading, user, showHandleSelection, showEmailVerification]);
   const balanceDisplayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const turfScreenRef = useRef<any>(null);
   const previousTokenRef = useRef<string | null>(null);
@@ -270,11 +285,20 @@ const AppContent = memo(() => {
   const shouldShowConnectivityOverlay = isConnected === false && isInternetReachable === false;
 
   // Show loading state while checking stored auth or fetching data
+  // Return a View with background color instead of null to prevent black screen
   if (isLoading || (token && (balanceLoading || botsLoading || buildStateLoading))) {
-    return null; // or a loading component
+    console.log('🔴 APP CONTENT: Rendering loading state', {
+      isLoading,
+      hasToken: !!token,
+      balanceLoading,
+      botsLoading,
+      buildStateLoading,
+    });
+    return <View style={{ flex: 1, backgroundColor: colors.background }} />;
   }
 
   if (!token) {
+    console.log('🔴 APP CONTENT: Rendering LoginScreen (no token)');
     return (
       <>
         <LoginScreen />
@@ -289,6 +313,14 @@ const AppContent = memo(() => {
       </>
     );
   }
+
+  console.log('🔴 APP CONTENT: Rendering TurfScreen (authenticated)', {
+    hasToken: !!token,
+    hasUser: !!user,
+    showHandleSelection,
+    showEmailVerification,
+    showOnboarding: user?.onboardingCompleted === false,
+  });
 
   return (
     <>

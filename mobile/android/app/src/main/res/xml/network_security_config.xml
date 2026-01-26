@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- CRITICAL: Allow cleartext traffic to localhost for Metro bundler -->
+    <!-- Metro bundler runs on localhost:8081 using HTTP (cleartext) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain>localhost</domain>
+        <domain>127.0.0.1</domain>
+        <domain>10.0.2.2</domain>
+    </domain-config>
+    
+    <!-- Base configuration: Allow HTTPS by default, block cleartext for production -->
+    <!-- This allows all HTTPS connections with system certificates -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- Trust preinstalled CAs (allows standard HTTPS) -->
+            <certificates src="system" />
+            <!-- Additionally trust user added CAs -->
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

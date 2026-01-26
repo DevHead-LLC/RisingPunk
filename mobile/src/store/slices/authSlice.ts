@@ -50,11 +50,47 @@ export const loginUser = createAsyncThunk(
   'auth/login',
   async (credentials: { handle: string; accessKey: string }, { rejectWithValue, dispatch }) => {
     try {
+      console.log('🔵 LOGIN: Starting login request', {
+        url: `${API_URL}/api/auth/login`,
+        hasHandle: !!credentials.handle,
+        apiUrl: API_URL,
+      });
+      
+      // Test basic connectivity first
+      console.log('🔵 LOGIN: Testing basic connectivity...');
+      try {
+        const healthController = new AbortController();
+        const healthTimeout = setTimeout(() => healthController.abort(), 5000);
+        const connectivityTest = await fetch(`${API_URL}/api/health`, {
+          method: 'GET',
+          signal: healthController.signal,
+        });
+        clearTimeout(healthTimeout);
+        console.log('🔵 LOGIN: Connectivity test result', {
+          ok: connectivityTest.ok,
+          status: connectivityTest.status,
+        });
+      } catch (connectivityError: any) {
+        console.log('🔵 LOGIN: Connectivity test failed', {
+          name: connectivityError?.name,
+          message: connectivityError?.message,
+        });
+        // Continue anyway - health endpoint might not exist
+      }
+      
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => {
+        console.log('🔵 LOGIN: Request timeout (10s) - aborting...');
+        controller.abort();
+      }, 10000);
       
       let response;
       try {
+        const fetchStartTime = Date.now();
+        console.log('🔵 LOGIN: Executing fetch...', {
+          url: `${API_URL}/api/auth/login`,
+          timestamp: fetchStartTime,
+        });
         response = await fetch(`${API_URL}/api/auth/login`, {
           method: 'POST',
           headers: {
@@ -63,6 +99,24 @@ export const loginUser = createAsyncThunk(
           body: JSON.stringify(credentials),
           signal: controller.signal,
         });
+        const fetchDuration = Date.now() - fetchStartTime;
+        console.log('🔵 LOGIN: Fetch completed', {
+          duration: `${fetchDuration}ms`,
+          ok: response.ok,
+          status: response.status,
+          headers: Object.fromEntries(response.headers.entries()),
+        });
+      } catch (fetchError: any) {
+        console.log('🔵 LOGIN: Fetch error', {
+          name: fetchError?.name,
+          message: fetchError?.message,
+          isAbortError: fetchError?.name === 'AbortError',
+          stack: fetchError?.stack,
+        });
+        if (fetchError.name === 'AbortError') {
+          return rejectWithValue('Request timeout: Server did not respond within 10 seconds');
+        }
+        throw fetchError;
       } finally {
         clearTimeout(timeoutId);
       }
@@ -154,39 +208,152 @@ export const registerUser = createAsyncThunk(
   'auth/register',
   async (credentials: { email: string; accessKey: string }, { rejectWithValue }) => {
     try {
-      // CRITICAL: Log the API URL being used for registration (development only)
-      if (__DEV__) {
-        console.log('🔴 REGISTRATION API CALL:');
-        console.log(`  - API_URL: ${API_URL}`);
-        console.log(`  - Full URL: ${API_URL}/api/auth/register`);
-        console.log(`  - Config.API_ENV: ${Config.API_ENV || 'undefined'}`);
-        console.log(`  - Config.API_URL: ${Config.API_URL || 'undefined'}`);
+      // CRITICAL: Log the API URL being used for registration
+      console.log('🔴 REGISTRATION API CALL:');
+      console.log(`  - API_URL: ${API_URL}`);
+      console.log(`  - Full URL: ${API_URL}/api/auth/register`);
+      console.log(`  - Config.API_ENV: ${Config.API_ENV || 'undefined'}`);
+      console.log(`  - Config.API_URL: ${Config.API_URL || 'undefined'}`);
+      
+      console.log('🔴 REGISTRATION: Creating AbortController for timeout...');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.log('🔴 REGISTRATION: Request timeout (10s) - aborting...');
+        controller.abort();
+      }, 10000);
+      
+      console.log('🔴 REGISTRATION: Starting fetch request...', {
+        url: `${API_URL}/api/auth/register`,
+        method: 'POST',
+        body: JSON.stringify(credentials),
+        hasEmail: !!credentials.email,
+        hasAccessKey: !!credentials.accessKey,
+        apiUrl: API_URL,
+      });
+      
+      // Test basic connectivity first
+      console.log('🔴 REGISTRATION: Testing basic connectivity...');
+      try {
+        const healthController = new AbortController();
+        const healthTimeout = setTimeout(() => healthController.abort(), 5000);
+        const connectivityTest = await fetch(`${API_URL}/api/health`, {
+          method: 'GET',
+          signal: healthController.signal,
+        });
+        clearTimeout(healthTimeout);
+        console.log('🔴 REGISTRATION: Connectivity test result', {
+          ok: connectivityTest.ok,
+          status: connectivityTest.status,
+        });
+      } catch (connectivityError: any) {
+        console.log('🔴 REGISTRATION: Connectivity test failed', {
+          name: connectivityError?.name,
+          message: connectivityError?.message,
+        });
+        // Continue anyway - health endpoint might not exist
       }
       
-      const response = await fetch(`${API_URL}/api/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(credentials),
+      let response;
+      try {
+        const fetchStartTime = Date.now();
+        console.log('🔴 REGISTRATION: Executing fetch...', {
+          url: `${API_URL}/api/auth/register`,
+          timestamp: fetchStartTime,
+        });
+        response = await fetch(`${API_URL}/api/auth/register`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(credentials),
+          signal: controller.signal,
+        });
+        const fetchDuration = Date.now() - fetchStartTime;
+        console.log('🔴 REGISTRATION: Fetch completed', {
+          duration: `${fetchDuration}ms`,
+          ok: response.ok,
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+        });
+      } catch (fetchError: any) {
+        console.log('🔴 REGISTRATION: Fetch error caught', {
+          name: fetchError?.name,
+          message: fetchError?.message,
+          isAbortError: fetchError?.name === 'AbortError',
+          stack: fetchError?.stack,
+        });
+        if (fetchError.name === 'AbortError') {
+          return rejectWithValue('Request timeout: Server did not respond within 10 seconds');
+        }
+        throw fetchError; // Re-throw to be caught by outer catch
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      console.log('🔴 REGISTRATION: Response received', {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
       });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Registration failed' }));
+        console.log('🔴 REGISTRATION: Response not OK, parsing error...');
+        let error;
+        try {
+          error = await response.json();
+          console.log('🔴 REGISTRATION: Error response parsed', error);
+        } catch (parseError) {
+          console.log('🔴 REGISTRATION: Failed to parse error response', parseError);
+          error = { error: 'Registration failed' };
+        }
         return rejectWithValue(error.error || 'Registration failed');
       }
 
-      const data = await response.json();
+      console.log('🔴 REGISTRATION: Response OK, parsing JSON...');
+      let data;
+      try {
+        data = await response.json();
+        console.log('🔴 REGISTRATION: Success - data received', {
+          hasToken: !!data.token,
+          hasUser: !!data.user,
+          userHandle: data.user?.handle,
+          userNeedsHandleSelection: data.user?.needsHandleSelection,
+          userOnboardingCompleted: data.user?.onboardingCompleted,
+        });
+      } catch (parseError) {
+        console.log('🔴 REGISTRATION: Failed to parse success response', parseError);
+        return rejectWithValue('Invalid response from server');
+      }
 
       // Store in AsyncStorage
+      console.log('🔴 REGISTRATION: Storing token in AsyncStorage...');
       await AsyncStorage.setItem('token', data.token);
+      console.log('🔴 REGISTRATION: Token stored');
+      
+      console.log('🔴 REGISTRATION: Storing user in AsyncStorage...');
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      console.log('🔴 REGISTRATION: User stored');
 
+      console.log('🔴 REGISTRATION: Returning data to Redux...');
       return data;
     } catch (error) {
+      console.log('🔴 REGISTRATION: Outer catch block - error occurred', {
+        errorType: error?.constructor?.name,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        isTypeError: error instanceof TypeError,
+        isAbortError: (error as any)?.name === 'AbortError',
+      });
+      
       if (error instanceof TypeError && error.message.includes('Network request failed')) {
+        console.log('🔴 REGISTRATION: Network error detected');
         return rejectWithValue('Network error: Cannot connect to server');
       }
+      if ((error as any)?.name === 'AbortError') {
+        console.log('🔴 REGISTRATION: Abort error (timeout)');
+        return rejectWithValue('Request timeout: Server did not respond');
+      }
+      console.log('🔴 REGISTRATION: Returning generic error');
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -983,10 +1150,18 @@ export const authSlice = createSlice({
     // Register
     builder
       .addCase(registerUser.pending, (state) => {
+        console.log('🔴 REGISTRATION REDUCER: Pending - setting isLoading=true');
         state.isLoading = true;
         state.error = null;
       })
           .addCase(registerUser.fulfilled, (state, action) => {
+      console.log('🔴 REGISTRATION REDUCER: Fulfilled - updating state', {
+        hasToken: !!action.payload.token,
+        hasUser: !!action.payload.user,
+        userHandle: action.payload.user?.handle,
+        needsHandleSelection: action.payload.user?.needsHandleSelection,
+        onboardingCompleted: action.payload.user?.onboardingCompleted,
+      });
       state.isLoading = false;
       state.token = action.payload.token;
       state.user = action.payload.user;
@@ -994,8 +1169,19 @@ export const authSlice = createSlice({
       state.showOnboarding = !action.payload.user.onboardingCompleted;
       state.showHandleSelection = action.payload.user.needsHandleSelection;
       state.isInitialized = true; // Mark as initialized after successful registration
+      console.log('🔴 REGISTRATION REDUCER: State updated', {
+        isLoading: state.isLoading,
+        hasToken: !!state.token,
+        hasUser: !!state.user,
+        showOnboarding: state.showOnboarding,
+        showHandleSelection: state.showHandleSelection,
+        isInitialized: state.isInitialized,
+      });
     })
       .addCase(registerUser.rejected, (state, action) => {
+        console.log('🔴 REGISTRATION REDUCER: Rejected', {
+          error: action.payload,
+        });
         state.isLoading = false;
         state.error = action.payload as string;
         state.token = null;

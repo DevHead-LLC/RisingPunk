@@ -153,13 +153,26 @@ async function createUserResearchData(userId: mongoose.Types.ObjectId): Promise<
 router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
   '/register', 
   async (req, res): Promise<void> => {
+    const requestStartTime = Date.now();
+    console.log('🔵 SERVER: Registration request received', {
+      timestamp: new Date().toISOString(),
+      hasBody: !!req.body,
+      hasEmail: !!req.body?.email,
+      hasAccessKey: !!req.body?.accessKey,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+    
     try {
       const { email, accessKey } = req.body;
       
       if (!email || !accessKey) {
+        console.log('🔵 SERVER: Registration validation failed - missing email or accessKey');
         res.status(400).json({ error: 'Email and password are required' });
         return;
       }
+      
+      console.log('🔵 SERVER: Registration validation passed, processing...');
 
       const normalizedEmail = email.trim().toLowerCase();
       const emailHash = EncryptionService.hashEmail(normalizedEmail);
@@ -249,7 +262,12 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
       });
 
     } catch (error) {
-      console.error('Registration error:', error);
+      const requestDuration = Date.now() - requestStartTime;
+      console.error('🔵 SERVER: Registration error', {
+        duration: `${requestDuration}ms`,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       
       // Handle duplicate key errors specifically
       if (error instanceof Error && error.message.includes('E11000')) {
