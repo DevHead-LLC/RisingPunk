@@ -6,6 +6,7 @@ import { updateBalance } from './balanceSlice';
 import { setBots, setBuildState } from './botsSlice';
 import { resetAllApiCaches } from '../api/resetApiCaches';
 import { authApi } from '../api/authApi';
+import { trackAccountCreated } from '../../services/analyticsService';
 
 // Types
 export interface User {
@@ -234,6 +235,9 @@ export const registerUser = createAsyncThunk(
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
 
+      // Track account creation
+      await trackAccountCreated('email');
+
       return data;
     } catch (error) {
       if (error instanceof TypeError && error.message.includes('Network request failed')) {
@@ -358,6 +362,9 @@ export const googleSignUpUser = createAsyncThunk(
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
+
+      // Track account creation
+      await trackAccountCreated('google');
 
       // Clear any existing RTK Query cache to ensure fresh data for new user
       resetAllApiCaches({ dispatch } as any);
@@ -529,6 +536,9 @@ export const appleSignUpUser = createAsyncThunk(
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
 
+      // Track account creation
+      await trackAccountCreated('apple');
+
       // Clear any existing RTK Query cache to ensure fresh data for new user
       resetAllApiCaches({ dispatch } as any);
 
@@ -677,6 +687,12 @@ export const logoutUser = createAsyncThunk(
   async (_, { dispatch }) => {
     await AsyncStorage.removeItem('token');
     await AsyncStorage.removeItem('user');
+    
+    // Note: We do NOT clear first-time tracking flags on logout.
+    // With user-scoped keys (e.g., has_built_bots_before_${userId}), flags should
+    // persist across sessions so the same user doesn't get duplicate first-time events.
+    // Each user's flags are independent and don't interfere with other users.
+    
     resetAllApiCaches({ dispatch } as any);
   }
 );
