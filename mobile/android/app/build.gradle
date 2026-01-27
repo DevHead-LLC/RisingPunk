@@ -134,7 +134,7 @@ android {
         applicationId "com.devheadllc.risingpunk"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 59
+        versionCode 60
         versionName "2.2.0"
         
         // CRITICAL: 16 KB Page Size Fix - Restrict to 64-bit ABIs only
