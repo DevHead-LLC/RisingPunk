@@ -17,7 +17,7 @@ function WhyRisingPunk() {
       id: 2,
       icon: '💰',
       title: 'Financial Empire Strategy',
-      description: 'Build wealth through smart investments and passive income. Master real financial concepts as you play.',
+      description: 'Build wealth through smart investments and passive income. Become a tycoon and master real financial concepts as you play.',
       accent: 'green'
     },
     {

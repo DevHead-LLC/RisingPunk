@@ -316,6 +316,7 @@
   width: 100%;
   max-width: 600px;
   position: relative;
+  height: 400px;
   min-height: 400px;
   display: flex;
   align-items: center;
@@ -324,6 +325,7 @@
 
 @media (max-width: 1023px) {
   .hero-visual {
+    height: 300px;
     min-height: 300px;
     margin-top: var(--spacing-xl);
   }
@@ -448,27 +450,4 @@
       opacity: 0.45;
     }
   }
-}
-
-.hero-image-wrapper {
-  width: 100%;
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
-  background: var(--bg-secondary);
-  transition: transform 0.3s ease-out, box-shadow 0.3s ease-out;
-}
-
-.hero-image-wrapper:hover {
-  transform: translateY(-4px);
-  box-shadow: 
-    0 16px 40px rgba(162, 57, 202, 0.3),
-    0 0 0 1px rgba(162, 57, 202, 0.2);
-}
-
-.hero-gameplay-image {
-  width: 100%;
-  height: auto;
-  display: block;
-  border-radius: 16px;
 }
