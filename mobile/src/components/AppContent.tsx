@@ -22,7 +22,7 @@ import { NotificationBanner } from './common/NotificationBanner';
 import { globalErrorHandler } from '../services/GlobalErrorHandler';
 import { getAnalytics, setAnalyticsCollectionEnabled, setUserProperty, logEvent } from '@react-native-firebase/analytics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { trackAppReturned } from '../services/analyticsService';
+import { trackAppReturned, trackFirstOpen } from '../services/analyticsService';
 
 const AppContent = memo(() => {
   const dispatch = useAppDispatch();
@@ -33,6 +33,7 @@ const AppContent = memo(() => {
   const turfScreenRef = useRef<any>(null);
   const previousTokenRef = useRef<string | null>(null);
   const appStateRef = useRef(AppState.currentState);
+  const hasTrackedInitialOpenRef = useRef<boolean>(false);
   const { isConnected, isInternetReachable } = useNetworkConnectivity();
 
   // Function to center the turf view to home/digital barracks position
@@ -83,6 +84,9 @@ const AppContent = memo(() => {
 
   useEffect(() => {
     dispatch(loadStoredAuth());
+    
+    // Track first app open (sets flag for prerequisite check)
+    trackFirstOpen();
   }, [dispatch]);
 
   // Initialize Firebase Analytics
@@ -205,6 +209,16 @@ const AppContent = memo(() => {
       dispatch(setBuildState(buildStateData));
     }
   }, [buildStateData, dispatch]);
+
+  // Track app return on initial app open when user is already logged in (auto-sign in)
+  // Only track once per app session to avoid duplicates
+  useEffect(() => {
+    if (token && user && !hasTrackedInitialOpenRef.current) {
+      // User is logged in on initial app open - track app return if prerequisites are met
+      hasTrackedInitialOpenRef.current = true;
+      trackAppReturned();
+    }
+  }, [token, user]);
 
   // Refresh user data when app comes back to foreground (e.g., after email verification)
   // Also track app return for analytics
