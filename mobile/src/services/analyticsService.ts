@@ -35,17 +35,17 @@ const getAnalyticsInstance = (): ReturnType<typeof getAnalytics> | null => {
  */
 export const trackAccountCreated = async (method: 'email' | 'google' | 'apple') => {
   try {
+    // Set prerequisite first so returning-user tracking works even if analytics fails
+    await AsyncStorage.setItem('has_account_created', 'true');
+
     const analytics = getAnalyticsInstance();
     if (!analytics) {
-      return; // Analytics not available, skip tracking
+      return; // Analytics not available, skip event (flag already set)
     }
     await logEvent(analytics, 'account_created', {
       signup_method: method,
       timestamp: new Date().toISOString(),
     });
-    
-    // Mark that account has been created (for app_returned prerequisite check)
-    await AsyncStorage.setItem('has_account_created', 'true');
   } catch (error) {
     console.error('[Analytics] Error tracking account_created:', error);
   }
@@ -115,7 +115,7 @@ export const markAccountExists = async () => {
  * Check if prerequisites are met for tracking app return
  * Returns true if both first_open and account_created have occurred
  */
-export const canTrackAppReturned = async (): Promise<boolean> => {
+const canTrackAppReturned = async (): Promise<boolean> => {
   try {
     const [hasOpened, hasCreated] = await Promise.all([
       hasFirstOpened(),
@@ -281,35 +281,17 @@ export const trackFirstBattle = async (userId: string) => {
  */
 export const trackAppReturned = async () => {
   try {
-    // Check prerequisites before tracking
-    const hasOpened = await hasFirstOpened();
-    const hasCreated = await hasAccountCreated();
-    const canTrack = hasOpened && hasCreated;
-
-    if (__DEV__) {
-      console.log('[Analytics] trackAppReturned: has_first_opened=', hasOpened, 'has_account_created=', hasCreated, 'will_send_app_open=', canTrack);
-    }
-
-    if (!canTrack) {
-      if (__DEV__) {
-        console.log('[Analytics] Skipping app_open - prerequisites not met (first_open or account_created missing)');
-      }
+    if (!(await canTrackAppReturned())) {
       return;
     }
 
     const analytics = getAnalyticsInstance();
     if (!analytics) {
-      if (__DEV__) {
-        console.log('[Analytics] Skipping app_open - analytics instance not available');
-      }
       return;
     }
 
     // Send standard app_open event to GA4 (same as logAppOpen; logEvent avoids deprecation warning)
     await logEvent(analytics, 'app_open', {});
-    if (__DEV__) {
-      console.log('[Analytics] Sent app_open event to Firebase/GA4');
-    }
   } catch (error) {
     console.error('[Analytics] Error tracking app_returned:', error);
   }

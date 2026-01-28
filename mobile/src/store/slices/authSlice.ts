@@ -5,7 +5,7 @@ import { updateBalance } from './balanceSlice';
 import { setBots, setBuildState } from './botsSlice';
 import { resetAllApiCaches } from '../api/resetApiCaches';
 import { authApi } from '../api/authApi';
-import { trackAccountCreated, trackAppReturned, markAccountExists } from '../../services/analyticsService';
+import { trackAccountCreated, markAccountExists } from '../../services/analyticsService';
 
 // Types
 export interface User {
@@ -123,8 +123,7 @@ export const loginUser = createAsyncThunk(
 
       // Mark that user has an account (so "returning user" tracking works for login-to-existing-account)
       await markAccountExists();
-      // Track app return after successful login (if prerequisites are met)
-      await trackAppReturned();
+      // app_open is tracked once in AppContent when token/user are set (avoids duplicate on manual login)
 
       return data;
     } catch (error) {
@@ -262,8 +261,7 @@ export const googleSignInUser = createAsyncThunk(
 
       // Mark that user has an account (so "returning user" tracking works for login-to-existing-account)
       await markAccountExists();
-      // Track app return after successful login (if prerequisites are met)
-      await trackAppReturned();
+      // app_open is tracked once in AppContent when token/user are set (avoids duplicate on manual login)
 
       return data;
     } catch (error) {
@@ -440,8 +438,7 @@ export const appleSignInUser = createAsyncThunk(
 
       // Mark that user has an account (so "returning user" tracking works for login-to-existing-account)
       await markAccountExists();
-      // Track app return after successful login (if prerequisites are met)
-      await trackAppReturned();
+      // app_open is tracked once in AppContent when token/user are set (avoids duplicate on manual login)
 
       return data;
     } catch (error) {
