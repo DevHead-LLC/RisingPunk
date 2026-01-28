@@ -10,6 +10,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 let analyticsInstance: ReturnType<typeof getAnalytics> | null = null;
 let initializationAttempted = false;
 
+// Session guard: set when user signs up this session so we don't send app_open for "returning" on first session
+let accountCreatedThisSession = false;
+
 const getAnalyticsInstance = (): ReturnType<typeof getAnalytics> | null => {
   // If initialization was already attempted and failed, don't retry
   if (initializationAttempted && !analyticsInstance) {
@@ -33,10 +36,17 @@ const getAnalyticsInstance = (): ReturnType<typeof getAnalytics> | null => {
  * Track account creation
  * Call this when a user successfully creates an account
  */
+/** Called by AppContent to skip app_open when user just signed up this session */
+export const getAccountCreatedThisSession = (): boolean => accountCreatedThisSession;
+export const clearAccountCreatedThisSession = (): void => {
+  accountCreatedThisSession = false;
+};
+
 export const trackAccountCreated = async (method: 'email' | 'google' | 'apple') => {
   try {
     // Set prerequisite first so returning-user tracking works even if analytics fails
     await AsyncStorage.setItem('has_account_created', 'true');
+    accountCreatedThisSession = true;
 
     const analytics = getAnalyticsInstance();
     if (!analytics) {

@@ -22,7 +22,7 @@ import { NotificationBanner } from './common/NotificationBanner';
 import { globalErrorHandler } from '../services/GlobalErrorHandler';
 import { getAnalytics, setAnalyticsCollectionEnabled, setUserProperty, logEvent } from '@react-native-firebase/analytics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { trackAppReturned, trackFirstOpen } from '../services/analyticsService';
+import { trackAppReturned, trackFirstOpen, getAccountCreatedThisSession, clearAccountCreatedThisSession } from '../services/analyticsService';
 
 const AppContent = memo(() => {
   const dispatch = useAppDispatch();
@@ -212,12 +212,15 @@ const AppContent = memo(() => {
     }
   }, [buildStateData, dispatch]);
 
-  // Track app return on initial app open when user is already logged in (auto-sign in)
-  // Only track once per app session to avoid duplicates
+  // Track app return on initial app open when user is already logged in (auto-sign in or manual login)
+  // Only track once per app session; skip if user just signed up this session (not a "returning" user yet)
   useEffect(() => {
     if (token && user && !hasTrackedInitialOpenRef.current) {
-      // User is logged in on initial app open - track app return if prerequisites are met
       hasTrackedInitialOpenRef.current = true;
+      if (getAccountCreatedThisSession()) {
+        clearAccountCreatedThisSession();
+        return;
+      }
       trackAppReturned();
     }
   }, [token, user]);
