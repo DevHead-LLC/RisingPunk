@@ -681,10 +681,13 @@ export const loadStoredAuth = createAsyncThunk(
       
       // Update stored user data with fresh database data
       await AsyncStorage.setItem('user', JSON.stringify(userData.user));
-      
+
+      // Mark that user has an account (so app_open tracking works for auto-sign-in returning users)
+      await markAccountExists();
+
       // Note: App return tracking for auto-sign in is handled in AppContent.tsx
       // when token/user is set, to avoid duplicate tracking
-      
+
       return {
         token: storedToken,
         user: userData.user,

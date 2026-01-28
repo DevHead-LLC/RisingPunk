@@ -83,10 +83,12 @@ const AppContent = memo(() => {
 
 
   useEffect(() => {
-    dispatch(loadStoredAuth());
-    
-    // Track first app open (sets flag for prerequisite check)
-    trackFirstOpen();
+    const init = async () => {
+      // Set first-open flag before loading auth so token/user effect doesn't race past it
+      await trackFirstOpen();
+      dispatch(loadStoredAuth());
+    };
+    init();
   }, [dispatch]);
 
   // Initialize Firebase Analytics
