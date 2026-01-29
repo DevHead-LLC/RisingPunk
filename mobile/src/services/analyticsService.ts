@@ -44,8 +44,9 @@ export const clearAccountCreatedThisSession = (): void => {
 
 export const trackAccountCreated = async (method: 'email' | 'google' | 'apple') => {
   try {
-    // Set prerequisite first so returning-user tracking works even if analytics fails
-    await AsyncStorage.setItem('has_account_created', 'true');
+    // Set prerequisite first so returning-user tracking works when storage succeeds
+    await markAccountExists();
+    // Always set session guard so we skip app_open this session (even if storage failed)
     accountCreatedThisSession = true;
 
     const analytics = getAnalyticsInstance();
@@ -112,12 +113,15 @@ const hasAccountCreated = async (): Promise<boolean> => {
  * Call when user successfully logs in to an existing account - so we treat
  * "logged in" as sufficient for "returning user" tracking even if they
  * never created an account on this device.
+ * @returns true if the flag was persisted, false if storage failed (caller can avoid setting in-memory state)
  */
-export const markAccountExists = async () => {
+export const markAccountExists = async (): Promise<boolean> => {
   try {
     await AsyncStorage.setItem('has_account_created', 'true');
+    return true;
   } catch (error) {
     console.error('[Analytics] Error marking account exists:', error);
+    return false;
   }
 };
 
