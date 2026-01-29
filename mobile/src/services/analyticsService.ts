@@ -32,16 +32,16 @@ const getAnalyticsInstance = (): ReturnType<typeof getAnalytics> | null => {
   return analyticsInstance;
 };
 
-/**
- * Track account creation
- * Call this when a user successfully creates an account
- */
 /** Called by AppContent to skip app_open when user just signed up this session */
 export const getAccountCreatedThisSession = (): boolean => accountCreatedThisSession;
 export const clearAccountCreatedThisSession = (): void => {
   accountCreatedThisSession = false;
 };
 
+/**
+ * Track account creation
+ * Call this when a user successfully creates an account
+ */
 export const trackAccountCreated = async (method: 'email' | 'google' | 'apple') => {
   try {
     // Set prerequisite first so returning-user tracking works when storage succeeds
