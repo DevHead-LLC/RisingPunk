@@ -69,13 +69,9 @@ export const trackAccountCreated = async (method: 'email' | 'google' | 'apple') 
  */
 export const trackFirstOpen = async () => {
   try {
-    const hasOpenedBefore = await AsyncStorage.getItem('has_first_opened');
-    if (hasOpenedBefore) {
-      // Already tracked, don't track again
+    if (await hasFirstOpened()) {
       return;
     }
-    
-    // Mark that app has been opened (for app_returned prerequisite check)
     await AsyncStorage.setItem('has_first_opened', 'true');
   } catch (error) {
     console.error('[Analytics] Error tracking first_open flag:', error);
