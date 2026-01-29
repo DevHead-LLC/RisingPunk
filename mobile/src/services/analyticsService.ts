@@ -286,8 +286,13 @@ export const trackFirstBattle = async (userId: string) => {
 /**
  * Track app return (returning user with account)
  * Call this when user returns to the app (background→foreground, login, auto-sign in, initial open)
- * Only tracks if both first_open and account_created prerequisites are met
- * Uses Firebase's standard logAppOpen() which sends app_open event to GA4
+ * Only tracks if both first_open and account_created prerequisites are met.
+ *
+ * We send the reserved event name app_open. Firebase does NOT auto-log app_open on iOS/Android
+ * (only first_open, session_start, user_engagement, etc. are automatic), so this is the only
+ * source of app_open and it does not duplicate any automatic event. Use it to measure how many
+ * "returning user with account" opens occur in a period; first_open remains the natural
+ * once-per-install event from Firebase.
  */
 export const trackAppReturned = async () => {
   try {
@@ -300,7 +305,6 @@ export const trackAppReturned = async () => {
       return;
     }
 
-    // Send standard app_open event to GA4 (same as logAppOpen; logEvent avoids deprecation warning)
     await logEvent(analytics, 'app_open', {});
   } catch (error) {
     console.error('[Analytics] Error tracking app_returned:', error);

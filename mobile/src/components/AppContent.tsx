@@ -92,8 +92,9 @@ const AppContent = memo(() => {
   }, [dispatch]);
 
   // Initialize Firebase Analytics
-  // Note: Firebase automatically logs 'first_open' and 'app_open' events
-  // We just need to enable analytics collection
+  // Firebase automatically logs first_open (once per install), session_start, user_engagement, etc.
+  // Firebase does NOT auto-log app_open on mobile; we log app_open manually in trackAppReturned()
+  // for "returning user with account" only, so first_open and app_open stay separate and non-duplicating.
   useEffect(() => {
     const initializeFirebaseAnalytics = async () => {
       try {
@@ -212,8 +213,15 @@ const AppContent = memo(() => {
     }
   }, [buildStateData, dispatch]);
 
+  // Reset initial-open tracking ref on logout so the next login (same or different user) gets one app_open
+  useEffect(() => {
+    if (!token) {
+      hasTrackedInitialOpenRef.current = false;
+    }
+  }, [token]);
+
   // Track app return on initial app open when user is already logged in (auto-sign in or manual login)
-  // Only track once per app session; skip if user just signed up this session (not a "returning" user yet)
+  // Only track once per login; skip if user just signed up this session (not a "returning" user yet)
   useEffect(() => {
     if (token && user && !hasTrackedInitialOpenRef.current) {
       hasTrackedInitialOpenRef.current = true;
