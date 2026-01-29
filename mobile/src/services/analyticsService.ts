@@ -45,7 +45,7 @@ export const clearAccountCreatedThisSession = (): void => {
 export const trackAccountCreated = async (method: 'email' | 'google' | 'apple') => {
   try {
     // Set prerequisite first so returning-user tracking works even if analytics fails
-    await AsyncStorage.setItem('has_account_created', 'true');
+    await markAccountExists();
     accountCreatedThisSession = true;
 
     const analytics = getAnalyticsInstance();
