@@ -84,7 +84,7 @@ export const trackFirstOpen = async () => {
 /**
  * Check if app has been opened at least once
  */
-export const hasFirstOpened = async (): Promise<boolean> => {
+const hasFirstOpened = async (): Promise<boolean> => {
   try {
     const hasOpened = await AsyncStorage.getItem('has_first_opened');
     return hasOpened === 'true';
@@ -97,7 +97,7 @@ export const hasFirstOpened = async (): Promise<boolean> => {
 /**
  * Check if account has been created
  */
-export const hasAccountCreated = async (): Promise<boolean> => {
+const hasAccountCreated = async (): Promise<boolean> => {
   try {
     const hasCreated = await AsyncStorage.getItem('has_account_created');
     return hasCreated === 'true';
