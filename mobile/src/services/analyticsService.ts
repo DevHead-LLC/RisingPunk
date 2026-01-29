@@ -83,45 +83,36 @@ export const trackFirstOpen = async () => {
 };
 
 /**
- * Check if app has been opened at least once
+ * Read a boolean flag from AsyncStorage (true only when value === 'true').
+ * Returns false on error or missing key.
  */
-const hasFirstOpened = async (): Promise<boolean> => {
+const checkStorageFlag = async (key: string, logLabel: string): Promise<boolean> => {
   try {
-    const hasOpened = await AsyncStorage.getItem('has_first_opened');
-    return hasOpened === 'true';
+    const value = await AsyncStorage.getItem(key);
+    return value === 'true';
   } catch (error) {
-    console.error('[Analytics] Error checking has_first_opened:', error);
+    console.error(`[Analytics] Error checking ${logLabel}:`, error);
     return false;
   }
 };
 
-/**
- * Check if account has been created
- */
-const hasAccountCreated = async (): Promise<boolean> => {
-  try {
-    const hasCreated = await AsyncStorage.getItem('has_account_created');
-    return hasCreated === 'true';
-  } catch (error) {
-    console.error('[Analytics] Error checking has_account_created:', error);
-    return false;
-  }
-};
+const hasFirstOpened = (): Promise<boolean> =>
+  checkStorageFlag('has_first_opened', 'has_first_opened');
+
+const hasAccountCreated = (): Promise<boolean> =>
+  checkStorageFlag('has_account_created', 'has_account_created');
 
 /**
  * Mark that user has an account (for app_returned prerequisite)
  * Call when user successfully logs in to an existing account - so we treat
  * "logged in" as sufficient for "returning user" tracking even if they
  * never created an account on this device.
- * @returns true if the flag was persisted, false if storage failed (caller can avoid setting in-memory state)
  */
-export const markAccountExists = async (): Promise<boolean> => {
+export const markAccountExists = async (): Promise<void> => {
   try {
     await AsyncStorage.setItem('has_account_created', 'true');
-    return true;
   } catch (error) {
     console.error('[Analytics] Error marking account exists:', error);
-    return false;
   }
 };
 
