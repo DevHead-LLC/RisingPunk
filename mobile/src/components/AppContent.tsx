@@ -234,8 +234,10 @@ const AppContent = memo(() => {
         appStateRef.current.match(/inactive|background/) &&
         nextAppState === 'active'
       ) {
-        // User returned to app from background
-        trackAppReturned();
+        // Only track app return when user is logged in (same as initial-open tracking)
+        if (token && user) {
+          trackAppReturned();
+        }
       }
       
       appStateRef.current = nextAppState;
