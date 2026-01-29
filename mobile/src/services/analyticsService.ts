@@ -44,11 +44,10 @@ export const clearAccountCreatedThisSession = (): void => {
 
 export const trackAccountCreated = async (method: 'email' | 'google' | 'apple') => {
   try {
-    // Set prerequisite first so returning-user tracking works even if analytics fails
-    const persisted = await markAccountExists();
-    if (persisted) {
-      accountCreatedThisSession = true;
-    }
+    // Set prerequisite first so returning-user tracking works when storage succeeds
+    await markAccountExists();
+    // Always set session guard so we skip app_open this session (even if storage failed)
+    accountCreatedThisSession = true;
 
     const analytics = getAnalyticsInstance();
     if (!analytics) {
