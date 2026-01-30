@@ -7,6 +7,7 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
+import androidx.core.view.WindowCompat
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.ReactRootView
@@ -20,11 +21,14 @@ class MainActivity : ReactActivity() {
     super.onCreate(savedInstanceState)
     requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
     
+    // Edge-to-edge display (Android 15+ / SDK 35) - Google Play Console recommendation
+    // Replaces deprecated setDecorFitsSystemWindows(false); ensures correct display on Android 15+
+    WindowCompat.enableEdgeToEdge(window)
+
     // CRITICAL: Disable Android system gestures to prevent swipe-to-home interference
     // This makes the app truly immersive and prevents gesture conflicts
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
       // Android 11+ (API 30+)
-      window.setDecorFitsSystemWindows(false)
       window.insetsController?.let { controller ->
         controller.hide(WindowInsets.Type.systemBars())
         controller.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE

@@ -46,7 +46,8 @@
     "// STAGING AAB BUILD - Builds staging AAB bundle for Google Play Console Internal Testing track": "",
     "android:build:bundle:staging": "node -e \"process.platform==='win32'?process.exit(require('child_process').spawnSync('npm.cmd',['run','android:build:bundle:staging:win'],{stdio:'inherit'}).status):process.exit(require('child_process').spawnSync('npm',['run','android:build:bundle:staging:mac'],{stdio:'inherit'}).status)\"",
     "android:build:bundle:staging:win": "cd android && gradlew.bat bundleRelease -DENVFILE=.env.staging && cd .. && cd .. && if not exist deployments\\client\\mobile\\staging mkdir deployments\\client\\mobile\\staging && copy mobile\\android\\app\\build\\outputs\\bundle\\release\\app-release.aab deployments\\client\\mobile\\staging\\rising-punk-staging.aab && echo ✅ Staging AAB ready: deployments/client/mobile/staging/rising-punk-staging.aab",
-    "android:build:bundle:staging:mac": "cd android && ./gradlew bundleRelease -DENVFILE=.env.staging && cd ../.. && mkdir -p deployments/client/mobile/staging && cp mobile/android/app/build/outputs/bundle/release/app-release.aab deployments/client/mobile/staging/rising-punk-staging.aab && echo \"✅ Staging AAB ready: deployments/client/mobile/staging/rising-punk-staging.aab\""
+    "android:build:bundle:staging:mac": "cd android && ./gradlew bundleRelease -DENVFILE=.env.staging && cd ../.. && mkdir -p deployments/client/mobile/staging && cp mobile/android/app/build/outputs/bundle/release/app-release.aab deployments/client/mobile/staging/rising-punk-staging.aab && echo \"✅ Staging AAB ready: deployments/client/mobile/staging/rising-punk-staging.aab\"",
+    "postinstall": "node scripts/patch-statusbar-android15.js"
   },
   "dependencies": {
     "@invertase/react-native-apple-authentication": "^2.4.1",

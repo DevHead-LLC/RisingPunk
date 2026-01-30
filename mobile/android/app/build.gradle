@@ -472,7 +472,11 @@ See: taskItems/android/deployment/16kb-page-size-fix.md for complete guide
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
-    
+
+    // Edge-to-edge display (Android 15+ / SDK 35) - Google Play Console recommendation
+    // enableEdgeToEdge() requires core-ktx 1.17.0+
+    implementation("androidx.core:core-ktx:1.17.0")
+
     // react-native-config (manually linked)
     implementation project(':react-native-config')
 
