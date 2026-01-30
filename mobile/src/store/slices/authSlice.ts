@@ -5,7 +5,7 @@ import { updateBalance } from './balanceSlice';
 import { setBots, setBuildState } from './botsSlice';
 import { resetAllApiCaches } from '../api/resetApiCaches';
 import { authApi } from '../api/authApi';
-import { trackAccountCreated } from '../../services/analyticsService';
+import { trackAccountCreated, markAccountExists } from '../../services/analyticsService';
 
 // Types
 export interface User {
@@ -120,6 +120,10 @@ export const loginUser = createAsyncThunk(
         // Don't fail login if data fetching fails
         console.warn('Failed to fetch initial data:', fetchError);
       }
+
+      // Mark that user has an account (so "returning user" tracking works for login-to-existing-account)
+      await markAccountExists();
+      // app_open is tracked once in AppContent when token/user are set (avoids duplicate on manual login)
 
       return data;
     } catch (error) {
@@ -254,6 +258,10 @@ export const googleSignInUser = createAsyncThunk(
         // Don't fail login if data fetching fails
         console.warn('Failed to fetch initial data:', fetchError);
       }
+
+      // Mark that user has an account (so "returning user" tracking works for login-to-existing-account)
+      await markAccountExists();
+      // app_open is tracked once in AppContent when token/user are set (avoids duplicate on manual login)
 
       return data;
     } catch (error) {
@@ -427,6 +435,10 @@ export const appleSignInUser = createAsyncThunk(
         // Don't fail login if data fetching fails
         console.error('Failed to fetch initial data:', fetchError);
       }
+
+      // Mark that user has an account (so "returning user" tracking works for login-to-existing-account)
+      await markAccountExists();
+      // app_open is tracked once in AppContent when token/user are set (avoids duplicate on manual login)
 
       return data;
     } catch (error) {
@@ -669,7 +681,13 @@ export const loadStoredAuth = createAsyncThunk(
       
       // Update stored user data with fresh database data
       await AsyncStorage.setItem('user', JSON.stringify(userData.user));
-      
+
+      // Mark that user has an account (so app_open tracking works for auto-sign-in returning users)
+      await markAccountExists();
+
+      // Note: App return tracking for auto-sign in is handled in AppContent.tsx
+      // when token/user is set, to avoid duplicate tracking
+
       return {
         token: storedToken,
         user: userData.user,

@@ -10,6 +10,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 let analyticsInstance: ReturnType<typeof getAnalytics> | null = null;
 let initializationAttempted = false;
 
+// Session guard: set when user signs up this session so we don't send app_open for "returning" on first session
+let accountCreatedThisSession = false;
+
 const getAnalyticsInstance = (): ReturnType<typeof getAnalytics> | null => {
   // If initialization was already attempted and failed, don't retry
   if (initializationAttempted && !analyticsInstance) {
@@ -29,15 +32,26 @@ const getAnalyticsInstance = (): ReturnType<typeof getAnalytics> | null => {
   return analyticsInstance;
 };
 
+/** Called by AppContent to skip app_open when user just signed up this session */
+export const getAccountCreatedThisSession = (): boolean => accountCreatedThisSession;
+export const clearAccountCreatedThisSession = (): void => {
+  accountCreatedThisSession = false;
+};
+
 /**
  * Track account creation
  * Call this when a user successfully creates an account
  */
 export const trackAccountCreated = async (method: 'email' | 'google' | 'apple') => {
   try {
+    // Set prerequisite first so returning-user tracking works when storage succeeds
+    await markAccountExists();
+    // Always set session guard so we skip app_open this session (even if storage failed)
+    accountCreatedThisSession = true;
+
     const analytics = getAnalyticsInstance();
     if (!analytics) {
-      return; // Analytics not available, skip tracking
+      return; // Analytics not available, skip event (flag already set)
     }
     await logEvent(analytics, 'account_created', {
       signup_method: method,
@@ -45,6 +59,70 @@ export const trackAccountCreated = async (method: 'email' | 'google' | 'apple') 
     });
   } catch (error) {
     console.error('[Analytics] Error tracking account_created:', error);
+  }
+};
+
+/**
+ * Track first app open
+ * Call this on first app initialization to mark that app has been opened at least once
+ * This is separate from Firebase's automatic first_open event - we use this for our own logic
+ */
+export const trackFirstOpen = async () => {
+  try {
+    if (await hasFirstOpened()) {
+      return;
+    }
+    await AsyncStorage.setItem('has_first_opened', 'true');
+  } catch (error) {
+    console.error('[Analytics] Error tracking first_open flag:', error);
+  }
+};
+
+/**
+ * Read a boolean flag from AsyncStorage (true only when value === 'true').
+ * Returns false on error or missing key.
+ */
+const checkStorageFlag = async (key: string): Promise<boolean> => {
+  try {
+    const value = await AsyncStorage.getItem(key);
+    return value === 'true';
+  } catch (error) {
+    console.error(`[Analytics] Error checking ${key}:`, error);
+    return false;
+  }
+};
+
+const hasFirstOpened = (): Promise<boolean> => checkStorageFlag('has_first_opened');
+const hasAccountCreated = (): Promise<boolean> => checkStorageFlag('has_account_created');
+
+/**
+ * Mark that user has an account (for app_returned prerequisite)
+ * Call when user successfully logs in to an existing account - so we treat
+ * "logged in" as sufficient for "returning user" tracking even if they
+ * never created an account on this device.
+ */
+export const markAccountExists = async (): Promise<void> => {
+  try {
+    await AsyncStorage.setItem('has_account_created', 'true');
+  } catch (error) {
+    console.error('[Analytics] Error marking account exists:', error);
+  }
+};
+
+/**
+ * Check if prerequisites are met for tracking app return
+ * Returns true if both first_open and account_created have occurred
+ */
+const canTrackAppReturned = async (): Promise<boolean> => {
+  try {
+    const [hasOpened, hasCreated] = await Promise.all([
+      hasFirstOpened(),
+      hasAccountCreated(),
+    ]);
+    return hasOpened && hasCreated;
+  } catch (error) {
+    console.error('[Analytics] Error checking app_returned prerequisites:', error);
+    return false;
   }
 };
 
@@ -194,19 +272,28 @@ export const trackFirstBattle = async (userId: string) => {
 };
 
 /**
- * Track app return
- * Call this when user returns to the app from background
- * This is more reliable than Firebase's automatic app_open event
+ * Track app return (returning user with account)
+ * Call this when user returns to the app (background→foreground, login, auto-sign in, initial open)
+ * Only tracks if both first_open and account_created prerequisites are met.
+ *
+ * We send the reserved event name app_open. Firebase does NOT auto-log app_open on iOS/Android
+ * (only first_open, session_start, user_engagement, etc. are automatic), so this is the only
+ * source of app_open and it does not duplicate any automatic event. Use it to measure how many
+ * "returning user with account" opens occur in a period; first_open remains the natural
+ * once-per-install event from Firebase.
  */
 export const trackAppReturned = async () => {
   try {
+    if (!(await canTrackAppReturned())) {
+      return;
+    }
+
     const analytics = getAnalyticsInstance();
     if (!analytics) {
-      return; // Analytics not available, skip tracking
+      return;
     }
-    await logEvent(analytics, 'app_returned', {
-      timestamp: new Date().toISOString(),
-    });
+
+    await logEvent(analytics, 'app_open', {});
   } catch (error) {
     console.error('[Analytics] Error tracking app_returned:', error);
   }
