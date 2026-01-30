@@ -21,6 +21,9 @@
 		B94813222E870AA50020DD49 /* AppleSignInModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = B94813202E870AA50020DD49 /* AppleSignInModule.swift */; };
 		B94813242E870BB50020DD49 /* GameCenterModule.m in Sources */ = {isa = PBXBuildFile; fileRef = B94813232E870BB50020DD49 /* GameCenterModule.m */; };
 		B94813252E870BB50020DD49 /* GameCenterModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = B94813262E870BB50020DD49 /* GameCenterModule.swift */; };
+		B948132A2E870CC50020DD49 /* AntDesign.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B94813272E870CC50020DD49 /* AntDesign.ttf */; };
+		B948132B2E870CC50020DD49 /* FontAwesome.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B94813282E870CC50020DD49 /* FontAwesome.ttf */; };
+		B948132C2E870CC50020DD49 /* Ionicons.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B94813292E870CC50020DD49 /* Ionicons.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -62,6 +65,9 @@
 		B94813262E870BB50020DD49 /* GameCenterModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameCenterModule.swift; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		FE486BCC9CA1C85C49E25284 /* Pods-mobile.staging.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-mobile.staging.xcconfig"; path = "Target Support Files/Pods-mobile/Pods-mobile.staging.xcconfig"; sourceTree = "<group>"; };
+		B94813272E870CC50020DD49 /* AntDesign.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = AntDesign.ttf; sourceTree = "<group>"; };
+		B94813282E870CC50020DD49 /* FontAwesome.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = FontAwesome.ttf; sourceTree = "<group>"; };
+		B94813292E870CC50020DD49 /* Ionicons.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Ionicons.ttf; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -107,6 +113,7 @@
 				B948131E2E8705C60020DD49 /* mobile.entitlements */,
 				13B07FAF1A68108700A75B9A /* AppDelegate.h */,
 				13B07FB01A68108700A75B9A /* AppDelegate.mm */,
+				B948132D2E870CC50020DD49 /* Fonts */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
@@ -116,6 +123,16 @@
 				B923798F2E66385500A41224 /* GoogleService-Info.plist */,
 			);
 			name = mobile;
+			sourceTree = "<group>";
+		};
+		B948132D2E870CC50020DD49 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				B94813272E870CC50020DD49 /* AntDesign.ttf */,
+				B94813282E870CC50020DD49 /* FontAwesome.ttf */,
+				B94813292E870CC50020DD49 /* Ionicons.ttf */,
+			);
+			path = "../src/assets/fonts";
 			sourceTree = "<group>";
 		};
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
@@ -271,6 +288,9 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B948132A2E870CC50020DD49 /* AntDesign.ttf in Resources */,
+				B948132B2E870CC50020DD49 /* FontAwesome.ttf in Resources */,
+				B948132C2E870CC50020DD49 /* Ionicons.ttf in Resources */,
 				B923798D2E66385500A41223 /* client_213914599866-omj66uek6jte9rrge2secalb8sf4bacs.apps.googleusercontent.com.plist in Resources */,
 				B923798E2E66385500A41224 /* GoogleService-Info.plist in Resources */,
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
