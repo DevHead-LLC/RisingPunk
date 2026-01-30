@@ -82,21 +82,18 @@ export const trackFirstOpen = async () => {
  * Read a boolean flag from AsyncStorage (true only when value === 'true').
  * Returns false on error or missing key.
  */
-const checkStorageFlag = async (key: string, logLabel: string): Promise<boolean> => {
+const checkStorageFlag = async (key: string): Promise<boolean> => {
   try {
     const value = await AsyncStorage.getItem(key);
     return value === 'true';
   } catch (error) {
-    console.error(`[Analytics] Error checking ${logLabel}:`, error);
+    console.error(`[Analytics] Error checking ${key}:`, error);
     return false;
   }
 };
 
-const hasFirstOpened = (): Promise<boolean> =>
-  checkStorageFlag('has_first_opened', 'has_first_opened');
-
-const hasAccountCreated = (): Promise<boolean> =>
-  checkStorageFlag('has_account_created', 'has_account_created');
+const hasFirstOpened = (): Promise<boolean> => checkStorageFlag('has_first_opened');
+const hasAccountCreated = (): Promise<boolean> => checkStorageFlag('has_account_created');
 
 /**
  * Mark that user has an account (for app_returned prerequisite)
