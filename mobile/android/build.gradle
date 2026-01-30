@@ -2,7 +2,7 @@ buildscript {
     ext {
         buildToolsVersion = "35.0.0"
         minSdkVersion = 24
-        compileSdkVersion = 35
+        compileSdkVersion = 36
         targetSdkVersion = 35
         ndkVersion = "27.0.12077973"
         kotlinVersion = "1.9.24"
@@ -12,7 +12,8 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("com.android.tools.build:gradle")
+        // Pin AGP 8.9.1+ so androidx.core:core-ktx:1.17.0 (edge-to-edge) can use compileSdk 36
+        classpath("com.android.tools.build:gradle:8.9.1")
         classpath("com.facebook.react:react-native-gradle-plugin")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
         classpath("com.google.gms:google-services:4.4.0")
