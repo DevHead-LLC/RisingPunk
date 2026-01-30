@@ -423,14 +423,48 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
     </View>
   );
 
+  const lockedFeatureModals = (
+    <>
+      <LockedFeatureModal
+        visible={showInsufficientFundsModal}
+        title="INSUFFICIENT FUNDS"
+        message="You need at least $100 to build 100 Guardian bots. Please earn more funds before starting this task."
+        onClose={() => setShowInsufficientFundsModal(false)}
+        closeButtonText="CLOSE"
+      />
+      <LockedFeatureModal
+        visible={showBuildInProgressModal}
+        title="BUILD IN PROGRESS"
+        message="You already have a bot build in progress. Please wait for it to complete or speed it up before starting this guided task."
+        onClose={() => setShowBuildInProgressModal(false)}
+        closeButtonText="CLOSE"
+      />
+      <LockedFeatureModal
+        visible={showLockedFeatureModal}
+        title="LOCKED FEATURE"
+        message={
+          blockedTaskId === 'free-hack-rig'
+            ? "You need to complete the 'Build 100 Guardians' task before you can unlock the Hack Rig."
+            : "You need to complete the 'Free your Hack Rig' task before you can visit the Hackmap."
+        }
+        onClose={() => {
+          setShowLockedFeatureModal(false);
+          setBlockedTaskId(null);
+        }}
+        closeButtonText="CLOSE"
+      />
+    </>
+  );
+
   return (
     <>
       {Platform.OS === 'android' && visible && (
         <View style={[StyleSheet.absoluteFill, { zIndex: 9999, elevation: 9999 }]} pointerEvents="auto">
           {modalBody}
+          {lockedFeatureModals}
         </View>
       )}
-      {Platform.OS !== 'android' ? (
+      {Platform.OS !== 'android' && (
         <Modal
           visible={visible}
           transparent={true}
@@ -442,66 +476,8 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
           presentationStyle="overFullScreen"
         >
           {modalBody}
-          <LockedFeatureModal
-        visible={showInsufficientFundsModal}
-        title="INSUFFICIENT FUNDS"
-        message="You need at least $100 to build 100 Guardian bots. Please earn more funds before starting this task."
-        onClose={() => setShowInsufficientFundsModal(false)}
-        closeButtonText="CLOSE"
-      />
-      <LockedFeatureModal
-        visible={showBuildInProgressModal}
-        title="BUILD IN PROGRESS"
-        message="You already have a bot build in progress. Please wait for it to complete or speed it up before starting this guided task."
-        onClose={() => setShowBuildInProgressModal(false)}
-        closeButtonText="CLOSE"
-      />
-      <LockedFeatureModal
-        visible={showLockedFeatureModal}
-        title="LOCKED FEATURE"
-        message={
-          blockedTaskId === 'free-hack-rig'
-            ? "You need to complete the 'Build 100 Guardians' task before you can unlock the Hack Rig."
-            : "You need to complete the 'Free your Hack Rig' task before you can visit the Hackmap."
-        }
-        onClose={() => {
-          setShowLockedFeatureModal(false);
-          setBlockedTaskId(null);
-        }}
-        closeButtonText="CLOSE"
-      />
+          {lockedFeatureModals}
         </Modal>
-      ) : (
-        <>
-          <LockedFeatureModal
-        visible={showInsufficientFundsModal}
-        title="INSUFFICIENT FUNDS"
-        message="You need at least $100 to build 100 Guardian bots. Please earn more funds before starting this task."
-        onClose={() => setShowInsufficientFundsModal(false)}
-        closeButtonText="CLOSE"
-      />
-      <LockedFeatureModal
-        visible={showBuildInProgressModal}
-        title="BUILD IN PROGRESS"
-        message="You already have a bot build in progress. Please wait for it to complete or speed it up before starting this guided task."
-        onClose={() => setShowBuildInProgressModal(false)}
-        closeButtonText="CLOSE"
-      />
-      <LockedFeatureModal
-        visible={showLockedFeatureModal}
-        title="LOCKED FEATURE"
-        message={
-          blockedTaskId === 'free-hack-rig'
-            ? "You need to complete the 'Build 100 Guardians' task before you can unlock the Hack Rig."
-            : "You need to complete the 'Free your Hack Rig' task before you can visit the Hackmap."
-        }
-        onClose={() => {
-          setShowLockedFeatureModal(false);
-          setBlockedTaskId(null);
-        }}
-        closeButtonText="CLOSE"
-      />
-        </>
       )}
     </>
   );
