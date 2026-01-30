@@ -1,16 +1,15 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Modal,
-  TouchableOpacity,
-  ScrollView,
   Platform,
   Dimensions,
   Pressable,
+  ScrollView,
+  BackHandler,
 } from 'react-native';
-import { ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { useGetCurrentTaskGuideTaskQuery, useCompleteTaskGuideTaskMutation } from '../../store/api/userGuideApi';
@@ -57,6 +56,10 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
   const [showBuildInProgressModal, setShowBuildInProgressModal] = useState(false);
   const [showLockedFeatureModal, setShowLockedFeatureModal] = useState(false);
   const [blockedTaskId, setBlockedTaskId] = useState<string | null>(null);
+  const scrollLogYRef = useRef<number>(-1);
+  const scrollOccurredRef = useRef(false);
+  const touchStartLoggedRef = useRef(false);
+  const moveCountRef = useRef(0);
 
   const taskList = data?.taskList || [];
   const completedTaskIds = new Set(data?.completedTaskIds || []);
@@ -73,6 +76,7 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
   };
 
   const handleTaskAction = async (taskId: string) => {
+    if (__DEV__) console.log('[TaskGuideModal] handleTaskAction taskId=', taskId);
     if (isTaskCompleted(taskId)) {
       // Collect reward - mark task as complete and add reward to balance
       try {
@@ -186,6 +190,15 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
     onClose();
   }, [onClose]);
 
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !visible) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [visible, handleClose]);
+
   const handleClosePressOut = useCallback(() => {
     if (Platform.OS === 'android') {
       onClose();
@@ -213,20 +226,52 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
     return filtered.slice(0, 10);
   }, [taskList, collectedTaskIds]);
 
-  return (
-    <Modal
-      visible={visible}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={handleClose}
-      statusBarTranslucent={true}
-      hardwareAccelerated={true}
-      supportedOrientations={['landscape']}
-      presentationStyle="overFullScreen"
-    >
-      <View style={styles.overlay}>
+  const modalBody = (
+    <View style={styles.overlay}>
         <View
           style={[styles.modalContainer, { backgroundColor: colors.background, borderColor: colors.secondary }]}
+          onStartShouldSetResponder={Platform.OS === 'android' ? () => false : undefined}
+          onMoveShouldSetResponder={Platform.OS === 'android' ? () => false : undefined}
+          onTouchStartCapture={
+            __DEV__ && Platform.OS === 'android'
+              ? () => {
+                  if (!touchStartLoggedRef.current) {
+                    touchStartLoggedRef.current = true;
+                    moveCountRef.current = 0;
+                    console.log('[TaskGuideModal] 1. touch start, component=ScrollView (RN)');
+                  }
+                }
+              : undefined
+          }
+          onTouchMoveCapture={
+            __DEV__ && Platform.OS === 'android'
+              ? () => {
+                  moveCountRef.current += 1;
+                  if (moveCountRef.current === 1) {
+                    console.log('[TaskGuideModal] 2. drag, component=ScrollView (RN), count=1');
+                  } else if (moveCountRef.current % 5 === 0) {
+                    console.log('[TaskGuideModal] 2. drag, component=ScrollView (RN), count=', moveCountRef.current);
+                  }
+                }
+              : undefined
+          }
+          onTouchEndCapture={
+            __DEV__ && Platform.OS === 'android'
+              ? () => {
+                  console.log('[TaskGuideModal] 3. touch end, component=ScrollView (RN)');
+                  console.log('[TaskGuideModal] 4. component that received touch & drag: ScrollView (RN)');
+                  console.log('[TaskGuideModal] 5. expected event: onScrollBeginDrag → onScroll(y) → onScrollEndDrag');
+                  if (scrollOccurredRef.current) {
+                    console.log('[TaskGuideModal] 6. scroll event triggered (native scroll fired)');
+                  } else {
+                    console.warn('[TaskGuideModal] 6. WARNING: scroll event did not trigger (native scroll did not fire)');
+                  }
+                  touchStartLoggedRef.current = false;
+                  moveCountRef.current = 0;
+                  scrollOccurredRef.current = false;
+                }
+              : undefined
+          }
         >
           <View style={[styles.header, { borderBottomColor: colors.secondary }]}>
             <Text style={[styles.title, { color: colors.text.primary }]}>
@@ -239,7 +284,8 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
               { backgroundColor: colors.primary, borderColor: colors.secondary },
               pressed && { opacity: 0.7 }
             ]}
-            onPress={handleClose}
+            onPressIn={() => { if (__DEV__) console.log('[TaskGuideModal] close onPressIn'); }}
+            onPress={() => { if (__DEV__) console.log('[TaskGuideModal] close onPress'); handleClose(); }}
             onPressOut={handleClosePressOut}
           >
             <Text style={[styles.closeButtonText, { color: colors.background }]}>×</Text>
@@ -253,214 +299,132 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
               </View>
             </View>
 
-            {Platform.OS === 'ios' ? (
-              <GestureScrollView 
-                style={styles.scrollView}
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={true}
-                nestedScrollEnabled={true}
-                keyboardShouldPersistTaps="handled"
-                scrollEnabled={true}
-                bounces={true}
-              >
-                {isLoading ? (
-              <View style={styles.emptyState}>
-                <Text style={[styles.emptyStateText, { color: colors.text.secondary }]}>
-                  Loading tasks...
-                </Text>
-              </View>
-            ) : error ? (
-              <View style={styles.emptyState}>
-                <Text style={[styles.emptyStateText, { color: colors.text.secondary }]}>
-                  Error loading tasks
-                </Text>
-              </View>
-            ) : visibleTasks.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Text style={[styles.emptyStateText, { color: colors.text.secondary }]}>
-                  More tasks coming soon
-                </Text>
-              </View>
-            ) : (
-              visibleTasks.map((task) => {
-                const completed = isTaskCompleted(task.id);
-                const rewardValue = task.reward?.value || 0;
-                return (
-                  <View 
-                    key={task.id} 
-                    style={[
-                      styles.taskItem, 
-                      { 
-                        borderBottomColor: colors.secondary,
-                      }
-                    ]}
-                  >
-                    <View style={styles.taskContent}>
-                      <Text 
-                        style={[
-                          styles.taskTitle, 
-                          { 
-                            color: colors.text.primary,
-                          }
-                        ]}
-                        numberOfLines={2}
-                        ellipsizeMode="tail"
-                      >
-                        {task.title || 'Untitled Task'}
-                      </Text>
-                      {task.howTo && (
-                        <Text 
-                          style={[
-                            styles.taskHowTo, 
-                            { 
-                              color: colors.text.secondary,
-                            }
-                          ]}
+            <ScrollView
+              style={styles.scrollView}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={true}
+              nestedScrollEnabled={true}
+              keyboardShouldPersistTaps="handled"
+              scrollEnabled={true}
+              scrollEventThrottle={16}
+              bounces={true}
+              pointerEvents="auto"
+              removeClippedSubviews={false}
+              {...(Platform.OS === 'android' ? { collapsable: false } : {})}
+              onLayout={(e) => {
+                if (__DEV__ && Platform.OS === 'android') {
+                  const { height } = e.nativeEvent.layout;
+                  console.log('[TaskGuideModal] scroll contract: component=ScrollView (RN), content=visibleTasks (task list), expected on drag: onScrollBeginDrag → onScroll(y) → onScrollEndDrag');
+                  console.log('[TaskGuideModal] ScrollView layout height (viewport):', height);
+                }
+              }}
+              onContentSizeChange={(w, h) => {
+                if (__DEV__ && Platform.OS === 'android') {
+                  console.log('[TaskGuideModal] ScrollView contentSize: width=', w, 'height=', h, '(content taller than viewport => scrollable)');
+                }
+              }}
+              onScrollBeginDrag={() => {
+                if (__DEV__ && Platform.OS === 'android') {
+                  scrollOccurredRef.current = true;
+                  console.log('[TaskGuideModal] ScrollView.onScrollBeginDrag (scroll recognized)');
+                }
+              }}
+              onScroll={(e) => {
+                if (__DEV__ && Platform.OS === 'android') {
+                  const y = Math.round(e.nativeEvent.contentOffset.y);
+                  const bucket = Math.floor(y / 80) * 80;
+                  if (bucket !== scrollLogYRef.current) {
+                    scrollLogYRef.current = bucket;
+                    console.log('[TaskGuideModal] ScrollView.onScroll y=', y, '(task list contentOffset)');
+                  }
+                }
+              }}
+              onScrollEndDrag={() => {
+                if (__DEV__ && Platform.OS === 'android') {
+                  console.log('[TaskGuideModal] ScrollView.onScrollEndDrag (scroll ended)');
+                }
+              }}
+            >
+              {isLoading ? (
+                <View style={styles.emptyState}>
+                  <Text style={[styles.emptyStateText, { color: colors.text.secondary }]}>
+                    Loading tasks...
+                  </Text>
+                </View>
+              ) : error ? (
+                <View style={styles.emptyState}>
+                  <Text style={[styles.emptyStateText, { color: colors.text.secondary }]}>
+                    Error loading tasks
+                  </Text>
+                </View>
+              ) : visibleTasks.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Text style={[styles.emptyStateText, { color: colors.text.secondary }]}>
+                    More tasks coming soon
+                  </Text>
+                </View>
+              ) : (
+                visibleTasks.map((task) => {
+                  const completed = isTaskCompleted(task.id);
+                  const rewardValue = task.reward?.value || 0;
+                  return (
+                    <View
+                      key={task.id}
+                      style={[
+                        styles.taskItem,
+                        { borderBottomColor: colors.secondary },
+                      ]}
+                    >
+                      <View style={styles.taskContent}>
+                        <Text
+                          style={[styles.taskTitle, { color: colors.text.primary }]}
+                          numberOfLines={2}
+                          ellipsizeMode="tail"
                         >
-                          {task.howTo}
+                          {task.title || 'Untitled Task'}
                         </Text>
-                      )}
-                    </View>
-                    <View style={styles.rightSection}>
-                      <Text 
-                        style={[
-                          styles.rewardAmount, 
-                          { 
-                            color: colors.text.secondary,
-                          }
-                        ]}
-                      >
-                        ${rewardValue}
-                      </Text>
-                      <Pressable
-                        style={({ pressed }) => [
-                          styles.actionButton,
-                          {
-                            backgroundColor: completed ? colors.matrix : colors.primary,
-                            borderColor: completed ? colors.matrix : colors.secondary,
-                          },
-                          pressed && { opacity: 0.7 }
-                        ]}
-                        onPress={() => handleTaskAction(task.id)}
-                      >
-                        <Text style={[styles.actionButtonText, { color: colors.background }]}>
-                          {completed ? 'Collect' : "Let's Go!"}
-                        </Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                );
-              })
-                )}
-              </GestureScrollView>
-            ) : (
-              <ScrollView 
-                style={styles.scrollView} 
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={true}
-                nestedScrollEnabled={true}
-                bounces={true}
-                scrollEnabled={true}
-                keyboardShouldPersistTaps="handled"
-              >
-                {isLoading ? (
-                  <View style={styles.emptyState}>
-                    <Text style={[styles.emptyStateText, { color: colors.text.secondary }]}>
-                      Loading tasks...
-                    </Text>
-                  </View>
-                ) : error ? (
-                  <View style={styles.emptyState}>
-                    <Text style={[styles.emptyStateText, { color: colors.text.secondary }]}>
-                      Error loading tasks
-                    </Text>
-                  </View>
-                ) : visibleTasks.length === 0 ? (
-                  <View style={styles.emptyState}>
-                    <Text style={[styles.emptyStateText, { color: colors.text.secondary }]}>
-                      More tasks coming soon
-                    </Text>
-                  </View>
-                ) : (
-                  visibleTasks.map((task) => {
-                    const completed = isTaskCompleted(task.id);
-                    const rewardValue = task.reward?.value || 0;
-                    return (
-                      <View 
-                        key={task.id} 
-                        style={[
-                          styles.taskItem, 
-                          { 
-                            borderBottomColor: colors.secondary,
-                          }
-                        ]}
-                      >
-                        <View style={styles.taskContent}>
-                          <Text 
-                            style={[
-                              styles.taskTitle, 
-                              { 
-                                color: colors.text.primary,
-                              }
-                            ]}
-                            numberOfLines={2}
-                            ellipsizeMode="tail"
-                          >
-                            {task.title || 'Untitled Task'}
+                        {task.howTo && (
+                          <Text style={[styles.taskHowTo, { color: colors.text.secondary }]}>
+                            {task.howTo}
                           </Text>
-                          {task.howTo && (
-                            <Text 
-                              style={[
-                                styles.taskHowTo, 
-                                { 
-                                  color: colors.text.secondary,
-                                }
-                              ]}
-                            >
-                              {task.howTo}
-                            </Text>
-                          )}
-                        </View>
-                        <View style={styles.rightSection}>
-                          <Text 
-                            style={[
-                              styles.rewardAmount, 
-                              { 
-                                color: colors.text.secondary,
-                              }
-                            ]}
-                          >
-                            ${rewardValue}
-                          </Text>
-                          <Pressable
-                            style={({ pressed }) => [
-                              styles.actionButton,
-                              {
-                                backgroundColor: completed ? colors.matrix : colors.primary,
-                                borderColor: completed ? colors.matrix : colors.secondary,
-                              },
-                              pressed && { opacity: 0.7 }
-                            ]}
-                            onPress={() => handleTaskAction(task.id)}
-                            onPressOut={() => {
-                              if (Platform.OS === 'android') {
-                                handleTaskAction(task.id);
-                              }
-                            }}
-                          >
-                            <Text style={[styles.actionButtonText, { color: colors.background }]}>
-                              {completed ? 'Collect' : "Let's Go!"}
-                            </Text>
-                          </Pressable>
-                        </View>
+                        )}
                       </View>
-                    );
-                  })
-                )}
-              </ScrollView>
-            )}
+                      <View style={styles.rightSection}>
+                        <Text style={[styles.rewardAmount, { color: colors.text.secondary }]}>
+                          ${rewardValue}
+                        </Text>
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.actionButton,
+                            {
+                              backgroundColor: completed ? colors.matrix : colors.primary,
+                              borderColor: completed ? colors.matrix : colors.secondary,
+                            },
+                            pressed && { opacity: 0.7 },
+                          ]}
+                          onPressIn={Platform.OS === 'android' ? () => { if (__DEV__) console.log('[TaskGuideModal] action onPressIn taskId=', task.id); } : undefined}
+                          onPress={() => {
+                            if (__DEV__ && Platform.OS === 'android') console.log('[TaskGuideModal] action onPress taskId=', task.id);
+                            handleTaskAction(task.id);
+                          }}
+                          onPressOut={Platform.OS === 'android' ? () => handleTaskAction(task.id) : undefined}
+                        >
+                          <Text style={[styles.actionButtonText, { color: colors.background }]}>
+                            {completed ? 'Collect' : "Let's Go!"}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
         </View>
-      </View>
+    </View>
+  );
+
+  const lockedFeatureModals = (
+    <>
       <LockedFeatureModal
         visible={showInsufficientFundsModal}
         title="INSUFFICIENT FUNDS"
@@ -489,7 +453,33 @@ export const TaskGuideModal: React.FC<TaskGuideModalProps> = ({
         }}
         closeButtonText="CLOSE"
       />
-    </Modal>
+    </>
+  );
+
+  return (
+    <>
+      {Platform.OS === 'android' && visible && (
+        <View style={[StyleSheet.absoluteFill, { zIndex: 9999, elevation: 9999 }]} pointerEvents="auto">
+          {modalBody}
+          {lockedFeatureModals}
+        </View>
+      )}
+      {Platform.OS !== 'android' && (
+        <Modal
+          visible={visible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={handleClose}
+          statusBarTranslucent={true}
+          hardwareAccelerated={true}
+          supportedOrientations={['landscape']}
+          presentationStyle="overFullScreen"
+        >
+          {modalBody}
+          {lockedFeatureModals}
+        </Modal>
+      )}
+    </>
   );
 };
 
@@ -558,6 +548,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   scrollView: {
     flex: 1,
+    minHeight: 0,
   },
   scrollContent: {
     paddingBottom: SIZING.spacing.lg,
