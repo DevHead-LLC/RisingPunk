@@ -110,8 +110,8 @@ export const researchFeaturesApi = createApi({
             dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
           }
           
-          // If income rate research completed, invalidate balance cache
-          if (arg.categoryId === 'cash-flow' && arg.featureId === 'increase-income-rate') {
+          // If income rate or insurance reduction research completed, invalidate balance cache
+          if (arg.categoryId === 'cash-flow' && (arg.featureId === 'increase-income-rate' || arg.featureId === 'reduce-insurance-expense')) {
             const { balanceApi } = await import('./balanceApi');
             dispatch(balanceApi.util.invalidateTags(['Balance']));
           }
@@ -150,8 +150,8 @@ export const researchFeaturesApi = createApi({
             dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
           }
           
-          // If income rate research was speeded up, invalidate balance cache
-          if (arg.categoryId === 'cash-flow' && arg.featureId === 'increase-income-rate') {
+          // If income rate or insurance reduction research was speeded up, invalidate balance cache
+          if (arg.categoryId === 'cash-flow' && (arg.featureId === 'increase-income-rate' || arg.featureId === 'reduce-insurance-expense')) {
             dispatch(balanceApi.util.invalidateTags(['Balance']));
           }
         } catch {

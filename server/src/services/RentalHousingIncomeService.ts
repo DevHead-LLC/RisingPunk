@@ -1,5 +1,5 @@
 import { IUser } from '../models/User';
-import { UserResearchFeature } from '../models/UserResearchFeature';
+import { isResearchFeatureUnlocked, getResearchFeatureUnlockTime } from '../utils/researchFeatureUtils';
 
 export interface RentalHousingIncome {
   totalIncomePerSecond: number;
@@ -29,46 +29,11 @@ export class RentalHousingIncomeService {
   private static readonly BASE_INCOME_PER_PROPERTY = 0.06;
 
   static async isRentalProfitResearchUnlocked(userId: string): Promise<boolean> {
-    try {
-      const feature = await UserResearchFeature.findOne({
-        userId,
-        categoryId: 'investments',
-        featureId: 'rental-profit-increase'
-      })
-      .select('isUnlocked unlockedAt')
-      .lean();
-
-      if (!feature) {
-        return false;
-      }
-
-      const isUnlocked = !!feature.isUnlocked;
-      return isUnlocked;
-    } catch (error) {
-      console.error('[RENTAL INCOME] Error checking rental profit research unlock status:', error);
-      return false;
-    }
+    return isResearchFeatureUnlocked(userId, 'investments', 'rental-profit-increase');
   }
 
   static async getRentalProfitResearchUnlockTime(userId: string): Promise<Date | null> {
-    try {
-      const feature = await UserResearchFeature.findOne({
-        userId,
-        categoryId: 'investments',
-        featureId: 'rental-profit-increase'
-      })
-      .select('isUnlocked unlockedAt')
-      .lean();
-
-      if (!feature || !feature.isUnlocked || !feature.unlockedAt) {
-        return null;
-      }
-
-      return feature.unlockedAt;
-    } catch (error) {
-      console.error('[RENTAL INCOME] Error getting rental profit research unlock time:', error);
-      return null;
-    }
+    return getResearchFeatureUnlockTime(userId, 'investments', 'rental-profit-increase');
   }
 
   static getRoomValuesWithResearch(isResearchUnlocked: boolean): { bathroom: number; kitchen: number; bedroom: number; livingRoom: number } {

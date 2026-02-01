@@ -793,6 +793,20 @@ export const RESEARCH_FEATURES: Record<string, IResearchFeature[]> = {
         value: 0.05,
         target: 'base-income-rate'
       }
+    },
+    {
+      id: 'reduce-insurance-expense',
+      name: 'Reduce Insurance Expense $0.02',
+      description: 'Reduce your insurance expense by $0.02 per second, increasing net income and cash flow',
+      unlockCost: 1000000,
+      levelRequirement: 12,
+      researchTimeHours: 10,
+      isUnlocked: false,
+      effect: {
+        type: 'reduction',
+        value: 0.02,
+        target: 'insurance-expense'
+      }
     }
   ],
 
