@@ -46,6 +46,7 @@ const BACKGROUND_IMAGE_MAP: Record<string, ImageSourcePropType> = {
   'crew-system-unlock': require('../../assets/images/startCrew.png'),
   'rental-profit-increase': require('../../assets/images/researchCenter/rentalPropertyIncrease.png'),
   'increase-income-rate': require('../../assets/images/researchCenter/incomeIncrease.png'),
+  'reduce-insurance-expense': require('../../assets/images/researchCenter/decreaseInsurance.png'),
 };
 
 export function FeatureCard({
@@ -99,9 +100,7 @@ export function FeatureCard({
       <View style={[
         styles.featureStatus,
         {
-          backgroundColor: feature.isResearching ? (isLightMode ? '#F0FDF4' : 'rgba(16, 185, 129, 0.1)') : 
-                          feature.isUnlocked ? (isLightMode ? '#F0F9FF' : 'rgba(59, 130, 246, 0.1)') :
-                          (isLightMode ? '#FEF2F2' : 'rgba(255, 255, 255, 0.1)'),
+          backgroundColor: isLightMode ? 'rgba(0, 0, 0, 0.55)' : 'rgba(0, 0, 0, 0.7)',
           borderColor: feature.isResearching ? (isLightMode ? '#BBF7D0' : '#10B981') :
                       feature.isUnlocked ? (isLightMode ? '#BFDBFE' : '#3B82F6') :
                       (isLightMode ? '#FECACA' : 'transparent'),
