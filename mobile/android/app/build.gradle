@@ -134,15 +134,13 @@ android {
         applicationId "com.devheadllc.risingpunk"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 63
+        versionCode 64
         versionName "2.2.1"
         
-        // CRITICAL: 16 KB Page Size Fix - Restrict to 64-bit ABIs only
-        // React Native 0.76.6's 32-bit libraries (armeabi-v7a, x86) are NOT 16 KB aligned
-        // Excluding them fixes the Google Play Console rejection without upgrading React Native
-        ndk {
-            abiFilters "arm64-v8a", "x86_64"
-        }
+        // Support all ABIs so we don't drop devices (32-bit + 64-bit). 16 KB alignment
+        // is handled by enableUncompressedNativeLibs + useLegacyPackaging=false; 64-bit-only
+        // would satisfy 16 KB but drops ~6k+ devices. See 16kb-page-size-fix.md.
+        // ndk { abiFilters ... } omitted = all ABIs included.
         
         // CRITICAL: Verify react-native-config values are being set
         // These should be set by dotenv.gradle, but we verify here
@@ -389,19 +387,12 @@ Actual: API_ENV=${apiEnv} in ${taskEnvFile}
                     errors.add("android.bundle.enableUncompressedNativeLibs is not 'true' in gradle.properties")
                     configOk = false
                 }
-                // CRITICAL: reactNativeArchitectures MUST be 64-bit only (native modules read this and build/pull libs)
+                // 16 KB: We support all ABIs for device reach. If 32-bit is present, Google may show 16 KB error.
                 def archList = reactNativeArchitectures.split(',').collect { it.trim().toLowerCase() }.findAll { it }
-                def allowedAbis = ['arm64-v8a', 'x86_64']
                 def has32Bit = archList.any { it == 'armeabi-v7a' || it == 'x86' }
-                def hasBoth64 = archList.contains('arm64-v8a') && archList.contains('x86_64')
-                def allAllowed = archList.every { allowedAbis.contains(it) }
-                if (has32Bit || !allAllowed) {
-                    errors.add("reactNativeArchitectures in gradle.properties must be 64-bit only: arm64-v8a,x86_64 (no armeabi-v7a or x86). Native modules use this and 32-bit libs cause 16 KB rejection.")
-                    configOk = false
-                }
-                if (!hasBoth64) {
-                    errors.add("reactNativeArchitectures in gradle.properties must include both arm64-v8a and x86_64 for 16 KB compliance.")
-                    configOk = false
+                if (has32Bit) {
+                    println "⚠️  16 KB: reactNativeArchitectures includes 32-bit (armeabi-v7a/x86). Google Play may show 'Your app does not support 16 KB memory page sizes.'"
+                    println "   To pass 16 KB you would restrict to arm64-v8a,x86_64 only—but that drops ~6k+ devices. Long-term: upgrade to RN 0.77+ (see 16kb-page-size-fix.md)."
                 }
                 // Parse NDK version to check if it's r27+ (required for 16 KB page size support)
                 def ndkVersionParts = rootProject.ext.ndkVersion.split("\\.")
@@ -417,11 +408,8 @@ Actual: API_ENV=${apiEnv} in ${taskEnvFile}
                 
                 
                 if (configOk) {
-                    println "✅ 16 KB page size configuration verified - All settings correct"
-                    println "✅ reactNativeArchitectures is 64-bit only (arm64-v8a,x86_64)"
-                    println "✅ 64-bit ABI filter applied in defaultConfig (arm64-v8a, x86_64 only)"
-                    println "   This excludes 32-bit libraries that cause 16 KB alignment issues"
-                    println "   with React Native 0.76.6's pre-built libraries"
+                    println "✅ 16 KB alignment config verified (enableUncompressedNativeLibs, NDK r27+, targetSdk 35, useLegacyPackaging=false)"
+                    println "   All ABIs included for device support; if Google shows 16 KB error, see taskItems/android/deployment/16kb-page-size-fix.md"
                 } else {
                     // FAIL THE BUILD - Don't waste time uploading to Google Play Console
                     def errorMessage = """
@@ -445,21 +433,16 @@ HOW TO FIX:
    - Ensure this line exists: android.bundle.enableUncompressedNativeLibs=true
    - If missing, add it (see taskItems/android/deployment/16kb-page-size-fix.md)
 
-2. Fix reactNativeArchitectures (MUST be 64-bit only):
-   - Open: mobile/android/gradle.properties
-   - Set: reactNativeArchitectures=arm64-v8a,x86_64
-   - DO NOT add armeabi-v7a or x86 (native modules read this; 32-bit causes 16 KB rejection)
-
-3. Fix NDK Version (if needed):
+2. Fix NDK Version (if needed):
    - Open: mobile/android/build.gradle
    - Ensure: ndkVersion = "27.0.12077973" (or newer r27+ version)
    - Install NDK r27+ via Android Studio SDK Manager if not installed
 
-4. Fix targetSdkVersion (if needed):
+3. Fix targetSdkVersion (if needed):
    - Open: mobile/android/build.gradle
    - Ensure: targetSdkVersion = 35
 
-5. Verify packaging configuration:
+4. Verify packaging configuration:
    - Open: mobile/android/app/build.gradle
    - Ensure packaging block has: useLegacyPackaging = false
    - (This should already be configured correctly)
