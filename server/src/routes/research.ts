@@ -16,41 +16,39 @@ const researchCompletionAttempts = new Map<string, { count: number; resetAt: num
 const RATE_LIMIT_WINDOW = 60000;
 const MAX_RESEARCH_COMPLETION_ATTEMPTS = 10;
 
-/**
- * Calculates and applies income earned before research unlock to prevent retroactive bonus application.
- * This ensures income is calculated using the old rate before the research bonus applies.
- * 
- * @param user - The user object with balance information
- * @param unlockTime - The time when the research feature was unlocked
- * @returns void - Modifies the user object in place
- */
-function applyPreUnlockIncome(user: any, unlockTime: Date): void {
-  // CRITICAL: Calculate and add income earned BEFORE research unlock (using old rate)
-  // This prevents income loss when we update lastUpdated to unlockTime
+/** Shared sync for cash-flow research completion/speedup (e.g. increase-income-rate, reduce-insurance-expense). */
+async function syncCashFlowResearchCompletion(
+  userId: string,
+  featureId: string,
+  existingUser?: InstanceType<typeof User> | null
+): Promise<InstanceType<typeof User> | null> {
+  const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
+  const { UserResearchFeature } = await import('../models/UserResearchFeature');
+  const user = existingUser ?? await User.findById(userId);
+  if (!user) return null;
+  const researchFeature = await UserResearchFeature.findOne({
+    userId,
+    categoryId: 'cash-flow',
+    featureId
+  }).select('unlockedAt').lean();
+  const unlockTime = researchFeature?.unlockedAt || new Date();
   const secondsElapsed = (unlockTime.getTime() - user.balance.lastUpdated.getTime()) / 1000;
   if (secondsElapsed > 0) {
-    // Round down to 10-second intervals to match balance endpoint logic
     const roundedSecondsElapsed = Math.floor(secondsElapsed / 10) * 10;
-    
-    // Calculate income using current ratePerSecond (before research bonus applies)
     const fullPrecisionIncome = roundedSecondsElapsed * user.balance.ratePerSecond;
-    
-    // Add to existing fractional remainder
     const totalWithRemainder = (user.balance.fractionalRemainder || 0) + fullPrecisionIncome;
-    
-    // Calculate whole dollars to add
     const wholeDollarsToAdd = Math.floor(totalWithRemainder);
-    
-    // Update balance and fractional remainder
     user.balance.total += wholeDollarsToAdd;
     user.balance.fractionalRemainder = totalWithRemainder - wholeDollarsToAdd;
-    
-    // CRITICAL: Update lastUpdated to unlock time to prevent retroactive bonus application
-    // This ensures the bonus only applies going forward from research completion
+    user.balance.lastUpdated = unlockTime;
+  } else if (unlockTime > user.balance.lastUpdated) {
     user.balance.lastUpdated = unlockTime;
   }
-  // If unlockTime is before or equal to lastUpdated (secondsElapsed <= 0),
-  // don't move timestamp backwards to prevent double-counting income from concurrent balance updates
+  user.balance.rentalHousingIncomeLastSynced = null;
+  await user.save();
+  await RentalHousingSyncService.performSync(user);
+  const reloaded = await User.findById(userId);
+  return reloaded ?? null;
 }
 
 router.get('/status', auth, async (req: Request, res: Response) => {
@@ -372,67 +370,12 @@ router.post('/complete-feature-research', auth, async (req: Request, res: Respon
         }
       }
       
-      // If income rate research completed, trigger sync to update income rate
-      if (categoryId === 'cash-flow' && featureId === 'increase-income-rate') {
+      // If cash-flow research completed (income rate or insurance reduction), trigger sync
+      if (categoryId === 'cash-flow' && (featureId === 'increase-income-rate' || featureId === 'reduce-insurance-expense')) {
         try {
-          const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
-          const { UserResearchFeature } = await import('../models/UserResearchFeature');
-          const user = await User.findById(userId);
-          if (user) {
-            // Get the research unlock time to prevent retroactive bonus application
-            const researchFeature = await UserResearchFeature.findOne({
-              userId,
-              categoryId: 'cash-flow',
-              featureId: 'increase-income-rate'
-            }).select('unlockedAt').lean();
-            
-            const unlockTime = researchFeature?.unlockedAt || new Date();
-            
-            // Calculate and apply income earned before research unlock
-            applyPreUnlockIncome(user, unlockTime);
-            
-            // Force sync to recalculate rate with new research unlock
-            user.balance.rentalHousingIncomeLastSynced = null;
-            await user.save();
-            await RentalHousingSyncService.performSync(user);
-          }
+          await syncCashFlowResearchCompletion(userId, featureId);
         } catch (error) {
-          console.error('Error syncing income rate after research completion:', error);
-          // Don't fail the request if sync fails
-        }
-      }
-      
-      // If insurance reduction research completed, trigger sync to update ratePerSecond
-      if (categoryId === 'cash-flow' && featureId === 'reduce-insurance-expense') {
-        try {
-          const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
-          const { UserResearchFeature } = await import('../models/UserResearchFeature');
-          const user = await User.findById(userId);
-          if (user) {
-            const researchFeature = await UserResearchFeature.findOne({
-              userId,
-              categoryId: 'cash-flow',
-              featureId: 'reduce-insurance-expense'
-            }).select('unlockedAt').lean();
-            const unlockTime = researchFeature?.unlockedAt || new Date();
-            const secondsElapsed = (unlockTime.getTime() - user.balance.lastUpdated.getTime()) / 1000;
-            if (secondsElapsed > 0) {
-              const roundedSecondsElapsed = Math.floor(secondsElapsed / 10) * 10;
-              const fullPrecisionIncome = roundedSecondsElapsed * user.balance.ratePerSecond;
-              const totalWithRemainder = (user.balance.fractionalRemainder || 0) + fullPrecisionIncome;
-              const wholeDollarsToAdd = Math.floor(totalWithRemainder);
-              user.balance.total += wholeDollarsToAdd;
-              user.balance.fractionalRemainder = totalWithRemainder - wholeDollarsToAdd;
-              user.balance.lastUpdated = unlockTime;
-            } else if (unlockTime > user.balance.lastUpdated) {
-              user.balance.lastUpdated = unlockTime;
-            }
-            user.balance.rentalHousingIncomeLastSynced = null;
-            await user.save();
-            await RentalHousingSyncService.performSync(user);
-          }
-        } catch (error) {
-          console.error('Error syncing after insurance reduction research completion:', error);
+          console.error(`Error syncing after cash-flow research completion (${featureId}):`, error);
         }
       }
       
@@ -725,78 +668,13 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
       }
     }
     
-    // If income rate research was speeded up, trigger sync to update income rate
-    if (categoryId === 'cash-flow' && featureId === 'increase-income-rate') {
+    // If cash-flow research was speeded up (income rate or insurance reduction), trigger sync
+    if (categoryId === 'cash-flow' && (featureId === 'increase-income-rate' || featureId === 'reduce-insurance-expense')) {
       try {
-        const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
-        const { UserResearchFeature } = await import('../models/UserResearchFeature');
-        if (updatedUser) {
-          // Get the research unlock time to prevent retroactive bonus application
-          const researchFeature = await UserResearchFeature.findOne({
-            userId,
-            categoryId: 'cash-flow',
-            featureId: 'increase-income-rate'
-          }).select('unlockedAt').lean();
-          
-          const unlockTime = researchFeature?.unlockedAt || new Date();
-          
-          // Calculate and apply income earned before research unlock
-          applyPreUnlockIncome(updatedUser, unlockTime);
-          
-          // Force sync to recalculate rate with new research unlock
-          updatedUser.balance.rentalHousingIncomeLastSynced = null;
-          await updatedUser.save();
-          await RentalHousingSyncService.performSync(updatedUser);
-          
-          // CRITICAL: Reload user after save to ensure response reflects actual database value
-          // This prevents showing incorrect balance if save() failed silently
-          const reloadedUser = await User.findById(userId);
-          if (reloadedUser) {
-            updatedUser = reloadedUser;
-          }
-        }
+        const reloaded = await syncCashFlowResearchCompletion(userId, featureId, updatedUser ?? undefined);
+        if (reloaded) updatedUser = reloaded;
       } catch (error) {
-        console.error('Error syncing income rate after speedup:', error);
-        // Don't fail the request if sync fails, but reload user to ensure correct balance
-        const reloadedUser = await User.findById(userId);
-        if (reloadedUser) {
-          updatedUser = reloadedUser;
-        }
-      }
-    }
-    
-    // If insurance reduction research was speeded up, trigger sync to update ratePerSecond
-    if (categoryId === 'cash-flow' && featureId === 'reduce-insurance-expense') {
-      try {
-        const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
-        const { UserResearchFeature } = await import('../models/UserResearchFeature');
-        if (updatedUser) {
-          const researchFeature = await UserResearchFeature.findOne({
-            userId,
-            categoryId: 'cash-flow',
-            featureId: 'reduce-insurance-expense'
-          }).select('unlockedAt').lean();
-          const unlockTime = researchFeature?.unlockedAt || new Date();
-          const secondsElapsed = (unlockTime.getTime() - updatedUser.balance.lastUpdated.getTime()) / 1000;
-          if (secondsElapsed > 0) {
-            const roundedSecondsElapsed = Math.floor(secondsElapsed / 10) * 10;
-            const fullPrecisionIncome = roundedSecondsElapsed * updatedUser.balance.ratePerSecond;
-            const totalWithRemainder = (updatedUser.balance.fractionalRemainder || 0) + fullPrecisionIncome;
-            const wholeDollarsToAdd = Math.floor(totalWithRemainder);
-            updatedUser.balance.total += wholeDollarsToAdd;
-            updatedUser.balance.fractionalRemainder = totalWithRemainder - wholeDollarsToAdd;
-            updatedUser.balance.lastUpdated = unlockTime;
-          } else if (unlockTime > updatedUser.balance.lastUpdated) {
-            updatedUser.balance.lastUpdated = unlockTime;
-          }
-          updatedUser.balance.rentalHousingIncomeLastSynced = null;
-          await updatedUser.save();
-          await RentalHousingSyncService.performSync(updatedUser);
-          const reloadedUser = await User.findById(userId);
-          if (reloadedUser) updatedUser = reloadedUser;
-        }
-      } catch (error) {
-        console.error('Error syncing after insurance reduction speedup:', error);
+        console.error(`Error syncing after cash-flow research speedup (${featureId}):`, error);
         const reloadedUser = await User.findById(userId);
         if (reloadedUser) updatedUser = reloadedUser;
       }
