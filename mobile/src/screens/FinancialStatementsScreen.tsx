@@ -7,6 +7,7 @@ import { getCurrentBalance } from '../store/slices/balanceSlice';
 import { useFetchFinanceTemplatesQuery, useFetchUserFinanceTiersQuery } from '../store/api/userFinanceApi';
 import { useGetRentalHousingIncomeQuery } from '../store/api/rentalHousingApi';
 import { useFetchBalanceQuery } from '../store/api/balanceApi';
+import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { useTheme } from '../context/ThemeContext';
 import { useThemeColors } from '../hooks/useThemeColors';
 
@@ -22,10 +23,12 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
   const { data: userTiersData } = useFetchUserFinanceTiersQuery();
   const { data: rentalHousingData, error: rentalHousingError, isLoading: rentalHousingLoading } = useGetRentalHousingIncomeQuery();
   const { data: balanceData } = useFetchBalanceQuery();
+  const { data: cashFlowFeatures } = useGetUserFeaturesQuery('cash-flow');
   const currentCash = useAppSelector(getCurrentBalance);
   const ratePerSecondFromState = useAppSelector(state => state.balance.ratePerSecond);
   // Use balanceData from query if available (fresh data), otherwise fall back to Redux state
   const ratePerSecond = balanceData?.ratePerSecond ?? ratePerSecondFromState;
+  const insuranceReductionUnlocked = Boolean(cashFlowFeatures?.find(f => f.id === 'reduce-insurance-expense' && f.isUnlocked));
   const { themeMode } = useTheme();
   const colors = useThemeColors();
   
@@ -35,7 +38,7 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
     return Math.max(0, ratePerSecond - rentalIncomeRate);
   }, [ratePerSecond, rentalHousingData?.totalIncomePerSecond]);
   
-  // Calculate income rate bonus (amount above base $1.00/sec)
+  // Calculate income rate bonus (amount above base $1.00/sec) — includes both income-rate and insurance-reduction bonuses
   const incomeRateBonus = useMemo(() => {
     return Math.max(0, baseIncomeRate - 1.0);
   }, [baseIncomeRate]);
@@ -57,11 +60,25 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
   const financialCalculations = useMemo(() => {
     if (!merged) return null;
     
-    const incomeStatementEntries = Object.entries(merged.incomeStatement || {});
+    // Apply insurance reduction research only when template has Insurance: $0.50 -> $0.48 when research unlocked
+    const baseIncomeStatement = merged.incomeStatement || {};
+    const effectiveIncomeStatement = { ...baseIncomeStatement };
+    const hasInsuranceInTemplate = 'Insurance' in baseIncomeStatement;
+    if (hasInsuranceInTemplate) {
+      const insuranceBase = baseIncomeStatement['Insurance'] ?? -0.50;
+      effectiveIncomeStatement['Insurance'] = insuranceBase + (insuranceReductionUnlocked ? 0.02 : 0);
+    }
     
-    // Base gross income: $12.00 (constant for all accounts)
+    const incomeStatementEntries = Object.entries(effectiveIncomeStatement);
+    
+    // Gross Income: only subtract insurance bonus from display when template has Insurance,
+    // so we don't double-count (savings shown as reduced expense). If template lacks Insurance,
+    // show full incomeRateBonus so the $0.02 doesn't vanish from the statement.
+    const effectiveIncomeRateBonus = hasInsuranceInTemplate && insuranceReductionUnlocked
+      ? Math.max(0, incomeRateBonus - 0.02)
+      : incomeRateBonus;
     const baseGrossIncome = 12.00;
-    const grossIncome = baseGrossIncome + incomeRateBonus;
+    const grossIncome = baseGrossIncome + effectiveIncomeRateBonus;
     
     // Calculate expenses (negative values only, excluding totals)
     const expenseEntries = incomeStatementEntries.filter(([k, v]) => {
@@ -99,7 +116,7 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
       passiveIncome,
       netCashFlow
     };
-  }, [merged, incomeRateBonus, rentalHousingData?.totalIncomePerSecond]);
+  }, [merged, incomeRateBonus, insuranceReductionUnlocked, rentalHousingData?.totalIncomePerSecond]);
 
   const getStyles = () => ({
     container: {
