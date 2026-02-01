@@ -402,6 +402,40 @@ router.post('/complete-feature-research', auth, async (req: Request, res: Respon
         }
       }
       
+      // If insurance reduction research completed, trigger sync to update ratePerSecond
+      if (categoryId === 'cash-flow' && featureId === 'reduce-insurance-expense') {
+        try {
+          const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
+          const { UserResearchFeature } = await import('../models/UserResearchFeature');
+          const user = await User.findById(userId);
+          if (user) {
+            const researchFeature = await UserResearchFeature.findOne({
+              userId,
+              categoryId: 'cash-flow',
+              featureId: 'reduce-insurance-expense'
+            }).select('unlockedAt').lean();
+            const unlockTime = researchFeature?.unlockedAt || new Date();
+            const secondsElapsed = (unlockTime.getTime() - user.balance.lastUpdated.getTime()) / 1000;
+            if (secondsElapsed > 0) {
+              const roundedSecondsElapsed = Math.floor(secondsElapsed / 10) * 10;
+              const fullPrecisionIncome = roundedSecondsElapsed * user.balance.ratePerSecond;
+              const totalWithRemainder = (user.balance.fractionalRemainder || 0) + fullPrecisionIncome;
+              const wholeDollarsToAdd = Math.floor(totalWithRemainder);
+              user.balance.total += wholeDollarsToAdd;
+              user.balance.fractionalRemainder = totalWithRemainder - wholeDollarsToAdd;
+              user.balance.lastUpdated = unlockTime;
+            } else if (unlockTime > user.balance.lastUpdated) {
+              user.balance.lastUpdated = unlockTime;
+            }
+            user.balance.rentalHousingIncomeLastSynced = null;
+            await user.save();
+            await RentalHousingSyncService.performSync(user);
+          }
+        } catch (error) {
+          console.error('Error syncing after insurance reduction research completion:', error);
+        }
+      }
+      
       if (categoryId === 'home-defense' && featureId === 'antivirus') {
         try {
           const { UserTaskProgress } = await import('../models/UserTaskProgress');
@@ -728,6 +762,43 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
         if (reloadedUser) {
           updatedUser = reloadedUser;
         }
+      }
+    }
+    
+    // If insurance reduction research was speeded up, trigger sync to update ratePerSecond
+    if (categoryId === 'cash-flow' && featureId === 'reduce-insurance-expense') {
+      try {
+        const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
+        const { UserResearchFeature } = await import('../models/UserResearchFeature');
+        if (updatedUser) {
+          const researchFeature = await UserResearchFeature.findOne({
+            userId,
+            categoryId: 'cash-flow',
+            featureId: 'reduce-insurance-expense'
+          }).select('unlockedAt').lean();
+          const unlockTime = researchFeature?.unlockedAt || new Date();
+          const secondsElapsed = (unlockTime.getTime() - updatedUser.balance.lastUpdated.getTime()) / 1000;
+          if (secondsElapsed > 0) {
+            const roundedSecondsElapsed = Math.floor(secondsElapsed / 10) * 10;
+            const fullPrecisionIncome = roundedSecondsElapsed * updatedUser.balance.ratePerSecond;
+            const totalWithRemainder = (updatedUser.balance.fractionalRemainder || 0) + fullPrecisionIncome;
+            const wholeDollarsToAdd = Math.floor(totalWithRemainder);
+            updatedUser.balance.total += wholeDollarsToAdd;
+            updatedUser.balance.fractionalRemainder = totalWithRemainder - wholeDollarsToAdd;
+            updatedUser.balance.lastUpdated = unlockTime;
+          } else if (unlockTime > updatedUser.balance.lastUpdated) {
+            updatedUser.balance.lastUpdated = unlockTime;
+          }
+          updatedUser.balance.rentalHousingIncomeLastSynced = null;
+          await updatedUser.save();
+          await RentalHousingSyncService.performSync(updatedUser);
+          const reloadedUser = await User.findById(userId);
+          if (reloadedUser) updatedUser = reloadedUser;
+        }
+      } catch (error) {
+        console.error('Error syncing after insurance reduction speedup:', error);
+        const reloadedUser = await User.findById(userId);
+        if (reloadedUser) updatedUser = reloadedUser;
       }
     }
     

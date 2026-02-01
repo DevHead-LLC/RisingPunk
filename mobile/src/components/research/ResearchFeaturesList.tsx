@@ -115,9 +115,9 @@ export function ResearchFeaturesList({
       return feature.id === 'crew-system-unlock';
     }
     
-    // For cash-flow, only show "increase-income-rate"
+    // For cash-flow, show "increase-income-rate" and "reduce-insurance-expense"
     if (categoryId === 'cash-flow') {
-      return feature.id === 'increase-income-rate';
+      return feature.id === 'increase-income-rate' || feature.id === 'reduce-insurance-expense';
     }
     
     // For investments, only show "rental-profit-increase"
