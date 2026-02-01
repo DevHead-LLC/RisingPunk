@@ -134,8 +134,8 @@ android {
         applicationId "com.devheadllc.risingpunk"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 60
-        versionName "2.2.0"
+        versionCode 61
+        versionName "2.2.1"
         
         // CRITICAL: 16 KB Page Size Fix - Restrict to 64-bit ABIs only
         // React Native 0.76.6's 32-bit libraries (armeabi-v7a, x86) are NOT 16 KB aligned
