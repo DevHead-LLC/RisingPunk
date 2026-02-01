@@ -12,6 +12,7 @@ export interface RentalHousingSyncResult {
 export class RentalHousingSyncService {
   private static readonly BASE_INCOME_PER_PROPERTY = 0.06; // $0.06 per property per second
   private static readonly BASE_INCOME_RATE_BONUS = 0.05; // $0.05 per second bonus when income rate research unlocked
+  private static readonly INSURANCE_REDUCTION_BONUS = 0.02; // $0.02 per second when reduce insurance expense research unlocked
 
   static async checkAndSyncRentalHousingIncome(user: IUser): Promise<RentalHousingSyncResult> {
     const now = new Date();
@@ -101,6 +102,27 @@ export class RentalHousingSyncService {
     }
   }
 
+  static async isInsuranceReductionResearchUnlocked(userId: string): Promise<boolean> {
+    try {
+      const feature = await UserResearchFeature.findOne({
+        userId,
+        categoryId: 'cash-flow',
+        featureId: 'reduce-insurance-expense'
+      })
+      .select('isUnlocked unlockedAt')
+      .lean();
+
+      if (!feature) {
+        return false;
+      }
+
+      return !!feature.isUnlocked;
+    } catch (error) {
+      console.error('[INSURANCE REDUCTION] Error checking insurance reduction research unlock status:', error);
+      return false;
+    }
+  }
+
   static async getIncomeRateResearchUnlockTime(userId: string): Promise<Date | null> {
     try {
       const feature = await UserResearchFeature.findOne({
@@ -171,11 +193,13 @@ export class RentalHousingSyncService {
     const syncResult = await this.checkAndSyncRentalHousingIncome(user);
     
     // CRITICAL: Always calculate and update ratePerSecond, even if no rental properties exist
-    // This ensures income rate research bonuses are applied for all users
-    // Calculate total effective rate as baseRate + passiveIncome
-    // Base rate is $1.00 + $0.05 bonus if income rate research unlocked, passive income is rental housing income
+    // This ensures income rate and insurance reduction research bonuses are applied for all users
+    // Base rate is $1.00 + income rate bonus ($0.05) + insurance reduction bonus ($0.02) when unlocked, plus passive income
     const isIncomeRateUnlocked = await this.isIncomeRateResearchUnlocked(String(user._id));
-    const baseRate = 1.0 + (isIncomeRateUnlocked ? this.BASE_INCOME_RATE_BONUS : 0);
+    const isInsuranceReductionUnlocked = await this.isInsuranceReductionResearchUnlocked(String(user._id));
+    const baseRate = 1.0
+      + (isIncomeRateUnlocked ? this.BASE_INCOME_RATE_BONUS : 0)
+      + (isInsuranceReductionUnlocked ? this.INSURANCE_REDUCTION_BONUS : 0);
     
     if (baseRate < 0) {
       console.error('[INCOME RATE] Invalid baseRate calculated:', baseRate);
