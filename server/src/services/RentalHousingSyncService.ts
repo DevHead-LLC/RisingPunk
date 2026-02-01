@@ -1,6 +1,6 @@
 import { IUser } from '../models/User';
 import { RentalHousingIncomeService } from './RentalHousingIncomeService';
-import { UserResearchFeature } from '../models/UserResearchFeature';
+import { isResearchFeatureUnlocked, getResearchFeatureUnlockTime } from '../utils/researchFeatureUtils';
 
 export interface RentalHousingSyncResult {
   needsSync: boolean;
@@ -81,67 +81,15 @@ export class RentalHousingSyncService {
   }
 
   static async isIncomeRateResearchUnlocked(userId: string): Promise<boolean> {
-    try {
-      const feature = await UserResearchFeature.findOne({
-        userId,
-        categoryId: 'cash-flow',
-        featureId: 'increase-income-rate'
-      })
-      .select('isUnlocked unlockedAt')
-      .lean();
-
-      if (!feature) {
-        return false;
-      }
-
-      const isUnlocked = !!feature.isUnlocked;
-      return isUnlocked;
-    } catch (error) {
-      console.error('[INCOME RATE] Error checking income rate research unlock status:', error);
-      return false;
-    }
+    return isResearchFeatureUnlocked(userId, 'cash-flow', 'increase-income-rate');
   }
 
   static async isInsuranceReductionResearchUnlocked(userId: string): Promise<boolean> {
-    try {
-      const feature = await UserResearchFeature.findOne({
-        userId,
-        categoryId: 'cash-flow',
-        featureId: 'reduce-insurance-expense'
-      })
-      .select('isUnlocked unlockedAt')
-      .lean();
-
-      if (!feature) {
-        return false;
-      }
-
-      return !!feature.isUnlocked;
-    } catch (error) {
-      console.error('[INSURANCE REDUCTION] Error checking insurance reduction research unlock status:', error);
-      return false;
-    }
+    return isResearchFeatureUnlocked(userId, 'cash-flow', 'reduce-insurance-expense');
   }
 
   static async getIncomeRateResearchUnlockTime(userId: string): Promise<Date | null> {
-    try {
-      const feature = await UserResearchFeature.findOne({
-        userId,
-        categoryId: 'cash-flow',
-        featureId: 'increase-income-rate'
-      })
-      .select('isUnlocked unlockedAt')
-      .lean();
-
-      if (!feature || !feature.isUnlocked || !feature.unlockedAt) {
-        return null;
-      }
-
-      return feature.unlockedAt;
-    } catch (error) {
-      console.error('[INCOME RATE] Error getting income rate research unlock time:', error);
-      return null;
-    }
+    return getResearchFeatureUnlockTime(userId, 'cash-flow', 'increase-income-rate');
   }
 
   private static async calculateHistoricalIncome(user: IUser, now: Date): Promise<number> {
