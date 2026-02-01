@@ -67,11 +67,13 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
   const financialCalculations = useMemo(() => {
     if (!merged) return null;
     
-    // Apply insurance reduction research: Insurance expense $0.50 -> $0.48 when research unlocked
+    // Apply insurance reduction research only when template has Insurance: $0.50 -> $0.48 when research unlocked
     const baseIncomeStatement = merged.incomeStatement || {};
     const effectiveIncomeStatement = { ...baseIncomeStatement };
-    const insuranceBase = baseIncomeStatement['Insurance'] ?? -0.50;
-    effectiveIncomeStatement['Insurance'] = insuranceBase + (insuranceReductionUnlocked ? 0.02 : 0);
+    if ('Insurance' in baseIncomeStatement) {
+      const insuranceBase = baseIncomeStatement['Insurance'] ?? -0.50;
+      effectiveIncomeStatement['Insurance'] = insuranceBase + (insuranceReductionUnlocked ? 0.02 : 0);
+    }
     
     const incomeStatementEntries = Object.entries(effectiveIncomeStatement);
     
