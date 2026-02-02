@@ -11,7 +11,7 @@ import { CrewModal } from '../components/hackMap/CrewModal';
 import { VisitingProfileModal } from '../components/hackMap/VisitingProfileModal';
 import { VisitCrewModal } from '../components/hackMap/VisitCrewModal';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
-import { setGrid, setLoading } from '../store/slices/mapSlice';
+import { setGrid, setLoading, clearPlayerCellsByUserIds } from '../store/slices/mapSlice';
 import { useFetchMapQuery, useFetchMapViewportQuery } from '../store/api/mapApi';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
@@ -2856,6 +2856,26 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }, 300);
   }, []);
 
+  const handleVisitingProfileUserNotFound = useCallback((userId: string) => {
+    dispatch(clearPlayerCellsByUserIds([userId]));
+    setDynamicEntityData((prev) => {
+      const next = { ...prev };
+      Object.entries(prev).forEach(([key, val]) => {
+        if ((val as any)?.userId === userId) delete next[key];
+      });
+      return next;
+    });
+    setEntityImageData((prev) => {
+      const next = { ...prev };
+      Object.entries(prev).forEach(([key, val]) => {
+        if (val?.userId === userId) delete next[key];
+      });
+      return next;
+    });
+    setSelectedCell((prev) => (prev?.info?.userId === userId ? null : prev));
+    handleVisitingProfileClose();
+  }, [dispatch, handleVisitingProfileClose]);
+
   useEffect(() => {
     return () => {
       if (visitingProfileCloseTimeoutRef.current) {
@@ -3043,8 +3063,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                           clearTimeout(visitingProfileCloseTimeoutRef.current);
                           visitingProfileCloseTimeoutRef.current = null;
                         }
-                        setVisitingProfileUserId(selectedCell.info.userId || null);
-                        setShowVisitingProfileModal(true);
+                        const normalizedUserId = selectedCell.info.userId != null ? String(selectedCell.info.userId).trim() : '';
+                        if (normalizedUserId) {
+                          setVisitingProfileUserId(normalizedUserId);
+                          setShowVisitingProfileModal(true);
+                        }
                       }}
                     >
                       <Text style={[styles.actionButtonText, { color: colors.background }]}>
@@ -3123,6 +3146,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           visible={showVisitingProfileModal}
           onClose={handleVisitingProfileClose}
           userId={visitingProfileUserId}
+          onUserNotFound={handleVisitingProfileUserNotFound}
         />
       )}
 
