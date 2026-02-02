@@ -2,32 +2,8 @@
 
 import mongoose from 'mongoose';
 import { getDatabaseName } from './scriptEnv';
+import type { Cell, MapDoc, TerrainType } from './scriptMapTypes';
 import { Map as MapModel } from '../src/models/Map';
-
-type TerrainType = 'plain' | 'mountain' | 'water' | 'forest' | 'road' | 'grass' | 'dirt';
-
-interface Cell {
-  x: number;
-  y: number;
-  terrain: TerrainType;
-  isActive: boolean;
-  isOccupied: boolean;
-  canBeOccupied: boolean;
-  occupiedBy: string;
-  entityName: string;
-  npcSlug: string;
-  npcInstanceId: string;
-  userId: mongoose.Types.ObjectId | null;
-}
-
-interface MapDoc {
-  _id: mongoose.Types.ObjectId;
-  name: string;
-  gridSize: number;
-  cells: Cell[];
-  version: number;
-  lastUpdated: Date;
-}
 
 function getNeighborCoords(x: number, y: number): { x: number; y: number }[] {
   return [

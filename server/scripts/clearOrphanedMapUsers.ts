@@ -11,22 +11,9 @@
 
 import mongoose from 'mongoose';
 import { getDatabaseName } from './scriptEnv';
+import type { Cell, MapDoc } from './scriptMapTypes';
 import { Map as MapModel } from '../src/models/Map';
 import { User } from '../src/models/User';
-
-interface MapCell {
-  x: number;
-  y: number;
-  terrain: string;
-  isActive: boolean;
-  isOccupied: boolean;
-  canBeOccupied: boolean;
-  occupiedBy: string;
-  entityName: string;
-  npcSlug?: string;
-  npcInstanceId?: string;
-  userId?: mongoose.Types.ObjectId | null;
-}
 
 async function clearOrphanedMapUsers(): Promise<void> {
   try {
@@ -58,7 +45,7 @@ async function clearOrphanedMapUsers(): Promise<void> {
     let totalCleared = 0;
 
     for (const mapDoc of maps) {
-      const map = mapDoc as { _id: mongoose.Types.ObjectId; name: string; gridSize: number; cells: MapCell[] };
+      const map = mapDoc as MapDoc;
       const cells = map.cells || [];
       const playerCells = cells.filter(
         (c) => c.occupiedBy === 'player' && c.userId != null && mongoose.Types.ObjectId.isValid(c.userId)
@@ -97,7 +84,7 @@ async function clearOrphanedMapUsers(): Promise<void> {
         continue;
       }
 
-      const cellsArray = mapDocMutable.cells as mongoose.Types.DocumentArray<MapCell & { isOccupied?: boolean; occupiedBy?: string; entityName?: string; userId?: mongoose.Types.ObjectId | null }>;
+      const cellsArray = mapDocMutable.cells as mongoose.Types.DocumentArray<Cell>;
       let clearedThisMap = 0;
 
       for (let i = 0; i < cellsArray.length; i++) {
