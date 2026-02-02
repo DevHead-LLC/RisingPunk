@@ -621,7 +621,6 @@ export const {
   useGoogleSignInMutation,
   useGetProfileQuery,
   useGetUserProfileQuery,
-  useLazyGetUserProfileQuery,
   useUnlockHackRigMutation,
   useUnlockResearchCenterMutation,
   useGetResearchCenterStatusQuery,
