@@ -23,7 +23,7 @@ export function TitleSection(): React.JSX.Element {
         </View>
       </View>
       <View style={styles.bottomRow}>
-        <Text style={[styles.versionText, { color: colors.text.secondary }]}>v2.2.0</Text>
+        <Text style={[styles.versionText, { color: colors.text.secondary }]}>v2.2.1</Text>
         <LightModeToggle />
       </View>
     </View>
