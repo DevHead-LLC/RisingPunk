@@ -3,16 +3,10 @@
 import mongoose from 'mongoose';
 import { getDatabaseName } from './scriptEnv';
 import type { Cell, MapDoc, TerrainType } from './scriptMapTypes';
+import { getCellAt, getNeighbors } from './scriptMapTypes';
 import { Map as MapModel } from '../src/models/Map';
 
 type Direction = 'north' | 'south' | 'east' | 'west';
-
-function getCellAt(cellMap: Map<string, Cell>, x: number, y: number, gridSize: number): Cell | null {
-  if (x < 0 || x >= gridSize || y < 0 || y >= gridSize) {
-    return null;
-  }
-  return cellMap.get(`${x},${y}`) || null;
-}
 
 function isOnEdge(x: number, y: number, gridSize: number): boolean {
   return x === 0 || x === gridSize - 1 || y === 0 || y === gridSize - 1;
@@ -33,16 +27,7 @@ function findClusters(
 ): Set<string>[] {
   const clusters: Set<string>[] = [];
   const visited = new Set<string>();
-  
-  const getNeighbors = (x: number, y: number): { x: number; y: number }[] => {
-    return [
-      { x: x + 1, y },
-      { x: x - 1, y },
-      { x, y: y + 1 },
-      { x, y: y - 1 }
-    ];
-  };
-  
+
   for (const cell of cellMap.values()) {
     if (cell.terrain !== terrainType) continue;
     
