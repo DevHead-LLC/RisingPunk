@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- CRITICAL: Allow cleartext traffic to localhost for Metro bundler -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+    </domain-config>
+    
+    <!-- EXPLICIT: api.risingpunk.com with system CAs only (no user certs = no MITM via user-installed certs) -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">api.risingpunk.com</domain>
+        <domain includeSubdomains="true">risingpunk.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+    
+    <!-- BASE: HTTPS with system CAs only. For API 24+, Android default does NOT trust user certs; we match that. -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
