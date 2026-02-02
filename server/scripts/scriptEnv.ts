@@ -24,6 +24,7 @@ if (process.env.NODE_ENV !== nodeEnv) {
 /**
  * Database name for mongoose connect({ dbName }) by NODE_ENV.
  * Single source of truth for all scripts.
+ * Staging and development share the same DB (RisingPunk); production uses RisingPunkProd.
  */
 export function getDatabaseName(): string {
   const env = process.env.NODE_ENV || 'development';
@@ -31,7 +32,6 @@ export function getDatabaseName(): string {
     case 'production':
       return 'RisingPunkProd';
     case 'staging':
-      return 'RisingPunkStaging';
     case 'development':
     default:
       return 'RisingPunk';
