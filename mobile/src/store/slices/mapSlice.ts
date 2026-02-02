@@ -61,9 +61,28 @@ export const mapSlice = createSlice({
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.loading = action.payload;
     },
+    /** Clear player cells whose userId is in the list (e.g. deleted accounts). Keeps terrain, sets entity to empty. */
+    clearPlayerCellsByUserIds: (state, action: PayloadAction<string[]>) => {
+      const userIdsToRemove = new Set(action.payload.map((id) => String(id ?? '').trim()).filter(Boolean));
+      if (userIdsToRemove.size === 0) return;
+      for (let y = 0; y < state.grid.length; y++) {
+        const row = state.grid[y];
+        if (!row) continue;
+        for (let x = 0; x < row.length; x++) {
+          const cell = row[x] as CellData & { userId?: unknown };
+          const cellUserId = cell?.userId != null ? String(cell.userId).trim() : '';
+          if (cellUserId && userIdsToRemove.has(cellUserId)) {
+            state.grid[y][x] = {
+              terrain: cell.terrain,
+              entity: 'empty',
+            };
+          }
+        }
+      }
+    },
     resetMap: () => initialState,
   },
 });
 
-export const { setGrid, setPlayerPosition, revealFog, setLoading, resetMap } = mapSlice.actions;
+export const { setGrid, setPlayerPosition, revealFog, setLoading, clearPlayerCellsByUserIds, resetMap } = mapSlice.actions;
 export default mapSlice.reducer;

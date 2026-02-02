@@ -1,36 +1,8 @@
 #!/usr/bin/env ts-node
 
 import mongoose from 'mongoose';
-import dotenvFlow from 'dotenv-flow';
+import { getDatabaseName } from './scriptEnv';
 import { MapService } from '../src/services/MapService';
-
-const nodeEnv = process.env.NODE_ENV || 'development';
-const envFileMap: Record<string, string> = {
-  'development': 'dev',
-  'production': 'prod'
-};
-const mappedNodeEnv = envFileMap[nodeEnv] || nodeEnv;
-
-dotenvFlow.config({ 
-  node_env: mappedNodeEnv,
-  silent: true 
-});
-
-if (process.env.NODE_ENV !== nodeEnv) {
-  process.env.NODE_ENV = nodeEnv;
-}
-
-const getDatabaseName = () => {
-  const nodeEnv = process.env.NODE_ENV || 'development';
-  switch (nodeEnv) {
-    case 'production':
-      return 'RisingPunkProd';
-    case 'staging':
-    case 'development':
-    default:
-      return 'RisingPunk';
-  }
-};
 
 async function updateNPCs() {
   try {
