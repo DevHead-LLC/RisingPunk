@@ -37,7 +37,6 @@ async function clearOrphanedMapUsers(): Promise<void> {
       console.log('📊 No maps found.');
       await mongoose.disconnect();
       process.exit(0);
-      return;
     }
 
     console.log(`📊 Found ${maps.length} map(s)\n`);
