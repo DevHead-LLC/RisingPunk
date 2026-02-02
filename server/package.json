@@ -12,7 +12,8 @@
     "seed:map": "node scripts/seedMap.js",
     "seed:database": "node scripts/seedDatabase.js",
     "backup:guide": "node scripts/backupRestore.js",
-    "update:npc": "ts-node scripts/updateNPCs.ts"
+    "update:npc": "ts-node scripts/updateNPCs.ts",
+    "script:clear-orphaned-map-users": "ts-node scripts/clearOrphanedMapUsers.ts"
   },
   "keywords": [],
   "author": "",
