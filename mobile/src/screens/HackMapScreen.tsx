@@ -2857,22 +2857,28 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   }, []);
 
   const handleVisitingProfileUserNotFound = useCallback((userId: string) => {
-    dispatch(clearPlayerCellsByUserIds([userId]));
+    const normalizedTarget = String(userId ?? '').trim();
+    if (!normalizedTarget) return;
+    dispatch(clearPlayerCellsByUserIds([normalizedTarget]));
     setDynamicEntityData((prev) => {
       const next = { ...prev };
       Object.entries(prev).forEach(([key, val]) => {
-        if ((val as any)?.userId === userId) delete next[key];
+        const stored = (val as any)?.userId;
+        if (String(stored ?? '').trim() === normalizedTarget) delete next[key];
       });
       return next;
     });
     setEntityImageData((prev) => {
       const next = { ...prev };
       Object.entries(prev).forEach(([key, val]) => {
-        if (val?.userId === userId) delete next[key];
+        const stored = val?.userId;
+        if (String(stored ?? '').trim() === normalizedTarget) delete next[key];
       });
       return next;
     });
-    setSelectedCell((prev) => (prev?.info?.userId === userId ? null : prev));
+    setSelectedCell((prev) =>
+      prev?.info?.userId != null && String(prev.info.userId).trim() === normalizedTarget ? null : prev
+    );
     handleVisitingProfileClose();
   }, [dispatch, handleVisitingProfileClose]);
 
