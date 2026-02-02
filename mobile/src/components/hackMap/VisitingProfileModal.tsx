@@ -11,21 +11,65 @@ interface VisitingProfileModalProps {
   visible: boolean;
   onClose: () => void;
   userId: string;
+  /** Called when profile returns 404 (e.g. deleted account). Use to clear that user from map/UI. */
+  onUserNotFound?: (userId: string) => void;
 }
 
 export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
   visible,
   onClose,
   userId,
+  onUserNotFound,
 }) => {
   const colors = useThemeColors();
   const currentUser = useAppSelector((state) => state.auth.user);
-  const { data: userProfile, isLoading, error } = useGetUserProfileQuery(userId, {
+  const { data: userProfile, isLoading, error, refetch } = useGetUserProfileQuery(userId, {
     skip: !visible || !userId,
   });
   const [trackAnotherUserProfileVisit] = useTrackAnotherUserProfileVisitMutation();
   const trackedUserIdRef = useRef<string | null>(null);
   const styles = createStyles(colors);
+
+  // Dev-only: log profile load failures for investigation (status, data, userId)
+  useEffect(() => {
+    if (__DEV__ && visible && error) {
+      const err = error as { status?: number | string; data?: unknown };
+      console.warn('[VisitingProfileModal] Profile load failed', {
+        userId,
+        status: err?.status,
+        data: err?.data,
+      });
+    }
+  }, [visible, error, userId]);
+
+  // Notify parent when user not found (404) so map can clear orphaned cells
+  useEffect(() => {
+    if (visible && error && (error as { status?: number })?.status === 404 && userId) {
+      onUserNotFound?.(userId);
+    }
+  }, [visible, error, userId, onUserNotFound]);
+
+  const profileErrorMessage =
+    error != null
+      ? (() => {
+          const err = error as { status?: number | string };
+          const status = err?.status;
+          if (status === 404) return 'User not found';
+          if (typeof status === 'number' && status >= 500) return "Couldn't load profile. Tap to try again.";
+          if (typeof status === 'string') return "Couldn't load profile. Tap to try again."; // FETCH_ERROR, TIMEOUT_ERROR, etc.
+          if (typeof status === 'number' && status >= 400) return "Couldn't load profile. Tap to try again."; // 400, 401, 403, etc.
+          return 'Failed to load profile';
+        })()
+      : 'Failed to load profile';
+  const isRetryableError =
+    error != null &&
+    (() => {
+      const s = (error as { status?: number | string })?.status;
+      if (s === 404) return false;
+      if (typeof s === 'number' && s >= 500) return true;
+      if (typeof s === 'string') return true; // FETCH_ERROR, TIMEOUT_ERROR, etc.
+      return true; // default: allow retry for other client errors
+    })();
 
   useEffect(() => {
     if (visible && userProfile && currentUser && !isLoading && !error) {
@@ -62,9 +106,20 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
           Loading...
         </Text>
       ) : error ? (
-        <Text style={[styles.errorText, { color: colors.error }]}>
-          Failed to load profile
-        </Text>
+        <View style={styles.errorContainer}>
+          <Text style={[styles.errorText, { color: colors.error }]}>
+            {profileErrorMessage}
+          </Text>
+          {isRetryableError && (
+            <TouchableOpacity
+              style={[styles.retryButton, { backgroundColor: colors.primary, borderColor: colors.secondary }]}
+              onPress={() => refetch()}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.retryButtonText, { color: colors.background }]}>Try again</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       ) : userProfile ? (
         <>
           <View style={[styles.avatarContainer, { borderColor: colors.secondary }]}>
@@ -336,6 +391,21 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: SIZING.font.body,
     textAlign: 'center',
     padding: SIZING.spacing.lg,
+  },
+  errorContainer: {
+    alignItems: 'center',
+    paddingVertical: SIZING.spacing.lg,
+  },
+  retryButton: {
+    marginTop: SIZING.spacing.md,
+    paddingHorizontal: SIZING.spacing.lg,
+    paddingVertical: SIZING.spacing.sm,
+    borderRadius: 8,
+    borderWidth: 2,
+  },
+  retryButtonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
   },
   scrollView: {
     maxHeight: '80%',
