@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, SafeAreaView, TextInput, ScrollView, FlatList } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, SafeAreaView, TextInput, ScrollView, FlatList, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { useCreateCrewMutation, useGetCrewStatusQuery, useSearchCrewsQuery, useGetSuggestedCrewsQuery, useApplyToCrewMutation, useWithdrawApplicationMutation } from '../../store/api/authApi';
@@ -62,8 +62,51 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
   const [showVisitCrewModal, setShowVisitCrewModal] = useState(false);
   const [selectedCrewId, setSelectedCrewId] = useState<string | null>(null);
   const [selectedCrewName, setSelectedCrewName] = useState<string | null>(null);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [inputFocused, setInputFocused] = useState(false);
+  const [focusedInputType, setFocusedInputType] = useState<'search' | 'crewName' | 'crewIdentifier' | null>(null);
+  const [fixedBarHasFocus, setFixedBarHasFocus] = useState(false);
+  const fixedBarSearchRef = useRef<TextInput>(null);
+  const fixedBarCrewNameRef = useRef<TextInput>(null);
+  const fixedBarCrewIdentifierRef = useRef<TextInput>(null);
   const styles = createStyles(colors);
   const isInCrew = crewStatus?.isInCrew || false;
+
+  // Only hide header/tabs after fixed bar has focus; avoid layout change while form input is focused (causes blur → keyboard closes)
+  const hideTabsForInput = keyboardVisible && inputFocused && fixedBarHasFocus;
+  const showFixedInputBar = keyboardHeight > 0 && focusedInputType !== null;
+  const hideFormInput = showFixedInputBar && fixedBarHasFocus;
+
+  useEffect(() => {
+    if (!visible) return;
+    const showSub = Keyboard.addListener('keyboardDidShow', (e: { endCoordinates: { height: number } }) => {
+      if (__DEV__) console.log('[CrewOnboarding] keyboardDidShow');
+      setKeyboardVisible(true);
+      setKeyboardHeight(e.endCoordinates?.height ?? 0);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      if (__DEV__) console.log('[CrewOnboarding] keyboardDidHide');
+      setKeyboardVisible(false);
+      setKeyboardHeight(0);
+      setFocusedInputType(null);
+      setFixedBarHasFocus(false);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [visible]);
+
+  useEffect(() => {
+    if (!showFixedInputBar) return;
+    const t = setTimeout(() => {
+      if (focusedInputType === 'search') fixedBarSearchRef.current?.focus();
+      else if (focusedInputType === 'crewName') fixedBarCrewNameRef.current?.focus();
+      else if (focusedInputType === 'crewIdentifier') fixedBarCrewIdentifierRef.current?.focus();
+    }, 50);
+    return () => clearTimeout(t);
+  }, [showFixedInputBar, focusedInputType]);
 
   useEffect(() => {
     if (isInCrew && visible) {
@@ -204,6 +247,11 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
       setShowVisitCrewModal(false);
       setSelectedCrewId(null);
       setSelectedCrewName(null);
+      setInputFocused(false);
+      setKeyboardVisible(false);
+      setKeyboardHeight(0);
+      setFocusedInputType(null);
+      setFixedBarHasFocus(false);
     }
   }, [visible]);
 
@@ -223,19 +271,32 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
       presentationStyle="overFullScreen"
     >
       <View style={styles.overlay}>
-        <SafeAreaView style={styles.crewOnboardingContainer}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Crew System</Text>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={onClose}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.closeButtonText}>×</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.tabContainer}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.keyboardAvoidingView}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+          >
+            <SafeAreaView style={styles.crewOnboardingContainer}>
+              <View style={[styles.header, hideTabsForInput && styles.headerHidden]}>
+                <Text style={styles.title}>Crew System</Text>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={onClose}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.closeButtonText}>×</Text>
+                </TouchableOpacity>
+              </View>
+              {hideTabsForInput && (
+                <TouchableOpacity
+                  style={[styles.floatingCloseButton, { backgroundColor: colors.primary, borderColor: colors.secondary }]}
+                  onPress={onClose}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.closeButtonText}>×</Text>
+                </TouchableOpacity>
+              )}
+          <View style={[styles.tabContainer, hideTabsForInput && styles.tabContainerHidden]}>
             <TouchableOpacity
               style={[styles.tabButton, activeTab === 'join' && styles.tabButtonActive]}
               onPress={() => setActiveTab('join')}
@@ -256,33 +317,47 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          <View style={styles.content}>
+          <View style={[styles.content, hideTabsForInput && styles.contentTabsHidden]}>
             {activeTab === 'join' ? (
               <ScrollView
                 style={styles.joinCrewContent}
                 contentContainerStyle={styles.joinCrewScrollContent}
                 showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
               >
                 <View style={styles.searchSection}>
                   <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
                     Search for Crews
                   </Text>
-                  <TextInput
-                    style={[
-                      styles.searchInput,
-                      {
-                        color: colors.text.primary,
-                        borderColor: colors.secondary,
-                        backgroundColor: colors.inputBg || colors.surface,
-                      }
-                    ]}
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    placeholder="Search by crew name or identifier..."
-                    placeholderTextColor={colors.text.placeholder}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
+                  <View style={hideFormInput && focusedInputType === 'search' ? styles.formInputHidden : undefined}>
+                    <TextInput
+                      style={[
+                        styles.searchInput,
+                        {
+                          color: colors.text.primary,
+                          borderColor: colors.secondary,
+                          backgroundColor: colors.inputBg || colors.surface,
+                        }
+                      ]}
+                      value={searchQuery}
+                      onChangeText={setSearchQuery}
+                      placeholder="Search by crew name or identifier..."
+                      placeholderTextColor={colors.text.placeholder}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      returnKeyType="done"
+                      blurOnSubmit={true}
+                      onFocus={() => {
+                        if (__DEV__) console.log('[CrewOnboarding] search onFocus');
+                        setInputFocused(true);
+                        setFocusedInputType('search');
+                      }}
+                      onBlur={() => {
+                        if (__DEV__) console.log('[CrewOnboarding] search onBlur');
+                      }}
+                    />
+                  </View>
                   {isSearching && (
                     <Text style={[styles.loadingText, { color: colors.text.secondary }]}>
                       Searching...
@@ -454,6 +529,8 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
                 style={styles.createCrewContent}
                 contentContainerStyle={styles.createCrewScrollContent}
                 showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
               >
                 <View style={styles.formSection}>
                   <Text style={[styles.label, { color: colors.text.primary }]}>
@@ -462,23 +539,35 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
                   <Text style={[styles.labelHint, { color: colors.text.secondary }]}>
                     Maximum 12 characters
                   </Text>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      {
-                        color: colors.text.primary,
-                        borderColor: crewNameError ? colors.error : colors.secondary,
-                        backgroundColor: colors.inputBg || colors.surface,
-                      }
-                    ]}
-                    value={crewName}
-                    onChangeText={handleCrewNameChange}
-                    placeholder="Enter crew name..."
-                    placeholderTextColor={colors.text.placeholder}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    maxLength={12}
-                  />
+                  <View style={hideFormInput && focusedInputType === 'crewName' ? styles.formInputHidden : undefined}>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        {
+                          color: colors.text.primary,
+                          borderColor: crewNameError ? colors.error : colors.secondary,
+                          backgroundColor: colors.inputBg || colors.surface,
+                        }
+                      ]}
+                      value={crewName}
+                      onChangeText={handleCrewNameChange}
+                      placeholder="Enter crew name..."
+                      placeholderTextColor={colors.text.placeholder}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      maxLength={12}
+                      returnKeyType="done"
+                      blurOnSubmit={true}
+                      onFocus={() => {
+                        if (__DEV__) console.log('[CrewOnboarding] crewName onFocus');
+                        setInputFocused(true);
+                        setFocusedInputType('crewName');
+                      }}
+                      onBlur={() => {
+                        if (__DEV__) console.log('[CrewOnboarding] crewName onBlur');
+                      }}
+                    />
+                  </View>
                   {crewNameError ? (
                     <Text style={[styles.errorText, { color: colors.error }]}>
                       {crewNameError}
@@ -493,23 +582,35 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
                   <Text style={[styles.labelHint, { color: colors.text.secondary }]}>
                     Maximum 5 characters (e.g., ABC12)
                   </Text>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      {
-                        color: colors.text.primary,
-                        borderColor: crewIdentifierError ? colors.error : colors.secondary,
-                        backgroundColor: colors.inputBg || colors.surface,
-                      }
-                    ]}
-                    value={crewIdentifier}
-                    onChangeText={handleCrewIdentifierChange}
-                    placeholder="Enter identifier..."
-                    placeholderTextColor={colors.text.placeholder}
-                    autoCapitalize="characters"
-                    autoCorrect={false}
-                    maxLength={5}
-                  />
+                  <View style={hideFormInput && focusedInputType === 'crewIdentifier' ? styles.formInputHidden : undefined}>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        {
+                          color: colors.text.primary,
+                          borderColor: crewIdentifierError ? colors.error : colors.secondary,
+                          backgroundColor: colors.inputBg || colors.surface,
+                        }
+                      ]}
+                      value={crewIdentifier}
+                      onChangeText={handleCrewIdentifierChange}
+                      placeholder="Enter identifier..."
+                      placeholderTextColor={colors.text.placeholder}
+                      autoCapitalize="characters"
+                      autoCorrect={false}
+                      maxLength={5}
+                      returnKeyType="done"
+                      blurOnSubmit={true}
+                      onFocus={() => {
+                        if (__DEV__) console.log('[CrewOnboarding] crewIdentifier onFocus');
+                        setInputFocused(true);
+                        setFocusedInputType('crewIdentifier');
+                      }}
+                      onBlur={() => {
+                        if (__DEV__) console.log('[CrewOnboarding] crewIdentifier onBlur');
+                      }}
+                    />
+                  </View>
                   {crewIdentifierError ? (
                     <Text style={[styles.errorText, { color: colors.error }]}>
                       {crewIdentifierError}
@@ -651,6 +752,94 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
             />
           )}
         </SafeAreaView>
+          </KeyboardAvoidingView>
+          {showFixedInputBar && (
+            <View style={[styles.fixedInputBar, { bottom: keyboardHeight, backgroundColor: colors.background }]} pointerEvents="box-none">
+              {focusedInputType === 'search' && (
+                <TextInput
+                  ref={fixedBarSearchRef}
+                  style={[
+                    styles.searchInput,
+                    styles.fixedBarInput,
+                    {
+                      color: colors.text.primary,
+                      borderColor: colors.secondary,
+                      backgroundColor: colors.inputBg || colors.surface,
+                    }
+                  ]}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Search by crew name or identifier..."
+                  placeholderTextColor={colors.text.placeholder}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="done"
+                  blurOnSubmit={true}
+                  onFocus={() => setFixedBarHasFocus(true)}
+                  onBlur={() => {
+                    setInputFocused(false);
+                    setFocusedInputType(null);
+                  }}
+                />
+              )}
+              {focusedInputType === 'crewName' && (
+                <TextInput
+                  ref={fixedBarCrewNameRef}
+                  style={[
+                    styles.input,
+                    styles.fixedBarInput,
+                    {
+                      color: colors.text.primary,
+                      borderColor: crewNameError ? colors.error : colors.secondary,
+                      backgroundColor: colors.inputBg || colors.surface,
+                    }
+                  ]}
+                  value={crewName}
+                  onChangeText={handleCrewNameChange}
+                  placeholder="Enter crew name..."
+                  placeholderTextColor={colors.text.placeholder}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  maxLength={12}
+                  returnKeyType="done"
+                  blurOnSubmit={true}
+                  onFocus={() => setFixedBarHasFocus(true)}
+                  onBlur={() => {
+                    setInputFocused(false);
+                    setFocusedInputType(null);
+                  }}
+                />
+              )}
+              {focusedInputType === 'crewIdentifier' && (
+                <TextInput
+                  ref={fixedBarCrewIdentifierRef}
+                  style={[
+                    styles.input,
+                    styles.fixedBarInput,
+                    {
+                      color: colors.text.primary,
+                      borderColor: crewIdentifierError ? colors.error : colors.secondary,
+                      backgroundColor: colors.inputBg || colors.surface,
+                    }
+                  ]}
+                  value={crewIdentifier}
+                  onChangeText={handleCrewIdentifierChange}
+                  placeholder="Enter identifier..."
+                  placeholderTextColor={colors.text.placeholder}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  maxLength={5}
+                  returnKeyType="done"
+                  blurOnSubmit={true}
+                  onFocus={() => setFixedBarHasFocus(true)}
+                  onBlur={() => {
+                    setInputFocused(false);
+                    setFocusedInputType(null);
+                  }}
+                />
+              )}
+            </View>
+          )}
       </View>
     </Modal>
   );
@@ -662,6 +851,9 @@ const createStyles = (colors: any) => StyleSheet.create({
     width: '100%',
     height: '100%',
     backgroundColor: colors.background,
+  },
+  keyboardAvoidingView: {
+    flex: 1,
   },
   crewOnboardingContainer: {
     flex: 1,
@@ -676,6 +868,26 @@ const createStyles = (colors: any) => StyleSheet.create({
     padding: SIZING.spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.secondary,
+  },
+  headerHidden: {
+    height: 0,
+    overflow: 'hidden',
+    padding: 0,
+    borderBottomWidth: 0,
+    margin: 0,
+    minHeight: 0,
+  },
+  floatingCloseButton: {
+    position: 'absolute',
+    top: SIZING.spacing.md,
+    right: SIZING.spacing.lg,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 20,
   },
   title: {
     color: colors.text.primary,
@@ -708,6 +920,16 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.secondary,
     gap: SIZING.spacing.sm,
+    zIndex: 0,
+    elevation: 0,
+  },
+  tabContainerHidden: {
+    height: 0,
+    overflow: 'hidden',
+    paddingVertical: 0,
+    borderBottomWidth: 0,
+    margin: 0,
+    minHeight: 0,
   },
   tabButton: {
     flex: 1,
@@ -736,6 +958,29 @@ const createStyles = (colors: any) => StyleSheet.create({
   content: {
     flex: 1,
     padding: SIZING.spacing.lg,
+    zIndex: 10,
+    elevation: 10,
+  },
+  contentTabsHidden: {
+    paddingTop: 72,
+  },
+  formInputHidden: {
+    opacity: 0,
+    pointerEvents: 'none',
+  },
+  fixedInputBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 100,
+    elevation: 100,
+    paddingHorizontal: SIZING.spacing.lg,
+    paddingVertical: SIZING.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.secondary,
+  },
+  fixedBarInput: {
+    width: '100%',
   },
   tabContent: {
     flex: 1,
