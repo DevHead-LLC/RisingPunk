@@ -403,7 +403,6 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
                         setInputFocused(true);
                         setFocusedInputType('search');
                       }}
-                      onBlur={() => {}}
                     />
                   </View>
                   {isSearching && (
@@ -595,7 +594,6 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
                         setInputFocused(true);
                         setFocusedInputType('crewName');
                       }}
-                      onBlur={() => {}}
                     />
                   </View>
                   {crewNameError ? (
@@ -620,7 +618,6 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
                         setInputFocused(true);
                         setFocusedInputType('crewIdentifier');
                       }}
-                      onBlur={() => {}}
                     />
                   </View>
                   {crewIdentifierError ? (
