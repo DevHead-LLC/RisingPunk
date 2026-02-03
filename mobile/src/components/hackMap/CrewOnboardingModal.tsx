@@ -91,6 +91,7 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
   const handleFixedBarBlur = useCallback(() => {
     setInputFocused(false);
     setFocusedInputType(null);
+    setFixedBarHasFocus(false);
   }, []);
 
   useEffect(() => {
