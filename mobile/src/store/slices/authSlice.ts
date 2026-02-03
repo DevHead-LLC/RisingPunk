@@ -5,6 +5,7 @@ import { updateBalance } from './balanceSlice';
 import { setBots, setBuildState } from './botsSlice';
 import { resetAllApiCaches } from '../api/resetApiCaches';
 import { authApi } from '../api/authApi';
+import { mapApi } from '../api/mapApi';
 import { trackAccountCreated, markAccountExists } from '../../services/analyticsService';
 
 // Types
@@ -586,7 +587,9 @@ export const updateUserHandle = createAsyncThunk(
       
       // Invalidate RTK Query cache to ensure profile data is refreshed
       dispatch(authApi.util.invalidateTags(['User']));
-      
+      // Invalidate map so HackMap refetches and shows updated handle; avoids stale grid and 0,0 / locator issues
+      dispatch(mapApi.util.invalidateTags(['Map']));
+
       return data;
     } catch (error: any) {
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
