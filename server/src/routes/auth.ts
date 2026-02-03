@@ -1011,8 +1011,12 @@ router.post('/update-handle', async (req, res): Promise<void> => {
         }
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Handle update error:', error);
+    if (error?.message === 'User not found') {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
     res.status(500).json({ error: 'Server error' });
   }
 });
