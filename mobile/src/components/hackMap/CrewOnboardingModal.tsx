@@ -87,6 +87,12 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
     setActiveTab(tab);
   }, [activeTab]);
 
+  const handleFixedBarFocus = useCallback(() => setFixedBarHasFocus(true), []);
+  const handleFixedBarBlur = useCallback(() => {
+    setInputFocused(false);
+    setFocusedInputType(null);
+  }, []);
+
   useEffect(() => {
     if (!visible) return;
     const showSub = Keyboard.addListener('keyboardDidShow', (e: { endCoordinates: { height: number } }) => {
@@ -776,11 +782,8 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
                   ref={fixedBarSearchRef}
                   {...sharedSearchInputProps}
                   style={[...searchInputStyleBase, styles.fixedBarInput]}
-                  onFocus={() => setFixedBarHasFocus(true)}
-                  onBlur={() => {
-                    setInputFocused(false);
-                    setFocusedInputType(null);
-                  }}
+                  onFocus={handleFixedBarFocus}
+                  onBlur={handleFixedBarBlur}
                 />
               )}
               {focusedInputType === 'crewName' && (
@@ -788,11 +791,8 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
                   ref={fixedBarCrewNameRef}
                   {...sharedCrewNameInputProps}
                   style={[...crewNameInputStyleBase, styles.fixedBarInput]}
-                  onFocus={() => setFixedBarHasFocus(true)}
-                  onBlur={() => {
-                    setInputFocused(false);
-                    setFocusedInputType(null);
-                  }}
+                  onFocus={handleFixedBarFocus}
+                  onBlur={handleFixedBarBlur}
                 />
               )}
               {focusedInputType === 'crewIdentifier' && (
@@ -800,11 +800,8 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
                   ref={fixedBarCrewIdentifierRef}
                   {...sharedCrewIdentifierInputProps}
                   style={[...crewIdentifierInputStyleBase, styles.fixedBarInput]}
-                  onFocus={() => setFixedBarHasFocus(true)}
-                  onBlur={() => {
-                    setInputFocused(false);
-                    setFocusedInputType(null);
-                  }}
+                  onFocus={handleFixedBarFocus}
+                  onBlur={handleFixedBarBlur}
                 />
               )}
             </View>
