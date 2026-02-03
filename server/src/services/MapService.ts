@@ -375,4 +375,26 @@ export class MapService {
       }
     }
   }
+
+  /**
+   * Updates entityName (display handle) for all map cells occupied by the given user.
+   * Call this when a user changes their handle so the map shows the new name without
+   * extra work on every map load. Uses indexed cells.userId for efficient update.
+   * @param session - Optional MongoDB session for use in a transaction (ensures atomicity with user save).
+   */
+  async updatePlayerHandleInMapCells(
+    userId: mongoose.Types.ObjectId,
+    newHandle: string,
+    session?: mongoose.mongo.ClientSession
+  ): Promise<void> {
+    const options: mongoose.mongo.UpdateOptions & { arrayFilters?: any[] } = {
+      arrayFilters: [{ 'elem.userId': userId }],
+    };
+    if (session) options.session = session;
+    await Map.updateMany(
+      { 'cells.userId': userId },
+      { $set: { 'cells.$[elem].entityName': newHandle } },
+      options
+    );
+  }
 } 
