@@ -78,6 +78,15 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
   const showFixedInputBar = keyboardHeight > 0 && focusedInputType !== null;
   const hideFormInput = showFixedInputBar && fixedBarHasFocus;
 
+  const handleTabPress = useCallback((tab: CrewTab) => {
+    if (activeTab === tab) return;
+    Keyboard.dismiss();
+    setFocusedInputType(null);
+    setInputFocused(false);
+    setFixedBarHasFocus(false);
+    setActiveTab(tab);
+  }, [activeTab]);
+
   useEffect(() => {
     if (!visible) return;
     const showSub = Keyboard.addListener('keyboardDidShow', (e: { endCoordinates: { height: number } }) => {
@@ -195,6 +204,57 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
     setCrewIdentifierError(validateCrewIdentifier(filtered));
   }, [validateCrewIdentifier]);
 
+  // Shared TextInput config (form + fixed bar) – single source of truth for value, onChange, placeholder, and keyboard props
+  const sharedSearchInputProps = useMemo(() => ({
+    value: searchQuery,
+    onChangeText: setSearchQuery,
+    placeholder: 'Search by crew name or identifier...',
+    placeholderTextColor: colors.text.placeholder,
+    autoCapitalize: 'none' as const,
+    autoCorrect: false,
+    returnKeyType: 'done' as const,
+    blurOnSubmit: true,
+  }), [searchQuery, colors.text.placeholder]);
+
+  const sharedCrewNameInputProps = useMemo(() => ({
+    value: crewName,
+    onChangeText: handleCrewNameChange,
+    placeholder: 'Enter crew name...',
+    placeholderTextColor: colors.text.placeholder,
+    autoCapitalize: 'none' as const,
+    autoCorrect: false,
+    maxLength: 12,
+    returnKeyType: 'done' as const,
+    blurOnSubmit: true,
+  }), [crewName, handleCrewNameChange, colors.text.placeholder]);
+
+  const sharedCrewIdentifierInputProps = useMemo(() => ({
+    value: crewIdentifier,
+    onChangeText: handleCrewIdentifierChange,
+    placeholder: 'Enter identifier...',
+    placeholderTextColor: colors.text.placeholder,
+    autoCapitalize: 'characters' as const,
+    autoCorrect: false,
+    maxLength: 5,
+    returnKeyType: 'done' as const,
+    blurOnSubmit: true,
+  }), [crewIdentifier, handleCrewIdentifierChange, colors.text.placeholder]);
+
+  const searchInputStyleBase = useMemo(() => [
+    styles.searchInput,
+    { color: colors.text.primary, borderColor: colors.secondary, backgroundColor: colors.inputBg || colors.surface },
+  ], [styles.searchInput, colors.text.primary, colors.secondary, colors.inputBg, colors.surface]);
+
+  const crewNameInputStyleBase = useMemo(() => [
+    styles.input,
+    { color: colors.text.primary, borderColor: crewNameError ? colors.error : colors.secondary, backgroundColor: colors.inputBg || colors.surface },
+  ], [styles.input, colors.text.primary, colors.secondary, colors.error, colors.inputBg, colors.surface, crewNameError]);
+
+  const crewIdentifierInputStyleBase = useMemo(() => [
+    styles.input,
+    { color: colors.text.primary, borderColor: crewIdentifierError ? colors.error : colors.secondary, backgroundColor: colors.inputBg || colors.surface },
+  ], [styles.input, colors.text.primary, colors.secondary, colors.error, colors.inputBg, colors.surface, crewIdentifierError]);
+
   const handleLanguageSelect = useCallback((language: string) => {
     setSelectedLanguage(language);
     setShowLanguagePicker(false);
@@ -299,7 +359,7 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
           <View style={[styles.tabContainer, hideTabsForInput && styles.tabContainerHidden]}>
             <TouchableOpacity
               style={[styles.tabButton, activeTab === 'join' && styles.tabButtonActive]}
-              onPress={() => setActiveTab('join')}
+              onPress={() => handleTabPress('join')}
               activeOpacity={0.7}
             >
               <Text style={[styles.tabText, activeTab === 'join' && styles.tabTextActive]}>
@@ -308,7 +368,7 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.tabButton, activeTab === 'create' && styles.tabButtonActive]}
-              onPress={() => setActiveTab('create')}
+              onPress={() => handleTabPress('create')}
               activeOpacity={0.7}
             >
               <Text style={[styles.tabText, activeTab === 'create' && styles.tabTextActive]}>
@@ -332,22 +392,8 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
                   </Text>
                   <View style={hideFormInput && focusedInputType === 'search' ? styles.formInputHidden : undefined}>
                     <TextInput
-                      style={[
-                        styles.searchInput,
-                        {
-                          color: colors.text.primary,
-                          borderColor: colors.secondary,
-                          backgroundColor: colors.inputBg || colors.surface,
-                        }
-                      ]}
-                      value={searchQuery}
-                      onChangeText={setSearchQuery}
-                      placeholder="Search by crew name or identifier..."
-                      placeholderTextColor={colors.text.placeholder}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      returnKeyType="done"
-                      blurOnSubmit={true}
+                      {...sharedSearchInputProps}
+                      style={searchInputStyleBase}
                       onFocus={() => {
                         if (__DEV__) console.log('[CrewOnboarding] search onFocus');
                         setInputFocused(true);
@@ -541,23 +587,8 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
                   </Text>
                   <View style={hideFormInput && focusedInputType === 'crewName' ? styles.formInputHidden : undefined}>
                     <TextInput
-                      style={[
-                        styles.input,
-                        {
-                          color: colors.text.primary,
-                          borderColor: crewNameError ? colors.error : colors.secondary,
-                          backgroundColor: colors.inputBg || colors.surface,
-                        }
-                      ]}
-                      value={crewName}
-                      onChangeText={handleCrewNameChange}
-                      placeholder="Enter crew name..."
-                      placeholderTextColor={colors.text.placeholder}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      maxLength={12}
-                      returnKeyType="done"
-                      blurOnSubmit={true}
+                      {...sharedCrewNameInputProps}
+                      style={crewNameInputStyleBase}
                       onFocus={() => {
                         if (__DEV__) console.log('[CrewOnboarding] crewName onFocus');
                         setInputFocused(true);
@@ -584,23 +615,8 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
                   </Text>
                   <View style={hideFormInput && focusedInputType === 'crewIdentifier' ? styles.formInputHidden : undefined}>
                     <TextInput
-                      style={[
-                        styles.input,
-                        {
-                          color: colors.text.primary,
-                          borderColor: crewIdentifierError ? colors.error : colors.secondary,
-                          backgroundColor: colors.inputBg || colors.surface,
-                        }
-                      ]}
-                      value={crewIdentifier}
-                      onChangeText={handleCrewIdentifierChange}
-                      placeholder="Enter identifier..."
-                      placeholderTextColor={colors.text.placeholder}
-                      autoCapitalize="characters"
-                      autoCorrect={false}
-                      maxLength={5}
-                      returnKeyType="done"
-                      blurOnSubmit={true}
+                      {...sharedCrewIdentifierInputProps}
+                      style={crewIdentifierInputStyleBase}
                       onFocus={() => {
                         if (__DEV__) console.log('[CrewOnboarding] crewIdentifier onFocus');
                         setInputFocused(true);
@@ -758,23 +774,8 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
               {focusedInputType === 'search' && (
                 <TextInput
                   ref={fixedBarSearchRef}
-                  style={[
-                    styles.searchInput,
-                    styles.fixedBarInput,
-                    {
-                      color: colors.text.primary,
-                      borderColor: colors.secondary,
-                      backgroundColor: colors.inputBg || colors.surface,
-                    }
-                  ]}
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  placeholder="Search by crew name or identifier..."
-                  placeholderTextColor={colors.text.placeholder}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="done"
-                  blurOnSubmit={true}
+                  {...sharedSearchInputProps}
+                  style={[...searchInputStyleBase, styles.fixedBarInput]}
                   onFocus={() => setFixedBarHasFocus(true)}
                   onBlur={() => {
                     setInputFocused(false);
@@ -785,24 +786,8 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
               {focusedInputType === 'crewName' && (
                 <TextInput
                   ref={fixedBarCrewNameRef}
-                  style={[
-                    styles.input,
-                    styles.fixedBarInput,
-                    {
-                      color: colors.text.primary,
-                      borderColor: crewNameError ? colors.error : colors.secondary,
-                      backgroundColor: colors.inputBg || colors.surface,
-                    }
-                  ]}
-                  value={crewName}
-                  onChangeText={handleCrewNameChange}
-                  placeholder="Enter crew name..."
-                  placeholderTextColor={colors.text.placeholder}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  maxLength={12}
-                  returnKeyType="done"
-                  blurOnSubmit={true}
+                  {...sharedCrewNameInputProps}
+                  style={[...crewNameInputStyleBase, styles.fixedBarInput]}
                   onFocus={() => setFixedBarHasFocus(true)}
                   onBlur={() => {
                     setInputFocused(false);
@@ -813,24 +798,8 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
               {focusedInputType === 'crewIdentifier' && (
                 <TextInput
                   ref={fixedBarCrewIdentifierRef}
-                  style={[
-                    styles.input,
-                    styles.fixedBarInput,
-                    {
-                      color: colors.text.primary,
-                      borderColor: crewIdentifierError ? colors.error : colors.secondary,
-                      backgroundColor: colors.inputBg || colors.surface,
-                    }
-                  ]}
-                  value={crewIdentifier}
-                  onChangeText={handleCrewIdentifierChange}
-                  placeholder="Enter identifier..."
-                  placeholderTextColor={colors.text.placeholder}
-                  autoCapitalize="characters"
-                  autoCorrect={false}
-                  maxLength={5}
-                  returnKeyType="done"
-                  blurOnSubmit={true}
+                  {...sharedCrewIdentifierInputProps}
+                  style={[...crewIdentifierInputStyleBase, styles.fixedBarInput]}
                   onFocus={() => setFixedBarHasFocus(true)}
                   onBlur={() => {
                     setInputFocused(false);
