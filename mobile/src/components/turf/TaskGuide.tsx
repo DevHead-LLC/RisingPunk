@@ -92,15 +92,11 @@ export const TaskGuide = memo(({ currentScreen, onNavigateToProfile }: TaskGuide
         ? 'Collect Reward!' 
         : (data?.currentTask?.description || 'Tap to view'));
 
-  const handlePress = async () => {
-    if (!pillTappedOnce) {
-      try {
-        await trackTaskGuidePillTap().unwrap();
-      } catch {
-        // Non-blocking: still open modal
-      }
-    }
+  const handlePress = () => {
     setModalVisible(true);
+    if (!pillTappedOnce) {
+      void trackTaskGuidePillTap();
+    }
   };
 
   return (
