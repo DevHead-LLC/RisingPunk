@@ -2654,6 +2654,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     hasCenteredOnHome.value = true;
   }, [grid, currentUserHandle, restorePan, containerSize.width, containerSize.height, minX, maxX, boundsReady, computeWindow, offsetX, offsetY]);
 
+  // When handle changes (e.g. after profile update), reset center flag so we re-center on home when fresh map data arrives
+  useEffect(() => {
+    hasCenteredOnHome.value = false;
+  }, [currentUserHandle]);
+
   const handleCellPressRef = useRef<((x: number, y: number, cellData: CellData) => Promise<void>) | null>(null);
   const lastPressTimeRef = useRef<number>(0);
   const lastPressCoordsRef = useRef<{ x: number; y: number } | null>(null);

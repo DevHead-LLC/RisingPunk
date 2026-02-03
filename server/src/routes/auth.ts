@@ -8,6 +8,7 @@ import { GoogleAuthService } from '../services/GoogleAuthService';
 import { AppleAuthService } from '../services/AppleAuthService';
 import { EmailService } from '../services/EmailService';
 import { EncryptionService } from '../services/EncryptionService';
+import { MapService } from '../services/MapService';
 import { filterBadWords, containsBadWords, containsBadWordsForHandle } from '../utils/contentModeration';
 
 // Helper function to safely escape regex special characters
@@ -977,6 +978,10 @@ router.post('/update-handle', async (req, res): Promise<void> => {
     user.needsHandleSelection = false;
     await user.save();
 
+    // Keep map cells in sync: update displayed handle in all cells occupied by this user
+    // (one-time write on handle change; no extra cost on map load)
+    const mapService = new MapService();
+    await mapService.updatePlayerHandleInMapCells(user._id as mongoose.Types.ObjectId, user.handle);
 
     res.json({
       success: true,

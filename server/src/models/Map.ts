@@ -41,4 +41,7 @@ const MapSchema = new mongoose.Schema({
 // Ensure x,y coordinates are unique within each map
 MapSchema.index({ 'cells.x': 1, 'cells.y': 1 }, { unique: true });
 
+// Index for efficient updates by userId (e.g. handle change, orphan cleanup)
+MapSchema.index({ 'cells.userId': 1 }, { sparse: true });
+
 export const Map = mongoose.model('Map', MapSchema); 
