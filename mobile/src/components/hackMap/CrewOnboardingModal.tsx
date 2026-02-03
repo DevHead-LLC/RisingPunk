@@ -97,12 +97,10 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
   useEffect(() => {
     if (!visible) return;
     const showSub = Keyboard.addListener('keyboardDidShow', (e: { endCoordinates: { height: number } }) => {
-      if (__DEV__) console.log('[CrewOnboarding] keyboardDidShow');
       setKeyboardVisible(true);
       setKeyboardHeight(e.endCoordinates?.height ?? 0);
     });
     const hideSub = Keyboard.addListener('keyboardDidHide', () => {
-      if (__DEV__) console.log('[CrewOnboarding] keyboardDidHide');
       setKeyboardVisible(false);
       setKeyboardHeight(0);
       setFocusedInputType(null);
@@ -402,13 +400,10 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
                       {...sharedSearchInputProps}
                       style={searchInputStyleBase}
                       onFocus={() => {
-                        if (__DEV__) console.log('[CrewOnboarding] search onFocus');
                         setInputFocused(true);
                         setFocusedInputType('search');
                       }}
-                      onBlur={() => {
-                        if (__DEV__) console.log('[CrewOnboarding] search onBlur');
-                      }}
+                      onBlur={() => {}}
                     />
                   </View>
                   {isSearching && (
@@ -597,13 +592,10 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
                       {...sharedCrewNameInputProps}
                       style={crewNameInputStyleBase}
                       onFocus={() => {
-                        if (__DEV__) console.log('[CrewOnboarding] crewName onFocus');
                         setInputFocused(true);
                         setFocusedInputType('crewName');
                       }}
-                      onBlur={() => {
-                        if (__DEV__) console.log('[CrewOnboarding] crewName onBlur');
-                      }}
+                      onBlur={() => {}}
                     />
                   </View>
                   {crewNameError ? (
@@ -625,13 +617,10 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
                       {...sharedCrewIdentifierInputProps}
                       style={crewIdentifierInputStyleBase}
                       onFocus={() => {
-                        if (__DEV__) console.log('[CrewOnboarding] crewIdentifier onFocus');
                         setInputFocused(true);
                         setFocusedInputType('crewIdentifier');
                       }}
-                      onBlur={() => {
-                        if (__DEV__) console.log('[CrewOnboarding] crewIdentifier onBlur');
-                      }}
+                      onBlur={() => {}}
                     />
                   </View>
                   {crewIdentifierError ? (
