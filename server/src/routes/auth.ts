@@ -966,23 +966,33 @@ router.post('/update-handle', async (req, res): Promise<void> => {
       return;
     }
 
-    const user = await User.findById(decoded.userId);
-    if (!user) {
-      res.status(404).json({ error: 'User not found' });
-      return;
+    // Atomic update: user handle + map cells in one transaction so we never leave DB inconsistent on partial failure
+    const session = await mongoose.startSession();
+    let userForResponse: typeof User.prototype;
+    try {
+      userForResponse = await session.withTransaction(async () => {
+        const user = await User.findById(decoded.userId).session(session);
+        if (!user) {
+          throw new Error('User not found');
+        }
+        // Note: Bad words check already done above, so we can save the handle as-is
+        user.handle = handle;
+        user.needsHandleSelection = false;
+        await user.save({ session });
+        // Keep map cells in sync: update displayed handle in all cells occupied by this user
+        const mapService = new MapService();
+        await mapService.updatePlayerHandleInMapCells(
+          user._id as mongoose.Types.ObjectId,
+          user.handle,
+          session
+        );
+        return user;
+      });
+    } finally {
+      await session.endSession();
     }
 
-    // Note: Bad words check already done above, so we can save the handle as-is
-    // (No need to filter since we're rejecting handles with bad words)
-    user.handle = handle;
-    user.needsHandleSelection = false;
-    await user.save();
-
-    // Keep map cells in sync: update displayed handle in all cells occupied by this user
-    // (one-time write on handle change; no extra cost on map load)
-    const mapService = new MapService();
-    await mapService.updatePlayerHandleInMapCells(user._id as mongoose.Types.ObjectId, user.handle);
-
+    const user = userForResponse;
     res.json({
       success: true,
       user: {
@@ -1001,8 +1011,12 @@ router.post('/update-handle', async (req, res): Promise<void> => {
         }
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Handle update error:', error);
+    if (error?.message === 'User not found') {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
     res.status(500).json({ error: 'Server error' });
   }
 });
