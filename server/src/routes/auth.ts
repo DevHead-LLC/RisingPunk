@@ -283,7 +283,8 @@ router.post('/guest', async (req, res): Promise<void> => {
     const user = new User({
       handle: guestHandle,
       needsHandleSelection: true,
-      isGuest: true
+      isGuest: true,
+      emailVerificationPrompted: true, // no email to verify; skip verification prompt
       // no email, no hashedAccessKey
     });
 

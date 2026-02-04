@@ -93,36 +93,7 @@ export const loginUser = createAsyncThunk(
       // Note: Preferences will be synced by AppContent useEffect after login completes
 
       // Fetch initial data after successful login
-      try {
-        // Balance fetching is handled by DataFetcher + RTK Query polling
-        
-        // Fetch bots
-        const botsResponse = await fetch(`${API_URL}/api/bots`, {
-          headers: {
-            'Authorization': `Bearer ${data.token}`,
-          },
-        });
-
-        if (botsResponse.ok) {
-          const botsData = await botsResponse.json();
-          dispatch(setBots(botsData.bots));
-        }
-
-        // Fetch build state
-        const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
-          headers: {
-            'Authorization': `Bearer ${data.token}`,
-          },
-        });
-
-        if (buildStateResponse.ok) {
-          const buildStateData = await buildStateResponse.json();
-          dispatch(setBuildState(buildStateData));
-        }
-      } catch (fetchError) {
-        // Don't fail login if data fetching fails
-        console.warn('Failed to fetch initial data:', fetchError);
-      }
+      await fetchBotsAndBuildStateForToken(data.token, dispatch, 'Failed to fetch initial data:');
 
       // Mark that user has an account (so "returning user" tracking works for login-to-existing-account)
       await markAccountExists();
@@ -194,7 +165,6 @@ export const registerUser = createAsyncThunk(
 );
 
 const GUEST_TOKEN_KEY = 'guestToken';
-const GUEST_USER_KEY = 'guestUser';
 
 /**
  * Resumes the session for the account previously linked to this device (guest or formerly-guest-now-linked).
@@ -259,7 +229,7 @@ export const playAsGuest = createAsyncThunk(
           await markAccountExists();
           return resumed;
         }
-        await AsyncStorage.multiRemove([GUEST_TOKEN_KEY, GUEST_USER_KEY]);
+        await AsyncStorage.multiRemove([GUEST_TOKEN_KEY]);
       }
 
       const response = await fetch(`${API_URL}/api/auth/guest`, {
@@ -276,7 +246,6 @@ export const playAsGuest = createAsyncThunk(
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
       await AsyncStorage.setItem(GUEST_TOKEN_KEY, data.token);
-      await AsyncStorage.setItem(GUEST_USER_KEY, JSON.stringify(data.user));
 
       resetAllApiCaches({ dispatch } as any);
       await fetchBotsAndBuildStateForToken(data.token, dispatch, 'Failed to fetch initial data for guest:');
@@ -329,37 +298,7 @@ export const googleSignInUser = createAsyncThunk(
       // Clear any existing RTK Query cache to ensure fresh data for new user
       resetAllApiCaches({ dispatch } as any);
 
-      // Fetch initial data after successful login
-      try {
-        // Balance fetching is handled by DataFetcher + RTK Query polling
-        
-        // Fetch bots
-        const botsResponse = await fetch(`${API_URL}/api/bots`, {
-          headers: {
-            'Authorization': `Bearer ${data.token}`,
-          },
-        });
-
-        if (botsResponse.ok) {
-          const botsData = await botsResponse.json();
-          dispatch(setBots(botsData.bots));
-        }
-
-        // Fetch build state
-        const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
-          headers: {
-            'Authorization': `Bearer ${data.token}`,
-          },
-        });
-
-        if (buildStateResponse.ok) {
-          const buildStateData = await buildStateResponse.json();
-          dispatch(setBuildState(buildStateData));
-        }
-      } catch (fetchError) {
-        // Don't fail login if data fetching fails
-        console.warn('Failed to fetch initial data:', fetchError);
-      }
+      await fetchBotsAndBuildStateForToken(data.token, dispatch, 'Failed to fetch initial data:');
 
       // Mark that user has an account (so "returning user" tracking works for login-to-existing-account)
       await markAccountExists();
@@ -432,29 +371,7 @@ export const googleSignUpUser = createAsyncThunk(
           }));
         }
 
-        // Fetch bots
-        const botsResponse = await fetch(`${API_URL}/api/bots`, {
-          headers: {
-            'Authorization': `Bearer ${data.token}`,
-          },
-        });
-
-        if (botsResponse.ok) {
-          const botsData = await botsResponse.json();
-          dispatch(setBots(botsData.bots));
-        }
-
-        // Fetch build state
-        const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
-          headers: {
-            'Authorization': `Bearer ${data.token}`,
-          },
-        });
-
-        if (buildStateResponse.ok) {
-          const buildStateData = await buildStateResponse.json();
-          dispatch(setBuildState(buildStateData));
-        }
+        await fetchBotsAndBuildStateForToken(data.token, dispatch, 'Failed to fetch initial data for Google sign-up:');
       } catch (fetchError) {
         // Silently handle fetch errors
       }
@@ -506,37 +423,7 @@ export const appleSignInUser = createAsyncThunk(
       // Clear any existing RTK Query cache to ensure fresh data for new user
       resetAllApiCaches({ dispatch } as any);
 
-      // Fetch initial data after successful login
-      try {
-        // Balance fetching is handled by DataFetcher + RTK Query polling
-        
-        // Fetch bots
-        const botsResponse = await fetch(`${API_URL}/api/bots`, {
-          headers: {
-            'Authorization': `Bearer ${data.token}`,
-          },
-        });
-
-        if (botsResponse.ok) {
-          const botsData = await botsResponse.json();
-          dispatch(setBots(botsData.bots));
-        }
-
-        // Fetch build state
-        const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
-          headers: {
-            'Authorization': `Bearer ${data.token}`,
-          },
-        });
-
-        if (buildStateResponse.ok) {
-          const buildStateData = await buildStateResponse.json();
-          dispatch(setBuildState(buildStateData));
-        }
-      } catch (fetchError) {
-        // Don't fail login if data fetching fails
-        console.error('Failed to fetch initial data:', fetchError);
-      }
+      await fetchBotsAndBuildStateForToken(data.token, dispatch, 'Failed to fetch initial data:');
 
       // Mark that user has an account (so "returning user" tracking works for login-to-existing-account)
       await markAccountExists();
@@ -609,29 +496,7 @@ export const appleSignUpUser = createAsyncThunk(
           }));
         }
 
-        // Fetch bots
-        const botsResponse = await fetch(`${API_URL}/api/bots`, {
-          headers: {
-            'Authorization': `Bearer ${data.token}`,
-          },
-        });
-
-        if (botsResponse.ok) {
-          const botsData = await botsResponse.json();
-          dispatch(setBots(botsData.bots));
-        }
-
-        // Fetch build state
-        const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
-          headers: {
-            'Authorization': `Bearer ${data.token}`,
-          },
-        });
-
-        if (buildStateResponse.ok) {
-          const buildStateData = await buildStateResponse.json();
-          dispatch(setBuildState(buildStateData));
-        }
+        await fetchBotsAndBuildStateForToken(data.token, dispatch, 'Failed to fetch initial data for Apple sign-up:');
       } catch (fetchError) {
         // Silently handle fetch errors
       }
@@ -740,11 +605,10 @@ export const logoutUser = createAsyncThunk(
     const { token, user } = state.auth;
     if (user?.isGuest && token) {
       await AsyncStorage.setItem(GUEST_TOKEN_KEY, token);
-      await AsyncStorage.setItem(GUEST_USER_KEY, JSON.stringify(user));
     }
     await AsyncStorage.removeItem('token');
     await AsyncStorage.removeItem('user');
-    // guestToken/guestUser are kept so "Play as Guest" can resume the same device guest next time.
+    // guestToken is kept so "Play as Guest" can resume the same device-linked account next time.
     
     // Note: We do NOT clear first-time tracking flags on logout.
     // With user-scoped keys (e.g., has_built_bots_before_${userId}), flags should
@@ -795,7 +659,6 @@ export const loadStoredAuth = createAsyncThunk(
 
       if (userData.user?.isGuest) {
         await AsyncStorage.setItem(GUEST_TOKEN_KEY, storedToken);
-        await AsyncStorage.setItem(GUEST_USER_KEY, JSON.stringify(userData.user));
       }
 
       // Mark that user has an account (so app_open tracking works for auto-sign-in returning users)
@@ -844,29 +707,7 @@ export const fetchInitialData = createAsyncThunk(
         }));
       }
 
-      // Fetch bots
-      const botsResponse = await fetch(`${API_URL}/api/bots`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (botsResponse.ok) {
-        const botsData = await botsResponse.json();
-        dispatch(setBots(botsData.bots));
-      }
-
-      // Fetch build state
-      const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (buildStateResponse.ok) {
-        const buildStateData = await buildStateResponse.json();
-        dispatch(setBuildState(buildStateData));
-      }
+      await fetchBotsAndBuildStateForToken(token, dispatch, 'Failed to fetch initial data:');
 
       return { success: true };
     } catch (error) {
@@ -937,27 +778,7 @@ export const forceRefreshAllData = createAsyncThunk(
         }));
       }
 
-      const botsResponse = await fetch(`${API_URL}/api/bots`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (botsResponse.ok) {
-        const botsData = await botsResponse.json();
-        dispatch(setBots(botsData.bots));
-      }
-
-      const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (buildStateResponse.ok) {
-        const buildStateData = await buildStateResponse.json();
-        dispatch(setBuildState(buildStateData));
-      }
+      await fetchBotsAndBuildStateForToken(token, dispatch, 'Failed to fetch bots/build-state during data refresh:');
 
       return { success: true };
     } catch (error) {
@@ -1258,8 +1079,8 @@ export const authSlice = createSlice({
           state.user.needsHandleSelection = false;
         }
         state.showHandleSelection = false;
-        // Show email verification modal after handle selection if email is not verified
-        if (state.user && !state.user.emailVerified) {
+        // Show email verification modal after handle selection only if user has an email to verify (not guest)
+        if (state.user && !state.user.emailVerified && !state.user.isGuest) {
           state.showEmailVerification = true;
         }
         state.error = null;
