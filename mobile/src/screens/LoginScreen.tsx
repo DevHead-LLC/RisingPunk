@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import {SIZING, styleGuide} from '../styles/theme';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { loginUser, registerUser, clearError } from '../store/slices/authSlice';
+import { loginUser, registerUser, playAsGuest, clearError } from '../store/slices/authSlice';
 import { TitleSection } from '../components/auth/TitleSection';
 import { AuthInputs } from '../components/auth/AuthInputs';
 import { SocialSignInButtons } from '../components/auth/SocialSignInButtons';
@@ -18,6 +18,7 @@ import { useThemeColors } from '../hooks/useThemeColors';
 import { ForgotPasswordModal } from '../components/modals/ForgotPasswordModal';
 
 type FormType = 'login' | 'register';
+type ViewMode = 'choice' | 'login' | 'register';
 
 const WelcomeMessage = memo(function WelcomeMessage({ formType }: { formType: FormType }) {
   const colors = useThemeColors();
@@ -45,6 +46,17 @@ const ToggleFormButton = memo(function ToggleFormButton({
   );
 });
 
+const BackToChoiceButton = memo(function BackToChoiceButton({ onPress }: { onPress: () => void }) {
+  const colors = useThemeColors();
+  return (
+    <TouchableOpacity style={styles.toggleButton} onPress={onPress}>
+      <Text style={[styles.toggleText, { color: colors.matrix }]}>
+        ← CHOOSE_ENTRY
+      </Text>
+    </TouchableOpacity>
+  );
+});
+
 const ErrorMessage = memo(function ErrorMessage({ error }: { error: string | null }) {
   if (!error) {return null;}
   const colors = useThemeColors();
@@ -55,6 +67,7 @@ const ErrorMessage = memo(function ErrorMessage({ error }: { error: string | nul
 export const LoginScreen = () => {
   const dispatch = useAppDispatch();
   const { isLoading: authLoading, error: authError } = useAppSelector((state) => state.auth);
+  const [viewMode, setViewMode] = useState<ViewMode>('choice');
   const [formType, setFormType] = useState<FormType>('login');
   const [formData, setFormData] = useState({
     email: '',
@@ -164,9 +177,26 @@ export const LoginScreen = () => {
   const toggleFormType = useCallback(() => {
     setFormType(prev => prev === 'login' ? 'register' : 'login');
     clearFormError();
-    dispatch(clearError()); // Clear auth errors when switching forms
+    dispatch(clearError());
     setFormData({ email: '', handle: '', accessKey: '', verifyAccessKey: '' });
   }, [clearFormError, dispatch]);
+
+  const goToChoice = useCallback(() => {
+    setViewMode('choice');
+    clearFormError();
+    dispatch(clearError());
+    setFormData({ email: '', handle: '', accessKey: '', verifyAccessKey: '' });
+  }, [clearFormError, dispatch]);
+
+  const handlePlayAsGuest = useCallback(async () => {
+    clearFormError();
+    dispatch(clearError());
+    try {
+      await dispatch(playAsGuest()).unwrap();
+    } catch (err) {
+      console.error('Play as guest error:', err);
+    }
+  }, [dispatch, clearFormError]);
 
   const renderLoginForm = () => {
     return (
@@ -241,6 +271,54 @@ export const LoginScreen = () => {
     </View>
   );
 
+  const renderChoiceView = () => (
+    <View style={styles.formContainer}>
+      <Text style={[styles.welcomeText, styles.chooseEntryTitle, { color: colors.secondary, marginBottom: SIZING.spacing.lg }]}>
+        CHOOSE_ENTRY
+      </Text>
+      <ErrorMessage error={error} />
+      <TouchableOpacity
+        style={[
+          styles.jackInButton,
+          { backgroundColor: isLoading ? colors.buttonDisabled : colors.buttonBg },
+        ]}
+        onPress={() => {
+          setFormType('login');
+          setViewMode('login');
+        }}
+        disabled={isLoading}
+      >
+        <Text style={[styles.jackInText, { color: '#FFFFFF' }]}>SIGN_IN</Text>
+        <View style={[styles.buttonCorner, { borderColor: colors.primary }]} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[
+          styles.jackInButton,
+          { backgroundColor: isLoading ? colors.buttonDisabled : colors.buttonBg, marginTop: SIZING.spacing.sm },
+        ]}
+        onPress={() => {
+          setFormType('register');
+          setViewMode('register');
+        }}
+        disabled={isLoading}
+      >
+        <Text style={[styles.jackInText, { color: '#FFFFFF' }]}>CREATE_ACCOUNT</Text>
+        <View style={[styles.buttonCorner, { borderColor: colors.primary }]} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[
+          styles.jackInButton,
+          { backgroundColor: isLoading ? colors.buttonDisabled : colors.buttonBg, marginTop: SIZING.spacing.sm },
+        ]}
+        onPress={handlePlayAsGuest}
+        disabled={isLoading}
+      >
+        <Text style={[styles.jackInText, { color: '#FFFFFF' }]}>PLAY_AS_GUEST</Text>
+        <View style={[styles.buttonCorner, { borderColor: colors.primary }]} />
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <ScreenContainer>
       <ScrollView 
@@ -256,11 +334,18 @@ export const LoginScreen = () => {
               <TitleSection />
             </View>
             <View style={styles.rightSide}>
-              <WelcomeMessage formType={formType} />
-              <ErrorMessage error={error} />
-              {formType === 'login' ? renderLoginForm() : renderRegisterForm()}
-              <SocialSignInButtons isSignUp={formType === 'register'} />
-              <ToggleFormButton formType={formType} onPress={toggleFormType} />
+              {viewMode === 'choice' ? (
+                renderChoiceView()
+              ) : (
+                <>
+                  <WelcomeMessage formType={formType} />
+                  <ErrorMessage error={error} />
+                  {formType === 'login' ? renderLoginForm() : renderRegisterForm()}
+                  <SocialSignInButtons isSignUp={formType === 'register'} />
+                  <ToggleFormButton formType={formType} onPress={toggleFormType} />
+                  <BackToChoiceButton onPress={goToChoice} />
+                </>
+              )}
             </View>
           </View>
         </View>
@@ -365,6 +450,11 @@ const styles = StyleSheet.create({
     fontSize: SIZING.font.h2 - 2,
     fontWeight: '500',
     marginBottom: SIZING.spacing.sm,
+  },
+  chooseEntryTitle: {
+    textAlign: 'center',
+    alignSelf: 'center',
+    width: '100%',
   },
   buttonDisabled: {
     opacity: 0.5,
