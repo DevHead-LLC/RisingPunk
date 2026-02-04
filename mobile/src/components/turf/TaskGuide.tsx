@@ -29,7 +29,6 @@ export const TaskGuide = memo(({ currentScreen, onNavigateToProfile }: TaskGuide
   const shouldShow = currentScreen === 'turf';
   const showTaskGuide = data === undefined ? true : (data?.showTaskGuide !== false);
   const pillTappedOnce = data?.taskGuidePillTappedOnce === true;
-  const runAttentionAnimation = shouldShow && showTaskGuide && !pillTappedOnce;
 
   useEffect(() => {
     if (!shouldShow || !showTaskGuide) return;
