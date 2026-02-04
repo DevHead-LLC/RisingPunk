@@ -26,6 +26,7 @@ export interface CurrentTaskResponse {
   currentTask: CurrentTask | null;
   progress: TaskProgress;
   showTaskGuide: boolean;
+  taskGuidePillTappedOnce?: boolean;
   taskList?: TaskListItem[];
   completedTaskIds?: string[];
   collectedTaskIds?: string[];
@@ -104,5 +105,10 @@ export interface TrackAnotherUserProfileVisitRequest {
 export interface TrackAnotherUserProfileVisitResponse {
   success: boolean;
   message?: string;
+}
+
+export interface TrackTaskGuidePillTapResponse {
+  success: boolean;
+  taskGuidePillTappedOnce?: boolean;
 }
 

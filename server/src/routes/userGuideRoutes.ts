@@ -32,11 +32,20 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
         new: true,
         setDefaultsOnInsert: true
       }
-    ).select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt walletViewedAt attackedLevel1NpcAt visitedAnotherUserProfileAt homeDefenseUnlockedAt antivirusUnlockedAt').lean();
+    ).select('completedTasks collectedTasks skippedTasks showTaskGuide taskGuidePillTappedOnce profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt walletViewedAt attackedLevel1NpcAt visitedAnotherUserProfileAt homeDefenseUnlockedAt antivirusUnlockedAt').lean();
 
     if (!progress) {
       res.status(500).json({ error: 'Failed to initialize task progress' });
       return;
+    }
+
+    // Backfill: ensure taskGuidePillTappedOnce exists for all accounts (new and old)
+    if (progress.taskGuidePillTappedOnce === undefined) {
+      await UserTaskProgress.updateOne(
+        { userId },
+        { $set: { taskGuidePillTappedOnce: false } }
+      );
+      (progress as { taskGuidePillTappedOnce?: boolean }).taskGuidePillTappedOnce = false;
     }
 
     const taskList = getTaskList();
@@ -168,7 +177,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
     // SECOND PASS: After auto-completing tasks, refresh progress and find the current task
     if (anyTaskAutoCompleted) {
       const updatedProgress = await UserTaskProgress.findOne({ userId })
-        .select('completedTasks collectedTasks skippedTasks showTaskGuide profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt walletViewedAt attackedLevel1NpcAt visitedAnotherUserProfileAt')
+        .select('completedTasks collectedTasks skippedTasks showTaskGuide taskGuidePillTappedOnce profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt walletViewedAt attackedLevel1NpcAt visitedAnotherUserProfileAt')
         .lean();
       
       if (updatedProgress) {
@@ -207,6 +216,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
         total: totalTasks
       },
       showTaskGuide: progress.showTaskGuide,
+      taskGuidePillTappedOnce: progress.taskGuidePillTappedOnce === true,
       taskList: taskList.map(task => ({
         id: task.id,
         title: task.title,
@@ -1144,6 +1154,33 @@ router.post('/track-wallet-view', auth, async (req: Request, res: Response) => {
     res.json({ success: true, message: 'Wallet view tracked' });
   } catch (error) {
     console.error('Error tracking wallet view:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/track-task-guide-pill-tap', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const existingProgress = await UserTaskProgress.findOne({ userId }).select('taskGuidePillTappedOnce').lean();
+    if (existingProgress?.taskGuidePillTappedOnce === true) {
+      res.json({ success: true, taskGuidePillTappedOnce: true });
+      return;
+    }
+
+    await UserTaskProgress.findOneAndUpdate(
+      { userId },
+      { $set: { taskGuidePillTappedOnce: true } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    res.json({ success: true, taskGuidePillTappedOnce: true });
+  } catch (error) {
+    console.error('Error tracking task guide pill tap:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
