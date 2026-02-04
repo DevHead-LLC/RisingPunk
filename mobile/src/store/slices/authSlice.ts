@@ -174,7 +174,7 @@ const GUEST_TOKEN_KEY = 'guestToken';
  * signed out, "Play as Guest" should still resume that same account on this device (one-tap return to their
  * device-linked identity), not create a new guest.
  */
-async function resumeGuestSession(guestToken: string, dispatch: any): Promise<{ token: string; user: any } | null> {
+async function resumeGuestSession(guestToken: string): Promise<{ token: string; user: any } | null> {
   try {
     const response = await fetch(`${API_URL}/api/auth/verify-token`, {
       method: 'GET',
@@ -222,7 +222,7 @@ export const playAsGuest = createAsyncThunk(
       const storedGuestToken = await AsyncStorage.getItem(GUEST_TOKEN_KEY);
 
       if (storedGuestToken) {
-        const resumed = await resumeGuestSession(storedGuestToken, dispatch);
+        const resumed = await resumeGuestSession(storedGuestToken);
         if (resumed) {
           await AsyncStorage.setItem('token', resumed.token);
           await AsyncStorage.setItem('user', JSON.stringify(resumed.user));
