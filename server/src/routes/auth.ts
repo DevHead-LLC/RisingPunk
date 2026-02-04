@@ -4,6 +4,7 @@ import { Research } from '../models/Research';
 import { ResearchUser } from '../models/ResearchUser';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
+import auth from '../middleware/auth';
 import { GoogleAuthService } from '../services/GoogleAuthService';
 import { AppleAuthService } from '../services/AppleAuthService';
 import { EmailService } from '../services/EmailService';
@@ -84,6 +85,8 @@ interface UserResponse {
       enableDataRefresh: boolean;
       enableDebugLogs: boolean;
     };
+    isGuest?: boolean;
+    hasPassword?: boolean;
   }
 }
 
@@ -245,7 +248,9 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
           debugFeatures: {
             enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
             enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
-          }
+          },
+          isGuest: false,
+          hasPassword: true
         }
       });
 
@@ -273,6 +278,73 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
     }
   });
 
+// Play as guest — create anonymous device-linked account (no email/password)
+router.post('/guest', async (req, res): Promise<void> => {
+  try {
+    const guestHandle = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const user = new User({
+      handle: guestHandle,
+      needsHandleSelection: true,
+      isGuest: true,
+      emailVerificationPrompted: true, // no email to verify; skip verification prompt
+      // no email, no hashedAccessKey
+    });
+
+    try {
+      await user.save();
+    } catch (saveError: any) {
+      if (saveError.code === 11000 && saveError.keyValue?.handle) {
+        // Handle collision — retry once with a different handle
+        const retryHandle = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        user.handle = retryHandle;
+        await user.save();
+      } else {
+        throw saveError;
+      }
+    }
+
+    await createUserResearchData(user._id as mongoose.Types.ObjectId);
+
+    const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    user.setCurrentToken(sessionId);
+    await user.save();
+
+    const token = jwt.sign(
+      { userId: user._id, sessionId },
+      process.env.JWT_SECRET || 'defaultsecret',
+      { expiresIn: '7d' }
+    );
+
+    res.status(201).json({
+      token,
+      user: {
+        handle: user.handle,
+        email: user.getDecryptedEmail(),
+        level: user.level,
+        experience: user.experience,
+        armyBonus: user.armyBonus,
+        balance: user.balance,
+        unlockedFeatures: user.unlockedFeatures,
+        profileGender: user.profileGender,
+        onboardingCompleted: user.onboardingCompleted || false,
+        needsHandleSelection: user.needsHandleSelection || false,
+        emailVerified: user.emailVerified || false,
+        emailVerificationToken: user.emailVerificationToken || null,
+        emailVerificationPrompted: user.emailVerificationPrompted || false,
+        debugFeatures: {
+          enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
+          enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
+        },
+        isGuest: true,
+        hasPassword: false
+      }
+    });
+  } catch (error) {
+    console.error('Guest creation error:', error);
+    res.status(500).json({ error: 'Failed to create guest account' });
+  }
+});
+
 // Login user
 router.post<{}, UserResponse | { error: string }, LoginRequest['body']>(
   '/login',
@@ -289,6 +361,12 @@ router.post<{}, UserResponse | { error: string }, LoginRequest['body']>(
       // Check if this is a Google Sign-In account (no password set)
       if (user.googleId && !user.hashedAccessKey) {
         res.status(400).json({ error: 'This account was created with Google Sign-In. Please use the "SIGN_IN_WITH_GOOGLE" option to sign in.' });
+        return;
+      }
+
+      // Guest accounts have no password; they must link email/password in Profile first
+      if (user.isGuest) {
+        res.status(400).json({ error: 'This is a guest account. Link email and password in Profile to sign in from other devices.' });
         return;
       }
 
@@ -317,7 +395,7 @@ router.post<{}, UserResponse | { error: string }, LoginRequest['body']>(
       user.setCurrentToken(sessionId);
       await user.save();
 
-      res.json({
+        res.json({
         token,
         user: {
           handle: user.handle,
@@ -336,7 +414,9 @@ router.post<{}, UserResponse | { error: string }, LoginRequest['body']>(
           debugFeatures: {
             enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
             enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
-          }
+          },
+          isGuest: user.isGuest || false,
+          hasPassword: !!(user as any).hashedAccessKey
         }
       });
 
@@ -406,7 +486,9 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
             debugFeatures: {
               enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
               enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
-            }
+            },
+            isGuest: user.isGuest || false,
+            hasPassword: !!(user as any).hashedAccessKey
           }
         });
         return;
@@ -455,7 +537,9 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
               debugFeatures: {
                 enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
                 enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
-              }
+              },
+              isGuest: user.isGuest || false,
+              hasPassword: !!(user as any).hashedAccessKey
             }
           });
           return;
@@ -559,7 +643,9 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
           debugFeatures: {
             enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
             enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
-          }
+          },
+          isGuest: false,
+          hasPassword: false
         }
       });
 
@@ -626,7 +712,9 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
             debugFeatures: {
               enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
               enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
-            }
+            },
+            isGuest: user.isGuest || false,
+            hasPassword: !!(user as any).hashedAccessKey
           }
         });
         return;
@@ -674,7 +762,9 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
                 debugFeatures: {
                   enableDataRefresh: existingUser.debugFeatures?.enableDataRefresh || false,
                   enableDebugLogs: existingUser.debugFeatures?.enableDebugLogs || false
-                }
+                },
+                isGuest: existingUser.isGuest || false,
+                hasPassword: !!(existingUser as any).hashedAccessKey
               }
             });
             return;
@@ -771,7 +861,9 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
                   debugFeatures: {
                     enableDataRefresh: existingUser.debugFeatures?.enableDataRefresh || false,
                     enableDebugLogs: existingUser.debugFeatures?.enableDebugLogs || false
-                  }
+                  },
+                  isGuest: existingUser.isGuest || false,
+                  hasPassword: !!(existingUser as any).hashedAccessKey
                 }
               });
               return;
@@ -811,7 +903,9 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
                   debugFeatures: {
                     enableDataRefresh: existingUser.debugFeatures?.enableDataRefresh || false,
                     enableDebugLogs: existingUser.debugFeatures?.enableDebugLogs || false
-                  }
+                  },
+                  isGuest: existingUser.isGuest || false,
+                  hasPassword: !!(existingUser as any).hashedAccessKey
                 }
               });
               return;
@@ -881,7 +975,9 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
           debugFeatures: {
             enableDataRefresh: newUser.debugFeatures?.enableDataRefresh || false,
             enableDebugLogs: newUser.debugFeatures?.enableDebugLogs || false
-          }
+          },
+          isGuest: false,
+          hasPassword: false
         }
       });
 
@@ -1008,7 +1104,9 @@ router.post('/update-handle', async (req, res): Promise<void> => {
         debugFeatures: {
           enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
           enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
-        }
+        },
+        isGuest: user.isGuest || false,
+        hasPassword: !!(user as any).hashedAccessKey
       }
     });
   } catch (error: any) {
@@ -1018,6 +1116,99 @@ router.post('/update-handle', async (req, res): Promise<void> => {
       return;
     }
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Link email & password to a guest account (auth required; guest only)
+router.post('/link-account', auth, async (req, res): Promise<void> => {
+  try {
+    const user = await User.findById((req as any).user._id);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    if (!user.isGuest) {
+      res.status(400).json({ error: 'Account is already linked. Use change-password to update password.' });
+      return;
+    }
+    const { email, accessKey } = req.body;
+    if (!email || !accessKey) {
+      res.status(400).json({ error: 'Email and password are required' });
+      return;
+    }
+    if (accessKey.length < 6) {
+      res.status(400).json({ error: 'Password must be at least 6 characters' });
+      return;
+    }
+    const normalizedEmail = email.trim().toLowerCase();
+    const emailExists = await User.emailExists(normalizedEmail);
+    if (emailExists) {
+      res.status(400).json({ error: 'Email already exists' });
+      return;
+    }
+    user.email = normalizedEmail;
+    user.hashedAccessKey = accessKey;
+    user.isGuest = false;
+    user.emailVerified = false;
+    user.emailVerificationPrompted = false; // allow app to show verification modal for this newly linked email
+    const verificationToken = EmailService.generateVerificationToken();
+    const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000); // 72 hours
+    user.emailVerificationToken = verificationToken;
+    user.emailVerificationExpires = expiresAt;
+    user.emailVerificationSentAt = new Date();
+    await user.save();
+
+    const emailSent = await EmailService.sendVerificationEmail(
+      normalizedEmail,
+      user.handle,
+      verificationToken
+    );
+    if (!emailSent) {
+      console.warn('Link account: verification email failed to send for user', user._id);
+    }
+    res.json({ success: true, message: 'Account linked successfully' });
+  } catch (error) {
+    console.error('Link account error:', error);
+    res.status(500).json({ error: 'Failed to link account' });
+  }
+});
+
+// Change password (auth required; full account only)
+router.post('/change-password', auth, async (req, res): Promise<void> => {
+  try {
+    const user = await User.findById((req as any).user._id);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    if (user.isGuest || !user.hashedAccessKey) {
+      res.status(400).json({ error: 'Guest accounts must use link-account to set a password.' });
+      return;
+    }
+    const { currentAccessKey, newAccessKey, verifyNewAccessKey } = req.body;
+    if (!currentAccessKey || !newAccessKey || !verifyNewAccessKey) {
+      res.status(400).json({ error: 'Current password, new password, and verification are required' });
+      return;
+    }
+    if (newAccessKey.length < 6) {
+      res.status(400).json({ error: 'New password must be at least 6 characters' });
+      return;
+    }
+    if (newAccessKey !== verifyNewAccessKey) {
+      res.status(400).json({ error: 'New passwords do not match' });
+      return;
+    }
+    const isValid = await user.verifyAccessKey(currentAccessKey);
+    if (!isValid) {
+      res.status(401).json({ error: 'Current password is incorrect' });
+      return;
+    }
+    user.hashedAccessKey = newAccessKey;
+    await user.save();
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ error: 'Failed to change password' });
   }
 });
 
@@ -1178,7 +1369,9 @@ router.get('/verify-token', async (req, res): Promise<void> => {
         debugFeatures: {
           enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
           enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
-        }
+        },
+        isGuest: user.isGuest || false,
+        hasPassword: !!(user as any).hashedAccessKey
       }
     });
   } catch (error: any) {
