@@ -1,61 +1,9 @@
 #!/usr/bin/env ts-node
 
 import mongoose from 'mongoose';
-import dotenvFlow from 'dotenv-flow';
+import { getDatabaseName } from './scriptEnv';
+import type { Cell, MapDoc, TerrainType } from './scriptMapTypes';
 import { Map as MapModel } from '../src/models/Map';
-
-const nodeEnv = process.env.NODE_ENV || 'development';
-const envFileMap: Record<string, string> = {
-  'development': 'dev',
-  'production': 'prod'
-};
-const mappedNodeEnv = envFileMap[nodeEnv] || nodeEnv;
-
-dotenvFlow.config({ 
-  node_env: mappedNodeEnv,
-  silent: true 
-});
-
-if (process.env.NODE_ENV !== nodeEnv) {
-  process.env.NODE_ENV = nodeEnv;
-}
-
-const getDatabaseName = () => {
-  const nodeEnv = process.env.NODE_ENV || 'development';
-  switch (nodeEnv) {
-    case 'production':
-      return 'RisingPunkProd';
-    case 'staging':
-    case 'development':
-    default:
-      return 'RisingPunk';
-  }
-};
-
-type TerrainType = 'plain' | 'mountain' | 'water' | 'forest' | 'road' | 'grass' | 'dirt';
-
-interface Cell {
-  x: number;
-  y: number;
-  terrain: TerrainType;
-  isActive: boolean;
-  isOccupied: boolean;
-  canBeOccupied: boolean;
-  occupiedBy: string;
-  entityName: string;
-  npcSlug: string;
-  npcInstanceId: string;
-  userId: mongoose.Types.ObjectId | null;
-}
-
-interface MapDoc {
-  _id: mongoose.Types.ObjectId;
-  name: string;
-  gridSize: number;
-  cells: Cell[];
-  version: number;
-  lastUpdated: Date;
-}
 
 function getNeighborCoords(x: number, y: number): { x: number; y: number }[] {
   return [

@@ -3,10 +3,11 @@ import bcrypt from 'bcryptjs';
 import { EncryptionService } from '../services/EncryptionService';
 
 export interface IUser extends Document {
-  email: string;
+  email?: string;
   emailHash?: string;
   handle: string;
-  hashedAccessKey: string;
+  hashedAccessKey?: string;
+  isGuest?: boolean;
   googleId?: string;
   appleId?: string;
   level: number;
@@ -90,8 +91,10 @@ export interface IUserModel extends mongoose.Model<IUser> {
 const userSchema = new Schema({
   email: {
     type: String,
-    required: true,
-    unique: true
+    required: false,
+    unique: true,
+    sparse: true,
+    index: true
   },
   emailHash: {
     type: String,
@@ -99,6 +102,10 @@ const userSchema = new Schema({
     unique: true,
     sparse: true,
     index: true
+  },
+  isGuest: {
+    type: Boolean,
+    default: false
   },
   handle: {
     type: String,
@@ -392,10 +399,12 @@ userSchema.pre('save', async function(this: IUser, next: Function) {
     this.hashedAccessKey = await bcrypt.hash(this.hashedAccessKey, salt);
   }
   
-  // Get the original email before any modifications
+  // Get the original email before any modifications (guests may have no email)
   let originalEmail: string;
   if (this.isModified('email')) {
-    if (!EncryptionService.isEncrypted(this.email)) {
+    if (!this.email) {
+      originalEmail = '';
+    } else if (!EncryptionService.isEncrypted(this.email)) {
       // Email is not encrypted yet, normalize it
       originalEmail = this.email.trim().toLowerCase();
       this.email = EncryptionService.encryptEmail(originalEmail);
@@ -423,14 +432,16 @@ userSchema.pre('save', async function(this: IUser, next: Function) {
   next();
 });
 
-// Add method to verify password
+// Add method to verify password (guest accounts have no password)
 userSchema.methods.verifyAccessKey = async function(accessKey: string): Promise<boolean> {
+  if (!this.hashedAccessKey) return false;
   return bcrypt.compare(accessKey, this.hashedAccessKey);
 };
 
 // Add email encryption/decryption methods
 userSchema.methods.getDecryptedEmail = function(): string {
   try {
+    if (!this.email) return '';
     // If email is not encrypted, return as-is
     if (!EncryptionService.isEncrypted(this.email)) {
       return this.email;

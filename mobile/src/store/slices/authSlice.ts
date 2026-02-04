@@ -6,6 +6,7 @@ import { updateBalance } from './balanceSlice';
 import { setBots, setBuildState } from './botsSlice';
 import { resetAllApiCaches } from '../api/resetApiCaches';
 import { authApi } from '../api/authApi';
+import { mapApi } from '../api/mapApi';
 import { trackAccountCreated, markAccountExists } from '../../services/analyticsService';
 
 // Types
@@ -28,6 +29,8 @@ export interface User {
     enableDebugLogs: boolean;
   };
   totalGuardiansBuilt?: number;
+  isGuest?: boolean;
+  hasPassword?: boolean;
 }
 
 export interface AuthState {
@@ -104,6 +107,7 @@ export const loginUser = createAsyncThunk(
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      await AsyncStorage.removeItem(GUEST_TOKEN_KEY); // so "Play as Guest" does not resume a different user's session
 
       // Clear any existing RTK Query cache to ensure fresh data for new user
       resetAllApiCaches({ dispatch } as any);
@@ -111,36 +115,7 @@ export const loginUser = createAsyncThunk(
       // Note: Preferences will be synced by AppContent useEffect after login completes
 
       // Fetch initial data after successful login
-      try {
-        // Balance fetching is handled by DataFetcher + RTK Query polling
-        
-        // Fetch bots
-        const botsResponse = await fetch(`${API_URL}/api/bots`, {
-          headers: {
-            'Authorization': `Bearer ${data.token}`,
-          },
-        });
-
-        if (botsResponse.ok) {
-          const botsData = await botsResponse.json();
-          dispatch(setBots(botsData.bots));
-        }
-
-        // Fetch build state
-        const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
-          headers: {
-            'Authorization': `Bearer ${data.token}`,
-          },
-        });
-
-        if (buildStateResponse.ok) {
-          const buildStateData = await buildStateResponse.json();
-          dispatch(setBuildState(buildStateData));
-        }
-      } catch (fetchError) {
-        // Don't fail login if data fetching fails
-        console.warn('Failed to fetch initial data:', fetchError);
-      }
+      await fetchBotsAndBuildStateForToken(data.token, dispatch, 'Failed to fetch initial data:');
 
       // Mark that user has an account (so "returning user" tracking works for login-to-existing-account)
       await markAccountExists();
@@ -238,6 +213,7 @@ export const registerUser = createAsyncThunk(
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      await AsyncStorage.removeItem(GUEST_TOKEN_KEY); // so "Play as Guest" does not resume a different user's session
 
       // Track account creation
       await trackAccountCreated('email');
@@ -249,6 +225,104 @@ export const registerUser = createAsyncThunk(
       }
       if ((error as any)?.name === 'AbortError') {
         return rejectWithValue('Request timeout: Server did not respond');
+      }
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+);
+
+const GUEST_TOKEN_KEY = 'guestToken';
+
+/**
+ * Resumes the session for the account previously linked to this device (guest or formerly-guest-now-linked).
+ * Intentional: we do NOT require userData.user.isGuest. If the user linked their guest account and then
+ * signed out, "Play as Guest" should still resume that same account on this device (one-tap return to their
+ * device-linked identity), not create a new guest.
+ */
+async function resumeGuestSession(guestToken: string): Promise<{ token: string; user: any } | null> {
+  try {
+    const response = await fetch(`${API_URL}/api/auth/verify-token`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${guestToken}` },
+    });
+    if (!response.ok) return null;
+    const userData = await response.json();
+    if (!userData.user) return null;
+    return { token: guestToken, user: userData.user };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchBotsAndBuildStateForToken(token: string, dispatch: any, logContext: string): Promise<void> {
+  try {
+    const botsResponse = await fetch(`${API_URL}/api/bots`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (botsResponse.ok) {
+      const botsData = await botsResponse.json();
+      dispatch(setBots(botsData.bots));
+    }
+    const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (buildStateResponse.ok) {
+      const buildStateData = await buildStateResponse.json();
+      dispatch(setBuildState(buildStateData));
+    }
+  } catch (fetchError) {
+    console.warn(logContext, fetchError);
+  }
+}
+
+/**
+ * Play as Guest: use the account linked to this device if one exists (guest or formerly-guest-now-linked),
+ * otherwise create a new guest. Each return to the app can use "Play as Guest" to resume that same
+ * device-linked account rather than creating a new one.
+ */
+export const playAsGuest = createAsyncThunk(
+  'auth/playAsGuest',
+  async (_, { rejectWithValue, dispatch }) => {
+    try {
+      const storedGuestToken = await AsyncStorage.getItem(GUEST_TOKEN_KEY);
+
+      if (storedGuestToken) {
+        const resumed = await resumeGuestSession(storedGuestToken);
+        if (resumed) {
+          await AsyncStorage.setItem('token', resumed.token);
+          await AsyncStorage.setItem('user', JSON.stringify(resumed.user));
+          resetAllApiCaches({ dispatch } as any);
+          await fetchBotsAndBuildStateForToken(resumed.token, dispatch, 'Failed to fetch initial data for guest resume:');
+          await markAccountExists();
+          return resumed;
+        }
+        await AsyncStorage.multiRemove([GUEST_TOKEN_KEY]);
+        return rejectWithValue('Previous session expired. Sign in with your account or tap Play as Guest to create a new guest.');
+      }
+
+      const response = await fetch(`${API_URL}/api/auth/guest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to create guest account' }));
+        return rejectWithValue(error.error || 'Failed to create guest account');
+      }
+
+      const data = await response.json();
+      await AsyncStorage.setItem('token', data.token);
+      await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      await AsyncStorage.setItem(GUEST_TOKEN_KEY, data.token);
+
+      resetAllApiCaches({ dispatch } as any);
+      await fetchBotsAndBuildStateForToken(data.token, dispatch, 'Failed to fetch initial data for guest:');
+
+      await markAccountExists();
+      return data;
+    } catch (error) {
+      if (error instanceof TypeError && (error.message.includes('Network request failed') || error.message.includes('Failed to fetch'))) {
+        return rejectWithValue('Network error: Cannot connect to server');
       }
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
     }
@@ -288,41 +362,12 @@ export const googleSignInUser = createAsyncThunk(
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      await AsyncStorage.removeItem(GUEST_TOKEN_KEY); // so "Play as Guest" does not resume a different user's session
 
       // Clear any existing RTK Query cache to ensure fresh data for new user
       resetAllApiCaches({ dispatch } as any);
 
-      // Fetch initial data after successful login
-      try {
-        // Balance fetching is handled by DataFetcher + RTK Query polling
-        
-        // Fetch bots
-        const botsResponse = await fetch(`${API_URL}/api/bots`, {
-          headers: {
-            'Authorization': `Bearer ${data.token}`,
-          },
-        });
-
-        if (botsResponse.ok) {
-          const botsData = await botsResponse.json();
-          dispatch(setBots(botsData.bots));
-        }
-
-        // Fetch build state
-        const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
-          headers: {
-            'Authorization': `Bearer ${data.token}`,
-          },
-        });
-
-        if (buildStateResponse.ok) {
-          const buildStateData = await buildStateResponse.json();
-          dispatch(setBuildState(buildStateData));
-        }
-      } catch (fetchError) {
-        // Don't fail login if data fetching fails
-        console.warn('Failed to fetch initial data:', fetchError);
-      }
+      await fetchBotsAndBuildStateForToken(data.token, dispatch, 'Failed to fetch initial data:');
 
       // Mark that user has an account (so "returning user" tracking works for login-to-existing-account)
       await markAccountExists();
@@ -370,6 +415,7 @@ export const googleSignUpUser = createAsyncThunk(
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      await AsyncStorage.removeItem(GUEST_TOKEN_KEY); // so "Play as Guest" does not resume a different user's session
 
       // Track account creation
       await trackAccountCreated('google');
@@ -395,29 +441,7 @@ export const googleSignUpUser = createAsyncThunk(
           }));
         }
 
-        // Fetch bots
-        const botsResponse = await fetch(`${API_URL}/api/bots`, {
-          headers: {
-            'Authorization': `Bearer ${data.token}`,
-          },
-        });
-
-        if (botsResponse.ok) {
-          const botsData = await botsResponse.json();
-          dispatch(setBots(botsData.bots));
-        }
-
-        // Fetch build state
-        const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
-          headers: {
-            'Authorization': `Bearer ${data.token}`,
-          },
-        });
-
-        if (buildStateResponse.ok) {
-          const buildStateData = await buildStateResponse.json();
-          dispatch(setBuildState(buildStateData));
-        }
+        await fetchBotsAndBuildStateForToken(data.token, dispatch, 'Failed to fetch initial data for Google sign-up:');
       } catch (fetchError) {
         // Silently handle fetch errors
       }
@@ -465,41 +489,12 @@ export const appleSignInUser = createAsyncThunk(
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      await AsyncStorage.removeItem(GUEST_TOKEN_KEY); // so "Play as Guest" does not resume a different user's session
 
       // Clear any existing RTK Query cache to ensure fresh data for new user
       resetAllApiCaches({ dispatch } as any);
 
-      // Fetch initial data after successful login
-      try {
-        // Balance fetching is handled by DataFetcher + RTK Query polling
-        
-        // Fetch bots
-        const botsResponse = await fetch(`${API_URL}/api/bots`, {
-          headers: {
-            'Authorization': `Bearer ${data.token}`,
-          },
-        });
-
-        if (botsResponse.ok) {
-          const botsData = await botsResponse.json();
-          dispatch(setBots(botsData.bots));
-        }
-
-        // Fetch build state
-        const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
-          headers: {
-            'Authorization': `Bearer ${data.token}`,
-          },
-        });
-
-        if (buildStateResponse.ok) {
-          const buildStateData = await buildStateResponse.json();
-          dispatch(setBuildState(buildStateData));
-        }
-      } catch (fetchError) {
-        // Don't fail login if data fetching fails
-        console.error('Failed to fetch initial data:', fetchError);
-      }
+      await fetchBotsAndBuildStateForToken(data.token, dispatch, 'Failed to fetch initial data:');
 
       // Mark that user has an account (so "returning user" tracking works for login-to-existing-account)
       await markAccountExists();
@@ -547,6 +542,7 @@ export const appleSignUpUser = createAsyncThunk(
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      await AsyncStorage.removeItem(GUEST_TOKEN_KEY); // so "Play as Guest" does not resume a different user's session
 
       // Track account creation
       await trackAccountCreated('apple');
@@ -572,29 +568,7 @@ export const appleSignUpUser = createAsyncThunk(
           }));
         }
 
-        // Fetch bots
-        const botsResponse = await fetch(`${API_URL}/api/bots`, {
-          headers: {
-            'Authorization': `Bearer ${data.token}`,
-          },
-        });
-
-        if (botsResponse.ok) {
-          const botsData = await botsResponse.json();
-          dispatch(setBots(botsData.bots));
-        }
-
-        // Fetch build state
-        const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
-          headers: {
-            'Authorization': `Bearer ${data.token}`,
-          },
-        });
-
-        if (buildStateResponse.ok) {
-          const buildStateData = await buildStateResponse.json();
-          dispatch(setBuildState(buildStateData));
-        }
+        await fetchBotsAndBuildStateForToken(data.token, dispatch, 'Failed to fetch initial data for Apple sign-up:');
       } catch (fetchError) {
         // Silently handle fetch errors
       }
@@ -651,7 +625,9 @@ export const updateUserHandle = createAsyncThunk(
       
       // Invalidate RTK Query cache to ensure profile data is refreshed
       dispatch(authApi.util.invalidateTags(['User']));
-      
+      // Invalidate map so HackMap refetches and shows updated handle; avoids stale grid and 0,0 / locator issues
+      dispatch(mapApi.util.invalidateTags(['Map']));
+
       return data;
     } catch (error: any) {
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
@@ -696,7 +672,14 @@ export const unlockHackRig = createAsyncThunk(
 
 export const logoutUser = createAsyncThunk(
   'auth/logout',
-  async (_, { dispatch }) => {
+  async (_, { dispatch, getState }) => {
+    const state = getState() as { auth: AuthState };
+    const { token } = state.auth;
+    // Save current token so "Play as Guest" can resume this device-linked account (guest or
+    // linked). Keeps one-tap resume on this device while allowing handle+password login elsewhere.
+    if (token) {
+      await AsyncStorage.setItem(GUEST_TOKEN_KEY, token);
+    }
     await AsyncStorage.removeItem('token');
     await AsyncStorage.removeItem('user');
     
@@ -747,6 +730,10 @@ export const loadStoredAuth = createAsyncThunk(
       // Update stored user data with fresh database data
       await AsyncStorage.setItem('user', JSON.stringify(userData.user));
 
+      if (userData.user?.isGuest) {
+        await AsyncStorage.setItem(GUEST_TOKEN_KEY, storedToken);
+      }
+
       // Mark that user has an account (so app_open tracking works for auto-sign-in returning users)
       await markAccountExists();
 
@@ -793,29 +780,7 @@ export const fetchInitialData = createAsyncThunk(
         }));
       }
 
-      // Fetch bots
-      const botsResponse = await fetch(`${API_URL}/api/bots`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (botsResponse.ok) {
-        const botsData = await botsResponse.json();
-        dispatch(setBots(botsData.bots));
-      }
-
-      // Fetch build state
-      const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (buildStateResponse.ok) {
-        const buildStateData = await buildStateResponse.json();
-        dispatch(setBuildState(buildStateData));
-      }
+      await fetchBotsAndBuildStateForToken(token, dispatch, 'Failed to fetch initial data:');
 
       return { success: true };
     } catch (error) {
@@ -886,27 +851,7 @@ export const forceRefreshAllData = createAsyncThunk(
         }));
       }
 
-      const botsResponse = await fetch(`${API_URL}/api/bots`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (botsResponse.ok) {
-        const botsData = await botsResponse.json();
-        dispatch(setBots(botsData.bots));
-      }
-
-      const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (buildStateResponse.ok) {
-        const buildStateData = await buildStateResponse.json();
-        dispatch(setBuildState(buildStateData));
-      }
+      await fetchBotsAndBuildStateForToken(token, dispatch, 'Failed to fetch bots/build-state during data refresh:');
 
       return { success: true };
     } catch (error) {
@@ -1081,6 +1026,27 @@ export const authSlice = createSlice({
         state.token = null;
         state.user = null;
         state.isInitialized = false;
+      })
+
+      .addCase(playAsGuest.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(playAsGuest.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.token = action.payload.token;
+        state.user = action.payload.user;
+        state.error = null;
+        state.showOnboarding = !action.payload.user.onboardingCompleted;
+        state.showHandleSelection = action.payload.user.needsHandleSelection;
+        state.isInitialized = true;
+      })
+      .addCase(playAsGuest.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+        state.token = null;
+        state.user = null;
+        state.isInitialized = false;
       });
 
     // Google Sign-In
@@ -1186,8 +1152,8 @@ export const authSlice = createSlice({
           state.user.needsHandleSelection = false;
         }
         state.showHandleSelection = false;
-        // Show email verification modal after handle selection if email is not verified
-        if (state.user && !state.user.emailVerified) {
+        // Show email verification modal after handle selection only if user has an email to verify (not guest)
+        if (state.user && !state.user.emailVerified && !state.user.isGuest) {
           state.showEmailVerification = true;
         }
         state.error = null;
@@ -1292,7 +1258,10 @@ export const authSlice = createSlice({
         state.isLoading = false;
         state.error = null;
         if (state.user && action.payload) {
-          // Update user data with fresh data from server
+          // Update user data with fresh data from server (e.g. after link-account, email is now set)
+          if (typeof action.payload.email === 'string') {
+            state.user.email = action.payload.email;
+          }
           state.user.emailVerified = action.payload.emailVerified || false;
           state.user.handle = action.payload.handle;
           state.user.level = action.payload.level;
@@ -1301,6 +1270,12 @@ export const authSlice = createSlice({
           state.user.onboardingCompleted = action.payload.onboardingCompleted;
           state.user.needsHandleSelection = action.payload.needsHandleSelection;
           state.user.totalGuardiansBuilt = action.payload.totalGuardiansBuilt || 0;
+          if (typeof action.payload.isGuest === 'boolean') {
+            state.user.isGuest = action.payload.isGuest;
+          }
+          if (typeof action.payload.hasPassword === 'boolean') {
+            state.user.hasPassword = action.payload.hasPassword;
+          }
           
           // Reset email verification prompted flag if email is now verified
           if (action.payload.emailVerified) {

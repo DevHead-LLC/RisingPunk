@@ -18,7 +18,8 @@ import type {
   TrackDigitalBarracksVisitResponse,
   TrackWalletViewResponse,
   TrackAnotherUserProfileVisitRequest,
-  TrackAnotherUserProfileVisitResponse
+  TrackAnotherUserProfileVisitResponse,
+  TrackTaskGuidePillTapResponse
 } from '../../types/userGuide';
 
 export const userGuideApi = createApi({
@@ -212,6 +213,13 @@ export const userGuideApi = createApi({
         }
       },
     }),
+    trackTaskGuidePillTap: builder.mutation<TrackTaskGuidePillTapResponse, void>({
+      query: () => ({
+        url: '/api/users/user-guide/track-task-guide-pill-tap',
+        method: 'POST',
+      }),
+      invalidatesTags: ['UserTaskProgress'],
+    }),
   }),
 });
 
@@ -227,6 +235,7 @@ export const {
   useTrackHackmapVisitMutation,
   useTrackDigitalBarracksVisitMutation,
   useTrackWalletViewMutation,
-  useTrackAnotherUserProfileVisitMutation
+  useTrackAnotherUserProfileVisitMutation,
+  useTrackTaskGuidePillTapMutation
 } = userGuideApi;
 
