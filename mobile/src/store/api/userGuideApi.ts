@@ -219,14 +219,6 @@ export const userGuideApi = createApi({
         method: 'POST',
       }),
       invalidatesTags: ['UserTaskProgress'],
-      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
-        try {
-          await queryFulfilled;
-          dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
-        } catch {
-          // Error handling is done by the mutation itself
-        }
-      },
     }),
   }),
 });
