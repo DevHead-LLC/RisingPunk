@@ -238,20 +238,18 @@ const GUEST_TOKEN_KEY = 'guestToken';
  * Intentional: we do NOT require userData.user.isGuest. If the user linked their guest account and then
  * signed out, "Play as Guest" should still resume that same account on this device (one-tap return to their
  * device-linked identity), not create a new guest.
+ * Returns { token, user } on success, null when the server says the session is invalid (401/404).
+ * Throws on network error so the caller can avoid deleting the stored token (user can retry when back online).
  */
 async function resumeGuestSession(guestToken: string): Promise<{ token: string; user: any } | null> {
-  try {
-    const response = await fetch(`${API_URL}/api/auth/verify-token`, {
-      method: 'GET',
-      headers: { 'Authorization': `Bearer ${guestToken}` },
-    });
-    if (!response.ok) return null;
-    const userData = await response.json();
-    if (!userData.user) return null;
-    return { token: guestToken, user: userData.user };
-  } catch {
-    return null;
-  }
+  const response = await fetch(`${API_URL}/api/auth/verify-token`, {
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${guestToken}` },
+  });
+  if (!response.ok) return null;
+  const userData = await response.json();
+  if (!userData.user) return null;
+  return { token: guestToken, user: userData.user };
 }
 
 async function fetchBotsAndBuildStateForToken(token: string, dispatch: any, logContext: string): Promise<void> {
@@ -287,7 +285,16 @@ export const playAsGuest = createAsyncThunk(
       const storedGuestToken = await AsyncStorage.getItem(GUEST_TOKEN_KEY);
 
       if (storedGuestToken) {
-        const resumed = await resumeGuestSession(storedGuestToken);
+        let resumed: { token: string; user: any } | null;
+        try {
+          resumed = await resumeGuestSession(storedGuestToken);
+        } catch (resumeError) {
+          // Network (or other transient) error: do not delete the token so user can retry when back online
+          if (resumeError instanceof TypeError && (resumeError.message.includes('Network request failed') || resumeError.message.includes('Failed to fetch'))) {
+            return rejectWithValue('Network error: Cannot connect to server');
+          }
+          return rejectWithValue(resumeError instanceof Error ? resumeError.message : 'Unknown error');
+        }
         if (resumed) {
           await AsyncStorage.setItem('token', resumed.token);
           await AsyncStorage.setItem('user', JSON.stringify(resumed.user));
@@ -296,6 +303,7 @@ export const playAsGuest = createAsyncThunk(
           await markAccountExists();
           return resumed;
         }
+        // Server returned 401/404: session invalid, safe to clear and show message
         await AsyncStorage.multiRemove([GUEST_TOKEN_KEY]);
         return rejectWithValue('Previous session expired. Sign in with your account or tap Play as Guest to create a new guest.');
       }
