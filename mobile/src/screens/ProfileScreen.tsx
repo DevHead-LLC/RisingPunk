@@ -1239,14 +1239,14 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                   >
                     <Text style={styles.primaryButtonText}>LINK EMAIL & PASSWORD</Text>
                   </TouchableOpacity>
-                ) : (
+                ) : user?.hasPassword ? (
                   <TouchableOpacity
                     style={[styles.primaryButton, { marginTop: SIZING.spacing.sm }]}
                     onPress={() => setShowChangePassword(true)}
                   >
                     <Text style={styles.primaryButtonText}>CHANGE PASSWORD</Text>
                   </TouchableOpacity>
-                )}
+                ) : null}
                 
                 {/* Email Verification Status */}
                 <View style={[styles.settingCard, { marginTop: SIZING.spacing.md }]}>

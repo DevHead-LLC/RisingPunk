@@ -282,7 +282,10 @@ export const LoginScreen = () => {
           styles.jackInButton,
           { backgroundColor: isLoading ? colors.buttonDisabled : colors.buttonBg },
         ]}
-        onPress={() => setViewMode('login')}
+        onPress={() => {
+          setFormType('login');
+          setViewMode('login');
+        }}
         disabled={isLoading}
       >
         <Text style={[styles.jackInText, { color: '#FFFFFF' }]}>SIGN_IN</Text>
@@ -293,7 +296,10 @@ export const LoginScreen = () => {
           styles.jackInButton,
           { backgroundColor: isLoading ? colors.buttonDisabled : colors.buttonBg, marginTop: SIZING.spacing.sm },
         ]}
-        onPress={() => setViewMode('register')}
+        onPress={() => {
+          setFormType('register');
+          setViewMode('register');
+        }}
         disabled={isLoading}
       >
         <Text style={[styles.jackInText, { color: '#FFFFFF' }]}>CREATE_ACCOUNT</Text>

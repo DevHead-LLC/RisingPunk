@@ -85,6 +85,7 @@ interface UserResponse {
       enableDebugLogs: boolean;
     };
     isGuest?: boolean;
+    hasPassword?: boolean;
   }
 }
 
@@ -246,7 +247,8 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
           debugFeatures: {
             enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
             enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
-          }
+          },
+          hasPassword: true
         }
       });
 
@@ -330,7 +332,8 @@ router.post('/guest', async (req, res): Promise<void> => {
           enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
           enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
         },
-        isGuest: true
+        isGuest: true,
+        hasPassword: false
       }
     });
   } catch (error) {
@@ -409,7 +412,8 @@ router.post<{}, UserResponse | { error: string }, LoginRequest['body']>(
             enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
             enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
           },
-          isGuest: user.isGuest || false
+          isGuest: user.isGuest || false,
+          hasPassword: !!(user as any).hashedAccessKey
         }
       });
 
@@ -479,7 +483,8 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
             debugFeatures: {
               enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
               enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
-            }
+            },
+            hasPassword: !!(user as any).hashedAccessKey
           }
         });
         return;
@@ -528,7 +533,8 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
               debugFeatures: {
                 enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
                 enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
-              }
+              },
+              hasPassword: !!(user as any).hashedAccessKey
             }
           });
           return;
@@ -632,7 +638,8 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
           debugFeatures: {
             enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
             enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
-          }
+          },
+          hasPassword: false
         }
       });
 
@@ -699,7 +706,8 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
             debugFeatures: {
               enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
               enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
-            }
+            },
+            hasPassword: !!(user as any).hashedAccessKey
           }
         });
         return;
@@ -747,7 +755,8 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
                 debugFeatures: {
                   enableDataRefresh: existingUser.debugFeatures?.enableDataRefresh || false,
                   enableDebugLogs: existingUser.debugFeatures?.enableDebugLogs || false
-                }
+                },
+                hasPassword: !!(existingUser as any).hashedAccessKey
               }
             });
             return;
@@ -844,7 +853,8 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
                   debugFeatures: {
                     enableDataRefresh: existingUser.debugFeatures?.enableDataRefresh || false,
                     enableDebugLogs: existingUser.debugFeatures?.enableDebugLogs || false
-                  }
+                  },
+                  hasPassword: !!(existingUser as any).hashedAccessKey
                 }
               });
               return;
@@ -884,7 +894,8 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
                   debugFeatures: {
                     enableDataRefresh: existingUser.debugFeatures?.enableDataRefresh || false,
                     enableDebugLogs: existingUser.debugFeatures?.enableDebugLogs || false
-                  }
+                  },
+                  hasPassword: !!(existingUser as any).hashedAccessKey
                 }
               });
               return;
@@ -954,7 +965,8 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
           debugFeatures: {
             enableDataRefresh: newUser.debugFeatures?.enableDataRefresh || false,
             enableDebugLogs: newUser.debugFeatures?.enableDebugLogs || false
-          }
+          },
+          hasPassword: false
         }
       });
 
@@ -1081,7 +1093,8 @@ router.post('/update-handle', async (req, res): Promise<void> => {
         debugFeatures: {
           enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
           enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
-        }
+        },
+        hasPassword: !!(user as any).hashedAccessKey
       }
     });
   } catch (error: any) {
@@ -1351,7 +1364,8 @@ router.get('/verify-token', async (req, res): Promise<void> => {
           enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
           enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
         },
-        isGuest: user.isGuest || false
+        isGuest: user.isGuest || false,
+        hasPassword: !!(user as any).hashedAccessKey
       }
     });
   } catch (error: any) {
