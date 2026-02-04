@@ -249,6 +249,7 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
             enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
             enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
           },
+          isGuest: false,
           hasPassword: true
         }
       });
@@ -486,6 +487,7 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
               enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
               enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
             },
+            isGuest: user.isGuest || false,
             hasPassword: !!(user as any).hashedAccessKey
           }
         });
@@ -536,6 +538,7 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
                 enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
                 enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
               },
+              isGuest: user.isGuest || false,
               hasPassword: !!(user as any).hashedAccessKey
             }
           });
@@ -641,6 +644,7 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
             enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
             enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
           },
+          isGuest: false,
           hasPassword: false
         }
       });
@@ -709,6 +713,7 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
               enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
               enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
             },
+            isGuest: user.isGuest || false,
             hasPassword: !!(user as any).hashedAccessKey
           }
         });
@@ -758,6 +763,7 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
                   enableDataRefresh: existingUser.debugFeatures?.enableDataRefresh || false,
                   enableDebugLogs: existingUser.debugFeatures?.enableDebugLogs || false
                 },
+                isGuest: existingUser.isGuest || false,
                 hasPassword: !!(existingUser as any).hashedAccessKey
               }
             });
@@ -856,6 +862,7 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
                     enableDataRefresh: existingUser.debugFeatures?.enableDataRefresh || false,
                     enableDebugLogs: existingUser.debugFeatures?.enableDebugLogs || false
                   },
+                  isGuest: existingUser.isGuest || false,
                   hasPassword: !!(existingUser as any).hashedAccessKey
                 }
               });
@@ -897,6 +904,7 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
                     enableDataRefresh: existingUser.debugFeatures?.enableDataRefresh || false,
                     enableDebugLogs: existingUser.debugFeatures?.enableDebugLogs || false
                   },
+                  isGuest: existingUser.isGuest || false,
                   hasPassword: !!(existingUser as any).hashedAccessKey
                 }
               });
@@ -968,6 +976,7 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
             enableDataRefresh: newUser.debugFeatures?.enableDataRefresh || false,
             enableDebugLogs: newUser.debugFeatures?.enableDebugLogs || false
           },
+          isGuest: false,
           hasPassword: false
         }
       });
@@ -1096,6 +1105,7 @@ router.post('/update-handle', async (req, res): Promise<void> => {
           enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
           enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
         },
+        isGuest: user.isGuest || false,
         hasPassword: !!(user as any).hashedAccessKey
       }
     });

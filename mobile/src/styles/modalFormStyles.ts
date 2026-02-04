@@ -6,7 +6,7 @@ import { SIZING, styleGuide } from './theme';
  */
 
 /** Overlay for Modal-based modals (flex layout). */
-export const modalOverlayFlex = {
+const modalOverlayFlex = {
   flex: 1,
   backgroundColor: 'rgba(0, 0, 0, 0.8)' as const,
   justifyContent: 'center' as const,
