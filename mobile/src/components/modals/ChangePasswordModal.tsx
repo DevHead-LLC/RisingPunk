@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { SIZING, styleGuide } from '../../styles/theme';
+import { sharedModalFormStyles } from '../../styles/modalFormStyles';
 import { useChangePasswordMutation } from '../../store/api/authApi';
 
 interface ChangePasswordModalProps {
@@ -143,39 +143,5 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SIZING.spacing.lg,
-  },
-  modal: {
-    width: '100%',
-    maxWidth: 400,
-    borderRadius: 8,
-    borderWidth: 2,
-    padding: 0,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: SIZING.spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  title: { fontSize: SIZING.font.h2, fontWeight: '600', letterSpacing: 1 },
-  closeButton: { width: 30, height: 30, justifyContent: 'center', alignItems: 'center' },
-  closeText: { fontSize: 24, fontWeight: 'bold' },
-  content: { padding: SIZING.spacing.lg },
-  inputContainer: { position: 'relative', marginBottom: SIZING.spacing.md },
-  input: { ...styleGuide.inputField, height: 48, paddingHorizontal: SIZING.spacing.md, borderWidth: 2, borderRadius: 4 },
-  inputCorner: { ...styleGuide.cornerDecoration },
-  buttonContainer: { gap: SIZING.spacing.md },
-  submitButton: { height: 48, justifyContent: 'center', alignItems: 'center', position: 'relative', borderWidth: 2, borderRadius: 4 },
-  submitText: { fontSize: SIZING.font.body, fontWeight: '600', letterSpacing: 1 },
-  cancelButton: { height: 48, justifyContent: 'center', alignItems: 'center', position: 'relative', borderWidth: 2, borderRadius: 4, backgroundColor: 'transparent' },
-  cancelText: { fontSize: SIZING.font.body, fontWeight: '600', letterSpacing: 1 },
-  buttonCorner: { ...styleGuide.cornerDecoration },
+  ...sharedModalFormStyles,
 });

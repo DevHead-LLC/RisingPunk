@@ -86,6 +86,7 @@ export const loginUser = createAsyncThunk(
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      await AsyncStorage.removeItem(GUEST_TOKEN_KEY); // so "Play as Guest" does not resume a different user's session
 
       // Clear any existing RTK Query cache to ensure fresh data for new user
       resetAllApiCaches({ dispatch } as any);
@@ -150,6 +151,7 @@ export const registerUser = createAsyncThunk(
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      await AsyncStorage.removeItem(GUEST_TOKEN_KEY); // so "Play as Guest" does not resume a different user's session
 
       // Track account creation
       await trackAccountCreated('email');
@@ -294,6 +296,7 @@ export const googleSignInUser = createAsyncThunk(
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      await AsyncStorage.removeItem(GUEST_TOKEN_KEY); // so "Play as Guest" does not resume a different user's session
 
       // Clear any existing RTK Query cache to ensure fresh data for new user
       resetAllApiCaches({ dispatch } as any);
@@ -346,6 +349,7 @@ export const googleSignUpUser = createAsyncThunk(
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      await AsyncStorage.removeItem(GUEST_TOKEN_KEY); // so "Play as Guest" does not resume a different user's session
 
       // Track account creation
       await trackAccountCreated('google');
@@ -419,6 +423,7 @@ export const appleSignInUser = createAsyncThunk(
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      await AsyncStorage.removeItem(GUEST_TOKEN_KEY); // so "Play as Guest" does not resume a different user's session
 
       // Clear any existing RTK Query cache to ensure fresh data for new user
       resetAllApiCaches({ dispatch } as any);
@@ -471,6 +476,7 @@ export const appleSignUpUser = createAsyncThunk(
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      await AsyncStorage.removeItem(GUEST_TOKEN_KEY); // so "Play as Guest" does not resume a different user's session
 
       // Track account creation
       await trackAccountCreated('apple');
