@@ -339,6 +339,23 @@ export const authApi = createApi({
       }),
     }),
 
+    linkAccount: builder.mutation<{ success: boolean; message: string }, { email: string; accessKey: string }>({
+      query: (data) => ({
+        url: '/api/auth/link-account',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
+
+    changePassword: builder.mutation<{ success: boolean; message: string }, { currentAccessKey: string; newAccessKey: string; verifyNewAccessKey: string }>({
+      query: (data) => ({
+        url: '/api/auth/change-password',
+        method: 'POST',
+        body: data,
+      }),
+    }),
+
     createCrew: builder.mutation<{ success: boolean; crew: { id: string; crewName: string; crewIdentifier: string; nativeLanguage: string } }, { crewName: string; crewIdentifier: string; nativeLanguage: string }>({
       query: (data) => ({
         url: '/api/crew/create',
@@ -632,6 +649,8 @@ export const {
   useCompleteOnboardingMutation,
   useDeleteAccountMutation,
   useForgotPasswordMutation,
+  useLinkAccountMutation,
+  useChangePasswordMutation,
   useCreateCrewMutation,
   useGetCrewStatusQuery,
   useGetUserCrewStatusQuery,
