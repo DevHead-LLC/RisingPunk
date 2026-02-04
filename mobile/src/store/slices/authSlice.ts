@@ -307,7 +307,15 @@ export const playAsGuest = createAsyncThunk(
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: 'Failed to create guest account' }));
-        return rejectWithValue(error.error || 'Failed to create guest account');
+        const message = error.error || 'Failed to create guest account';
+        console.error(
+          `Play as guest: server returned ${response.status} ${response.statusText}. URL: ${API_URL}/api/auth/guest. Body:`,
+          error
+        );
+        if (response.status >= 500) {
+          return rejectWithValue(`${message} (Server ${response.status}. Check server logs and ensure dev server is running.)`);
+        }
+        return rejectWithValue(message);
       }
 
       const data = await response.json();
