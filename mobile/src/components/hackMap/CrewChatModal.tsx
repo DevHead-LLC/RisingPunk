@@ -11,6 +11,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
@@ -76,16 +78,45 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
   // Track if we've scrolled on this modal open session
   const hasScrolledOnOpen = useRef(false);
   const lastVisibleState = useRef(false);
-  
-  // Reset scroll flag and report modal state when modal closes
+  const prevMessagesLengthRef = useRef(0);
+  const SCROLL_BOTTOM_THRESHOLD = 60;
+  const isAtBottomRef = useRef(true);
+
+  // Reset scroll flags and report modal state when modal closes
   useEffect(() => {
     if (!visible && lastVisibleState.current) {
       hasScrolledOnOpen.current = false;
+      prevMessagesLengthRef.current = 0;
+      isAtBottomRef.current = true;
       setShowReportModal(false);
       setReportedMessage(null);
     }
     lastVisibleState.current = visible;
   }, [visible]);
+
+  // When new messages arrive, auto-scroll only if user was already at bottom (don't pull them down if reading up)
+  useEffect(() => {
+    const prevLen = prevMessagesLengthRef.current;
+    if (messages.length > prevLen && isAtBottomRef.current && visible) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 50);
+    }
+    prevMessagesLengthRef.current = messages.length;
+  }, [messages.length, visible]);
+
+  // Update "at bottom" only when user finishes scrolling (onScrollEndDrag / onMomentumScrollEnd), not during scroll, to avoid touch issues
+  const updateAtBottomFromScrollEvent = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    try {
+      const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+      if (contentSize.height <= 0) return;
+      const atBottom =
+        contentOffset.y + layoutMeasurement.height >= contentSize.height - SCROLL_BOTTOM_THRESHOLD;
+      isAtBottomRef.current = atBottom;
+    } catch (_) {
+      // ignore
+    }
+  }, []);
 
   const handleSendMessage = async () => {
     const trimmedMessage = messageInput.trim();
@@ -114,6 +145,10 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
       
       setMessageInput('');
       Keyboard.dismiss();
+      isAtBottomRef.current = true;
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 50);
     } catch (error: any) {
       // Silent error handling - mutation will show error state if needed
     }
@@ -199,9 +234,12 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
             showsVerticalScrollIndicator={false}
             nestedScrollEnabled={true}
             scrollEnabled={true}
+            onScrollEndDrag={updateAtBottomFromScrollEvent}
+            onMomentumScrollEnd={updateAtBottomFromScrollEvent}
             onContentSizeChange={() => {
               if (visible && !hasScrolledOnOpen.current && messages.length > 0 && !isLoadingMessages) {
                 hasScrolledOnOpen.current = true;
+                isAtBottomRef.current = true;
                 setTimeout(() => {
                   scrollViewRef.current?.scrollToEnd({ animated: false });
                 }, 50);

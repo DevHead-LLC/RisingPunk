@@ -107,7 +107,7 @@ const markInvestmentPropertyTaskCompleted = async (userId: string | mongoose.Typ
 
 router.get('/profile', auth, async (req: Request, res: Response) => {
   try {
-    const user = await User.findById(req.user._id).select('handle email level experience unlockedFeatures profileGender battleStats totalGuardiansBuilt');
+    const user = await User.findById(req.user._id).select('handle email level experience unlockedFeatures profileGender battleStats totalGuardiansBuilt isGuest hashedAccessKey');
     
     if (!user) {
       res.status(404).json({ message: 'User not found' });
@@ -116,7 +116,7 @@ router.get('/profile', auth, async (req: Request, res: Response) => {
 
     res.json({
       handle: user.handle,
-      email: user.email,
+      email: user.getDecryptedEmail(),
       level: user.level,
       experience: {
         current: user.experience?.current || 0,
@@ -139,7 +139,9 @@ router.get('/profile', auth, async (req: Request, res: Response) => {
         successfulDefenses: user.battleStats?.successfulDefenses || 0,
         failedDefenses: user.battleStats?.failedDefenses || 0
       },
-      totalGuardiansBuilt: user.totalGuardiansBuilt || 0
+      totalGuardiansBuilt: user.totalGuardiansBuilt || 0,
+      isGuest: user.isGuest || false,
+      hasPassword: !!(user as any).hashedAccessKey
     });
   } catch (error) {
     console.error('Server error:', error);

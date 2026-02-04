@@ -11,7 +11,7 @@ import { CrewModal } from '../components/hackMap/CrewModal';
 import { VisitingProfileModal } from '../components/hackMap/VisitingProfileModal';
 import { VisitCrewModal } from '../components/hackMap/VisitCrewModal';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
-import { setGrid, setLoading } from '../store/slices/mapSlice';
+import { setGrid, setLoading, clearPlayerCellsByUserIds } from '../store/slices/mapSlice';
 import { useFetchMapQuery, useFetchMapViewportQuery } from '../store/api/mapApi';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
@@ -33,6 +33,29 @@ const PAN_BUFFER = 8; // Buffer in cells for window range calculation
 const PAN_CHANGE_THRESHOLD = 4; // Minimum pan change in pixels to trigger update
 const MAX_CACHE_SIZE = 1000; // Maximum number of cached cell objects
 const PANNING_STOPPED_DEBOUNCE_MS = 200; // Debounce time for panning stopped detection
+
+/**
+ * NPC level-based images (hackMap/npc/). Use the image for the range that contains the NPC's level.
+ * Level ranges and assets:
+ *   1–5   → level_1-5_npc.png   (current NPCs in this range use this)
+ *   6–10  → level_6-10_npc.png  (current NPCs only go to 8; levels 6–8 use this)
+ *   11–15 → level_11-15_npc.png (for future NPC level expansion)
+ *   16–20 → level_16-20_npc.png (for future NPC level expansion)
+ *   21–25 → level_21-25_npc.png (for future NPC level expansion)
+ *   26–30 → level_26-30.png     (for future NPC level expansion; filename has no _npc suffix)
+ * When advancing NPC levels beyond 8, add or adjust ranges and ensure the correct asset is used per range.
+ */
+const getNpcImageForLevel = (npcLevel: number | undefined): number => {
+  if (npcLevel == null) {
+    return require('../assets/images/hackMap/npc/level_1-5_npc.png');
+  }
+  if (npcLevel <= 5) return require('../assets/images/hackMap/npc/level_1-5_npc.png');
+  if (npcLevel <= 10) return require('../assets/images/hackMap/npc/level_6-10_npc.png');
+  if (npcLevel <= 15) return require('../assets/images/hackMap/npc/level_11-15_npc.png');
+  if (npcLevel <= 20) return require('../assets/images/hackMap/npc/level_16-20_npc.png');
+  if (npcLevel <= 25) return require('../assets/images/hackMap/npc/level_21-25_npc.png');
+  return require('../assets/images/hackMap/npc/level_26-30.png');
+};
 
 /**
  * Convert grid coordinates to pan coordinates (centers the cell on screen)
@@ -367,6 +390,7 @@ const panningTileMemoComparison = <T extends {
     owner?: string;
     userId?: string;
     npcSlug?: string;
+    npcLevel?: number;
   };
   currentUserId?: string | null;
   isShieldActive: boolean;
@@ -379,6 +403,7 @@ const panningTileMemoComparison = <T extends {
     prevProps.entityImage?.owner === nextProps.entityImage?.owner &&
     prevProps.entityImage?.userId === nextProps.entityImage?.userId &&
     prevProps.entityImage?.npcSlug === nextProps.entityImage?.npcSlug &&
+    prevProps.entityImage?.npcLevel === nextProps.entityImage?.npcLevel &&
     prevProps.currentUserId === nextProps.currentUserId &&
     prevProps.isShieldActive === nextProps.isShieldActive
   );
@@ -514,16 +539,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                   resizeMode="contain" 
                 />
               ) : (
-                <>
-                  {(() => {
-                    const slug = (cell as any).npcSlug as string | undefined;
-                    if (slug === 'npc-small-corporation') {
-                      return <Image source={require('../assets/images/fog-building.png')} style={styles.playerHomeIcon} resizeMode="contain" />;
-                    }
-                    // default for small bank and large corporation
-                    return <Image source={require('../assets/images/fog-tall-building.png')} style={styles.playerHomeIcon} resizeMode="contain" />;
-                  })()}
-                </>
+                <Image
+                  source={getNpcImageForLevel(cell.npcLevel)}
+                  style={styles.playerHomeIcon}
+                  resizeMode="contain"
+                />
               )}
               <View style={styles.entityLabelContainer} pointerEvents="none">
                 <Text
@@ -560,6 +580,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       owner?: string;
       userId?: string;
       npcSlug?: string;
+      npcLevel?: number;
     };
     xStyle: any;
     terrainStyleMap: Record<TerrainType, any>;
@@ -601,15 +622,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                   resizeMode="contain" 
                 />
               ) : (
-                <>
-                  {(() => {
-                    const slug = entityImage.npcSlug;
-                    if (slug === 'npc-small-corporation') {
-                      return <Image source={require('../assets/images/fog-building.png')} style={styles.playerHomeIcon} resizeMode="contain" />;
-                    }
-                    return <Image source={require('../assets/images/fog-tall-building.png')} style={styles.playerHomeIcon} resizeMode="contain" />;
-                  })()}
-                </>
+                <Image
+                  source={getNpcImageForLevel(entityImage.npcLevel)}
+                  style={styles.playerHomeIcon}
+                  resizeMode="contain"
+                />
               )}
             </>
           )}
@@ -628,6 +645,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       owner?: string;
       userId?: string;
       npcSlug?: string;
+      npcLevel?: number;
     };
     xStyle: any;
     yStyle: any;
@@ -733,12 +751,13 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   // Static vs Dynamic Data Separation
   const [staticTerrainData, setStaticTerrainData] = useState<Record<string, TerrainType>>({});
   const [dynamicEntityData, setDynamicEntityData] = useState<Record<string, any>>({});
-  // Phase 2: Separate entity images from entity details
+  // Phase 2: Separate entity images from entity details (npcLevel used for level-based NPC image)
   const [entityImageData, setEntityImageData] = useState<Record<string, {
     entity: EntityType;
     owner?: string;
     userId?: string;
     npcSlug?: string;
+    npcLevel?: number;
   }>>({});
   const [terrainDataLoaded, setTerrainDataLoaded] = useState<boolean>(false);
   
@@ -1926,6 +1945,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       owner?: string;
       userId?: string;
       npcSlug?: string;
+      npcLevel?: number;
     }> = {};
     const entityDetails: Record<string, any> = {};
     
@@ -1955,12 +1975,13 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         
         // Phase 2: Split entities into images (minimal) and details (full)
         if (cell.entity !== 'empty') {
-          // EntityImages: minimal info for rendering images
+          // EntityImages: minimal info for rendering images (npcLevel needed for level-based NPC image)
           entityImages[key] = {
             entity: cell.entity,
             owner: cell.owner,
             userId: cell.userId,
             npcSlug: cell.npcSlug,
+            npcLevel: cell.npcLevel,
           };
           
           // EntityDetails: full info for interactions
@@ -2655,6 +2676,17 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     hasCenteredOnHome.value = true;
   }, [grid, currentUserHandle, restorePan, containerSize.width, containerSize.height, minX, maxX, boundsReady, computeWindow, offsetX, offsetY]);
 
+  // When handle changes (e.g. after profile update), reset center flag so we re-center on home when fresh map data arrives.
+  // Only reset on actual change, not on mount, to avoid undoing initial centering and causing a second jump.
+  const prevHandleRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const prev = prevHandleRef.current;
+    prevHandleRef.current = currentUserHandle ?? undefined;
+    if (prev !== undefined && prev !== (currentUserHandle ?? undefined)) {
+      hasCenteredOnHome.value = false;
+    }
+  }, [currentUserHandle]);
+
   const handleCellPressRef = useRef<((x: number, y: number, cellData: CellData) => Promise<void>) | null>(null);
   const lastPressTimeRef = useRef<number>(0);
   const lastPressCoordsRef = useRef<{ x: number; y: number } | null>(null);
@@ -2857,6 +2889,32 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }, 300);
   }, []);
 
+  const handleVisitingProfileUserNotFound = useCallback((userId: string) => {
+    const normalizedTarget = String(userId ?? '').trim();
+    if (!normalizedTarget) return;
+    dispatch(clearPlayerCellsByUserIds([normalizedTarget]));
+    setDynamicEntityData((prev) => {
+      const next = { ...prev };
+      Object.entries(prev).forEach(([key, val]) => {
+        const stored = (val as any)?.userId;
+        if (String(stored ?? '').trim() === normalizedTarget) delete next[key];
+      });
+      return next;
+    });
+    setEntityImageData((prev) => {
+      const next = { ...prev };
+      Object.entries(prev).forEach(([key, val]) => {
+        const stored = val?.userId;
+        if (String(stored ?? '').trim() === normalizedTarget) delete next[key];
+      });
+      return next;
+    });
+    setSelectedCell((prev) =>
+      prev?.info?.userId != null && String(prev.info.userId).trim() === normalizedTarget ? null : prev
+    );
+    handleVisitingProfileClose();
+  }, [dispatch, handleVisitingProfileClose]);
+
   useEffect(() => {
     return () => {
       if (visitingProfileCloseTimeoutRef.current) {
@@ -3044,8 +3102,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                           clearTimeout(visitingProfileCloseTimeoutRef.current);
                           visitingProfileCloseTimeoutRef.current = null;
                         }
-                        setVisitingProfileUserId(selectedCell.info.userId || null);
-                        setShowVisitingProfileModal(true);
+                        const normalizedUserId = selectedCell.info.userId != null ? String(selectedCell.info.userId).trim() : '';
+                        if (normalizedUserId) {
+                          setVisitingProfileUserId(normalizedUserId);
+                          setShowVisitingProfileModal(true);
+                        }
                       }}
                     >
                       <Text style={[styles.actionButtonText, { color: colors.background }]}>
@@ -3124,6 +3185,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           visible={showVisitingProfileModal}
           onClose={handleVisitingProfileClose}
           userId={visitingProfileUserId}
+          onUserNotFound={handleVisitingProfileUserNotFound}
         />
       )}
 
