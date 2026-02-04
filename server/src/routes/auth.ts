@@ -1139,7 +1139,23 @@ router.post('/link-account', auth, async (req, res): Promise<void> => {
     user.email = normalizedEmail;
     user.hashedAccessKey = accessKey;
     user.isGuest = false;
+    user.emailVerified = false;
+    user.emailVerificationPrompted = false; // allow app to show verification modal for this newly linked email
+    const verificationToken = EmailService.generateVerificationToken();
+    const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000); // 72 hours
+    user.emailVerificationToken = verificationToken;
+    user.emailVerificationExpires = expiresAt;
+    user.emailVerificationSentAt = new Date();
     await user.save();
+
+    const emailSent = await EmailService.sendVerificationEmail(
+      normalizedEmail,
+      user.handle,
+      verificationToken
+    );
+    if (!emailSent) {
+      console.warn('Link account: verification email failed to send for user', user._id);
+    }
     res.json({ success: true, message: 'Account linked successfully' });
   } catch (error) {
     console.error('Link account error:', error);

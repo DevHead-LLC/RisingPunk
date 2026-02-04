@@ -232,6 +232,7 @@ export const playAsGuest = createAsyncThunk(
           return resumed;
         }
         await AsyncStorage.multiRemove([GUEST_TOKEN_KEY]);
+        return rejectWithValue('Previous session expired. Sign in with your account or tap Play as Guest to create a new guest.');
       }
 
       const response = await fetch(`${API_URL}/api/auth/guest`, {
@@ -608,13 +609,14 @@ export const logoutUser = createAsyncThunk(
   'auth/logout',
   async (_, { dispatch, getState }) => {
     const state = getState() as { auth: AuthState };
-    const { token, user } = state.auth;
-    if (user?.isGuest && token) {
+    const { token } = state.auth;
+    // Save current token so "Play as Guest" can resume this device-linked account (guest or
+    // linked). Keeps one-tap resume on this device while allowing handle+password login elsewhere.
+    if (token) {
       await AsyncStorage.setItem(GUEST_TOKEN_KEY, token);
     }
     await AsyncStorage.removeItem('token');
     await AsyncStorage.removeItem('user');
-    // guestToken is kept so "Play as Guest" can resume the same device-linked account next time.
     
     // Note: We do NOT clear first-time tracking flags on logout.
     // With user-scoped keys (e.g., has_built_bots_before_${userId}), flags should
