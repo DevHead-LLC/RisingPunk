@@ -4,6 +4,7 @@ import { Research } from '../models/Research';
 import { ResearchUser } from '../models/ResearchUser';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
+import auth from '../middleware/auth';
 import { GoogleAuthService } from '../services/GoogleAuthService';
 import { AppleAuthService } from '../services/AppleAuthService';
 import { EmailService } from '../services/EmailService';
@@ -1109,16 +1110,9 @@ router.post('/update-handle', async (req, res): Promise<void> => {
 });
 
 // Link email & password to a guest account (auth required; guest only)
-router.post('/link-account', async (req, res): Promise<void> => {
+router.post('/link-account', auth, async (req, res): Promise<void> => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({ error: 'Authentication required' });
-      return;
-    }
-    const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'defaultsecret') as { userId: string };
-    const user = await User.findById(decoded.userId);
+    const user = await User.findById((req as any).user._id);
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;
@@ -1148,26 +1142,15 @@ router.post('/link-account', async (req, res): Promise<void> => {
     await user.save();
     res.json({ success: true, message: 'Account linked successfully' });
   } catch (error) {
-    if (error instanceof jwt.JsonWebTokenError) {
-      res.status(401).json({ error: 'Invalid token' });
-      return;
-    }
     console.error('Link account error:', error);
     res.status(500).json({ error: 'Failed to link account' });
   }
 });
 
 // Change password (auth required; full account only)
-router.post('/change-password', async (req, res): Promise<void> => {
+router.post('/change-password', auth, async (req, res): Promise<void> => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({ error: 'Authentication required' });
-      return;
-    }
-    const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'defaultsecret') as { userId: string };
-    const user = await User.findById(decoded.userId);
+    const user = await User.findById((req as any).user._id);
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;
@@ -1198,10 +1181,6 @@ router.post('/change-password', async (req, res): Promise<void> => {
     await user.save();
     res.json({ success: true, message: 'Password updated successfully' });
   } catch (error) {
-    if (error instanceof jwt.JsonWebTokenError) {
-      res.status(401).json({ error: 'Invalid token' });
-      return;
-    }
     console.error('Change password error:', error);
     res.status(500).json({ error: 'Failed to change password' });
   }

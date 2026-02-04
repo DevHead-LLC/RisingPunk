@@ -1191,7 +1191,10 @@ export const authSlice = createSlice({
         state.isLoading = false;
         state.error = null;
         if (state.user && action.payload) {
-          // Update user data with fresh data from server
+          // Update user data with fresh data from server (e.g. after link-account, email is now set)
+          if (typeof action.payload.email === 'string') {
+            state.user.email = action.payload.email;
+          }
           state.user.emailVerified = action.payload.emailVerified || false;
           state.user.handle = action.payload.handle;
           state.user.level = action.payload.level;
