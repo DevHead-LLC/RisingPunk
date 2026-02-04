@@ -28,6 +28,7 @@ export interface User {
     enableDebugLogs: boolean;
   };
   totalGuardiansBuilt?: number;
+  isGuest?: boolean;
 }
 
 export interface AuthState {
@@ -184,6 +185,108 @@ export const registerUser = createAsyncThunk(
       return data;
     } catch (error) {
       if (error instanceof TypeError && error.message.includes('Network request failed')) {
+        return rejectWithValue('Network error: Cannot connect to server');
+      }
+      return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+);
+
+const GUEST_TOKEN_KEY = 'guestToken';
+const GUEST_USER_KEY = 'guestUser';
+
+async function resumeGuestSession(guestToken: string, dispatch: any): Promise<{ token: string; user: any } | null> {
+  try {
+    const response = await fetch(`${API_URL}/api/auth/verify-token`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${guestToken}` },
+    });
+    if (!response.ok) return null;
+    const userData = await response.json();
+    if (!userData.user) return null;
+    return { token: guestToken, user: userData.user };
+  } catch {
+    return null;
+  }
+}
+
+export const playAsGuest = createAsyncThunk(
+  'auth/playAsGuest',
+  async (_, { rejectWithValue, dispatch }) => {
+    try {
+      const storedGuestToken = await AsyncStorage.getItem(GUEST_TOKEN_KEY);
+
+      if (storedGuestToken) {
+        const resumed = await resumeGuestSession(storedGuestToken, dispatch);
+        if (resumed) {
+          await AsyncStorage.setItem('token', resumed.token);
+          await AsyncStorage.setItem('user', JSON.stringify(resumed.user));
+          resetAllApiCaches({ dispatch } as any);
+          try {
+            const botsResponse = await fetch(`${API_URL}/api/bots`, {
+              headers: { 'Authorization': `Bearer ${resumed.token}` },
+            });
+            if (botsResponse.ok) {
+              const botsData = await botsResponse.json();
+              dispatch(setBots(botsData.bots));
+            }
+            const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
+              headers: { 'Authorization': `Bearer ${resumed.token}` },
+            });
+            if (buildStateResponse.ok) {
+              const buildStateData = await buildStateResponse.json();
+              dispatch(setBuildState(buildStateData));
+            }
+          } catch (fetchError) {
+            console.warn('Failed to fetch initial data for guest resume:', fetchError);
+          }
+          await markAccountExists();
+          return resumed;
+        }
+        await AsyncStorage.multiRemove([GUEST_TOKEN_KEY, GUEST_USER_KEY]);
+      }
+
+      const response = await fetch(`${API_URL}/api/auth/guest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to create guest account' }));
+        return rejectWithValue(error.error || 'Failed to create guest account');
+      }
+
+      const data = await response.json();
+      await AsyncStorage.setItem('token', data.token);
+      await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      await AsyncStorage.setItem(GUEST_TOKEN_KEY, data.token);
+      await AsyncStorage.setItem(GUEST_USER_KEY, JSON.stringify(data.user));
+
+      resetAllApiCaches({ dispatch } as any);
+
+      try {
+        const botsResponse = await fetch(`${API_URL}/api/bots`, {
+          headers: { 'Authorization': `Bearer ${data.token}` },
+        });
+        if (botsResponse.ok) {
+          const botsData = await botsResponse.json();
+          dispatch(setBots(botsData.bots));
+        }
+        const buildStateResponse = await fetch(`${API_URL}/api/bots/build-state`, {
+          headers: { 'Authorization': `Bearer ${data.token}` },
+        });
+        if (buildStateResponse.ok) {
+          const buildStateData = await buildStateResponse.json();
+          dispatch(setBuildState(buildStateData));
+        }
+      } catch (fetchError) {
+        console.warn('Failed to fetch initial data for guest:', fetchError);
+      }
+
+      await markAccountExists();
+      return data;
+    } catch (error) {
+      if (error instanceof TypeError && (error.message.includes('Network request failed') || error.message.includes('Failed to fetch'))) {
         return rejectWithValue('Network error: Cannot connect to server');
       }
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
@@ -634,9 +737,16 @@ export const unlockHackRig = createAsyncThunk(
 
 export const logoutUser = createAsyncThunk(
   'auth/logout',
-  async (_, { dispatch }) => {
+  async (_, { dispatch, getState }) => {
+    const state = getState() as { auth: AuthState };
+    const { token, user } = state.auth;
+    if (user?.isGuest && token) {
+      await AsyncStorage.setItem(GUEST_TOKEN_KEY, token);
+      await AsyncStorage.setItem(GUEST_USER_KEY, JSON.stringify(user));
+    }
     await AsyncStorage.removeItem('token');
     await AsyncStorage.removeItem('user');
+    // guestToken/guestUser are kept so "Play as Guest" can resume the same device guest next time.
     
     // Note: We do NOT clear first-time tracking flags on logout.
     // With user-scoped keys (e.g., has_built_bots_before_${userId}), flags should
@@ -684,6 +794,11 @@ export const loadStoredAuth = createAsyncThunk(
       
       // Update stored user data with fresh database data
       await AsyncStorage.setItem('user', JSON.stringify(userData.user));
+
+      if (userData.user?.isGuest) {
+        await AsyncStorage.setItem(GUEST_TOKEN_KEY, storedToken);
+        await AsyncStorage.setItem(GUEST_USER_KEY, JSON.stringify(userData.user));
+      }
 
       // Mark that user has an account (so app_open tracking works for auto-sign-in returning users)
       await markAccountExists();
@@ -1019,6 +1134,27 @@ export const authSlice = createSlice({
         state.token = null;
         state.user = null;
         state.isInitialized = false;
+      })
+
+      .addCase(playAsGuest.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(playAsGuest.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.token = action.payload.token;
+        state.user = action.payload.user;
+        state.error = null;
+        state.showOnboarding = !action.payload.user.onboardingCompleted;
+        state.showHandleSelection = action.payload.user.needsHandleSelection;
+        state.isInitialized = true;
+      })
+      .addCase(playAsGuest.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+        state.token = null;
+        state.user = null;
+        state.isInitialized = false;
       });
 
     // Google Sign-In
@@ -1239,6 +1375,9 @@ export const authSlice = createSlice({
           state.user.onboardingCompleted = action.payload.onboardingCompleted;
           state.user.needsHandleSelection = action.payload.needsHandleSelection;
           state.user.totalGuardiansBuilt = action.payload.totalGuardiansBuilt || 0;
+          if (typeof action.payload.isGuest === 'boolean') {
+            state.user.isGuest = action.payload.isGuest;
+          }
           
           // Reset email verification prompted flag if email is now verified
           if (action.payload.emailVerified) {

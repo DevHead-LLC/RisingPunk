@@ -32,6 +32,8 @@ import { PrivacyPolicyModal } from '../components/profile/PrivacyPolicyModal';
 import { TermsOfServiceModal } from '../components/profile/TermsOfServiceModal';
 import { DeleteAccountModal } from '../components/profile/DeleteAccountModal';
 import { HandleSelectionModal } from '../components/modals/HandleSelectionModal';
+import { LinkAccountModal } from '../components/modals/LinkAccountModal';
+import { ChangePasswordModal } from '../components/modals/ChangePasswordModal';
 
 interface BotStats {
   role: string;
@@ -580,6 +582,8 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const [showTermsOfService, setShowTermsOfService] = useState(false);
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
   const [showChangeHandle, setShowChangeHandle] = useState(false);
+  const [showLinkAccount, setShowLinkAccount] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const { themeMode, toggleTheme } = useTheme();
   const colors = useThemeColors();
   const profileGender = useAppSelector((state) => state.preferences.profileGender);
@@ -1227,6 +1231,22 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                 >
                   <Text style={styles.primaryButtonText}>CHANGE USER HANDLE</Text>
                 </TouchableOpacity>
+
+                {user?.isGuest ? (
+                  <TouchableOpacity
+                    style={[styles.primaryButton, { marginTop: SIZING.spacing.sm }]}
+                    onPress={() => setShowLinkAccount(true)}
+                  >
+                    <Text style={styles.primaryButtonText}>LINK EMAIL & PASSWORD</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.primaryButton, { marginTop: SIZING.spacing.sm }]}
+                    onPress={() => setShowChangePassword(true)}
+                  >
+                    <Text style={styles.primaryButtonText}>CHANGE PASSWORD</Text>
+                  </TouchableOpacity>
+                )}
                 
                 {/* Email Verification Status */}
                 <View style={[styles.settingCard, { marginTop: SIZING.spacing.md }]}>
@@ -1354,6 +1374,14 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
         isLoading={false}
         isRequired={false}
         onClose={() => setShowChangeHandle(false)}
+      />
+      <LinkAccountModal
+        isVisible={showLinkAccount}
+        onClose={() => setShowLinkAccount(false)}
+      />
+      <ChangePasswordModal
+        isVisible={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
       />
     </SafeAreaView>
   );
