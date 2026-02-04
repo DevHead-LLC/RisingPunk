@@ -10,6 +10,7 @@ export interface IUserTaskProgress extends Document {
   skippedTasks: string[];
   lastCompletedTaskId?: string;
   showTaskGuide: boolean;
+  taskGuidePillTappedOnce?: boolean;
   profileVisitedAt?: Date;
   themeChangedToDarkAt?: Date;
   themeChangedToLightAt?: Date;
@@ -58,6 +59,11 @@ const userTaskProgressSchema = new Schema({
   showTaskGuide: {
     type: Boolean,
     default: true
+  },
+  taskGuidePillTappedOnce: {
+    type: Boolean,
+    required: false,
+    default: false
   },
   profileVisitedAt: {
     type: Date,

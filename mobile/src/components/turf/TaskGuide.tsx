@@ -2,7 +2,7 @@ import React, { memo, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
-import { useGetCurrentTaskGuideTaskQuery } from '../../store/api/userGuideApi';
+import { useGetCurrentTaskGuideTaskQuery, useTrackTaskGuidePillTapMutation } from '../../store/api/userGuideApi';
 import { TaskGuideModal } from '../modals/TaskGuideModal';
 
 type TaskGuideProps = {
@@ -10,11 +10,15 @@ type TaskGuideProps = {
   onNavigateToProfile?: () => void;
 };
 
+const ATTENTION_INTERVAL_MS = 1000;
+const CALM_INTERVAL_MS = 60000;
+
 export const TaskGuide = memo(({ currentScreen, onNavigateToProfile }: TaskGuideProps) => {
   const colors = useThemeColors();
   const [taskGuideColorIndex, setTaskGuideColorIndex] = useState(0);
   const taskGuideAnimatedColor = useState(new Animated.Value(0))[0];
   const [modalVisible, setModalVisible] = useState(false);
+  const [trackTaskGuidePillTap] = useTrackTaskGuidePillTapMutation();
 
   const taskGuideColors = [colors.matrix, colors.secondary];
 
@@ -22,39 +26,37 @@ export const TaskGuide = memo(({ currentScreen, onNavigateToProfile }: TaskGuide
     skip: currentScreen !== 'turf',
   });
 
-  // Show if on turf screen
   const shouldShow = currentScreen === 'turf';
-  
-  // Default to showing if API hasn't returned yet, otherwise respect the setting
   const showTaskGuide = data === undefined ? true : (data?.showTaskGuide !== false);
+  const pillTappedOnce = data?.taskGuidePillTappedOnce === true;
+  const runAttentionAnimation = shouldShow && showTaskGuide && !pillTappedOnce;
+
+  useEffect(() => {
+    if (!shouldShow || !showTaskGuide) return;
+    Animated.timing(taskGuideAnimatedColor, {
+      toValue: 0,
+      duration: 0,
+      useNativeDriver: false,
+    }).start();
+
+    const intervalMs = pillTappedOnce ? CALM_INTERVAL_MS : ATTENTION_INTERVAL_MS;
+    const interval = setInterval(() => {
+      setTaskGuideColorIndex(prev => (prev + 1) % taskGuideColors.length);
+    }, intervalMs);
+
+    return () => clearInterval(interval);
+  }, [shouldShow, showTaskGuide, pillTappedOnce, taskGuideColors.length, taskGuideAnimatedColor]);
 
   useEffect(() => {
     if (shouldShow && showTaskGuide) {
-      // Start with first color, then change every 60 seconds
-      // Trigger initial animation
-      Animated.timing(taskGuideAnimatedColor, {
-        toValue: 0,
-        duration: 0,
-        useNativeDriver: false,
-      }).start();
-
-      const interval = setInterval(() => {
-        setTaskGuideColorIndex(prev => (prev + 1) % taskGuideColors.length);
-      }, 60000); // Change color every 60 seconds
-
-      return () => clearInterval(interval);
-    }
-  }, [shouldShow, showTaskGuide, taskGuideColors.length, taskGuideAnimatedColor]);
-
-  useEffect(() => {
-    if (shouldShow && showTaskGuide) {
+      const duration = pillTappedOnce ? 500 : 400;
       Animated.timing(taskGuideAnimatedColor, {
         toValue: taskGuideColorIndex,
-        duration: 500,
+        duration,
         useNativeDriver: false,
       }).start();
     }
-  }, [taskGuideColorIndex, shouldShow, showTaskGuide, taskGuideAnimatedColor]);
+  }, [taskGuideColorIndex, shouldShow, showTaskGuide, pillTappedOnce, taskGuideAnimatedColor]);
 
   const taskGuideAnimatedColorValue = taskGuideAnimatedColor.interpolate({
     inputRange: [0, 1],
@@ -92,6 +94,9 @@ export const TaskGuide = memo(({ currentScreen, onNavigateToProfile }: TaskGuide
 
   const handlePress = () => {
     setModalVisible(true);
+    if (!pillTappedOnce) {
+      void trackTaskGuidePillTap();
+    }
   };
 
   return (
