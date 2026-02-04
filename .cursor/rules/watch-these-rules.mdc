@@ -12,5 +12,6 @@ alwaysApply: true
 6. Use a "Source of Truth" (AKA "Authority") for similar code pieces.  Be careful not to create competing or duplicate code.
 7. Use existing mobile/src/current-task.md file as your personal extra context.  Read it, update it, perform a phase of tasks as needed, then update it again and repeat this process.  This ensures you accurately track what you're doing with extra contextual pieces.
 8. Keep current-task.md to a maximum of 300 lines.  Replace irrelevant content by deleting older content and keeping the main current task as the priority.  (Keep associated items, delete unrelated items)
-9. DO NOT make mock values.  I hate mock values.  don't make them.  Let's always set up real implementations or nothing at all.
-10. Don't run my server or client application!  I will handle that manually.  You are not to run it.
+9. DO NOT make mock values.  I hate mock values.  Don't make them.  Let's always set up real implementations or nothing at all. 
+10. No default values.  If it doesn't exist and would create an error, we should throw an error instead of create default values. Then we should solve the root cause of the error and fix it permanently.  No Default Values.
+11. Don't run my server or client application!  I will handle that manually.  You are not to run it.
