@@ -183,8 +183,8 @@ async function getOrCreateGuestDeviceId(): Promise<string> {
 /** Result of trying to resume the device-linked guest/linked account. */
 type ResumeResult =
   | { ok: true; token: string; user: any }
-  | { ok: false; reason: 'invalid' }   // 401 / token invalid — clear stored token and allow new guest
-  | { ok: false; reason: 'network' };  // network/other — keep stored token so retry can resume
+  | { ok: false; reason: 'invalid' }   // permanent failure — clear stored token and allow new guest
+  | { ok: false; reason: 'network' };   // transient — keep stored token so retry can resume
 
 /**
  * Resumes the session for the account previously linked to this device (guest or formerly-guest-now-linked).
@@ -198,9 +198,9 @@ async function resumeGuestSession(guestToken: string): Promise<ResumeResult> {
       method: 'GET',
       headers: { 'Authorization': `Bearer ${guestToken}` },
     });
-    if (response.status === 401) {
-      return { ok: false, reason: 'invalid' };
-    }
+    // Permanent failures: clear stored token so user can create a new guest (no stuck error loop).
+    if (response.status === 401) return { ok: false, reason: 'invalid' }; // token invalid/expired
+    if (response.status === 404) return { ok: false, reason: 'invalid' }; // user deleted
     if (!response.ok) {
       return { ok: false, reason: 'network' };
     }

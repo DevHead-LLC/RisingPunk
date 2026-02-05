@@ -278,7 +278,8 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
     }
   });
 
-// Helper to send guest user response (same shape for create and get-or-create)
+// Helper to send guest/get-or-create response (same shape for create and device-linked resume)
+// Used when creating a new guest or when returning the device-linked account (guest or formerly-guest-now-linked).
 function sendGuestUserResponse(res: Response, user: any, token: string, statusCode: number): void {
   res.status(statusCode).json({
     token,
@@ -300,7 +301,7 @@ function sendGuestUserResponse(res: Response, user: any, token: string, statusCo
         enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
         enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
       },
-      isGuest: true,
+      isGuest: !!user.isGuest,
       hasPassword: !!user.hashedAccessKey
     }
   });
@@ -312,7 +313,9 @@ router.post('/guest', async (req, res): Promise<void> => {
     const deviceId = typeof req.body?.deviceId === 'string' ? req.body.deviceId.trim() : undefined;
 
     if (deviceId) {
-      const existing = await User.findOne({ isGuest: true, guestDeviceId: deviceId });
+      // Find device-linked account by guestDeviceId only (guest or formerly-guest-now-linked).
+      // When a guest links via /link-account, isGuest becomes false but guestDeviceId is preserved.
+      const existing = await User.findOne({ guestDeviceId: deviceId });
       if (existing) {
         const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
         existing.setCurrentToken(sessionId);
