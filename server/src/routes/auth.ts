@@ -278,23 +278,69 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
     }
   });
 
-// Play as guest — create anonymous device-linked account (no email/password)
+// Helper to send guest user response (same shape for create and get-or-create)
+function sendGuestUserResponse(res: Response, user: any, token: string, statusCode: number): void {
+  res.status(statusCode).json({
+    token,
+    user: {
+      handle: user.handle,
+      email: user.getDecryptedEmail(),
+      level: user.level,
+      experience: user.experience,
+      armyBonus: user.armyBonus,
+      balance: user.balance,
+      unlockedFeatures: user.unlockedFeatures,
+      profileGender: user.profileGender,
+      onboardingCompleted: user.onboardingCompleted || false,
+      needsHandleSelection: user.needsHandleSelection || false,
+      emailVerified: user.emailVerified || false,
+      emailVerificationToken: user.emailVerificationToken || null,
+      emailVerificationPrompted: user.emailVerificationPrompted || false,
+      debugFeatures: {
+        enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
+        enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
+      },
+      isGuest: true,
+      hasPassword: !!user.hashedAccessKey
+    }
+  });
+}
+
+// Play as guest — one guest per device: get existing guest by deviceId or create new (no email/password)
 router.post('/guest', async (req, res): Promise<void> => {
   try {
+    const deviceId = typeof req.body?.deviceId === 'string' ? req.body.deviceId.trim() : undefined;
+
+    if (deviceId) {
+      const existing = await User.findOne({ isGuest: true, guestDeviceId: deviceId });
+      if (existing) {
+        const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+        existing.setCurrentToken(sessionId);
+        await existing.save();
+
+        const token = jwt.sign(
+          { userId: existing._id, sessionId },
+          process.env.JWT_SECRET || 'defaultsecret',
+          { expiresIn: '7d' }
+        );
+        sendGuestUserResponse(res, existing, token, 200);
+        return;
+      }
+    }
+
     const guestHandle = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const user = new User({
       handle: guestHandle,
       needsHandleSelection: true,
       isGuest: true,
-      emailVerificationPrompted: true, // no email to verify; skip verification prompt
-      // no email, no hashedAccessKey
+      emailVerificationPrompted: true,
+      ...(deviceId && { guestDeviceId: deviceId })
     });
 
     try {
       await user.save();
     } catch (saveError: any) {
       if (saveError.code === 11000 && saveError.keyValue?.handle) {
-        // Handle collision — retry once with a different handle
         const retryHandle = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         user.handle = retryHandle;
         await user.save();
@@ -315,30 +361,7 @@ router.post('/guest', async (req, res): Promise<void> => {
       { expiresIn: '7d' }
     );
 
-    res.status(201).json({
-      token,
-      user: {
-        handle: user.handle,
-        email: user.getDecryptedEmail(),
-        level: user.level,
-        experience: user.experience,
-        armyBonus: user.armyBonus,
-        balance: user.balance,
-        unlockedFeatures: user.unlockedFeatures,
-        profileGender: user.profileGender,
-        onboardingCompleted: user.onboardingCompleted || false,
-        needsHandleSelection: user.needsHandleSelection || false,
-        emailVerified: user.emailVerified || false,
-        emailVerificationToken: user.emailVerificationToken || null,
-        emailVerificationPrompted: user.emailVerificationPrompted || false,
-        debugFeatures: {
-          enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
-          enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
-        },
-        isGuest: true,
-        hasPassword: false
-      }
-    });
+    sendGuestUserResponse(res, user, token, 201);
   } catch (error) {
     console.error('Guest creation error:', error);
     res.status(500).json({ error: 'Failed to create guest account' });

@@ -45,6 +45,7 @@ export interface IUser extends Document {
     enableDataRefresh: boolean;
     enableDebugLogs: boolean;
   };
+  guestDeviceId?: string;
   currentTokenId?: string;
   researchCenterBuild?: {
     startedAt: Date | null;
@@ -381,6 +382,13 @@ const userSchema = new Schema({
     type: Number,
     default: 0,
     min: 0
+  },
+  /** Stable device identifier for "one guest per device"; used by POST /auth/guest get-or-create. */
+  guestDeviceId: {
+    type: String,
+    required: false,
+    sparse: true,
+    index: true
   },
   currentTokenId: {
     type: String,
