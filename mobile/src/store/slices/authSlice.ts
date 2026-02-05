@@ -609,11 +609,14 @@ export const logoutUser = createAsyncThunk(
   'auth/logout',
   async (_, { dispatch, getState }) => {
     const state = getState() as { auth: AuthState };
-    const { token } = state.auth;
-    // Save current token so "Play as Guest" can resume this device-linked account (guest or
-    // linked). Keeps one-tap resume on this device while allowing handle+password login elsewhere.
-    if (token) {
+    const { token, user } = state.auth;
+    // Only save token for "Play as Guest" resume when the current account is a guest.
+    // If the user is logging out from Apple/Google/handle, do NOT store that token as the
+    // guest token—otherwise the next "Play as Guest" would resume the wrong (non-guest) account.
+    if (token && user?.isGuest) {
       await AsyncStorage.setItem(GUEST_TOKEN_KEY, token);
+    } else {
+      await AsyncStorage.removeItem(GUEST_TOKEN_KEY);
     }
     await AsyncStorage.removeItem('token');
     await AsyncStorage.removeItem('user');
