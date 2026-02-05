@@ -134,13 +134,22 @@ export const registerUser = createAsyncThunk(
   'auth/register',
   async (credentials: { email: string; accessKey: string }, { rejectWithValue }) => {
     try {
-      const response = await fetch(`${API_URL}/api/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(credentials),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      let response;
+      try {
+        response = await fetch(`${API_URL}/api/auth/register`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(credentials),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: 'Registration failed' }));
@@ -159,6 +168,9 @@ export const registerUser = createAsyncThunk(
 
       return data;
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return rejectWithValue('Network error: Cannot connect to server');
+      }
       if (error instanceof TypeError && error.message.includes('Network request failed')) {
         return rejectWithValue('Network error: Cannot connect to server');
       }
