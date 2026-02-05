@@ -316,25 +316,35 @@ router.post('/guest', async (req, res): Promise<void> => {
       // Find device-linked account by guestDeviceId only (guest or formerly-guest-now-linked).
       const existing = await User.findOne({ guestDeviceId: deviceId });
       if (existing) {
-        try {
-          const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-          existing.setCurrentToken(sessionId);
-          await existing.save();
+        // Try to return existing user (with one retry for transient errors). Never clear guestDeviceId
+        // on failure — that would orphan the account and lose progress on transient DB/network errors.
+        let lastReturnError: unknown;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+            existing.setCurrentToken(sessionId);
+            await existing.save();
 
-          const token = jwt.sign(
-            { userId: existing._id, sessionId },
-            process.env.JWT_SECRET || 'defaultsecret',
-            { expiresIn: '7d' }
-          );
-          sendGuestUserResponse(res, existing, token, 200);
-          return;
-        } catch (returnError) {
-          // Returning the existing user failed (e.g. save/validation). Release device so we can create a new guest.
-          console.error('Guest return-existing failed, releasing device for new guest:', returnError);
-          existing.guestDeviceId = undefined;
-          await existing.save().catch((saveErr) => console.error('Failed to clear guestDeviceId:', saveErr));
-          // Fall through to create new guest below
+            const token = jwt.sign(
+              { userId: existing._id, sessionId },
+              process.env.JWT_SECRET || 'defaultsecret',
+              { expiresIn: '7d' }
+            );
+            sendGuestUserResponse(res, existing, token, 200);
+            return;
+          } catch (returnError) {
+            lastReturnError = returnError;
+            if (attempt === 0) {
+              console.warn('Guest return-existing failed, will retry once:', returnError);
+              continue;
+            }
+          }
         }
+        console.error('Guest return-existing failed after retry:', lastReturnError);
+        res.status(503).json({
+          error: 'Could not restore your session. Please try again in a moment. If this persists, contact support@risingpunk.com.'
+        });
+        return;
       }
     }
 
@@ -354,26 +364,34 @@ router.post('/guest', async (req, res): Promise<void> => {
         // Race: another request created the guest for this deviceId; return that user with new session.
         const existing = await User.findOne({ guestDeviceId: deviceId });
         if (existing) {
-          try {
-            const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-            existing.setCurrentToken(sessionId);
-            await existing.save();
-            const token = jwt.sign(
-              { userId: existing._id, sessionId },
-              process.env.JWT_SECRET || 'defaultsecret',
-              { expiresIn: '7d' }
-            );
-            sendGuestUserResponse(res, existing, token, 200);
-            return;
-          } catch (returnError) {
-            console.error('Guest race return-existing failed, releasing device:', returnError);
-            existing.guestDeviceId = undefined;
-            await existing.save().catch((e) => console.error('Failed to clear guestDeviceId:', e));
-            await user.save(); // retry; deviceId is now free
+          let lastReturnError: unknown;
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+              existing.setCurrentToken(sessionId);
+              await existing.save();
+              const token = jwt.sign(
+                { userId: existing._id, sessionId },
+                process.env.JWT_SECRET || 'defaultsecret',
+                { expiresIn: '7d' }
+              );
+              sendGuestUserResponse(res, existing, token, 200);
+              return;
+            } catch (returnError) {
+              lastReturnError = returnError;
+              if (attempt === 0) {
+                console.warn('Guest race return-existing failed, will retry once:', returnError);
+                continue;
+              }
+            }
           }
-        } else {
-          throw saveError;
+          console.error('Guest race return-existing failed after retry:', lastReturnError);
+          res.status(503).json({
+            error: 'Could not restore your session. Please try again in a moment. If this persists, contact support@risingpunk.com.'
+          });
+          return;
         }
+        throw saveError;
       } else
       if (saveError.code === 11000 && saveError.keyValue?.handle) {
         const retryHandle = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
