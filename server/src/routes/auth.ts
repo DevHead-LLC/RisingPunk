@@ -278,23 +278,122 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
     }
   });
 
-// Play as guest — create anonymous device-linked account (no email/password)
+// Helper to send guest/get-or-create response (same shape for create and device-linked resume)
+// Used when creating a new guest or when returning the device-linked account (guest or formerly-guest-now-linked).
+function sendGuestUserResponse(res: Response, user: any, token: string, statusCode: number): void {
+  res.status(statusCode).json({
+    token,
+    user: {
+      handle: user.handle,
+      email: user.getDecryptedEmail(),
+      level: user.level,
+      experience: user.experience,
+      armyBonus: user.armyBonus,
+      balance: user.balance,
+      unlockedFeatures: user.unlockedFeatures,
+      profileGender: user.profileGender,
+      onboardingCompleted: user.onboardingCompleted || false,
+      needsHandleSelection: user.needsHandleSelection || false,
+      emailVerified: user.emailVerified || false,
+      emailVerificationToken: user.emailVerificationToken || null,
+      emailVerificationPrompted: user.emailVerificationPrompted || false,
+      debugFeatures: {
+        enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
+        enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
+      },
+      isGuest: !!user.isGuest,
+      hasPassword: !!user.hashedAccessKey
+    }
+  });
+}
+
+// Play as guest — one guest per device: get existing guest by deviceId or create new (no email/password)
 router.post('/guest', async (req, res): Promise<void> => {
   try {
+    const deviceId = typeof req.body?.deviceId === 'string' ? req.body.deviceId.trim() : undefined;
+
+    if (deviceId) {
+      // Find device-linked account by guestDeviceId only (guest or formerly-guest-now-linked).
+      const existing = await User.findOne({ guestDeviceId: deviceId });
+      if (existing) {
+        // Try to return existing user (with one retry for transient errors). Never clear guestDeviceId
+        // on failure — that would orphan the account and lose progress on transient DB/network errors.
+        let lastReturnError: unknown;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+            existing.setCurrentToken(sessionId);
+            await existing.save();
+
+            const token = jwt.sign(
+              { userId: existing._id, sessionId },
+              process.env.JWT_SECRET || 'defaultsecret',
+              { expiresIn: '7d' }
+            );
+            sendGuestUserResponse(res, existing, token, 200);
+            return;
+          } catch (returnError) {
+            lastReturnError = returnError;
+            if (attempt === 0) {
+              console.warn('Guest return-existing failed, will retry once:', returnError);
+              continue;
+            }
+          }
+        }
+        console.error('Guest return-existing failed after retry:', lastReturnError);
+        res.status(503).json({
+          error: 'Could not restore your session. Please try again in a moment. If this persists, contact support@risingpunk.com.'
+        });
+        return;
+      }
+    }
+
     const guestHandle = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const user = new User({
       handle: guestHandle,
       needsHandleSelection: true,
       isGuest: true,
-      emailVerificationPrompted: true, // no email to verify; skip verification prompt
-      // no email, no hashedAccessKey
+      emailVerificationPrompted: true,
+      ...(deviceId && { guestDeviceId: deviceId })
     });
 
     try {
       await user.save();
     } catch (saveError: any) {
+      if (saveError.code === 11000 && saveError.keyValue?.guestDeviceId && deviceId) {
+        // Race: another request created the guest for this deviceId; return that user with new session.
+        const existing = await User.findOne({ guestDeviceId: deviceId });
+        if (existing) {
+          let lastReturnError: unknown;
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+              existing.setCurrentToken(sessionId);
+              await existing.save();
+              const token = jwt.sign(
+                { userId: existing._id, sessionId },
+                process.env.JWT_SECRET || 'defaultsecret',
+                { expiresIn: '7d' }
+              );
+              sendGuestUserResponse(res, existing, token, 200);
+              return;
+            } catch (returnError) {
+              lastReturnError = returnError;
+              if (attempt === 0) {
+                console.warn('Guest race return-existing failed, will retry once:', returnError);
+                continue;
+              }
+            }
+          }
+          console.error('Guest race return-existing failed after retry:', lastReturnError);
+          res.status(503).json({
+            error: 'Could not restore your session. Please try again in a moment. If this persists, contact support@risingpunk.com.'
+          });
+          return;
+        }
+        throw saveError;
+      } else
       if (saveError.code === 11000 && saveError.keyValue?.handle) {
-        // Handle collision — retry once with a different handle
         const retryHandle = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         user.handle = retryHandle;
         await user.save();
@@ -303,7 +402,15 @@ router.post('/guest', async (req, res): Promise<void> => {
       }
     }
 
-    await createUserResearchData(user._id as mongoose.Types.ObjectId);
+    try {
+      await createUserResearchData(user._id as mongoose.Types.ObjectId);
+    } catch (researchError) {
+      // Research data creation failed; user is already in DB with guestDeviceId. Remove the user
+      // so retry creates a fresh guest (and research data) instead of returning a broken user.
+      console.error('Guest creation: createUserResearchData failed, removing user to allow retry:', researchError);
+      await User.findByIdAndDelete(user._id).catch((e) => console.error('Failed to delete guest user after research data failure:', e));
+      throw researchError;
+    }
 
     const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
     user.setCurrentToken(sessionId);
@@ -315,30 +422,7 @@ router.post('/guest', async (req, res): Promise<void> => {
       { expiresIn: '7d' }
     );
 
-    res.status(201).json({
-      token,
-      user: {
-        handle: user.handle,
-        email: user.getDecryptedEmail(),
-        level: user.level,
-        experience: user.experience,
-        armyBonus: user.armyBonus,
-        balance: user.balance,
-        unlockedFeatures: user.unlockedFeatures,
-        profileGender: user.profileGender,
-        onboardingCompleted: user.onboardingCompleted || false,
-        needsHandleSelection: user.needsHandleSelection || false,
-        emailVerified: user.emailVerified || false,
-        emailVerificationToken: user.emailVerificationToken || null,
-        emailVerificationPrompted: user.emailVerificationPrompted || false,
-        debugFeatures: {
-          enableDataRefresh: user.debugFeatures?.enableDataRefresh || false,
-          enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
-        },
-        isGuest: true,
-        hasPassword: false
-      }
-    });
+    sendGuestUserResponse(res, user, token, 201);
   } catch (error) {
     console.error('Guest creation error:', error);
     res.status(500).json({ error: 'Failed to create guest account' });
