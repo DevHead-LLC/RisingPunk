@@ -383,12 +383,12 @@ const userSchema = new Schema({
     default: 0,
     min: 0
   },
-  /** Stable device identifier for "one guest per device"; used by POST /auth/guest get-or-create. */
+  /** Stable device identifier for "one guest per device"; used by POST /auth/guest get-or-create. Unique per device (sparse so nulls are allowed). */
   guestDeviceId: {
     type: String,
     required: false,
-    sparse: true,
-    index: true
+    unique: true,
+    sparse: true
   },
   currentTokenId: {
     type: String,

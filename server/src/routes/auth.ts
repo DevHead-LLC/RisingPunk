@@ -314,20 +314,27 @@ router.post('/guest', async (req, res): Promise<void> => {
 
     if (deviceId) {
       // Find device-linked account by guestDeviceId only (guest or formerly-guest-now-linked).
-      // When a guest links via /link-account, isGuest becomes false but guestDeviceId is preserved.
       const existing = await User.findOne({ guestDeviceId: deviceId });
       if (existing) {
-        const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-        existing.setCurrentToken(sessionId);
-        await existing.save();
+        try {
+          const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+          existing.setCurrentToken(sessionId);
+          await existing.save();
 
-        const token = jwt.sign(
-          { userId: existing._id, sessionId },
-          process.env.JWT_SECRET || 'defaultsecret',
-          { expiresIn: '7d' }
-        );
-        sendGuestUserResponse(res, existing, token, 200);
-        return;
+          const token = jwt.sign(
+            { userId: existing._id, sessionId },
+            process.env.JWT_SECRET || 'defaultsecret',
+            { expiresIn: '7d' }
+          );
+          sendGuestUserResponse(res, existing, token, 200);
+          return;
+        } catch (returnError) {
+          // Returning the existing user failed (e.g. save/validation). Release device so we can create a new guest.
+          console.error('Guest return-existing failed, releasing device for new guest:', returnError);
+          existing.guestDeviceId = undefined;
+          await existing.save().catch((saveErr) => console.error('Failed to clear guestDeviceId:', saveErr));
+          // Fall through to create new guest below
+        }
       }
     }
 
@@ -343,6 +350,31 @@ router.post('/guest', async (req, res): Promise<void> => {
     try {
       await user.save();
     } catch (saveError: any) {
+      if (saveError.code === 11000 && saveError.keyValue?.guestDeviceId && deviceId) {
+        // Race: another request created the guest for this deviceId; return that user with new session.
+        const existing = await User.findOne({ guestDeviceId: deviceId });
+        if (existing) {
+          try {
+            const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+            existing.setCurrentToken(sessionId);
+            await existing.save();
+            const token = jwt.sign(
+              { userId: existing._id, sessionId },
+              process.env.JWT_SECRET || 'defaultsecret',
+              { expiresIn: '7d' }
+            );
+            sendGuestUserResponse(res, existing, token, 200);
+            return;
+          } catch (returnError) {
+            console.error('Guest race return-existing failed, releasing device:', returnError);
+            existing.guestDeviceId = undefined;
+            await existing.save().catch((e) => console.error('Failed to clear guestDeviceId:', e));
+            await user.save(); // retry; deviceId is now free
+          }
+        } else {
+          throw saveError;
+        }
+      } else
       if (saveError.code === 11000 && saveError.keyValue?.handle) {
         const retryHandle = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         user.handle = retryHandle;
