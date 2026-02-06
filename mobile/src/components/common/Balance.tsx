@@ -36,11 +36,11 @@ export const Balance = memo(({ isIntroActive = false }: BalanceProps) => {
   const isHighlighted = isIntroActive || highlightTaskId === 'view-wallet';
   const isViewWalletTask = highlightTaskId === 'view-wallet';
 
-  // Force re-render every 10 seconds to update balance display
+  // Re-render periodically to update balance display (30s to reduce churn and ease image loading)
   useEffect(() => {
     const interval = setInterval(() => {
       setUpdateTrigger(prev => prev + 1);
-    }, 10000);
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [balance]);

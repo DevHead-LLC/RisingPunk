@@ -81,7 +81,9 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
   
   const hasSufficientFunds = numericBalance !== null && !isNaN(numericBalance as number) && numericBalance >= RENTAL_HOUSING_COST;
 
-  const isBuildInvestmentProperty = highlightTaskId === 'build-investment-property' && propertyId === 1;
+  const isBuildInvestmentProperty =
+    (highlightTaskId === 'build-investment-property' && propertyId === 1) ||
+    (highlightTaskId === 'build-investment-property-2' && propertyId === 2);
   const isHighlighted = isIntroActive || isBuildInvestmentProperty;
   
   useEffect(() => {
@@ -89,8 +91,8 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
   }, [isBuilding]);
 
   useEffect(() => {
-    // Only invalidate cache when unlock state transitions from false to true (for property 1)
-    if (isUnlocked && previousIsUnlockedRef.current === false && propertyId === 1) {
+    // Invalidate task guide when property 1 or 2 transitions to unlocked (for guided tasks)
+    if (isUnlocked && previousIsUnlockedRef.current === false && (propertyId === 1 || propertyId === 2)) {
       dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
     }
     previousIsUnlockedRef.current = isUnlocked;

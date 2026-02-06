@@ -17,6 +17,8 @@ import type {
   TrackHackmapVisitResponse,
   TrackDigitalBarracksVisitResponse,
   TrackWalletViewResponse,
+  TrackFinancialStatementViewResponse,
+  TrackUsernameChangeSettingViewResponse,
   TrackAnotherUserProfileVisitRequest,
   TrackAnotherUserProfileVisitResponse,
   TrackTaskGuidePillTapResponse
@@ -196,6 +198,36 @@ export const userGuideApi = createApi({
         }
       },
     }),
+    trackFinancialStatementView: builder.mutation<TrackFinancialStatementViewResponse, void>({
+      query: () => ({
+        url: '/api/users/user-guide/track-financial-statement-view',
+        method: 'POST',
+      }),
+      invalidatesTags: ['UserTaskProgress'],
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
+        } catch {
+          // Error handling is done by the mutation itself
+        }
+      },
+    }),
+    trackUsernameChangeSettingView: builder.mutation<TrackUsernameChangeSettingViewResponse, void>({
+      query: () => ({
+        url: '/api/users/user-guide/track-username-change-setting-view',
+        method: 'POST',
+      }),
+      invalidatesTags: ['UserTaskProgress'],
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
+        } catch {
+          // Error handling is done by the mutation itself
+        }
+      },
+    }),
     trackAnotherUserProfileVisit: builder.mutation<TrackAnotherUserProfileVisitResponse, TrackAnotherUserProfileVisitRequest>({
       query: (body) => ({
         url: '/api/users/user-guide/track-another-user-profile-visit',
@@ -235,6 +267,8 @@ export const {
   useTrackHackmapVisitMutation,
   useTrackDigitalBarracksVisitMutation,
   useTrackWalletViewMutation,
+  useTrackFinancialStatementViewMutation,
+  useTrackUsernameChangeSettingViewMutation,
   useTrackAnotherUserProfileVisitMutation,
   useTrackTaskGuidePillTapMutation
 } = userGuideApi;

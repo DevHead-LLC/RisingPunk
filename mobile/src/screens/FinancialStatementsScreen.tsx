@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
 import { SIZING } from '../styles/theme';
 import { CloseButton } from '../components/common/CloseButton';
@@ -8,6 +8,7 @@ import { useFetchFinanceTemplatesQuery, useFetchUserFinanceTiersQuery } from '..
 import { useGetRentalHousingIncomeQuery } from '../store/api/rentalHousingApi';
 import { useFetchBalanceQuery } from '../store/api/balanceApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
+import { useTrackFinancialStatementViewMutation } from '../store/api/userGuideApi';
 import { useTheme } from '../context/ThemeContext';
 import { useThemeColors } from '../hooks/useThemeColors';
 
@@ -19,6 +20,13 @@ type TabKey = 'income' | 'balance' | 'cashflow';
 
 export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<TabKey>('income');
+  const [trackFinancialStatementView] = useTrackFinancialStatementViewMutation();
+
+  // Mark "View financial statement" guided task when user reaches this screen (opened via wallet/balance tap)
+  useEffect(() => {
+    void trackFinancialStatementView();
+  }, [trackFinancialStatementView]);
+
   const { data: templatesData } = useFetchFinanceTemplatesQuery();
   const { data: userTiersData } = useFetchUserFinanceTiersQuery();
   const { data: rentalHousingData, error: rentalHousingError, isLoading: rentalHousingLoading } = useGetRentalHousingIncomeQuery();
