@@ -404,111 +404,99 @@ const TASK_LIST: Task[] = [
     howTo: 'Navigate: Home (Turf) > Research Center > Hack Ability Category. Meet the level and wallet balance requirements, then pay to unlock the category.'
   },
   {
-    id: 'build-second-investment-property',
-    title: 'Build second investment property',
-    description: 'Construct your second investment property (Property 2)',
-    order: 32,
-    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
-      return user.unlockedFeatures?.rentalHousing2 === true;
-    },
-    skipable: true,
-    reward: { type: 'wallet', value: 90 },
-    howTo: 'Navigate: Home (Turf) > Development Zone > Investment Property 2 — tap the location to unlock and start construction. Build completes in 2 hours (or speed up for a fee). Requires Property 1 built first and sufficient balance to unlock.'
-  },
-  {
     id: 'perform-add-battalion-c-research',
     title: 'Perform Add Battalion C Research',
     description: 'Complete the Add Battalion C research in the Hack Ability category to unlock a third battalion',
-    order: 33,
+    order: 32,
     autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
       return !!(progress?.addBattalionCResearchUnlockedAt);
     },
     skipable: true,
-    reward: { type: 'wallet', value: 95 },
+    reward: { type: 'wallet', value: 90 },
     howTo: 'Navigate: Home (Turf) > Research Center > Hack Ability Category > Add Battalion C. Unlock the Hack Ability category first if needed; then start and complete the Add Battalion C research (unlocks a third battalion for battles).'
   },
   {
     id: 'reach-level-6',
     title: 'Achieve level 6',
     description: 'Reach level 6 by fighting on the Hack Map',
-    order: 34,
+    order: 33,
     autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
       return user.level >= 6;
     },
     skipable: true,
-    reward: { type: 'wallet', value: 100 },
+    reward: { type: 'wallet', value: 95 },
     howTo: 'Navigate: Home (Turf) > HackRig > HackMap. Fight NPCs or players to gain experience and reach level 6. You can view your current level and progress in your profile.'
   },
   {
     id: 'perform-battalion-size-plus-250-research',
     title: 'Battalion Size +250 Research',
     description: 'Complete the Battalion Size +250 research in the Hack Ability category to increase max troops per battalion from 250 to 500',
-    order: 35,
+    order: 34,
     autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
       return !!(progress?.battalionSizePlus250ResearchUnlockedAt);
     },
     skipable: true,
-    reward: { type: 'wallet', value: 105 },
+    reward: { type: 'wallet', value: 100 },
     howTo: 'Navigate: Home (Turf) > Research Center > Hack Ability Category > Battalion Size +250. Unlock the Hack Ability category and Add Battalion C first if needed; then start and complete the Battalion Size +250 research (increases max troops per battalion to 500).'
   },
   {
     id: 'unlock-hack-crew-category',
     title: 'Unlock Hack Crew Category in Research Center',
     description: 'Unlock the Hack Crew research category',
-    order: 36,
+    order: 35,
     autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
       return !!(progress?.hackCrewUnlockedAt);
     },
     skipable: true,
-    reward: { type: 'wallet', value: 110 },
+    reward: { type: 'wallet', value: 105 },
     howTo: 'Navigate: Home (Turf) > Research Center > Hack Crew Category. Meet the level and wallet balance requirements, then pay to unlock the category.'
   },
   {
     id: 'perform-crew-system-research',
     title: 'Perform Crew System Research',
     description: 'Complete the Crew System research in the Hack Crew category to unlock forming, joining, and managing hack crews',
-    order: 37,
+    order: 36,
     autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
       return !!(progress?.crewSystemResearchUnlockedAt);
     },
     skipable: true,
-    reward: { type: 'wallet', value: 115 },
+    reward: { type: 'wallet', value: 110 },
     howTo: 'Navigate: Home (Turf) > Research Center > Hack Crew Category > Crew System. Unlock the Hack Crew category first if needed; then start and complete the Crew System research (unlocks ability to form, join, and manage hack crews).'
   },
   {
     id: 'hack-level-6-npc',
     title: 'Hack a level 6 NPC',
     description: 'Attack a level 6 NPC on the hack map',
-    order: 38,
+    order: 37,
     autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
       return !!(progress?.attackedLevel6NpcAt);
     },
     skipable: true,
-    reward: { type: 'wallet', value: 120 },
+    reward: { type: 'wallet', value: 115 },
     howTo: 'Navigate: Home (Turf) > HackRig > HackMap > LEVEL 6 NPC. Look for the level indicator at the top right of the NPC tile.'
   },
   {
     id: 'start-or-join-crew',
     title: 'Start or join a Crew',
     description: 'Create your own hack crew or join an existing one',
-    order: 39,
+    order: 38,
     autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
       return !!(progress?.crewJoinedAt);
     },
     skipable: true,
-    reward: { type: 'wallet', value: 125 },
+    reward: { type: 'wallet', value: 120 },
     howTo: 'Navigate: Home (Turf) > Research Center > Hack Crew Category — complete Crew System research first. Then start a crew (create one) or find and join an existing crew from the Crew area.'
   },
   {
     id: 'send-first-crew-chat-message',
     title: 'Send your first message in crew chat',
     description: 'Post a message in your crew\'s chat',
-    order: 40,
+    order: 39,
     autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
       return !!(progress?.firstCrewChatMessageSentAt);
     },
     skipable: true,
-    reward: { type: 'wallet', value: 130 },
+    reward: { type: 'wallet', value: 125 },
     howTo: 'Navigate to your Crew (after starting or joining one), open crew chat, and send a message. You must be in a crew and have completed Crew System research.'
   }
 ];

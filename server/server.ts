@@ -458,14 +458,18 @@ app.post('/api/antivirus-shield/activate', auth, async (req: Request, res: Respo
     await user.save();
 
     // Mark "Use a shield" guided task progress (any shield duration completes the task)
-    await UserTaskProgress.findOneAndUpdate(
-      { userId: user._id },
-      {
-        $set: { shieldActivatedAt: now },
-        $setOnInsert: { completedTasks: [], collectedTasks: [], skippedTasks: [], showTaskGuide: true }
-      },
-      { upsert: true }
-    );
+    try {
+      await UserTaskProgress.findOneAndUpdate(
+        { userId: user._id },
+        {
+          $set: { shieldActivatedAt: now },
+          $setOnInsert: { completedTasks: [], collectedTasks: [], skippedTasks: [], showTaskGuide: true }
+        },
+        { upsert: true }
+      );
+    } catch (taskTrackingError) {
+      console.error('Error tracking shield activation for task guide:', taskTrackingError);
+    }
 
     res.json({
       success: true,
