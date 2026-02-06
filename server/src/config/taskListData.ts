@@ -246,7 +246,7 @@ const TASK_LIST: Task[] = [
       return !!(progress?.homeDefenseUnlockedAt);
     },
     skipable: true,
-    reward: { type: 'wallet', value: 30 },
+    reward: { type: 'wallet', value: 25 },
     howTo: 'Navigate: HomeLocation > Research Center > Home Defense Category\n\nRequirements: Level 2 and $10,000 wallet balance. If you don\'t meet these requirements yet, fight NPCs in the HackMap to level up and earn money.'
   },
   {
@@ -284,6 +284,88 @@ const TASK_LIST: Task[] = [
     skipable: true,
     reward: { type: 'wallet', value: 40 },
     howTo: 'Navigate: Home (Turf) > Development Zone > Investment Property 2 — tap the location to unlock and start construction. Build completes in 2 hours (or speed up for a fee). Requires Property 1 built first and sufficient balance to unlock.'
+  },
+  {
+    id: 'view-financial-statement',
+    title: 'View financial statement',
+    description: 'Open the Financial Statement screen to see income and cash flow',
+    order: 23,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.financialStatementViewedAt);
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 45 },
+    howTo: 'Navigate: Home (Turf) > tap Wallet/Balance (top) > Financial Statement view opens.'
+  },
+  {
+    id: 'reach-level-3',
+    title: 'Achieve level 3',
+    description: 'Reach level 3 by fighting on the Hack Map',
+    order: 24,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return user.level >= 3;
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 50 },
+    howTo: 'Navigate: Home (Turf) > HackRig > HackMap. Fight NPCs or players to gain experience and reach level 3. You can view your current level and progress in your profile.'
+  },
+  {
+    id: 'view-username-change-setting',
+    title: 'View "Username Change" setting',
+    description: 'Open the Account settings and view the Change User Handle (username change) option',
+    order: 25,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.usernameChangeSettingViewedAt);
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 55 },
+    howTo: 'Navigate: Home (Turf) > Profile > Account tab. The "Change User Handle" (username change) setting is here.'
+  },
+  {
+    id: 'build-100-each-bot-type-remaining',
+    title: 'Achieve total bot builds of 100 of each type remaining',
+    description: 'Build 100 Breachers and 100 Phreaks (100 Guardians already counted in a prior task)',
+    order: 26,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      const breachers = user.totalBreachersBuilt;
+      const phreaks = user.totalPhreaksBuilt;
+      if (breachers === undefined || breachers === null || typeof breachers !== 'number') return false;
+      if (phreaks === undefined || phreaks === null || typeof phreaks !== 'number') return false;
+      return breachers >= 100 && phreaks >= 100;
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 60 },
+    howTo: 'Navigate: Home (Turf) > Digital Barracks. Build bots in the garage until you have 100 Breachers and 100 Phreaks (Guardians already count from a prior task).'
+  },
+  {
+    id: 'hack-level-5-npc',
+    title: 'Hack a level 5 NPC',
+    description: 'Attack a level 5 NPC on the hack map',
+    order: 27,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.attackedLevel5NpcAt);
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 65 },
+    howTo: 'Navigate: Home (Turf) > HackRig > HackMap > LEVEL 5 NPC. Look for the level indicator at the top right of the NPC tile.'
+  },
+  {
+    id: 'build-500-each-bot-type',
+    title: 'Achieve total bot builds of 500 of each type',
+    description: 'Build 500 Guardians, 500 Breachers, and 500 Phreaks',
+    order: 29,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      const guardians = user.totalGuardiansBuilt;
+      const breachers = user.totalBreachersBuilt;
+      const phreaks = user.totalPhreaksBuilt;
+      if (guardians === undefined || guardians === null || typeof guardians !== 'number') return false;
+      if (breachers === undefined || breachers === null || typeof breachers !== 'number') return false;
+      if (phreaks === undefined || phreaks === null || typeof phreaks !== 'number') return false;
+      return guardians >= 500 && breachers >= 500 && phreaks >= 500;
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 75 },
+    howTo: 'Navigate: Home (Turf) > Digital Barracks. Build bots in the garage until you have 500 Guardians, 500 Breachers, and 500 Phreaks.'
   }
 ];
 

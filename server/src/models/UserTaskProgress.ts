@@ -21,10 +21,13 @@ export interface IUserTaskProgress extends Document {
   digitalBarracksVisitedAt?: Date;
   walletViewedAt?: Date;
   attackedLevel1NpcAt?: Date;
+  attackedLevel5NpcAt?: Date;
   visitedAnotherUserProfileAt?: Date;
   homeDefenseUnlockedAt?: Date;
   antivirusUnlockedAt?: Date;
   shieldActivatedAt?: Date;
+  financialStatementViewedAt?: Date;
+  usernameChangeSettingViewedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -106,6 +109,10 @@ const userTaskProgressSchema = new Schema({
     type: Date,
     required: false
   },
+  attackedLevel5NpcAt: {
+    type: Date,
+    required: false
+  },
   visitedAnotherUserProfileAt: {
     type: Date,
     required: false
@@ -119,6 +126,14 @@ const userTaskProgressSchema = new Schema({
     required: false
   },
   shieldActivatedAt: {
+    type: Date,
+    required: false
+  },
+  financialStatementViewedAt: {
+    type: Date,
+    required: false
+  },
+  usernameChangeSettingViewedAt: {
     type: Date,
     required: false
   }

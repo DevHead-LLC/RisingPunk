@@ -233,25 +233,18 @@ const AppContent = memo(() => {
     }
   }, [token, user]);
 
-  // Refresh user data when app comes back to foreground (e.g., after email verification)
-  // Also track app return for analytics
+  // Refresh user data only when app returns from background/inactive (e.g., after email verification).
+  // Do NOT refresh on every 'active' transition: React Native can fire 'change' immediately when
+  // the listener is first added (app already active), and when effect re-runs (e.g. user ref
+  // changes after refresh) the new listener can fire again, causing a repeated refresh loop and
+  // prolonged "Refreshing..." / loading state (especially noticeable with guest sign-in).
   useEffect(() => {
     const handleAppStateChange = (nextAppState: string) => {
-      // Track when app returns from background to foreground
-      if (
-        appStateRef.current.match(/inactive|background/) &&
-        nextAppState === 'active'
-      ) {
-        // Only track app return when user is logged in (same as initial-open tracking)
-        if (token && user) {
-          trackAppReturned();
-        }
-      }
-      
+      const wasBackgroundOrInactive = appStateRef.current.match(/inactive|background/);
       appStateRef.current = nextAppState;
-      
-      if (nextAppState === 'active' && token && user) {
-        // Refresh user data when app becomes active
+
+      if (wasBackgroundOrInactive && nextAppState === 'active' && token && user) {
+        trackAppReturned();
         dispatch(refreshUserData());
       }
     };

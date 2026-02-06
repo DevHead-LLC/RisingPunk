@@ -32,7 +32,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
         new: true,
         setDefaultsOnInsert: true
       }
-    ).select('completedTasks collectedTasks skippedTasks showTaskGuide taskGuidePillTappedOnce profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt walletViewedAt attackedLevel1NpcAt visitedAnotherUserProfileAt homeDefenseUnlockedAt antivirusUnlockedAt shieldActivatedAt').lean();
+    ).select('completedTasks collectedTasks skippedTasks showTaskGuide taskGuidePillTappedOnce profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt walletViewedAt attackedLevel1NpcAt attackedLevel5NpcAt visitedAnotherUserProfileAt homeDefenseUnlockedAt antivirusUnlockedAt shieldActivatedAt financialStatementViewedAt usernameChangeSettingViewedAt').lean();
 
     if (!progress) {
       res.status(500).json({ error: 'Failed to initialize task progress' });
@@ -177,7 +177,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
     // SECOND PASS: After auto-completing tasks, refresh progress and find the current task
     if (anyTaskAutoCompleted) {
       const updatedProgress = await UserTaskProgress.findOne({ userId })
-        .select('completedTasks collectedTasks skippedTasks showTaskGuide taskGuidePillTappedOnce profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt walletViewedAt attackedLevel1NpcAt visitedAnotherUserProfileAt homeDefenseUnlockedAt antivirusUnlockedAt shieldActivatedAt')
+        .select('completedTasks collectedTasks skippedTasks showTaskGuide taskGuidePillTappedOnce profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt walletViewedAt attackedLevel1NpcAt attackedLevel5NpcAt visitedAnotherUserProfileAt homeDefenseUnlockedAt antivirusUnlockedAt shieldActivatedAt financialStatementViewedAt usernameChangeSettingViewedAt')
         .lean();
       
       if (updatedProgress) {
@@ -1154,6 +1154,150 @@ router.post('/track-wallet-view', auth, async (req: Request, res: Response) => {
     res.json({ success: true, message: 'Wallet view tracked' });
   } catch (error) {
     console.error('Error tracking wallet view:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/track-financial-statement-view', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const existingProgress = await UserTaskProgress.findOne({ userId });
+    const wasAlreadyViewed = existingProgress?.financialStatementViewedAt;
+
+    if (!wasAlreadyViewed) {
+      await UserTaskProgress.findOneAndUpdate(
+        { userId },
+        {
+          $set: { financialStatementViewedAt: new Date() },
+          $setOnInsert: {
+            completedTasks: [],
+            collectedTasks: [],
+            skippedTasks: [],
+            showTaskGuide: true
+          }
+        },
+        { upsert: true, new: true }
+      );
+    }
+
+    if (!wasAlreadyViewed) {
+      const taskList = getTaskList();
+      const financialStatementTask = taskList.find(t => t.id === 'view-financial-statement');
+
+      if (financialStatementTask && financialStatementTask.autoCompleteConditions) {
+        const user = await User.findById(userId).lean();
+        if (user) {
+          const updatedProgress = await UserTaskProgress.findOne({ userId });
+          const shouldAutoComplete = financialStatementTask.autoCompleteConditions(user as any, updatedProgress ?? undefined);
+
+          if (shouldAutoComplete) {
+            const isAlreadyCompleted = updatedProgress?.completedTasks?.some(
+              (task: any) => task.taskId === 'view-financial-statement'
+            );
+
+            if (!isAlreadyCompleted) {
+              await UserTaskProgress.findOneAndUpdate(
+                {
+                  userId,
+                  'completedTasks.taskId': { $ne: 'view-financial-statement' }
+                },
+                {
+                  $push: {
+                    completedTasks: {
+                      taskId: 'view-financial-statement',
+                      completedAt: new Date()
+                    }
+                  },
+                  $set: { lastCompletedTaskId: 'view-financial-statement' }
+                },
+                { new: true }
+              );
+            }
+          }
+        }
+      }
+    }
+
+    res.json({ success: true, message: 'Financial statement view tracked' });
+  } catch (error) {
+    console.error('Error tracking financial statement view:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/track-username-change-setting-view', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const existingProgress = await UserTaskProgress.findOne({ userId });
+    const wasAlreadyViewed = existingProgress?.usernameChangeSettingViewedAt;
+
+    if (!wasAlreadyViewed) {
+      await UserTaskProgress.findOneAndUpdate(
+        { userId },
+        {
+          $set: { usernameChangeSettingViewedAt: new Date() },
+          $setOnInsert: {
+            completedTasks: [],
+            collectedTasks: [],
+            skippedTasks: [],
+            showTaskGuide: true
+          }
+        },
+        { upsert: true, new: true }
+      );
+    }
+
+    if (!wasAlreadyViewed) {
+      const taskList = getTaskList();
+      const usernameChangeTask = taskList.find(t => t.id === 'view-username-change-setting');
+
+      if (usernameChangeTask && usernameChangeTask.autoCompleteConditions) {
+        const user = await User.findById(userId).lean();
+        if (user) {
+          const updatedProgress = await UserTaskProgress.findOne({ userId });
+          const shouldAutoComplete = usernameChangeTask.autoCompleteConditions(user as any, updatedProgress ?? undefined);
+
+          if (shouldAutoComplete) {
+            const isAlreadyCompleted = updatedProgress?.completedTasks?.some(
+              (task: any) => task.taskId === 'view-username-change-setting'
+            );
+
+            if (!isAlreadyCompleted) {
+              await UserTaskProgress.findOneAndUpdate(
+                {
+                  userId,
+                  'completedTasks.taskId': { $ne: 'view-username-change-setting' }
+                },
+                {
+                  $push: {
+                    completedTasks: {
+                      taskId: 'view-username-change-setting',
+                      completedAt: new Date()
+                    }
+                  },
+                  $set: { lastCompletedTaskId: 'view-username-change-setting' }
+                },
+                { new: true }
+              );
+            }
+          }
+        }
+      }
+    }
+
+    res.json({ success: true, message: 'Username change setting view tracked' });
+  } catch (error) {
+    console.error('Error tracking username change setting view:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
