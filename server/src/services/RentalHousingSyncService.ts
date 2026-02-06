@@ -56,14 +56,10 @@ export class RentalHousingSyncService {
 
   private static getUnlockedProperties(user: IUser): number[] {
     const unlockedProperties: number[] = [];
-    
     for (let i = 1; i <= 4; i++) {
-      const rentalHousingKey = `rentalHousing${i}` as keyof typeof user.unlockedFeatures;
-      if (user.unlockedFeatures[rentalHousingKey]) {
-        unlockedProperties.push(i);
-      }
+      const level = RentalHousingIncomeService.getPropertyLevel(user, i);
+      if (level >= 1) unlockedProperties.push(i);
     }
-    
     return unlockedProperties;
   }
 
@@ -130,11 +126,11 @@ export class RentalHousingSyncService {
     return historicalIncome;
   }
 
-  private static async calculateIncomeForPeriod(user: IUser, propertyCount: number, isResearchUnlocked: boolean): Promise<number> {
-    const baseIncomePerProperty = 0.06; // $0.06 per property per second (base rate)
-    const researchBonusPerProperty = 0.04; // $0.04 bonus per property per second when research unlocked
-    const incomePerProperty = baseIncomePerProperty + (isResearchUnlocked ? researchBonusPerProperty : 0);
-    return propertyCount * incomePerProperty;
+  private static async calculateIncomeForPeriod(user: IUser, _propertyCount: number, isResearchUnlocked: boolean): Promise<number> {
+    const income = await RentalHousingIncomeService.calculateRentalHousingIncome(user, {
+      includeResearchBonus: isResearchUnlocked,
+    });
+    return income.totalIncomePerSecond;
   }
 
   static async performSync(user: IUser): Promise<{ success: boolean; syncedAmount: number; newBalance: number }> {

@@ -11,6 +11,7 @@ import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { useTrackFinancialStatementViewMutation } from '../store/api/userGuideApi';
 import { useTheme } from '../context/ThemeContext';
 import { useThemeColors } from '../hooks/useThemeColors';
+import { floorToHundredths } from '../utils/currencyUtils';
 
 type Props = {
   onClose: () => void;
@@ -274,19 +275,18 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                       
                       return (
                         <>
-                          {/* Section 1: Gross Income */}
+                          {/* Section 1: Gross Income (display floored to hundredths) */}
                           <Text style={styles.sectionTitle}>Gross Income</Text>
                           <View style={styles.row}>
                             <Text style={styles.keyText}>Gross Income</Text>
-                            <Text style={styles.valText}>+${grossIncome.toFixed(2)}</Text>
+                            <Text style={styles.valText}>+${floorToHundredths(grossIncome).toFixed(2)}</Text>
                           </View>
                           
                           {/* Section 2: Expenses */}
                           <Text style={[styles.sectionTitle, { marginTop: SIZING.spacing.md }]}>Expenses</Text>
                           {expenseEntries.map(([k, v]) => {
-                            const num = Number(v);
+                            const num = floorToHundredths(Number(v));
                             const cleanLabel = k.replace(/\s*\([^)]*%[^)]*\)/g, '').trim();
-                            // Format negative values consistently: -$X.XX (not $-X.XX)
                             const formattedValue = num < 0 ? `-$${Math.abs(num).toFixed(2)}` : `$${num.toFixed(2)}`;
                             return (
                               <View key={k} style={styles.row}>
@@ -297,25 +297,25 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                           })}
                           <View style={styles.row}>
                             <Text style={styles.keyText}>Total Expenses</Text>
-                            <Text style={styles.valText}>-${totalExpenses.toFixed(2)}</Text>
+                            <Text style={styles.valText}>-${floorToHundredths(totalExpenses).toFixed(2)}</Text>
                           </View>
                           
                           {/* Section 3: Net Income Calculation */}
                           <Text style={[styles.sectionTitle, { marginTop: SIZING.spacing.md }]}>Net Income</Text>
                           <View style={styles.row}>
                             <Text style={styles.keyText}>Gross Income</Text>
-                            <Text style={styles.valText}>+${grossIncome.toFixed(2)}</Text>
+                            <Text style={styles.valText}>+${floorToHundredths(grossIncome).toFixed(2)}</Text>
                           </View>
                           <View style={styles.row}>
                             <Text style={styles.keyText}>Less: Total Expenses</Text>
-                            <Text style={styles.valText}>-${totalExpenses.toFixed(2)}</Text>
+                            <Text style={styles.valText}>-${floorToHundredths(totalExpenses).toFixed(2)}</Text>
                           </View>
                           <View style={[styles.row, { marginTop: SIZING.spacing.xs }]}>
                             <Text style={styles.keyText}>Net Income</Text>
-                            <Text style={styles.valText}>{netIncome >= 0 ? `+$${netIncome.toFixed(2)}` : `-$${Math.abs(netIncome).toFixed(2)}`}</Text>
+                            <Text style={styles.valText}>{floorToHundredths(netIncome) >= 0 ? `+$${floorToHundredths(netIncome).toFixed(2)}` : `-$${Math.abs(floorToHundredths(netIncome)).toFixed(2)}`}</Text>
                           </View>
                           
-                          {/* Section 4: Net Cash Flow Calculation */}
+                          {/* Section 4: Net Cash Flow (passive income & net cash flow floored to hundredths) */}
                           <Text style={[styles.sectionTitle, { marginTop: SIZING.spacing.md }]}>Net Cash Flow</Text>
                           {rentalHousingLoading && (
                             <View style={styles.row}>
@@ -332,16 +332,16 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                           {rentalHousingData && (
                             <View style={styles.row}>
                               <Text style={styles.keyText}>Investment Properties (Passive Income)</Text>
-                              <Text style={styles.valText}>+${rentalHousingData.totalIncomePerSecond.toFixed(2)}</Text>
+                              <Text style={styles.valText}>+${floorToHundredths(rentalHousingData.totalIncomePerSecond).toFixed(2)}</Text>
                             </View>
                           )}
                           <View style={styles.row}>
                             <Text style={styles.keyText}>Net Income</Text>
-                            <Text style={styles.valText}>{netIncome >= 0 ? `+$${netIncome.toFixed(2)}` : `-$${Math.abs(netIncome).toFixed(2)}`}</Text>
+                            <Text style={styles.valText}>{floorToHundredths(netIncome) >= 0 ? `+$${floorToHundredths(netIncome).toFixed(2)}` : `-$${Math.abs(floorToHundredths(netIncome)).toFixed(2)}`}</Text>
                           </View>
                           <View style={[styles.row, { marginTop: SIZING.spacing.xs }]}>
                             <Text style={styles.keyText}>Net Cash Flow</Text>
-                            <Text style={styles.valText}>{netCashFlow >= 0 ? `+$${netCashFlow.toFixed(2)}` : `-$${Math.abs(netCashFlow).toFixed(2)}`}</Text>
+                            <Text style={styles.valText}>{floorToHundredths(netCashFlow) >= 0 ? `+$${floorToHundredths(netCashFlow).toFixed(2)}` : `-$${Math.abs(floorToHundredths(netCashFlow)).toFixed(2)}`}</Text>
                           </View>
                         </>
                       );
@@ -379,12 +379,16 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                     )}
                     {rentalHousingData && rentalHousingData.propertyBreakdown
                       .filter(p => p.isUnlocked)
-                      .map((property, index) => (
-                        <View key={property.propertyId} style={styles.row}>
-                          <Text style={styles.keyText}>Investment Property {property.propertyId}</Text>
-                          <Text style={styles.valText}>$100,000</Text>
-                        </View>
-                      ))}
+                      .map((property) => {
+                        const level = property.propertyLevel ?? 1;
+                        const cumulativeValue = [0, 10000, 40000, 90000, 165000, 265000][Math.min(5, level)] ?? 100000;
+                        return (
+                          <View key={property.propertyId} style={styles.row}>
+                            <Text style={styles.keyText}>Investment Property {property.propertyId} (Lv.{level})</Text>
+                            <Text style={styles.valText}>${cumulativeValue.toLocaleString()}</Text>
+                          </View>
+                        );
+                      })}
                     <Text style={[styles.sectionTitle, { marginTop: SIZING.spacing.md }]}>Liabilities</Text>
                     <View style={styles.row}>
                       <Text style={styles.keyText}>None</Text>
@@ -393,7 +397,7 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                     <View style={[styles.row, { marginTop: SIZING.spacing.sm }]}>
                       <Text style={styles.keyText}>Net Worth</Text>
                       <Text style={styles.valText}>
-                        {`$${Math.round(Number(currentCash) + (rentalHousingData ? rentalHousingData.propertyBreakdown.filter(p => p.isUnlocked).length * 100000 : 0)).toLocaleString()}`}
+                        {`$${Math.round(Number(currentCash) + (rentalHousingData ? rentalHousingData.propertyBreakdown.filter(p => p.isUnlocked).reduce((sum, p) => sum + ([0, 10000, 40000, 90000, 165000, 265000][Math.min(5, p.propertyLevel ?? 1)] ?? 100000), 0) : 0)).toLocaleString()}`}
                       </Text>
                     </View>
                   </View>
@@ -413,31 +417,33 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                     <Text style={styles.sectionTitle}>Operating</Text>
                     {(() => {
                       const { grossIncome, totalExpenses, netIncome } = financialCalculations;
-                      
+                      const g = floorToHundredths(grossIncome);
+                      const te = floorToHundredths(totalExpenses);
+                      const ni = floorToHundredths(netIncome);
                       return (
                         <>
                           {/* 1. Job Income (matches Gross Income from Income Statement) */}
                           <View style={styles.row}>
                             <Text style={styles.keyText}>Job Income</Text>
-                            <Text style={styles.valText}>+${grossIncome.toFixed(2)}</Text>
+                            <Text style={styles.valText}>+${g.toFixed(2)}</Text>
                           </View>
                           
                           {/* 2. Total Expenses (brief summary, matches Income Statement total) */}
                           <View style={styles.row}>
                             <Text style={styles.keyText}>Total Expenses</Text>
-                            <Text style={styles.valText}>-${totalExpenses.toFixed(2)}</Text>
+                            <Text style={styles.valText}>-${te.toFixed(2)}</Text>
                           </View>
                           
                           {/* 3. Net from Operations (matches Net Income from Income Statement) */}
                           <View style={[styles.row, { marginTop: SIZING.spacing.sm }]}>
                             <Text style={styles.keyText}>Net from Operations</Text>
-                            <Text style={styles.valText}>{netIncome >= 0 ? `+$${netIncome.toFixed(2)}` : `-$${Math.abs(netIncome).toFixed(2)}`}</Text>
+                            <Text style={styles.valText}>{ni >= 0 ? `+$${ni.toFixed(2)}` : `-$${Math.abs(ni).toFixed(2)}`}</Text>
                           </View>
                         </>
                       );
                     })()}
                     
-                    {/* 4. Investment Properties (Passive Income) */}
+                    {/* 4. Investment Properties (Passive Income) - floored to hundredths for display */}
                     {rentalHousingLoading && (
                       <View style={styles.row}>
                         <Text style={styles.keyText}>Loading rental data...</Text>
@@ -453,24 +459,24 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                     {rentalHousingData && (
                       <View style={styles.row}>
                         <Text style={styles.keyText}>Investment Properties (Passive Income)</Text>
-                        <Text style={styles.valText}>+${rentalHousingData.totalIncomePerSecond.toFixed(2)}</Text>
+                        <Text style={styles.valText}>+${floorToHundredths(rentalHousingData.totalIncomePerSecond).toFixed(2)}</Text>
                       </View>
                     )}
                     
-                    {/* 5. Total Cash Flow Rate (uses actual ratePerSecond from balance state) */}
+                    {/* 5. Total Cash Flow Rate (floored to hundredths for display) */}
                     <View style={[styles.row, { marginTop: SIZING.spacing.md }]}>
                       <Text style={styles.keyText}>Total Cash Flow Rate</Text>
                       <Text style={[styles.valText, { color: colors.matrix }]}>
-                        {ratePerSecond >= 0 ? `+$${ratePerSecond.toFixed(2)}` : `-$${Math.abs(ratePerSecond).toFixed(2)}`}/sec
+                        {floorToHundredths(ratePerSecond) >= 0 ? `+$${floorToHundredths(ratePerSecond).toFixed(2)}` : `-$${Math.abs(floorToHundredths(ratePerSecond)).toFixed(2)}`}/sec
                       </Text>
                     </View>
                     <View style={[styles.row, { marginTop: SIZING.spacing.md }]}>
                       <Text style={styles.keyText}>Investing Activities</Text>
-                      <Text style={styles.valText}>{(merged.cashFlows?.investing ?? 0) >= 0 ? `+${(merged.cashFlows?.investing ?? 0).toFixed(2)}` : (merged.cashFlows?.investing ?? 0).toFixed(2)}</Text>
+                      <Text style={styles.valText}>{(() => { const v = floorToHundredths(merged.cashFlows?.investing ?? 0); return v >= 0 ? `+${v.toFixed(2)}` : v.toFixed(2); })()}</Text>
                     </View>
                     <View style={styles.row}>
                       <Text style={styles.keyText}>Financing Activities</Text>
-                      <Text style={styles.valText}>{(merged.cashFlows?.financing ?? 0).toFixed(2)}</Text>
+                      <Text style={styles.valText}>{floorToHundredths(merged.cashFlows?.financing ?? 0).toFixed(2)}</Text>
                     </View>
                   </View>
                 ) : (
