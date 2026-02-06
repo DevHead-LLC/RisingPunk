@@ -1,5 +1,5 @@
 import React, { memo, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Animated, TouchableOpacity, Platform } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { useGetCurrentTaskGuideTaskQuery, useTrackTaskGuidePillTapMutation } from '../../store/api/userGuideApi';
@@ -138,10 +138,10 @@ const createTaskGuideStyles = (colors: ReturnType<typeof useThemeColors>) => Sty
   touchableContainer: {
     position: 'absolute',
     bottom: SIZING.spacing.lg,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
     zIndex: 500,
+    ...(Platform.OS === 'android'
+      ? { left: SIZING.spacing.lg, alignItems: 'flex-start' as const }
+      : { left: 0, right: 0, alignItems: 'center' as const }),
   },
   taskGuideContainer: {
     padding: SIZING.spacing.xs,
