@@ -98,6 +98,16 @@ export interface TrackWalletViewResponse {
   message?: string;
 }
 
+export interface TrackFinancialStatementViewResponse {
+  success: boolean;
+  message?: string;
+}
+
+export interface TrackUsernameChangeSettingViewResponse {
+  success: boolean;
+  message?: string;
+}
+
 export interface TrackAnotherUserProfileVisitRequest {
   visitedUserId: string;
 }
