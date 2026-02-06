@@ -167,10 +167,8 @@ export function ResearchLockedModal({
 
       if (data.success) {
         onUnlockSuccess(data.newBalance);
-        
-        if (requirements.categoryId === 'home-defense') {
-          dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
-        }
+        // Invalidate task guide so category-unlock tasks (e.g. Home Defense, Hack Ability, Hack Crew) update live
+        dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
       } else {
         setShowUnlockError(true);
         setErrorMessage(data.message);
