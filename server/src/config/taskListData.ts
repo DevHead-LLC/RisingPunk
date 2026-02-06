@@ -260,6 +260,30 @@ const TASK_LIST: Task[] = [
     skipable: true,
     reward: { type: 'wallet', value: 30 },
     howTo: 'Navigate: HomeLocation > Research Center > Home Defense Category > Antivirus Feature\n\nRequirements: Level 2 and $25,000 wallet balance. If you don\'t meet these requirements yet, fight NPCs in the HackMap to level up and earn money. Once you start research, it will take time to complete. You can speed it up for a fee if desired.'
+  },
+  {
+    id: 'use-shield',
+    title: 'Use a shield',
+    description: 'Activate an Antivirus Shield to protect your system from attacks',
+    order: 21,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.shieldActivatedAt);
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 35 },
+    howTo: 'Navigate: Home > HackRig / HackMapScreen > Toolbar (bottom right of screen) > Click Shield > In modal, select a shield time and click it.\n\n*Must have unlocked Antivirus in research for shielding ability.'
+  },
+  {
+    id: 'build-investment-property-2',
+    title: 'Build Investment Property 2',
+    description: 'Construct your second investment property (Property 2)',
+    order: 22,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return user.unlockedFeatures?.rentalHousing2 === true;
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 40 },
+    howTo: 'Navigate: Home (Turf) > Development Zone > Investment Property 2 — tap the location to unlock and start construction. Build completes in 2 hours (or speed up for a fee). Requires Property 1 built first and sufficient balance to unlock.'
   }
 ];
 

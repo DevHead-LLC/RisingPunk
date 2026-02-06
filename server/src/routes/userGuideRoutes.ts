@@ -32,7 +32,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
         new: true,
         setDefaultsOnInsert: true
       }
-    ).select('completedTasks collectedTasks skippedTasks showTaskGuide taskGuidePillTappedOnce profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt walletViewedAt attackedLevel1NpcAt visitedAnotherUserProfileAt homeDefenseUnlockedAt antivirusUnlockedAt').lean();
+    ).select('completedTasks collectedTasks skippedTasks showTaskGuide taskGuidePillTappedOnce profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt walletViewedAt attackedLevel1NpcAt visitedAnotherUserProfileAt homeDefenseUnlockedAt antivirusUnlockedAt shieldActivatedAt').lean();
 
     if (!progress) {
       res.status(500).json({ error: 'Failed to initialize task progress' });
@@ -62,7 +62,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
     // This ensures tasks like 'reach-level-2' are auto-completed if user has already reached level 2
     // Note: Using .lean() to get plain JavaScript object, and explicitly selecting fields
     // If fields don't exist in database, they will be undefined (not default value)
-    const user = await User.findById(userId).select('totalGuardiansBuilt totalPhreaksBuilt totalBreachersBuilt unlockedFeatures.hackRig unlockedFeatures.researchCenter unlockedFeatures.rentalHousing1 level').lean();
+    const user = await User.findById(userId).select('totalGuardiansBuilt totalPhreaksBuilt totalBreachersBuilt unlockedFeatures.hackRig unlockedFeatures.researchCenter unlockedFeatures.rentalHousing1 unlockedFeatures.rentalHousing2 level').lean();
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;
@@ -177,7 +177,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
     // SECOND PASS: After auto-completing tasks, refresh progress and find the current task
     if (anyTaskAutoCompleted) {
       const updatedProgress = await UserTaskProgress.findOne({ userId })
-        .select('completedTasks collectedTasks skippedTasks showTaskGuide taskGuidePillTappedOnce profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt walletViewedAt attackedLevel1NpcAt visitedAnotherUserProfileAt')
+        .select('completedTasks collectedTasks skippedTasks showTaskGuide taskGuidePillTappedOnce profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt walletViewedAt attackedLevel1NpcAt visitedAnotherUserProfileAt homeDefenseUnlockedAt antivirusUnlockedAt shieldActivatedAt')
         .lean();
       
       if (updatedProgress) {

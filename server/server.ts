@@ -7,6 +7,7 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { User } from './src/models/User';
+import { UserTaskProgress } from './src/models/UserTaskProgress';
 import { ShieldService } from './src/services/ShieldService';
 import authRoutes from './src/routes/auth';
 import auth from './src/middleware/auth';
@@ -455,6 +456,16 @@ app.post('/api/antivirus-shield/activate', auth, async (req: Request, res: Respo
       cooldownUntil: null
     };
     await user.save();
+
+    // Mark "Use a shield" guided task progress (any shield duration completes the task)
+    await UserTaskProgress.findOneAndUpdate(
+      { userId: user._id },
+      {
+        $set: { shieldActivatedAt: now },
+        $setOnInsert: { completedTasks: [], collectedTasks: [], skippedTasks: [], showTaskGuide: true }
+      },
+      { upsert: true }
+    );
 
     res.json({
       success: true,
