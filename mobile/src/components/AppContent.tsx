@@ -263,11 +263,11 @@ const AppContent = memo(() => {
       return;
     }
 
-    // Start timer to trigger balance selector recalculation for display updates
+    // Trigger balance display recalculation (30s to reduce re-renders and ease image loading during dev)
     if (!balanceDisplayTimerRef.current) {
       balanceDisplayTimerRef.current = setInterval(() => {
         dispatch(triggerUpdate());
-      }, 10000);
+      }, 30000);
     }
 
     return () => {

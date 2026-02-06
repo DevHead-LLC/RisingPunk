@@ -22,9 +22,17 @@ export interface IUserTaskProgress extends Document {
   walletViewedAt?: Date;
   attackedLevel1NpcAt?: Date;
   attackedLevel5NpcAt?: Date;
+  attackedLevel6NpcAt?: Date;
   visitedAnotherUserProfileAt?: Date;
   homeDefenseUnlockedAt?: Date;
   antivirusUnlockedAt?: Date;
+  hackAbilityUnlockedAt?: Date;
+  addBattalionCResearchUnlockedAt?: Date;
+  battalionSizePlus250ResearchUnlockedAt?: Date;
+  hackCrewUnlockedAt?: Date;
+  crewSystemResearchUnlockedAt?: Date;
+  crewJoinedAt?: Date;
+  firstCrewChatMessageSentAt?: Date;
   shieldActivatedAt?: Date;
   financialStatementViewedAt?: Date;
   usernameChangeSettingViewedAt?: Date;
@@ -113,6 +121,10 @@ const userTaskProgressSchema = new Schema({
     type: Date,
     required: false
   },
+  attackedLevel6NpcAt: {
+    type: Date,
+    required: false
+  },
   visitedAnotherUserProfileAt: {
     type: Date,
     required: false
@@ -122,6 +134,34 @@ const userTaskProgressSchema = new Schema({
     required: false
   },
   antivirusUnlockedAt: {
+    type: Date,
+    required: false
+  },
+  hackAbilityUnlockedAt: {
+    type: Date,
+    required: false
+  },
+  addBattalionCResearchUnlockedAt: {
+    type: Date,
+    required: false
+  },
+  battalionSizePlus250ResearchUnlockedAt: {
+    type: Date,
+    required: false
+  },
+  hackCrewUnlockedAt: {
+    type: Date,
+    required: false
+  },
+  crewSystemResearchUnlockedAt: {
+    type: Date,
+    required: false
+  },
+  crewJoinedAt: {
+    type: Date,
+    required: false
+  },
+  firstCrewChatMessageSentAt: {
     type: Date,
     required: false
   },
