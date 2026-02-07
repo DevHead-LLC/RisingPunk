@@ -52,11 +52,40 @@ export interface IUser extends Document {
     completesAt: Date | null;
   };
   rentalHousingBuilds?: {
-    property1: { startedAt: Date | null; completesAt: Date | null };
-    property2: { startedAt: Date | null; completesAt: Date | null };
-    property3: { startedAt: Date | null; completesAt: Date | null };
-    property4: { startedAt: Date | null; completesAt: Date | null };
+    property1: { startedAt: Date | null; completesAt: Date | null; targetLevel?: number };
+    property2: { startedAt: Date | null; completesAt: Date | null; targetLevel?: number };
+    property3: { startedAt: Date | null; completesAt: Date | null; targetLevel?: number };
+    property4: { startedAt: Date | null; completesAt: Date | null; targetLevel?: number };
   };
+  /** Property level 0 = not built, 1-5 = build level. */
+  rentalHousingLevels?: {
+    property1: number;
+    property2: number;
+    property3: number;
+    property4: number;
+  };
+  /** True when level was set by completing a build (so we don't grandfather them to 5). */
+  rentalHousingLevelSetByBuild?: {
+    property1: boolean;
+    property2: boolean;
+    property3: boolean;
+    property4: boolean;
+  };
+  /** Room remodel level 1-4 per room (1 = base, 2-4 = remodel tiers). */
+  rentalHousingRooms?: {
+    property1: { bathroom: number; kitchen: number; bedroom: number; livingRoom: number };
+    property2: { bathroom: number; kitchen: number; bedroom: number; livingRoom: number };
+    property3: { bathroom: number; kitchen: number; bedroom: number; livingRoom: number };
+    property4: { bathroom: number; kitchen: number; bedroom: number; livingRoom: number };
+  };
+  /** One active remodel at a time (any property). */
+  activeRemodel?: {
+    propertyId: number;
+    room: 'bathroom' | 'kitchen' | 'bedroom' | 'livingRoom';
+    startedAt: Date | null;
+    completesAt: Date | null;
+    targetRoomLevel: number;
+  } | null;
   antivirusShield?: {
     active: boolean;
     startedAt: Date | null;
@@ -276,45 +305,70 @@ const userSchema = new Schema({
   },
   rentalHousingBuilds: {
     property1: {
-      startedAt: {
-        type: Date,
-        default: null
-      },
-      completesAt: {
-        type: Date,
-        default: null
-      }
+      startedAt: { type: Date, default: null },
+      completesAt: { type: Date, default: null },
+      targetLevel: { type: Number, default: null }
     },
     property2: {
-      startedAt: {
-        type: Date,
-        default: null
-      },
-      completesAt: {
-        type: Date,
-        default: null
-      }
+      startedAt: { type: Date, default: null },
+      completesAt: { type: Date, default: null },
+      targetLevel: { type: Number, default: null }
     },
     property3: {
-      startedAt: {
-        type: Date,
-        default: null
-      },
-      completesAt: {
-        type: Date,
-        default: null
-      }
+      startedAt: { type: Date, default: null },
+      completesAt: { type: Date, default: null },
+      targetLevel: { type: Number, default: null }
     },
     property4: {
-      startedAt: {
-        type: Date,
-        default: null
-      },
-      completesAt: {
-        type: Date,
-        default: null
-      }
+      startedAt: { type: Date, default: null },
+      completesAt: { type: Date, default: null },
+      targetLevel: { type: Number, default: null }
     }
+  },
+  rentalHousingLevels: {
+    property1: { type: Number, default: 0 },
+    property2: { type: Number, default: 0 },
+    property3: { type: Number, default: 0 },
+    property4: { type: Number, default: 0 }
+  },
+  rentalHousingLevelSetByBuild: {
+    property1: { type: Boolean, default: false },
+    property2: { type: Boolean, default: false },
+    property3: { type: Boolean, default: false },
+    property4: { type: Boolean, default: false }
+  },
+  rentalHousingRooms: {
+    property1: {
+      bathroom: { type: Number, default: 1 },
+      kitchen: { type: Number, default: 1 },
+      bedroom: { type: Number, default: 1 },
+      livingRoom: { type: Number, default: 1 }
+    },
+    property2: {
+      bathroom: { type: Number, default: 1 },
+      kitchen: { type: Number, default: 1 },
+      bedroom: { type: Number, default: 1 },
+      livingRoom: { type: Number, default: 1 }
+    },
+    property3: {
+      bathroom: { type: Number, default: 1 },
+      kitchen: { type: Number, default: 1 },
+      bedroom: { type: Number, default: 1 },
+      livingRoom: { type: Number, default: 1 }
+    },
+    property4: {
+      bathroom: { type: Number, default: 1 },
+      kitchen: { type: Number, default: 1 },
+      bedroom: { type: Number, default: 1 },
+      livingRoom: { type: Number, default: 1 }
+    }
+  },
+  activeRemodel: {
+    propertyId: { type: Number, default: null },
+    room: { type: String, enum: ['bathroom', 'kitchen', 'bedroom', 'livingRoom'], default: null },
+    startedAt: { type: Date, default: null },
+    completesAt: { type: Date, default: null },
+    targetRoomLevel: { type: Number, default: null }
   },
   antivirusShield: {
     active: {

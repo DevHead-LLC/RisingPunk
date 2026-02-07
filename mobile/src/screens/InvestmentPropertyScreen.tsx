@@ -1,10 +1,30 @@
-import React, { useRef, useEffect, useMemo, useCallback, memo } from 'react';
-import { View, ScrollView, StyleSheet, Dimensions, Text, Platform } from 'react-native';
+import React, { useRef, useEffect, useMemo, useCallback, memo, useState } from 'react';
+import { View, ScrollView, StyleSheet, Dimensions, Text, Platform, Modal, TouchableOpacity } from 'react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useTheme } from '../context/ThemeContext';
 import { SIZING } from '../styles/theme';
 import { CloseButton } from '../components/common/CloseButton';
 import { FloorPlan } from '../components/common/FloorPlan';
+import {
+  useGetRentalHousingStatusQuery,
+  useStartRemodelMutation,
+  useCompleteRemodelMutation,
+  useSpeedupRemodelMutation,
+} from '../store/api/authApi';
+import { useAppSelector, useAppDispatch } from '../store/hooks';
+import { updateBalance } from '../store/slices/balanceSlice';
+import type { RemodelRoomType } from '../store/api/authApi';
+
+/**
+ * Remodel tier cost/time. Source of truth: server/src/config/rentalPropertyConfig.ts ROOM_REMODEL_LEVELS.
+ * Min property level per next room level (2→3, 3→4, 4→5) is in FloorPlan.minPropertyLevelForNextRoomLevel
+ * and in the modal's propertyLevel check — must match server ROOM_REMODEL_MIN_PROPERTY_LEVEL. See task doc § Client–server config sync.
+ */
+const ROOM_REMODEL_CONFIG: { level: number; cost: number; timeMinutes: number }[] = [
+  { level: 2, cost: 5000, timeMinutes: 5 },
+  { level: 3, cost: 10000, timeMinutes: 10 },
+  { level: 4, cost: 15000, timeMinutes: 15 },
+];
 
 let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, computePanBounds: any;
 
@@ -23,6 +43,17 @@ computePanBounds = mapPanBounds.computePanBounds;
 interface InvestmentPropertyScreenProps {
   propertyId: number;
   onBack: () => void;
+}
+
+/** Human-readable label for remodel room type (e.g. livingRoom → "Living Room"). */
+function getRemodelRoomDisplayName(room: RemodelRoomType): string {
+  const labels: Record<RemodelRoomType, string> = {
+    bathroom: 'Bathroom',
+    kitchen: 'Kitchen',
+    bedroom: 'Bedroom',
+    livingRoom: 'Living Room',
+  };
+  return labels[room] ?? room;
 }
 
 const GesturePanView = memo(function GesturePanView({
@@ -72,6 +103,35 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
   const colors = useThemeColors();
   const { themeMode } = useTheme();
   const scrollViewRef = useRef<ScrollView>(null);
+  const [remodelRoom, setRemodelRoom] = useState<RemodelRoomType | null>(null);
+  const [modalCountdownNow, setModalCountdownNow] = useState(() => Date.now());
+  const [hasActiveRemodelHere, setHasActiveRemodelHere] = useState(false);
+
+  const { data: status } = useGetRentalHousingStatusQuery(propertyId, {
+    pollingInterval: remodelRoom || hasActiveRemodelHere ? 5000 : 0
+  });
+
+  useEffect(() => {
+    setHasActiveRemodelHere(status?.activeRemodel?.propertyId === propertyId);
+  }, [status?.activeRemodel?.propertyId, propertyId]);
+
+  const [startRemodel] = useStartRemodelMutation();
+  const [completeRemodel] = useCompleteRemodelMutation();
+  const [speedupRemodel] = useSpeedupRemodelMutation();
+  const dispatch = useAppDispatch();
+  const balanceState = useAppSelector(state => state.balance);
+  const propertyLevel = status?.propertyLevel ?? 0;
+  const roomLevels = status?.roomLevels ?? { bathroom: 1, kitchen: 1, bedroom: 1, livingRoom: 1 };
+  const activeRemodel = status?.activeRemodel?.propertyId === propertyId ? status.activeRemodel : null;
+  const activeRemodelRoom = activeRemodel?.room ?? null;
+
+  const isModalShowingInProgress = Boolean(remodelRoom && activeRemodel?.room === remodelRoom && activeRemodel?.completesAt);
+  useEffect(() => {
+    if (!isModalShowingInProgress) return;
+    setModalCountdownNow(Date.now());
+    const id = setInterval(() => setModalCountdownNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [isModalShowingInProgress, remodelRoom, activeRemodel?.room, activeRemodel?.completesAt]);
 
   const FLOOR_PLAN_WIDTH = 1250;
   const FLOOR_PLAN_HEIGHT = 950;
@@ -223,10 +283,162 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
           panGesture={panGesture}
         >
           <View style={[styles.floorPlanContainer, { borderColor: colors.matrix }]}>
-            <FloorPlan propertyId={propertyId} />
+            <FloorPlan
+              propertyId={propertyId}
+              propertyLevel={propertyLevel}
+              onRemodel={propertyLevel >= 3 ? setRemodelRoom : undefined}
+              activeRemodelRoom={activeRemodelRoom}
+              activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
+            />
           </View>
         </GesturePanView>
       </View>
+
+      {/* Remodel modal */}
+      {remodelRoom && (
+        <Modal visible transparent animationType="fade" supportedOrientations={['landscape-left', 'landscape-right']}>
+          <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
+            <View style={[styles.modalBox, { backgroundColor: colors.background }]}>
+              <Text style={[styles.modalTitle, { color: colors.text?.primary || '#fff' }]}>
+                Remodel {getRemodelRoomDisplayName(remodelRoom)}
+              </Text>
+              {activeRemodel?.room === remodelRoom ? (
+                (() => {
+                  const remainingSec = activeRemodel.completesAt
+                    ? Math.max(0, (new Date(activeRemodel.completesAt).getTime() - modalCountdownNow) / 1000)
+                    : 0;
+                  const speedupCost = Math.ceil(remainingSec) * 5;
+                  const canSpeedup = (balanceState.total ?? 0) >= speedupCost && remainingSec > 0;
+                  const timeUp = remainingSec <= 0;
+                  return (
+                    <>
+                      <Text style={[styles.modalSubtitle, { color: colors.text?.secondary || '#ccc' }]}>
+                        {timeUp ? 'Remodel complete! Tap Complete to finish.' : `Remodel in progress. Time left: ${Math.floor(remainingSec / 60)}:${(Math.floor(remainingSec) % 60).toString().padStart(2, '0')}`}
+                      </Text>
+                      <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+                        {timeUp ? (
+                          <TouchableOpacity
+                            style={[styles.modalButton, { backgroundColor: colors.primary }]}
+                            onPress={async () => {
+                              try {
+                                const res = await completeRemodel({ propertyId, room: remodelRoom }).unwrap();
+                                if (res.ratePerSecond != null || res.newBalance != null) {
+                                  dispatch(updateBalance({
+                                    total: res.newBalance ?? balanceState.total ?? 0,
+                                    ratePerSecond: res.ratePerSecond ?? balanceState.ratePerSecond,
+                                    lastUpdated: balanceState.lastUpdated ? new Date(balanceState.lastUpdated) : null,
+                                    fractionalRemainder: balanceState.fractionalRemainder
+                                  }));
+                                }
+                                setRemodelRoom(null);
+                              } catch {
+                                // keep modal open
+                              }
+                            }}
+                          >
+                            <Text style={styles.modalButtonText}>Complete</Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <TouchableOpacity
+                            style={[styles.modalButton, { backgroundColor: canSpeedup ? colors.primary : '#666' }]}
+                            onPress={async () => {
+                              if (!canSpeedup) return;
+                              try {
+                                const res = await speedupRemodel({ propertyId, room: remodelRoom }).unwrap();
+                                dispatch(updateBalance({
+                                  total: res.newBalance,
+                                  ratePerSecond: res.ratePerSecond ?? balanceState.ratePerSecond,
+                                  lastUpdated: balanceState.lastUpdated ? new Date(balanceState.lastUpdated) : null,
+                                  fractionalRemainder: balanceState.fractionalRemainder
+                                }));
+                                setRemodelRoom(null);
+                              } catch {
+                                // keep modal open
+                              }
+                            }}
+                            disabled={!canSpeedup}
+                          >
+                            <Text style={styles.modalButtonText}>Speedup (${speedupCost})</Text>
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity style={[styles.modalButton, { backgroundColor: '#444' }]} onPress={() => setRemodelRoom(null)}>
+                          <Text style={styles.modalButtonText}>Close</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  );
+                })()
+              ) : (
+                (() => {
+                  const currentLevel = roomLevels[remodelRoom] ?? 1;
+                  if (currentLevel >= 4) {
+                    return (
+                      <>
+                        <Text style={[styles.modalSubtitle, { color: colors.text?.secondary || '#ccc' }]}>
+                          This room is already at max level (4).
+                        </Text>
+                        <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.primary }]} onPress={() => setRemodelRoom(null)}>
+                          <Text style={styles.modalButtonText}>Close</Text>
+                        </TouchableOpacity>
+                      </>
+                    );
+                  }
+                  const nextLevel = Math.min(4, currentLevel + 1);
+                  const config = ROOM_REMODEL_CONFIG[nextLevel - 2];
+                  if (!config || propertyLevel < (nextLevel === 2 ? 3 : nextLevel === 3 ? 4 : 5)) {
+                    return (
+                      <>
+                        <Text style={[styles.modalSubtitle, { color: colors.text?.secondary || '#ccc' }]}>
+                          Property level too low for next remodel.
+                        </Text>
+                        <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.primary }]} onPress={() => setRemodelRoom(null)}>
+                          <Text style={styles.modalButtonText}>Close</Text>
+                        </TouchableOpacity>
+                      </>
+                    );
+                  }
+                  const hasFunds = (balanceState.total ?? 0) >= config.cost;
+                  return (
+                    <>
+                      <Text style={[styles.modalSubtitle, { color: colors.text?.secondary || '#ccc' }]}>
+                        Level {currentLevel} → {nextLevel}: ${config.cost.toLocaleString()}, {config.timeMinutes} min
+                      </Text>
+                      <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+                        <TouchableOpacity
+                          style={[styles.modalButton, { backgroundColor: hasFunds ? colors.primary : '#666' }]}
+                          onPress={async () => {
+                            if (!hasFunds) return;
+                            try {
+                              const res = await startRemodel({ propertyId, room: remodelRoom }).unwrap();
+                              if (res.newBalance != null) {
+                                dispatch(updateBalance({
+                                  total: res.newBalance,
+                                  ratePerSecond: balanceState.ratePerSecond,
+                                  lastUpdated: balanceState.lastUpdated ? new Date(balanceState.lastUpdated) : null,
+                                  fractionalRemainder: balanceState.fractionalRemainder
+                                }));
+                              }
+                              setRemodelRoom(null);
+                            } catch {
+                              // keep modal open
+                            }
+                          }}
+                          disabled={!hasFunds}
+                        >
+                          <Text style={styles.modalButtonText}>Start Remodel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.modalButton, { backgroundColor: '#444' }]} onPress={() => setRemodelRoom(null)}>
+                          <Text style={styles.modalButtonText}>Cancel</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  );
+                })()
+              )}
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 };
@@ -265,9 +477,37 @@ const styles = StyleSheet.create({
     zIndex: 1000, // Ensure it's above everything
   },
   fixedPropertyText: {
-    fontSize: 20, // Reduced from 24px
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
     textAlign: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBox: {
+    padding: SIZING.spacing.lg,
+    borderRadius: 12,
+    minWidth: 280,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    marginBottom: 12,
+  },
+  modalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontWeight: '600',
   },
 });

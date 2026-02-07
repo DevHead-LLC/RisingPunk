@@ -150,7 +150,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const isFreeHackRig = highlightTaskId === 'free-hack-rig';
   const isViewWallet = highlightTaskId === 'view-wallet';
   const isBuildResearchCenter = highlightTaskId === 'build-research-center';
-  const isBuildInvestmentProperty = highlightTaskId === 'build-investment-property';
+  const isBuildInvestmentProperty = highlightTaskId === 'build-investment-property' || highlightTaskId === 'build-investment-property-2';
   const isHomeHighlight = isVisitHome || isVisitHackmap || (isBuildGuardians && highlightStep === null) || (isFreeHackRig && highlightStep === null);
   const isDigitalBarracksHighlight = isVisitDigitalBarracks;
   const isResearchCenterHighlight = isBuildResearchCenter;

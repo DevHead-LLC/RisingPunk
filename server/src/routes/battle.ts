@@ -123,9 +123,51 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
               );
             }
           }
+          // Display level 5 (shown on hack map tile) = userLevelAssociation 20 (see map.ts getDisplayLevel)
+          if (npc && npc.userLevelAssociation === 20) {
+            const existingProgress = await UserTaskProgress.findOne({ userId: req.user._id });
+            const wasAlreadyAttacked = existingProgress?.attackedLevel5NpcAt;
+            
+            if (!wasAlreadyAttacked) {
+              await UserTaskProgress.findOneAndUpdate(
+                { userId: req.user._id },
+                {
+                  $set: { attackedLevel5NpcAt: new Date() },
+                  $setOnInsert: {
+                    completedTasks: [],
+                    collectedTasks: [],
+                    skippedTasks: [],
+                    showTaskGuide: true
+                  }
+                },
+                { upsert: true, new: true }
+              );
+            }
+          }
+          // Display level 6 (shown on hack map tile) = userLevelAssociation 25 (see map.ts getDisplayLevel)
+          if (npc && npc.userLevelAssociation === 25) {
+            const existingProgress = await UserTaskProgress.findOne({ userId: req.user._id });
+            const wasAlreadyAttacked = existingProgress?.attackedLevel6NpcAt;
+            
+            if (!wasAlreadyAttacked) {
+              await UserTaskProgress.findOneAndUpdate(
+                { userId: req.user._id },
+                {
+                  $set: { attackedLevel6NpcAt: new Date() },
+                  $setOnInsert: {
+                    completedTasks: [],
+                    collectedTasks: [],
+                    skippedTasks: [],
+                    showTaskGuide: true
+                  }
+                },
+                { upsert: true, new: true }
+              );
+            }
+          }
         }
       } catch (taskTrackingError) {
-        console.error('Error tracking Level 1 NPC attack for task guide:', taskTrackingError);
+        console.error('Error tracking Level 1/5/6 NPC attack for task guide:', taskTrackingError);
       }
       
       res.status(201).json({ battleId: battle.battleId });

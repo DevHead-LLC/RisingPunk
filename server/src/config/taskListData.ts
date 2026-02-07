@@ -246,7 +246,7 @@ const TASK_LIST: Task[] = [
       return !!(progress?.homeDefenseUnlockedAt);
     },
     skipable: true,
-    reward: { type: 'wallet', value: 30 },
+    reward: { type: 'wallet', value: 25 },
     howTo: 'Navigate: HomeLocation > Research Center > Home Defense Category\n\nRequirements: Level 2 and $10,000 wallet balance. If you don\'t meet these requirements yet, fight NPCs in the HackMap to level up and earn money.'
   },
   {
@@ -260,6 +260,244 @@ const TASK_LIST: Task[] = [
     skipable: true,
     reward: { type: 'wallet', value: 30 },
     howTo: 'Navigate: HomeLocation > Research Center > Home Defense Category > Antivirus Feature\n\nRequirements: Level 2 and $25,000 wallet balance. If you don\'t meet these requirements yet, fight NPCs in the HackMap to level up and earn money. Once you start research, it will take time to complete. You can speed it up for a fee if desired.'
+  },
+  {
+    id: 'use-shield',
+    title: 'Use a shield',
+    description: 'Activate an Antivirus Shield to protect your system from attacks',
+    order: 21,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.shieldActivatedAt);
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 35 },
+    howTo: 'Navigate: Home > HackRig / HackMapScreen > Toolbar (bottom right of screen) > Click Shield > In modal, select a shield time and click it.\n\n*Must have unlocked Antivirus in research for shielding ability.'
+  },
+  {
+    id: 'build-investment-property-2',
+    title: 'Build Investment Property 2',
+    description: 'Construct your second investment property (Property 2)',
+    order: 22,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return user.unlockedFeatures?.rentalHousing2 === true;
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 40 },
+    howTo: 'Navigate: Home (Turf) > Development Zone > Investment Property 2 — tap the location to unlock and start construction. Build completes in 2 hours (or speed up for a fee). Requires Property 1 built first and sufficient balance to unlock.'
+  },
+  {
+    id: 'view-financial-statement',
+    title: 'View financial statement',
+    description: 'Open the Financial Statement screen to see income and cash flow',
+    order: 23,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.financialStatementViewedAt);
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 45 },
+    howTo: 'Navigate: Home (Turf) > tap Wallet/Balance (top) > Financial Statement view opens.'
+  },
+  {
+    id: 'reach-level-3',
+    title: 'Achieve level 3',
+    description: 'Reach level 3 by fighting on the Hack Map',
+    order: 24,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return user.level >= 3;
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 50 },
+    howTo: 'Navigate: Home (Turf) > HackRig > HackMap. Fight NPCs or players to gain experience and reach level 3. You can view your current level and progress in your profile.'
+  },
+  {
+    id: 'view-username-change-setting',
+    title: 'View "Username Change" setting',
+    description: 'Open the Account settings and view the Change User Handle (username change) option',
+    order: 25,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.usernameChangeSettingViewedAt);
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 55 },
+    howTo: 'Navigate: Home (Turf) > Profile > Account tab. The "Change User Handle" (username change) setting is here.'
+  },
+  {
+    id: 'build-100-each-bot-type-remaining',
+    title: 'Achieve total bot builds of 100 of each type remaining',
+    description: 'Build 100 Breachers and 100 Phreaks (100 Guardians already counted in a prior task)',
+    order: 26,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      const breachers = user.totalBreachersBuilt;
+      const phreaks = user.totalPhreaksBuilt;
+      if (breachers === undefined || breachers === null || typeof breachers !== 'number') return false;
+      if (phreaks === undefined || phreaks === null || typeof phreaks !== 'number') return false;
+      return breachers >= 100 && phreaks >= 100;
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 60 },
+    howTo: 'Navigate: Home (Turf) > Digital Barracks. Build bots in the garage until you have 100 Breachers and 100 Phreaks (Guardians already count from a prior task).'
+  },
+  {
+    id: 'hack-level-5-npc',
+    title: 'Hack a level 5 NPC',
+    description: 'Attack a level 5 NPC on the hack map',
+    order: 27,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.attackedLevel5NpcAt);
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 65 },
+    howTo: 'Navigate: Home (Turf) > HackRig > HackMap > LEVEL 5 NPC. Look for the level indicator at the top right of the NPC tile.'
+  },
+  {
+    id: 'reach-level-4',
+    title: 'Achieve level 4',
+    description: 'Reach level 4 by fighting on the Hack Map',
+    order: 28,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return user.level >= 4;
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 70 },
+    howTo: 'Navigate: Home (Turf) > HackRig > HackMap. Fight NPCs or players to gain experience and reach level 4. You can view your current level and progress in your profile.'
+  },
+  {
+    id: 'build-500-each-bot-type',
+    title: 'Achieve total bot builds of 500 of each type',
+    description: 'Build 500 Guardians, 500 Breachers, and 500 Phreaks',
+    order: 29,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      const guardians = user.totalGuardiansBuilt;
+      const breachers = user.totalBreachersBuilt;
+      const phreaks = user.totalPhreaksBuilt;
+      if (guardians === undefined || guardians === null || typeof guardians !== 'number') return false;
+      if (breachers === undefined || breachers === null || typeof breachers !== 'number') return false;
+      if (phreaks === undefined || phreaks === null || typeof phreaks !== 'number') return false;
+      return guardians >= 500 && breachers >= 500 && phreaks >= 500;
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 75 },
+    howTo: 'Navigate: Home (Turf) > Digital Barracks. Build bots in the garage until you have 500 Guardians, 500 Breachers, and 500 Phreaks.'
+  },
+  {
+    id: 'reach-level-5',
+    title: 'Achieve level 5',
+    description: 'Reach level 5 by fighting on the Hack Map',
+    order: 30,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return user.level >= 5;
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 80 },
+    howTo: 'Navigate: Home (Turf) > HackRig > HackMap. Fight NPCs or players to gain experience and reach level 5. You can view your current level and progress in your profile.'
+  },
+  {
+    id: 'unlock-hack-ability-category',
+    title: 'Unlock Hack Ability Category in Research Center',
+    description: 'Unlock the Hack Ability research category',
+    order: 31,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.hackAbilityUnlockedAt);
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 85 },
+    howTo: 'Navigate: Home (Turf) > Research Center > Hack Ability Category. Meet the level and wallet balance requirements, then pay to unlock the category.'
+  },
+  {
+    id: 'perform-add-battalion-c-research',
+    title: 'Perform Add Battalion C Research',
+    description: 'Complete the Add Battalion C research in the Hack Ability category to unlock a third battalion',
+    order: 32,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.addBattalionCResearchUnlockedAt);
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 90 },
+    howTo: 'Navigate: Home (Turf) > Research Center > Hack Ability Category > Add Battalion C. Unlock the Hack Ability category first if needed; then start and complete the Add Battalion C research (unlocks a third battalion for battles).'
+  },
+  {
+    id: 'reach-level-6',
+    title: 'Achieve level 6',
+    description: 'Reach level 6 by fighting on the Hack Map',
+    order: 33,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return user.level >= 6;
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 95 },
+    howTo: 'Navigate: Home (Turf) > HackRig > HackMap. Fight NPCs or players to gain experience and reach level 6. You can view your current level and progress in your profile.'
+  },
+  {
+    id: 'perform-battalion-size-plus-250-research',
+    title: 'Battalion Size +250 Research',
+    description: 'Complete the Battalion Size +250 research in the Hack Ability category to increase max troops per battalion from 250 to 500',
+    order: 34,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.battalionSizePlus250ResearchUnlockedAt);
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 100 },
+    howTo: 'Navigate: Home (Turf) > Research Center > Hack Ability Category > Battalion Size +250. Unlock the Hack Ability category and Add Battalion C first if needed; then start and complete the Battalion Size +250 research (increases max troops per battalion to 500).'
+  },
+  {
+    id: 'unlock-hack-crew-category',
+    title: 'Unlock Hack Crew Category in Research Center',
+    description: 'Unlock the Hack Crew research category',
+    order: 35,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.hackCrewUnlockedAt);
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 105 },
+    howTo: 'Navigate: Home (Turf) > Research Center > Hack Crew Category. Meet the level and wallet balance requirements, then pay to unlock the category.'
+  },
+  {
+    id: 'perform-crew-system-research',
+    title: 'Perform Crew System Research',
+    description: 'Complete the Crew System research in the Hack Crew category to unlock forming, joining, and managing hack crews',
+    order: 36,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.crewSystemResearchUnlockedAt);
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 110 },
+    howTo: 'Navigate: Home (Turf) > Research Center > Hack Crew Category > Crew System. Unlock the Hack Crew category first if needed; then start and complete the Crew System research (unlocks ability to form, join, and manage hack crews).'
+  },
+  {
+    id: 'hack-level-6-npc',
+    title: 'Hack a level 6 NPC',
+    description: 'Attack a level 6 NPC on the hack map',
+    order: 37,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.attackedLevel6NpcAt);
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 115 },
+    howTo: 'Navigate: Home (Turf) > HackRig > HackMap > LEVEL 6 NPC. Look for the level indicator at the top right of the NPC tile.'
+  },
+  {
+    id: 'start-or-join-crew',
+    title: 'Start or join a Crew',
+    description: 'Create your own hack crew or join an existing one',
+    order: 38,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.crewJoinedAt);
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 120 },
+    howTo: 'Navigate: Home (Turf) > Research Center > Hack Crew Category — complete Crew System research first. Then start a crew (create one) or find and join an existing crew from the Crew area.'
+  },
+  {
+    id: 'send-first-crew-chat-message',
+    title: 'Send your first message in crew chat',
+    description: 'Post a message in your crew\'s chat',
+    order: 39,
+    autoCompleteConditions: (user: IUser, progress?: IUserTaskProgress) => {
+      return !!(progress?.firstCrewChatMessageSentAt);
+    },
+    skipable: true,
+    reward: { type: 'wallet', value: 125 },
+    howTo: 'Navigate to your Crew (after starting or joining one), open crew chat, and send a message. You must be in a crew and have completed Crew System research.'
   }
 ];
 

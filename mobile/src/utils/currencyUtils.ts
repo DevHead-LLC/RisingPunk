@@ -5,6 +5,17 @@ export const formatCurrency = (amount: number): string => {
   return `+$${amount.toFixed(2)}`;
 };
 
+/** For investment property room display: show tenth-of-cent (thousandths). */
+export const formatCurrencyThousandths = (amount: number): string => {
+  return `+$${Number(amount).toFixed(3)}`;
+};
+
+/** Truncate to hundredths (for UI display only; keep full precision in state). Trunc toward zero so negative values (e.g. net loss) are not inflated. */
+export const truncToHundredths = (amount: number): number => {
+  // Round to 10000ths first to avoid IEEE 754 errors (e.g. 0.29 * 100 → 28.999…), then truncate to cents.
+  return Math.trunc(Math.round(amount * 10000) / 100) / 100;
+};
+
 export const roundToFloor = (amount: number): number => {
   return Math.floor(amount);
 };
