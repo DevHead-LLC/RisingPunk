@@ -105,10 +105,12 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
   const scrollViewRef = useRef<ScrollView>(null);
   const [remodelRoom, setRemodelRoom] = useState<RemodelRoomType | null>(null);
   const [modalCountdownNow, setModalCountdownNow] = useState(() => Date.now());
+  const prevStatusRef = useRef<{ activeRemodel?: { propertyId: number } } | undefined>(undefined);
 
   const { data: status } = useGetRentalHousingStatusQuery(propertyId, {
-    pollingInterval: remodelRoom || (status?.activeRemodel?.propertyId === propertyId) ? 5000 : 0
+    pollingInterval: remodelRoom || (prevStatusRef.current?.activeRemodel?.propertyId === propertyId) ? 5000 : 0
   });
+  prevStatusRef.current = status;
 
   const [startRemodel] = useStartRemodelMutation();
   const [completeRemodel] = useCompleteRemodelMutation();
