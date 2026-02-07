@@ -973,14 +973,21 @@ router.post('/complete-remodel/:propertyId', auth, async (req, res): Promise<voi
       const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
       await RentalHousingSyncService.performSync(updatedUser);
     }
+
+    const userForResponse = await User.findById(userId);
+    if (!userForResponse) {
+      res.status(500).json({ error: 'Error retrieving updated user data' });
+      return;
+    }
+
     res.json({
       success: true,
       message: 'Remodel completed',
       propertyId,
       room,
       roomLevel: ar.targetRoomLevel,
-      newBalance: updatedUser?.balance?.total,
-      ratePerSecond: updatedUser?.balance?.ratePerSecond
+      newBalance: userForResponse.balance.total,
+      ratePerSecond: userForResponse.balance.ratePerSecond
     });
   } catch (error) {
     console.error('Error completing remodel:', error);
