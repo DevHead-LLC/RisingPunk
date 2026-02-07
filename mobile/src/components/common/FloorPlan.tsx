@@ -23,6 +23,11 @@ function formatRemodelTimeLeft(remainingSec: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+/** Min property level required to remodel to this room level (2→3, 3→4, 4→5). Matches server ROOM_REMODEL_MIN_PROPERTY_LEVEL. */
+function minPropertyLevelForNextRoomLevel(nextLevel: 2 | 3 | 4): number {
+  return nextLevel === 2 ? 3 : nextLevel === 3 ? 4 : 5;
+}
+
 export const FloorPlan: React.FC<FloorPlanProps> = ({ propertyId, propertyLevel = 0, onRemodel, activeRemodelRoom, activeRemodelCompletesAt }) => {
   const colors = useThemeColors();
   const { data: rentalIncome, isLoading } = useGetRentalHousingIncomeQuery();
@@ -44,7 +49,11 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({ propertyId, propertyLevel 
   const propertyData = rentalIncome?.propertyBreakdown.find(p => p.propertyId === propertyId);
   const roomValues = propertyData?.roomValues;
   const roomLevels = propertyData?.roomLevels;
-  const canRemodel = propertyLevel >= 3 && Boolean(onRemodel);
+  const hasRemodelCallback = Boolean(onRemodel);
+  const canShowRemodelForRoom = (roomLevel: number) =>
+    hasRemodelCallback &&
+    roomLevel < 4 &&
+    propertyLevel >= minPropertyLevelForNextRoomLevel((roomLevel + 1) as 2 | 3 | 4);
 
   return (
     <View style={styles.floorPlan}>
@@ -58,7 +67,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({ propertyId, propertyLevel 
           <Text style={styles.roomText}>Bathroom</Text>
           <View style={styles.roomLevelRow}>
             <Text style={styles.roomLevelBadge}>Lv. {roomLevels?.bathroom ?? 1}</Text>
-            {canRemodel && (roomLevels?.bathroom ?? 1) < 4 && !activeRemodelRoom && (
+            {canShowRemodelForRoom(roomLevels?.bathroom ?? 1) && !activeRemodelRoom && (
               <TouchableOpacity onPress={() => onRemodel!('bathroom')} style={styles.remodelButton}>
                 <Text style={styles.remodelButtonText}>↑ Remodel</Text>
               </TouchableOpacity>
@@ -91,7 +100,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({ propertyId, propertyLevel 
           <Text style={styles.roomText}>Kitchen</Text>
           <View style={styles.roomLevelRow}>
             <Text style={styles.roomLevelBadge}>Lv. {roomLevels?.kitchen ?? 1}</Text>
-            {canRemodel && (roomLevels?.kitchen ?? 1) < 4 && !activeRemodelRoom && (
+            {canShowRemodelForRoom(roomLevels?.kitchen ?? 1) && !activeRemodelRoom && (
               <TouchableOpacity onPress={() => onRemodel!('kitchen')} style={styles.remodelButton}>
                 <Text style={styles.remodelButtonText}>↑ Remodel</Text>
               </TouchableOpacity>
@@ -118,7 +127,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({ propertyId, propertyLevel 
           <Text style={styles.roomText}>Bedroom</Text>
           <View style={styles.roomLevelRow}>
             <Text style={styles.roomLevelBadge}>Lv. {roomLevels?.bedroom ?? 1}</Text>
-            {canRemodel && (roomLevels?.bedroom ?? 1) < 4 && !activeRemodelRoom && (
+            {canShowRemodelForRoom(roomLevels?.bedroom ?? 1) && !activeRemodelRoom && (
               <TouchableOpacity onPress={() => onRemodel!('bedroom')} style={styles.remodelButton}>
                 <Text style={styles.remodelButtonText}>↑ Remodel</Text>
               </TouchableOpacity>
@@ -144,7 +153,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({ propertyId, propertyLevel 
           <Text style={styles.roomText}>Living Room</Text>
           <View style={styles.roomLevelRow}>
             <Text style={styles.roomLevelBadge}>Lv. {roomLevels?.livingRoom ?? 1}</Text>
-            {canRemodel && (roomLevels?.livingRoom ?? 1) < 4 && !activeRemodelRoom && (
+            {canShowRemodelForRoom(roomLevels?.livingRoom ?? 1) && !activeRemodelRoom && (
               <TouchableOpacity onPress={() => onRemodel!('livingRoom')} style={styles.remodelButton}>
                 <Text style={styles.remodelButtonText}>↑ Remodel</Text>
               </TouchableOpacity>

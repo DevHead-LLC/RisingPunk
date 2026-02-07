@@ -15,6 +15,11 @@ import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { updateBalance } from '../store/slices/balanceSlice';
 import type { RemodelRoomType } from '../store/api/authApi';
 
+/**
+ * Remodel tier cost/time. Source of truth: server/src/config/rentalPropertyConfig.ts ROOM_REMODEL_LEVELS.
+ * Min property level per next room level (2→3, 3→4, 4→5) is in FloorPlan.minPropertyLevelForNextRoomLevel
+ * and in the modal's propertyLevel check — must match server ROOM_REMODEL_MIN_PROPERTY_LEVEL. See task doc § Client–server config sync.
+ */
 const ROOM_REMODEL_CONFIG: { level: number; cost: number; timeMinutes: number }[] = [
   { level: 2, cost: 5000, timeMinutes: 5 },
   { level: 3, cost: 10000, timeMinutes: 10 },
