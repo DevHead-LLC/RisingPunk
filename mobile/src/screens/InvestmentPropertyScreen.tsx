@@ -40,6 +40,17 @@ interface InvestmentPropertyScreenProps {
   onBack: () => void;
 }
 
+/** Human-readable label for remodel room type (e.g. livingRoom → "Living Room"). */
+function getRemodelRoomDisplayName(room: RemodelRoomType): string {
+  const labels: Record<RemodelRoomType, string> = {
+    bathroom: 'Bathroom',
+    kitchen: 'Kitchen',
+    bedroom: 'Bedroom',
+    livingRoom: 'Living Room',
+  };
+  return labels[room] ?? room;
+}
+
 const GesturePanView = memo(function GesturePanView({
   children,
   offsetX,
@@ -275,7 +286,7 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
           <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
             <View style={[styles.modalBox, { backgroundColor: colors.background }]}>
               <Text style={[styles.modalTitle, { color: colors.text?.primary || '#fff' }]}>
-                Remodel {remodelRoom}
+                Remodel {getRemodelRoomDisplayName(remodelRoom)}
               </Text>
               {activeRemodel?.room === remodelRoom ? (
                 (() => {

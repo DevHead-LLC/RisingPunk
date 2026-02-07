@@ -12,7 +12,8 @@ export const formatCurrencyThousandths = (amount: number): string => {
 
 /** Floor to hundredths (for UI display only; keep full precision in state). */
 export const floorToHundredths = (amount: number): number => {
-  return Math.floor(amount * 100) / 100;
+  // Round to 10000ths first to avoid IEEE 754 errors (e.g. 0.29 * 100 → 28.999…), then floor to cents.
+  return Math.floor(Math.round(amount * 10000) / 100) / 100;
 };
 
 export const roundToFloor = (amount: number): number => {
