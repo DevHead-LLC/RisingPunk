@@ -1030,18 +1030,28 @@ router.post('/speedup-remodel/:propertyId', auth, async (req, res): Promise<void
   } finally {
     await session.endSession();
   }
+
   const updatedUser = await User.findById(userId);
-  if (updatedUser) {
+  if (!updatedUser) {
+    res.status(500).json({ error: 'Error retrieving updated user data' });
+    return;
+  }
+
+  try {
     const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
     await RentalHousingSyncService.performSync(updatedUser);
+  } catch (syncError) {
+    console.error('Error syncing rental housing after speedup-remodel:', syncError);
+    // Don't fail the request if sync fails; transaction already succeeded
   }
+
   res.json({
     success: true,
     message: 'Remodel completed',
     propertyId,
     room,
-    newBalance: updatedUser!.balance.total,
-    ratePerSecond: updatedUser!.balance.ratePerSecond
+    newBalance: updatedUser.balance.total,
+    ratePerSecond: updatedUser.balance.ratePerSecond
   });
 });
 

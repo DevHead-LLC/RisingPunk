@@ -15,15 +15,6 @@ export const floorToHundredths = (amount: number): number => {
   return Math.floor(amount * 100) / 100;
 };
 
-/** Format for financial statement display: floored to hundredths, 2 decimal places. */
-export const formatFlooredToHundredths = (amount: number, signed = false): string => {
-  const floored = floorToHundredths(amount);
-  const abs = Math.abs(floored);
-  const str = `$${abs.toFixed(2)}`;
-  if (!signed) return str;
-  return floored >= 0 ? `+${str}` : `-${str}`;
-};
-
 export const roundToFloor = (amount: number): number => {
   return Math.floor(amount);
 };
