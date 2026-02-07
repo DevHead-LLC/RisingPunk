@@ -1013,9 +1013,9 @@ router.post('/speedup-remodel/:propertyId', auth, async (req, res): Promise<void
       propRooms[room] = ar.targetRoomLevel;
       rooms[`property${propertyId}`] = propRooms;
       userInTransaction.rentalHousingRooms = rooms;
-      (userInTransaction as any).activeRemodel = undefined;
       userInTransaction.balance.total -= cost;
       await userInTransaction.save({ session });
+      await User.updateOne({ _id: userId }, { $unset: { activeRemodel: 1 } }, { session });
     });
   } catch (error: any) {
     if (['User not found', 'No active remodel found for this property and room', 'Remodel is already complete', 'Insufficient funds'].includes(error.message)) {

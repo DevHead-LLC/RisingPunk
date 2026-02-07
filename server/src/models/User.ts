@@ -307,22 +307,22 @@ const userSchema = new Schema({
     property1: {
       startedAt: { type: Date, default: null },
       completesAt: { type: Date, default: null },
-      targetLevel: { type: Number, default: 1 }
+      targetLevel: { type: Number, default: null }
     },
     property2: {
       startedAt: { type: Date, default: null },
       completesAt: { type: Date, default: null },
-      targetLevel: { type: Number, default: 1 }
+      targetLevel: { type: Number, default: null }
     },
     property3: {
       startedAt: { type: Date, default: null },
       completesAt: { type: Date, default: null },
-      targetLevel: { type: Number, default: 1 }
+      targetLevel: { type: Number, default: null }
     },
     property4: {
       startedAt: { type: Date, default: null },
       completesAt: { type: Date, default: null },
-      targetLevel: { type: Number, default: 1 }
+      targetLevel: { type: Number, default: null }
     }
   },
   rentalHousingLevels: {
