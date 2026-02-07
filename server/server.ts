@@ -289,7 +289,7 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
 
 // Removed unused /api/balance/deduct endpoint - not used by mobile app
 
-// Get rental housing income data
+// Get rental housing income data (ensure legacy level migration so legacy users get level-5 rates)
 app.get('/api/rental-housing/income', auth, async (req: Request, res: Response) => {
   try {
     const user = await User.findById(req.user._id);
@@ -299,7 +299,9 @@ app.get('/api/rental-housing/income', auth, async (req: Request, res: Response) 
       return;
     }
 
+    const { RentalHousingSyncService } = await import('./src/services/RentalHousingSyncService');
     const { RentalHousingIncomeService } = await import('./src/services/RentalHousingIncomeService');
+    await RentalHousingSyncService.ensureLegacyRentalLevels(user);
     const rentalIncome = await RentalHousingIncomeService.calculateRentalHousingIncome(user);
 
     res.json(rentalIncome);
