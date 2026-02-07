@@ -1026,7 +1026,9 @@ router.post('/speedup-remodel/:propertyId', auth, async (req, res): Promise<void
       res.status(400).json({ error: error.message });
       return;
     }
-    throw error;
+    console.error('Error speeding up remodel:', error);
+    res.status(500).json({ error: 'Internal server error' });
+    return;
   } finally {
     await session.endSession();
   }
