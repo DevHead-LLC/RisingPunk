@@ -8,6 +8,9 @@ import { FinanceTemplate } from '../models/FinanceTemplate';
 import mongoose from 'mongoose';
 import { UserTaskProgress } from '../models/UserTaskProgress';
 import { getTaskList } from '../config/taskListData';
+import { getPropertyBuildConfig, getRoomRemodelConfig } from '../config/rentalPropertyConfig';
+import { RentalHousingIncomeService } from '../services/RentalHousingIncomeService';
+import { RentalHousingSyncService } from '../services/RentalHousingSyncService';
 
 interface UpdatePreferencesRequest extends Request {
   body: {
@@ -526,20 +529,40 @@ router.get('/rental-housing-status/:propertyId', auth, async (req, res): Promise
       return;
     }
 
+    await RentalHousingSyncService.ensureLegacyRentalLevels(user);
+
+    const propertyLevel = RentalHousingIncomeService.getPropertyLevel(user, propertyId);
+    const isUnlocked = propertyLevel >= 1;
     const propertyKey = `property${propertyId}` as keyof typeof user.rentalHousingBuilds;
-    const rentalHousingKey = `rentalHousing${propertyId}` as keyof typeof user.unlockedFeatures;
+    const buildStatusRaw = user.rentalHousingBuilds?.[propertyKey] as { startedAt: Date | null; completesAt: Date | null; targetLevel?: number } | undefined;
+    const buildStatus = buildStatusRaw
+      ? { startedAt: buildStatusRaw.startedAt, completesAt: buildStatusRaw.completesAt, targetLevel: buildStatusRaw.targetLevel ?? 1 }
+      : { startedAt: null, completesAt: null, targetLevel: 1 };
     
-    const isUnlocked = user.unlockedFeatures[rentalHousingKey] || false;
-    const buildStatus = user.rentalHousingBuilds?.[propertyKey] || { startedAt: null, completesAt: null };
-    
-    const isBuilding = buildStatus.startedAt && buildStatus.completesAt && new Date() < new Date(buildStatus.completesAt);
+    const isBuilding = Boolean(buildStatus.startedAt && buildStatus.completesAt && new Date() < new Date(buildStatus.completesAt));
+    const nextBuildLevel = propertyLevel < 5 ? (propertyLevel + 1) as 1 | 2 | 3 | 4 | 5 : null;
+    let nextBuildCost: number | null = null;
+    let nextBuildTimeMinutes: number | null = null;
+    if (nextBuildLevel) {
+      const config = getPropertyBuildConfig(nextBuildLevel);
+      nextBuildCost = config.cost;
+      nextBuildTimeMinutes = config.constructionTimeMinutes;
+    }
+    const roomLevels = RentalHousingIncomeService.getRoomLevels(user, propertyId);
+    const activeRemodel = user.activeRemodel?.propertyId === propertyId ? user.activeRemodel : null;
     
     res.json({
       propertyId,
       isUnlocked,
+      propertyLevel,
+      nextBuildLevel,
+      nextBuildCost,
+      nextBuildTimeMinutes,
       isBuilding,
       buildStatus,
-      canBuild: !isUnlocked && !isBuilding
+      canBuild: propertyLevel < 5 && !isBuilding,
+      roomLevels,
+      activeRemodel,
     });
   } catch (error) {
     console.error('Error fetching rental housing status:', error);
@@ -563,63 +586,64 @@ router.post('/unlock-rental-housing/:propertyId', auth, async (req, res): Promis
       return;
     }
 
-    const propertyKey = `property${propertyId}` as keyof typeof user.rentalHousingBuilds;
-    const rentalHousingKey = `rentalHousing${propertyId}` as keyof typeof user.unlockedFeatures;
-    
-    const isUnlocked = user.unlockedFeatures[rentalHousingKey] || false;
-    const buildStatus = user.rentalHousingBuilds?.[propertyKey] || { startedAt: null, completesAt: null };
-    
-    if (isUnlocked) {
-      res.status(400).json({ error: 'Property already unlocked' });
+    await RentalHousingSyncService.ensureLegacyRentalLevels(user);
+
+    const propertyLevel = RentalHousingIncomeService.getPropertyLevel(user, propertyId);
+    if (propertyLevel >= 5) {
+      res.status(400).json({ error: 'Property already at max level' });
       return;
     }
+
+    const propertyKey = `property${propertyId}` as keyof typeof user.rentalHousingBuilds;
+    const buildStatus = user.rentalHousingBuilds?.[propertyKey] as { startedAt: Date | null; completesAt: Date | null; targetLevel?: number } | undefined;
     
-    if (buildStatus.startedAt && buildStatus.completesAt && new Date() < new Date(buildStatus.completesAt)) {
+    if (buildStatus?.startedAt && buildStatus?.completesAt && new Date() < new Date(buildStatus.completesAt)) {
       res.status(400).json({ error: 'Property already under construction' });
       return;
     }
 
-    const RENTAL_HOUSING_COST = 100000;
-    if (user.balance.total < RENTAL_HOUSING_COST) {
+    const nextBuildLevel = (propertyLevel + 1) as 1 | 2 | 3 | 4 | 5;
+    const config = getPropertyBuildConfig(nextBuildLevel);
+    const buildCost = config.cost;
+    const buildTimeMinutes = config.constructionTimeMinutes;
+
+    if (user.balance.total < buildCost) {
       res.status(400).json({ error: 'Insufficient funds' });
       return;
     }
 
-    // Check if any other property is currently building
-    const hasActiveBuild = Object.values(user.rentalHousingBuilds || {}).some(
-      build => build.startedAt && build.completesAt && new Date() < new Date(build.completesAt)
-    );
-    
+    const hasActiveBuild = Object.entries(user.rentalHousingBuilds || {}).some(([, build]) => {
+      const b = build as { startedAt: Date | null; completesAt: Date | null };
+      return b.startedAt && b.completesAt && new Date() < new Date(b.completesAt);
+    });
     if (hasActiveBuild) {
       res.status(400).json({ error: 'Only one property can be built at a time' });
       return;
     }
 
-    // Start build process
     const now = new Date();
-    const buildTimeMinutes = 120; // 2 hours build time
     const completesAt = new Date(now.getTime() + buildTimeMinutes * 60 * 1000);
 
-    // Update user
     const updateData: any = {
-      [`unlockedFeatures.${rentalHousingKey}`]: false, // Will be true when build completes
       [`rentalHousingBuilds.${propertyKey}`]: {
         startedAt: now,
-        completesAt: completesAt
+        completesAt: completesAt,
+        targetLevel: nextBuildLevel
       },
-      'balance.total': user.balance.total - RENTAL_HOUSING_COST
+      'balance.total': user.balance.total - buildCost
     };
 
     await User.findByIdAndUpdate(userId, { $set: updateData });
 
     res.json({
       success: true,
-      message: 'Rental housing build started',
+      message: 'Build started',
       buildStatus: {
         startedAt: now,
-        completesAt: completesAt
+        completesAt: completesAt,
+        targetLevel: nextBuildLevel
       },
-      newBalance: user.balance.total - RENTAL_HOUSING_COST
+      newBalance: user.balance.total - buildCost
     });
   } catch (error) {
     console.error('Error starting rental housing build:', error);
@@ -645,49 +669,57 @@ router.post('/complete-rental-housing/:propertyId', auth, async (req, res): Prom
 
     const propertyKey = `property${propertyId}` as keyof typeof user.rentalHousingBuilds;
     const rentalHousingKey = `rentalHousing${propertyId}` as keyof typeof user.unlockedFeatures;
-    
-    const buildStatus = user.rentalHousingBuilds?.[propertyKey] as { startedAt: Date | null; completesAt: Date | null } | undefined;
+    const buildStatus = user.rentalHousingBuilds?.[propertyKey] as { startedAt: Date | null; completesAt: Date | null; targetLevel?: number } | undefined;
     
     if (!buildStatus?.startedAt || !buildStatus?.completesAt) {
       res.status(400).json({ error: 'No active build found for this property' });
       return;
     }
 
-    // Check if build time has actually completed
     const now = new Date();
     if (now < new Date(buildStatus.completesAt)) {
       res.status(400).json({ error: 'Build time has not completed yet' });
       return;
     }
 
-    // Mark property as unlocked and clear build status
+    const rawTargetLevel = buildStatus.targetLevel;
+    const isLegacyBuild = rawTargetLevel === undefined || rawTargetLevel === null;
+    const targetLevel = isLegacyBuild ? 5 : Math.min(5, Math.max(1, rawTargetLevel));
+
     const updateData: any = {
+      [`rentalHousingLevels.${propertyKey}`]: targetLevel,
       [`unlockedFeatures.${rentalHousingKey}`]: true,
       [`rentalHousingBuilds.${propertyKey}`]: {
         startedAt: null,
-        completesAt: null
+        completesAt: null,
+        targetLevel: 1
       }
     };
+    if (!isLegacyBuild) {
+      updateData[`rentalHousingLevelSetByBuild.${propertyKey}`] = true;
+    }
 
     await User.findByIdAndUpdate(userId, { $set: updateData });
 
-    // Mark the build-investment-property task as completed after transaction (only for property 1)
     if (propertyId === 1) {
       await markInvestmentPropertyTaskCompleted(userId);
     }
 
-    // Trigger a sync to ensure rental housing income is properly calculated
-    const updatedUser = await User.findById(userId);
+    let updatedUser = await User.findById(userId);
     if (updatedUser) {
       const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
       await RentalHousingSyncService.performSync(updatedUser);
+      updatedUser = await User.findById(userId);
     }
 
     res.json({
       success: true,
-      message: 'Rental housing build completed',
+      message: 'Build completed',
       propertyId,
-      isUnlocked: true
+      propertyLevel: targetLevel,
+      isUnlocked: true,
+      newBalance: updatedUser?.balance?.total,
+      ratePerSecond: updatedUser?.balance?.ratePerSecond
     });
   } catch (error) {
     console.error('Error completing rental housing build:', error);
@@ -741,18 +773,28 @@ router.post('/speedup-property-construction/:propertyId', auth, async (req, res)
         throw new Error('Insufficient funds');
       }
 
-      // Mark property as unlocked and clear build status, deduct balance atomically
+      const buildStatusWithTarget = userInTransaction.rentalHousingBuilds?.[propertyKey] as { startedAt: Date; completesAt: Date; targetLevel?: number } | undefined;
+      const rawTargetLevel = buildStatusWithTarget?.targetLevel;
+      const isLegacyBuild = rawTargetLevel === undefined || rawTargetLevel === null;
+      const targetLevel = isLegacyBuild ? 5 : Math.min(5, Math.max(1, rawTargetLevel));
+
+      (userInTransaction.rentalHousingLevels as any) = userInTransaction.rentalHousingLevels || {};
+      (userInTransaction.rentalHousingLevels as any)[propertyKey] = targetLevel;
+      if (!isLegacyBuild) {
+        (userInTransaction.rentalHousingLevelSetByBuild as any) = userInTransaction.rentalHousingLevelSetByBuild || {};
+        (userInTransaction.rentalHousingLevelSetByBuild as any)[propertyKey] = true;
+      }
       (userInTransaction.unlockedFeatures as any)[rentalHousingKey] = true;
       (userInTransaction.rentalHousingBuilds as any)[propertyKey] = {
         startedAt: null,
-        completesAt: null
+        completesAt: null,
+        targetLevel: 1
       };
       userInTransaction.balance.total -= cost;
 
       await userInTransaction.save({ session });
     });
     
-    // Mark the build-investment-property task as completed after transaction (only for property 1)
     if (propertyId === 1) {
       await markInvestmentPropertyTaskCompleted(userId);
     }
@@ -802,7 +844,212 @@ router.post('/speedup-property-construction/:propertyId', auth, async (req, res)
     message: 'Property construction completed',
     propertyId,
     isUnlocked: true,
-    newBalance: updatedUser.balance.total
+    newBalance: updatedUser.balance.total,
+    ratePerSecond: updatedUser.balance.ratePerSecond
+  });
+});
+
+// --- Remodel endpoints (room upgrades, one at a time) ---
+const ROOM_TYPES = ['bathroom', 'kitchen', 'bedroom', 'livingRoom'] as const;
+
+router.post('/start-remodel/:propertyId', auth, async (req, res): Promise<void> => {
+  const userId = req.user?._id;
+  const propertyId = parseInt(req.params.propertyId);
+  const room = req.body?.room as string | undefined;
+  if (!userId || propertyId < 1 || propertyId > 4 || !ROOM_TYPES.includes(room as any)) {
+    res.status(400).json({ error: 'Invalid property ID or room' });
+    return;
+  }
+  const preUser = await User.findById(userId);
+  if (!preUser) {
+    res.status(404).json({ error: 'User not found' });
+    return;
+  }
+  await RentalHousingSyncService.ensureLegacyRentalLevels(preUser);
+
+  const session = await mongoose.startSession();
+  try {
+    let newBalance = 0;
+    let activeRemodelPayload: { propertyId: number; room: string; startedAt: Date; completesAt: Date; targetRoomLevel: 2 | 3 | 4 } | null = null;
+    await session.withTransaction(async () => {
+      const user = await User.findById(userId).session(session);
+      if (!user) throw new Error('User not found');
+      const propertyLevel = RentalHousingIncomeService.getPropertyLevel(user, propertyId);
+      if (propertyLevel < 3) throw new Error('Property must be level 3 or higher to remodel rooms');
+      if (user.activeRemodel && (user.activeRemodel as any).propertyId != null) {
+        throw new Error('Another remodel is already in progress');
+      }
+      const roomLevels = RentalHousingIncomeService.getRoomLevels(user, propertyId);
+      const currentRoomLevel = roomLevels[room as keyof typeof roomLevels] ?? 1;
+      if (currentRoomLevel >= 4) throw new Error('Room is already at max remodel level');
+      const nextRoomLevel = (currentRoomLevel + 1) as 2 | 3 | 4;
+      const config = getRoomRemodelConfig(nextRoomLevel);
+      if (propertyLevel < config.minPropertyLevel) {
+        throw new Error(`Property must be level ${config.minPropertyLevel} to remodel this room to level ${nextRoomLevel}`);
+      }
+      if (user.balance.total < config.cost) throw new Error('Insufficient funds');
+      const now = new Date();
+      const completesAt = new Date(now.getTime() + config.constructionTimeMinutes * 60 * 1000);
+      newBalance = user.balance.total - config.cost;
+      user.balance.total = newBalance;
+      (user as any).activeRemodel = {
+        propertyId,
+        room,
+        startedAt: now,
+        completesAt,
+        targetRoomLevel: nextRoomLevel
+      };
+      activeRemodelPayload = { propertyId, room: room as string, startedAt: now, completesAt, targetRoomLevel: nextRoomLevel };
+      await user.save({ session });
+    });
+    res.json({
+      success: true,
+      message: 'Remodel started',
+      activeRemodel: activeRemodelPayload,
+      newBalance
+    });
+  } catch (error: any) {
+    if (error.message === 'User not found') {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    if (['Another remodel is already in progress', 'Room is already at max remodel level', 'Insufficient funds', 'Property must be level 3 or higher to remodel rooms'].includes(error.message)) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    if (error.message?.startsWith('Property must be level')) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    console.error('Error starting remodel:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    await session.endSession();
+  }
+});
+
+router.post('/complete-remodel/:propertyId', auth, async (req, res): Promise<void> => {
+  try {
+    const userId = req.user?._id;
+    const propertyId = parseInt(req.params.propertyId);
+    const room = req.body?.room as string | undefined;
+    if (!userId || propertyId < 1 || propertyId > 4 || !ROOM_TYPES.includes(room as any)) {
+      res.status(400).json({ error: 'Invalid property ID or room' });
+      return;
+    }
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    const ar = user.activeRemodel;
+    if (!ar || ar.propertyId !== propertyId || ar.room !== room) {
+      res.status(400).json({ error: 'No active remodel found for this property and room' });
+      return;
+    }
+    if (!ar.completesAt) {
+      res.status(400).json({ error: 'No active remodel found for this property and room' });
+      return;
+    }
+    const now = new Date();
+    if (now < new Date(ar.completesAt)) {
+      res.status(400).json({ error: 'Remodel time has not completed yet' });
+      return;
+    }
+    const path = `rentalHousingRooms.property${propertyId}.${room}` as const;
+    await User.findByIdAndUpdate(userId, {
+      $set: { [path]: ar.targetRoomLevel },
+      $unset: { activeRemodel: 1 }
+    });
+    const updatedUser = await User.findById(userId);
+    if (updatedUser) {
+      const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
+      await RentalHousingSyncService.performSync(updatedUser);
+    }
+    res.json({
+      success: true,
+      message: 'Remodel completed',
+      propertyId,
+      room,
+      roomLevel: ar.targetRoomLevel,
+      newBalance: updatedUser?.balance?.total,
+      ratePerSecond: updatedUser?.balance?.ratePerSecond
+    });
+  } catch (error) {
+    console.error('Error completing remodel:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/speedup-remodel/:propertyId', auth, async (req, res): Promise<void> => {
+  const userId = req.user?._id;
+  const propertyId = parseInt(req.params.propertyId);
+  const room = req.body?.room as string | undefined;
+  if (!userId || propertyId < 1 || propertyId > 4 || !ROOM_TYPES.includes(room as any)) {
+    res.status(400).json({ error: 'Invalid property ID or room' });
+    return;
+  }
+  const session = await mongoose.startSession();
+  try {
+    await session.withTransaction(async () => {
+      const userInTransaction = await User.findById(userId).session(session);
+      if (!userInTransaction) throw new Error('User not found');
+      const ar = userInTransaction.activeRemodel;
+      if (!ar || ar.propertyId !== propertyId || ar.room !== room) {
+        throw new Error('No active remodel found for this property and room');
+      }
+      if (!ar.completesAt) {
+        throw new Error('No active remodel found for this property and room');
+      }
+      const now = new Date();
+      const completesAt = new Date(ar.completesAt);
+      const remainingMs = Math.max(0, completesAt.getTime() - now.getTime());
+      const remainingSeconds = Math.ceil(remainingMs / 1000);
+      if (remainingSeconds <= 0) throw new Error('Remodel is already complete');
+      const cost = remainingSeconds * 5;
+      if (userInTransaction.balance.total < cost) throw new Error('Insufficient funds');
+      const rooms = userInTransaction.rentalHousingRooms || {} as any;
+      const propRooms = rooms[`property${propertyId}`] || { bathroom: 1, kitchen: 1, bedroom: 1, livingRoom: 1 };
+      propRooms[room] = ar.targetRoomLevel;
+      rooms[`property${propertyId}`] = propRooms;
+      userInTransaction.rentalHousingRooms = rooms;
+      userInTransaction.balance.total -= cost;
+      await userInTransaction.save({ session });
+      await User.updateOne({ _id: userId }, { $unset: { activeRemodel: 1 } }, { session });
+    });
+  } catch (error: any) {
+    if (['User not found', 'No active remodel found for this property and room', 'Remodel is already complete', 'Insufficient funds'].includes(error.message)) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    console.error('Error speeding up remodel:', error);
+    res.status(500).json({ error: 'Internal server error' });
+    return;
+  } finally {
+    await session.endSession();
+  }
+
+  const updatedUser = await User.findById(userId);
+  if (!updatedUser) {
+    res.status(500).json({ error: 'Error retrieving updated user data' });
+    return;
+  }
+
+  try {
+    const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
+    await RentalHousingSyncService.performSync(updatedUser);
+  } catch (syncError) {
+    console.error('Error syncing rental housing after speedup-remodel:', syncError);
+    // Don't fail the request if sync fails; transaction already succeeded
+  }
+
+  res.json({
+    success: true,
+    message: 'Remodel completed',
+    propertyId,
+    room,
+    newBalance: updatedUser.balance.total,
+    ratePerSecond: updatedUser.balance.ratePerSecond
   });
 });
 
