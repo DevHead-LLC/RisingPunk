@@ -134,7 +134,9 @@ export class RentalHousingSyncService {
 
   /**
    * Ensure legacy users with unlockedFeatures.rentalHousingN have rentalHousingLevels.propertyN = 5 (grandfathered).
-   * Call before any income calculation or sync so balance/research paths get correct rates without visiting status.
+   * In performSync we call checkAndSyncRentalHousingIncome before this so historical income uses pre-grandfather rates;
+   * then we call this so ratePerSecond is correct going forward. Other callers (e.g. income endpoint) call this first so
+   * current income/display uses level-5 rates.
    */
   static async ensureLegacyRentalLevels(user: IUser): Promise<boolean> {
     let updated = false;
@@ -156,8 +158,9 @@ export class RentalHousingSyncService {
   }
 
   static async performSync(user: IUser): Promise<{ success: boolean; syncedAmount: number; newBalance: number }> {
-    await this.ensureLegacyRentalLevels(user);
+    // Historical income must use pre-grandfather rates (legacy users at level 1), so run sync check first.
     const syncResult = await this.checkAndSyncRentalHousingIncome(user);
+    await this.ensureLegacyRentalLevels(user);
     
     // CRITICAL: Always calculate and update ratePerSecond, even if no rental properties exist
     // This ensures income rate and insurance reduction research bonuses are applied for all users
