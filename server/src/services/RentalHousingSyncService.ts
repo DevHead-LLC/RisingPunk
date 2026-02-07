@@ -128,17 +128,17 @@ export class RentalHousingSyncService {
     return historicalIncome;
   }
 
-  /** True if every unlocked property would be grandfathered (no level or level 1 not set by build). */
+  /** True if every unlocked property would be grandfathered (no level or level 1 not set by build). Uses getPropertyLevel so we match getUnlockedProperties (levels and unlockedFeatures). */
   private static isFullyLegacyForHistoricalIncome(user: IUser): boolean {
     const levelSetByBuild = (user.rentalHousingLevelSetByBuild as Record<string, boolean>) || {};
     const levels = (user.rentalHousingLevels as Record<string, number>) || {};
     for (let i = 1; i <= 4; i++) {
-      const ufKey = `rentalHousing${i}` as keyof typeof user.unlockedFeatures;
-      if (!user.unlockedFeatures[ufKey]) continue;
-      const level = levels[`property${i}`];
+      const level = RentalHousingIncomeService.getPropertyLevel(user, i);
+      if (level < 1) continue;
+      const storedLevel = levels[`property${i}`];
       const setByBuild = levelSetByBuild[`property${i}`];
-      if (typeof level === 'number' && level >= 2) return false;
-      if (typeof level === 'number' && level === 1 && setByBuild) return false;
+      if (typeof storedLevel === 'number' && storedLevel >= 2) return false;
+      if (typeof storedLevel === 'number' && storedLevel === 1 && setByBuild) return false;
     }
     return true;
   }
