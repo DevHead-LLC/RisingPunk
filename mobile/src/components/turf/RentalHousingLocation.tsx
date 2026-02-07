@@ -80,6 +80,14 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
   const propertyLevel = rentalHousingStatus?.propertyLevel ?? 0;
   const buildCost = rentalHousingStatus?.nextBuildCost ?? 100000;
   const buildTimeMinutes = rentalHousingStatus?.nextBuildTimeMinutes ?? 120;
+  const buildTimeDisplay = buildTimeMinutes < 60
+    ? `${buildTimeMinutes} min`
+    : (() => {
+        const hours = Math.floor(buildTimeMinutes / 60);
+        const mins = buildTimeMinutes % 60;
+        const hourPart = `${hours} hour${hours !== 1 ? 's' : ''}`;
+        return mins > 0 ? `${hourPart} ${mins} min` : hourPart;
+      })();
   const hasSufficientFunds = numericBalance !== null && !isNaN(numericBalance as number) && numericBalance >= buildCost;
   const showUpgradeArrow = isUnlocked && canBuild;
 
@@ -309,7 +317,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
         visible={showPopup}
         title={propertyLevel === 0 ? 'Build Investment Property' : `Upgrade to Level ${(propertyLevel + 1)}`}
         cost={buildCost}
-        buildTime={buildTimeMinutes >= 60 ? `${Math.floor(buildTimeMinutes / 60)} hour${buildTimeMinutes >= 120 ? 's' : ''}` : `${buildTimeMinutes} min`}
+        buildTime={buildTimeDisplay}
         hasSufficientFunds={hasSufficientFunds}
         onBuild={handleBuild}
         onClose={handleClose}
@@ -335,9 +343,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
       <LockedFeatureModal
         visible={showBuildStartedModal}
         title="BUILD STARTED"
-        message={buildTimeMinutes >= 60
-          ? `Your build has begun! Check back in ${Math.floor(buildTimeMinutes / 60)} hour${buildTimeMinutes >= 120 ? 's' : ''} to see your completed upgrade.`
-          : `Your build has begun! Check back in ${buildTimeMinutes} minutes to see your completed upgrade.`}
+        message={`Your build has begun! Check back in ${buildTimeDisplay} to see your completed upgrade.`}
         onClose={() => setShowBuildStartedModal(false)}
         closeButtonText="OK"
       />
