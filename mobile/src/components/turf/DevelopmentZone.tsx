@@ -64,14 +64,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     zIndex: 1,
     paddingHorizontal: SIZING.spacing.lg,
-    paddingVertical: SIZING.spacing.lg,
+    paddingTop: SIZING.spacing.lg,
+    paddingBottom: SIZING.spacing.sm,
   },
   gridContainer: {
     flex: 1,
     flexDirection: 'column',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    gap: SIZING.spacing.lg,
+    gap: SIZING.spacing.sm,
   },
   topRow: {
     flexDirection: 'row',
@@ -92,7 +93,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     letterSpacing: 2,
-    marginTop: SIZING.spacing.lg,
+    marginTop: SIZING.spacing.sm,
     width: '100%',
   },
   timerContainer: {
