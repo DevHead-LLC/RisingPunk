@@ -104,16 +104,11 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
   const { themeMode } = useTheme();
   const scrollViewRef = useRef<ScrollView>(null);
   const [remodelRoom, setRemodelRoom] = useState<RemodelRoomType | null>(null);
-  const [hasActiveRemodelHere, setHasActiveRemodelHere] = useState(false);
   const [modalCountdownNow, setModalCountdownNow] = useState(() => Date.now());
 
   const { data: status } = useGetRentalHousingStatusQuery(propertyId, {
-    pollingInterval: remodelRoom || hasActiveRemodelHere ? 5000 : 0
+    pollingInterval: remodelRoom || (status?.activeRemodel?.propertyId === propertyId) ? 5000 : 0
   });
-
-  useEffect(() => {
-    setHasActiveRemodelHere(status?.activeRemodel?.propertyId === propertyId);
-  }, [status?.activeRemodel?.propertyId, propertyId]);
 
   const [startRemodel] = useStartRemodelMutation();
   const [completeRemodel] = useCompleteRemodelMutation();
