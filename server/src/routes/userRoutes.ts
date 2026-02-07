@@ -839,13 +839,20 @@ router.post('/speedup-property-construction/:propertyId', auth, async (req, res)
     // Don't fail the request if sync fails, but log it
   }
 
+  // Re-fetch so response uses persisted balance and ratePerSecond (post-sync or transaction state)
+  const userForResponse = await User.findById(userId);
+  if (!userForResponse) {
+    res.status(500).json({ error: 'Error retrieving updated user data' });
+    return;
+  }
+
   res.json({
     success: true,
     message: 'Property construction completed',
     propertyId,
     isUnlocked: true,
-    newBalance: updatedUser.balance.total,
-    ratePerSecond: updatedUser.balance.ratePerSecond
+    newBalance: userForResponse.balance.total,
+    ratePerSecond: userForResponse.balance.ratePerSecond
   });
 });
 
@@ -1043,13 +1050,20 @@ router.post('/speedup-remodel/:propertyId', auth, async (req, res): Promise<void
     // Don't fail the request if sync fails; transaction already succeeded
   }
 
+  // Re-fetch so response uses persisted balance and ratePerSecond (post-sync or transaction state)
+  const userForResponse = await User.findById(userId);
+  if (!userForResponse) {
+    res.status(500).json({ error: 'Error retrieving updated user data' });
+    return;
+  }
+
   res.json({
     success: true,
     message: 'Remodel completed',
     propertyId,
     room,
-    newBalance: updatedUser.balance.total,
-    ratePerSecond: updatedUser.balance.ratePerSecond
+    newBalance: userForResponse.balance.total,
+    ratePerSecond: userForResponse.balance.ratePerSecond
   });
 });
 

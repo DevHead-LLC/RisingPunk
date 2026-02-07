@@ -104,8 +104,8 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
   const { themeMode } = useTheme();
   const scrollViewRef = useRef<ScrollView>(null);
   const [remodelRoom, setRemodelRoom] = useState<RemodelRoomType | null>(null);
-  const [hasActiveRemodelHere, setHasActiveRemodelHere] = useState(false);
   const [modalCountdownNow, setModalCountdownNow] = useState(() => Date.now());
+  const [hasActiveRemodelHere, setHasActiveRemodelHere] = useState(false);
 
   const { data: status } = useGetRentalHousingStatusQuery(propertyId, {
     pollingInterval: remodelRoom || hasActiveRemodelHere ? 5000 : 0
