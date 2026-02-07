@@ -31,6 +31,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({ propertyId, propertyLevel 
   const completesAtMs = activeRemodelCompletesAt ? new Date(activeRemodelCompletesAt).getTime() : 0;
   useEffect(() => {
     if (!activeRemodelRoom || !completesAtMs) return;
+    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [activeRemodelRoom, completesAtMs]);
