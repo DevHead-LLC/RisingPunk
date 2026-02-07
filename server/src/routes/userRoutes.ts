@@ -958,8 +958,12 @@ router.post('/complete-remodel/:propertyId', auth, async (req, res): Promise<voi
       res.status(400).json({ error: 'No active remodel found for this property and room' });
       return;
     }
+    if (!ar.completesAt) {
+      res.status(400).json({ error: 'No active remodel found for this property and room' });
+      return;
+    }
     const now = new Date();
-    if (now < new Date(ar.completesAt!)) {
+    if (now < new Date(ar.completesAt)) {
       res.status(400).json({ error: 'Remodel time has not completed yet' });
       return;
     }
@@ -1005,8 +1009,11 @@ router.post('/speedup-remodel/:propertyId', auth, async (req, res): Promise<void
       if (!ar || ar.propertyId !== propertyId || ar.room !== room) {
         throw new Error('No active remodel found for this property and room');
       }
+      if (!ar.completesAt) {
+        throw new Error('No active remodel found for this property and room');
+      }
       const now = new Date();
-      const completesAt = new Date(ar.completesAt!);
+      const completesAt = new Date(ar.completesAt);
       const remainingMs = Math.max(0, completesAt.getTime() - now.getTime());
       const remainingSeconds = Math.ceil(remainingMs / 1000);
       if (remainingSeconds <= 0) throw new Error('Remodel is already complete');

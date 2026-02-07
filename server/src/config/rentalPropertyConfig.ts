@@ -44,10 +44,11 @@ export const ROOM_REMODEL_MIN_PROPERTY_LEVEL: Record<2 | 3 | 4, number> = {
   4: 5,
 };
 
+/** Remodel tier config: time, cost, and min property level. Income add amounts are in ROOM_REMODEL_ADD_SMALL / ROOM_REMODEL_ADD_LARGE (per room type). */
 export const ROOM_REMODEL_LEVELS = [
-  { roomLevel: 2, constructionTimeMinutes: 5, cost: 5_000, addPerSecond: 0.005, minPropertyLevel: 3 },
-  { roomLevel: 3, constructionTimeMinutes: 10, cost: 10_000, addPerSecond: 0.01, minPropertyLevel: 4 },
-  { roomLevel: 4, constructionTimeMinutes: 15, cost: 15_000, addPerSecond: 0.015, minPropertyLevel: 5 },
+  { roomLevel: 2, constructionTimeMinutes: 5, cost: 5_000, minPropertyLevel: 3 },
+  { roomLevel: 3, constructionTimeMinutes: 10, cost: 10_000, minPropertyLevel: 4 },
+  { roomLevel: 4, constructionTimeMinutes: 15, cost: 15_000, minPropertyLevel: 5 },
 ] as const;
 
 export type RoomType = 'bathroom' | 'kitchen' | 'bedroom' | 'livingRoom';
