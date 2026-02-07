@@ -701,11 +701,12 @@ router.post('/complete-rental-housing/:propertyId', auth, async (req, res): Prom
       return;
     }
 
-    const targetLevel = Math.min(5, Math.max(1, buildStatus.targetLevel ?? 1));
+    const rawTargetLevel = buildStatus.targetLevel;
+    const isLegacyBuild = rawTargetLevel === undefined || rawTargetLevel === null;
+    const targetLevel = isLegacyBuild ? 5 : Math.min(5, Math.max(1, rawTargetLevel));
 
     const updateData: any = {
       [`rentalHousingLevels.${propertyKey}`]: targetLevel,
-      [`rentalHousingLevelSetByBuild.${propertyKey}`]: true,
       [`unlockedFeatures.${rentalHousingKey}`]: true,
       [`rentalHousingBuilds.${propertyKey}`]: {
         startedAt: null,
@@ -713,6 +714,9 @@ router.post('/complete-rental-housing/:propertyId', auth, async (req, res): Prom
         targetLevel: 1
       }
     };
+    if (!isLegacyBuild) {
+      updateData[`rentalHousingLevelSetByBuild.${propertyKey}`] = true;
+    }
 
     await User.findByIdAndUpdate(userId, { $set: updateData });
 
@@ -789,12 +793,16 @@ router.post('/speedup-property-construction/:propertyId', auth, async (req, res)
       }
 
       const buildStatusWithTarget = userInTransaction.rentalHousingBuilds?.[propertyKey] as { startedAt: Date; completesAt: Date; targetLevel?: number } | undefined;
-      const targetLevel = Math.min(5, Math.max(1, buildStatusWithTarget?.targetLevel ?? 1));
+      const rawTargetLevel = buildStatusWithTarget?.targetLevel;
+      const isLegacyBuild = rawTargetLevel === undefined || rawTargetLevel === null;
+      const targetLevel = isLegacyBuild ? 5 : Math.min(5, Math.max(1, rawTargetLevel));
 
       (userInTransaction.rentalHousingLevels as any) = userInTransaction.rentalHousingLevels || {};
       (userInTransaction.rentalHousingLevels as any)[propertyKey] = targetLevel;
-      (userInTransaction.rentalHousingLevelSetByBuild as any) = userInTransaction.rentalHousingLevelSetByBuild || {};
-      (userInTransaction.rentalHousingLevelSetByBuild as any)[propertyKey] = true;
+      if (!isLegacyBuild) {
+        (userInTransaction.rentalHousingLevelSetByBuild as any) = userInTransaction.rentalHousingLevelSetByBuild || {};
+        (userInTransaction.rentalHousingLevelSetByBuild as any)[propertyKey] = true;
+      }
       (userInTransaction.unlockedFeatures as any)[rentalHousingKey] = true;
       (userInTransaction.rentalHousingBuilds as any)[propertyKey] = {
         startedAt: null,

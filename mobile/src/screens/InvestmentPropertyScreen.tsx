@@ -357,6 +357,18 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
               ) : (
                 (() => {
                   const currentLevel = roomLevels[remodelRoom] ?? 1;
+                  if (currentLevel >= 4) {
+                    return (
+                      <>
+                        <Text style={[styles.modalSubtitle, { color: colors.text?.secondary || '#ccc' }]}>
+                          This room is already at max level (4).
+                        </Text>
+                        <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.primary }]} onPress={() => setRemodelRoom(null)}>
+                          <Text style={styles.modalButtonText}>Close</Text>
+                        </TouchableOpacity>
+                      </>
+                    );
+                  }
                   const nextLevel = Math.min(4, currentLevel + 1);
                   const config = ROOM_REMODEL_CONFIG[nextLevel - 2];
                   if (!config || propertyLevel < (nextLevel === 2 ? 3 : nextLevel === 3 ? 4 : 5)) {
