@@ -986,31 +986,36 @@ router.post('/complete-remodel/:propertyId', auth, async (req, res): Promise<voi
     await session.endSession();
   }
 
-  const updatedUser = await User.findById(userId);
-  if (updatedUser) {
-    try {
-      const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
-      await RentalHousingSyncService.performSync(updatedUser);
-    } catch (syncError) {
-      console.error('Error syncing rental housing after complete-remodel:', syncError);
+  try {
+    const updatedUser = await User.findById(userId);
+    if (updatedUser) {
+      try {
+        const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
+        await RentalHousingSyncService.performSync(updatedUser);
+      } catch (syncError) {
+        console.error('Error syncing rental housing after complete-remodel:', syncError);
+      }
     }
-  }
 
-  const userForResponse = await User.findById(userId);
-  if (!userForResponse) {
-    res.status(500).json({ error: 'Error retrieving updated user data' });
-    return;
-  }
+    const userForResponse = await User.findById(userId);
+    if (!userForResponse) {
+      res.status(500).json({ error: 'Error retrieving updated user data' });
+      return;
+    }
 
-  res.json({
-    success: true,
-    message: 'Remodel completed',
-    propertyId,
-    room,
-    roomLevel: roomLevel ?? 1,
-    newBalance: userForResponse.balance.total,
-    ratePerSecond: userForResponse.balance.ratePerSecond
-  });
+    res.json({
+      success: true,
+      message: 'Remodel completed',
+      propertyId,
+      room,
+      roomLevel: roomLevel ?? 1,
+      newBalance: userForResponse.balance.total,
+      ratePerSecond: userForResponse.balance.ratePerSecond
+    });
+  } catch (error: any) {
+    console.error('Error after complete-remodel transaction:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 router.post('/speedup-remodel/:propertyId', auth, async (req, res): Promise<void> => {
