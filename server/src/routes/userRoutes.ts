@@ -936,63 +936,81 @@ router.post('/start-remodel/:propertyId', auth, async (req, res): Promise<void> 
 });
 
 router.post('/complete-remodel/:propertyId', auth, async (req, res): Promise<void> => {
+  const userId = req.user?._id;
+  const propertyId = parseInt(req.params.propertyId);
+  const room = req.body?.room as string | undefined;
+  if (!userId || propertyId < 1 || propertyId > 4 || !ROOM_TYPES.includes(room as any)) {
+    res.status(400).json({ error: 'Invalid property ID or room' });
+    return;
+  }
+
+  let roomLevel: number | undefined;
+  const session = await mongoose.startSession();
   try {
-    const userId = req.user?._id;
-    const propertyId = parseInt(req.params.propertyId);
-    const room = req.body?.room as string | undefined;
-    if (!userId || propertyId < 1 || propertyId > 4 || !ROOM_TYPES.includes(room as any)) {
-      res.status(400).json({ error: 'Invalid property ID or room' });
-      return;
-    }
-    const user = await User.findById(userId);
-    if (!user) {
-      res.status(404).json({ error: 'User not found' });
-      return;
-    }
-    const ar = user.activeRemodel;
-    if (!ar || ar.propertyId !== propertyId || ar.room !== room) {
-      res.status(400).json({ error: 'No active remodel found for this property and room' });
-      return;
-    }
-    if (!ar.completesAt) {
-      res.status(400).json({ error: 'No active remodel found for this property and room' });
-      return;
-    }
-    const now = new Date();
-    if (now < new Date(ar.completesAt)) {
-      res.status(400).json({ error: 'Remodel time has not completed yet' });
-      return;
-    }
-    const path = `rentalHousingRooms.property${propertyId}.${room}` as const;
-    await User.findByIdAndUpdate(userId, {
-      $set: { [path]: ar.targetRoomLevel },
-      $unset: { activeRemodel: 1 }
+    await session.withTransaction(async () => {
+      const userInTransaction = await User.findById(userId).session(session);
+      if (!userInTransaction) throw new Error('User not found');
+      const ar = userInTransaction.activeRemodel;
+      if (!ar || ar.propertyId !== propertyId || ar.room !== room) {
+        throw new Error('No active remodel found for this property and room');
+      }
+      if (!ar.completesAt) {
+        throw new Error('No active remodel found for this property and room');
+      }
+      const now = new Date();
+      if (now < new Date(ar.completesAt)) {
+        throw new Error('Remodel time has not completed yet');
+      }
+      roomLevel = ar.targetRoomLevel;
+      const rooms = userInTransaction.rentalHousingRooms || {} as any;
+      const propRooms = rooms[`property${propertyId}`] || { bathroom: 1, kitchen: 1, bedroom: 1, livingRoom: 1 };
+      propRooms[room] = ar.targetRoomLevel;
+      rooms[`property${propertyId}`] = propRooms;
+      userInTransaction.rentalHousingRooms = rooms;
+      await userInTransaction.save({ session });
+      await User.updateOne({ _id: userId }, { $unset: { activeRemodel: 1 } }, { session });
     });
-    const updatedUser = await User.findById(userId);
-    if (updatedUser) {
-      const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
-      await RentalHousingSyncService.performSync(updatedUser);
-    }
-
-    const userForResponse = await User.findById(userId);
-    if (!userForResponse) {
-      res.status(500).json({ error: 'Error retrieving updated user data' });
+  } catch (error: any) {
+    if (error.message === 'User not found') {
+      res.status(404).json({ error: error.message });
       return;
     }
-
-    res.json({
-      success: true,
-      message: 'Remodel completed',
-      propertyId,
-      room,
-      roomLevel: ar.targetRoomLevel,
-      newBalance: userForResponse.balance.total,
-      ratePerSecond: userForResponse.balance.ratePerSecond
-    });
-  } catch (error) {
+    if (['No active remodel found for this property and room', 'Remodel time has not completed yet'].includes(error.message)) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
     console.error('Error completing remodel:', error);
     res.status(500).json({ error: 'Internal server error' });
+    return;
+  } finally {
+    await session.endSession();
   }
+
+  const updatedUser = await User.findById(userId);
+  if (updatedUser) {
+    try {
+      const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
+      await RentalHousingSyncService.performSync(updatedUser);
+    } catch (syncError) {
+      console.error('Error syncing rental housing after complete-remodel:', syncError);
+    }
+  }
+
+  const userForResponse = await User.findById(userId);
+  if (!userForResponse) {
+    res.status(500).json({ error: 'Error retrieving updated user data' });
+    return;
+  }
+
+  res.json({
+    success: true,
+    message: 'Remodel completed',
+    propertyId,
+    room,
+    roomLevel: roomLevel ?? 1,
+    newBalance: userForResponse.balance.total,
+    ratePerSecond: userForResponse.balance.ratePerSecond
+  });
 });
 
 router.post('/speedup-remodel/:propertyId', auth, async (req, res): Promise<void> => {
@@ -1032,7 +1050,11 @@ router.post('/speedup-remodel/:propertyId', auth, async (req, res): Promise<void
       await User.updateOne({ _id: userId }, { $unset: { activeRemodel: 1 } }, { session });
     });
   } catch (error: any) {
-    if (['User not found', 'No active remodel found for this property and room', 'Remodel is already complete', 'Insufficient funds'].includes(error.message)) {
+    if (error.message === 'User not found') {
+      res.status(404).json({ error: error.message });
+      return;
+    }
+    if (['No active remodel found for this property and room', 'Remodel is already complete', 'Insufficient funds'].includes(error.message)) {
       res.status(400).json({ error: error.message });
       return;
     }
