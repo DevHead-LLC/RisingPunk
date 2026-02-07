@@ -1,7 +1,6 @@
 import Header from '../components/Header'
 import Footer from '../components/Footer'
-import DailyCountdownOffer from '../components/DailyCountdownOffer'
-import Level35Promotion from '../components/Level35Promotion'
+import Level50CountdownOffer from '../components/Level50CountdownOffer'
 import FinalCTA from '../components/FinalCTA'
 import './Offers.css'
 import { FaArrowLeft } from 'react-icons/fa'
@@ -20,28 +19,27 @@ function Offers() {
             <div className="offers-hero-content">
               <div className="offers-urgency-badge">⚡ Limited Time</div>
               <h1 className="offers-title">Claim Your <span className="offers-title-accent">Exclusive Rewards</span></h1>
-              <p className="offers-subtitle">Up to $1,100,000 in-game balance + exclusive merch for early players</p>
+              <p className="offers-subtitle">Reach Level 50 by March 31, 2026 for a custom shirt + $2,000,000 in-game balance. Must be 18+ to claim.</p>
               <div className="offers-value-stack">
                 <div className="value-item">
                   <span className="value-icon">💰</span>
-                  <span className="value-text">$1,100,000+ Total Value</span>
+                  <span className="value-text">$2,000,000 In-Game Balance</span>
                 </div>
                 <div className="value-item">
                   <span className="value-icon">🎁</span>
-                  <span className="value-text">Free RisingPunk Shirt</span>
+                  <span className="value-text">Custom RisingPunk Shirt</span>
                 </div>
                 <div className="value-item">
                   <span className="value-icon">⚡</span>
-                  <span className="value-text">Limited Spots Available</span>
+                  <span className="value-text">Level 50 by March 31, 2026</span>
                 </div>
               </div>
             </div>
           </div>
         </div>
-        
-        <Level35Promotion />
-        <DailyCountdownOffer />
-        
+
+        <Level50CountdownOffer />
+
         <FinalCTA />
       </div>
       <Footer />
