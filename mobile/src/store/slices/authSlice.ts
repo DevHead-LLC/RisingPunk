@@ -133,10 +133,10 @@ export const loginUser = createAsyncThunk(
 export const registerUser = createAsyncThunk(
   'auth/register',
   async (credentials: { email: string; accessKey: string }, { rejectWithValue }) => {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
+    try {
       let response;
       try {
         response = await fetch(`${API_URL}/api/auth/register`, {
@@ -175,6 +175,8 @@ export const registerUser = createAsyncThunk(
         return rejectWithValue('Network error: Cannot connect to server');
       }
       return rejectWithValue(error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 );

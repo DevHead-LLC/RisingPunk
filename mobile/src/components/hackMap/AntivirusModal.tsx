@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Pressable, Image, ScrollView, Platform, Dimensions } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
@@ -6,7 +6,9 @@ import { CloseButton } from '../common/CloseButton';
 import { useAppSelector } from '../../store/hooks';
 import { getCurrentBalance } from '../../store/slices/balanceSlice';
 import { formatBalance } from '../common/Balance';
+import { useAppDispatch } from '../../store/hooks';
 import { useGetShieldStatusQuery, useActivateShieldMutation } from '../../store/api/antivirusApi';
+import { userGuideApi } from '../../store/api/userGuideApi';
 import { useGetUserFeaturesQuery } from '../../store/api/researchFeaturesApi';
 import { AntivirusShieldTimer } from './AntivirusShieldTimer';
 import { AntivirusCooldownTimer } from './AntivirusCooldownTimer';
@@ -74,28 +76,11 @@ export const AntivirusModal: React.FC<AntivirusModalProps> = ({
   const { data: shieldData, refetch, error: shieldError, isLoading: shieldLoading } = useGetShieldStatusQuery(undefined, {
     pollingInterval: 1000,
   });
-  
-  useEffect(() => {
-    if (shieldError) {
-      console.error('[AntivirusModal] Shield status query error:', shieldError);
-    }
-  }, [shieldError]);
-  
-  const [activateShield, { isLoading: isActivating, error: activateError }] = useActivateShieldMutation();
-  
-  useEffect(() => {
-    if (activateError) {
-      console.error('[AntivirusModal] Activate shield mutation error:', activateError);
-    }
-  }, [activateError]);
-  
-  const { data: researchFeatures, error: researchError } = useGetUserFeaturesQuery('home-defense');
-  
-  useEffect(() => {
-    if (researchError) {
-      console.error('[AntivirusModal] Research features query error:', researchError);
-    }
-  }, [researchError]);
+  const dispatch = useAppDispatch();
+  const [activateShield, { isLoading: isActivating }] = useActivateShieldMutation();
+
+  // Get research features data (same as HackMapScreen and ResearchFeaturesList)
+  const { data: researchFeatures } = useGetUserFeaturesQuery('home-defense');
   
   const antivirusFeature = researchFeatures?.find(f => f.id === 'antivirus');
   
@@ -123,8 +108,10 @@ export const AntivirusModal: React.FC<AntivirusModalProps> = ({
     try {
       await activateShield({ optionId: option.id }).unwrap();
       refetch();
-    } catch (error: any) {
-      console.error('[AntivirusModal] Failed to activate shield:', error);
+      // Invalidate task guide so "Use a shield" moves to Collect
+      dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
+    } catch (error) {
+      console.error('Failed to activate shield:', error);
     }
   };
 

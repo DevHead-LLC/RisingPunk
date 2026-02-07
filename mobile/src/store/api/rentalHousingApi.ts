@@ -7,8 +7,15 @@ export interface RentalHousingIncome {
   propertyBreakdown: {
     propertyId: number;
     isUnlocked: boolean;
+    propertyLevel?: number;
     incomePerSecond: number;
     roomValues: {
+      bathroom: number;
+      kitchen: number;
+      bedroom: number;
+      livingRoom: number;
+    };
+    roomLevels?: {
       bathroom: number;
       kitchen: number;
       bedroom: number;

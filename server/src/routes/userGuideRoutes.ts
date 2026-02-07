@@ -4,6 +4,8 @@ import { UserTaskProgress } from '../models/UserTaskProgress';
 import { User } from '../models/User';
 import { Research } from '../models/Research';
 import { ResearchUser } from '../models/ResearchUser';
+import { CrewStatus } from '../models/CrewStatus';
+import { CrewChatMessage } from '../models/CrewChatMessage';
 import { getTaskList } from '../config/taskListData';
 import mongoose from 'mongoose';
 
@@ -32,7 +34,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
         new: true,
         setDefaultsOnInsert: true
       }
-    ).select('completedTasks collectedTasks skippedTasks showTaskGuide taskGuidePillTappedOnce profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt walletViewedAt attackedLevel1NpcAt visitedAnotherUserProfileAt homeDefenseUnlockedAt antivirusUnlockedAt').lean();
+    ).select('completedTasks collectedTasks skippedTasks showTaskGuide taskGuidePillTappedOnce profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt walletViewedAt attackedLevel1NpcAt attackedLevel5NpcAt attackedLevel6NpcAt visitedAnotherUserProfileAt homeDefenseUnlockedAt antivirusUnlockedAt hackAbilityUnlockedAt addBattalionCResearchUnlockedAt battalionSizePlus250ResearchUnlockedAt hackCrewUnlockedAt crewSystemResearchUnlockedAt crewJoinedAt firstCrewChatMessageSentAt shieldActivatedAt financialStatementViewedAt usernameChangeSettingViewedAt').lean();
 
     if (!progress) {
       res.status(500).json({ error: 'Failed to initialize task progress' });
@@ -62,7 +64,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
     // This ensures tasks like 'reach-level-2' are auto-completed if user has already reached level 2
     // Note: Using .lean() to get plain JavaScript object, and explicitly selecting fields
     // If fields don't exist in database, they will be undefined (not default value)
-    const user = await User.findById(userId).select('totalGuardiansBuilt totalPhreaksBuilt totalBreachersBuilt unlockedFeatures.hackRig unlockedFeatures.researchCenter unlockedFeatures.rentalHousing1 level').lean();
+    const user = await User.findById(userId).select('totalGuardiansBuilt totalPhreaksBuilt totalBreachersBuilt unlockedFeatures.hackRig unlockedFeatures.researchCenter unlockedFeatures.rentalHousing1 unlockedFeatures.rentalHousing2 level').lean();
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;
@@ -129,6 +131,209 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
       }
     }
 
+    if (!progress.hackAbilityUnlockedAt) {
+      const hackAbilityResearch = await Research.findOne({ categoryId: 'hack-ability' });
+      if (hackAbilityResearch) {
+        const userResearch = await ResearchUser.findOne({
+          userId,
+          researchId: hackAbilityResearch._id
+        });
+
+        if (userResearch && userResearch.isUnlocked) {
+          await UserTaskProgress.findOneAndUpdate(
+            { userId },
+            {
+              $set: { hackAbilityUnlockedAt: userResearch.unlockedAt || new Date() },
+              $setOnInsert: {
+                completedTasks: [],
+                collectedTasks: [],
+                skippedTasks: [],
+                showTaskGuide: true
+              }
+            },
+            { upsert: true, new: true }
+          );
+
+          const updatedProgress = await UserTaskProgress.findOne({ userId }).lean();
+          if (updatedProgress) {
+            progress = updatedProgress as any;
+          }
+        }
+      }
+    }
+
+    if (!progress.hackCrewUnlockedAt) {
+      const hackCrewResearch = await Research.findOne({ categoryId: 'hack-crew' });
+      if (hackCrewResearch) {
+        const userResearch = await ResearchUser.findOne({
+          userId,
+          researchId: hackCrewResearch._id
+        });
+
+        if (userResearch && userResearch.isUnlocked) {
+          await UserTaskProgress.findOneAndUpdate(
+            { userId },
+            {
+              $set: { hackCrewUnlockedAt: userResearch.unlockedAt || new Date() },
+              $setOnInsert: {
+                completedTasks: [],
+                collectedTasks: [],
+                skippedTasks: [],
+                showTaskGuide: true
+              }
+            },
+            { upsert: true, new: true }
+          );
+
+          const updatedProgress = await UserTaskProgress.findOne({ userId }).lean();
+          if (updatedProgress) {
+            progress = updatedProgress as any;
+          }
+        }
+      }
+    }
+
+    if (!progress.addBattalionCResearchUnlockedAt) {
+      const { UserResearchFeature } = await import('../models/UserResearchFeature');
+      const addBattalionCFeature = await UserResearchFeature.findOne({
+        userId,
+        categoryId: 'hack-ability',
+        featureId: 'battalions-per-battle'
+      });
+
+      if (addBattalionCFeature && addBattalionCFeature.isUnlocked) {
+        await UserTaskProgress.findOneAndUpdate(
+          { userId },
+          {
+            $set: { addBattalionCResearchUnlockedAt: addBattalionCFeature.unlockedAt || new Date() },
+            $setOnInsert: {
+              completedTasks: [],
+              collectedTasks: [],
+              skippedTasks: [],
+              showTaskGuide: true
+            }
+          },
+          { upsert: true, new: true }
+        );
+
+        const updatedProgress = await UserTaskProgress.findOne({ userId }).lean();
+        if (updatedProgress) {
+          progress = updatedProgress as any;
+        }
+      }
+    }
+
+    if (!progress.battalionSizePlus250ResearchUnlockedAt) {
+      const { UserResearchFeature } = await import('../models/UserResearchFeature');
+      const battalionSizeFeature = await UserResearchFeature.findOne({
+        userId,
+        categoryId: 'hack-ability',
+        featureId: 'increase-battalion-size'
+      });
+
+      if (battalionSizeFeature && battalionSizeFeature.isUnlocked) {
+        await UserTaskProgress.findOneAndUpdate(
+          { userId },
+          {
+            $set: { battalionSizePlus250ResearchUnlockedAt: battalionSizeFeature.unlockedAt || new Date() },
+            $setOnInsert: {
+              completedTasks: [],
+              collectedTasks: [],
+              skippedTasks: [],
+              showTaskGuide: true
+            }
+          },
+          { upsert: true, new: true }
+        );
+
+        const updatedProgress = await UserTaskProgress.findOne({ userId }).lean();
+        if (updatedProgress) {
+          progress = updatedProgress as any;
+        }
+      }
+    }
+
+    if (!progress.crewSystemResearchUnlockedAt) {
+      const { UserResearchFeature } = await import('../models/UserResearchFeature');
+      const crewSystemFeature = await UserResearchFeature.findOne({
+        userId,
+        categoryId: 'hack-crew',
+        featureId: 'crew-system-unlock'
+      });
+
+      if (crewSystemFeature && crewSystemFeature.isUnlocked) {
+        await UserTaskProgress.findOneAndUpdate(
+          { userId },
+          {
+            $set: { crewSystemResearchUnlockedAt: crewSystemFeature.unlockedAt || new Date() },
+            $setOnInsert: {
+              completedTasks: [],
+              collectedTasks: [],
+              skippedTasks: [],
+              showTaskGuide: true
+            }
+          },
+          { upsert: true, new: true }
+        );
+
+        const updatedProgress = await UserTaskProgress.findOne({ userId }).lean();
+        if (updatedProgress) {
+          progress = updatedProgress as any;
+        }
+      }
+    }
+
+    if (!progress.crewJoinedAt) {
+      const crewStatus = await CrewStatus.findOne({ userId }).lean();
+      if (crewStatus && crewStatus.isInCrew) {
+        await UserTaskProgress.findOneAndUpdate(
+          { userId },
+          {
+            $set: { crewJoinedAt: (crewStatus as any).updatedAt || new Date() },
+            $setOnInsert: {
+              completedTasks: [],
+              collectedTasks: [],
+              skippedTasks: [],
+              showTaskGuide: true
+            }
+          },
+          { upsert: true, new: true }
+        );
+
+        const updatedProgress = await UserTaskProgress.findOne({ userId }).lean();
+        if (updatedProgress) {
+          progress = updatedProgress as any;
+        }
+      }
+    }
+
+    if (!progress.firstCrewChatMessageSentAt) {
+      const firstMessage = await CrewChatMessage.findOne({ userId })
+        .sort({ createdAt: 1 })
+        .select('createdAt')
+        .lean();
+      if (firstMessage && firstMessage.createdAt) {
+        await UserTaskProgress.findOneAndUpdate(
+          { userId },
+          {
+            $set: { firstCrewChatMessageSentAt: firstMessage.createdAt },
+            $setOnInsert: {
+              completedTasks: [],
+              collectedTasks: [],
+              skippedTasks: [],
+              showTaskGuide: true
+            }
+          },
+          { upsert: true, new: true }
+        );
+
+        const updatedProgress = await UserTaskProgress.findOne({ userId }).lean();
+        if (updatedProgress) {
+          progress = updatedProgress as any;
+        }
+      }
+    }
+
     let currentTask = null;
     const sortedTasks = [...taskList].sort((a, b) => a.order - b.order);
     let anyTaskAutoCompleted = false;
@@ -177,7 +382,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
     // SECOND PASS: After auto-completing tasks, refresh progress and find the current task
     if (anyTaskAutoCompleted) {
       const updatedProgress = await UserTaskProgress.findOne({ userId })
-        .select('completedTasks collectedTasks skippedTasks showTaskGuide taskGuidePillTappedOnce profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt walletViewedAt attackedLevel1NpcAt visitedAnotherUserProfileAt')
+        .select('completedTasks collectedTasks skippedTasks showTaskGuide taskGuidePillTappedOnce profileVisitedAt themeChangedToDarkAt themeChangedToLightAt avatarChangedAt taskGuideShownAt homeVisitedAt hackmapVisitedAt digitalBarracksVisitedAt walletViewedAt attackedLevel1NpcAt attackedLevel5NpcAt attackedLevel6NpcAt visitedAnotherUserProfileAt homeDefenseUnlockedAt antivirusUnlockedAt hackAbilityUnlockedAt addBattalionCResearchUnlockedAt battalionSizePlus250ResearchUnlockedAt hackCrewUnlockedAt crewSystemResearchUnlockedAt crewJoinedAt firstCrewChatMessageSentAt shieldActivatedAt financialStatementViewedAt usernameChangeSettingViewedAt')
         .lean();
       
       if (updatedProgress) {
@@ -1154,6 +1359,150 @@ router.post('/track-wallet-view', auth, async (req: Request, res: Response) => {
     res.json({ success: true, message: 'Wallet view tracked' });
   } catch (error) {
     console.error('Error tracking wallet view:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/track-financial-statement-view', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const existingProgress = await UserTaskProgress.findOne({ userId });
+    const wasAlreadyViewed = existingProgress?.financialStatementViewedAt;
+
+    if (!wasAlreadyViewed) {
+      await UserTaskProgress.findOneAndUpdate(
+        { userId },
+        {
+          $set: { financialStatementViewedAt: new Date() },
+          $setOnInsert: {
+            completedTasks: [],
+            collectedTasks: [],
+            skippedTasks: [],
+            showTaskGuide: true
+          }
+        },
+        { upsert: true, new: true }
+      );
+    }
+
+    if (!wasAlreadyViewed) {
+      const taskList = getTaskList();
+      const financialStatementTask = taskList.find(t => t.id === 'view-financial-statement');
+
+      if (financialStatementTask && financialStatementTask.autoCompleteConditions) {
+        const user = await User.findById(userId).lean();
+        if (user) {
+          const updatedProgress = await UserTaskProgress.findOne({ userId });
+          const shouldAutoComplete = financialStatementTask.autoCompleteConditions(user as any, updatedProgress ?? undefined);
+
+          if (shouldAutoComplete) {
+            const isAlreadyCompleted = updatedProgress?.completedTasks?.some(
+              (task: any) => task.taskId === 'view-financial-statement'
+            );
+
+            if (!isAlreadyCompleted) {
+              await UserTaskProgress.findOneAndUpdate(
+                {
+                  userId,
+                  'completedTasks.taskId': { $ne: 'view-financial-statement' }
+                },
+                {
+                  $push: {
+                    completedTasks: {
+                      taskId: 'view-financial-statement',
+                      completedAt: new Date()
+                    }
+                  },
+                  $set: { lastCompletedTaskId: 'view-financial-statement' }
+                },
+                { new: true }
+              );
+            }
+          }
+        }
+      }
+    }
+
+    res.json({ success: true, message: 'Financial statement view tracked' });
+  } catch (error) {
+    console.error('Error tracking financial statement view:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/track-username-change-setting-view', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const existingProgress = await UserTaskProgress.findOne({ userId });
+    const wasAlreadyViewed = existingProgress?.usernameChangeSettingViewedAt;
+
+    if (!wasAlreadyViewed) {
+      await UserTaskProgress.findOneAndUpdate(
+        { userId },
+        {
+          $set: { usernameChangeSettingViewedAt: new Date() },
+          $setOnInsert: {
+            completedTasks: [],
+            collectedTasks: [],
+            skippedTasks: [],
+            showTaskGuide: true
+          }
+        },
+        { upsert: true, new: true }
+      );
+    }
+
+    if (!wasAlreadyViewed) {
+      const taskList = getTaskList();
+      const usernameChangeTask = taskList.find(t => t.id === 'view-username-change-setting');
+
+      if (usernameChangeTask && usernameChangeTask.autoCompleteConditions) {
+        const user = await User.findById(userId).lean();
+        if (user) {
+          const updatedProgress = await UserTaskProgress.findOne({ userId });
+          const shouldAutoComplete = usernameChangeTask.autoCompleteConditions(user as any, updatedProgress ?? undefined);
+
+          if (shouldAutoComplete) {
+            const isAlreadyCompleted = updatedProgress?.completedTasks?.some(
+              (task: any) => task.taskId === 'view-username-change-setting'
+            );
+
+            if (!isAlreadyCompleted) {
+              await UserTaskProgress.findOneAndUpdate(
+                {
+                  userId,
+                  'completedTasks.taskId': { $ne: 'view-username-change-setting' }
+                },
+                {
+                  $push: {
+                    completedTasks: {
+                      taskId: 'view-username-change-setting',
+                      completedAt: new Date()
+                    }
+                  },
+                  $set: { lastCompletedTaskId: 'view-username-change-setting' }
+                },
+                { new: true }
+              );
+            }
+          }
+        }
+      }
+    }
+
+    res.json({ success: true, message: 'Username change setting view tracked' });
+  } catch (error) {
+    console.error('Error tracking username change setting view:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

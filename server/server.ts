@@ -7,6 +7,7 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { User } from './src/models/User';
+import { UserTaskProgress } from './src/models/UserTaskProgress';
 import { ShieldService } from './src/services/ShieldService';
 import authRoutes from './src/routes/auth';
 import auth from './src/middleware/auth';
@@ -307,7 +308,7 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
 
 // Removed unused /api/balance/deduct endpoint - not used by mobile app
 
-// Get rental housing income data
+// Get rental housing income data (ensure legacy level migration so legacy users get level-5 rates)
 app.get('/api/rental-housing/income', auth, async (req: Request, res: Response) => {
   try {
     const user = await User.findById(req.user._id);
@@ -317,7 +318,9 @@ app.get('/api/rental-housing/income', auth, async (req: Request, res: Response) 
       return;
     }
 
+    const { RentalHousingSyncService } = await import('./src/services/RentalHousingSyncService');
     const { RentalHousingIncomeService } = await import('./src/services/RentalHousingIncomeService');
+    await RentalHousingSyncService.ensureLegacyRentalLevels(user);
     const rentalIncome = await RentalHousingIncomeService.calculateRentalHousingIncome(user);
 
     res.json(rentalIncome);
@@ -474,6 +477,20 @@ app.post('/api/antivirus-shield/activate', auth, async (req: Request, res: Respo
       cooldownUntil: null
     };
     await user.save();
+
+    // Mark "Use a shield" guided task progress (any shield duration completes the task)
+    try {
+      await UserTaskProgress.findOneAndUpdate(
+        { userId: user._id },
+        {
+          $set: { shieldActivatedAt: now },
+          $setOnInsert: { completedTasks: [], collectedTasks: [], skippedTasks: [], showTaskGuide: true }
+        },
+        { upsert: true }
+      );
+    } catch (taskTrackingError) {
+      console.error('Error tracking shield activation for task guide:', taskTrackingError);
+    }
 
     res.json({
       success: true,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { logout, setShowOnboarding, updateUserHandle, forceRefresh, setShowEmailVerification, refreshUserData } from '../store/slices/authSlice';
 import { updateProfileGender } from '../store/slices/preferencesSlice';
 import { useUpdatePreferencesMutation } from '../store/api/preferencesApi';
-import { useGetCurrentTaskGuideTaskQuery, useUpdateTaskGuideVisibilityMutation, useTrackProfileVisitMutation, useTrackThemeChangeMutation, useTrackAvatarChangeMutation } from '../store/api/userGuideApi';
+import { useGetCurrentTaskGuideTaskQuery, useUpdateTaskGuideVisibilityMutation, useTrackProfileVisitMutation, useTrackThemeChangeMutation, useTrackAvatarChangeMutation, useTrackUsernameChangeSettingViewMutation } from '../store/api/userGuideApi';
 import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
 import { TaskGuideHighlightOverlay } from '../components/turf/TaskGuideHighlightOverlay';
 import { useGetProfileQuery, useGetResearchCenterStatusQuery, useDeleteAccountMutation, authApi } from '../store/api/authApi';
@@ -596,7 +596,17 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const [trackProfileVisit] = useTrackProfileVisitMutation();
   const [trackThemeChange] = useTrackThemeChangeMutation();
   const [trackAvatarChange] = useTrackAvatarChangeMutation();
+  const [trackUsernameChangeSettingView] = useTrackUsernameChangeSettingViewMutation();
+  const hasTrackedUsernameChangeSettingRef = useRef(false);
   const { highlightTaskId, highlightStep, clearHighlight, advanceHighlightStep } = useTaskGuideHighlight();
+
+  // Mark "View Username Change setting" guided task when user views Account tab (where Change User Handle is)
+  useEffect(() => {
+    if (activeTab === 'account' && !hasTrackedUsernameChangeSettingRef.current) {
+      hasTrackedUsernameChangeSettingRef.current = true;
+      void trackUsernameChangeSettingView();
+    }
+  }, [activeTab, trackUsernameChangeSettingView]);
   
   const isThemeTask = highlightTaskId === 'use-hacker-mode' || highlightTaskId === 'use-business-mode';
   const isAvatarTask = highlightTaskId === 'change-avatar';

@@ -1,0 +1,11 @@
+{
+  "ignore_dirs": [
+    "node_modules",
+    "build",
+    "dist",
+    ".bundle",
+    "android/build",
+    "ios/build",
+    ".git"
+  ]
+}
