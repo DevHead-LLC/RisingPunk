@@ -10,6 +10,7 @@ import { UserTaskProgress } from '../models/UserTaskProgress';
 import { getTaskList } from '../config/taskListData';
 import { getPropertyBuildConfig, getRoomRemodelConfig } from '../config/rentalPropertyConfig';
 import { RentalHousingIncomeService } from '../services/RentalHousingIncomeService';
+import { RentalHousingSyncService } from '../services/RentalHousingSyncService';
 
 interface UpdatePreferencesRequest extends Request {
   body: {
@@ -511,26 +512,6 @@ router.get('/finance/templates', auth, async (_req: Request, res: Response) => {
   }
 });
 
-// Ensure legacy users with unlockedFeatures.rentalHousingN have rentalHousingLevels.propertyN = 5 (grandfathered)
-async function ensureLegacyRentalLevels(user: IUser): Promise<boolean> {
-  let updated = false;
-  const levelSetByBuild = (user.rentalHousingLevelSetByBuild as Record<string, boolean>) || {};
-  for (let i = 1; i <= 4; i++) {
-    const ufKey = `rentalHousing${i}` as keyof typeof user.unlockedFeatures;
-    const isUnlocked = user.unlockedFeatures[ufKey];
-    const level = (user.rentalHousingLevels as Record<string, number>)?.[`property${i}`];
-    const setByBuild = levelSetByBuild[`property${i}`];
-    const shouldGrandfather = isUnlocked && (typeof level !== 'number' || level < 1 || (level === 1 && !setByBuild));
-    if (shouldGrandfather) {
-      (user.rentalHousingLevels as any) = user.rentalHousingLevels || {};
-      (user.rentalHousingLevels as any)[`property${i}`] = 5;
-      updated = true;
-    }
-  }
-  if (updated) await user.save();
-  return updated;
-}
-
 // Rental Housing endpoints
 router.get('/rental-housing-status/:propertyId', auth, async (req, res): Promise<void> => {
   try {
@@ -548,7 +529,7 @@ router.get('/rental-housing-status/:propertyId', auth, async (req, res): Promise
       return;
     }
 
-    await ensureLegacyRentalLevels(user);
+    await RentalHousingSyncService.ensureLegacyRentalLevels(user);
 
     const propertyLevel = RentalHousingIncomeService.getPropertyLevel(user, propertyId);
     const isUnlocked = propertyLevel >= 1;
@@ -605,7 +586,7 @@ router.post('/unlock-rental-housing/:propertyId', auth, async (req, res): Promis
       return;
     }
 
-    await ensureLegacyRentalLevels(user);
+    await RentalHousingSyncService.ensureLegacyRentalLevels(user);
 
     const propertyLevel = RentalHousingIncomeService.getPropertyLevel(user, propertyId);
     if (propertyLevel >= 5) {
@@ -884,7 +865,7 @@ router.post('/start-remodel/:propertyId', auth, async (req, res): Promise<void> 
     res.status(404).json({ error: 'User not found' });
     return;
   }
-  await ensureLegacyRentalLevels(preUser);
+  await RentalHousingSyncService.ensureLegacyRentalLevels(preUser);
 
   const session = await mongoose.startSession();
   try {
