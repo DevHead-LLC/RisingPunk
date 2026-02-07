@@ -101,12 +101,30 @@ export interface ResearchCenterStatusResponse {
 export interface RentalHousingStatusResponse {
   propertyId: number;
   isUnlocked: boolean;
+  propertyLevel: number;
+  nextBuildLevel: number | null;
+  nextBuildCost: number | null;
+  nextBuildTimeMinutes: number | null;
   isBuilding: boolean;
   buildStatus: {
-    startedAt: string;
-    completesAt: string;
+    startedAt: string | null;
+    completesAt: string | null;
+    targetLevel?: number;
   } | null;
   canBuild: boolean;
+  roomLevels?: {
+    bathroom: number;
+    kitchen: number;
+    bedroom: number;
+    livingRoom: number;
+  };
+  activeRemodel?: {
+    propertyId: number;
+    room: string;
+    startedAt: string | null;
+    completesAt: string | null;
+    targetRoomLevel: number;
+  } | null;
 }
 
 export interface UnlockRentalHousingResponse {
@@ -115,6 +133,7 @@ export interface UnlockRentalHousingResponse {
   buildStatus: {
     startedAt: string;
     completesAt: string;
+    targetLevel?: number;
   };
   newBalance: number;
 }
@@ -123,7 +142,10 @@ export interface CompleteRentalHousingResponse {
   success: boolean;
   message: string;
   propertyId: number;
+  propertyLevel?: number;
   isUnlocked: boolean;
+  newBalance?: number;
+  ratePerSecond?: number;
 }
 
 export interface SpeedupPropertyConstructionResponse {
@@ -132,6 +154,40 @@ export interface SpeedupPropertyConstructionResponse {
   propertyId: number;
   isUnlocked: boolean;
   newBalance: number;
+  ratePerSecond?: number;
+}
+
+export type RemodelRoomType = 'bathroom' | 'kitchen' | 'bedroom' | 'livingRoom';
+
+export interface StartRemodelRequest {
+  propertyId: number;
+  room: RemodelRoomType;
+}
+
+export interface StartRemodelResponse {
+  success: boolean;
+  message: string;
+  activeRemodel: { propertyId: number; room: string; startedAt: string; completesAt: string; targetRoomLevel: number };
+  newBalance: number;
+}
+
+export interface CompleteRemodelResponse {
+  success: boolean;
+  message: string;
+  propertyId: number;
+  room: string;
+  roomLevel: number;
+  newBalance?: number;
+  ratePerSecond?: number;
+}
+
+export interface SpeedupRemodelResponse {
+  success: boolean;
+  message: string;
+  propertyId: number;
+  room: string;
+  newBalance: number;
+  ratePerSecond?: number;
 }
 
 export interface SpeedupResearchCenterConstructionResponse {
@@ -290,6 +346,16 @@ export const authApi = createApi({
         url: `/api/users/complete-rental-housing/${propertyId}`,
         method: 'POST',
       }),
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(balanceApi.util.invalidateTags(['Balance']));
+          const { rentalHousingApi } = await import('./rentalHousingApi');
+          dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
+        } catch {
+          // Error handling is done by the mutation itself
+        }
+      },
       invalidatesTags: (result, error, propertyId) => [
         { type: 'User', id: `rentalHousingStatus-${propertyId}` }
       ],
@@ -303,13 +369,77 @@ export const authApi = createApi({
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           await queryFulfilled;
-          // Invalidate Balance tag from balanceApi to ensure fresh balance data
           dispatch(balanceApi.util.invalidateTags(['Balance']));
+          const { rentalHousingApi } = await import('./rentalHousingApi');
+          dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
         } catch {
           // Error handling is done by the mutation itself
         }
       },
       invalidatesTags: (result, error, propertyId) => [
+        { type: 'User', id: `rentalHousingStatus-${propertyId}` }
+      ],
+    }),
+
+    startRemodel: builder.mutation<StartRemodelResponse, StartRemodelRequest>({
+      query: ({ propertyId, room }) => ({
+        url: `/api/users/start-remodel/${propertyId}`,
+        method: 'POST',
+        body: { room },
+      }),
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(balanceApi.util.invalidateTags(['Balance']));
+          const { rentalHousingApi } = await import('./rentalHousingApi');
+          dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
+        } catch {
+          // no-op
+        }
+      },
+      invalidatesTags: (result, error, { propertyId }) => [
+        { type: 'User', id: `rentalHousingStatus-${propertyId}` }
+      ],
+    }),
+
+    completeRemodel: builder.mutation<CompleteRemodelResponse, StartRemodelRequest>({
+      query: ({ propertyId, room }) => ({
+        url: `/api/users/complete-remodel/${propertyId}`,
+        method: 'POST',
+        body: { room },
+      }),
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(balanceApi.util.invalidateTags(['Balance']));
+          const { rentalHousingApi } = await import('./rentalHousingApi');
+          dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
+        } catch {
+          // no-op
+        }
+      },
+      invalidatesTags: (result, error, { propertyId }) => [
+        { type: 'User', id: `rentalHousingStatus-${propertyId}` }
+      ],
+    }),
+
+    speedupRemodel: builder.mutation<SpeedupRemodelResponse, StartRemodelRequest>({
+      query: ({ propertyId, room }) => ({
+        url: `/api/users/speedup-remodel/${propertyId}`,
+        method: 'POST',
+        body: { room },
+      }),
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(balanceApi.util.invalidateTags(['Balance']));
+          const { rentalHousingApi } = await import('./rentalHousingApi');
+          dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
+        } catch {
+          // no-op
+        }
+      },
+      invalidatesTags: (result, error, { propertyId }) => [
         { type: 'User', id: `rentalHousingStatus-${propertyId}` }
       ],
     }),
@@ -646,6 +776,9 @@ export const {
   useUnlockRentalHousingMutation,
   useCompleteRentalHousingMutation,
   useSpeedupPropertyConstructionMutation,
+  useStartRemodelMutation,
+  useCompleteRemodelMutation,
+  useSpeedupRemodelMutation,
   useCompleteOnboardingMutation,
   useDeleteAccountMutation,
   useForgotPasswordMutation,

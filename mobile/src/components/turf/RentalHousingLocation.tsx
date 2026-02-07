@@ -1,5 +1,5 @@
 import React, { memo, useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useTheme } from '../../context/ThemeContext';
@@ -77,9 +77,19 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
   const buildStatus = rentalHousingStatus?.buildStatus ?? null;
   const canBuild = rentalHousingStatus?.canBuild ?? false;
   
-  const RENTAL_HOUSING_COST = 100000;
-  
-  const hasSufficientFunds = numericBalance !== null && !isNaN(numericBalance as number) && numericBalance >= RENTAL_HOUSING_COST;
+  const propertyLevel = rentalHousingStatus?.propertyLevel ?? 0;
+  const buildCost = rentalHousingStatus?.nextBuildCost ?? 100000;
+  const buildTimeMinutes = rentalHousingStatus?.nextBuildTimeMinutes ?? 120;
+  const buildTimeDisplay = buildTimeMinutes < 60
+    ? `${buildTimeMinutes} min`
+    : (() => {
+        const hours = Math.floor(buildTimeMinutes / 60);
+        const mins = buildTimeMinutes % 60;
+        const hourPart = `${hours} hour${hours !== 1 ? 's' : ''}`;
+        return mins > 0 ? `${hourPart} ${mins} min` : hourPart;
+      })();
+  const hasSufficientFunds = numericBalance !== null && !isNaN(numericBalance as number) && numericBalance >= buildCost;
+  const showUpgradeArrow = isUnlocked && canBuild;
 
   const isBuildInvestmentProperty =
     (highlightTaskId === 'build-investment-property' && propertyId === 1) ||
@@ -178,49 +188,46 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
 
   const handleTimerComplete = useCallback(async () => {
     try {
-      // Mark the build as complete in the database
       const result = await completeRentalHousing(propertyId).unwrap();
-      
       if (result.success) {
-        // Force a re-render to update the UI (don't block on analytics)
+        if (typeof result.ratePerSecond === 'number' || typeof result.newBalance === 'number') {
+          dispatch(updateBalance({
+            total: typeof result.newBalance === 'number' ? result.newBalance : (currentBalanceState.total ?? 0),
+            ratePerSecond: result.ratePerSecond ?? currentBalanceState.ratePerSecond,
+            lastUpdated: currentBalanceState.lastUpdated ? new Date(currentBalanceState.lastUpdated) : null,
+            fractionalRemainder: currentBalanceState.fractionalRemainder
+          }));
+        }
         setForceUpdate(prev => prev + 1);
-        
-        // Track first construction (fire-and-forget, don't block UI updates)
         if (userId) {
           trackFirstConstruct('rental_property', userId, propertyId).catch((error) => {
             console.error('[Analytics] Error tracking first_construct:', error);
           });
         }
-        const refetchResult = await refetch();
+        await refetch();
       }
     } catch (error: any) {
       console.error('Error completing rental housing build:', error);
       setShowCompletionErrorModal(true);
     }
-  }, [propertyId, completeRentalHousing, refetch, userId]);
+  }, [propertyId, completeRentalHousing, refetch, userId, dispatch, currentBalanceState]);
 
   const handleSpeedup = useCallback(async () => {
     try {
       const result = await speedupPropertyConstruction(propertyId).unwrap();
-      
       if (result.success) {
-        // Update balance
-        dispatch(updateBalance({ 
-          total: result.newBalance, 
-          ratePerSecond: currentBalanceState.ratePerSecond, 
+        dispatch(updateBalance({
+          total: result.newBalance,
+          ratePerSecond: result.ratePerSecond ?? currentBalanceState.ratePerSecond,
           lastUpdated: currentBalanceState.lastUpdated ? new Date(currentBalanceState.lastUpdated) : null,
           fractionalRemainder: currentBalanceState.fractionalRemainder
         }));
-        
-        // Force a re-render to update the UI
         setForceUpdate(prev => prev + 1);
         await refetch();
-        // Close speedup modal on success
         setShowSpeedupModal(false);
       }
     } catch (error: any) {
       console.error('Error speeding up property construction:', error);
-      // Close speedup modal and show error modal instead
       setShowSpeedupModal(false);
       if (error?.data?.error === 'Insufficient funds') {
         setShowInsufficientFundsModal(true);
@@ -266,6 +273,11 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
 
   return (
     <View style={[styles.rentalHousingContainer, { zIndex: zIndexValue }]}>
+      {isUnlocked && propertyLevel >= 1 && (
+        <Text style={[styles.levelBadge, { color: themeMode === 'light' ? '#333' : colors.matrix }]}>
+          Lv. {propertyLevel}
+        </Text>
+      )}
       <View style={styles.iconWrapper}>
         <DevelopmentIcon
           isBuilding={isBuilding}
@@ -279,6 +291,15 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
           isIntroActive={isHighlighted}
         />
         <Text style={[styles.propertyNumber, { color: themeMode === 'light' ? '#FFFFFF' : colors.matrix }]}>{propertyId}</Text>
+        {showUpgradeArrow && (
+          <TouchableOpacity
+            style={[styles.upgradeArrow, { backgroundColor: colors.primary }]}
+            onPress={() => setShowPopup(true)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.upgradeArrowText}>↑</Text>
+          </TouchableOpacity>
+        )}
       </View>
       
       {showTimer && (
@@ -294,13 +315,13 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
 
       <BuildModal
         visible={showPopup}
-        title="Build Rental Housing"
-        cost={RENTAL_HOUSING_COST}
-        buildTime="2 hours"
+        title={propertyLevel === 0 ? 'Build Investment Property' : `Upgrade to Level ${(propertyLevel + 1)}`}
+        cost={buildCost}
+        buildTime={buildTimeDisplay}
         hasSufficientFunds={hasSufficientFunds}
         onBuild={handleBuild}
         onClose={handleClose}
-        buildButtonText="Build Rental Housing"
+        buildButtonText={propertyLevel === 0 ? 'Start Build' : 'Start Upgrade'}
       />
       
       <LockedFeatureModal
@@ -314,7 +335,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
       <LockedFeatureModal
         visible={showInsufficientFundsModal}
         title="INSUFFICIENT FUNDS"
-        message="You need $100,000 to build the Rental Housing."
+        message={`You need $${buildCost.toLocaleString()} to ${propertyLevel === 0 ? 'build' : 'upgrade'} this property.`}
         onClose={() => setShowInsufficientFundsModal(false)}
         closeButtonText="OK"
       />
@@ -322,7 +343,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
       <LockedFeatureModal
         visible={showBuildStartedModal}
         title="BUILD STARTED"
-        message="Your rental housing build has begun! Check back in 2 hours to see your completed property."
+        message={`Your build has begun! Check back in ${buildTimeDisplay} to see your completed upgrade.`}
         onClose={() => setShowBuildStartedModal(false)}
         closeButtonText="OK"
       />
@@ -362,7 +383,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: 120,
-    height: 120,
+    minHeight: 120,
+  },
+  levelBadge: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 0,
+    letterSpacing: 0.5,
   },
   iconWrapper: {
     position: 'relative',
@@ -382,5 +409,21 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     minWidth: 20,
     textAlign: 'center',
+  },
+  upgradeArrow: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  upgradeArrowText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
   },
 });

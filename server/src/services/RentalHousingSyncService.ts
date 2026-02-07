@@ -10,9 +10,11 @@ export interface RentalHousingSyncResult {
 }
 
 export class RentalHousingSyncService {
-  private static readonly BASE_INCOME_PER_PROPERTY = 0.06; // $0.06 per property per second
   private static readonly BASE_INCOME_RATE_BONUS = 0.05; // $0.05 per second bonus when income rate research unlocked
   private static readonly INSURANCE_REDUCTION_BONUS = 0.02; // $0.02 per second when reduce insurance expense research unlocked
+  /** Pre-level-system flat rate per property per second; use for historical income when user is legacy (would be grandfathered). */
+  private static readonly LEGACY_FLAT_RATE_PER_PROPERTY = 0.06;
+  private static readonly LEGACY_RESEARCH_BONUS_PER_PROPERTY = 0.04; // 4 rooms × 0.01
 
   static async checkAndSyncRentalHousingIncome(user: IUser): Promise<RentalHousingSyncResult> {
     const now = new Date();
@@ -56,14 +58,10 @@ export class RentalHousingSyncService {
 
   private static getUnlockedProperties(user: IUser): number[] {
     const unlockedProperties: number[] = [];
-    
     for (let i = 1; i <= 4; i++) {
-      const rentalHousingKey = `rentalHousing${i}` as keyof typeof user.unlockedFeatures;
-      if (user.unlockedFeatures[rentalHousingKey]) {
-        unlockedProperties.push(i);
-      }
+      const level = RentalHousingIncomeService.getPropertyLevel(user, i);
+      if (level >= 1) unlockedProperties.push(i);
     }
-    
     return unlockedProperties;
   }
 
@@ -130,15 +128,60 @@ export class RentalHousingSyncService {
     return historicalIncome;
   }
 
+  /** True if every unlocked property would be grandfathered (no level or level 1 not set by build). Uses getPropertyLevel so we match getUnlockedProperties (levels and unlockedFeatures). */
+  private static isFullyLegacyForHistoricalIncome(user: IUser): boolean {
+    const levelSetByBuild = (user.rentalHousingLevelSetByBuild as Record<string, boolean>) || {};
+    const levels = (user.rentalHousingLevels as Record<string, number>) || {};
+    for (let i = 1; i <= 4; i++) {
+      const level = RentalHousingIncomeService.getPropertyLevel(user, i);
+      if (level < 1) continue;
+      const storedLevel = levels[`property${i}`];
+      const setByBuild = levelSetByBuild[`property${i}`];
+      if (typeof storedLevel === 'number' && storedLevel >= 2) return false;
+      if (typeof storedLevel === 'number' && storedLevel === 1 && setByBuild) return false;
+    }
+    return true;
+  }
+
   private static async calculateIncomeForPeriod(user: IUser, propertyCount: number, isResearchUnlocked: boolean): Promise<number> {
-    const baseIncomePerProperty = 0.06; // $0.06 per property per second (base rate)
-    const researchBonusPerProperty = 0.04; // $0.04 bonus per property per second when research unlocked
-    const incomePerProperty = baseIncomePerProperty + (isResearchUnlocked ? researchBonusPerProperty : 0);
-    return propertyCount * incomePerProperty;
+    if (this.isFullyLegacyForHistoricalIncome(user)) {
+      return propertyCount * (this.LEGACY_FLAT_RATE_PER_PROPERTY + (isResearchUnlocked ? this.LEGACY_RESEARCH_BONUS_PER_PROPERTY : 0));
+    }
+    const income = await RentalHousingIncomeService.calculateRentalHousingIncome(user, {
+      includeResearchBonus: isResearchUnlocked,
+    });
+    return income.totalIncomePerSecond;
+  }
+
+  /**
+   * Ensure legacy users with unlockedFeatures.rentalHousingN have rentalHousingLevels.propertyN = 5 (grandfathered).
+   * In performSync we call checkAndSyncRentalHousingIncome before this so historical income uses pre-grandfather rates;
+   * then we call this so ratePerSecond is correct going forward. Other callers (e.g. income endpoint) call this first so
+   * current income/display uses level-5 rates.
+   */
+  static async ensureLegacyRentalLevels(user: IUser): Promise<boolean> {
+    let updated = false;
+    const levelSetByBuild = (user.rentalHousingLevelSetByBuild as Record<string, boolean>) || {};
+    for (let i = 1; i <= 4; i++) {
+      const ufKey = `rentalHousing${i}` as keyof typeof user.unlockedFeatures;
+      const isUnlocked = user.unlockedFeatures[ufKey];
+      const level = (user.rentalHousingLevels as Record<string, number>)?.[`property${i}`];
+      const setByBuild = levelSetByBuild[`property${i}`];
+      const shouldGrandfather = isUnlocked && (typeof level !== 'number' || level < 1 || (level === 1 && !setByBuild));
+      if (shouldGrandfather) {
+        (user.rentalHousingLevels as any) = user.rentalHousingLevels || {};
+        (user.rentalHousingLevels as any)[`property${i}`] = 5;
+        updated = true;
+      }
+    }
+    if (updated) await user.save();
+    return updated;
   }
 
   static async performSync(user: IUser): Promise<{ success: boolean; syncedAmount: number; newBalance: number }> {
+    // Historical income must use pre-grandfather rates (legacy users at level 1), so run sync check first.
     const syncResult = await this.checkAndSyncRentalHousingIncome(user);
+    await this.ensureLegacyRentalLevels(user);
     
     // CRITICAL: Always calculate and update ratePerSecond, even if no rental properties exist
     // This ensures income rate and insurance reduction research bonuses are applied for all users
