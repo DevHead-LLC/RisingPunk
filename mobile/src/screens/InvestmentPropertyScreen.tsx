@@ -395,7 +395,15 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                           onPress={async () => {
                             if (!hasFunds) return;
                             try {
-                              await startRemodel({ propertyId, room: remodelRoom }).unwrap();
+                              const res = await startRemodel({ propertyId, room: remodelRoom }).unwrap();
+                              if (res.newBalance != null) {
+                                dispatch(updateBalance({
+                                  total: res.newBalance,
+                                  ratePerSecond: balanceState.ratePerSecond,
+                                  lastUpdated: balanceState.lastUpdated ? new Date(balanceState.lastUpdated) : null,
+                                  fractionalRemainder: balanceState.fractionalRemainder
+                                }));
+                              }
                               setRemodelRoom(null);
                             } catch {
                               // keep modal open

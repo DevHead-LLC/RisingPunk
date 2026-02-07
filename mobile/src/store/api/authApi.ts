@@ -387,6 +387,16 @@ export const authApi = createApi({
         method: 'POST',
         body: { room },
       }),
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(balanceApi.util.invalidateTags(['Balance']));
+          const { rentalHousingApi } = await import('./rentalHousingApi');
+          dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
+        } catch {
+          // no-op
+        }
+      },
       invalidatesTags: (result, error, { propertyId }) => [
         { type: 'User', id: `rentalHousingStatus-${propertyId}` }
       ],
