@@ -12,6 +12,9 @@ export interface RentalHousingSyncResult {
 export class RentalHousingSyncService {
   private static readonly BASE_INCOME_RATE_BONUS = 0.05; // $0.05 per second bonus when income rate research unlocked
   private static readonly INSURANCE_REDUCTION_BONUS = 0.02; // $0.02 per second when reduce insurance expense research unlocked
+  /** Pre-level-system flat rate per property per second; use for historical income when user is legacy (would be grandfathered). */
+  private static readonly LEGACY_FLAT_RATE_PER_PROPERTY = 0.06;
+  private static readonly LEGACY_RESEARCH_BONUS_PER_PROPERTY = 0.04; // 4 rooms × 0.01
 
   static async checkAndSyncRentalHousingIncome(user: IUser): Promise<RentalHousingSyncResult> {
     const now = new Date();
@@ -125,7 +128,25 @@ export class RentalHousingSyncService {
     return historicalIncome;
   }
 
-  private static async calculateIncomeForPeriod(user: IUser, _propertyCount: number, isResearchUnlocked: boolean): Promise<number> {
+  /** True if every unlocked property would be grandfathered (no level or level 1 not set by build). */
+  private static isFullyLegacyForHistoricalIncome(user: IUser): boolean {
+    const levelSetByBuild = (user.rentalHousingLevelSetByBuild as Record<string, boolean>) || {};
+    const levels = (user.rentalHousingLevels as Record<string, number>) || {};
+    for (let i = 1; i <= 4; i++) {
+      const ufKey = `rentalHousing${i}` as keyof typeof user.unlockedFeatures;
+      if (!user.unlockedFeatures[ufKey]) continue;
+      const level = levels[`property${i}`];
+      const setByBuild = levelSetByBuild[`property${i}`];
+      if (typeof level === 'number' && level >= 2) return false;
+      if (typeof level === 'number' && level === 1 && setByBuild) return false;
+    }
+    return true;
+  }
+
+  private static async calculateIncomeForPeriod(user: IUser, propertyCount: number, isResearchUnlocked: boolean): Promise<number> {
+    if (this.isFullyLegacyForHistoricalIncome(user)) {
+      return propertyCount * (this.LEGACY_FLAT_RATE_PER_PROPERTY + (isResearchUnlocked ? this.LEGACY_RESEARCH_BONUS_PER_PROPERTY : 0));
+    }
     const income = await RentalHousingIncomeService.calculateRentalHousingIncome(user, {
       includeResearchBonus: isResearchUnlocked,
     });
