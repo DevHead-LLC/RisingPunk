@@ -105,6 +105,7 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
   const scrollViewRef = useRef<ScrollView>(null);
   const [remodelRoom, setRemodelRoom] = useState<RemodelRoomType | null>(null);
   const [hasActiveRemodelHere, setHasActiveRemodelHere] = useState(false);
+  const [modalCountdownNow, setModalCountdownNow] = useState(() => Date.now());
 
   const { data: status } = useGetRentalHousingStatusQuery(propertyId, {
     pollingInterval: remodelRoom || hasActiveRemodelHere ? 5000 : 0
@@ -123,6 +124,14 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
   const roomLevels = status?.roomLevels ?? { bathroom: 1, kitchen: 1, bedroom: 1, livingRoom: 1 };
   const activeRemodel = status?.activeRemodel?.propertyId === propertyId ? status.activeRemodel : null;
   const activeRemodelRoom = activeRemodel?.room ?? null;
+
+  const isModalShowingInProgress = Boolean(remodelRoom && activeRemodel?.room === remodelRoom && activeRemodel?.completesAt);
+  useEffect(() => {
+    if (!isModalShowingInProgress) return;
+    setModalCountdownNow(Date.now());
+    const id = setInterval(() => setModalCountdownNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [isModalShowingInProgress, remodelRoom, activeRemodel?.room, activeRemodel?.completesAt]);
 
   const FLOOR_PLAN_WIDTH = 1250;
   const FLOOR_PLAN_HEIGHT = 950;
@@ -296,7 +305,7 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
               {activeRemodel?.room === remodelRoom ? (
                 (() => {
                   const remainingSec = activeRemodel.completesAt
-                    ? Math.max(0, (new Date(activeRemodel.completesAt).getTime() - Date.now()) / 1000)
+                    ? Math.max(0, (new Date(activeRemodel.completesAt).getTime() - modalCountdownNow) / 1000)
                     : 0;
                   const speedupCost = Math.ceil(remainingSec) * 5;
                   const canSpeedup = (balanceState.total ?? 0) >= speedupCost && remainingSec > 0;
