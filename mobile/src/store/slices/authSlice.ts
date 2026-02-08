@@ -184,6 +184,21 @@ export const registerUser = createAsyncThunk(
 const GUEST_TOKEN_KEY = 'guestToken';
 const GUEST_DEVICE_ID_KEY = 'guestDeviceId';
 
+/** Extract hostname from API_URL for logging (handles URL with/without protocol). */
+function getApiHostForLogging(): string {
+  try {
+    const u = new URL(API_URL);
+    return u.hostname || 'unknown';
+  } catch {
+    try {
+      const u = new URL(`https://${API_URL}`);
+      return u.hostname || 'unknown';
+    } catch {
+      return typeof API_URL === 'string' ? API_URL.slice(0, 60) : 'unknown';
+    }
+  }
+}
+
 /** Stable device ID for "one guest per device"; created once per install and sent with POST /auth/guest. */
 async function getOrCreateGuestDeviceId(): Promise<string> {
   let id = await AsyncStorage.getItem(GUEST_DEVICE_ID_KEY);
@@ -292,19 +307,7 @@ export const playAsGuest = createAsyncThunk(
       } finally {
         clearTimeout(timeoutId);
       }
-      const apiHost = (() => {
-        try {
-          const u = new URL(API_URL);
-          return u.hostname || 'unknown';
-        } catch {
-          try {
-            const u = new URL(`https://${API_URL}`);
-            return u.hostname || 'unknown';
-          } catch {
-            return typeof API_URL === 'string' ? API_URL.slice(0, 60) : 'unknown';
-          }
-        }
-      })();
+      const apiHost = getApiHostForLogging();
       if (!response.ok) {
         const errorBody = await response.json().catch(() => ({}));
         const serverMessage = (errorBody && typeof errorBody.error === 'string') ? errorBody.error : (errorBody && typeof errorBody.message === 'string') ? errorBody.message : '';
@@ -324,20 +327,7 @@ export const playAsGuest = createAsyncThunk(
       await markAccountExists();
       return data;
     } catch (error) {
-      const apiHost = (() => {
-        try {
-          const u = new URL(API_URL);
-          return u.hostname || 'unknown';
-        } catch {
-          try {
-            const u = new URL(`https://${API_URL}`);
-            return u.hostname || 'unknown';
-          } catch {
-            return typeof API_URL === 'string' ? API_URL.slice(0, 60) : 'unknown';
-          }
-        }
-      })();
-      console.error('[auth] Play as guest error', { apiHost, error });
+      console.error('[auth] Play as guest error', { apiHost: getApiHostForLogging(), error });
       if (error instanceof Error && error.name === 'AbortError') {
         return rejectWithValue('Network error: Cannot connect to server');
       }
