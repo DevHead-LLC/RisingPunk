@@ -9,6 +9,7 @@ import mongoose from 'mongoose';
 import { UserTaskProgress } from '../models/UserTaskProgress';
 import { getTaskList } from '../config/taskListData';
 import { getPropertyBuildConfig, getRoomRemodelConfig } from '../config/rentalPropertyConfig';
+import { getResearchCenterLevelConfig, type ResearchCenterLevel } from '../config/researchCenterConfig';
 import { RentalHousingIncomeService } from '../services/RentalHousingIncomeService';
 import { RentalHousingSyncService } from '../services/RentalHousingSyncService';
 
@@ -260,35 +261,64 @@ router.get('/research-center-status', auth, async (req: Request, res: Response) 
     }
 
     const now = new Date();
-    let buildStatus = null;
+    let buildStatus: { startedAt: string; completesAt: string; timeRemaining: number; targetLevel?: number } | null = null;
     let isUnlocked = user.unlockedFeatures?.researchCenter || false;
+    let level: number = user.researchCenterLevel ?? 0;
 
-    // Check if build is in progress and should be completed
+    // Migration: existing users who already have Research Center get level 3
+    if (isUnlocked && (!level || level < 1)) {
+      level = 3;
+      user.researchCenterLevel = 3;
+      await user.save();
+    }
+
+    // Check if build is in progress and should be completed (timer finished)
     if (user.researchCenterBuild?.startedAt && user.researchCenterBuild?.completesAt) {
       if (now >= user.researchCenterBuild.completesAt) {
-        // Build is complete, unlock the feature
+        const targetLevel = (user.researchCenterBuild.targetLevel ?? 1) as ResearchCenterLevel;
         user.unlockedFeatures.researchCenter = true;
+        user.researchCenterLevel = targetLevel;
         user.researchCenterBuild = {
           startedAt: null,
-          completesAt: null
+          completesAt: null,
+          targetLevel: null
         };
         await user.save();
         isUnlocked = true;
-        
-        // Mark the build-research-center task as completed
+        level = targetLevel;
         await markResearchCenterTaskCompleted(String(user._id));
       } else {
-        // Build is still in progress
         buildStatus = {
           startedAt: user.researchCenterBuild.startedAt.toISOString(),
           completesAt: user.researchCenterBuild.completesAt.toISOString(),
-          timeRemaining: Math.max(0, user.researchCenterBuild.completesAt.getTime() - now.getTime())
+          timeRemaining: Math.max(0, user.researchCenterBuild.completesAt.getTime() - now.getTime()),
+          targetLevel: user.researchCenterBuild.targetLevel ?? 1
         };
       }
     }
 
+    // After migration/timer completion, level may have been updated
+    if (isUnlocked && (!level || level < 1)) {
+      level = user.researchCenterLevel ?? 3;
+    }
+
+    const nextLevel = level < 3 ? (level + 1) as ResearchCenterLevel : null;
+    let nextBuildCost: number | null = null;
+    let nextBuildTimeMinutes: number | null = null;
+    if (nextLevel) {
+      const config = getResearchCenterLevelConfig(nextLevel);
+      nextBuildCost = config.cost;
+      nextBuildTimeMinutes = config.constructionTimeMinutes;
+    }
+    const isBuilding = Boolean(user.researchCenterBuild?.startedAt && user.researchCenterBuild?.completesAt && now < user.researchCenterBuild.completesAt);
+    const canBuild = isUnlocked && level < 3 && !isBuilding;
+
     res.json({
       isUnlocked,
+      level,
+      canBuild,
+      nextBuildCost,
+      nextBuildTimeMinutes,
       buildStatus
     });
   } catch (error) {
@@ -299,18 +329,17 @@ router.get('/research-center-status', auth, async (req: Request, res: Response) 
 
 router.post('/unlock-research-center', auth, async (req: Request, res: Response) => {
   try {
-    const RESEARCH_CENTER_COST = 50000;
-    const BUILD_TIME_MINUTES = 60; // 1 hour build time
-    
     const user = await User.findById(req.user._id);
     if (!user) {
       res.status(404).json({ message: 'User not found' });
       return;
     }
 
-    // Check if user has sufficient balance
-    if (user.balance.total < RESEARCH_CENTER_COST) {
-      res.status(400).json({ message: 'Insufficient balance. Research Center costs $50,000.' });
+    // Effective level: 0 if not unlocked; else researchCenterLevel or 3 for legacy
+    const isUnlocked = user.unlockedFeatures?.researchCenter || false;
+    let currentLevel: number = user.researchCenterLevel ?? (isUnlocked ? 3 : 0);
+    if (currentLevel >= 3) {
+      res.status(400).json({ message: 'Research Center is already at max level.' });
       return;
     }
 
@@ -323,13 +352,25 @@ router.post('/unlock-research-center', auth, async (req: Request, res: Response)
       }
     }
 
-    // Deduct balance and start build timer
-    user.balance.total -= RESEARCH_CENTER_COST;
+    const nextLevel = (currentLevel + 1) as ResearchCenterLevel;
+    const config = getResearchCenterLevelConfig(nextLevel);
+    const buildCost = config.cost;
+    const buildTimeMinutes = config.constructionTimeMinutes;
+
+    if (user.balance.total < buildCost) {
+      res.status(400).json({
+        message: `Insufficient balance. ${nextLevel === 1 ? 'Research Center build' : `Upgrade to level ${nextLevel}`} costs $${buildCost.toLocaleString()}.`
+      });
+      return;
+    }
+
+    user.balance.total -= buildCost;
     const now = new Date();
-    const buildTimeMs = BUILD_TIME_MINUTES * 60 * 1000;
+    const buildTimeMs = buildTimeMinutes * 60 * 1000;
     user.researchCenterBuild = {
       startedAt: now,
-      completesAt: new Date(now.getTime() + buildTimeMs)
+      completesAt: new Date(now.getTime() + buildTimeMs),
+      targetLevel: nextLevel
     };
     await user.save();
 
@@ -342,7 +383,8 @@ router.post('/unlock-research-center', auth, async (req: Request, res: Response)
       },
       researchCenterBuild: {
         startedAt: user.researchCenterBuild!.startedAt!.toISOString(),
-        completesAt: user.researchCenterBuild!.completesAt!.toISOString()
+        completesAt: user.researchCenterBuild!.completesAt!.toISOString(),
+        targetLevel: nextLevel
       },
       unlockedFeatures: {
         hackRig: user.unlockedFeatures?.hackRig || false,
@@ -390,11 +432,13 @@ router.post('/speedup-research-center-construction', auth, async (req: Request, 
         throw new Error('Insufficient funds');
       }
 
-      // Mark research center as unlocked and clear build status, deduct balance atomically
+      const targetLevel = (buildStatus.targetLevel ?? 1) as ResearchCenterLevel;
       userInTransaction.unlockedFeatures.researchCenter = true;
+      userInTransaction.researchCenterLevel = targetLevel;
       userInTransaction.researchCenterBuild = {
         startedAt: null,
-        completesAt: null
+        completesAt: null,
+        targetLevel: null
       };
       userInTransaction.balance.total -= cost;
 
