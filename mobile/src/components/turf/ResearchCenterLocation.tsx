@@ -161,6 +161,11 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
       setShowLoadingModal(true);
       return;
     }
+    if (balanceLoading || currentBalance === null || currentBalance === undefined) {
+      setLoadingModalReason('balance');
+      setShowLoadingModal(true);
+      return;
+    }
     setShowPopup(true);
   };
 
