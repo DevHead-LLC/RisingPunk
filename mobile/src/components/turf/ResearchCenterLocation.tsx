@@ -1,5 +1,6 @@
 import React, {memo, useState, useEffect, useRef} from 'react';
 import {TouchableOpacity, View, Text, Image, StyleSheet, Modal, Animated} from 'react-native';
+import { useTheme } from '../../context/ThemeContext';
 import {SIZING} from '../../styles/theme';
 import {useThemeColors} from '../../hooks/useThemeColors';
 import { useUnlockResearchCenterMutation, useGetProfileQuery, useGetResearchCenterStatusQuery, useSpeedupResearchCenterConstructionMutation } from '../../store/api/authApi';
@@ -19,11 +20,21 @@ type ResearchCenterLocationProps = {
   isIntroActive?: boolean;
 };
 
+function formatBuildTime(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  const hourPart = `${hours} hour${hours !== 1 ? 's' : ''}`;
+  return mins > 0 ? `${hourPart} ${mins} min` : hourPart;
+}
+
 export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onPress, onNavigateToResearch, isIntroActive = false }: ResearchCenterLocationProps) {
   const colors = useThemeColors();
+  const { themeMode } = useTheme();
   const { highlightTaskId, clearHighlight } = useTaskGuideHighlight();
   const [showPopup, setShowPopup] = useState(false);
   const [showLoadingModal, setShowLoadingModal] = useState(false);
+  const [loadingModalReason, setLoadingModalReason] = useState<'balance' | 'status' | null>(null);
   const [showInsufficientFundsModal, setShowInsufficientFundsModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -57,14 +68,20 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
   const numericBalance = typeof currentBalance === 'string' ? parseFloat(currentBalance) : currentBalance;
 
   const isUnlocked = buildStatus?.isUnlocked || false;
+  const level = buildStatus?.level ?? 0;
+  const canBuild = buildStatus?.canBuild ?? false;
+  const nextBuildCost = buildStatus?.nextBuildCost ?? 5000;
+  const nextBuildTimeMinutes = buildStatus?.nextBuildTimeMinutes ?? 1;
+  const buildCost = nextBuildCost;
+  const buildTimeDisplay = formatBuildTime(nextBuildTimeMinutes);
   const isBuilding = buildStatus?.buildStatus != null;
+  const showUpgradeArrow = isUnlocked && canBuild;
   
   useEffect(() => {
     setIsBuildingState(isBuilding);
   }, [isBuilding]);
-  const RESEARCH_CENTER_COST = 50000;
   
-  const hasSufficientFunds = numericBalance !== null && !isNaN(numericBalance as number) && numericBalance >= RESEARCH_CENTER_COST;
+  const hasSufficientFunds = numericBalance !== null && !isNaN(numericBalance as number) && numericBalance >= buildCost;
   
   useEffect(() => {
     // Only track and invalidate cache when unlock state transitions from false to true
@@ -128,13 +145,28 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
     } else if (isUnlocked) {
       if (onNavigateToResearch) onNavigateToResearch();
     } else {
-      // Only show modal if we have valid balance data
-      if (balanceLoading || currentBalance === null || currentBalance === undefined) {
+      // Not unlocked: show build modal (or loading if balance/status not ready)
+      if (balanceLoading || buildStatusLoading || currentBalance === null || currentBalance === undefined) {
+        setLoadingModalReason(buildStatusLoading ? 'status' : 'balance');
         setShowLoadingModal(true);
         return;
       }
       setShowPopup(true);
     }
+  };
+
+  const handleUpgradeArrowPress = () => {
+    if (buildStatusLoading) {
+      setLoadingModalReason('status');
+      setShowLoadingModal(true);
+      return;
+    }
+    if (balanceLoading || currentBalance === null || currentBalance === undefined) {
+      setLoadingModalReason('balance');
+      setShowLoadingModal(true);
+      return;
+    }
+    setShowPopup(true);
   };
 
   const handleBuild = async () => {
@@ -227,23 +259,39 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
         onPress={handlePress}
         activeOpacity={0.8}
       >
-        <Animated.View style={[
-          styles.iconContainer, 
-          { 
-            borderColor: isHighlighted ? animatedBorderColorValue : colors.matrix,
-            borderWidth: isHighlighted ? 3 : 1
-          }
-        ]}>
-          <Image
-            source={isBuilding 
-              ? require('../../assets/images/underConstruction.png')
-              : isUnlocked 
-                ? require('../../assets/images/ResearchLvl1.png')
-                : require('../../assets/images/dirt.png')
+        {isUnlocked && level >= 1 && (
+          <Text style={[styles.levelBadge, { color: themeMode === 'light' ? '#333' : colors.matrix }]}>
+            Lv. {level}
+          </Text>
+        )}
+        <View style={styles.iconWrapper}>
+          <Animated.View style={[
+            styles.iconContainer, 
+            { 
+              borderColor: isHighlighted ? animatedBorderColorValue : colors.matrix,
+              borderWidth: isHighlighted ? 3 : 1
             }
-            style={styles.locationIcon}
-          />
-        </Animated.View>
+          ]}>
+            <Image
+              source={isBuilding 
+                ? require('../../assets/images/underConstruction.png')
+                : isUnlocked 
+                  ? require('../../assets/images/ResearchLvl1.png')
+                  : require('../../assets/images/dirt.png')
+              }
+              style={styles.locationIcon}
+            />
+          </Animated.View>
+          {showUpgradeArrow && (
+            <TouchableOpacity
+              style={[styles.upgradeArrow, { backgroundColor: colors.primary }]}
+              onPress={handleUpgradeArrowPress}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.upgradeArrowText}>↑</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </TouchableOpacity>
       
       <Text style={[styles.locationLabel, { color: colors.secondary }]}>
@@ -281,9 +329,11 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
             onPress={() => {}} 
             activeOpacity={1}
           >
-            <Text style={[styles.popupTitle, { color: colors.secondary }]}>Build Research Center</Text>
-            <Text style={[styles.popupPrice, { color: colors.matrix }]}>$50,000</Text>
-            <Text style={[styles.buildTime, { color: colors.secondary }]}>Time to build: 1 hour</Text>
+            <Text style={[styles.popupTitle, { color: colors.secondary }]}>
+              {level < 1 ? 'Build Research Center' : `Upgrade to Level ${level + 1}`}
+            </Text>
+            <Text style={[styles.popupPrice, { color: colors.matrix }]}>${buildCost.toLocaleString()}</Text>
+            <Text style={[styles.buildTime, { color: colors.secondary }]}>Time: {buildTimeDisplay}</Text>
             <TouchableOpacity 
               style={[
                 styles.buildButton, 
@@ -301,7 +351,7 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
                   color: hasSufficientFunds ? colors.background : colors.text.secondary 
                 }
               ]}>
-                Build Research Center
+                {level < 1 ? 'Start Build' : 'Start Upgrade'}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.closeButton, { borderColor: colors.matrix }]} onPress={handleClose}>
@@ -313,16 +363,16 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
       
       <LockedFeatureModal
         visible={showLoadingModal}
-        title="LOADING BALANCE"
-        message="Please wait while we load your current balance."
-        onClose={() => setShowLoadingModal(false)}
+        title={loadingModalReason === 'status' ? 'LOADING RESEARCH CENTER' : 'LOADING BALANCE'}
+        message={loadingModalReason === 'status' ? 'Please wait while we load your research center status.' : 'Please wait while we load your current balance.'}
+        onClose={() => { setShowLoadingModal(false); setLoadingModalReason(null); }}
         closeButtonText="OK"
       />
       
       <LockedFeatureModal
         visible={showInsufficientFundsModal}
         title="INSUFFICIENT FUNDS"
-        message="You need $50,000 to build the Research Center."
+        message={`You need $${buildCost.toLocaleString()} to ${level < 1 ? 'build' : 'upgrade'} the Research Center.`}
         onClose={() => setShowInsufficientFundsModal(false)}
         closeButtonText="UNDERSTOOD"
       />
@@ -359,7 +409,7 @@ const styles = StyleSheet.create({
     height: '11%',
     borderRadius: 8,
     zIndex: 1,
-    justifyContent: 'flex-start',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     paddingBottom: SIZING.spacing.lg,
     paddingTop: SIZING.spacing.md,
@@ -387,14 +437,38 @@ const styles = StyleSheet.create({
     height: 100,
     resizeMode: 'contain' as const,
   },
+  levelBadge: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: SIZING.spacing.sm,
+    letterSpacing: 0.5,
+  },
+  iconWrapper: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  upgradeArrow: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  upgradeArrowText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
   locationLabel: {
     fontSize: SIZING.font.body,
     letterSpacing: 2,
     textAlign: 'center',
-    position: 'absolute',
-    bottom: '20%',
     width: 400,
-    left: -50,
   },
   timerContainer: {
     position: 'absolute',
