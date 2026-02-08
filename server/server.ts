@@ -104,7 +104,26 @@ mongoose.connect(process.env.MONGODB_URI, {
     process.exit(1);
   }
 
-  
+  // Ensure multiple guest users (email: null) are allowed. Schema defines email as unique + sparse.
+  // If production DB has a non-sparse unique index on email, only one null is allowed and guest creation fails.
+  try {
+    const usersCollection = mongoose.connection.db.collection('users');
+    const indexes = await usersCollection.indexes();
+    const emailIndex = indexes.find((i: { name?: string }) => i.name === 'email_1') as { name?: string; sparse?: boolean } | undefined;
+    if (emailIndex && !emailIndex.sparse) {
+      await usersCollection.dropIndex('email_1');
+      await User.syncIndexes();
+      console.log('Dropped non-sparse email_1 index and re-synced; guest accounts can now be created.');
+    }
+  } catch (indexErr: unknown) {
+    const err = indexErr as { codeName?: string; message?: string };
+    if (err.codeName === 'IndexNotFound') {
+      await User.syncIndexes().catch(() => {});
+    } else {
+      console.warn('Email index check/fix failed (non-fatal):', err.message ?? indexErr);
+    }
+  }
+
   // Initialize Google Auth Service
   try {
     const { GoogleAuthService } = require('./src/services/GoogleAuthService');
