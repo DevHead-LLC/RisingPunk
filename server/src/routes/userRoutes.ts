@@ -275,7 +275,8 @@ router.get('/research-center-status', auth, async (req: Request, res: Response) 
     // Check if build is in progress and should be completed (timer finished)
     if (user.researchCenterBuild?.startedAt && user.researchCenterBuild?.completesAt) {
       if (now >= user.researchCenterBuild.completesAt) {
-        const targetLevel = (user.researchCenterBuild.targetLevel ?? 1) as ResearchCenterLevel;
+        // Legacy in-progress builds (no targetLevel) completed under old $50k system → grant level 3
+        const targetLevel = (user.researchCenterBuild.targetLevel ?? 3) as ResearchCenterLevel;
         user.unlockedFeatures.researchCenter = true;
         user.researchCenterLevel = targetLevel;
         user.researchCenterBuild = {
@@ -292,7 +293,7 @@ router.get('/research-center-status', auth, async (req: Request, res: Response) 
           startedAt: user.researchCenterBuild.startedAt.toISOString(),
           completesAt: user.researchCenterBuild.completesAt.toISOString(),
           timeRemaining: Math.max(0, user.researchCenterBuild.completesAt.getTime() - now.getTime()),
-          targetLevel: user.researchCenterBuild.targetLevel ?? 1
+          targetLevel: user.researchCenterBuild.targetLevel ?? 3
         };
       }
     }
@@ -339,7 +340,8 @@ router.post('/unlock-research-center', auth, async (req: Request, res: Response)
 
     // Auto-complete expired builds before charging (same as research-center-status)
     if (user.researchCenterBuild?.startedAt && user.researchCenterBuild?.completesAt && now >= user.researchCenterBuild.completesAt) {
-      const targetLevel = (user.researchCenterBuild.targetLevel ?? 1) as ResearchCenterLevel;
+      // Legacy in-progress builds (no targetLevel) completed under old $50k system → grant level 3
+      const targetLevel = (user.researchCenterBuild.targetLevel ?? 3) as ResearchCenterLevel;
       user.unlockedFeatures.researchCenter = true;
       user.researchCenterLevel = targetLevel;
       user.researchCenterBuild = {
@@ -445,7 +447,8 @@ router.post('/speedup-research-center-construction', auth, async (req: Request, 
         throw new Error('Insufficient funds');
       }
 
-      const targetLevel = (buildStatus.targetLevel ?? 1) as ResearchCenterLevel;
+      // Legacy in-progress builds (no targetLevel) completed under old $50k system → grant level 3
+      const targetLevel = (buildStatus.targetLevel ?? 3) as ResearchCenterLevel;
       userInTransaction.unlockedFeatures.researchCenter = true;
       userInTransaction.researchCenterLevel = targetLevel;
       userInTransaction.researchCenterBuild = {
