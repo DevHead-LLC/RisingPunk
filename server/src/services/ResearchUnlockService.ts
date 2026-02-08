@@ -12,6 +12,8 @@ export interface UnlockValidationResult {
     balance?: boolean;
     dependencies?: string[];
     antivirus?: boolean;
+    researchCenterLevel?: boolean;
+    requiredFeatures?: string[];
   };
 }
 
@@ -71,8 +73,26 @@ export class ResearchUnlockService {
         missingRequirements.dependencies = missingDependencies;
       }
 
-      // Special check for Hack Crew (requires Antivirus feature)
-      if (categoryId === 'hack-crew') {
+      // Research Center building level requirement
+      const rcLevelReq = (research as any).researchCenterLevelRequirement;
+      if (rcLevelReq != null && typeof rcLevelReq === 'number') {
+        const effectiveRcLevel = user.researchCenterLevel ?? (user.unlockedFeatures?.researchCenter ? 3 : 0);
+        if (effectiveRcLevel < rcLevelReq) {
+          reasons.push(`Research Center level ${rcLevelReq} required (current: ${effectiveRcLevel})`);
+          missingRequirements.researchCenterLevel = true;
+        }
+      }
+
+      // Required features (from requiredFeatureRefs; replaces hardcoded hack-crew Antivirus check)
+      const refs = (research as any).requiredFeatureRefs as { categoryId: string; featureId: string }[] | undefined;
+      if (refs?.length) {
+        const missingRefs = await this.checkRequiredFeatureRefs(userId, refs);
+        if (missingRefs.length > 0) {
+          const refLabels = missingRefs.map(r => `${r.categoryId}:${r.featureId}`);
+          reasons.push(`Required features not completed: ${refLabels.join(', ')}`);
+          missingRequirements.requiredFeatures = refLabels;
+        }
+      } else if (categoryId === 'hack-crew') {
         const hasAntivirus = await this.checkAntivirusFeature(userId);
         if (!hasAntivirus) {
           reasons.push('Antivirus feature must be unlocked');
@@ -148,8 +168,42 @@ export class ResearchUnlockService {
     return false;
   }
 
+  /** Returns refs that are not yet unlocked (or completed). */
+  private static async checkRequiredFeatureRefs(
+    userId: string,
+    refs: { categoryId: string; featureId: string }[]
+  ): Promise<{ categoryId: string; featureId: string }[]> {
+    if (refs.length === 0) return [];
+    const now = new Date();
+    const missing: { categoryId: string; featureId: string }[] = [];
+    for (const ref of refs) {
+      const uf = await UserResearchFeature.findOne({
+        userId,
+        categoryId: ref.categoryId,
+        featureId: ref.featureId
+      });
+      const satisfied = uf && (
+        uf.isUnlocked ||
+        (uf.isResearching && uf.researchCompletesAt && now >= uf.researchCompletesAt)
+      );
+      if (!satisfied) {
+        missing.push(ref);
+      }
+    }
+    return missing;
+  }
+
   static getUnlockCost(categoryId: string): number {
     return this.UNLOCK_COSTS[categoryId] || 0;
+  }
+
+  /** Prefer research.unlockCost from DB; fallback to UNLOCK_COSTS. */
+  private static getUnlockCostForResearch(research: { categoryId: string; unlockCost?: number }): number {
+    const cost = (research as any).unlockCost;
+    if (typeof cost === 'number' && cost >= 0) {
+      return cost;
+    }
+    return this.UNLOCK_COSTS[research.categoryId] ?? 0;
   }
 
   static async unlockResearch(
@@ -192,8 +246,30 @@ export class ResearchUnlockService {
           };
         }
 
-        // Special check for Hack Crew (requires Antivirus feature)
-        if (categoryId === 'hack-crew') {
+        // Research Center building level requirement
+        const rcLevelReq = (research as any).researchCenterLevelRequirement;
+        if (rcLevelReq != null && typeof rcLevelReq === 'number') {
+          const effectiveRcLevel = user.researchCenterLevel ?? (user.unlockedFeatures?.researchCenter ? 3 : 0);
+          if (effectiveRcLevel < rcLevelReq) {
+            return {
+              success: false,
+              message: `Research Center level ${rcLevelReq} required (current: ${effectiveRcLevel})`
+            };
+          }
+        }
+
+        // Required features (requiredFeatureRefs)
+        const refs = (research as any).requiredFeatureRefs as { categoryId: string; featureId: string }[] | undefined;
+        if (refs?.length) {
+          const missingRefs = await this.checkRequiredFeatureRefs(userId, refs);
+          if (missingRefs.length > 0) {
+            const refLabels = missingRefs.map(r => `${r.categoryId}:${r.featureId}`).join(', ');
+            return {
+              success: false,
+              message: `Required features not completed: ${refLabels}`
+            };
+          }
+        } else if (categoryId === 'hack-crew') {
           const hasAntivirus = await this.checkAntivirusFeature(userId);
           if (!hasAntivirus) {
             return {
@@ -203,7 +279,7 @@ export class ResearchUnlockService {
           }
         }
 
-        const unlockCost = this.getUnlockCost(categoryId);
+        const unlockCost = this.getUnlockCostForResearch(research);
         
         // Check balance again (in case it changed)
         if (user.balance.total < unlockCost) {
@@ -282,41 +358,56 @@ export class ResearchUnlockService {
         .sort({ 'researchId.categoryId': 1 });
     }
 
+    const effectiveRcLevel = user.researchCenterLevel ?? (user.unlockedFeatures?.researchCenter ? 3 : 0);
+
     const results = await Promise.all(userResearch.map(async (ur) => {
       const research = ur.researchId as any;
       const dbUnlocked = ur.isUnlocked;
-      
+
       const levelMet = user.level >= research.levelRequirement;
-      
+
       const unlockedDependencies = userResearch
         .filter(ur2 => research.dependencies.includes((ur2.researchId as any)?.categoryId))
         .map(ur2 => ur2.isUnlocked);
-      const dependenciesMet = research.dependencies.length === 0 || 
-        (unlockedDependencies.length === research.dependencies.length && unlockedDependencies.every(unlocked => unlocked === true));
-      
-      const actuallyUnlocked = dbUnlocked ? (levelMet && dependenciesMet) : false;
+      const dependenciesMet = research.dependencies.length === 0 ||
+        (unlockedDependencies.length === research.dependencies.length && unlockedDependencies.every((unlocked: boolean) => unlocked === true));
 
-      if (!actuallyUnlocked && dbUnlocked) {
-        ResearchUser.findOneAndUpdate(
-          { userId, researchId: research._id },
-          { isUnlocked: false, unlockedAt: null },
-          { new: false }
-        ).catch(err => console.error('Error correcting unlock status:', err));
+      const rcLevelReq = research.researchCenterLevelRequirement;
+      const rcLevelMet = rcLevelReq == null || typeof rcLevelReq !== 'number' || effectiveRcLevel >= rcLevelReq;
+
+      const refs = research.requiredFeatureRefs as { categoryId: string; featureId: string }[] | undefined;
+      let requiredFeaturesMet = true;
+      if (refs?.length) {
+        const missingRefs = await this.checkRequiredFeatureRefs(userId, refs);
+        requiredFeaturesMet = missingRefs.length === 0;
+      } else if (research.categoryId === 'hack-crew') {
+        requiredFeaturesMet = await this.checkAntivirusFeature(userId);
       }
+
+      // Once a user has unlocked a category (dbUnlocked), keep it unlocked. Do not revoke access
+      // when new requirements (e.g. Research Center level, required features) are added, so
+      // existing users are not locked out. New users must still meet all requirements to unlock.
+      const actuallyUnlocked = dbUnlocked;
 
       const result: any = {
         categoryId: research.categoryId,
         name: research.name,
         isUnlocked: actuallyUnlocked,
         unlockedAt: actuallyUnlocked ? ur.unlockedAt : null,
-        unlockCost: this.getUnlockCost(research.categoryId),
+        unlockCost: this.getUnlockCostForResearch(research),
         levelRequirement: research.levelRequirement,
         balanceRequirement: research.balanceRequirement,
         dependencies: research.dependencies,
         image: research.image
       };
 
-      if (research.categoryId === 'hack-crew') {
+      if (research.researchCenterLevelRequirement != null) {
+        result.researchCenterLevelRequirement = research.researchCenterLevelRequirement;
+      }
+      if (refs?.length) {
+        result.requiredFeatures = refs.map((r: { featureId: string }) => r.featureId);
+        result.requiredFeatureRefs = refs;
+      } else if (research.categoryId === 'hack-crew') {
         result.requiredFeatures = ['antivirus'];
       }
 
