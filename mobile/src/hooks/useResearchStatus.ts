@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useAppSelector } from '../store/hooks';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { API_URL } from '../config';
+import { researchFeaturesApi } from '../store/api/researchFeaturesApi';
 
 export interface ResearchStatus {
   categoryId: string;
@@ -20,6 +21,9 @@ export function useResearchStatus() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const token = useAppSelector(state => state.auth.token);
+  const userLevel = useAppSelector(state => state.auth.user?.level ?? 1);
+  const dispatch = useAppDispatch();
+  const previousLevelRef = useRef<number | undefined>(undefined);
 
   const fetchResearchStatus = useCallback(async () => {
     if (!token) return;
@@ -79,6 +83,19 @@ export function useResearchStatus() {
       fetchResearchStatus();
     }
   }, [token, fetchResearchStatus]);
+
+  // When user level changes (e.g. after level-up), refetch category status and invalidate feature caches so Research Center shows new unlocks without app refresh
+  useEffect(() => {
+    if (previousLevelRef.current !== undefined && previousLevelRef.current !== userLevel) {
+      if (token) {
+        fetchResearchStatus();
+        dispatch(researchFeaturesApi.util.invalidateTags(['ResearchFeatures']));
+      }
+      previousLevelRef.current = userLevel;
+    } else if (previousLevelRef.current === undefined) {
+      previousLevelRef.current = userLevel;
+    }
+  }, [userLevel, token, fetchResearchStatus, dispatch]);
 
   return {
     researchStatus,
