@@ -285,8 +285,11 @@ export const playAsGuest = createAsyncThunk(
       });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Failed to create guest account' }));
-        return rejectWithValue(error.error || 'Failed to create guest account');
+        const errorBody = await response.json().catch(() => ({}));
+        const serverMessage = (errorBody && typeof errorBody.error === 'string') ? errorBody.error : (errorBody && typeof errorBody.message === 'string') ? errorBody.message : '';
+        const userMessage = serverMessage || 'Failed to create guest account';
+        console.error('[auth] Guest creation failed', { status: response.status, statusText: response.statusText, body: errorBody });
+        return rejectWithValue(userMessage);
       }
 
       const data = await response.json();
@@ -300,6 +303,7 @@ export const playAsGuest = createAsyncThunk(
       await markAccountExists();
       return data;
     } catch (error) {
+      console.error('[auth] Play as guest error', error);
       if (error instanceof TypeError && (error.message.includes('Network request failed') || error.message.includes('Failed to fetch'))) {
         return rejectWithValue('Network error: Cannot connect to server');
       }

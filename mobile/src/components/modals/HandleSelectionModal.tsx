@@ -4,6 +4,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   Modal,
   KeyboardAvoidingView,
@@ -400,6 +401,8 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
         }]} 
         pointerEvents="box-none"
       >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <View style={styles.overlayDismissArea}>
         {Platform.OS === 'ios' ? (
           <KeyboardAvoidingView
             behavior="padding"
@@ -426,50 +429,44 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
                     This will be your identity across the network
                   </Text>
 
-                  <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                    <View style={styles.inputContainer}>
-                      <TextInput
-                        ref={textInputRef}
-                        style={[
-                          styles.input,
-                          { 
-                            color: colors.text.primary,
-                            borderColor: error ? colors.error : colors.matrix,
-                            backgroundColor: colors.inputBg || colors.background,
-                          }
-                        ]}
-                        value={handle}
-                        onChangeText={handleTextChange}
-                        placeholder="Enter handle..."
-                        placeholderTextColor={colors.secondary}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        maxLength={15}
-                        editable={!isLoading}
-                        onKeyPress={handleKeyPress}
-                        {...(Platform.OS === 'android' && {
-                          // Android-specific props to ensure reliable text input in production
-                          includeFontPadding: false,
-                          textAlignVertical: 'center',
-                          // Disable autofill to prevent interference
-                          autoComplete: 'off',
-                          importantForAutofill: 'no',
-                          // Ensure keyboard shows properly
-                          keyboardType: 'default',
-                          returnKeyType: 'done',
-                          // Prevent text selection issues
-                          selectTextOnFocus: false,
-                          // Ensure input is properly focusable
-                          focusable: true,
-                        })}
-                      />
-                      {error ? (
-                        <Text style={[styles.errorText, { color: colors.error }]}>
-                          {getErrorMessage(error)}
-                        </Text>
-                      ) : null}
-                    </View>
-                  </TouchableWithoutFeedback>
+                  <Pressable
+                    style={styles.inputContainer}
+                    onPress={() => textInputRef.current?.focus()}
+                  >
+                    <TextInput
+                      ref={textInputRef}
+                      style={[
+                        styles.input,
+                        { 
+                          color: colors.text.primary,
+                          borderColor: error ? colors.error : colors.matrix,
+                          backgroundColor: colors.inputBg || colors.background,
+                        }
+                      ]}
+                      value={handle}
+                      onChangeText={handleTextChange}
+                      placeholder="Enter handle..."
+                      placeholderTextColor={colors.secondary}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      maxLength={15}
+                      editable={!isLoading}
+                      onKeyPress={handleKeyPress}
+                      includeFontPadding={false}
+                      textAlignVertical="center"
+                      autoComplete="off"
+                      importantForAutofill="no"
+                      keyboardType="default"
+                      returnKeyType="done"
+                      selectTextOnFocus={false}
+                      focusable={true}
+                    />
+                    {error ? (
+                      <Text style={[styles.errorText, { color: colors.error }]}>
+                        {getErrorMessage(error)}
+                      </Text>
+                    ) : null}
+                  </Pressable>
                   
                   {/* Requirements Checklist */}
                   <View style={styles.requirementsContainer}>
@@ -578,50 +575,44 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
                     This will be your identity across the network
                   </Text>
 
-                  <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                    <View style={styles.inputContainer}>
-                      <TextInput
-                        ref={textInputRef}
-                        style={[
-                          styles.input,
-                          { 
-                            color: colors.text.primary,
-                            borderColor: error ? colors.error : colors.matrix,
-                            backgroundColor: colors.inputBg || colors.background,
-                          }
-                        ]}
-                        value={handle}
-                        onChangeText={handleTextChange}
-                        placeholder="Enter handle..."
-                        placeholderTextColor={colors.secondary}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        maxLength={15}
-                        editable={!isLoading}
-                        onKeyPress={handleKeyPress}
-                        {...(Platform.OS === 'android' && {
-                          // Android-specific props to ensure reliable text input in production
-                          includeFontPadding: false,
-                          textAlignVertical: 'center',
-                          // Disable autofill to prevent interference
-                          autoComplete: 'off',
-                          importantForAutofill: 'no',
-                          // Ensure keyboard shows properly
-                          keyboardType: 'default',
-                          returnKeyType: 'done',
-                          // Prevent text selection issues
-                          selectTextOnFocus: false,
-                          // Ensure input is properly focusable
-                          focusable: true,
-                        })}
-                      />
-                      {error ? (
-                        <Text style={[styles.errorText, { color: colors.error }]}>
-                          {getErrorMessage(error)}
-                        </Text>
-                      ) : null}
-                    </View>
-                  </TouchableWithoutFeedback>
+                  <Pressable
+                    style={styles.inputContainer}
+                    onPress={() => textInputRef.current?.focus()}
+                  >
+                    <TextInput
+                      ref={textInputRef}
+                      style={[
+                        styles.input,
+                        { 
+                          color: colors.text.primary,
+                          borderColor: error ? colors.error : colors.matrix,
+                          backgroundColor: colors.inputBg || colors.background,
+                        }
+                      ]}
+                      value={handle}
+                      onChangeText={handleTextChange}
+                      placeholder="Enter handle..."
+                      placeholderTextColor={colors.secondary}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      maxLength={15}
+                      editable={!isLoading}
+                      onKeyPress={handleKeyPress}
+                      includeFontPadding={false}
+                      textAlignVertical="center"
+                      autoComplete="off"
+                      importantForAutofill="no"
+                      keyboardType="default"
+                      returnKeyType="done"
+                      selectTextOnFocus={false}
+                      focusable={true}
+                    />
+                    {error ? (
+                      <Text style={[styles.errorText, { color: colors.error }]}>
+                        {getErrorMessage(error)}
+                      </Text>
+                    ) : null}
+                  </Pressable>
                   
                   {/* Requirements Checklist */}
                   <View style={styles.requirementsContainer}>
@@ -709,6 +700,8 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
             </View>
           </View>
         )}
+          </View>
+        </TouchableWithoutFeedback>
       </View>
     </Modal>
   );
@@ -730,6 +723,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: SIZING.spacing.lg,
     zIndex: 10001, // Higher than email verification (10000) and onboarding (1000)
+  },
+  overlayDismissArea: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   keyboardAvoidingView: {
     flex: 1,
