@@ -34,6 +34,7 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
   const { highlightTaskId, clearHighlight } = useTaskGuideHighlight();
   const [showPopup, setShowPopup] = useState(false);
   const [showLoadingModal, setShowLoadingModal] = useState(false);
+  const [loadingModalReason, setLoadingModalReason] = useState<'balance' | 'status' | null>(null);
   const [showInsufficientFundsModal, setShowInsufficientFundsModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -146,6 +147,7 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
     } else {
       // Not unlocked: show build modal (or loading if balance/status not ready)
       if (balanceLoading || buildStatusLoading || currentBalance === null || currentBalance === undefined) {
+        setLoadingModalReason(buildStatusLoading ? 'status' : 'balance');
         setShowLoadingModal(true);
         return;
       }
@@ -155,6 +157,7 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
 
   const handleUpgradeArrowPress = () => {
     if (buildStatusLoading) {
+      setLoadingModalReason('status');
       setShowLoadingModal(true);
       return;
     }
@@ -355,9 +358,9 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
       
       <LockedFeatureModal
         visible={showLoadingModal}
-        title="LOADING BALANCE"
-        message="Please wait while we load your current balance."
-        onClose={() => setShowLoadingModal(false)}
+        title={loadingModalReason === 'status' ? 'LOADING RESEARCH CENTER' : 'LOADING BALANCE'}
+        message={loadingModalReason === 'status' ? 'Please wait while we load your research center status.' : 'Please wait while we load your current balance.'}
+        onClose={() => { setShowLoadingModal(false); setLoadingModalReason(null); }}
         closeButtonText="OK"
       />
       
