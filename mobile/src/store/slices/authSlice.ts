@@ -928,6 +928,12 @@ export const authSlice = createSlice({
     setShowAccountSwitchedBanner: (state, action: PayloadAction<boolean>) => {
       state.showAccountSwitchedBanner = action.payload;
     },
+    /** Update user level from battle end (or other source). No fetch, no loading — so Research Center and other UI see new level live. */
+    setUserLevel: (state, action: PayloadAction<number>) => {
+      if (state.user) {
+        state.user.level = action.payload;
+      }
+    },
     handleAccountSwitched: (state, action) => {
       // Prevent multiple calls - if already logged out, don't process again
       if (!state.token) {
@@ -1285,7 +1291,7 @@ export const authSlice = createSlice({
   },
 });
 
-export const { clearError, setCredentials, setOnboardingCompleted, setShowOnboarding, setShowTurfIntro, setShowHandleSelection, setShowEmailVerification, setShowEmailVerificationBanner, setEmailVerificationPrompted, forceRefreshData, setShowAccountSwitched, setShowAccountSwitchedBanner, handleAccountSwitched } = authSlice.actions;
+export const { clearError, setCredentials, setOnboardingCompleted, setShowOnboarding, setShowTurfIntro, setShowHandleSelection, setShowEmailVerification, setShowEmailVerificationBanner, setEmailVerificationPrompted, forceRefreshData, setShowAccountSwitched, setShowAccountSwitchedBanner, setUserLevel, handleAccountSwitched } = authSlice.actions;
 export const logout = logoutUser;
 export const googleSignIn = googleSignInUser;
 export const googleSignUp = googleSignUpUser;

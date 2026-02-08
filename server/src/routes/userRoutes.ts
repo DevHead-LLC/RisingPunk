@@ -380,7 +380,6 @@ router.post('/unlock-research-center', auth, async (req: Request, res: Response)
     }
 
     user.balance.total -= buildCost;
-    const now = new Date();
     const buildTimeMs = buildTimeMinutes * 60 * 1000;
     user.researchCenterBuild = {
       startedAt: now,
