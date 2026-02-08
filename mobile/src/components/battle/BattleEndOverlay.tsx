@@ -6,6 +6,7 @@ import { BattleLossBreakdown } from './BattleLossBreakdown';
 import { LevelUpAnimation } from '../common/LevelUpAnimation';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { setUserLevel } from '../../store/slices/authSlice';
 import { authApi } from '../../store/api/authApi';
 import { userGuideApi } from '../../store/api/userGuideApi';
 import { balanceApi } from '../../store/api/balanceApi';
@@ -29,12 +30,13 @@ export const BattleEndOverlay: React.FC<BattleEndOverlayProps> = ({ winner, onCo
     }
   }, [battleEndData]);
 
-  // Invalidate user profile cache when battle ends to ensure fresh data
+  // When battle ends with a level-up, update auth level from the response so Research Center (and any UI) sees the new level live — no fetch, no refresh. Also invalidate caches for next time profile/tasks are loaded.
   useEffect(() => {
     if (battleEndData) {
-      // Invalidate the User cache tag to force profile data refresh
+      if (battleEndData.levelUp?.newLevel != null) {
+        dispatch(setUserLevel(battleEndData.levelUp.newLevel));
+      }
       dispatch(authApi.util.invalidateTags(['User']));
-      // Invalidate task guide cache if user leveled up to ensure task list updates immediately
       if (battleEndData.levelUp && battleEndData.levelUp.levelsGained > 0) {
         dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
       }

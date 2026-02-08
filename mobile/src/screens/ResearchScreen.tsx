@@ -53,7 +53,7 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
   const userLevel = useAppSelector(state => state.auth.user?.level || 1);
   const userBalance = useAppSelector(state => getCurrentBalance(state));
   const currentBalanceState = useAppSelector((state) => state.balance);
-  
+
   // Get the selected research card
   const selectedCard = RESEARCH_CARDS.find(card => card.id === currentScreen);
   
