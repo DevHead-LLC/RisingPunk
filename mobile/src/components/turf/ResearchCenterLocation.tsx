@@ -144,8 +144,8 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
     } else if (isUnlocked) {
       if (onNavigateToResearch) onNavigateToResearch();
     } else {
-      // Not unlocked: show build modal (or loading if balance not ready)
-      if (balanceLoading || currentBalance === null || currentBalance === undefined) {
+      // Not unlocked: show build modal (or loading if balance/status not ready)
+      if (balanceLoading || buildStatusLoading || currentBalance === null || currentBalance === undefined) {
         setShowLoadingModal(true);
         return;
       }
@@ -154,6 +154,10 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
   };
 
   const handleUpgradeArrowPress = () => {
+    if (buildStatusLoading) {
+      setShowLoadingModal(true);
+      return;
+    }
     setShowPopup(true);
   };
 
