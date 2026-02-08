@@ -401,8 +401,11 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
         }]} 
         pointerEvents="box-none"
       >
+        {/* Backdrop only: tap dark area to dismiss keyboard. Must be behind modal so modal taps reach Pressable/TextInput. */}
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-          <View style={styles.overlayDismissArea}>
+          <View style={StyleSheet.absoluteFill} />
+        </TouchableWithoutFeedback>
+        <View style={styles.overlayDismissArea} pointerEvents="box-none">
         {Platform.OS === 'ios' ? (
           <KeyboardAvoidingView
             behavior="padding"
@@ -700,8 +703,7 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
             </View>
           </View>
         )}
-          </View>
-        </TouchableWithoutFeedback>
+        </View>
       </View>
     </Modal>
   );

@@ -134,7 +134,7 @@ android {
         applicationId "com.devheadllc.risingpunk"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 70
+        versionCode 72
         versionName "2.4.0"
         
         // Support all ABIs so we don't drop devices (32-bit + 64-bit). 16 KB alignment
