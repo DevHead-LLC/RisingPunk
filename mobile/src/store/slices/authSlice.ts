@@ -246,10 +246,17 @@ async function fetchBotsAndBuildStateForToken(token: string, dispatch: any, logC
  * otherwise create a new guest. Each return to the app can use "Play as Guest" to resume that same
  * device-linked account rather than creating a new one.
  */
+export type PlayAsGuestPayload = { forceNew?: boolean } | void;
+
 export const playAsGuest = createAsyncThunk(
   'auth/playAsGuest',
-  async (_, { rejectWithValue, dispatch }) => {
+  async (payload: PlayAsGuestPayload, { rejectWithValue, dispatch }) => {
     try {
+      const forceNew = payload?.forceNew === true;
+      if (forceNew) {
+        await AsyncStorage.multiRemove([GUEST_TOKEN_KEY]);
+      }
+
       const storedGuestToken = await AsyncStorage.getItem(GUEST_TOKEN_KEY);
 
       if (storedGuestToken) {
@@ -275,7 +282,7 @@ export const playAsGuest = createAsyncThunk(
       const response = await fetch(`${API_URL}/api/auth/guest`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deviceId }),
+        body: JSON.stringify({ deviceId, ...(forceNew && { forceNew: true }) }),
       });
 
       if (!response.ok) {
