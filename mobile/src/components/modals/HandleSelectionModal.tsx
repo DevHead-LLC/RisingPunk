@@ -11,7 +11,6 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   Dimensions,
-  Pressable,
 } from 'react-native';
 import { SIZING, styleGuide } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -579,7 +578,7 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
                     This will be your identity across the network
                   </Text>
 
-                  <Pressable onPress={() => textInputRef.current?.focus()}>
+                  <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                     <View style={styles.inputContainer}>
                       <TextInput
                         ref={textInputRef}
@@ -622,7 +621,7 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
                         </Text>
                       ) : null}
                     </View>
-                  </Pressable>
+                  </TouchableWithoutFeedback>
                   
                   {/* Requirements Checklist */}
                   <View style={styles.requirementsContainer}>

@@ -15,6 +15,8 @@ import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { updateBalance } from '../store/slices/balanceSlice';
 import type { RemodelRoomType } from '../store/api/authApi';
 
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
 /**
  * Remodel tier cost/time. Source of truth: server/src/config/rentalPropertyConfig.ts ROOM_REMODEL_LEVELS.
  * Min property level per next room level (2→3, 3→4, 4→5) is in FloorPlan.minPropertyLevelForNextRoomLevel
@@ -294,11 +296,43 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
         </GesturePanView>
       </View>
 
-      {/* Remodel modal */}
+      {/* Remodel modal — Android: explicit overlay dimensions so modal centers (see taskItems/android/turf/investment-property-remodel-modal-android.md) */}
       {remodelRoom && (
-        <Modal visible transparent animationType="fade" supportedOrientations={['landscape-left', 'landscape-right']}>
-          <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
-            <View style={[styles.modalBox, { backgroundColor: colors.background }]}>
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={() => setRemodelRoom(null)}
+          statusBarTranslucent
+          hardwareAccelerated
+          supportedOrientations={['landscape-left', 'landscape-right']}
+          presentationStyle="overFullScreen"
+        >
+          <View
+            style={[
+              styles.modalOverlay,
+              { backgroundColor: 'rgba(0,0,0,0.6)' },
+              Platform.OS === 'android' && {
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: SCREEN_WIDTH,
+                height: SCREEN_HEIGHT,
+              },
+            ]}
+            pointerEvents="box-none"
+          >
+            <View
+              style={[
+                styles.modalBox,
+                {
+                  backgroundColor: colors.background,
+                  borderWidth: 2,
+                  borderColor: colors.matrix ?? colors.text?.secondary ?? '#888',
+                },
+              ]}
+              pointerEvents="auto"
+            >
               <Text style={[styles.modalTitle, { color: colors.text?.primary || '#fff' }]}>
                 Remodel {getRemodelRoomDisplayName(remodelRoom)}
               </Text>
@@ -335,6 +369,26 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                                 // keep modal open
                               }
                             }}
+                            onPressOut={() => {
+                              if (Platform.OS === 'android') {
+                                (async () => {
+                                  try {
+                                    const res = await completeRemodel({ propertyId, room: remodelRoom }).unwrap();
+                                    if (res.ratePerSecond != null || res.newBalance != null) {
+                                      dispatch(updateBalance({
+                                        total: res.newBalance ?? balanceState.total ?? 0,
+                                        ratePerSecond: res.ratePerSecond ?? balanceState.ratePerSecond,
+                                        lastUpdated: balanceState.lastUpdated ? new Date(balanceState.lastUpdated) : null,
+                                        fractionalRemainder: balanceState.fractionalRemainder
+                                      }));
+                                    }
+                                    setRemodelRoom(null);
+                                  } catch {
+                                    // keep modal open
+                                  }
+                                })();
+                              }
+                            }}
                           >
                             <Text style={styles.modalButtonText}>Complete</Text>
                           </TouchableOpacity>
@@ -356,12 +410,34 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                                 // keep modal open
                               }
                             }}
+                            onPressOut={() => {
+                              if (Platform.OS === 'android' && canSpeedup) {
+                                (async () => {
+                                  try {
+                                    const res = await speedupRemodel({ propertyId, room: remodelRoom }).unwrap();
+                                    dispatch(updateBalance({
+                                      total: res.newBalance,
+                                      ratePerSecond: res.ratePerSecond ?? balanceState.ratePerSecond,
+                                      lastUpdated: balanceState.lastUpdated ? new Date(balanceState.lastUpdated) : null,
+                                      fractionalRemainder: balanceState.fractionalRemainder
+                                    }));
+                                    setRemodelRoom(null);
+                                  } catch {
+                                    // keep modal open
+                                  }
+                                })();
+                              }
+                            }}
                             disabled={!canSpeedup}
                           >
                             <Text style={styles.modalButtonText}>Speedup (${speedupCost})</Text>
                           </TouchableOpacity>
                         )}
-                        <TouchableOpacity style={[styles.modalButton, { backgroundColor: '#444' }]} onPress={() => setRemodelRoom(null)}>
+                        <TouchableOpacity
+                          style={[styles.modalButton, { backgroundColor: '#444' }]}
+                          onPress={() => setRemodelRoom(null)}
+                          onPressOut={() => { if (Platform.OS === 'android') setRemodelRoom(null); }}
+                        >
                           <Text style={styles.modalButtonText}>Close</Text>
                         </TouchableOpacity>
                       </View>
@@ -377,7 +453,11 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                         <Text style={[styles.modalSubtitle, { color: colors.text?.secondary || '#ccc' }]}>
                           This room is already at max level (4).
                         </Text>
-                        <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.primary }]} onPress={() => setRemodelRoom(null)}>
+                        <TouchableOpacity
+                          style={[styles.modalButton, { backgroundColor: colors.primary }]}
+                          onPress={() => setRemodelRoom(null)}
+                          onPressOut={() => { if (Platform.OS === 'android') setRemodelRoom(null); }}
+                        >
                           <Text style={styles.modalButtonText}>Close</Text>
                         </TouchableOpacity>
                       </>
@@ -391,7 +471,11 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                         <Text style={[styles.modalSubtitle, { color: colors.text?.secondary || '#ccc' }]}>
                           Property level too low for next remodel.
                         </Text>
-                        <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.primary }]} onPress={() => setRemodelRoom(null)}>
+                        <TouchableOpacity
+                          style={[styles.modalButton, { backgroundColor: colors.primary }]}
+                          onPress={() => setRemodelRoom(null)}
+                          onPressOut={() => { if (Platform.OS === 'android') setRemodelRoom(null); }}
+                        >
                           <Text style={styles.modalButtonText}>Close</Text>
                         </TouchableOpacity>
                       </>
@@ -423,11 +507,35 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                               // keep modal open
                             }
                           }}
+                          onPressOut={() => {
+                            if (Platform.OS === 'android' && hasFunds) {
+                              (async () => {
+                                try {
+                                  const res = await startRemodel({ propertyId, room: remodelRoom }).unwrap();
+                                  if (res.newBalance != null) {
+                                    dispatch(updateBalance({
+                                      total: res.newBalance,
+                                      ratePerSecond: balanceState.ratePerSecond,
+                                      lastUpdated: balanceState.lastUpdated ? new Date(balanceState.lastUpdated) : null,
+                                      fractionalRemainder: balanceState.fractionalRemainder
+                                    }));
+                                  }
+                                  setRemodelRoom(null);
+                                } catch {
+                                  // keep modal open
+                                }
+                              })();
+                            }
+                          }}
                           disabled={!hasFunds}
                         >
                           <Text style={styles.modalButtonText}>Start Remodel</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={[styles.modalButton, { backgroundColor: '#444' }]} onPress={() => setRemodelRoom(null)}>
+                        <TouchableOpacity
+                          style={[styles.modalButton, { backgroundColor: '#444' }]}
+                          onPress={() => setRemodelRoom(null)}
+                          onPressOut={() => { if (Platform.OS === 'android') setRemodelRoom(null); }}
+                        >
                           <Text style={styles.modalButtonText}>Cancel</Text>
                         </TouchableOpacity>
                       </View>
