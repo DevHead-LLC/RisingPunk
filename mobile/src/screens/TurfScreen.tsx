@@ -150,6 +150,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const isFreeHackRig = highlightTaskId === 'free-hack-rig';
   const isViewWallet = highlightTaskId === 'view-wallet';
   const isBuildResearchCenter = highlightTaskId === 'build-research-center';
+  // Both property-1 and property-2 task guides use the same auto-pan target (property 1 area). Intentional; no per-property pan required.
   const isBuildInvestmentProperty = highlightTaskId === 'build-investment-property' || highlightTaskId === 'build-investment-property-2';
   const isHomeHighlight = isVisitHome || isVisitHackmap || (isBuildGuardians && highlightStep === null) || (isFreeHackRig && highlightStep === null);
   const isDigitalBarracksHighlight = isVisitDigitalBarracks;
@@ -872,6 +873,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       autoPanTimeoutRef.current = setTimeout(() => {
         const SCREEN_WIDTH = Dimensions.get('window').width;
         const CONTENT_WIDTH = 2000;
+        // Single pan target for both build-investment-property and build-investment-property-2; no per-property coordinates (intentional).
         const INVESTMENT_X = (CONTENT_WIDTH - SCREEN_WIDTH) / 2 - 390;
         const INVESTMENT_Y = 725;
         
