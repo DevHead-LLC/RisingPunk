@@ -402,15 +402,7 @@ router.post('/guest', async (req, res): Promise<void> => {
       }
     }
 
-    try {
-      await createUserResearchData(user._id as mongoose.Types.ObjectId);
-    } catch (researchError) {
-      // Research data creation failed; user is already in DB with guestDeviceId. Remove the user
-      // so retry creates a fresh guest (and research data) instead of returning a broken user.
-      console.error('Guest creation: createUserResearchData failed, removing user to allow retry:', researchError);
-      await User.findByIdAndDelete(user._id).catch((e) => console.error('Failed to delete guest user after research data failure:', e));
-      throw researchError;
-    }
+    await createUserResearchData(user._id as mongoose.Types.ObjectId);
 
     const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
     user.setCurrentToken(sessionId);
