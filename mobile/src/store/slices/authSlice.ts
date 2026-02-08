@@ -278,17 +278,38 @@ export const playAsGuest = createAsyncThunk(
       }
 
       const deviceId = await getOrCreateGuestDeviceId();
-      const response = await fetch(`${API_URL}/api/auth/guest`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deviceId }),
-      });
-
+      const guestUrl = `${API_URL}/api/auth/guest`;
+      let response: Response;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      try {
+        response = await fetch(guestUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ deviceId }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+      const apiHost = (() => {
+        try {
+          const u = new URL(API_URL);
+          return u.hostname || 'unknown';
+        } catch {
+          try {
+            const u = new URL(`https://${API_URL}`);
+            return u.hostname || 'unknown';
+          } catch {
+            return typeof API_URL === 'string' ? API_URL.slice(0, 60) : 'unknown';
+          }
+        }
+      })();
       if (!response.ok) {
         const errorBody = await response.json().catch(() => ({}));
         const serverMessage = (errorBody && typeof errorBody.error === 'string') ? errorBody.error : (errorBody && typeof errorBody.message === 'string') ? errorBody.message : '';
         const userMessage = serverMessage || 'Failed to create guest account';
-        console.error('[auth] Guest creation failed', { status: response.status, statusText: response.statusText, body: errorBody });
+        console.error('[auth] Guest creation failed', { apiHost, status: response.status, statusText: response.statusText, body: errorBody });
         return rejectWithValue(userMessage);
       }
 
@@ -303,7 +324,23 @@ export const playAsGuest = createAsyncThunk(
       await markAccountExists();
       return data;
     } catch (error) {
-      console.error('[auth] Play as guest error', error);
+      const apiHost = (() => {
+        try {
+          const u = new URL(API_URL);
+          return u.hostname || 'unknown';
+        } catch {
+          try {
+            const u = new URL(`https://${API_URL}`);
+            return u.hostname || 'unknown';
+          } catch {
+            return typeof API_URL === 'string' ? API_URL.slice(0, 60) : 'unknown';
+          }
+        }
+      })();
+      console.error('[auth] Play as guest error', { apiHost, error });
+      if (error instanceof Error && error.name === 'AbortError') {
+        return rejectWithValue('Network error: Cannot connect to server');
+      }
       if (error instanceof TypeError && (error.message.includes('Network request failed') || error.message.includes('Failed to fetch'))) {
         return rejectWithValue('Network error: Cannot connect to server');
       }
