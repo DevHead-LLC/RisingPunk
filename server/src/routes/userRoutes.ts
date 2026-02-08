@@ -335,6 +335,22 @@ router.post('/unlock-research-center', auth, async (req: Request, res: Response)
       return;
     }
 
+    const now = new Date();
+
+    // Auto-complete expired builds before charging (same as research-center-status)
+    if (user.researchCenterBuild?.startedAt && user.researchCenterBuild?.completesAt && now >= user.researchCenterBuild.completesAt) {
+      const targetLevel = (user.researchCenterBuild.targetLevel ?? 1) as ResearchCenterLevel;
+      user.unlockedFeatures.researchCenter = true;
+      user.researchCenterLevel = targetLevel;
+      user.researchCenterBuild = {
+        startedAt: null,
+        completesAt: null,
+        targetLevel: null
+      };
+      await user.save();
+      await markResearchCenterTaskCompleted(String(user._id));
+    }
+
     // Effective level: 0 if not unlocked; else researchCenterLevel or 3 for legacy
     const isUnlocked = user.unlockedFeatures?.researchCenter || false;
     let currentLevel: number = user.researchCenterLevel ?? (isUnlocked ? 3 : 0);
@@ -343,13 +359,10 @@ router.post('/unlock-research-center', auth, async (req: Request, res: Response)
       return;
     }
 
-    // Check if build is already in progress
-    if (user.researchCenterBuild?.startedAt && user.researchCenterBuild?.completesAt) {
-      const now = new Date();
-      if (now < user.researchCenterBuild.completesAt) {
-        res.status(400).json({ message: 'Research Center build already in progress.' });
-        return;
-      }
+    // Reject if a build is still in progress (timer not yet expired)
+    if (user.researchCenterBuild?.startedAt && user.researchCenterBuild?.completesAt && now < user.researchCenterBuild.completesAt) {
+      res.status(400).json({ message: 'Research Center build already in progress.' });
+      return;
     }
 
     const nextLevel = (currentLevel + 1) as ResearchCenterLevel;
