@@ -3,6 +3,11 @@ import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { API_URL } from '../config';
 import { researchFeaturesApi } from '../store/api/researchFeaturesApi';
 
+export interface ResearchFeatureRef {
+  categoryId: string;
+  featureId: string;
+}
+
 export interface ResearchStatus {
   categoryId: string;
   name: string;
@@ -13,6 +18,8 @@ export interface ResearchStatus {
   balanceRequirement: number;
   dependencies: string[];
   requiredFeatures?: string[];
+  requiredFeatureRefs?: ResearchFeatureRef[];
+  researchCenterLevelRequirement?: number;
   image: string;
 }
 
@@ -73,6 +80,8 @@ export function useResearchStatus() {
       balanceRequirement: research.balanceRequirement,
       dependencies: research.dependencies,
       requiredFeatures: research.requiredFeatures || [],
+      requiredFeatureRefs: research.requiredFeatureRefs || [],
+      researchCenterLevelRequirement: research.researchCenterLevelRequirement,
       unlockCost: research.unlockCost,
       isUnlocked: research.isUnlocked
     };
