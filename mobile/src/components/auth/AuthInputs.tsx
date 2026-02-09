@@ -33,7 +33,7 @@ export const AuthInputs = memo(function AuthInputs({
       <KeyboardDismissView>
         <View>
         <KeyboardAwareInput
-          placeholder="HANDLE (USERNAME)"
+          placeholder="USERNAME OR EMAIL"
           value={formData.handle}
           onChangeText={handleInputChange('handle')}
           onSubmitEditing={() => focusNext(accessKeyRef)}
