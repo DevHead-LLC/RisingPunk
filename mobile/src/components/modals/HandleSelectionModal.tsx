@@ -430,6 +430,7 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
                     This will be your identity across the network
                   </Text>
 
+                  {/* iOS branch: TouchableWithoutFeedback dismisses keyboard on container tap. Intentional—this branch deploys Android only; do not change the Android branch (plain View + onTouchEnd focus). See taskItems/android/onboarding/handle-selection-modal-fix.md */}
                   <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
                     <View style={styles.inputContainer}>
                       <TextInput
