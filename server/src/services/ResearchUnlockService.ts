@@ -193,10 +193,6 @@ export class ResearchUnlockService {
     return missing;
   }
 
-  static getUnlockCost(categoryId: string): number {
-    return this.UNLOCK_COSTS[categoryId] || 0;
-  }
-
   /** Prefer research.unlockCost from DB; fallback to UNLOCK_COSTS. */
   private static getUnlockCostForResearch(research: { categoryId: string; unlockCost?: number }): number {
     const cost = (research as any).unlockCost;

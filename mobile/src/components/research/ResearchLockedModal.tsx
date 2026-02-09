@@ -368,6 +368,15 @@ export function ResearchLockedModal({
                   </View>
                 </View>
               )}
+
+              <View style={[styles.requirementRow, styles.unlockPaymentRow]}>
+                <Text style={styles.requirementLabel}>Unlock payment:</Text>
+                <View style={styles.requirementValueWrap}>
+                  <Text style={styles.requirementValue}>
+                    ${(requirements.unlockCost ?? 0).toLocaleString()}
+                  </Text>
+                </View>
+              </View>
             </View>
           </View>
 
@@ -484,6 +493,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: SIZING.spacing.xs,
+  },
+  unlockPaymentRow: {
+    marginTop: SIZING.spacing.sm,
+    paddingTop: SIZING.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   requirementLabel: {
     color: colors.text.secondary,
