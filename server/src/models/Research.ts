@@ -19,6 +19,11 @@ export interface IResearchFeature {
   };
 }
 
+export interface IResearchFeatureRef {
+  categoryId: string;
+  featureId: string;
+}
+
 export interface IResearch extends Document {
   categoryId: string;
   name: string;
@@ -28,6 +33,12 @@ export interface IResearch extends Document {
   image: string;
   description: string;
   features: IResearchFeature[];
+  /** Cost to unlock this category (paid at unlock). If missing, server uses fallback. */
+  unlockCost?: number;
+  /** Required Research Center building level (1–3). If set, user must have at least this level. */
+  researchCenterLevelRequirement?: number;
+  /** Features that must be unlocked (or completed) before this category can unlock. */
+  requiredFeatureRefs?: IResearchFeatureRef[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -148,7 +159,13 @@ const researchSchema = new Schema({
     type: String,
     required: true
   },
-  features: [researchFeatureSchema]
+  features: [researchFeatureSchema],
+  unlockCost: { type: Number, required: false },
+  researchCenterLevelRequirement: { type: Number, required: false },
+  requiredFeatureRefs: [{
+    categoryId: { type: String, required: true },
+    featureId: { type: String, required: true }
+  }]
 }, {
   collection: 'research',
   timestamps: true
