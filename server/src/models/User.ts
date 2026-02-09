@@ -548,27 +548,7 @@ userSchema.methods.getDecryptedEmailVerificationNewEmail = function(): string {
 };
 
 userSchema.statics.emailExists = async function(email: string): Promise<boolean> {
-  const emailHash = EncryptionService.hashEmail(email);
-  const existingUser = await this.findOne({ emailHash });
-  
-  if (existingUser) {
-    return true;
-  }
-  
-  const usersWithoutHash = await this.find({ 
-    $or: [
-      { emailHash: { $exists: false } },
-      { emailHash: null }
-    ]
-  });
-  
-  const normalizedEmail = email.trim().toLowerCase();
-  const foundInFallback = usersWithoutHash.some((user: IUser) => {
-    const decrypted = user.getDecryptedEmail().trim().toLowerCase();
-    return decrypted === normalizedEmail;
-  });
-  
-  return foundInFallback;
+  return (await this.findByEmail(email)) !== null;
 };
 
 // Find user by email. Uses emailHash when present; falls back to decrypt-and-compare for users without emailHash (legacy).
