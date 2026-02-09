@@ -47,9 +47,13 @@ export interface IUser extends Document {
   };
   guestDeviceId?: string;
   currentTokenId?: string;
+  /** Research Center building level 1–3. Missing or 0 = not built (or legacy, resolved on read). */
+  researchCenterLevel?: number;
   researchCenterBuild?: {
     startedAt: Date | null;
     completesAt: Date | null;
+    /** Target level (1–3) for this build. */
+    targetLevel?: number | null;
   };
   rentalHousingBuilds?: {
     property1: { startedAt: Date | null; completesAt: Date | null; targetLevel?: number };
@@ -293,6 +297,10 @@ const userSchema = new Schema({
       default: false
     }
   },
+  researchCenterLevel: {
+    type: Number,
+    required: false
+  },
   researchCenterBuild: {
     startedAt: {
       type: Date,
@@ -300,6 +308,10 @@ const userSchema = new Schema({
     },
     completesAt: {
       type: Date,
+      default: null
+    },
+    targetLevel: {
+      type: Number,
       default: null
     }
   },
