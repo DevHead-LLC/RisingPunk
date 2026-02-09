@@ -135,7 +135,9 @@ if (process.env.NODE_ENV !== 'production') {
 async function createUserResearchData(userId: mongoose.Types.ObjectId): Promise<void> {
   try {
     const researchCategories = await Research.find().select('_id');
-    
+    if (researchCategories.length === 0) {
+      return;
+    }
     const researchUserEntries = researchCategories.map(research => ({
       userId,
       researchId: research._id,
@@ -145,7 +147,6 @@ async function createUserResearchData(userId: mongoose.Types.ObjectId): Promise<
       createdAt: new Date(),
       updatedAt: new Date()
     }));
-
     await ResearchUser.insertMany(researchUserEntries);
   } catch (error) {
     console.error('Error creating research data for new user:', error);
@@ -308,11 +309,21 @@ function sendGuestUserResponse(res: Response, user: any, token: string, statusCo
 }
 
 // Play as guest — one guest per device: get existing guest by deviceId or create new (no email/password)
+// Optional body.forceNew: if true, unlink this device from any existing user and create a new guest (no manual DB cleanup needed).
 router.post('/guest', async (req, res): Promise<void> => {
   try {
     const deviceId = typeof req.body?.deviceId === 'string' ? req.body.deviceId.trim() : undefined;
+    const forceNew = req.body?.forceNew === true;
 
-    if (deviceId) {
+    if (deviceId && forceNew) {
+      const existing = await User.findOne({ guestDeviceId: deviceId });
+      if (existing) {
+        existing.guestDeviceId = undefined;
+        await existing.save();
+      }
+    }
+
+    if (deviceId && !forceNew) {
       // Find device-linked account by guestDeviceId only (guest or formerly-guest-now-linked).
       const existing = await User.findOne({ guestDeviceId: deviceId });
       if (existing) {
@@ -407,6 +418,7 @@ router.post('/guest', async (req, res): Promise<void> => {
     } catch (researchError) {
       // Research data creation failed; user is already in DB with guestDeviceId. Remove the user
       // so retry creates a fresh guest (and research data) instead of returning a broken user.
+      // Per taskItems/ios/appWide/guest-login-play-as-guest.md and android/appWide/guest-login-play-as-guest.md
       console.error('Guest creation: createUserResearchData failed, removing user to allow retry:', researchError);
       await User.findByIdAndDelete(user._id).catch((e) => console.error('Failed to delete guest user after research data failure:', e));
       throw researchError;
@@ -423,8 +435,12 @@ router.post('/guest', async (req, res): Promise<void> => {
     );
 
     sendGuestUserResponse(res, user, token, 201);
-  } catch (error) {
-    console.error('Guest creation error:', error);
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    console.error('Guest creation error:', err.message, err.stack);
+    if (error && typeof error === 'object' && 'code' in error) {
+      console.error('Guest creation error code/keyValue:', (error as { code?: number; keyValue?: Record<string, unknown> }).code, (error as { keyValue?: Record<string, unknown> }).keyValue);
+    }
     res.status(500).json({ error: 'Failed to create guest account' });
   }
 });

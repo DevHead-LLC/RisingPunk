@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, createContext, useContext, useCallback } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Alert } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -8,7 +8,81 @@ import { API_URL } from '../../config';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { getCurrentBalance } from '../../store/slices/balanceSlice';
 import { useGetUserFeaturesQuery } from '../../store/api/researchFeaturesApi';
+import { useGetResearchCenterStatusQuery } from '../../store/api/authApi';
 import { userGuideApi } from '../../store/api/userGuideApi';
+import type { ResearchFeatureRef } from '../../hooks/useResearchStatus';
+
+/** Context for feature data keyed by categoryId so any requiredFeatureRefs category works without hardcoding. */
+type FeatureRefsContextValue = {
+  featuresByCategory: Record<string, any[] | undefined>;
+  isLoadingAny: boolean;
+};
+const FeatureRefsContext = createContext<FeatureRefsContextValue>({ featuresByCategory: {}, isLoadingAny: false });
+
+/** Fetches user features for one category and reports to parent state. Allows dynamic category list from requiredFeatureRefs. */
+function CategoryFeatureFetcher({
+  categoryId,
+  skip,
+  onData,
+  onLoading,
+}: {
+  categoryId: string;
+  skip: boolean;
+  onData: (data: any[] | undefined) => void;
+  onLoading: (loading: boolean) => void;
+}) {
+  const { data, isLoading } = useGetUserFeaturesQuery(categoryId, { skip });
+  useEffect(() => {
+    onData(data);
+  }, [data, onData]);
+  useEffect(() => {
+    onLoading(isLoading);
+  }, [isLoading, onLoading]);
+  return null;
+}
+
+/** Provides featuresByCategory and isLoadingAny for exactly the categoryIds derived from refs (and legacy). */
+function FeatureRefsProvider({
+  categoryIds,
+  visible,
+  children,
+}: {
+  categoryIds: string[];
+  visible: boolean;
+  children: React.ReactNode;
+}) {
+  const [featuresByCategory, setFeaturesByCategory] = useState<Record<string, any[] | undefined>>({});
+  const [loading, setLoading] = useState<Record<string, boolean>>({});
+
+  const setFeaturesForCategory = useCallback((categoryId: string, data: any[] | undefined) => {
+    setFeaturesByCategory(prev => (prev[categoryId] === data ? prev : { ...prev, [categoryId]: data }));
+  }, []);
+  const setLoadingForCategory = useCallback((categoryId: string, value: boolean) => {
+    setLoading(prev => (prev[categoryId] === value ? prev : { ...prev, [categoryId]: value }));
+  }, []);
+
+  const isLoadingAny = categoryIds.some(id => loading[id]);
+
+  const value = useMemo<FeatureRefsContextValue>(
+    () => ({ featuresByCategory, isLoadingAny }),
+    [featuresByCategory, isLoadingAny]
+  );
+
+  return (
+    <FeatureRefsContext.Provider value={value}>
+      {categoryIds.map(id => (
+        <CategoryFeatureFetcher
+          key={id}
+          categoryId={id}
+          skip={!visible}
+          onData={data => setFeaturesForCategory(id, data)}
+          onLoading={v => setLoadingForCategory(id, v)}
+        />
+      ))}
+      {children}
+    </FeatureRefsContext.Provider>
+  );
+}
 
 interface ResearchRequirements {
   categoryId: string;
@@ -17,6 +91,8 @@ interface ResearchRequirements {
   balanceRequirement: number;
   dependencies: string[];
   requiredFeatures?: string[];
+  requiredFeatureRefs?: ResearchFeatureRef[];
+  researchCenterLevelRequirement?: number;
   unlockCost: number;
   isUnlocked: boolean;
 }
@@ -83,59 +159,171 @@ export function ResearchLockedModal({
   const colors = useThemeColors();
   const styles = createStyles(colors);
 
-  const { data: homeDefenseFeatures, isLoading: isLoadingHomeDefenseFeatures } = useGetUserFeaturesQuery('home-defense', {
-    skip: !requirements || requirements.categoryId !== 'hack-crew'
+  const { data: buildStatus, isLoading: isLoadingResearchCenterStatus } = useGetResearchCenterStatusQuery(undefined, {
+    skip: !visible || !requirements
   });
+  const currentResearchCenterLevel = buildStatus?.level ?? 0;
 
-  // Check if required features are unlocked (must be before early return)
-  const requiredFeaturesMet = useMemo(() => {
-    if (!requirements?.requiredFeatures || requirements.requiredFeatures.length === 0) {
-      return true;
-    }
+  const refs = requirements?.requiredFeatureRefs ?? [];
+  const legacyHackCrewNeedsHomeDefense = requirements?.categoryId === 'hack-crew' && (requirements?.requiredFeatures?.length ?? 0) > 0;
 
-    if (requirements.categoryId === 'hack-crew') {
-      if (isLoadingHomeDefenseFeatures) {
-        return false;
-      }
-      
-      if (!homeDefenseFeatures) {
-        return false;
-      }
-      
-      return requirements.requiredFeatures.every(featureId => {
-        const feature = homeDefenseFeatures.find(f => f.id === featureId);
-        if (!feature) return false;
-        
-        if (feature.isUnlocked) {
-          return true;
-        }
-        
-        if (feature.isResearching && feature.researchCompletesAt) {
-          const now = new Date().getTime();
-          const researchCompletesAt = new Date(feature.researchCompletesAt).getTime();
-          const remaining = Math.max(0, researchCompletesAt - now);
-          return remaining === 0;
-        }
-        
-        return false;
-      });
-    }
-
-    return true;
-  }, [requirements?.requiredFeatures, requirements?.categoryId, homeDefenseFeatures, isLoadingHomeDefenseFeatures]);
+  // Derive category IDs from requiredFeatureRefs (and legacy hack-crew → home-defense). New categories work without code changes.
+  const featureRefCategoryIds = useMemo(() => {
+    const fromRefs = refs.length ? [...new Set(refs.map(r => r.categoryId))] : [];
+    const legacy = legacyHackCrewNeedsHomeDefense ? ['home-defense'] : [];
+    return [...new Set([...fromRefs, ...legacy])];
+  }, [refs, legacyHackCrewNeedsHomeDefense]);
 
   if (!requirements) return null;
 
+  return (
+    <FeatureRefsProvider categoryIds={featureRefCategoryIds} visible={visible}>
+      <ResearchLockedModalContent
+        visible={visible}
+        onClose={onClose}
+        onUnlockSuccess={onUnlockSuccess}
+        requirements={requirements}
+        researchStatus={researchStatus}
+        onRefreshResearchStatus={onRefreshResearchStatus}
+        refs={refs}
+        legacyHackCrewNeedsHomeDefense={legacyHackCrewNeedsHomeDefense}
+        currentResearchCenterLevel={currentResearchCenterLevel}
+        isLoadingResearchCenterStatus={isLoadingResearchCenterStatus}
+        currentLevel={currentLevel}
+        currentBalance={currentBalance}
+        isUnlocking={isUnlocking}
+        setIsUnlocking={setIsUnlocking}
+        showAuthError={showAuthError}
+        setShowAuthError={setShowAuthError}
+        showUnlockError={showUnlockError}
+        setShowUnlockError={setShowUnlockError}
+        showNetworkError={showNetworkError}
+        setShowNetworkError={setShowNetworkError}
+        showRequirementsNotMet={showRequirementsNotMet}
+        setShowRequirementsNotMet={setShowRequirementsNotMet}
+        errorMessage={errorMessage}
+        setErrorMessage={setErrorMessage}
+      />
+    </FeatureRefsProvider>
+  );
+}
+
+/** Inner content that reads feature refs from context (so any categoryId from requiredFeatureRefs works). */
+function ResearchLockedModalContent({
+  visible,
+  onClose,
+  onUnlockSuccess,
+  requirements,
+  researchStatus,
+  onRefreshResearchStatus,
+  refs,
+  legacyHackCrewNeedsHomeDefense,
+  currentResearchCenterLevel,
+  isLoadingResearchCenterStatus,
+  currentLevel,
+  currentBalance,
+  isUnlocking,
+  setIsUnlocking,
+  showAuthError,
+  setShowAuthError,
+  showUnlockError,
+  setShowUnlockError,
+  showNetworkError,
+  setShowNetworkError,
+  showRequirementsNotMet,
+  setShowRequirementsNotMet,
+  errorMessage,
+  setErrorMessage,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onUnlockSuccess: (newBalance: number) => void;
+  requirements: ResearchRequirements;
+  researchStatus: ResearchStatus[];
+  onRefreshResearchStatus?: () => void;
+  refs: ResearchFeatureRef[];
+  legacyHackCrewNeedsHomeDefense: boolean;
+  currentResearchCenterLevel: number;
+  isLoadingResearchCenterStatus: boolean;
+  currentLevel: number;
+  currentBalance: number;
+  isUnlocking: boolean;
+  setIsUnlocking: (v: boolean) => void;
+  showAuthError: boolean;
+  setShowAuthError: (v: boolean) => void;
+  showUnlockError: boolean;
+  setShowUnlockError: (v: boolean) => void;
+  showNetworkError: boolean;
+  setShowNetworkError: (v: boolean) => void;
+  showRequirementsNotMet: boolean;
+  setShowRequirementsNotMet: (v: boolean) => void;
+  errorMessage: string;
+  setErrorMessage: (v: string) => void;
+}): React.JSX.Element {
+  const { featuresByCategory, isLoadingAny } = useContext(FeatureRefsContext);
+  const token = useAppSelector(state => state.auth.token);
+  const dispatch = useAppDispatch();
+  const colors = useThemeColors();
+  const styles = createStyles(colors);
+
+  // Check if required features (from requiredFeatureRefs or legacy requiredFeatures) are unlocked
+  const requiredFeaturesMet = useMemo(() => {
+    if (refs.length > 0) {
+      if (isLoadingAny) return false;
+      return refs.every(ref => {
+        const features = featuresByCategory[ref.categoryId];
+        if (!features) return false;
+        const feature = features.find((f: any) => f.id === ref.featureId || f.featureId === ref.featureId);
+        if (!feature) return false;
+        if (feature.isUnlocked) return true;
+        if (feature.isResearching && feature.researchCompletesAt) {
+          const now = new Date().getTime();
+          const completesAt = new Date(feature.researchCompletesAt).getTime();
+          return now >= completesAt;
+        }
+        return false;
+      });
+    }
+    if (requirements?.requiredFeatures?.length) {
+      if (requirements.categoryId === 'hack-crew' && isLoadingAny) return false;
+      const homeDefense = featuresByCategory['home-defense'];
+      if (!homeDefense) return false;
+      return requirements.requiredFeatures.every(featureId => {
+        const feature = homeDefense.find((f: any) => f.id === featureId || f.featureId === featureId);
+        if (!feature) return false;
+        if (feature.isUnlocked) return true;
+        if (feature.isResearching && feature.researchCompletesAt) {
+          const now = new Date().getTime();
+          const completesAt = new Date(feature.researchCompletesAt).getTime();
+          return now >= completesAt;
+        }
+        return false;
+      });
+    }
+    return true;
+  }, [refs, requirements?.requiredFeatures, requirements?.categoryId, featuresByCategory, isLoadingAny]);
+
   const levelMet = currentLevel >= requirements.levelRequirement;
   const balanceMet = currentBalance >= requirements.balanceRequirement;
-  
-  // Check if each dependency is actually unlocked
+  const rcLevelReq = requirements.researchCenterLevelRequirement;
+  const researchCenterLevelMet =
+    rcLevelReq == null ||
+    (isLoadingResearchCenterStatus ? false : currentResearchCenterLevel >= rcLevelReq);
+
   const dependenciesMet = requirements.dependencies.every(depId => {
     const depResearch = researchStatus.find(r => r.categoryId === depId);
     return depResearch?.isUnlocked || false;
   });
-  
-  const canUnlock = levelMet && balanceMet && dependenciesMet && requiredFeaturesMet;
+
+  const canUnlock = levelMet && balanceMet && dependenciesMet && researchCenterLevelMet && requiredFeaturesMet;
+
+  const getCategoryName = (categoryId: string) => researchStatus.find(r => r.categoryId === categoryId)?.name ?? categoryId;
+  const formatFeatureId = (featureId: string) =>
+    featureId.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+  const displayRequiredFeatures = (requirements.requiredFeatureRefs?.length ?? 0) > 0
+    ? (requirements.requiredFeatureRefs ?? []).map(r => formatFeatureId(r.featureId))
+    : (requirements.requiredFeatures ?? []).map(f => formatFeatureId(f));
+  const showRequiredFeaturesRow = displayRequiredFeatures.length > 0;
 
   const handleUnlock = async () => {
     if (!token) {
@@ -210,51 +398,80 @@ export function ResearchLockedModal({
               
               <View style={styles.requirementRow}>
                 <Text style={styles.requirementLabel}>Level:</Text>
-                <Text style={[
-                  styles.requirementValue,
-                  levelMet ? styles.requirementMet : styles.requirementNotMet
-                ]}>
-                  {currentLevel}/{requirements.levelRequirement}
-                </Text>
+                <View style={styles.requirementValueWrap}>
+                  <Text style={[
+                    styles.requirementValue,
+                    levelMet ? styles.requirementMet : styles.requirementNotMet
+                  ]}>
+                    {currentLevel}/{requirements.levelRequirement}
+                  </Text>
+                </View>
               </View>
 
               <View style={styles.requirementRow}>
                 <Text style={styles.requirementLabel}>Balance:</Text>
-                <Text style={[
-                  styles.requirementValue,
-                  balanceMet ? styles.requirementMet : styles.requirementNotMet
-                ]}>
-                  ${currentBalance.toLocaleString()}/${requirements.balanceRequirement.toLocaleString()}
-                </Text>
+                <View style={styles.requirementValueWrap}>
+                  <Text style={styles.requirementValue}>
+                    <Text style={styles.balanceMyAmount}>${currentBalance.toLocaleString()}</Text>
+                    <Text style={[
+                      styles.balanceCost,
+                      balanceMet ? styles.requirementMet : styles.requirementNotMet
+                    ]}>
+                      /${requirements.balanceRequirement.toLocaleString()}
+                    </Text>
+                  </Text>
+                </View>
               </View>
+
+              {rcLevelReq != null && (
+                <View style={styles.requirementRow}>
+                  <Text style={styles.requirementLabel}>Research Center Level:</Text>
+                  <View style={styles.requirementValueWrap}>
+                    <Text style={[
+                      styles.requirementValue,
+                      researchCenterLevelMet ? styles.requirementMet : styles.requirementNotMet
+                    ]}>
+                      {isLoadingResearchCenterStatus ? '…' : currentResearchCenterLevel}/{rcLevelReq}
+                    </Text>
+                  </View>
+                </View>
+              )}
 
               {requirements.dependencies.length > 0 && (
                 <View style={styles.requirementRow}>
-                  <Text style={styles.requirementLabel}>Dependencies:</Text>
-                  <Text style={[
-                    styles.requirementValue,
-                    dependenciesMet ? styles.requirementMet : styles.requirementNotMet
-                  ]}>
-                    {requirements.dependencies.join(', ')}
-                  </Text>
+                  <Text style={styles.requirementLabel}>Other Categories:</Text>
+                  <View style={styles.requirementValueWrap}>
+                    <Text style={[
+                      styles.requirementValue,
+                      dependenciesMet ? styles.requirementMet : styles.requirementNotMet
+                    ]}>
+                      {requirements.dependencies.map(depId => getCategoryName(depId)).join(', ')}
+                    </Text>
+                  </View>
                 </View>
               )}
 
-              {requirements.requiredFeatures && requirements.requiredFeatures.length > 0 && (
+              {showRequiredFeaturesRow && (
                 <View style={styles.requirementRow}>
                   <Text style={styles.requirementLabel}>Required Features:</Text>
-                  <Text style={[
-                    styles.requirementValue,
-                    requiredFeaturesMet ? styles.requirementMet : styles.requirementNotMet
-                  ]}>
-                    {requirements.requiredFeatures.map(f => f.charAt(0).toUpperCase() + f.slice(1)).join(', ')}
-                  </Text>
+                  <View style={styles.requirementValueWrap}>
+                    <Text style={[
+                      styles.requirementValue,
+                      requiredFeaturesMet ? styles.requirementMet : styles.requirementNotMet
+                    ]}>
+                      {displayRequiredFeatures.join(', ')}
+                    </Text>
+                  </View>
                 </View>
               )}
 
-              <View style={styles.costContainer}>
-                <Text style={styles.costLabel}>Unlock Cost:</Text>
-                <Text style={styles.costValue}>${requirements.unlockCost.toLocaleString()}</Text>
+              <View style={[styles.requirementRow, styles.unlockPaymentRow]}>
+                <Text style={styles.requirementLabel}>Unlock payment:</Text>
+                <View style={styles.requirementValueWrap}>
+                  <Text style={styles.requirementValue}>
+                    ${(requirements.unlockCost ?? 0).toLocaleString()}
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
@@ -318,7 +535,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderRadius: 12,
     padding: SIZING.spacing.md,
     margin: SIZING.spacing.md,
-    maxWidth: 400,
+    maxWidth: 440,
     width: '100%',
     ...(colors.modalBorder && { borderWidth: 1, borderColor: colors.modalBorder }),
   },
@@ -370,40 +587,40 @@ const createStyles = (colors: any) => StyleSheet.create({
   requirementRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: SIZING.spacing.xs,
+  },
+  unlockPaymentRow: {
+    marginTop: SIZING.spacing.sm,
+    paddingTop: SIZING.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   requirementLabel: {
     color: colors.text.secondary,
     fontSize: SIZING.font.body,
+  },
+  requirementValueWrap: {
+    flex: 1,
+    marginLeft: SIZING.spacing.sm,
+    flexShrink: 1,
   },
   requirementValue: {
     color: colors.text.primary,
     fontSize: SIZING.font.body,
     fontWeight: '500',
   },
+  balanceMyAmount: {
+    color: colors.text.primary,
+  },
+  balanceCost: {
+    /* Base for cost segment; met/not-met applied conditionally via requirementMet / requirementNotMet */
+  },
   requirementMet: {
     color: colors.success,
   },
   requirementNotMet: {
     color: colors.error,
-  },
-  costContainer: {
-    marginTop: SIZING.spacing.sm,
-    paddingTop: SIZING.spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    alignItems: 'center',
-  },
-  costLabel: {
-    color: colors.text.secondary,
-    fontSize: SIZING.font.body,
-    marginBottom: SIZING.spacing.xs,
-  },
-  costValue: {
-    color: colors.text.primary,
-    fontSize: SIZING.font.h2,
-    fontWeight: '600',
   },
   footer: {
     flexDirection: 'row',

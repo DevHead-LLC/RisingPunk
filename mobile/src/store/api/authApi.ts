@@ -82,6 +82,7 @@ export interface UnlockResearchCenterResponse {
   researchCenterBuild: {
     startedAt: string;
     completesAt: string;
+    targetLevel?: number;
   };
   unlockedFeatures: {
     hackRig: boolean;
@@ -91,10 +92,15 @@ export interface UnlockResearchCenterResponse {
 
 export interface ResearchCenterStatusResponse {
   isUnlocked: boolean;
+  level: number;
+  canBuild: boolean;
+  nextBuildCost: number | null;
+  nextBuildTimeMinutes: number | null;
   buildStatus: {
     startedAt: string;
     completesAt: string;
     timeRemaining: number;
+    targetLevel?: number;
   } | null;
 }
 

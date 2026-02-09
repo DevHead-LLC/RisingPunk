@@ -267,10 +267,17 @@ async function fetchBotsAndBuildStateForToken(token: string, dispatch: any, logC
  * otherwise create a new guest. Each return to the app can use "Play as Guest" to resume that same
  * device-linked account rather than creating a new one.
  */
+export type PlayAsGuestPayload = { forceNew?: boolean } | void;
+
 export const playAsGuest = createAsyncThunk(
   'auth/playAsGuest',
-  async (_, { rejectWithValue, dispatch }) => {
+  async (payload: PlayAsGuestPayload, { rejectWithValue, dispatch }) => {
     try {
+      const forceNew = payload?.forceNew === true;
+      if (forceNew) {
+        await AsyncStorage.multiRemove([GUEST_TOKEN_KEY]);
+      }
+
       const storedGuestToken = await AsyncStorage.getItem(GUEST_TOKEN_KEY);
 
       if (storedGuestToken) {
@@ -301,7 +308,7 @@ export const playAsGuest = createAsyncThunk(
         response = await fetch(guestUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ deviceId }),
+          body: JSON.stringify({ deviceId, ...(forceNew && { forceNew: true }) }),
           signal: controller.signal,
         });
       } finally {
@@ -958,6 +965,12 @@ export const authSlice = createSlice({
     setShowAccountSwitchedBanner: (state, action: PayloadAction<boolean>) => {
       state.showAccountSwitchedBanner = action.payload;
     },
+    /** Update user level from battle end (or other source). No fetch, no loading — so Research Center and other UI see new level live. */
+    setUserLevel: (state, action: PayloadAction<number>) => {
+      if (state.user) {
+        state.user.level = action.payload;
+      }
+    },
     handleAccountSwitched: (state, action) => {
       // Prevent multiple calls - if already logged out, don't process again
       if (!state.token) {
@@ -1315,7 +1328,7 @@ export const authSlice = createSlice({
   },
 });
 
-export const { clearError, setCredentials, setOnboardingCompleted, setShowOnboarding, setShowTurfIntro, setShowHandleSelection, setShowEmailVerification, setShowEmailVerificationBanner, setEmailVerificationPrompted, forceRefreshData, setShowAccountSwitched, setShowAccountSwitchedBanner, handleAccountSwitched } = authSlice.actions;
+export const { clearError, setCredentials, setOnboardingCompleted, setShowOnboarding, setShowTurfIntro, setShowHandleSelection, setShowEmailVerification, setShowEmailVerificationBanner, setEmailVerificationPrompted, forceRefreshData, setShowAccountSwitched, setShowAccountSwitchedBanner, setUserLevel, handleAccountSwitched } = authSlice.actions;
 export const logout = logoutUser;
 export const googleSignIn = googleSignInUser;
 export const googleSignUp = googleSignUpUser;
