@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, createContext, useContext, useCallback } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Alert } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -11,6 +11,78 @@ import { useGetUserFeaturesQuery } from '../../store/api/researchFeaturesApi';
 import { useGetResearchCenterStatusQuery } from '../../store/api/authApi';
 import { userGuideApi } from '../../store/api/userGuideApi';
 import type { ResearchFeatureRef } from '../../hooks/useResearchStatus';
+
+/** Context for feature data keyed by categoryId so any requiredFeatureRefs category works without hardcoding. */
+type FeatureRefsContextValue = {
+  featuresByCategory: Record<string, any[] | undefined>;
+  isLoadingAny: boolean;
+};
+const FeatureRefsContext = createContext<FeatureRefsContextValue>({ featuresByCategory: {}, isLoadingAny: false });
+
+/** Fetches user features for one category and reports to parent state. Allows dynamic category list from requiredFeatureRefs. */
+function CategoryFeatureFetcher({
+  categoryId,
+  skip,
+  onData,
+  onLoading,
+}: {
+  categoryId: string;
+  skip: boolean;
+  onData: (data: any[] | undefined) => void;
+  onLoading: (loading: boolean) => void;
+}) {
+  const { data, isLoading } = useGetUserFeaturesQuery(categoryId, { skip });
+  useEffect(() => {
+    onData(data);
+  }, [data, onData]);
+  useEffect(() => {
+    onLoading(isLoading);
+  }, [isLoading, onLoading]);
+  return null;
+}
+
+/** Provides featuresByCategory and isLoadingAny for exactly the categoryIds derived from refs (and legacy). */
+function FeatureRefsProvider({
+  categoryIds,
+  visible,
+  children,
+}: {
+  categoryIds: string[];
+  visible: boolean;
+  children: React.ReactNode;
+}) {
+  const [featuresByCategory, setFeaturesByCategory] = useState<Record<string, any[] | undefined>>({});
+  const [loading, setLoading] = useState<Record<string, boolean>>({});
+
+  const setFeaturesForCategory = useCallback((categoryId: string, data: any[] | undefined) => {
+    setFeaturesByCategory(prev => (prev[categoryId] === data ? prev : { ...prev, [categoryId]: data }));
+  }, []);
+  const setLoadingForCategory = useCallback((categoryId: string, value: boolean) => {
+    setLoading(prev => (prev[categoryId] === value ? prev : { ...prev, [categoryId]: value }));
+  }, []);
+
+  const isLoadingAny = categoryIds.some(id => loading[id]);
+
+  const value = useMemo<FeatureRefsContextValue>(
+    () => ({ featuresByCategory, isLoadingAny }),
+    [featuresByCategory, isLoadingAny]
+  );
+
+  return (
+    <FeatureRefsContext.Provider value={value}>
+      {categoryIds.map(id => (
+        <CategoryFeatureFetcher
+          key={id}
+          categoryId={id}
+          skip={!visible}
+          onData={data => setFeaturesForCategory(id, data)}
+          onLoading={v => setLoadingForCategory(id, v)}
+        />
+      ))}
+      {children}
+    </FeatureRefsContext.Provider>
+  );
+}
 
 interface ResearchRequirements {
   categoryId: string;
@@ -94,88 +166,110 @@ export function ResearchLockedModal({
 
   const refs = requirements?.requiredFeatureRefs ?? [];
   const legacyHackCrewNeedsHomeDefense = requirements?.categoryId === 'hack-crew' && (requirements?.requiredFeatures?.length ?? 0) > 0;
-  const needsHomeDefense = refs.some(r => r.categoryId === 'home-defense') || legacyHackCrewNeedsHomeDefense;
-  const needsHackAbility = refs.some(r => r.categoryId === 'hack-ability');
-  const needsHackCrew = refs.some(r => r.categoryId === 'hack-crew');
-  const needsCashFlow = refs.some(r => r.categoryId === 'cash-flow');
-  const needsInvestments = refs.some(r => r.categoryId === 'investments');
-  const needsFinancial = refs.some(r => r.categoryId === 'financial');
-  const needsNpc = refs.some(r => r.categoryId === 'npc');
-  const needsConstruction = refs.some(r => r.categoryId === 'construction');
-  const needsBattleMechanics = refs.some(r => r.categoryId === 'battle-mechanics');
-  const needsGear = refs.some(r => r.categoryId === 'gear');
 
-  const { data: homeDefenseFeatures, isLoading: isLoadingHomeDefense } = useGetUserFeaturesQuery('home-defense', {
-    skip: !visible || !needsHomeDefense
-  });
-  const { data: hackAbilityFeatures, isLoading: isLoadingHackAbility } = useGetUserFeaturesQuery('hack-ability', {
-    skip: !visible || !needsHackAbility
-  });
-  const { data: hackCrewFeatures, isLoading: isLoadingHackCrew } = useGetUserFeaturesQuery('hack-crew', {
-    skip: !visible || !needsHackCrew
-  });
-  const { data: cashFlowFeatures, isLoading: isLoadingCashFlow } = useGetUserFeaturesQuery('cash-flow', {
-    skip: !visible || !needsCashFlow
-  });
-  const { data: investmentsFeatures, isLoading: isLoadingInvestments } = useGetUserFeaturesQuery('investments', {
-    skip: !visible || !needsInvestments
-  });
-  const { data: financialFeatures, isLoading: isLoadingFinancial } = useGetUserFeaturesQuery('financial', {
-    skip: !visible || !needsFinancial
-  });
-  const { data: npcFeatures, isLoading: isLoadingNpc } = useGetUserFeaturesQuery('npc', {
-    skip: !visible || !needsNpc
-  });
-  const { data: constructionFeatures, isLoading: isLoadingConstruction } = useGetUserFeaturesQuery('construction', {
-    skip: !visible || !needsConstruction
-  });
-  const { data: battleMechanicsFeatures, isLoading: isLoadingBattleMechanics } = useGetUserFeaturesQuery('battle-mechanics', {
-    skip: !visible || !needsBattleMechanics
-  });
-  const { data: gearFeatures, isLoading: isLoadingGear } = useGetUserFeaturesQuery('gear', {
-    skip: !visible || !needsGear
-  });
+  // Derive category IDs from requiredFeatureRefs (and legacy hack-crew → home-defense). New categories work without code changes.
+  const featureRefCategoryIds = useMemo(() => {
+    const fromRefs = refs.length ? [...new Set(refs.map(r => r.categoryId))] : [];
+    const legacy = legacyHackCrewNeedsHomeDefense ? ['home-defense'] : [];
+    return [...new Set([...fromRefs, ...legacy])];
+  }, [refs, legacyHackCrewNeedsHomeDefense]);
 
-  const featuresByCategory: Record<string, any[] | undefined> = useMemo(() => ({
-    'home-defense': homeDefenseFeatures,
-    'hack-ability': hackAbilityFeatures,
-    'hack-crew': hackCrewFeatures,
-    'cash-flow': cashFlowFeatures,
-    'investments': investmentsFeatures,
-    'financial': financialFeatures,
-    'npc': npcFeatures,
-    'construction': constructionFeatures,
-    'battle-mechanics': battleMechanicsFeatures,
-    'gear': gearFeatures
-  }), [
-    homeDefenseFeatures,
-    hackAbilityFeatures,
-    hackCrewFeatures,
-    cashFlowFeatures,
-    investmentsFeatures,
-    financialFeatures,
-    npcFeatures,
-    constructionFeatures,
-    battleMechanicsFeatures,
-    gearFeatures
-  ]);
+  if (!requirements) return null;
 
-  const isLoadingAnyFeatures =
-    (needsHomeDefense && isLoadingHomeDefense) ||
-    (needsHackAbility && isLoadingHackAbility) ||
-    (needsHackCrew && isLoadingHackCrew) ||
-    (needsCashFlow && isLoadingCashFlow) ||
-    (needsInvestments && isLoadingInvestments) ||
-    (needsFinancial && isLoadingFinancial) ||
-    (needsNpc && isLoadingNpc) ||
-    (needsConstruction && isLoadingConstruction) ||
-    (needsBattleMechanics && isLoadingBattleMechanics) ||
-    (needsGear && isLoadingGear);
+  return (
+    <FeatureRefsProvider categoryIds={featureRefCategoryIds} visible={visible}>
+      <ResearchLockedModalContent
+        visible={visible}
+        onClose={onClose}
+        onUnlockSuccess={onUnlockSuccess}
+        requirements={requirements}
+        researchStatus={researchStatus}
+        onRefreshResearchStatus={onRefreshResearchStatus}
+        refs={refs}
+        legacyHackCrewNeedsHomeDefense={legacyHackCrewNeedsHomeDefense}
+        currentResearchCenterLevel={currentResearchCenterLevel}
+        isLoadingResearchCenterStatus={isLoadingResearchCenterStatus}
+        currentLevel={currentLevel}
+        currentBalance={currentBalance}
+        isUnlocking={isUnlocking}
+        setIsUnlocking={setIsUnlocking}
+        showAuthError={showAuthError}
+        setShowAuthError={setShowAuthError}
+        showUnlockError={showUnlockError}
+        setShowUnlockError={setShowUnlockError}
+        showNetworkError={showNetworkError}
+        setShowNetworkError={setShowNetworkError}
+        showRequirementsNotMet={showRequirementsNotMet}
+        setShowRequirementsNotMet={setShowRequirementsNotMet}
+        errorMessage={errorMessage}
+        setErrorMessage={setErrorMessage}
+      />
+    </FeatureRefsProvider>
+  );
+}
+
+/** Inner content that reads feature refs from context (so any categoryId from requiredFeatureRefs works). */
+function ResearchLockedModalContent({
+  visible,
+  onClose,
+  onUnlockSuccess,
+  requirements,
+  researchStatus,
+  onRefreshResearchStatus,
+  refs,
+  legacyHackCrewNeedsHomeDefense,
+  currentResearchCenterLevel,
+  isLoadingResearchCenterStatus,
+  currentLevel,
+  currentBalance,
+  isUnlocking,
+  setIsUnlocking,
+  showAuthError,
+  setShowAuthError,
+  showUnlockError,
+  setShowUnlockError,
+  showNetworkError,
+  setShowNetworkError,
+  showRequirementsNotMet,
+  setShowRequirementsNotMet,
+  errorMessage,
+  setErrorMessage,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onUnlockSuccess: (newBalance: number) => void;
+  requirements: ResearchRequirements;
+  researchStatus: ResearchStatus[];
+  onRefreshResearchStatus?: () => void;
+  refs: ResearchFeatureRef[];
+  legacyHackCrewNeedsHomeDefense: boolean;
+  currentResearchCenterLevel: number;
+  isLoadingResearchCenterStatus: boolean;
+  currentLevel: number;
+  currentBalance: number;
+  isUnlocking: boolean;
+  setIsUnlocking: (v: boolean) => void;
+  showAuthError: boolean;
+  setShowAuthError: (v: boolean) => void;
+  showUnlockError: boolean;
+  setShowUnlockError: (v: boolean) => void;
+  showNetworkError: boolean;
+  setShowNetworkError: (v: boolean) => void;
+  showRequirementsNotMet: boolean;
+  setShowRequirementsNotMet: (v: boolean) => void;
+  errorMessage: string;
+  setErrorMessage: (v: string) => void;
+}): React.JSX.Element {
+  const { featuresByCategory, isLoadingAny } = useContext(FeatureRefsContext);
+  const token = useAppSelector(state => state.auth.token);
+  const dispatch = useAppDispatch();
+  const colors = useThemeColors();
+  const styles = createStyles(colors);
 
   // Check if required features (from requiredFeatureRefs or legacy requiredFeatures) are unlocked
   const requiredFeaturesMet = useMemo(() => {
     if (refs.length > 0) {
-      if (isLoadingAnyFeatures) return false;
+      if (isLoadingAny) return false;
       return refs.every(ref => {
         const features = featuresByCategory[ref.categoryId];
         if (!features) return false;
@@ -191,7 +285,7 @@ export function ResearchLockedModal({
       });
     }
     if (requirements?.requiredFeatures?.length) {
-      if (requirements.categoryId === 'hack-crew' && isLoadingHomeDefense) return false;
+      if (requirements.categoryId === 'hack-crew' && isLoadingAny) return false;
       const homeDefense = featuresByCategory['home-defense'];
       if (!homeDefense) return false;
       return requirements.requiredFeatures.every(featureId => {
@@ -207,9 +301,7 @@ export function ResearchLockedModal({
       });
     }
     return true;
-  }, [refs, requirements?.requiredFeatures, requirements?.categoryId, featuresByCategory, isLoadingAnyFeatures, isLoadingHomeDefense]);
-
-  if (!requirements) return null;
+  }, [refs, requirements?.requiredFeatures, requirements?.categoryId, featuresByCategory, isLoadingAny]);
 
   const levelMet = currentLevel >= requirements.levelRequirement;
   const balanceMet = currentBalance >= requirements.balanceRequirement;
