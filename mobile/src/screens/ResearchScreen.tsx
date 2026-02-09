@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { SIZING } from '../styles/theme';
 import { Balance } from '../components/common/Balance';
@@ -47,7 +47,8 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
   const [currentScreen, setCurrentScreen] = useState<'main' | string>('main');
   const [showLockedModal, setShowLockedModal] = useState(false);
   const [selectedResearch, setSelectedResearch] = useState<string | null>(null);
-  
+  const closeModalTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const dispatch = useAppDispatch();
   const { researchStatus, loading, error, canAccessResearch, getResearchRequirements, refreshAfterUnlock } = useResearchStatus();
   const userLevel = useAppSelector(state => state.auth.user?.level || 1);
@@ -61,11 +62,21 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
   const { features, loading: featuresLoading, error: featuresError, refetch: refetchFeatures } = useResearchFeatures(selectedCard?.id || null);
   
   const styles = createStyles(colors);
-  
+
+  useEffect(() => {
+    return () => {
+      if (closeModalTimeoutRef.current) clearTimeout(closeModalTimeoutRef.current);
+    };
+  }, []);
+
   const handleCardPress = (cardId: string) => {
     if (canAccessResearch(cardId)) {
       setCurrentScreen(cardId);
     } else {
+      if (closeModalTimeoutRef.current) {
+        clearTimeout(closeModalTimeoutRef.current);
+        closeModalTimeoutRef.current = null;
+      }
       setSelectedResearch(cardId);
       setShowLockedModal(true);
     }
@@ -174,17 +185,31 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
     );
   };
   
+  const MODAL_CLOSE_ANIMATION_MS = 300;
+
   const handleCloseLockedModal = () => {
+    if (closeModalTimeoutRef.current) {
+      clearTimeout(closeModalTimeoutRef.current);
+      closeModalTimeoutRef.current = null;
+    }
     setShowLockedModal(false);
-    setSelectedResearch(null);
+    closeModalTimeoutRef.current = setTimeout(() => {
+      setSelectedResearch(null);
+      closeModalTimeoutRef.current = null;
+    }, MODAL_CLOSE_ANIMATION_MS);
   };
 
-
-
   const handleUnlockSuccess = (newBalance: number) => {
+    if (closeModalTimeoutRef.current) {
+      clearTimeout(closeModalTimeoutRef.current);
+      closeModalTimeoutRef.current = null;
+    }
     setShowLockedModal(false);
-    setSelectedResearch(null);
-    
+    closeModalTimeoutRef.current = setTimeout(() => {
+      setSelectedResearch(null);
+      closeModalTimeoutRef.current = null;
+    }, MODAL_CLOSE_ANIMATION_MS);
+
     // Update balance in Redux store - preserve existing ratePerSecond, lastUpdated, and fractionalRemainder
     dispatch(updateBalance({
       total: newBalance,

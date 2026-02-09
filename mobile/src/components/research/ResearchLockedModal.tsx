@@ -8,7 +8,9 @@ import { API_URL } from '../../config';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { getCurrentBalance } from '../../store/slices/balanceSlice';
 import { useGetUserFeaturesQuery } from '../../store/api/researchFeaturesApi';
+import { useGetResearchCenterStatusQuery } from '../../store/api/authApi';
 import { userGuideApi } from '../../store/api/userGuideApi';
+import type { ResearchFeatureRef } from '../../hooks/useResearchStatus';
 
 interface ResearchRequirements {
   categoryId: string;
@@ -17,6 +19,8 @@ interface ResearchRequirements {
   balanceRequirement: number;
   dependencies: string[];
   requiredFeatures?: string[];
+  requiredFeatureRefs?: ResearchFeatureRef[];
+  researchCenterLevelRequirement?: number;
   unlockCost: number;
   isUnlocked: boolean;
 }
@@ -83,59 +87,151 @@ export function ResearchLockedModal({
   const colors = useThemeColors();
   const styles = createStyles(colors);
 
-  const { data: homeDefenseFeatures, isLoading: isLoadingHomeDefenseFeatures } = useGetUserFeaturesQuery('home-defense', {
-    skip: !requirements || requirements.categoryId !== 'hack-crew'
+  const { data: buildStatus, isLoading: isLoadingResearchCenterStatus } = useGetResearchCenterStatusQuery(undefined, {
+    skip: !visible || !requirements
+  });
+  const currentResearchCenterLevel = buildStatus?.level ?? 0;
+
+  const refs = requirements?.requiredFeatureRefs ?? [];
+  const legacyHackCrewNeedsHomeDefense = requirements?.categoryId === 'hack-crew' && (requirements?.requiredFeatures?.length ?? 0) > 0;
+  const needsHomeDefense = refs.some(r => r.categoryId === 'home-defense') || legacyHackCrewNeedsHomeDefense;
+  const needsHackAbility = refs.some(r => r.categoryId === 'hack-ability');
+  const needsHackCrew = refs.some(r => r.categoryId === 'hack-crew');
+  const needsCashFlow = refs.some(r => r.categoryId === 'cash-flow');
+  const needsInvestments = refs.some(r => r.categoryId === 'investments');
+  const needsFinancial = refs.some(r => r.categoryId === 'financial');
+  const needsNpc = refs.some(r => r.categoryId === 'npc');
+  const needsConstruction = refs.some(r => r.categoryId === 'construction');
+  const needsBattleMechanics = refs.some(r => r.categoryId === 'battle-mechanics');
+  const needsGear = refs.some(r => r.categoryId === 'gear');
+
+  const { data: homeDefenseFeatures, isLoading: isLoadingHomeDefense } = useGetUserFeaturesQuery('home-defense', {
+    skip: !visible || !needsHomeDefense
+  });
+  const { data: hackAbilityFeatures, isLoading: isLoadingHackAbility } = useGetUserFeaturesQuery('hack-ability', {
+    skip: !visible || !needsHackAbility
+  });
+  const { data: hackCrewFeatures, isLoading: isLoadingHackCrew } = useGetUserFeaturesQuery('hack-crew', {
+    skip: !visible || !needsHackCrew
+  });
+  const { data: cashFlowFeatures, isLoading: isLoadingCashFlow } = useGetUserFeaturesQuery('cash-flow', {
+    skip: !visible || !needsCashFlow
+  });
+  const { data: investmentsFeatures, isLoading: isLoadingInvestments } = useGetUserFeaturesQuery('investments', {
+    skip: !visible || !needsInvestments
+  });
+  const { data: financialFeatures, isLoading: isLoadingFinancial } = useGetUserFeaturesQuery('financial', {
+    skip: !visible || !needsFinancial
+  });
+  const { data: npcFeatures, isLoading: isLoadingNpc } = useGetUserFeaturesQuery('npc', {
+    skip: !visible || !needsNpc
+  });
+  const { data: constructionFeatures, isLoading: isLoadingConstruction } = useGetUserFeaturesQuery('construction', {
+    skip: !visible || !needsConstruction
+  });
+  const { data: battleMechanicsFeatures, isLoading: isLoadingBattleMechanics } = useGetUserFeaturesQuery('battle-mechanics', {
+    skip: !visible || !needsBattleMechanics
+  });
+  const { data: gearFeatures, isLoading: isLoadingGear } = useGetUserFeaturesQuery('gear', {
+    skip: !visible || !needsGear
   });
 
-  // Check if required features are unlocked (must be before early return)
-  const requiredFeaturesMet = useMemo(() => {
-    if (!requirements?.requiredFeatures || requirements.requiredFeatures.length === 0) {
-      return true;
-    }
+  const featuresByCategory: Record<string, any[] | undefined> = useMemo(() => ({
+    'home-defense': homeDefenseFeatures,
+    'hack-ability': hackAbilityFeatures,
+    'hack-crew': hackCrewFeatures,
+    'cash-flow': cashFlowFeatures,
+    'investments': investmentsFeatures,
+    'financial': financialFeatures,
+    'npc': npcFeatures,
+    'construction': constructionFeatures,
+    'battle-mechanics': battleMechanicsFeatures,
+    'gear': gearFeatures
+  }), [
+    homeDefenseFeatures,
+    hackAbilityFeatures,
+    hackCrewFeatures,
+    cashFlowFeatures,
+    investmentsFeatures,
+    financialFeatures,
+    npcFeatures,
+    constructionFeatures,
+    battleMechanicsFeatures,
+    gearFeatures
+  ]);
 
-    if (requirements.categoryId === 'hack-crew') {
-      if (isLoadingHomeDefenseFeatures) {
-        return false;
-      }
-      
-      if (!homeDefenseFeatures) {
-        return false;
-      }
-      
-      return requirements.requiredFeatures.every(featureId => {
-        const feature = homeDefenseFeatures.find(f => f.id === featureId);
+  const isLoadingAnyFeatures =
+    (needsHomeDefense && isLoadingHomeDefense) ||
+    (needsHackAbility && isLoadingHackAbility) ||
+    (needsHackCrew && isLoadingHackCrew) ||
+    (needsCashFlow && isLoadingCashFlow) ||
+    (needsInvestments && isLoadingInvestments) ||
+    (needsFinancial && isLoadingFinancial) ||
+    (needsNpc && isLoadingNpc) ||
+    (needsConstruction && isLoadingConstruction) ||
+    (needsBattleMechanics && isLoadingBattleMechanics) ||
+    (needsGear && isLoadingGear);
+
+  // Check if required features (from requiredFeatureRefs or legacy requiredFeatures) are unlocked
+  const requiredFeaturesMet = useMemo(() => {
+    if (refs.length > 0) {
+      if (isLoadingAnyFeatures) return false;
+      return refs.every(ref => {
+        const features = featuresByCategory[ref.categoryId];
+        if (!features) return false;
+        const feature = features.find((f: any) => f.id === ref.featureId || f.featureId === ref.featureId);
         if (!feature) return false;
-        
-        if (feature.isUnlocked) {
-          return true;
-        }
-        
+        if (feature.isUnlocked) return true;
         if (feature.isResearching && feature.researchCompletesAt) {
           const now = new Date().getTime();
-          const researchCompletesAt = new Date(feature.researchCompletesAt).getTime();
-          const remaining = Math.max(0, researchCompletesAt - now);
-          return remaining === 0;
+          const completesAt = new Date(feature.researchCompletesAt).getTime();
+          return now >= completesAt;
         }
-        
         return false;
       });
     }
-
+    if (requirements?.requiredFeatures?.length) {
+      if (requirements.categoryId === 'hack-crew' && isLoadingHomeDefense) return false;
+      const homeDefense = featuresByCategory['home-defense'];
+      if (!homeDefense) return false;
+      return requirements.requiredFeatures.every(featureId => {
+        const feature = homeDefense.find((f: any) => f.id === featureId || f.featureId === featureId);
+        if (!feature) return false;
+        if (feature.isUnlocked) return true;
+        if (feature.isResearching && feature.researchCompletesAt) {
+          const now = new Date().getTime();
+          const completesAt = new Date(feature.researchCompletesAt).getTime();
+          return now >= completesAt;
+        }
+        return false;
+      });
+    }
     return true;
-  }, [requirements?.requiredFeatures, requirements?.categoryId, homeDefenseFeatures, isLoadingHomeDefenseFeatures]);
+  }, [refs, requirements?.requiredFeatures, requirements?.categoryId, featuresByCategory, isLoadingAnyFeatures, isLoadingHomeDefense]);
 
   if (!requirements) return null;
 
   const levelMet = currentLevel >= requirements.levelRequirement;
   const balanceMet = currentBalance >= requirements.balanceRequirement;
-  
-  // Check if each dependency is actually unlocked
+  const rcLevelReq = requirements.researchCenterLevelRequirement;
+  const researchCenterLevelMet =
+    rcLevelReq == null ||
+    (isLoadingResearchCenterStatus ? false : currentResearchCenterLevel >= rcLevelReq);
+
   const dependenciesMet = requirements.dependencies.every(depId => {
     const depResearch = researchStatus.find(r => r.categoryId === depId);
     return depResearch?.isUnlocked || false;
   });
-  
-  const canUnlock = levelMet && balanceMet && dependenciesMet && requiredFeaturesMet;
+
+  const canUnlock = levelMet && balanceMet && dependenciesMet && researchCenterLevelMet && requiredFeaturesMet;
+
+  const getCategoryName = (categoryId: string) => researchStatus.find(r => r.categoryId === categoryId)?.name ?? categoryId;
+  const formatFeatureId = (featureId: string) =>
+    featureId.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+  const displayRequiredFeatures = (requirements.requiredFeatureRefs?.length ?? 0) > 0
+    ? (requirements.requiredFeatureRefs ?? []).map(r => formatFeatureId(r.featureId))
+    : (requirements.requiredFeatures ?? []).map(f => formatFeatureId(f));
+  const showRequiredFeaturesRow = displayRequiredFeatures.length > 0;
 
   const handleUnlock = async () => {
     if (!token) {
@@ -210,51 +306,80 @@ export function ResearchLockedModal({
               
               <View style={styles.requirementRow}>
                 <Text style={styles.requirementLabel}>Level:</Text>
-                <Text style={[
-                  styles.requirementValue,
-                  levelMet ? styles.requirementMet : styles.requirementNotMet
-                ]}>
-                  {currentLevel}/{requirements.levelRequirement}
-                </Text>
+                <View style={styles.requirementValueWrap}>
+                  <Text style={[
+                    styles.requirementValue,
+                    levelMet ? styles.requirementMet : styles.requirementNotMet
+                  ]}>
+                    {currentLevel}/{requirements.levelRequirement}
+                  </Text>
+                </View>
               </View>
 
               <View style={styles.requirementRow}>
                 <Text style={styles.requirementLabel}>Balance:</Text>
-                <Text style={[
-                  styles.requirementValue,
-                  balanceMet ? styles.requirementMet : styles.requirementNotMet
-                ]}>
-                  ${currentBalance.toLocaleString()}/${requirements.balanceRequirement.toLocaleString()}
-                </Text>
+                <View style={styles.requirementValueWrap}>
+                  <Text style={styles.requirementValue}>
+                    <Text style={styles.balanceMyAmount}>${currentBalance.toLocaleString()}</Text>
+                    <Text style={[
+                      styles.balanceCost,
+                      balanceMet ? styles.requirementMet : styles.requirementNotMet
+                    ]}>
+                      /${requirements.balanceRequirement.toLocaleString()}
+                    </Text>
+                  </Text>
+                </View>
               </View>
+
+              {rcLevelReq != null && (
+                <View style={styles.requirementRow}>
+                  <Text style={styles.requirementLabel}>Research Center Level:</Text>
+                  <View style={styles.requirementValueWrap}>
+                    <Text style={[
+                      styles.requirementValue,
+                      researchCenterLevelMet ? styles.requirementMet : styles.requirementNotMet
+                    ]}>
+                      {isLoadingResearchCenterStatus ? '…' : currentResearchCenterLevel}/{rcLevelReq}
+                    </Text>
+                  </View>
+                </View>
+              )}
 
               {requirements.dependencies.length > 0 && (
                 <View style={styles.requirementRow}>
-                  <Text style={styles.requirementLabel}>Dependencies:</Text>
-                  <Text style={[
-                    styles.requirementValue,
-                    dependenciesMet ? styles.requirementMet : styles.requirementNotMet
-                  ]}>
-                    {requirements.dependencies.join(', ')}
-                  </Text>
+                  <Text style={styles.requirementLabel}>Other Categories:</Text>
+                  <View style={styles.requirementValueWrap}>
+                    <Text style={[
+                      styles.requirementValue,
+                      dependenciesMet ? styles.requirementMet : styles.requirementNotMet
+                    ]}>
+                      {requirements.dependencies.map(depId => getCategoryName(depId)).join(', ')}
+                    </Text>
+                  </View>
                 </View>
               )}
 
-              {requirements.requiredFeatures && requirements.requiredFeatures.length > 0 && (
+              {showRequiredFeaturesRow && (
                 <View style={styles.requirementRow}>
                   <Text style={styles.requirementLabel}>Required Features:</Text>
-                  <Text style={[
-                    styles.requirementValue,
-                    requiredFeaturesMet ? styles.requirementMet : styles.requirementNotMet
-                  ]}>
-                    {requirements.requiredFeatures.map(f => f.charAt(0).toUpperCase() + f.slice(1)).join(', ')}
-                  </Text>
+                  <View style={styles.requirementValueWrap}>
+                    <Text style={[
+                      styles.requirementValue,
+                      requiredFeaturesMet ? styles.requirementMet : styles.requirementNotMet
+                    ]}>
+                      {displayRequiredFeatures.join(', ')}
+                    </Text>
+                  </View>
                 </View>
               )}
 
-              <View style={styles.costContainer}>
-                <Text style={styles.costLabel}>Unlock Cost:</Text>
-                <Text style={styles.costValue}>${requirements.unlockCost.toLocaleString()}</Text>
+              <View style={[styles.requirementRow, styles.unlockPaymentRow]}>
+                <Text style={styles.requirementLabel}>Unlock payment:</Text>
+                <View style={styles.requirementValueWrap}>
+                  <Text style={styles.requirementValue}>
+                    ${(requirements.unlockCost ?? 0).toLocaleString()}
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
@@ -318,7 +443,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderRadius: 12,
     padding: SIZING.spacing.md,
     margin: SIZING.spacing.md,
-    maxWidth: 400,
+    maxWidth: 440,
     width: '100%',
     ...(colors.modalBorder && { borderWidth: 1, borderColor: colors.modalBorder }),
   },
@@ -370,40 +495,40 @@ const createStyles = (colors: any) => StyleSheet.create({
   requirementRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: SIZING.spacing.xs,
+  },
+  unlockPaymentRow: {
+    marginTop: SIZING.spacing.sm,
+    paddingTop: SIZING.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   requirementLabel: {
     color: colors.text.secondary,
     fontSize: SIZING.font.body,
+  },
+  requirementValueWrap: {
+    flex: 1,
+    marginLeft: SIZING.spacing.sm,
+    flexShrink: 1,
   },
   requirementValue: {
     color: colors.text.primary,
     fontSize: SIZING.font.body,
     fontWeight: '500',
   },
+  balanceMyAmount: {
+    color: colors.text.primary,
+  },
+  balanceCost: {
+    /* Base for cost segment; met/not-met applied conditionally via requirementMet / requirementNotMet */
+  },
   requirementMet: {
     color: colors.success,
   },
   requirementNotMet: {
     color: colors.error,
-  },
-  costContainer: {
-    marginTop: SIZING.spacing.sm,
-    paddingTop: SIZING.spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    alignItems: 'center',
-  },
-  costLabel: {
-    color: colors.text.secondary,
-    fontSize: SIZING.font.body,
-    marginBottom: SIZING.spacing.xs,
-  },
-  costValue: {
-    color: colors.text.primary,
-    fontSize: SIZING.font.h2,
-    fontWeight: '600',
   },
   footer: {
     flexDirection: 'row',
