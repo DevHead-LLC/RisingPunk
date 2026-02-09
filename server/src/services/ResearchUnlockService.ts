@@ -358,36 +358,16 @@ export class ResearchUnlockService {
         .sort({ 'researchId.categoryId': 1 });
     }
 
-    const effectiveRcLevel = user.researchCenterLevel ?? (user.unlockedFeatures?.researchCenter ? 3 : 0);
-
-    const results = await Promise.all(userResearch.map(async (ur) => {
+    const results = userResearch.map((ur) => {
       const research = ur.researchId as any;
       const dbUnlocked = ur.isUnlocked;
-
-      const levelMet = user.level >= research.levelRequirement;
-
-      const unlockedDependencies = userResearch
-        .filter(ur2 => research.dependencies.includes((ur2.researchId as any)?.categoryId))
-        .map(ur2 => ur2.isUnlocked);
-      const dependenciesMet = research.dependencies.length === 0 ||
-        (unlockedDependencies.length === research.dependencies.length && unlockedDependencies.every((unlocked: boolean) => unlocked === true));
-
-      const rcLevelReq = research.researchCenterLevelRequirement;
-      const rcLevelMet = rcLevelReq == null || typeof rcLevelReq !== 'number' || effectiveRcLevel >= rcLevelReq;
-
-      const refs = research.requiredFeatureRefs as { categoryId: string; featureId: string }[] | undefined;
-      let requiredFeaturesMet = true;
-      if (refs?.length) {
-        const missingRefs = await this.checkRequiredFeatureRefs(userId, refs);
-        requiredFeaturesMet = missingRefs.length === 0;
-      } else if (research.categoryId === 'hack-crew') {
-        requiredFeaturesMet = await this.checkAntivirusFeature(userId);
-      }
 
       // Once a user has unlocked a category (dbUnlocked), keep it unlocked. Do not revoke access
       // when new requirements (e.g. Research Center level, required features) are added, so
       // existing users are not locked out. New users must still meet all requirements to unlock.
       const actuallyUnlocked = dbUnlocked;
+
+      const refs = research.requiredFeatureRefs as { categoryId: string; featureId: string }[] | undefined;
 
       const result: any = {
         categoryId: research.categoryId,
@@ -412,7 +392,7 @@ export class ResearchUnlockService {
       }
 
       return result;
-    }));
+    });
 
     return results;
   }

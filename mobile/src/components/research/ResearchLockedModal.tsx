@@ -10,11 +10,7 @@ import { getCurrentBalance } from '../../store/slices/balanceSlice';
 import { useGetUserFeaturesQuery } from '../../store/api/researchFeaturesApi';
 import { useGetResearchCenterStatusQuery } from '../../store/api/authApi';
 import { userGuideApi } from '../../store/api/userGuideApi';
-
-export interface ResearchFeatureRef {
-  categoryId: string;
-  featureId: string;
-}
+import type { ResearchFeatureRef } from '../../hooks/useResearchStatus';
 
 interface ResearchRequirements {
   categoryId: string;
@@ -95,7 +91,8 @@ export function ResearchLockedModal({
   const currentResearchCenterLevel = buildStatus?.level ?? 0;
 
   const refs = requirements?.requiredFeatureRefs ?? [];
-  const needsHomeDefense = refs.some(r => r.categoryId === 'home-defense');
+  const legacyHackCrewNeedsHomeDefense = requirements?.categoryId === 'hack-crew' && (requirements?.requiredFeatures?.length ?? 0) > 0;
+  const needsHomeDefense = refs.some(r => r.categoryId === 'home-defense') || legacyHackCrewNeedsHomeDefense;
   const needsHackCrew = refs.some(r => r.categoryId === 'hack-crew');
   const needsInvestments = refs.some(r => r.categoryId === 'investments');
 
@@ -264,7 +261,12 @@ export function ResearchLockedModal({
                 <View style={styles.requirementValueWrap}>
                   <Text style={styles.requirementValue}>
                     <Text style={styles.balanceMyAmount}>${currentBalance.toLocaleString()}</Text>
-                    <Text style={styles.balanceCost}>/${requirements.balanceRequirement.toLocaleString()}</Text>
+                    <Text style={[
+                      styles.balanceCost,
+                      balanceMet ? styles.requirementMet : styles.requirementNotMet
+                    ]}>
+                      /${requirements.balanceRequirement.toLocaleString()}
+                    </Text>
                   </Text>
                 </View>
               </View>
@@ -445,7 +447,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.text.primary,
   },
   balanceCost: {
-    color: colors.success,
+    /* Base for cost segment; met/not-met applied conditionally via requirementMet / requirementNotMet */
   },
   requirementMet: {
     color: colors.success,
