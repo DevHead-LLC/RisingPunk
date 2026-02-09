@@ -73,6 +73,9 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
     if (!value.trim()) {
       return 'HANDLE_REQUIRED';
     }
+    if (value.includes('@')) {
+      return 'HANDLE_NO_AT';
+    }
     if (value.length < 5) {
       return 'HANDLE_TOO_SHORT';
     }
@@ -339,6 +342,8 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
         return 'Handle must be at least 5 characters';
       case 'HANDLE_TOO_LONG':
         return 'Handle must be 15 characters or less';
+      case 'HANDLE_NO_AT':
+        return 'Handle cannot contain the @ symbol.';
       case 'HANDLE_INVALID_CHARS':
         return 'Handle can only contain letters, numbers, and !&%^*_';
       case 'HANDLE_CONTAINS_BAD_WORDS':
