@@ -93,26 +93,82 @@ export function ResearchLockedModal({
   const refs = requirements?.requiredFeatureRefs ?? [];
   const legacyHackCrewNeedsHomeDefense = requirements?.categoryId === 'hack-crew' && (requirements?.requiredFeatures?.length ?? 0) > 0;
   const needsHomeDefense = refs.some(r => r.categoryId === 'home-defense') || legacyHackCrewNeedsHomeDefense;
+  const needsHackAbility = refs.some(r => r.categoryId === 'hack-ability');
   const needsHackCrew = refs.some(r => r.categoryId === 'hack-crew');
+  const needsCashFlow = refs.some(r => r.categoryId === 'cash-flow');
   const needsInvestments = refs.some(r => r.categoryId === 'investments');
+  const needsFinancial = refs.some(r => r.categoryId === 'financial');
+  const needsNpc = refs.some(r => r.categoryId === 'npc');
+  const needsConstruction = refs.some(r => r.categoryId === 'construction');
+  const needsBattleMechanics = refs.some(r => r.categoryId === 'battle-mechanics');
+  const needsGear = refs.some(r => r.categoryId === 'gear');
 
   const { data: homeDefenseFeatures, isLoading: isLoadingHomeDefense } = useGetUserFeaturesQuery('home-defense', {
     skip: !visible || !needsHomeDefense
   });
+  const { data: hackAbilityFeatures, isLoading: isLoadingHackAbility } = useGetUserFeaturesQuery('hack-ability', {
+    skip: !visible || !needsHackAbility
+  });
   const { data: hackCrewFeatures, isLoading: isLoadingHackCrew } = useGetUserFeaturesQuery('hack-crew', {
     skip: !visible || !needsHackCrew
+  });
+  const { data: cashFlowFeatures, isLoading: isLoadingCashFlow } = useGetUserFeaturesQuery('cash-flow', {
+    skip: !visible || !needsCashFlow
   });
   const { data: investmentsFeatures, isLoading: isLoadingInvestments } = useGetUserFeaturesQuery('investments', {
     skip: !visible || !needsInvestments
   });
+  const { data: financialFeatures, isLoading: isLoadingFinancial } = useGetUserFeaturesQuery('financial', {
+    skip: !visible || !needsFinancial
+  });
+  const { data: npcFeatures, isLoading: isLoadingNpc } = useGetUserFeaturesQuery('npc', {
+    skip: !visible || !needsNpc
+  });
+  const { data: constructionFeatures, isLoading: isLoadingConstruction } = useGetUserFeaturesQuery('construction', {
+    skip: !visible || !needsConstruction
+  });
+  const { data: battleMechanicsFeatures, isLoading: isLoadingBattleMechanics } = useGetUserFeaturesQuery('battle-mechanics', {
+    skip: !visible || !needsBattleMechanics
+  });
+  const { data: gearFeatures, isLoading: isLoadingGear } = useGetUserFeaturesQuery('gear', {
+    skip: !visible || !needsGear
+  });
 
   const featuresByCategory: Record<string, any[] | undefined> = useMemo(() => ({
     'home-defense': homeDefenseFeatures,
+    'hack-ability': hackAbilityFeatures,
     'hack-crew': hackCrewFeatures,
-    'investments': investmentsFeatures
-  }), [homeDefenseFeatures, hackCrewFeatures, investmentsFeatures]);
+    'cash-flow': cashFlowFeatures,
+    'investments': investmentsFeatures,
+    'financial': financialFeatures,
+    'npc': npcFeatures,
+    'construction': constructionFeatures,
+    'battle-mechanics': battleMechanicsFeatures,
+    'gear': gearFeatures
+  }), [
+    homeDefenseFeatures,
+    hackAbilityFeatures,
+    hackCrewFeatures,
+    cashFlowFeatures,
+    investmentsFeatures,
+    financialFeatures,
+    npcFeatures,
+    constructionFeatures,
+    battleMechanicsFeatures,
+    gearFeatures
+  ]);
 
-  const isLoadingAnyFeatures = (needsHomeDefense && isLoadingHomeDefense) || (needsHackCrew && isLoadingHackCrew) || (needsInvestments && isLoadingInvestments);
+  const isLoadingAnyFeatures =
+    (needsHomeDefense && isLoadingHomeDefense) ||
+    (needsHackAbility && isLoadingHackAbility) ||
+    (needsHackCrew && isLoadingHackCrew) ||
+    (needsCashFlow && isLoadingCashFlow) ||
+    (needsInvestments && isLoadingInvestments) ||
+    (needsFinancial && isLoadingFinancial) ||
+    (needsNpc && isLoadingNpc) ||
+    (needsConstruction && isLoadingConstruction) ||
+    (needsBattleMechanics && isLoadingBattleMechanics) ||
+    (needsGear && isLoadingGear);
 
   // Check if required features (from requiredFeatureRefs or legacy requiredFeatures) are unlocked
   const requiredFeaturesMet = useMemo(() => {
