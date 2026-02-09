@@ -179,7 +179,7 @@ export const HandleSelectionModal: React.FC<HandleSelectionModalProps> = ({
       case 'HANDLE_TOO_LONG':
         return 'Handle must be 15 characters or less';
       case 'HANDLE_NO_AT':
-        return 'Handle cannot contain @. Use your email to sign in instead.';
+        return 'Handle cannot contain the @ symbol.';
       case 'HANDLE_INVALID_CHARS':
         return 'Handle can only contain letters, numbers, and !&%^*_';
       case 'HANDLE_CONTAINS_BAD_WORDS':

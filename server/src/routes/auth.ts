@@ -460,8 +460,7 @@ router.post<{}, UserResponse | { error: string }, LoginRequest['body']>(
       const trimmed = identifier.trim();
       let user = null;
       if (trimmed.includes('@')) {
-        const emailHash = EncryptionService.hashEmail(trimmed.toLowerCase());
-        user = await User.findOne({ emailHash });
+        user = await User.findByEmail(trimmed.toLowerCase());
       } else {
         user = await User.findOne({ handle: { $regex: new RegExp(`^${escapeRegexString(trimmed)}$`, 'i') } });
       }
@@ -1149,7 +1148,7 @@ router.post('/update-handle', async (req, res): Promise<void> => {
     }
 
     if (handle.includes('@')) {
-      res.status(400).json({ error: 'Handle cannot contain @. Use your email to sign in instead.' });
+      res.status(400).json({ error: 'Handle cannot contain the @ symbol.' });
       return;
     }
 
@@ -1341,7 +1340,7 @@ router.post('/check-handle', async (req, res): Promise<void> => {
     }
 
     if (handle.includes('@')) {
-      res.status(400).json({ error: 'Handle cannot contain @', available: false });
+      res.status(400).json({ error: 'Handle cannot contain the @ symbol.', available: false });
       return;
     }
 

@@ -118,6 +118,7 @@ export interface IUser extends Document {
 
 export interface IUserModel extends mongoose.Model<IUser> {
   emailExists(email: string): Promise<boolean>;
+  findByEmail(email: string): Promise<IUser | null>;
   findByGoogleId(googleId: string): Promise<IUser | null>;
   findByAppleId(appleId: string): Promise<IUser | null>;
 }
@@ -568,6 +569,27 @@ userSchema.statics.emailExists = async function(email: string): Promise<boolean>
   });
   
   return foundInFallback;
+};
+
+// Find user by email. Uses emailHash when present; falls back to decrypt-and-compare for users without emailHash (legacy).
+userSchema.statics.findByEmail = async function(email: string): Promise<IUser | null> {
+  const normalizedEmail = email.trim().toLowerCase();
+  const emailHash = EncryptionService.hashEmail(normalizedEmail);
+  const byHash = await this.findOne({ emailHash });
+  if (byHash) {
+    return byHash;
+  }
+  const usersWithoutHash = await this.find({
+    $or: [
+      { emailHash: { $exists: false } },
+      { emailHash: null }
+    ]
+  });
+  const match = usersWithoutHash.find((user: IUser) => {
+    const decrypted = user.getDecryptedEmail().trim().toLowerCase();
+    return decrypted === normalizedEmail;
+  });
+  return match ?? null;
 };
 
 // Static method to find user by Google ID
