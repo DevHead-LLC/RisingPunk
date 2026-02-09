@@ -548,7 +548,7 @@ userSchema.methods.getDecryptedEmailVerificationNewEmail = function(): string {
 };
 
 userSchema.statics.emailExists = async function(email: string): Promise<boolean> {
-  return (await this.findByEmail(email)) !== null;
+  return (await (this as IUserModel).findByEmail(email)) !== null;
 };
 
 // Find user by email. Uses emailHash when present; falls back to decrypt-and-compare for users without emailHash (legacy).
