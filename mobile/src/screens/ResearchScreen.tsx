@@ -188,6 +188,10 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
   const MODAL_CLOSE_ANIMATION_MS = 300;
 
   const handleCloseLockedModal = () => {
+    if (closeModalTimeoutRef.current) {
+      clearTimeout(closeModalTimeoutRef.current);
+      closeModalTimeoutRef.current = null;
+    }
     setShowLockedModal(false);
     closeModalTimeoutRef.current = setTimeout(() => {
       setSelectedResearch(null);
@@ -196,6 +200,10 @@ export function ResearchScreen({ onClose }: ResearchScreenProps): React.JSX.Elem
   };
 
   const handleUnlockSuccess = (newBalance: number) => {
+    if (closeModalTimeoutRef.current) {
+      clearTimeout(closeModalTimeoutRef.current);
+      closeModalTimeoutRef.current = null;
+    }
     setShowLockedModal(false);
     closeModalTimeoutRef.current = setTimeout(() => {
       setSelectedResearch(null);
