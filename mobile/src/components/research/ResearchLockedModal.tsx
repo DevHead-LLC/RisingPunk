@@ -87,7 +87,9 @@ export function ResearchLockedModal({
   const colors = useThemeColors();
   const styles = createStyles(colors);
 
-  const { data: buildStatus } = useGetResearchCenterStatusQuery(undefined, { skip: !visible || !requirements });
+  const { data: buildStatus, isLoading: isLoadingResearchCenterStatus } = useGetResearchCenterStatusQuery(undefined, {
+    skip: !visible || !requirements
+  });
   const currentResearchCenterLevel = buildStatus?.level ?? 0;
 
   const refs = requirements?.requiredFeatureRefs ?? [];
@@ -212,7 +214,9 @@ export function ResearchLockedModal({
   const levelMet = currentLevel >= requirements.levelRequirement;
   const balanceMet = currentBalance >= requirements.balanceRequirement;
   const rcLevelReq = requirements.researchCenterLevelRequirement;
-  const researchCenterLevelMet = rcLevelReq == null || currentResearchCenterLevel >= rcLevelReq;
+  const researchCenterLevelMet =
+    rcLevelReq == null ||
+    (isLoadingResearchCenterStatus ? false : currentResearchCenterLevel >= rcLevelReq);
 
   const dependenciesMet = requirements.dependencies.every(depId => {
     const depResearch = researchStatus.find(r => r.categoryId === depId);
@@ -335,7 +339,7 @@ export function ResearchLockedModal({
                       styles.requirementValue,
                       researchCenterLevelMet ? styles.requirementMet : styles.requirementNotMet
                     ]}>
-                      {currentResearchCenterLevel}/{rcLevelReq}
+                      {isLoadingResearchCenterStatus ? '…' : currentResearchCenterLevel}/{rcLevelReq}
                     </Text>
                   </View>
                 </View>
