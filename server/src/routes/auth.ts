@@ -445,14 +445,27 @@ router.post('/guest', async (req, res): Promise<void> => {
   }
 });
 
-// Login user
+// Login user — accepts handle OR email (same password). If identifier contains @, lookup by email; otherwise by handle.
 router.post<{}, UserResponse | { error: string }, LoginRequest['body']>(
   '/login',
   async (req, res): Promise<void> => {
     try {
-      const { handle, accessKey } = req.body;
-      
-      const user = await User.findOne({ handle: { $regex: new RegExp(`^${escapeRegexString(handle)}$`, 'i') } });
+      const { handle: identifier, accessKey } = req.body;
+
+      if (!identifier || typeof identifier !== 'string' || !identifier.trim()) {
+        res.status(400).json({ error: 'Username or email is required' });
+        return;
+      }
+
+      const trimmed = identifier.trim();
+      let user = null;
+      if (trimmed.includes('@')) {
+        const emailHash = EncryptionService.hashEmail(trimmed.toLowerCase());
+        user = await User.findOne({ emailHash });
+      } else {
+        user = await User.findOne({ handle: { $regex: new RegExp(`^${escapeRegexString(trimmed)}$`, 'i') } });
+      }
+
       if (!user) {
         res.status(401).json({ error: 'Authentication failed' });
         return;
@@ -1135,6 +1148,11 @@ router.post('/update-handle', async (req, res): Promise<void> => {
       return;
     }
 
+    if (handle.includes('@')) {
+      res.status(400).json({ error: 'Handle cannot contain @. Use your email to sign in instead.' });
+      return;
+    }
+
     if (handle.length < 5 || handle.length > 15) {
       res.status(400).json({ error: 'Handle must be between 5 and 15 characters' });
       return;
@@ -1314,11 +1332,21 @@ router.post('/change-password', auth, async (req, res): Promise<void> => {
 
 // Check handle availability (no auth required for real-time checking)
 router.post('/check-handle', async (req, res): Promise<void> => {
-  try {
+    try {
     const { handle } = req.body;
     
     if (!handle || typeof handle !== 'string') {
       res.status(400).json({ error: 'Handle is required' });
+      return;
+    }
+
+    if (handle.includes('@')) {
+      res.status(400).json({ error: 'Handle cannot contain @', available: false });
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9!&%^*_]+$/.test(handle)) {
+      res.status(400).json({ error: 'Handle can only contain letters, numbers, and !&%^*_', available: false });
       return;
     }
 
