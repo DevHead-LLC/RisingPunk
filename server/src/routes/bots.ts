@@ -494,6 +494,33 @@ router.post('/assign', auth, async (req, res) => {
         return;
       }
     }
+
+    if (battalionId === 'E') {
+      const battalionEFeature = await UserResearchFeature.findOne({
+        userId: req.user._id,
+        categoryId: 'hack-ability',
+        featureId: 'add-battalion-e'
+      })
+      .select('isUnlocked isResearching researchCompletesAt')
+      .lean();
+
+      if (!battalionEFeature) {
+        res.status(403).json({ error: 'Battalion E is locked. Complete the "Add Battalion E" research feature to unlock it.' });
+        return;
+      }
+
+      const researchCompletesAtE = battalionEFeature.researchCompletesAt
+        ? new Date(battalionEFeature.researchCompletesAt).getTime()
+        : null;
+      const remainingE = researchCompletesAtE !== null ? Math.max(0, researchCompletesAtE - now) : null;
+      const isActuallyUnlockedE = battalionEFeature.isUnlocked ||
+        (battalionEFeature.isResearching && researchCompletesAtE !== null && remainingE === 0);
+
+      if (!isActuallyUnlockedE) {
+        res.status(403).json({ error: 'Battalion E is locked. Complete the "Add Battalion E" research feature to unlock it.' });
+        return;
+      }
+    }
     const userAttempts = battalionAssignmentAttempts.get(userId);
     
     if (userAttempts) {
@@ -632,6 +659,12 @@ router.post('/assign', auth, async (req, res) => {
 
         if (battalionId === 'C') {
           console.log(`[AUDIT] User ${userId} assigned ${quantity} ${botType} to Battalion C`);
+        }
+        if (battalionId === 'D') {
+          console.log(`[AUDIT] User ${userId} assigned ${quantity} ${botType} to Battalion D`);
+        }
+        if (battalionId === 'E') {
+          console.log(`[AUDIT] User ${userId} assigned ${quantity} ${botType} to Battalion E`);
         }
 
         res.json({ 

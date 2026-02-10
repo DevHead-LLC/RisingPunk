@@ -334,6 +334,9 @@ export class ResearchFeatureService {
         if (categoryId === 'hack-ability' && featureId === 'add-battalion-d') {
           console.log(`[AUDIT] User ${userId} unlocked Battalion D at ${unlockedAt.toISOString()}`);
         }
+        if (categoryId === 'hack-ability' && featureId === 'add-battalion-e') {
+          console.log(`[AUDIT] User ${userId} unlocked Battalion E at ${unlockedAt.toISOString()}`);
+        }
 
         if (categoryId === 'hack-ability' && featureId === 'battalion-size-250') {
           console.log(`[AUDIT] User ${userId} unlocked Battalion Size +250 at ${unlockedAt.toISOString()}`);

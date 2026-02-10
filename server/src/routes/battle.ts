@@ -55,7 +55,7 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
         return;
       }
       
-      const MAX_USER_BATTALIONS = 5;
+      const MAX_USER_BATTALIONS = 6;
       if (userBattalions.length > MAX_USER_BATTALIONS) {
         res.status(400).json({ success: false, error: `Maximum ${MAX_USER_BATTALIONS} battalions allowed` });
         return;
@@ -124,6 +124,39 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
           res.status(403).json({
             success: false,
             error: 'Battalion D is locked. Complete the "Add Battalion D" research feature to unlock it.'
+          });
+          return;
+        }
+      }
+
+      if (userBattalions.length > 4) {
+        const battalionEFeature = await UserResearchFeature.findOne({
+          userId: req.user._id,
+          categoryId: 'hack-ability',
+          featureId: 'add-battalion-e'
+        })
+        .select('isUnlocked isResearching researchCompletesAt')
+        .lean();
+
+        if (!battalionEFeature) {
+          res.status(403).json({
+            success: false,
+            error: 'Battalion E is locked. Complete the "Add Battalion E" research feature to unlock it.'
+          });
+          return;
+        }
+
+        const researchCompletesAtE = battalionEFeature.researchCompletesAt
+          ? new Date(battalionEFeature.researchCompletesAt).getTime()
+          : null;
+        const remainingE = researchCompletesAtE !== null ? Math.max(0, researchCompletesAtE - now) : null;
+        const isActuallyUnlockedE = battalionEFeature.isUnlocked ||
+          (battalionEFeature.isResearching && researchCompletesAtE !== null && remainingE === 0);
+
+        if (!isActuallyUnlockedE) {
+          res.status(403).json({
+            success: false,
+            error: 'Battalion E is locked. Complete the "Add Battalion E" research feature to unlock it.'
           });
           return;
         }
