@@ -20,10 +20,10 @@ const TAX_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
   { featureId: 'reduce-expenses', value: 0.02 }
 ];
 
-/** Investments feature IDs that add rental profit per room (spec 18). */
-const RENTAL_PROFIT_FEATURES: { featureId: string; value: number }[] = [
-  { featureId: 'rental-profit-01', value: 0.01 },
-  { featureId: 'rental-profit-015', value: 0.015 }
+/** Rental profit per room features (spec 18). Both tiers in investments. */
+export const RENTAL_PROFIT_FEATURES: { featureId: string; value: number; categoryId: string }[] = [
+  { featureId: 'rental-profit-01', value: 0.01, categoryId: 'investments' },
+  { featureId: 'rental-profit-015', value: 0.015, categoryId: 'investments' }
 ];
 
 /**
@@ -71,8 +71,8 @@ export async function getTaxReductionBonus(userId: string): Promise<number> {
  */
 export async function getRentalProfitBonusPerRoom(userId: string): Promise<number> {
   let total = 0;
-  for (const { featureId, value } of RENTAL_PROFIT_FEATURES) {
-    const unlocked = await isResearchFeatureUnlocked(userId, 'investments', featureId);
+  for (const { featureId, value, categoryId } of RENTAL_PROFIT_FEATURES) {
+    const unlocked = await isResearchFeatureUnlocked(userId, categoryId, featureId);
     if (unlocked) total += value;
   }
   return total;

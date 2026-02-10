@@ -1,5 +1,5 @@
 import { IUser } from '../models/User';
-import { getRentalProfitBonusPerRoom, getResearchFeatureUnlockTime } from '../utils/researchFeatureUtils';
+import { getRentalProfitBonusPerRoom, getResearchFeatureUnlockTime, RENTAL_PROFIT_FEATURES } from '../utils/researchFeatureUtils';
 import {
   PROPERTY_BASE_RATES,
   ROOM_REMODEL_ADD_SMALL,
@@ -29,8 +29,6 @@ export interface RentalHousingIncome {
     };
   }[];
 }
-
-const RENTAL_PROFIT_FEATURE_IDS = ['rental-profit-01', 'rental-profit-015'];
 
 export class RentalHousingIncomeService {
   /** Effective property level (1-5). Uses rentalHousingLevels; if legacy unlocked with no level, returns 1. */
@@ -82,8 +80,8 @@ export class RentalHousingIncomeService {
   /** Earliest unlock time among rental-profit features (for historical income split). */
   static async getRentalProfitResearchUnlockTime(userId: string): Promise<Date | null> {
     let earliest: Date | null = null;
-    for (const featureId of RENTAL_PROFIT_FEATURE_IDS) {
-      const t = await getResearchFeatureUnlockTime(userId, 'investments', featureId);
+    for (const { featureId, categoryId } of RENTAL_PROFIT_FEATURES) {
+      const t = await getResearchFeatureUnlockTime(userId, categoryId, featureId);
       if (t && (!earliest || t < earliest)) earliest = t;
     }
     return earliest;

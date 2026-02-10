@@ -354,14 +354,10 @@ export class ResearchFeatureService {
 
         if (categoryId === 'investments' && (featureId === 'rental-profit-01' || featureId === 'rental-profit-015')) {
           console.log(`[AUDIT] User ${userId} unlocked ${featureId} at ${unlockedAt.toISOString()}`);
-          
           const { RentalHousingSyncService } = await import('./RentalHousingSyncService');
           const { User } = await import('../models/User');
-          
-          // Reload user to ensure we have latest state including unlocked research
           const updatedUser = await User.findById(userId).session(session);
           if (updatedUser) {
-            // Reset sync timestamp to force immediate recalculation
             updatedUser.balance.rentalHousingIncomeLastSynced = null;
             await updatedUser.save({ session });
           }

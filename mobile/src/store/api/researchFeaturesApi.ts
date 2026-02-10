@@ -115,8 +115,7 @@ export const researchFeaturesApi = createApi({
             dispatch(balanceApi.util.invalidateTags(['Balance']));
             dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
           }
-          
-          // If cash-flow income/insurance research completed (spec 18), invalidate balance cache
+          // If cash-flow income/insurance/tax research completed (spec 18), invalidate balance cache
           const cashFlowSyncIds = ['increase-income-01', 'increase-income-02', 'increase-income-025', 'increase-income-03', 'reduce-insurance-01', 'reduce-insurance-02', 'reduce-tax-expense-02', 'reduce-expenses'];
           if (arg.categoryId === 'cash-flow' && cashFlowSyncIds.includes(arg.featureId)) {
             const { balanceApi } = await import('./balanceApi');
@@ -156,8 +155,7 @@ export const researchFeaturesApi = createApi({
             dispatch(balanceApi.util.invalidateTags(['Balance']));
             dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
           }
-          
-          // If cash-flow income/insurance research was speeded up (spec 18), invalidate balance cache
+          // If cash-flow income/insurance/tax research was speeded up (spec 18), invalidate balance cache
           const cashFlowSyncIds = ['increase-income-01', 'increase-income-02', 'increase-income-025', 'increase-income-03', 'reduce-insurance-01', 'reduce-insurance-02', 'reduce-tax-expense-02'];
           if (arg.categoryId === 'cash-flow' && cashFlowSyncIds.includes(arg.featureId)) {
             dispatch(balanceApi.util.invalidateTags(['Balance']));
