@@ -14,6 +14,12 @@ const INSURANCE_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
   { featureId: 'reduce-insurance-02', value: 0.02 }
 ];
 
+/** Cash-flow feature IDs that reduce tax expense (spec 18). Includes legacy 'reduce-expenses' for backwards compatibility. */
+const TAX_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
+  { featureId: 'reduce-tax-expense-02', value: 0.02 },
+  { featureId: 'reduce-expenses', value: 0.02 }
+];
+
 /** Investments feature IDs that add rental profit per room (spec 18). */
 const RENTAL_PROFIT_FEATURES: { featureId: string; value: number }[] = [
   { featureId: 'rental-profit-01', value: 0.01 },
@@ -40,6 +46,22 @@ export async function getInsuranceReductionBonus(userId: string): Promise<number
   for (const { featureId, value } of INSURANCE_REDUCTION_FEATURES) {
     const unlocked = await isResearchFeatureUnlocked(userId, 'cash-flow', featureId);
     if (unlocked) total += value;
+  }
+  return total;
+}
+
+/**
+ * Total tax expense reduction from all unlocked cash-flow features (spec 18).
+ * Only one of reduce-tax-expense-02 or legacy reduce-expenses should be unlocked; both grant $0.02.
+ */
+export async function getTaxReductionBonus(userId: string): Promise<number> {
+  let total = 0;
+  for (const { featureId, value } of TAX_REDUCTION_FEATURES) {
+    const unlocked = await isResearchFeatureUnlocked(userId, 'cash-flow', featureId);
+    if (unlocked) {
+      total += value;
+      break; // Only one tax reduction feature (current or legacy) per user
+    }
   }
   return total;
 }

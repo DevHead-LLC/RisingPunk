@@ -287,6 +287,14 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
       await user.save();
     }
 
+    // Expense modifiers from research (single source of truth for Financial Statements screen)
+    const { getInsuranceReductionBonus, getTaxReductionBonus } = await import('./src/utils/researchFeatureUtils');
+    const userId = String(user._id);
+    const [insuranceReduction, taxReduction] = await Promise.all([
+      getInsuranceReductionBonus(userId),
+      getTaxReductionBonus(userId)
+    ]);
+
     // Return updated balance (ratePerSecond already includes rental housing income)
     const currentBalance = {
       total: user.balance.total,
@@ -294,7 +302,9 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
       lastUpdated: user.balance.lastUpdated,
       fractionalRemainder: user.balance.fractionalRemainder || 0,
       lifetimeHighNetWorth: user.lifetimeHighNetWorth || 0,
-      lifetimeHighUpdated: lifetimeHighUpdated
+      lifetimeHighUpdated: lifetimeHighUpdated,
+      insuranceReduction,
+      taxReduction
     };
 
     res.json(currentBalance);

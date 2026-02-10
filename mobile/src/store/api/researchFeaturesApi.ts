@@ -44,8 +44,12 @@ export const researchFeaturesApi = createApi({
       return headers;
     },
   }),
-  tagTypes: ['ResearchFeature', 'ResearchFeatures'],
+  tagTypes: ['ResearchFeature', 'ResearchFeatures', 'ExpenseModifiers'],
   endpoints: (builder) => ({
+    getExpenseModifiers: builder.query<{ insuranceReduction: number; taxReduction: number }, void>({
+      query: () => '/expense-modifiers',
+      providesTags: ['ExpenseModifiers'],
+    }),
     getFeatureStatus: builder.query<ResearchFeatureStatus, string>({
       query: (featureId) => `/feature-status/${featureId}`,
       transformResponse: (response: { success: boolean; data: ResearchFeatureStatus }) => response.data,
@@ -93,15 +97,17 @@ export const researchFeaturesApi = createApi({
       }),
       transformResponse: (response: { success: boolean; data: CompleteResearchResponse }) => response.data,
       invalidatesTags: (result, error, { categoryId }) => [
-        { type: 'ResearchFeatures', id: categoryId }
+        { type: 'ResearchFeatures', id: categoryId },
+        ...(categoryId === 'cash-flow' ? [{ type: 'ExpenseModifiers' as const }] : [])
       ],
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           await queryFulfilled;
           // Invalidate UserTaskProgress to update task guide when research completes
-          // This ensures tasks like unlock-antivirus update immediately when feature is unlocked
           dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
-          
+          if (arg.categoryId === 'cash-flow') {
+            dispatch(researchFeaturesApi.util.invalidateTags(['ExpenseModifiers']));
+          }
           // If rental profit research completed (spec 18), invalidate balance and rental housing income cache
           if (arg.categoryId === 'investments' && (arg.featureId === 'rental-profit-01' || arg.featureId === 'rental-profit-015')) {
             const { balanceApi } = await import('./balanceApi');
@@ -111,7 +117,7 @@ export const researchFeaturesApi = createApi({
           }
           
           // If cash-flow income/insurance research completed (spec 18), invalidate balance cache
-          const cashFlowSyncIds = ['increase-income-01', 'increase-income-02', 'increase-income-025', 'increase-income-03', 'reduce-insurance-01', 'reduce-insurance-02', 'reduce-expenses'];
+          const cashFlowSyncIds = ['increase-income-01', 'increase-income-02', 'increase-income-025', 'increase-income-03', 'reduce-insurance-01', 'reduce-insurance-02', 'reduce-tax-expense-02', 'reduce-expenses'];
           if (arg.categoryId === 'cash-flow' && cashFlowSyncIds.includes(arg.featureId)) {
             const { balanceApi } = await import('./balanceApi');
             dispatch(balanceApi.util.invalidateTags(['Balance']));
@@ -152,7 +158,7 @@ export const researchFeaturesApi = createApi({
           }
           
           // If cash-flow income/insurance research was speeded up (spec 18), invalidate balance cache
-          const cashFlowSyncIds = ['increase-income-01', 'increase-income-02', 'increase-income-025', 'increase-income-03', 'reduce-insurance-01', 'reduce-insurance-02', 'reduce-expenses'];
+          const cashFlowSyncIds = ['increase-income-01', 'increase-income-02', 'increase-income-025', 'increase-income-03', 'reduce-insurance-01', 'reduce-insurance-02', 'reduce-tax-expense-02'];
           if (arg.categoryId === 'cash-flow' && cashFlowSyncIds.includes(arg.featureId)) {
             dispatch(balanceApi.util.invalidateTags(['Balance']));
           }
@@ -161,7 +167,8 @@ export const researchFeaturesApi = createApi({
         }
       },
       invalidatesTags: (result, error, { categoryId }) => [
-        { type: 'ResearchFeatures', id: categoryId }
+        { type: 'ResearchFeatures', id: categoryId },
+        ...(categoryId === 'cash-flow' ? [{ type: 'ExpenseModifiers' as const }] : [])
       ],
     }),
   }),
@@ -171,6 +178,7 @@ export const {
   useGetFeatureStatusQuery, 
   useGetFeaturesQuery,
   useGetUserFeaturesQuery,
+  useGetExpenseModifiersQuery,
   useStartResearchMutation, 
   useCompleteResearchMutation,
   useSpeedupFeatureResearchMutation

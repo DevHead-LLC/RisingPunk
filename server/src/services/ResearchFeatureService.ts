@@ -348,6 +348,9 @@ export class ResearchFeatureService {
         if (categoryId === 'cash-flow' && (featureId === 'increase-income-01' || featureId === 'increase-income-02' || featureId === 'increase-income-025' || featureId === 'increase-income-03')) {
           console.log(`[AUDIT] User ${userId} unlocked ${featureId} at ${unlockedAt.toISOString()}`);
         }
+        if (categoryId === 'cash-flow' && featureId === 'reduce-tax-expense-02') {
+          console.log(`[AUDIT] User ${userId} unlocked Reduce Tax Expense $0.02 at ${unlockedAt.toISOString()}`);
+        }
 
         if (categoryId === 'investments' && (featureId === 'rental-profit-01' || featureId === 'rental-profit-015')) {
           console.log(`[AUDIT] User ${userId} unlocked ${featureId} at ${unlockedAt.toISOString()}`);
@@ -398,9 +401,13 @@ export class ResearchFeatureService {
       .select('featureId isUnlocked unlockedAt isResearching researchStartedAt researchCompletesAt researchTimeHours')
       .lean();
 
-      // Merge base features with user progress from UserResearchFeature collection
+      // Merge base features with user progress from UserResearchFeature collection.
+      // Legacy: treat completed 'reduce-expenses' as unlocked for 'reduce-tax-expense-02'.
       const featuresWithStatus = baseFeatures.map(feature => {
-        const userFeature = userFeatures.find(uf => uf.featureId === feature.id);
+        const userFeature = userFeatures.find(uf =>
+          uf.featureId === feature.id ||
+          (feature.id === 'reduce-tax-expense-02' && uf.featureId === 'reduce-expenses')
+        );
 
         const userResearchTimeHours = userFeature?.researchTimeHours;
         const validUserResearchTime = ResearchFeatureService.isValidResearchTimeHours(userResearchTimeHours) 

@@ -16,10 +16,10 @@ const researchCompletionAttempts = new Map<string, { count: number; resetAt: num
 const RATE_LIMIT_WINDOW = 60000;
 const MAX_RESEARCH_COMPLETION_ATTEMPTS = 10;
 
-/** Cash-flow feature IDs that affect base rate or insurance (spec 18). Triggers sync on completion/speedup. */
+/** Cash-flow feature IDs that affect base rate, insurance, or tax (spec 18). Triggers sync on completion/speedup. */
 const CASH_FLOW_SYNC_FEATURE_IDS = new Set([
   'increase-income-01', 'increase-income-02', 'increase-income-025', 'increase-income-03',
-  'reduce-insurance-01', 'reduce-insurance-02', 'reduce-expenses'
+  'reduce-insurance-01', 'reduce-insurance-02', 'reduce-tax-expense-02'
 ]);
 
 /** Investments feature IDs that affect rental income (spec 18). */
@@ -252,6 +252,22 @@ router.post('/fix-user-research', auth, async (req: Request, res: Response): Pro
 
 // NEW ENDPOINTS FOR INDIVIDUAL FEATURE MANAGEMENT
 // These use the new UserResearchFeature collection and don't interfere with category unlocking
+
+// Expense modifiers for Financial Statements (single source of truth; same logic as balance rate)
+router.get('/expense-modifiers', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = String((req as any).user._id);
+    const { getInsuranceReductionBonus, getTaxReductionBonus } = await import('../utils/researchFeatureUtils');
+    const [insuranceReduction, taxReduction] = await Promise.all([
+      getInsuranceReductionBonus(userId),
+      getTaxReductionBonus(userId)
+    ]);
+    res.json({ insuranceReduction, taxReduction });
+  } catch (error) {
+    console.error('Error fetching expense modifiers:', error);
+    res.status(500).json({ insuranceReduction: 0, taxReduction: 0 });
+  }
+});
 
 // Get user's individual feature status for a category
 router.get('/user-features/:categoryId', auth, async (req: Request, res: Response) => {

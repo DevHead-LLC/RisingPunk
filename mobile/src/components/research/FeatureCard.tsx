@@ -65,7 +65,7 @@ const BACKGROUND_IMAGE_MAP: Record<string, ImageSourcePropType> = {
   'increase-income-03': require('../../assets/images/researchCenter/incomeIncrease.png'),
   'reduce-insurance-01': require('../../assets/images/researchCenter/decreaseInsurance.png'),
   'reduce-insurance-02': require('../../assets/images/researchCenter/decreaseInsurance.png'),
-  'reduce-expenses': require('../../assets/images/researchCenter/decreaseInsurance.png'),
+  'reduce-tax-expense-02': require('../../assets/images/researchCenter/taxExpenseReduction.png'),
   'probe': require('../../assets/images/researchCenter/increaseBattalions.png'),
 };
 

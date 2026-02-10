@@ -187,15 +187,15 @@ export const RESEARCH_SPEC_18: SpecFeatureInput[] = [
   },
   {
     categoryId: 'cash-flow',
-    id: 'reduce-expenses',
-    name: 'Reduce Expenses',
-    description: 'Lower your daily operational costs.',
+    id: 'reduce-tax-expense-02',
+    name: 'Reduce Tax Expense $0.02',
+    description: 'Reduce your tax expense by $0.02 per second.',
     unlockCost: 300000,
     levelRequirement: 15,
     researchTimeHours: 5,
     requiredFeatureRefs: [m({ categoryId: 'cash-flow', featureId: 'reduce-insurance-02' })],
     researchCenterLevelRequirement: 2,
-    effect: { type: 'reduction', value: 0.02, target: 'operational-costs' }
+    effect: { type: 'reduction', value: 0.02, target: 'tax-expense' }
   },
   {
     categoryId: 'hack-ability',

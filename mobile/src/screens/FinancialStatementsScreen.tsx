@@ -7,7 +7,7 @@ import { getCurrentBalance } from '../store/slices/balanceSlice';
 import { useFetchFinanceTemplatesQuery, useFetchUserFinanceTiersQuery } from '../store/api/userFinanceApi';
 import { useGetRentalHousingIncomeQuery } from '../store/api/rentalHousingApi';
 import { useFetchBalanceQuery } from '../store/api/balanceApi';
-import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
+import { useGetUserFeaturesQuery, useGetExpenseModifiersQuery } from '../store/api/researchFeaturesApi';
 import { useTrackFinancialStatementViewMutation } from '../store/api/userGuideApi';
 import { useTheme } from '../context/ThemeContext';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -42,20 +42,30 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
   const { data: templatesData } = useFetchFinanceTemplatesQuery();
   const { data: userTiersData } = useFetchUserFinanceTiersQuery();
   const { data: rentalHousingData, error: rentalHousingError, isLoading: rentalHousingLoading } = useGetRentalHousingIncomeQuery();
-  const { data: balanceData } = useFetchBalanceQuery();
+  const { data: balanceData } = useFetchBalanceQuery(undefined, { refetchOnFocus: true });
+  const { data: expenseModifiers } = useGetExpenseModifiersQuery(undefined, { refetchOnFocus: true });
   const { data: cashFlowFeatures } = useGetUserFeaturesQuery('cash-flow');
   const currentCash = useAppSelector(getCurrentBalance);
   const ratePerSecondFromState = useAppSelector(state => state.balance.ratePerSecond);
   // Use balanceData from query if available (fresh data), otherwise fall back to Redux state
   const ratePerSecond = balanceData?.ratePerSecond ?? ratePerSecondFromState;
-  // Total insurance expense reduction from unlocked research (must match server researchFeatureUtils INSURANCE_REDUCTION_FEATURES)
+  // Expense reductions: prefer dedicated expense-modifiers API (single source of truth). Fall back to balance, then research features.
   const insuranceReductionTotal = useMemo(() => {
+    if (typeof expenseModifiers?.insuranceReduction === 'number') return expenseModifiers.insuranceReduction;
+    if (typeof balanceData?.insuranceReduction === 'number') return balanceData.insuranceReduction;
     if (!cashFlowFeatures) return 0;
     let total = 0;
     if (cashFlowFeatures.some((f: any) => (f.id === 'reduce-insurance-01') && f.isUnlocked)) total += 0.01;
     if (cashFlowFeatures.some((f: any) => (f.id === 'reduce-insurance-02') && f.isUnlocked)) total += 0.02;
     return total;
-  }, [cashFlowFeatures]);
+  }, [expenseModifiers?.insuranceReduction, balanceData?.insuranceReduction, cashFlowFeatures]);
+  const taxReductionTotal = useMemo(() => {
+    if (typeof expenseModifiers?.taxReduction === 'number') return expenseModifiers.taxReduction;
+    if (typeof balanceData?.taxReduction === 'number') return balanceData.taxReduction;
+    if (!cashFlowFeatures) return 0;
+    if (cashFlowFeatures.some((f: any) => (f.id === 'reduce-tax-expense-02' || f.id === 'reduce-expenses') && f.isUnlocked)) return 0.02;
+    return 0;
+  }, [expenseModifiers?.taxReduction, balanceData?.taxReduction, cashFlowFeatures]);
   const { themeMode } = useTheme();
   const colors = useThemeColors();
   
@@ -95,20 +105,32 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
       const insuranceBase = baseIncomeStatement['Insurance'] ?? -0.50;
       effectiveIncomeStatement['Insurance'] = insuranceBase + insuranceReductionTotal;
     }
+    // Tax/Taxes: apply unlocked reduction research (reduce-tax-expense-02 = $0.02). Match template key case-insensitively.
+    const taxKey = Object.keys(baseIncomeStatement).find(
+      k => k.trim().toLowerCase() === 'taxes' || k.trim().toLowerCase() === 'tax'
+    ) ?? null;
+    const hasTaxInTemplate = taxKey !== null;
+    if (hasTaxInTemplate && taxKey) {
+      const taxBase = baseIncomeStatement[taxKey] ?? -0.60;
+      effectiveIncomeStatement[taxKey] = taxBase + taxReductionTotal;
+    }
     
     const incomeStatementEntries = Object.entries(effectiveIncomeStatement);
     
-    // Gross Income: subtract insurance reduction from display when template has Insurance,
-    // so we don't double-count (savings shown as reduced expense). If template lacks Insurance,
-    // show full incomeRateBonus.
-    const effectiveIncomeRateBonus = hasInsuranceInTemplate && insuranceReductionTotal > 0
-      ? Math.max(0, incomeRateBonus - insuranceReductionTotal)
-      : incomeRateBonus;
+    // Gross Income: subtract insurance and tax reduction from display when template has those lines,
+    // so we don't double-count (savings shown as reduced expense). If template lacks them, show full incomeRateBonus.
+    let effectiveIncomeRateBonus = incomeRateBonus;
+    if (hasInsuranceInTemplate && insuranceReductionTotal > 0) {
+      effectiveIncomeRateBonus = Math.max(0, effectiveIncomeRateBonus - insuranceReductionTotal);
+    }
+    if (taxReductionTotal > 0) {
+      effectiveIncomeRateBonus = Math.max(0, effectiveIncomeRateBonus - taxReductionTotal);
+    }
     const baseGrossIncome = 12.00;
     const grossIncome = baseGrossIncome + effectiveIncomeRateBonus;
     
     // Calculate expenses (negative values only, excluding totals)
-    const expenseEntries = incomeStatementEntries.filter(([k, v]) => {
+    const rawExpenseEntries = incomeStatementEntries.filter(([k, v]) => {
       const num = Number(v);
       const keyLower = k.toLowerCase().trim();
       if (k === 'Gross Income' || k === 'Gross income' || k === 'gross income' ||
@@ -118,6 +140,14 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
         return false;
       }
       return num < 0;
+    });
+    // Apply tax reduction to any expense line whose label contains "tax" (bulletproof: no dependency on template key)
+    const expenseEntries = rawExpenseEntries.map(([k, v]) => {
+      const num = Number(v);
+      if (num < 0 && /tax/.test(String(k).trim().toLowerCase())) {
+        return [k, num + taxReductionTotal] as [string, number];
+      }
+      return [k, v] as [string, number];
     });
     
     const totalExpenses = expenseEntries.reduce((sum, [, v]) => {
@@ -143,7 +173,7 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
       passiveIncome,
       netCashFlow
     };
-  }, [merged, incomeRateBonus, insuranceReductionTotal, rentalHousingData?.totalIncomePerSecond]);
+  }, [merged, incomeRateBonus, insuranceReductionTotal, taxReductionTotal, rentalHousingData?.totalIncomePerSecond]);
 
   const getStyles = () => ({
     container: {

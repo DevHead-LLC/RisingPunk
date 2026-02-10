@@ -1,6 +1,6 @@
 import { IUser } from '../models/User';
 import { RentalHousingIncomeService } from './RentalHousingIncomeService';
-import { getBaseIncomeRateBonus, getInsuranceReductionBonus, getResearchFeatureUnlockTime } from '../utils/researchFeatureUtils';
+import { getBaseIncomeRateBonus, getInsuranceReductionBonus, getTaxReductionBonus, getResearchFeatureUnlockTime } from '../utils/researchFeatureUtils';
 
 export interface RentalHousingSyncResult {
   needsSync: boolean;
@@ -175,10 +175,11 @@ export class RentalHousingSyncService {
     await this.ensureLegacyRentalLevels(user);
     
     // CRITICAL: Always calculate and update ratePerSecond, even if no rental properties exist
-    // Base rate is $1.00 + income rate bonus (sum of increase-income-* per spec 18) + insurance reduction (sum of reduce-insurance-*), plus passive income
+    // Base rate is $1.00 + income rate bonus (sum of increase-income-* per spec 18) + insurance reduction (sum of reduce-insurance-*) + tax reduction (reduce-tax-expense-02), plus passive income
     const incomeBonus = await getBaseIncomeRateBonus(String(user._id));
     const insuranceBonus = await getInsuranceReductionBonus(String(user._id));
-    const baseRate = 1.0 + incomeBonus + insuranceBonus;
+    const taxBonus = await getTaxReductionBonus(String(user._id));
+    const baseRate = 1.0 + incomeBonus + insuranceBonus + taxBonus;
     
     if (baseRate < 0) {
       console.error('[INCOME RATE] Invalid baseRate calculated:', baseRate);
