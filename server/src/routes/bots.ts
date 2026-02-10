@@ -467,6 +467,33 @@ router.post('/assign', auth, async (req, res) => {
         return;
       }
     }
+
+    if (battalionId === 'D') {
+      const battalionDFeature = await UserResearchFeature.findOne({
+        userId: req.user._id,
+        categoryId: 'hack-ability',
+        featureId: 'add-battalion-d'
+      })
+      .select('isUnlocked isResearching researchCompletesAt')
+      .lean();
+
+      if (!battalionDFeature) {
+        res.status(403).json({ error: 'Battalion D is locked. Complete the "Add Battalion D" research feature to unlock it.' });
+        return;
+      }
+
+      const researchCompletesAtD = battalionDFeature.researchCompletesAt
+        ? new Date(battalionDFeature.researchCompletesAt).getTime()
+        : null;
+      const remainingD = researchCompletesAtD !== null ? Math.max(0, researchCompletesAtD - now) : null;
+      const isActuallyUnlockedD = battalionDFeature.isUnlocked ||
+        (battalionDFeature.isResearching && researchCompletesAtD !== null && remainingD === 0);
+
+      if (!isActuallyUnlockedD) {
+        res.status(403).json({ error: 'Battalion D is locked. Complete the "Add Battalion D" research feature to unlock it.' });
+        return;
+      }
+    }
     const userAttempts = battalionAssignmentAttempts.get(userId);
     
     if (userAttempts) {

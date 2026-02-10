@@ -130,6 +130,24 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       (battalionCFeature.isResearching && remaining === 0);
   }, [battalionCFeature?.isUnlocked, battalionCFeature?.isResearching, battalionCFeature?.researchCompletesAt]);
 
+  // Find and memoize the Battalion D feature
+  const battalionDFeature = useMemo(() => {
+    return hackAbilityFeatures?.find(f => f.id === 'add-battalion-d');
+  }, [hackAbilityFeatures]);
+
+  // Check if Battalion D is unlocked (same pattern as C)
+  const isBattalionDUnlocked = useMemo(() => {
+    if (!battalionDFeature) return false;
+
+    const now = new Date().getTime();
+    const researchCompletesAt = battalionDFeature.researchCompletesAt
+      ? new Date(battalionDFeature.researchCompletesAt).getTime()
+      : 0;
+    const remaining = Math.max(0, researchCompletesAt - now);
+    return battalionDFeature.isUnlocked ||
+      (battalionDFeature.isResearching && remaining === 0);
+  }, [battalionDFeature?.isUnlocked, battalionDFeature?.isResearching, battalionDFeature?.researchCompletesAt]);
+
   // Memoize available battalions array (A and B always available)
   const availableBattalions = useMemo(() => {
     return ['A', 'B'];
@@ -227,11 +245,14 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       if (isBattalionCUnlocked) {
         resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'C' }));
       }
+      if (isBattalionDUnlocked) {
+        resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'D' }));
+      }
       await Promise.all(resetPromises);
     } catch (error) {
       console.error('Failed to reset battalions:', error);
     }
-  }, [assignToBattalion, isBattalionCUnlocked]);
+  }, [assignToBattalion, isBattalionCUnlocked, isBattalionDUnlocked]);
 
   // Convert assignments to battalion data format
   const convertAssignmentsToBattalionData = React.useCallback((assignments: Record<string, BattalionAssignment>) => {
@@ -442,7 +463,9 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
             </Animated.View>
             <View style={[styles.battalionsContainer, isBattalionAHighlight && { zIndex: 1001, elevation: 1001 }]}>
               {renderBattalionSlots(['E', 'F'], false, true)}
-              {isBattalionCUnlocked ? (
+              {!isBattalionCUnlocked ? (
+                renderBattalionSlots(['C', 'D'], false, true)
+              ) : (
                 <View style={styles.battalionColumn}>
                   <BattalionSlot
                     name="C"
@@ -456,15 +479,13 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
                   <BattalionSlot
                     name="D"
                     isEnemy={false}
-                    isLocked={true}
-                    onPress={undefined}
-                    assignment={undefined}
+                    isLocked={!isBattalionDUnlocked}
+                    onPress={isBattalionDUnlocked ? () => handleBattalionPress('D') : undefined}
+                    assignment={isBattalionDUnlocked ? assignments['D'] : undefined}
                     isHighlighted={false}
-                    disabled={false}
+                    disabled={isBattalionAHighlight}
                   />
                 </View>
-              ) : (
-                renderBattalionSlots(['C', 'D'], false, true)
               )}
               {renderBattalionSlots(availableBattalions)}
               {renderCircleSlots(3)}

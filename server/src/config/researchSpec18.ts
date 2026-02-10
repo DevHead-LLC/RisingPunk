@@ -15,6 +15,8 @@ export interface SpecFeatureInput {
   levelRequirement: number;
   researchTimeHours: number;
   requiredFeatureRefs?: IResearchFeatureRef[];
+  /** Required Research Center building level (1–4). */
+  researchCenterLevelRequirement?: number;
   effect: IResearchFeature['effect'];
 }
 
@@ -33,6 +35,7 @@ export const RESEARCH_SPEC_18: SpecFeatureInput[] = [
     levelRequirement: 2,
     researchTimeHours: 5 / 60,
     requiredFeatureRefs: [],
+    researchCenterLevelRequirement: 1,
     effect: { type: 'unlock', value: 'antivirus', target: 'system-protection' }
   },
   {
@@ -44,6 +47,7 @@ export const RESEARCH_SPEC_18: SpecFeatureInput[] = [
     levelRequirement: 8,
     researchTimeHours: 3,
     requiredFeatureRefs: [m({ categoryId: 'investments', featureId: 'rental-profit-01' })],
+    researchCenterLevelRequirement: 2,
     effect: { type: 'unlock', value: 'probe', target: 'battle-strategy' }
   },
   {
@@ -55,6 +59,7 @@ export const RESEARCH_SPEC_18: SpecFeatureInput[] = [
     levelRequirement: 2,
     researchTimeHours: 10 / 60,
     requiredFeatureRefs: [m({ categoryId: 'home-defense', featureId: 'antivirus' })],
+    researchCenterLevelRequirement: 1,
     effect: { type: 'improvement', value: 0.01, target: 'base-income-rate' }
   },
   {
@@ -66,6 +71,7 @@ export const RESEARCH_SPEC_18: SpecFeatureInput[] = [
     levelRequirement: 5,
     researchTimeHours: 0.5,
     requiredFeatureRefs: [m({ categoryId: 'cash-flow', featureId: 'increase-income-01' })],
+    researchCenterLevelRequirement: 1,
     effect: { type: 'improvement', value: 0.02, target: 'base-income-rate' }
   },
   {
@@ -77,6 +83,7 @@ export const RESEARCH_SPEC_18: SpecFeatureInput[] = [
     levelRequirement: 5,
     researchTimeHours: 0.5,
     requiredFeatureRefs: [m({ categoryId: 'cash-flow', featureId: 'increase-income-02' })],
+    researchCenterLevelRequirement: 1,
     effect: { type: 'reduction', value: 0.01, target: 'insurance-expense' }
   },
   {
@@ -88,6 +95,7 @@ export const RESEARCH_SPEC_18: SpecFeatureInput[] = [
     levelRequirement: 5,
     researchTimeHours: 0.75,
     requiredFeatureRefs: [m({ categoryId: 'cash-flow', featureId: 'increase-income-02' })],
+    researchCenterLevelRequirement: 1,
     effect: { type: 'improvement', value: 1, target: 'battalion-capacity' }
   },
   {
@@ -99,6 +107,7 @@ export const RESEARCH_SPEC_18: SpecFeatureInput[] = [
     levelRequirement: 5,
     researchTimeHours: 1,
     requiredFeatureRefs: [m({ categoryId: 'cash-flow', featureId: 'reduce-insurance-01' })],
+    researchCenterLevelRequirement: 1,
     effect: { type: 'unlock', value: 'hack-crew-system', target: 'crew-management' }
   },
   {
@@ -110,6 +119,7 @@ export const RESEARCH_SPEC_18: SpecFeatureInput[] = [
     levelRequirement: 6,
     researchTimeHours: 1.5,
     requiredFeatureRefs: [m({ categoryId: 'cash-flow', featureId: 'reduce-insurance-01' })],
+    researchCenterLevelRequirement: 1,
     effect: { type: 'reduction', value: 0.02, target: 'insurance-expense' }
   },
   {
@@ -121,6 +131,7 @@ export const RESEARCH_SPEC_18: SpecFeatureInput[] = [
     levelRequirement: 6,
     researchTimeHours: 2,
     requiredFeatureRefs: [m({ categoryId: 'hack-ability', featureId: 'add-battalion-c' })],
+    researchCenterLevelRequirement: 1,
     effect: { type: 'improvement', value: 250, target: 'battalion-size' }
   },
   {
@@ -132,6 +143,7 @@ export const RESEARCH_SPEC_18: SpecFeatureInput[] = [
     levelRequirement: 7,
     researchTimeHours: 2.5,
     requiredFeatureRefs: [m({ categoryId: 'cash-flow', featureId: 'reduce-insurance-02' })],
+    researchCenterLevelRequirement: 1,
     effect: { type: 'improvement', value: 0.01, target: 'rental-room-income' }
   },
   {
@@ -143,6 +155,7 @@ export const RESEARCH_SPEC_18: SpecFeatureInput[] = [
     levelRequirement: 10,
     researchTimeHours: 3.5,
     requiredFeatureRefs: [m({ categoryId: 'hack-ability', featureId: 'battalion-size-250' })],
+    researchCenterLevelRequirement: 2,
     effect: { type: 'improvement', value: 500, target: 'battalion-size' }
   },
   {
@@ -157,6 +170,7 @@ export const RESEARCH_SPEC_18: SpecFeatureInput[] = [
       m({ categoryId: 'hack-ability', featureId: 'battalion-size-250' }),
       m({ categoryId: 'hack-ability', featureId: 'add-battalion-c' })
     ],
+    researchCenterLevelRequirement: 2,
     effect: { type: 'improvement', value: 1, target: 'battalion-capacity' }
   },
   {
@@ -168,6 +182,7 @@ export const RESEARCH_SPEC_18: SpecFeatureInput[] = [
     levelRequirement: 15,
     researchTimeHours: 5,
     requiredFeatureRefs: [m({ categoryId: 'cash-flow', featureId: 'increase-income-02' })],
+    researchCenterLevelRequirement: 2,
     effect: { type: 'improvement', value: 0.025, target: 'base-income-rate' }
   },
   {
@@ -179,6 +194,7 @@ export const RESEARCH_SPEC_18: SpecFeatureInput[] = [
     levelRequirement: 15,
     researchTimeHours: 5,
     requiredFeatureRefs: [m({ categoryId: 'cash-flow', featureId: 'reduce-insurance-02' })],
+    researchCenterLevelRequirement: 2,
     effect: { type: 'reduction', value: 0.02, target: 'operational-costs' }
   },
   {
@@ -190,6 +206,7 @@ export const RESEARCH_SPEC_18: SpecFeatureInput[] = [
     levelRequirement: 20,
     researchTimeHours: 6,
     requiredFeatureRefs: [m({ categoryId: 'hack-ability', featureId: 'battalion-size-500' })],
+    researchCenterLevelRequirement: 2,
     effect: { type: 'improvement', value: 1000, target: 'battalion-size' }
   },
   {
@@ -201,6 +218,7 @@ export const RESEARCH_SPEC_18: SpecFeatureInput[] = [
     levelRequirement: 20,
     researchTimeHours: 6,
     requiredFeatureRefs: [m({ categoryId: 'investments', featureId: 'rental-profit-01' })],
+    researchCenterLevelRequirement: 3,
     effect: { type: 'improvement', value: 0.015, target: 'rental-room-income' }
   },
   {
@@ -212,6 +230,7 @@ export const RESEARCH_SPEC_18: SpecFeatureInput[] = [
     levelRequirement: 25,
     researchTimeHours: 8,
     requiredFeatureRefs: [m({ categoryId: 'hack-ability', featureId: 'add-battalion-d' })],
+    researchCenterLevelRequirement: 3,
     effect: { type: 'improvement', value: 1, target: 'battalion-capacity' }
   },
   {
@@ -223,6 +242,7 @@ export const RESEARCH_SPEC_18: SpecFeatureInput[] = [
     levelRequirement: 25,
     researchTimeHours: 8,
     requiredFeatureRefs: [m({ categoryId: 'cash-flow', featureId: 'increase-income-025' })],
+    researchCenterLevelRequirement: 3,
     effect: { type: 'improvement', value: 0.03, target: 'base-income-rate' }
   }
 ];
@@ -237,6 +257,7 @@ function toResearchFeature(input: SpecFeatureInput): IResearchFeature {
     isUnlocked: false,
     researchTimeHours: input.researchTimeHours,
     requiredFeatureRefs: input.requiredFeatureRefs ?? [],
+    researchCenterLevelRequirement: input.researchCenterLevelRequirement,
     effect: input.effect
   };
 }

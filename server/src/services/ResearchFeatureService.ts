@@ -10,6 +10,7 @@ export interface ResearchFeatureValidation {
   missingRequirements: {
     level?: boolean;
     balance?: boolean;
+    researchCenterLevel?: boolean;
     dependencies?: string[];
     requiredFeatures?: string[];
   };
@@ -67,6 +68,16 @@ export class ResearchFeatureService {
       if (user.balance.total < feature.unlockCost) {
         reasons.push(`$${feature.unlockCost.toLocaleString()} required (current: $${user.balance.total.toLocaleString()})`);
         missingRequirements.balance = true;
+      }
+
+      // Check Research Center level requirement (per-feature)
+      const rcLevelReq = (feature as any).researchCenterLevelRequirement;
+      if (rcLevelReq != null) {
+        const effectiveRcLevel = user.researchCenterLevel ?? (user.unlockedFeatures?.researchCenter ? 3 : 0);
+        if (effectiveRcLevel < rcLevelReq) {
+          reasons.push(`Research Center level ${rcLevelReq} required (current: ${effectiveRcLevel})`);
+          missingRequirements.researchCenterLevel = true;
+        }
       }
 
       // Check if already unlocked
@@ -152,6 +163,18 @@ export class ResearchFeatureService {
         if (user.balance.total < feature.unlockCost) {
           reasons.push(`$${feature.unlockCost.toLocaleString()} required (current: $${user.balance.total.toLocaleString()})`);
           missingRequirements.balance = true;
+        }
+
+        // Check Research Center level requirement (per-feature)
+        const rcLevelReq = (feature as any).researchCenterLevelRequirement;
+        if (rcLevelReq != null) {
+          const effectiveRcLevel = user.researchCenterLevel ?? (user.unlockedFeatures?.researchCenter ? 3 : 0);
+          if (effectiveRcLevel < rcLevelReq) {
+            return {
+              success: false,
+              message: `Research Center level ${rcLevelReq} required (current: ${effectiveRcLevel})`
+            };
+          }
         }
 
         // Check if already unlocked or researching (using transaction session)
@@ -307,6 +330,9 @@ export class ResearchFeatureService {
 
         if (categoryId === 'hack-ability' && featureId === 'add-battalion-c') {
           console.log(`[AUDIT] User ${userId} unlocked Battalion C at ${unlockedAt.toISOString()}`);
+        }
+        if (categoryId === 'hack-ability' && featureId === 'add-battalion-d') {
+          console.log(`[AUDIT] User ${userId} unlocked Battalion D at ${unlockedAt.toISOString()}`);
         }
 
         if (categoryId === 'hack-ability' && featureId === 'battalion-size-250') {

@@ -29,6 +29,8 @@ export interface ResearchFeature {
   researchCompletesAt?: Date;
   /** Feature(s) that must be unlocked before this feature can be started. */
   requiredFeatureRefs?: ResearchFeatureRef[];
+  /** Required Research Center building level (1–4). */
+  researchCenterLevelRequirement?: number;
   effect: {
     type: 'unlock' | 'improvement' | 'reduction' | 'special';
     value: number | string;

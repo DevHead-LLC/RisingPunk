@@ -15,6 +15,8 @@ export interface IResearchFeature {
   researchTimeHours?: number;
   /** Feature(s) that must be unlocked before this feature can be started (AND). */
   requiredFeatureRefs?: IResearchFeatureRef[];
+  /** Required Research Center building level (1–4). User must have at least this level to start research. */
+  researchCenterLevelRequirement?: number;
   effect: {
     type: 'unlock' | 'improvement' | 'reduction' | 'special';
     value: number | string;

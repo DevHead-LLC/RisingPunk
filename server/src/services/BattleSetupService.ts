@@ -35,7 +35,7 @@ export class BattleSetupService {
       throw new Error('userBattalions is required and must contain at least one battalion');
     }
     
-    const MAX_USER_BATTALIONS = 3;
+    const MAX_USER_BATTALIONS = 5;
     if (userBattalions.length > MAX_USER_BATTALIONS) {
       throw new Error(`Maximum ${MAX_USER_BATTALIONS} battalions allowed`);
     }

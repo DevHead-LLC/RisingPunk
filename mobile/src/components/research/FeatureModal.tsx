@@ -11,6 +11,7 @@ import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { ResearchFeature } from './ResearchFeaturesList';
 import { useStartResearchMutation, useCompleteResearchMutation, useSpeedupFeatureResearchMutation, useGetUserFeaturesQuery } from '../../store/api/researchFeaturesApi';
+import { useGetResearchCenterStatusQuery } from '../../store/api/authApi';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { updateBalance } from '../../store/slices/balanceSlice';
 import { LockedFeatureModal } from '../turf/LockedFeatureModal';
@@ -71,6 +72,8 @@ export function FeatureModal({
   const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability', { skip: !visible || !refCategories.includes('hack-ability') });
   const { data: hackCrewFeatures } = useGetUserFeaturesQuery('hack-crew', { skip: !visible || !refCategories.includes('hack-crew') });
   const { data: investmentsFeatures } = useGetUserFeaturesQuery('investments', { skip: !visible || !refCategories.includes('investments') });
+  const { data: researchCenterStatus } = useGetResearchCenterStatusQuery(undefined, { skip: !visible });
+  const currentResearchCenterLevel = researchCenterStatus?.level ?? 0;
 
   const featuresByCategory = useMemo(() => ({
     'home-defense': homeDefFeatures ?? [],
@@ -102,8 +105,10 @@ export function FeatureModal({
   
   const canAfford = currentBalance >= feature.unlockCost;
   const meetsLevelRequirement = currentLevel >= feature.levelRequirement;
+  const rcLevelReq = feature.researchCenterLevelRequirement;
+  const meetsRcLevelRequirement = rcLevelReq == null || currentResearchCenterLevel >= rcLevelReq;
   const meetsPrerequisiteRequirements = missingRequiredRefs.length === 0;
-  const canStartResearch = canAfford && meetsLevelRequirement && meetsPrerequisiteRequirements && !feature.isResearching;
+  const canStartResearch = canAfford && meetsLevelRequirement && meetsRcLevelRequirement && meetsPrerequisiteRequirements && !feature.isResearching;
   const researchTimeHours = feature.researchTimeHours ?? 4; // Default to 4 hours if not specified
 
   /** Format researchTimeHours (fractional ok) as human-readable: weeks, days, hours, minutes, seconds (only appropriate parts). */
@@ -175,6 +180,7 @@ export function FeatureModal({
       const items: string[] = [];
       if (!meetsLevelRequirement) items.push(`Level ${feature.levelRequirement} required`);
       if (!canAfford) items.push(`$${feature.unlockCost.toLocaleString()} balance required`);
+      if (rcLevelReq != null && !meetsRcLevelRequirement) items.push(`Research Center level ${rcLevelReq} required`);
       missingRequiredDisplay.forEach(label => items.push(label));
       showRequirementsNotMetOverlay(items.length > 0 ? items : ['Requirements not met']);
       return;
@@ -300,6 +306,19 @@ export function FeatureModal({
             {researchTimeDisplay}
           </Text>
         </View>
+        {rcLevelReq != null && (
+          <View style={styles.requirementRow}>
+            <Text style={[styles.requirementLabel, { color: colors.text.secondary }]}>
+              Research Center Level:
+            </Text>
+            <Text style={[
+              styles.requirementValue,
+              { color: meetsRcLevelRequirement ? colors.success : colors.error }
+            ]}>
+              {currentResearchCenterLevel}/{rcLevelReq}
+            </Text>
+          </View>
+        )}
         {refs.length > 0 && (
           <View style={styles.requirementRow}>
             <Text style={[styles.requirementLabel, { color: colors.text.secondary }]}>
@@ -320,36 +339,38 @@ export function FeatureModal({
         )}
       </View>
       
-      {!isCurrentlyResearching && (
+      <View style={styles.buttonRow}>
         <TouchableOpacity
-          style={[
-            styles.researchButton,
-            { 
-              backgroundColor: canStartResearch ? colors.secondary : '#6B7280',
-              opacity: isStartingResearch ? 0.6 : 1
-            }
-          ]}
-          onPress={handlePerformResearch}
-          disabled={isStartingResearch}
+          style={[styles.modalActionButton, { backgroundColor: colors.primary }]}
+          onPress={onClose}
         >
-          <Text style={[styles.researchButtonText, { color: '#FFFFFF' }]}>
-            {isStartingResearch ? 'Starting Research...' : 
-             !canAfford ? 'Insufficient Funds' :
-             !meetsLevelRequirement ? 'Level Too Low' :
-             !meetsPrerequisiteRequirements ? 'Required research not complete' :
-             'Perform Research'}
+          <Text style={[styles.modalActionButtonText, { color: '#FFFFFF' }]}>
+            Cancel
           </Text>
         </TouchableOpacity>
-      )}
-      
-      <TouchableOpacity
-        style={[styles.closeButton, { backgroundColor: colors.primary }]}
-        onPress={onClose}
-      >
-        <Text style={[styles.closeButtonText, { color: '#FFFFFF' }]}>
-          Close
-        </Text>
-      </TouchableOpacity>
+        {!isCurrentlyResearching && (
+          <TouchableOpacity
+            style={[
+              styles.modalActionButton,
+              { 
+                backgroundColor: canStartResearch ? colors.secondary : '#6B7280',
+                opacity: isStartingResearch ? 0.6 : 1
+              }
+            ]}
+            onPress={handlePerformResearch}
+            disabled={isStartingResearch}
+          >
+            <Text style={[styles.modalActionButtonText, { color: '#FFFFFF' }]}>
+              {isStartingResearch ? 'Starting...' : 
+               !canAfford ? 'Insufficient Funds' :
+               !meetsLevelRequirement ? 'Level Too Low' :
+               (rcLevelReq != null && !meetsRcLevelRequirement) ? 'RC Level Too Low' :
+               !meetsPrerequisiteRequirements ? 'Required research not complete' :
+               'Research'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       {showRequirementsNotMet && (
         <View style={styles.requirementsNotMetOverlay}>
@@ -447,43 +468,63 @@ export function FeatureModal({
               </TouchableOpacity>
             </View>
           )}
+          <TouchableOpacity
+            style={[styles.closeButton, { backgroundColor: '#475569', marginTop: SIZING.spacing.sm }]}
+            onPress={onClose}
+          >
+            <Text style={[styles.closeButtonText, { color: '#FFFFFF' }]}>
+              Cancel
+            </Text>
+          </TouchableOpacity>
         </View>
       ) : !feature.isUnlocked ? (
-        <TouchableOpacity
-          style={[
-            styles.researchButton,
-            {
-              backgroundColor: canStartResearch ? colors.secondary : '#EF4444',
-              opacity: canStartResearch ? 1 : 0.6
-            }
-          ]}
-          onPress={handlePerformResearch}
-          disabled={isStartingResearch}
-        >
-          <Text style={[styles.researchButtonText, { color: '#FFFFFF' }]}>
-            {isStartingResearch ? 'Starting Research...' : 
-             !canAfford ? 'Insufficient Funds' :
-             !meetsLevelRequirement ? 'Level Too Low' :
-             !meetsPrerequisiteRequirements ? 'Required research not complete' :
-             'Perform Research'}
-          </Text>
-        </TouchableOpacity>
-      ) : (
-        <View style={styles.unlockedStatus}>
-          <Text style={[styles.unlockedText, { color: '#10B981' }]}>
-            ✓ Feature Unlocked
-          </Text>
+        <View style={styles.buttonRow}>
+          <TouchableOpacity
+            style={[styles.modalActionButton, { backgroundColor: '#475569' }]}
+            onPress={onClose}
+          >
+            <Text style={[styles.modalActionButtonText, { color: '#FFFFFF' }]}>
+              Cancel
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.modalActionButton,
+              {
+                backgroundColor: canStartResearch ? colors.secondary : '#EF4444',
+                opacity: canStartResearch ? 1 : 0.6
+              }
+            ]}
+            onPress={handlePerformResearch}
+            disabled={isStartingResearch}
+          >
+            <Text style={[styles.modalActionButtonText, { color: '#FFFFFF' }]}>
+              {isStartingResearch ? 'Starting...' : 
+               !canAfford ? 'Insufficient Funds' :
+               !meetsLevelRequirement ? 'Level Too Low' :
+               (rcLevelReq != null && !meetsRcLevelRequirement) ? 'RC Level Too Low' :
+               !meetsPrerequisiteRequirements ? 'Required research not complete' :
+               'Research'}
+            </Text>
+          </TouchableOpacity>
         </View>
+      ) : (
+        <>
+          <View style={styles.unlockedStatus}>
+            <Text style={[styles.unlockedText, { color: '#10B981' }]}>
+              ✓ Feature Unlocked
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.closeButton, { backgroundColor: '#475569' }]}
+            onPress={onClose}
+          >
+            <Text style={[styles.closeButtonText, { color: '#FFFFFF' }]}>
+              Cancel
+            </Text>
+          </TouchableOpacity>
+        </>
       )}
-
-      <TouchableOpacity
-        style={[styles.closeButton, { backgroundColor: '#475569' }]}
-        onPress={onClose}
-      >
-        <Text style={[styles.closeButtonText, { color: '#FFFFFF' }]}>
-          Close
-        </Text>
-      </TouchableOpacity>
 
       {showRequirementsNotMet && (
         <View style={styles.requirementsNotMetOverlay}>
@@ -623,12 +664,33 @@ const styles = StyleSheet.create({
     fontSize: SIZING.font.body,
     fontWeight: '600',
   },
+  buttonRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: SIZING.spacing.xs,
+    gap: SIZING.spacing.sm,
+    marginTop: SIZING.spacing.sm,
+    marginBottom: SIZING.spacing.xs,
+  },
+  modalActionButton: {
+    flex: 1,
+    paddingVertical: SIZING.spacing.md,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  modalActionButtonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
+  },
   researchButton: {
     paddingHorizontal: SIZING.spacing.lg,
     paddingVertical: SIZING.spacing.md,
     borderRadius: 8,
-    marginBottom: SIZING.spacing.md,
-    minWidth: 200,
+    minWidth: 120,
     alignItems: 'center',
   },
   researchButtonText: {
@@ -714,7 +776,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     minWidth: 100,
     alignItems: 'center',
-    marginTop: SIZING.spacing.xs,
   },
   closeButtonText: {
     fontSize: SIZING.font.body,
