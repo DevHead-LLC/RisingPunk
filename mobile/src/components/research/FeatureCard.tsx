@@ -10,6 +10,11 @@ import {
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 
+export interface ResearchFeatureRef {
+  categoryId: string;
+  featureId: string;
+}
+
 export interface ResearchFeature {
   id: string;
   name: string;
@@ -22,6 +27,8 @@ export interface ResearchFeature {
   isResearching?: boolean;
   researchStartedAt?: Date;
   researchCompletesAt?: Date;
+  /** Feature(s) that must be unlocked before this feature can be started. */
+  requiredFeatureRefs?: ResearchFeatureRef[];
   effect: {
     type: 'unlock' | 'improvement' | 'reduction' | 'special';
     value: number | string;
@@ -40,13 +47,24 @@ interface FeatureCardProps {
 
 const BACKGROUND_IMAGE_MAP: Record<string, ImageSourcePropType> = {
   'antivirus': require('../../assets/images/antivirusResearch.png'),
-  'battalions-per-battle': require('../../assets/images/researchCenter/increaseBattalions.png'),
-  'increase-battalion-size': require('../../assets/images/researchCenter/increaseBots250.png'),
+  'add-battalion-c': require('../../assets/images/researchCenter/increaseBattalions.png'),
+  'battalion-size-250': require('../../assets/images/researchCenter/increaseBots250.png'),
+  'battalion-size-500': require('../../assets/images/researchCenter/increaseBots250.png'),
+  'battalion-size-1000': require('../../assets/images/researchCenter/increaseBots250.png'),
+  'add-battalion-d': require('../../assets/images/researchCenter/increaseBattalions.png'),
+  'add-battalion-e': require('../../assets/images/researchCenter/increaseBattalions.png'),
   'bot-trap': require('../../assets/images/botTrapResearch.png'),
   'crew-system-unlock': require('../../assets/images/startCrew.png'),
-  'rental-profit-increase': require('../../assets/images/researchCenter/rentalPropertyIncrease.png'),
-  'increase-income-rate': require('../../assets/images/researchCenter/incomeIncrease.png'),
-  'reduce-insurance-expense': require('../../assets/images/researchCenter/decreaseInsurance.png'),
+  'rental-profit-01': require('../../assets/images/researchCenter/rentalPropertyIncrease.png'),
+  'rental-profit-015': require('../../assets/images/researchCenter/rentalPropertyIncrease.png'),
+  'increase-income-01': require('../../assets/images/researchCenter/incomeIncrease.png'),
+  'increase-income-02': require('../../assets/images/researchCenter/incomeIncrease.png'),
+  'increase-income-025': require('../../assets/images/researchCenter/incomeIncrease.png'),
+  'increase-income-03': require('../../assets/images/researchCenter/incomeIncrease.png'),
+  'reduce-insurance-01': require('../../assets/images/researchCenter/decreaseInsurance.png'),
+  'reduce-insurance-02': require('../../assets/images/researchCenter/decreaseInsurance.png'),
+  'reduce-expenses': require('../../assets/images/researchCenter/decreaseInsurance.png'),
+  'probe': require('../../assets/images/researchCenter/increaseBattalions.png'),
 };
 
 export function FeatureCard({

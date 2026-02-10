@@ -102,16 +102,17 @@ export const researchFeaturesApi = createApi({
           // This ensures tasks like unlock-antivirus update immediately when feature is unlocked
           dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
           
-          // If rental profit research completed, invalidate balance and rental housing income cache
-          if (arg.categoryId === 'investments' && arg.featureId === 'rental-profit-increase') {
+          // If rental profit research completed (spec 18), invalidate balance and rental housing income cache
+          if (arg.categoryId === 'investments' && (arg.featureId === 'rental-profit-01' || arg.featureId === 'rental-profit-015')) {
             const { balanceApi } = await import('./balanceApi');
             const { rentalHousingApi } = await import('./rentalHousingApi');
             dispatch(balanceApi.util.invalidateTags(['Balance']));
             dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
           }
           
-          // If income rate or insurance reduction research completed, invalidate balance cache
-          if (arg.categoryId === 'cash-flow' && (arg.featureId === 'increase-income-rate' || arg.featureId === 'reduce-insurance-expense')) {
+          // If cash-flow income/insurance research completed (spec 18), invalidate balance cache
+          const cashFlowSyncIds = ['increase-income-01', 'increase-income-02', 'increase-income-025', 'increase-income-03', 'reduce-insurance-01', 'reduce-insurance-02', 'reduce-expenses'];
+          if (arg.categoryId === 'cash-flow' && cashFlowSyncIds.includes(arg.featureId)) {
             const { balanceApi } = await import('./balanceApi');
             dispatch(balanceApi.util.invalidateTags(['Balance']));
           }
@@ -143,15 +144,16 @@ export const researchFeaturesApi = createApi({
           // This ensures tasks like unlock-antivirus update immediately when feature is unlocked
           dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
           
-          // If rental profit research was speeded up, invalidate balance and rental housing income cache
-          if (arg.categoryId === 'investments' && arg.featureId === 'rental-profit-increase') {
+          // If rental profit research was speeded up (spec 18), invalidate balance and rental housing income cache
+          if (arg.categoryId === 'investments' && (arg.featureId === 'rental-profit-01' || arg.featureId === 'rental-profit-015')) {
             const { rentalHousingApi } = await import('./rentalHousingApi');
             dispatch(balanceApi.util.invalidateTags(['Balance']));
             dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
           }
           
-          // If income rate or insurance reduction research was speeded up, invalidate balance cache
-          if (arg.categoryId === 'cash-flow' && (arg.featureId === 'increase-income-rate' || arg.featureId === 'reduce-insurance-expense')) {
+          // If cash-flow income/insurance research was speeded up (spec 18), invalidate balance cache
+          const cashFlowSyncIds = ['increase-income-01', 'increase-income-02', 'increase-income-025', 'increase-income-03', 'reduce-insurance-01', 'reduce-insurance-02', 'reduce-expenses'];
+          if (arg.categoryId === 'cash-flow' && cashFlowSyncIds.includes(arg.featureId)) {
             dispatch(balanceApi.util.invalidateTags(['Balance']));
           }
         } catch {

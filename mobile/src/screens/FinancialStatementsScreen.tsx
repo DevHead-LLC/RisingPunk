@@ -48,7 +48,14 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
   const ratePerSecondFromState = useAppSelector(state => state.balance.ratePerSecond);
   // Use balanceData from query if available (fresh data), otherwise fall back to Redux state
   const ratePerSecond = balanceData?.ratePerSecond ?? ratePerSecondFromState;
-  const insuranceReductionUnlocked = Boolean(cashFlowFeatures?.find(f => f.id === 'reduce-insurance-expense' && f.isUnlocked));
+  // Total insurance expense reduction from unlocked research (must match server researchFeatureUtils INSURANCE_REDUCTION_FEATURES)
+  const insuranceReductionTotal = useMemo(() => {
+    if (!cashFlowFeatures) return 0;
+    let total = 0;
+    if (cashFlowFeatures.some((f: any) => (f.id === 'reduce-insurance-01') && f.isUnlocked)) total += 0.01;
+    if (cashFlowFeatures.some((f: any) => (f.id === 'reduce-insurance-02') && f.isUnlocked)) total += 0.02;
+    return total;
+  }, [cashFlowFeatures]);
   const { themeMode } = useTheme();
   const colors = useThemeColors();
   
@@ -80,22 +87,22 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
   const financialCalculations = useMemo(() => {
     if (!merged) return null;
     
-    // Apply insurance reduction research only when template has Insurance: $0.50 -> $0.48 when research unlocked
+    // Insurance: base $0.50/sec; subtract unlocked reduction research (reduce-insurance-01 = $0.01, reduce-insurance-02 = $0.02)
     const baseIncomeStatement = merged.incomeStatement || {};
     const effectiveIncomeStatement = { ...baseIncomeStatement };
     const hasInsuranceInTemplate = 'Insurance' in baseIncomeStatement;
     if (hasInsuranceInTemplate) {
       const insuranceBase = baseIncomeStatement['Insurance'] ?? -0.50;
-      effectiveIncomeStatement['Insurance'] = insuranceBase + (insuranceReductionUnlocked ? 0.02 : 0);
+      effectiveIncomeStatement['Insurance'] = insuranceBase + insuranceReductionTotal;
     }
     
     const incomeStatementEntries = Object.entries(effectiveIncomeStatement);
     
-    // Gross Income: only subtract insurance bonus from display when template has Insurance,
+    // Gross Income: subtract insurance reduction from display when template has Insurance,
     // so we don't double-count (savings shown as reduced expense). If template lacks Insurance,
-    // show full incomeRateBonus so the $0.02 doesn't vanish from the statement.
-    const effectiveIncomeRateBonus = hasInsuranceInTemplate && insuranceReductionUnlocked
-      ? Math.max(0, incomeRateBonus - 0.02)
+    // show full incomeRateBonus.
+    const effectiveIncomeRateBonus = hasInsuranceInTemplate && insuranceReductionTotal > 0
+      ? Math.max(0, incomeRateBonus - insuranceReductionTotal)
       : incomeRateBonus;
     const baseGrossIncome = 12.00;
     const grossIncome = baseGrossIncome + effectiveIncomeRateBonus;
@@ -136,7 +143,7 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
       passiveIncome,
       netCashFlow
     };
-  }, [merged, incomeRateBonus, insuranceReductionUnlocked, rentalHousingData?.totalIncomePerSecond]);
+  }, [merged, incomeRateBonus, insuranceReductionTotal, rentalHousingData?.totalIncomePerSecond]);
 
   const getStyles = () => ({
     container: {

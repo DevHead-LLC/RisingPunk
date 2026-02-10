@@ -6,6 +6,8 @@ import { useTheme } from '../../../context/ThemeContext';
 import { KeyboardAwareInput } from '../../common/KeyboardAwareInput';
 import { useGetUserFeaturesQuery } from '../../../store/api/researchFeaturesApi';
 
+const BATTALION_SIZE_FEATURE_IDS = ['battalion-size-250', 'battalion-size-500', 'battalion-size-1000'] as const;
+
 type Props = {
   quantity: number;
   available: number;
@@ -20,31 +22,33 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
   const [currentTime, setCurrentTime] = React.useState(() => Date.now());
 
   React.useEffect(() => {
-    const battalionSizeFeature = hackAbilityFeatures?.find(f => f.id === 'increase-battalion-size');
-    if (battalionSizeFeature?.isResearching && battalionSizeFeature?.researchCompletesAt) {
-      const interval = setInterval(() => {
-        setCurrentTime(Date.now());
-      }, 1000);
+    const anyResearching = BATTALION_SIZE_FEATURE_IDS.some(id => {
+      const f = hackAbilityFeatures?.find(feature => feature.id === id);
+      return f?.isResearching && f?.researchCompletesAt;
+    });
+    if (anyResearching) {
+      const interval = setInterval(() => setCurrentTime(Date.now()), 1000);
       return () => clearInterval(interval);
     }
   }, [hackAbilityFeatures]);
 
-  const battalionSizeFeature = React.useMemo(() => {
-    return hackAbilityFeatures?.find(f => f.id === 'increase-battalion-size');
-  }, [hackAbilityFeatures]);
-
-  const isUnlocked = React.useMemo(() => {
-    if (!battalionSizeFeature) return false;
+  const MAX_BATTALION_SIZE = React.useMemo(() => {
     const now = currentTime;
-    const researchCompletesAt = battalionSizeFeature.researchCompletesAt 
-      ? new Date(battalionSizeFeature.researchCompletesAt).getTime() 
-      : null;
-    const remaining = researchCompletesAt !== null ? Math.max(0, researchCompletesAt - now) : null;
-    return battalionSizeFeature.isUnlocked || 
-      (battalionSizeFeature.isResearching && researchCompletesAt !== null && remaining === 0);
-  }, [battalionSizeFeature?.isUnlocked, battalionSizeFeature?.isResearching, battalionSizeFeature?.researchCompletesAt, currentTime]);
-
-  const MAX_BATTALION_SIZE = isUnlocked ? 500 : 250;
+    let max = 250;
+    for (const id of BATTALION_SIZE_FEATURE_IDS) {
+      const f = hackAbilityFeatures?.find(feature => feature.id === id);
+      if (!f) break;
+      const researchCompletesAt = f.researchCompletesAt ? new Date(f.researchCompletesAt).getTime() : null;
+      const effectivelyUnlocked =
+        f.isUnlocked || (!!f.isResearching && researchCompletesAt !== null && researchCompletesAt <= now);
+      if (effectivelyUnlocked) {
+        if (id === 'battalion-size-250') max = 500;
+        else if (id === 'battalion-size-500') max = 1000;
+        else if (id === 'battalion-size-1000') max = 2000;
+      } else break;
+    }
+    return max;
+  }, [hackAbilityFeatures, currentTime]);
   const maxQuantity = Math.min(available, MAX_BATTALION_SIZE);
 
   const adjustQuantity = React.useCallback((adjustment: number) => {
@@ -114,7 +118,7 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
               }]}
               containerStyle={styles.inputContainer}
               isLastInput={true}
-              maxLength={3}
+              maxLength={4}
               editable={!disabled}
             />
           </View>

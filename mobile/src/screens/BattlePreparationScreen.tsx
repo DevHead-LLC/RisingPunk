@@ -114,7 +114,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
   
   // Find and memoize the Battalion C feature
   const battalionCFeature = useMemo(() => {
-    return hackAbilityFeatures?.find(f => f.id === 'battalions-per-battle');
+    return hackAbilityFeatures?.find(f => f.id === 'add-battalion-c');
   }, [hackAbilityFeatures]);
   
   // Check if Battalion C is unlocked (same pattern as antivirus)

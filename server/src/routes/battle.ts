@@ -65,7 +65,7 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
         const battalionCFeature = await UserResearchFeature.findOne({
           userId: req.user._id,
           categoryId: 'hack-ability',
-          featureId: 'battalions-per-battle'
+          featureId: 'add-battalion-c'
         })
         .select('isUnlocked isResearching researchCompletesAt')
         .lean();

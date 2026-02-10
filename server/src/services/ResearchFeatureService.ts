@@ -11,6 +11,7 @@ export interface ResearchFeatureValidation {
     level?: boolean;
     balance?: boolean;
     dependencies?: string[];
+    requiredFeatures?: string[];
   };
 }
 
@@ -33,7 +34,7 @@ export interface CompleteResearchResult {
 export class ResearchFeatureService {
   private static isValidResearchTimeHours(hours: number | null | undefined): boolean {
     if (hours == null) return false;
-    return hours >= 0.1;
+    return hours > 0;
   }
 
   static async validateFeatureRequirements(
@@ -81,6 +82,24 @@ export class ResearchFeatureService {
 
       if (existingFeature?.isResearching) {
         reasons.push('Research already in progress');
+      }
+
+      // Check feature-level prerequisites (requiredFeatureRefs)
+      const refs = feature.requiredFeatureRefs;
+      if (refs?.length) {
+        for (const ref of refs) {
+          const prereq = await UserResearchFeature.findOne({
+            userId,
+            categoryId: ref.categoryId,
+            featureId: ref.featureId
+          }).select('isUnlocked').lean();
+          if (!prereq?.isUnlocked) {
+            const label = `${ref.categoryId}:${ref.featureId}`;
+            reasons.push(`Requires research: ${label}`);
+            if (!missingRequirements.requiredFeatures) missingRequirements.requiredFeatures = [];
+            missingRequirements.requiredFeatures.push(label);
+          }
+        }
       }
 
       const canResearch = reasons.length === 0;
@@ -148,6 +167,21 @@ export class ResearchFeatureService {
 
         if (existingFeature?.isResearching) {
           reasons.push('Research already in progress');
+        }
+
+        // Check feature-level prerequisites (requiredFeatureRefs)
+        const refs = feature.requiredFeatureRefs;
+        if (refs?.length) {
+          for (const ref of refs) {
+            const prereq = await UserResearchFeature.findOne({
+              userId,
+              categoryId: ref.categoryId,
+              featureId: ref.featureId
+            }).session(session).select('isUnlocked').lean();
+            if (!prereq?.isUnlocked) {
+              reasons.push(`Requires research: ${ref.categoryId}:${ref.featureId}`);
+            }
+          }
         }
 
         if (reasons.length > 0) {
@@ -271,16 +305,22 @@ export class ResearchFeatureService {
           { session }
         );
 
-        if (categoryId === 'hack-ability' && featureId === 'battalions-per-battle') {
+        if (categoryId === 'hack-ability' && featureId === 'add-battalion-c') {
           console.log(`[AUDIT] User ${userId} unlocked Battalion C at ${unlockedAt.toISOString()}`);
         }
 
-        if (categoryId === 'hack-ability' && featureId === 'increase-battalion-size') {
+        if (categoryId === 'hack-ability' && featureId === 'battalion-size-250') {
           console.log(`[AUDIT] User ${userId} unlocked Battalion Size +250 at ${unlockedAt.toISOString()}`);
         }
+        if (categoryId === 'hack-ability' && featureId === 'battalion-size-500') {
+          console.log(`[AUDIT] User ${userId} unlocked Battalion Size +500 at ${unlockedAt.toISOString()}`);
+        }
+        if (categoryId === 'hack-ability' && featureId === 'battalion-size-1000') {
+          console.log(`[AUDIT] User ${userId} unlocked Battalion Size +1,000 at ${unlockedAt.toISOString()}`);
+        }
 
-        if (categoryId === 'investments' && featureId === 'rental-profit-increase') {
-          console.log(`[AUDIT] User ${userId} unlocked Rental Profit +$0.01/Room at ${unlockedAt.toISOString()}`);
+        if (categoryId === 'investments' && (featureId === 'rental-profit-01' || featureId === 'rental-profit-015')) {
+          console.log(`[AUDIT] User ${userId} unlocked ${featureId} at ${unlockedAt.toISOString()}`);
           
           const { RentalHousingSyncService } = await import('./RentalHousingSyncService');
           const { User } = await import('../models/User');

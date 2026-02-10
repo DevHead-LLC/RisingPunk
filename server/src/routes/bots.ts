@@ -4,6 +4,7 @@ import auth from '../middleware/auth';
 import { User } from '../models/User';
 import mongoose from 'mongoose';
 import { UserResearchFeature } from '../models/UserResearchFeature';
+import { getMaxBattalionSize } from '../utils/researchFeatureUtils';
 
 const router = express.Router();
 
@@ -421,28 +422,21 @@ router.post('/assign', auth, async (req, res) => {
       return;
     }
 
-    const battalionSizeFeature = await UserResearchFeature.findOne({
-      userId: req.user._id,
-      categoryId: 'hack-ability',
-      featureId: 'increase-battalion-size'
-    })
-    .select('isUnlocked isResearching researchCompletesAt')
-    .lean();
-
     const now = Date.now();
-    const researchCompletesAt = battalionSizeFeature?.researchCompletesAt 
-      ? new Date(battalionSizeFeature.researchCompletesAt).getTime() 
-      : null;
-    const remaining = researchCompletesAt !== null ? Math.max(0, researchCompletesAt - now) : null;
-    const isActuallyUnlocked = battalionSizeFeature?.isUnlocked || 
-      (battalionSizeFeature?.isResearching && researchCompletesAt !== null && remaining === 0);
-
-    const maxLimit = isActuallyUnlocked ? 500 : 250;
+    const maxLimit = await getMaxBattalionSize(userId, new Date(now));
 
     if (quantity > maxLimit) {
-      const errorMessage = isActuallyUnlocked 
-        ? 'Maximum troops per battalion is 500.'
-        : 'Maximum troops per battalion is 250. Complete "Battalion Size +250" research to increase to 500.';
+      const nextStep =
+        maxLimit === 250
+          ? 'Complete "Battalion Size +250" research to increase to 500.'
+          : maxLimit === 500
+            ? 'Complete "Battalion Size +500" research to increase to 1,000.'
+            : maxLimit === 1000
+              ? 'Complete "Battalion Size +1,000" research to increase to 2,000.'
+              : null;
+      const errorMessage = nextStep
+        ? `Maximum troops per battalion is ${maxLimit.toLocaleString()}. ${nextStep}`
+        : `Maximum troops per battalion is ${maxLimit.toLocaleString()}.`;
       res.status(400).json({ error: errorMessage });
       return;
     }
@@ -451,7 +445,7 @@ router.post('/assign', auth, async (req, res) => {
       const battalionCFeature = await UserResearchFeature.findOne({
         userId: req.user._id,
         categoryId: 'hack-ability',
-        featureId: 'battalions-per-battle'
+        featureId: 'add-battalion-c'
       })
       .select('isUnlocked isResearching researchCompletesAt')
       .lean();

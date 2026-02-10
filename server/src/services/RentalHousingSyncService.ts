@@ -1,6 +1,6 @@
 import { IUser } from '../models/User';
 import { RentalHousingIncomeService } from './RentalHousingIncomeService';
-import { isResearchFeatureUnlocked, getResearchFeatureUnlockTime } from '../utils/researchFeatureUtils';
+import { getBaseIncomeRateBonus, getInsuranceReductionBonus, getResearchFeatureUnlockTime } from '../utils/researchFeatureUtils';
 
 export interface RentalHousingSyncResult {
   needsSync: boolean;
@@ -10,8 +10,7 @@ export interface RentalHousingSyncResult {
 }
 
 export class RentalHousingSyncService {
-  private static readonly BASE_INCOME_RATE_BONUS = 0.05; // $0.05 per second bonus when income rate research unlocked
-  private static readonly INSURANCE_REDUCTION_BONUS = 0.02; // $0.02 per second when reduce insurance expense research unlocked
+  // Income/insurance bonuses are now multi-tier per spec 18; see researchFeatureUtils getBaseIncomeRateBonus, getInsuranceReductionBonus
   /** Pre-level-system flat rate per property per second; use for historical income when user is legacy (would be grandfathered). */
   private static readonly LEGACY_FLAT_RATE_PER_PROPERTY = 0.06;
   private static readonly LEGACY_RESEARCH_BONUS_PER_PROPERTY = 0.04; // 4 rooms × 0.01
@@ -78,16 +77,8 @@ export class RentalHousingSyncService {
     return user.balance.rentalHousingIncomeLastSynced < oneHourAgo;
   }
 
-  static async isIncomeRateResearchUnlocked(userId: string): Promise<boolean> {
-    return isResearchFeatureUnlocked(userId, 'cash-flow', 'increase-income-rate');
-  }
-
-  static async isInsuranceReductionResearchUnlocked(userId: string): Promise<boolean> {
-    return isResearchFeatureUnlocked(userId, 'cash-flow', 'reduce-insurance-expense');
-  }
-
-  static async getIncomeRateResearchUnlockTime(userId: string): Promise<Date | null> {
-    return getResearchFeatureUnlockTime(userId, 'cash-flow', 'increase-income-rate');
+  static async getIncomeRateResearchUnlockTime(userId: string, featureId: string): Promise<Date | null> {
+    return getResearchFeatureUnlockTime(userId, 'cash-flow', featureId);
   }
 
   private static async calculateHistoricalIncome(user: IUser, now: Date): Promise<number> {
@@ -184,13 +175,10 @@ export class RentalHousingSyncService {
     await this.ensureLegacyRentalLevels(user);
     
     // CRITICAL: Always calculate and update ratePerSecond, even if no rental properties exist
-    // This ensures income rate and insurance reduction research bonuses are applied for all users
-    // Base rate is $1.00 + income rate bonus ($0.05) + insurance reduction bonus ($0.02) when unlocked, plus passive income
-    const isIncomeRateUnlocked = await this.isIncomeRateResearchUnlocked(String(user._id));
-    const isInsuranceReductionUnlocked = await this.isInsuranceReductionResearchUnlocked(String(user._id));
-    const baseRate = 1.0
-      + (isIncomeRateUnlocked ? this.BASE_INCOME_RATE_BONUS : 0)
-      + (isInsuranceReductionUnlocked ? this.INSURANCE_REDUCTION_BONUS : 0);
+    // Base rate is $1.00 + income rate bonus (sum of increase-income-* per spec 18) + insurance reduction (sum of reduce-insurance-*), plus passive income
+    const incomeBonus = await getBaseIncomeRateBonus(String(user._id));
+    const insuranceBonus = await getInsuranceReductionBonus(String(user._id));
+    const baseRate = 1.0 + incomeBonus + insuranceBonus;
     
     if (baseRate < 0) {
       console.error('[INCOME RATE] Invalid baseRate calculated:', baseRate);
