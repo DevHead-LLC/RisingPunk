@@ -28,6 +28,7 @@ export const RENTAL_PROFIT_FEATURES: { featureId: string; value: number; categor
 
 /**
  * Total base income rate bonus from all unlocked cash-flow income features (spec 18).
+ * Legacy: if no new IDs are unlocked, check increase-income-rate (cash-flow) and add $0.05/sec so pre-migration users get correct rate.
  */
 export async function getBaseIncomeRateBonus(userId: string): Promise<number> {
   let total = 0;
@@ -35,17 +36,26 @@ export async function getBaseIncomeRateBonus(userId: string): Promise<number> {
     const unlocked = await isResearchFeatureUnlocked(userId, 'cash-flow', featureId);
     if (unlocked) total += value;
   }
+  if (total === 0) {
+    const legacyUnlocked = await isResearchFeatureUnlocked(userId, 'cash-flow', 'increase-income-rate');
+    if (legacyUnlocked) total = 0.05;
+  }
   return total;
 }
 
 /**
  * Total insurance expense reduction from all unlocked cash-flow features (spec 18).
+ * Legacy: if no new IDs are unlocked, check reduce-insurance-expense (cash-flow) and add $0.02 so pre-migration users get correct reduction.
  */
 export async function getInsuranceReductionBonus(userId: string): Promise<number> {
   let total = 0;
   for (const { featureId, value } of INSURANCE_REDUCTION_FEATURES) {
     const unlocked = await isResearchFeatureUnlocked(userId, 'cash-flow', featureId);
     if (unlocked) total += value;
+  }
+  if (total === 0) {
+    const legacyUnlocked = await isResearchFeatureUnlocked(userId, 'cash-flow', 'reduce-insurance-expense');
+    if (legacyUnlocked) total = 0.02;
   }
   return total;
 }
@@ -68,6 +78,7 @@ export async function getTaxReductionBonus(userId: string): Promise<number> {
 
 /**
  * Total rental profit bonus per room per second from all unlocked investments features (spec 18).
+ * Legacy: if no new IDs are unlocked, check rental-profit-increase (investments) and add $0.01 so pre-migration users get correct bonus.
  */
 export async function getRentalProfitBonusPerRoom(userId: string): Promise<number> {
   let total = 0;
@@ -75,12 +86,16 @@ export async function getRentalProfitBonusPerRoom(userId: string): Promise<numbe
     const unlocked = await isResearchFeatureUnlocked(userId, categoryId, featureId);
     if (unlocked) total += value;
   }
+  if (total === 0) {
+    const legacyUnlocked = await isResearchFeatureUnlocked(userId, 'investments', 'rental-profit-increase');
+    if (legacyUnlocked) total = 0.01;
+  }
   return total;
 }
 
 /**
  * Rental profit bonus per room as of a given time (for historical income).
- * Sums only features unlocked at or before asOfTime to avoid retroactive combined bonus.
+ * Sums only features unlocked at or before asOfTime. Legacy: if no new IDs unlocked by then, check rental-profit-increase (investments).
  */
 export async function getRentalProfitBonusPerRoomAsOf(userId: string, asOfTime: Date): Promise<number> {
   const asOfMs = asOfTime.getTime();
@@ -88,6 +103,10 @@ export async function getRentalProfitBonusPerRoomAsOf(userId: string, asOfTime: 
   for (const { featureId, value, categoryId } of RENTAL_PROFIT_FEATURES) {
     const unlockedAt = await getResearchFeatureUnlockTime(userId, categoryId, featureId);
     if (unlockedAt && unlockedAt.getTime() <= asOfMs) total += value;
+  }
+  if (total === 0) {
+    const legacyUnlockedAt = await getResearchFeatureUnlockTime(userId, 'investments', 'rental-profit-increase');
+    if (legacyUnlockedAt && legacyUnlockedAt.getTime() <= asOfMs) total = 0.01;
   }
   return total;
 }
@@ -121,28 +140,34 @@ export async function isResearchFeatureUnlocked(
   }
 }
 
-/** Hack-ability battalion-size feature IDs in prereq order (spec 18). Value is the additive increase. Bugbot: no legacy IDs (e.g. battalions-per-battle, increase-battalion-size) — never used in this project. */
+/** Hack-ability battalion-size feature IDs in prereq order (spec 18). Value is the additive increase. */
 const BATTALION_SIZE_FEATURES: { featureId: string; add: number }[] = [
   { featureId: 'battalion-size-250', add: 250 },
   { featureId: 'battalion-size-500', add: 500 },
   { featureId: 'battalion-size-1000', add: 1000 }
 ];
 
+/** Legacy feature IDs (pre–spec-18) so we find docs before grandfather migration runs. Same category hack-ability. */
+const BATTALION_SIZE_LEGACY_IDS: Record<string, string[]> = {
+  'battalion-size-250': ['battalion-size-250', 'increase-battalion-size'],
+};
+
 const BASE_BATTALION_SIZE = 250;
 
 /**
  * Max troops per battalion for a user from research (250, 500, 1000, or 2000).
- * Uses isUnlocked or "completing at or before asOfTime" so the cap updates as soon as research completes.
+ * Uses isUnlocked or "completing at or before asOfTime". Queries include legacy IDs so users with old docs are found before migration.
  * @param asOfTime If provided, research is treated unlocked when researchCompletesAt <= asOfTime.
  */
 export async function getMaxBattalionSize(userId: string, asOfTime?: Date): Promise<number> {
   const now = (asOfTime ?? new Date()).getTime();
   let max = BASE_BATTALION_SIZE;
   for (const { featureId, add } of BATTALION_SIZE_FEATURES) {
+    const featureIds = BATTALION_SIZE_LEGACY_IDS[featureId] ?? [featureId];
     const doc = await UserResearchFeature.findOne({
       userId,
       categoryId: 'hack-ability',
-      featureId
+      featureId: featureIds.length === 1 ? featureIds[0] : { $in: featureIds },
     })
       .select('isUnlocked isResearching researchCompletesAt')
       .lean();
@@ -161,9 +186,14 @@ const BATTALION_SLOT_FEATURE_IDS: Record<'C' | 'D' | 'E', string> = {
   E: 'add-battalion-e',
 };
 
+/** Legacy slot IDs so Battalion C is found under battalions-per-battle before grandfather migration. D/E have no legacy. */
+const BATTALION_SLOT_LEGACY_IDS: Record<string, string[]> = {
+  'add-battalion-c': ['add-battalion-c', 'battalions-per-battle'],
+};
+
 /**
  * Whether the add-battalion-X research is effectively unlocked for a user (unlocked or research just completed at asOfTime).
- * Shared by battle and bots routes to avoid duplicating the same check.
+ * Queries include legacy IDs (e.g. battalions-per-battle for C) so users with old docs are found before migration.
  */
 export async function isBattalionSlotUnlocked(
   userId: string,
@@ -171,10 +201,11 @@ export async function isBattalionSlotUnlocked(
   asOfTime?: Date
 ): Promise<boolean> {
   const featureId = BATTALION_SLOT_FEATURE_IDS[battalionId];
+  const featureIds = BATTALION_SLOT_LEGACY_IDS[featureId] ?? [featureId];
   const doc = await UserResearchFeature.findOne({
     userId,
     categoryId: 'hack-ability',
-    featureId,
+    featureId: featureIds.length === 1 ? featureIds[0] : { $in: featureIds },
   })
     .select('isUnlocked isResearching researchCompletesAt')
     .lean();
