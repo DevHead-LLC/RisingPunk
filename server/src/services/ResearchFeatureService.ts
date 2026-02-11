@@ -305,13 +305,17 @@ export class ResearchFeatureService {
       'battalion-size-250': ['battalion-size-250', 'increase-battalion-size'],
       'reduce-insurance-02': ['reduce-insurance-02', 'reduce-insurance-expense'],
       'rental-profit-01': ['rental-profit-01', 'rental-profit-increase'],
+      'increase-income-01': ['increase-income-01', 'increase-income-rate'],
+      'increase-income-02': ['increase-income-02', 'increase-income-rate'],
+      'increase-income-025': ['increase-income-025', 'increase-income-rate'],
     };
     const legacyIds = legacyMap[featureId];
     if (legacyIds) {
       const categoryMatch =
         (categoryId === 'cash-flow' && featureId === 'reduce-insurance-02') ||
         (categoryId === 'hack-ability' && (featureId === 'add-battalion-c' || featureId === 'battalion-size-250')) ||
-        (categoryId === 'investments' && featureId === 'rental-profit-01');
+        (categoryId === 'investments' && featureId === 'rental-profit-01') ||
+        (categoryId === 'cash-flow' && (featureId === 'increase-income-01' || featureId === 'increase-income-02' || featureId === 'increase-income-025'));
       if (categoryMatch) {
         return { categoryId, featureId: { $in: legacyIds } };
       }

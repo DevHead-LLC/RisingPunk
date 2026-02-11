@@ -105,7 +105,7 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
       const insuranceBase = baseIncomeStatement['Insurance'] ?? -0.50;
       effectiveIncomeStatement['Insurance'] = insuranceBase + insuranceReductionTotal;
     }
-    // Tax reduction applied once below when building expenseEntries (any label containing "tax"). Use same "contains tax" check so gross-income deduction matches (no double-count for keys like "Tax Rate").
+    // Tax reduction applied once to the first expense line containing "tax" (below). hasTaxInTemplate uses same /tax/ check so gross-income deduction matches.
     const hasTaxInTemplate = Object.keys(baseIncomeStatement).some(
       k => /tax/.test(String(k).trim().toLowerCase())
     );
@@ -136,10 +136,12 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
       }
       return num < 0;
     });
-    // Apply tax reduction to any expense line whose label contains "tax" (bulletproof: no dependency on template key)
+    // Apply tax reduction to the first expense line whose label contains "tax" only (so gross-income offset matches; Bugbot: avoid N× reduction with 1× offset when multiple "tax" lines exist).
+    let taxReductionApplied = false;
     const expenseEntries = rawExpenseEntries.map(([k, v]) => {
       const num = Number(v);
-      if (num < 0 && /tax/.test(String(k).trim().toLowerCase())) {
+      if (num < 0 && /tax/.test(String(k).trim().toLowerCase()) && !taxReductionApplied) {
+        taxReductionApplied = true;
         return [k, num + taxReductionTotal] as [string, number];
       }
       return [k, v] as [string, number];
