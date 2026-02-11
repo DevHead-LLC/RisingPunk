@@ -64,7 +64,7 @@ jobs:
           
           echo "Waiting for Cursor bot to appear and complete on PR #$PR_NUMBER before proceeding..."
           
-          MAX_WAIT=1200
+          MAX_WAIT=1800
           WAIT_INTERVAL=10
           LOG_INTERVAL=60
           ELAPSED=0

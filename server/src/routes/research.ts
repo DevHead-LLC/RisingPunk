@@ -37,8 +37,7 @@ async function syncCashFlowResearchCompletion(
   if (!user) return null;
   const researchFeature = await UserResearchFeature.findOne({
     userId,
-    categoryId: 'cash-flow',
-    featureId
+    ...ResearchFeatureService.getFeatureIdFindFilter('cash-flow', featureId),
   }).select('unlockedAt').lean();
   const unlockTime = researchFeature?.unlockedAt || new Date();
   const secondsElapsed = (unlockTime.getTime() - user.balance.lastUpdated.getTime()) / 1000;
