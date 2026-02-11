@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -87,7 +87,8 @@ export function FeatureModal({
     if (refs.length === 0) return [];
     return refs.filter(ref => {
       const list = featuresByCategory[ref.categoryId];
-      if (!list) return true;
+      // Don't treat refs in non-fetched categories as missing (would block canStartResearch incorrectly). Server validates (Bugbot).
+      if (!list) return false;
       const f = list.find((x: any) => (x.id || x.featureId) === ref.featureId);
       return !f?.isUnlocked;
     });
@@ -133,14 +134,26 @@ export function FeatureModal({
   // Check if research is in progress
   const isCurrentlyResearching = feature.isResearching || false;
   
-  // Reset error state when modal opens or closes
+  const requirementsOverlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Reset error state when modal opens or closes; clear requirements overlay timer to avoid setState after unmount (Bugbot).
   useEffect(() => {
     if (!visible) {
+      if (requirementsOverlayTimerRef.current) {
+        clearTimeout(requirementsOverlayTimerRef.current);
+        requirementsOverlayTimerRef.current = null;
+      }
       setShowErrorModal(false);
       setErrorMessage('');
       setShowRequirementsNotMet(false);
       setRequirementsNotMetList([]);
     }
+    return () => {
+      if (requirementsOverlayTimerRef.current) {
+        clearTimeout(requirementsOverlayTimerRef.current);
+        requirementsOverlayTimerRef.current = null;
+      }
+    };
   }, [visible]);
   
   // Calculate time remaining if research is in progress
@@ -170,9 +183,16 @@ export function FeatureModal({
   }, [isCurrentlyResearching, feature.researchCompletesAt, feature.id, completeResearch, categoryId, onResearchStarted]);
   
   const showRequirementsNotMetOverlay = (items: string[]) => {
+    if (requirementsOverlayTimerRef.current) {
+      clearTimeout(requirementsOverlayTimerRef.current);
+      requirementsOverlayTimerRef.current = null;
+    }
     setRequirementsNotMetList(items);
     setShowRequirementsNotMet(true);
-    setTimeout(() => setShowRequirementsNotMet(false), 2000);
+    requirementsOverlayTimerRef.current = setTimeout(() => {
+      requirementsOverlayTimerRef.current = null;
+      setShowRequirementsNotMet(false);
+    }, 2000);
   };
 
   const handlePerformResearch = async () => {

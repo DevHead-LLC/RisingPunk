@@ -63,7 +63,8 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
     if (typeof expenseModifiers?.taxReduction === 'number') return expenseModifiers.taxReduction;
     if (typeof balanceData?.taxReduction === 'number') return balanceData.taxReduction;
     if (!cashFlowFeatures) return 0;
-    if (cashFlowFeatures.some((f: any) => (f.id === 'reduce-tax-expense-02' || f.id === 'reduce-expenses') && f.isUnlocked)) return 0.02;
+    // Server maps legacy financial/reduce-expenses onto cash-flow reduce-tax-expense-02, so this id alone covers both (Bugbot: reduce-expenses is financial, not in cashFlowFeatures).
+    if (cashFlowFeatures.some((f: any) => f.id === 'reduce-tax-expense-02' && f.isUnlocked)) return 0.02;
     return 0;
   }, [expenseModifiers?.taxReduction, balanceData?.taxReduction, cashFlowFeatures]);
   const { themeMode } = useTheme();
