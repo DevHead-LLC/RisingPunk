@@ -9,6 +9,14 @@ export interface RentalHousingSyncResult {
   syncTimestamp: Date;
 }
 
+export interface PerformSyncResult {
+  success: boolean;
+  syncedAmount: number;
+  newBalance: number;
+  insuranceReduction: number;
+  taxReduction: number;
+}
+
 export class RentalHousingSyncService {
   // Income/insurance bonuses are now multi-tier per spec 18; see researchFeatureUtils getBaseIncomeRateBonus, getInsuranceReductionBonus
   /** Pre-level-system flat rate per property per second; use for historical income when user is legacy (would be grandfathered). */
@@ -160,7 +168,7 @@ export class RentalHousingSyncService {
     return updated;
   }
 
-  static async performSync(user: IUser): Promise<{ success: boolean; syncedAmount: number; newBalance: number }> {
+  static async performSync(user: IUser): Promise<PerformSyncResult> {
     // Historical income must use pre-grandfather rates (legacy users at level 1), so run sync check first.
     const syncResult = await this.checkAndSyncRentalHousingIncome(user);
     await this.ensureLegacyRentalLevels(user);
@@ -214,7 +222,9 @@ export class RentalHousingSyncService {
     return {
       success: true,
       syncedAmount: syncResult.syncedAmount,
-      newBalance: user.balance.total
+      newBalance: user.balance.total,
+      insuranceReduction: insuranceBonus,
+      taxReduction: taxBonus,
     };
   }
 }

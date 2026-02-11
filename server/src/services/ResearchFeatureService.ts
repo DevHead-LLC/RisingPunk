@@ -224,9 +224,9 @@ export class ResearchFeatureService {
           { session }
         );
 
-        // Create or update user research feature record
+        // Create or update user research feature record (use legacy filter so we update existing legacy doc instead of creating duplicate)
         await UserResearchFeature.findOneAndUpdate(
-          { userId, categoryId, featureId },
+          { userId, ...ResearchFeatureService.getFeatureIdFindFilter(categoryId, featureId) },
           {
             userId,
             categoryId,

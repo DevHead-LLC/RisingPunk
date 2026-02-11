@@ -105,9 +105,9 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
       const insuranceBase = baseIncomeStatement['Insurance'] ?? -0.50;
       effectiveIncomeStatement['Insurance'] = insuranceBase + insuranceReductionTotal;
     }
-    // Tax reduction applied once below when building expenseEntries (any label containing "tax"). Bugbot: no double-apply; gross-income deduction guarded by hasTaxInTemplate (see lines 121–122).
+    // Tax reduction applied once below when building expenseEntries (any label containing "tax"). Use same "contains tax" check so gross-income deduction matches (no double-count for keys like "Tax Rate").
     const hasTaxInTemplate = Object.keys(baseIncomeStatement).some(
-      k => k.trim().toLowerCase() === 'taxes' || k.trim().toLowerCase() === 'tax'
+      k => /tax/.test(String(k).trim().toLowerCase())
     );
 
     const incomeStatementEntries = Object.entries(effectiveIncomeStatement);
