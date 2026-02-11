@@ -1,5 +1,5 @@
 import { IUser } from '../models/User';
-import { getRentalProfitBonusPerRoom, getResearchFeatureUnlockTime, RENTAL_PROFIT_FEATURES } from '../utils/researchFeatureUtils';
+import { getRentalProfitBonusPerRoom, getResearchFeatureUnlockTime, getRentalProfitUnlockTimes, RENTAL_PROFIT_FEATURES, type BonusPrefetch } from '../utils/researchFeatureUtils';
 import {
   PROPERTY_BASE_RATES,
   ROOM_REMODEL_ADD_SMALL,
@@ -73,8 +73,8 @@ export class RentalHousingIncomeService {
     return rate;
   }
 
-  static async getRentalProfitBonusPerRoom(userId: string): Promise<number> {
-    return getRentalProfitBonusPerRoom(userId);
+  static async getRentalProfitBonusPerRoom(userId: string, prefetch?: BonusPrefetch): Promise<number> {
+    return getRentalProfitBonusPerRoom(userId, prefetch);
   }
 
   /** Earliest unlock time among rental-profit features (for historical income split). */
@@ -87,16 +87,9 @@ export class RentalHousingIncomeService {
     return earliest;
   }
 
-  /** Sorted unlock times for each rental-profit tier (for historical income segments). Includes legacy rental-profit-increase so pre-migration unlock creates a boundary. */
-  static async getRentalProfitUnlockTimes(userId: string): Promise<Date[]> {
-    const times: Date[] = [];
-    for (const { featureId, categoryId } of RENTAL_PROFIT_FEATURES) {
-      const t = await getResearchFeatureUnlockTime(userId, categoryId, featureId);
-      if (t) times.push(t);
-    }
-    const legacyT = await getResearchFeatureUnlockTime(userId, 'investments', 'rental-profit-increase');
-    if (legacyT) times.push(legacyT);
-    return times.sort((a, b) => a.getTime() - b.getTime());
+  /** Sorted unlock times for each rental-profit tier (for historical income segments). Includes legacy. Pass prefetch to avoid N+1. */
+  static async getRentalProfitUnlockTimes(userId: string, prefetch?: BonusPrefetch): Promise<Date[]> {
+    return getRentalProfitUnlockTimes(userId, prefetch);
   }
 
   static getRoomValuesWithResearch(

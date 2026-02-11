@@ -1,5 +1,35 @@
 import { UserResearchFeature } from '../models/UserResearchFeature';
 
+/** Prefetched research feature rows for bonus sync (cash-flow, financial, investments). One batch query replaces N findOne (Bugbot). */
+export type BonusPrefetch = { categoryId: string; featureId: string; isUnlocked: boolean; unlockedAt: Date | null }[];
+
+const BONUS_SYNC_CATEGORIES = ['cash-flow', 'financial', 'investments'] as const;
+
+export async function getResearchFeaturesForBonusSync(userId: string): Promise<BonusPrefetch> {
+  const docs = await UserResearchFeature.find({
+    userId,
+    categoryId: { $in: [...BONUS_SYNC_CATEGORIES] },
+  })
+    .select('categoryId featureId isUnlocked unlockedAt')
+    .lean();
+  return docs.map(d => ({
+    categoryId: d.categoryId,
+    featureId: d.featureId,
+    isUnlocked: !!d.isUnlocked,
+    unlockedAt: d.unlockedAt ? new Date(d.unlockedAt) : null,
+  }));
+}
+
+function isUnlockedInPrefetch(prefetch: BonusPrefetch, categoryId: string, featureId: string): boolean {
+  const doc = prefetch.find(d => d.categoryId === categoryId && d.featureId === featureId);
+  return !!doc?.isUnlocked;
+}
+
+function getUnlockTimeInPrefetch(prefetch: BonusPrefetch, categoryId: string, featureId: string): Date | null {
+  const doc = prefetch.find(d => d.categoryId === categoryId && d.featureId === featureId);
+  return doc?.isUnlocked && doc.unlockedAt ? doc.unlockedAt : null;
+}
+
 /** Cash-flow feature IDs that add to base income rate (spec 18). Bugbot: no legacy IDs in DB — only reduce-expenses is legacy (TAX_REDUCTION_FEATURES). Grandfather migration for increase-income-rate intentionally grants 01+02+025 ($0.055/sec), slightly more than old $0.05/sec. */
 const INCOME_RATE_FEATURES: { featureId: string; value: number }[] = [
   { featureId: 'increase-income-01', value: 0.01 },
@@ -28,43 +58,52 @@ export const RENTAL_PROFIT_FEATURES: { featureId: string; value: number; categor
 
 /**
  * Total base income rate bonus from all unlocked cash-flow income features (spec 18).
- * Legacy: add $0.05/sec when increase-income-rate (cash-flow) is unlocked so pre-migration users keep credit after unlocking new tiers (Bugbot).
+ * Legacy: add $0.05/sec only when no new-tier unlocks (so pre-migration users get credit; avoids double-count if migration left old doc; Bugbot).
+ * Pass prefetch from getResearchFeaturesForBonusSync to avoid N+1 queries (Bugbot).
  */
-export async function getBaseIncomeRateBonus(userId: string): Promise<number> {
+export async function getBaseIncomeRateBonus(userId: string, prefetch?: BonusPrefetch): Promise<number> {
+  const check = prefetch
+    ? (cat: string, fid: string) => Promise.resolve(isUnlockedInPrefetch(prefetch, cat, fid))
+    : (cat: string, fid: string) => isResearchFeatureUnlocked(userId, cat, fid);
   let total = 0;
   for (const { featureId, value } of INCOME_RATE_FEATURES) {
-    const unlocked = await isResearchFeatureUnlocked(userId, 'cash-flow', featureId);
-    if (unlocked) total += value;
+    if (await check('cash-flow', featureId)) total += value;
   }
-  const legacyUnlocked = await isResearchFeatureUnlocked(userId, 'cash-flow', 'increase-income-rate');
-  if (legacyUnlocked) total += 0.05;
+  // Only add legacy when no new-tier unlocks (avoids double-count if migration created new docs but old doc remains; Bugbot).
+  if (total === 0 && (await check('cash-flow', 'increase-income-rate'))) total += 0.05;
   return total;
 }
 
 /**
  * Total insurance expense reduction from all unlocked cash-flow features (spec 18).
- * Legacy: add $0.02 when reduce-insurance-expense (cash-flow) is unlocked so pre-migration users keep credit after unlocking new tiers (Bugbot).
+ * Legacy: add $0.02 only when no new-tier unlocks (avoids double-count if migration left old doc; Bugbot).
+ * Pass prefetch to avoid N+1 queries (Bugbot).
  */
-export async function getInsuranceReductionBonus(userId: string): Promise<number> {
+export async function getInsuranceReductionBonus(userId: string, prefetch?: BonusPrefetch): Promise<number> {
+  const check = prefetch
+    ? (cat: string, fid: string) => Promise.resolve(isUnlockedInPrefetch(prefetch, cat, fid))
+    : (cat: string, fid: string) => isResearchFeatureUnlocked(userId, cat, fid);
   let total = 0;
   for (const { featureId, value } of INSURANCE_REDUCTION_FEATURES) {
-    const unlocked = await isResearchFeatureUnlocked(userId, 'cash-flow', featureId);
-    if (unlocked) total += value;
+    if (await check('cash-flow', featureId)) total += value;
   }
-  const legacyUnlocked = await isResearchFeatureUnlocked(userId, 'cash-flow', 'reduce-insurance-expense');
-  if (legacyUnlocked) total += 0.02;
+  // Only add legacy when no new-tier unlocks (avoids double-count if migration left old doc; Bugbot).
+  if (total === 0 && (await check('cash-flow', 'reduce-insurance-expense'))) total += 0.02;
   return total;
 }
 
 /**
  * Total tax expense reduction from unlocked tax features (spec 18 + legacy).
  * reduce-tax-expense-02 is cash-flow; legacy reduce-expenses is financial. Only one applies; both grant $0.02.
+ * Pass prefetch to avoid N+1 queries (Bugbot).
  */
-export async function getTaxReductionBonus(userId: string): Promise<number> {
+export async function getTaxReductionBonus(userId: string, prefetch?: BonusPrefetch): Promise<number> {
+  const check = prefetch
+    ? (cat: string, fid: string) => Promise.resolve(isUnlockedInPrefetch(prefetch, cat, fid))
+    : (cat: string, fid: string) => isResearchFeatureUnlocked(userId, cat, fid);
   let total = 0;
   for (const { featureId, value, categoryId } of TAX_REDUCTION_FEATURES) {
-    const unlocked = await isResearchFeatureUnlocked(userId, categoryId, featureId);
-    if (unlocked) {
+    if (await check(categoryId, featureId)) {
       total += value;
       break; // Only one tax reduction feature (current or legacy) per user
     }
@@ -74,33 +113,56 @@ export async function getTaxReductionBonus(userId: string): Promise<number> {
 
 /**
  * Total rental profit bonus per room per second from all unlocked investments features (spec 18).
- * Legacy: add $0.01 when rental-profit-increase (investments) is unlocked so pre-migration users keep credit after unlocking new tiers (Bugbot).
+ * Legacy: add $0.01 only when no new-tier unlocks (avoids double-count if migration left old doc; Bugbot).
+ * Pass prefetch to avoid N+1 queries (Bugbot).
  */
-export async function getRentalProfitBonusPerRoom(userId: string): Promise<number> {
+export async function getRentalProfitBonusPerRoom(userId: string, prefetch?: BonusPrefetch): Promise<number> {
+  const check = prefetch
+    ? (cat: string, fid: string) => Promise.resolve(isUnlockedInPrefetch(prefetch, cat, fid))
+    : (cat: string, fid: string) => isResearchFeatureUnlocked(userId, cat, fid);
   let total = 0;
   for (const { featureId, value, categoryId } of RENTAL_PROFIT_FEATURES) {
-    const unlocked = await isResearchFeatureUnlocked(userId, categoryId, featureId);
-    if (unlocked) total += value;
+    if (await check(categoryId, featureId)) total += value;
   }
-  const legacyUnlocked = await isResearchFeatureUnlocked(userId, 'investments', 'rental-profit-increase');
-  if (legacyUnlocked) total += 0.01;
+  // Only add legacy when no new-tier unlocks (avoids double-count if migration left old doc; Bugbot).
+  if (total === 0 && (await check('investments', 'rental-profit-increase'))) total += 0.01;
   return total;
 }
 
 /**
  * Rental profit bonus per room as of a given time (for historical income).
- * Sums only features unlocked at or before asOfTime. Legacy: add $0.01 when rental-profit-increase (investments) unlocked by then (Bugbot).
+ * Sums only features unlocked at or before asOfTime. Legacy: add $0.01 only when no new-tier unlocks by then (Bugbot).
+ * Pass prefetch to avoid N+1 queries (Bugbot).
  */
-export async function getRentalProfitBonusPerRoomAsOf(userId: string, asOfTime: Date): Promise<number> {
+export async function getRentalProfitBonusPerRoomAsOf(userId: string, asOfTime: Date, prefetch?: BonusPrefetch): Promise<number> {
   const asOfMs = asOfTime.getTime();
+  const getTime = prefetch
+    ? (cat: string, fid: string) => Promise.resolve(getUnlockTimeInPrefetch(prefetch, cat, fid))
+    : (cat: string, fid: string) => getResearchFeatureUnlockTime(userId, cat, fid);
   let total = 0;
   for (const { featureId, value, categoryId } of RENTAL_PROFIT_FEATURES) {
-    const unlockedAt = await getResearchFeatureUnlockTime(userId, categoryId, featureId);
+    const unlockedAt = await getTime(categoryId, featureId);
     if (unlockedAt && unlockedAt.getTime() <= asOfMs) total += value;
   }
-  const legacyUnlockedAt = await getResearchFeatureUnlockTime(userId, 'investments', 'rental-profit-increase');
-  if (legacyUnlockedAt && legacyUnlockedAt.getTime() <= asOfMs) total += 0.01;
+  // Only add legacy when no new-tier unlocks by asOfTime (avoids double-count; Bugbot).
+  const legacyUnlockedAt = await getTime('investments', 'rental-profit-increase');
+  if (total === 0 && legacyUnlockedAt && legacyUnlockedAt.getTime() <= asOfMs) total += 0.01;
   return total;
+}
+
+/** Sorted unlock times for rental-profit features (for historical income segments). Includes legacy. Pass prefetch to avoid N+1 (Bugbot). */
+export async function getRentalProfitUnlockTimes(userId: string, prefetch?: BonusPrefetch): Promise<Date[]> {
+  const getTime = prefetch
+    ? (cat: string, fid: string) => Promise.resolve(getUnlockTimeInPrefetch(prefetch, cat, fid))
+    : (cat: string, fid: string) => getResearchFeatureUnlockTime(userId, cat, fid);
+  const times: Date[] = [];
+  for (const { featureId, categoryId } of RENTAL_PROFIT_FEATURES) {
+    const t = await getTime(categoryId, featureId);
+    if (t) times.push(t);
+  }
+  const legacyT = await getTime('investments', 'rental-profit-increase');
+  if (legacyT) times.push(legacyT);
+  return times.sort((a, b) => a.getTime() - b.getTime());
 }
 
 /**
