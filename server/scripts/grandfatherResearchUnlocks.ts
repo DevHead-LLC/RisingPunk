@@ -79,6 +79,7 @@ async function run(): Promise<void> {
       for (const oldDoc of oldDocs) {
         const userId = oldDoc.userId;
         const unlockedAt = oldDoc.unlockedAt || new Date();
+        let createdAny = false;
 
         for (const entry of newEntries) {
           const exists = await UserResearchFeature.exists({
@@ -113,8 +114,30 @@ async function run(): Promise<void> {
               unlockCost,
             });
           }
+          createdAny = true;
           totalInserted++;
           console.log(`   ${DRY_RUN ? '[dry-run] ' : ''}+ ${entry.categoryId}/${entry.featureId} for user ${userId}`);
+        }
+
+        // Remove old doc so bonus logic doesn't double-count (Bugbot: legacy + new records would yield 0.105 vs intended 0.055).
+        if (!DRY_RUN && oldDoc._id) {
+          if (createdAny) {
+            await UserResearchFeature.deleteOne({ _id: oldDoc._id });
+            console.log(`   − removed old ${oldCategoryId}/${oldFeatureId} for user ${userId}`);
+          } else {
+            // Already-migrated: user has all new entries but still has old doc; remove it.
+            const hasAllNew = (
+              await Promise.all(
+                newEntries.map(entry =>
+                  UserResearchFeature.exists({ userId, categoryId: entry.categoryId, featureId: entry.featureId })
+                )
+              )
+            ).every(Boolean);
+            if (hasAllNew) {
+              await UserResearchFeature.deleteOne({ _id: oldDoc._id });
+              console.log(`   − removed old ${oldCategoryId}/${oldFeatureId} (already had new) for user ${userId}`);
+            }
+          }
         }
       }
       console.log('');
