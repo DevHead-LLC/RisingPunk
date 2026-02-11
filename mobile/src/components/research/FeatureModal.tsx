@@ -1,21 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Modal,
   TouchableOpacity,
-  SafeAreaView,
   Platform,
 } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { ResearchFeature } from './ResearchFeaturesList';
-import { useStartResearchMutation, useCompleteResearchMutation, useSpeedupFeatureResearchMutation } from '../../store/api/researchFeaturesApi';
+import { useStartResearchMutation, useCompleteResearchMutation, useSpeedupFeatureResearchMutation, useGetUserFeaturesQuery } from '../../store/api/researchFeaturesApi';
+import { useGetResearchCenterStatusQuery } from '../../store/api/authApi';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { updateBalance } from '../../store/slices/balanceSlice';
 import { LockedFeatureModal } from '../turf/LockedFeatureModal';
 import { trackFirstResearch } from '../../services/analyticsService';
+
+const CATEGORY_DISPLAY_NAMES: Record<string, string> = {
+  'home-defense': 'Home Defense',
+  'cash-flow': 'Cash Flow',
+  'hack-ability': 'Hack Ability',
+  'hack-crew': 'Hack Crew',
+  'investments': 'Investments',
+  'financial': 'Financial',
+  'npc': 'NPC',
+  'construction': 'Construction',
+  'battle-mechanics': 'Battle Mechanics',
+  'gear': 'Gear',
+};
 
 interface FeatureModalProps {
   visible: boolean;
@@ -45,14 +58,77 @@ export function FeatureModal({
   const [isSpeedupLoading, setIsSpeedupLoading] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [showRequirementsNotMet, setShowRequirementsNotMet] = useState(false);
+  const [requirementsNotMetList, setRequirementsNotMetList] = useState<string[]>([]);
   const [startResearch, { isLoading: isStartingResearch }] = useStartResearchMutation();
   const [completeResearch, { isLoading: isCompletingResearch }] = useCompleteResearchMutation();
   const [speedupFeatureResearch] = useSpeedupFeatureResearchMutation();
   const isLightMode = colors.background === '#FAFAFA' || colors.background === '#F5F5DC';
+
+  const refs = feature.requiredFeatureRefs ?? [];
+  const refCategories = useMemo(() => [...new Set(refs.map(r => r.categoryId))], [refs]);
+  const { data: homeDefFeatures } = useGetUserFeaturesQuery('home-defense', { skip: !visible || !refCategories.includes('home-defense') });
+  const { data: cashFlowFeatures } = useGetUserFeaturesQuery('cash-flow', { skip: !visible || !refCategories.includes('cash-flow') });
+  const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability', { skip: !visible || !refCategories.includes('hack-ability') });
+  const { data: hackCrewFeatures } = useGetUserFeaturesQuery('hack-crew', { skip: !visible || !refCategories.includes('hack-crew') });
+  const { data: investmentsFeatures } = useGetUserFeaturesQuery('investments', { skip: !visible || !refCategories.includes('investments') });
+  const { data: researchCenterStatus } = useGetResearchCenterStatusQuery(undefined, { skip: !visible });
+  const currentResearchCenterLevel = researchCenterStatus?.level ?? 0;
+
+  const featuresByCategory = useMemo(() => ({
+    'home-defense': homeDefFeatures ?? [],
+    'cash-flow': cashFlowFeatures ?? [],
+    'hack-ability': hackAbilityFeatures ?? [],
+    'hack-crew': hackCrewFeatures ?? [],
+    'investments': investmentsFeatures ?? [],
+  }), [homeDefFeatures, cashFlowFeatures, hackAbilityFeatures, hackCrewFeatures, investmentsFeatures]);
+
+  const missingRequiredRefs = useMemo(() => {
+    if (refs.length === 0) return [];
+    return refs.filter(ref => {
+      const list = featuresByCategory[ref.categoryId];
+      if (!list) return true;
+      const f = list.find((x: any) => (x.id || x.featureId) === ref.featureId);
+      return !f?.isUnlocked;
+    });
+  }, [refs, featuresByCategory]);
+
+  const missingRequiredDisplay = useMemo(() => {
+    return missingRequiredRefs.map(ref => {
+      const list = featuresByCategory[ref.categoryId];
+      const f = list?.find((x: any) => (x.id || x.featureId) === ref.featureId);
+      const featureName = f?.name ?? ref.featureId.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+      const categoryName = CATEGORY_DISPLAY_NAMES[ref.categoryId] ?? ref.categoryId;
+      return `${featureName} (${categoryName})`;
+    });
+  }, [missingRequiredRefs, featuresByCategory]);
   
   const canAfford = currentBalance >= feature.unlockCost;
   const meetsLevelRequirement = currentLevel >= feature.levelRequirement;
-  const researchTimeHours = feature.researchTimeHours || 4; // Default to 4 hours if not specified
+  const rcLevelReq = feature.researchCenterLevelRequirement;
+  const meetsRcLevelRequirement = rcLevelReq == null || currentResearchCenterLevel >= rcLevelReq;
+  const meetsPrerequisiteRequirements = missingRequiredRefs.length === 0;
+  const canStartResearch = canAfford && meetsLevelRequirement && meetsRcLevelRequirement && meetsPrerequisiteRequirements && !feature.isResearching;
+  const researchTimeHours = feature.researchTimeHours ?? 4; // Default to 4 hours if not specified
+
+  /** Format researchTimeHours (fractional ok) as human-readable: weeks, days, hours, minutes, seconds (only appropriate parts). */
+  const formatResearchTimeDisplay = (hours: number): string => {
+    const totalSeconds = Math.round(hours * 3600);
+    if (totalSeconds <= 0) return '0 seconds';
+    const weeks = Math.floor(totalSeconds / (7 * 24 * 3600));
+    const days = Math.floor((totalSeconds % (7 * 24 * 3600)) / (24 * 3600));
+    const hrs = Math.floor((totalSeconds % (24 * 3600)) / 3600);
+    const min = Math.floor((totalSeconds % 3600) / 60);
+    const sec = totalSeconds % 60;
+    const parts: string[] = [];
+    if (weeks > 0) parts.push(`${weeks} week${weeks !== 1 ? 's' : ''}`);
+    if (days > 0) parts.push(`${days} day${days !== 1 ? 's' : ''}`);
+    if (hrs > 0) parts.push(`${hrs} hour${hrs !== 1 ? 's' : ''}`);
+    if (min > 0) parts.push(`${min} minute${min !== 1 ? 's' : ''}`);
+    if (sec > 0 || parts.length === 0) parts.push(`${sec} second${sec !== 1 ? 's' : ''}`);
+    return parts.join(' ');
+  };
+  const researchTimeDisplay = formatResearchTimeDisplay(researchTimeHours);
   
   // Check if research is in progress
   const isCurrentlyResearching = feature.isResearching || false;
@@ -60,9 +136,10 @@ export function FeatureModal({
   // Reset error state when modal opens or closes
   useEffect(() => {
     if (!visible) {
-      // Reset error state when modal closes
       setShowErrorModal(false);
       setErrorMessage('');
+      setShowRequirementsNotMet(false);
+      setRequirementsNotMetList([]);
     }
   }, [visible]);
   
@@ -92,26 +169,39 @@ export function FeatureModal({
     }
   }, [isCurrentlyResearching, feature.researchCompletesAt, feature.id, completeResearch, categoryId, onResearchStarted]);
   
+  const showRequirementsNotMetOverlay = (items: string[]) => {
+    setRequirementsNotMetList(items);
+    setShowRequirementsNotMet(true);
+    setTimeout(() => setShowRequirementsNotMet(false), 2000);
+  };
+
   const handlePerformResearch = async () => {
-    if (canAfford && meetsLevelRequirement && !isCurrentlyResearching) {
-      try {
-        const result = await startResearch({ categoryId, featureId: feature.id }).unwrap();
-        
-        // Update UI immediately after successful mutation
-        setIsResearching(true);
-        onResearchStarted?.();
-        onClose(); // Close modal after starting research
-        
-        // Track first research (fire-and-forget, don't block UI updates)
-        if (userId) {
-          trackFirstResearch(categoryId, feature.id, userId).catch((analyticsError) => {
-            // Analytics failure should not affect user experience
-            console.error('[Analytics] Error tracking first_research:', analyticsError);
-          });
-        }
-      } catch (error) {
-        console.error('Failed to start research:', error);
+    if (!canStartResearch) {
+      const items: string[] = [];
+      if (!meetsLevelRequirement) items.push(`Level ${feature.levelRequirement} required`);
+      if (!canAfford) items.push(`$${feature.unlockCost.toLocaleString()} balance required`);
+      if (rcLevelReq != null && !meetsRcLevelRequirement) items.push(`Research Center level ${rcLevelReq} required`);
+      missingRequiredDisplay.forEach(label => items.push(label));
+      showRequirementsNotMetOverlay(items.length > 0 ? items : ['Requirements not met']);
+      return;
+    }
+    try {
+      const result = await startResearch({ categoryId, featureId: feature.id }).unwrap();
+      
+      setIsResearching(true);
+      onResearchStarted?.();
+      onClose();
+      
+      if (userId) {
+        trackFirstResearch(categoryId, feature.id, userId).catch((analyticsError) => {
+          console.error('[Analytics] Error tracking first_research:', analyticsError);
+        });
       }
+    } catch (error: any) {
+      console.error('Failed to start research:', error);
+      const msg = error?.data?.message || error?.message;
+      const items = msg ? [msg] : ['Requirements not met. Complete any required research in other categories first.'];
+      showRequirementsNotMetOverlay(items);
     }
   };
   
@@ -212,42 +302,86 @@ export function FeatureModal({
           <Text style={[styles.requirementLabel, { color: colors.text.secondary }]}>
             Research Time:
           </Text>
-          <Text style={[styles.requirementValue, { color: colors.text.primary }]}>
-            {researchTimeHours} hours
+          <Text style={[styles.requirementValue, { color: colors.success }]}>
+            {researchTimeDisplay}
           </Text>
         </View>
+        {rcLevelReq != null && (
+          <View style={styles.requirementRow}>
+            <Text style={[styles.requirementLabel, { color: colors.text.secondary }]}>
+              Research Center Level:
+            </Text>
+            <Text style={[
+              styles.requirementValue,
+              { color: meetsRcLevelRequirement ? colors.success : colors.error }
+            ]}>
+              {currentResearchCenterLevel}/{rcLevelReq}
+            </Text>
+          </View>
+        )}
+        {refs.length > 0 && (
+          <View style={styles.requirementRow}>
+            <Text style={[styles.requirementLabel, { color: colors.text.secondary }]}>
+              Required research:
+            </Text>
+            <View style={styles.requirementValueWrap}>
+              {missingRequiredDisplay.length > 0 ? (
+                <Text style={[styles.requirementValue, { color: colors.error }]}>
+                  {missingRequiredDisplay.join('\n')}
+                </Text>
+              ) : (
+                <Text style={[styles.requirementValue, { color: colors.success }]}>
+                  Met
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
       </View>
       
-      {/* Show research button if conditions are met, or disabled button if conditions not met */}
-      {!isCurrentlyResearching && (
+      <View style={styles.buttonRow}>
         <TouchableOpacity
-          style={[
-            styles.researchButton,
-            { 
-              backgroundColor: (canAfford && meetsLevelRequirement) ? colors.secondary : '#6B7280',
-              opacity: isStartingResearch ? 0.6 : 1
-            }
-          ]}
-          onPress={handlePerformResearch}
-          disabled={isStartingResearch || !canAfford || !meetsLevelRequirement}
+          style={[styles.modalActionButton, { backgroundColor: colors.primary }]}
+          onPress={onClose}
         >
-          <Text style={[styles.researchButtonText, { color: '#FFFFFF' }]}>
-            {isStartingResearch ? 'Starting Research...' : 
-             !canAfford ? 'Insufficient Funds' :
-             !meetsLevelRequirement ? 'Level Too Low' :
-             'Perform Research'}
+          <Text style={[styles.modalActionButtonText, { color: '#FFFFFF' }]}>
+            Cancel
           </Text>
         </TouchableOpacity>
+        {!isCurrentlyResearching && (
+          <TouchableOpacity
+            style={[
+              styles.modalActionButton,
+              { 
+                backgroundColor: canStartResearch ? colors.secondary : '#6B7280',
+                opacity: isStartingResearch ? 0.6 : 1
+              }
+            ]}
+            onPress={handlePerformResearch}
+            disabled={isStartingResearch}
+          >
+            <Text style={[styles.modalActionButtonText, { color: '#FFFFFF' }]}>
+              {isStartingResearch ? 'Starting...' : 
+               !canAfford ? 'Insufficient Funds' :
+               !meetsLevelRequirement ? 'Level Too Low' :
+               (rcLevelReq != null && !meetsRcLevelRequirement) ? 'RC Level Too Low' :
+               !meetsPrerequisiteRequirements ? 'Required research not complete' :
+               'Research'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {showRequirementsNotMet && (
+        <View style={styles.requirementsNotMetOverlay}>
+          <View style={[styles.requirementsNotMetPopup, { backgroundColor: colors.error }]}>
+            <Text style={styles.requirementsNotMetText}>Requirements Not Met</Text>
+            {requirementsNotMetList.map((item, i) => (
+              <Text key={i} style={styles.requirementsNotMetItem}>{item}</Text>
+            ))}
+          </View>
+        </View>
       )}
-      
-      <TouchableOpacity
-        style={[styles.closeButton, { backgroundColor: colors.primary }]}
-        onPress={onClose}
-      >
-        <Text style={[styles.closeButtonText, { color: '#FFFFFF' }]}>
-          Close
-        </Text>
-      </TouchableOpacity>
     </View>
   );
 
@@ -277,8 +411,8 @@ export function FeatureModal({
             <Text style={[styles.infoLabel, { color: '#8B5CF6', textDecorationLine: 'underline' }]}>
               Research Time:
             </Text>
-            <Text style={[styles.infoValue, { color: isLightMode ? '#374151' : '#F1F5F9' }]}>
-              {researchTimeHours} hours
+            <Text style={[styles.infoValue, { color: colors.success }]}>
+              {researchTimeDisplay}
             </Text>
           </View>
         </View>
@@ -334,42 +468,74 @@ export function FeatureModal({
               </TouchableOpacity>
             </View>
           )}
+          <TouchableOpacity
+            style={[styles.closeButton, { backgroundColor: '#475569', marginTop: SIZING.spacing.sm }]}
+            onPress={onClose}
+          >
+            <Text style={[styles.closeButtonText, { color: '#FFFFFF' }]}>
+              Cancel
+            </Text>
+          </TouchableOpacity>
         </View>
       ) : !feature.isUnlocked ? (
-        <TouchableOpacity
-          style={[
-            styles.researchButton,
-            {
-              backgroundColor: (canAfford && meetsLevelRequirement) ? colors.secondary : '#EF4444',
-              opacity: (canAfford && meetsLevelRequirement) ? 1 : 0.6
-            }
-          ]}
-          onPress={handlePerformResearch}
-          disabled={!canAfford || !meetsLevelRequirement || isStartingResearch}
-        >
-          <Text style={[styles.researchButtonText, { color: '#FFFFFF' }]}>
-            {isStartingResearch ? 'Starting Research...' : 
-             !canAfford ? 'Insufficient Funds' :
-             !meetsLevelRequirement ? 'Level Too Low' :
-             'Perform Research'}
-          </Text>
-        </TouchableOpacity>
-      ) : (
-        <View style={styles.unlockedStatus}>
-          <Text style={[styles.unlockedText, { color: '#10B981' }]}>
-            ✓ Feature Unlocked
-          </Text>
+        <View style={styles.buttonRow}>
+          <TouchableOpacity
+            style={[styles.modalActionButton, { backgroundColor: '#475569' }]}
+            onPress={onClose}
+          >
+            <Text style={[styles.modalActionButtonText, { color: '#FFFFFF' }]}>
+              Cancel
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.modalActionButton,
+              {
+                backgroundColor: canStartResearch ? colors.secondary : '#EF4444',
+                opacity: canStartResearch ? 1 : 0.6
+              }
+            ]}
+            onPress={handlePerformResearch}
+            disabled={isStartingResearch}
+          >
+            <Text style={[styles.modalActionButtonText, { color: '#FFFFFF' }]}>
+              {isStartingResearch ? 'Starting...' : 
+               !canAfford ? 'Insufficient Funds' :
+               !meetsLevelRequirement ? 'Level Too Low' :
+               (rcLevelReq != null && !meetsRcLevelRequirement) ? 'RC Level Too Low' :
+               !meetsPrerequisiteRequirements ? 'Required research not complete' :
+               'Research'}
+            </Text>
+          </TouchableOpacity>
         </View>
+      ) : (
+        <>
+          <View style={styles.unlockedStatus}>
+            <Text style={[styles.unlockedText, { color: '#10B981' }]}>
+              ✓ Feature Unlocked
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.closeButton, { backgroundColor: '#475569' }]}
+            onPress={onClose}
+          >
+            <Text style={[styles.closeButtonText, { color: '#FFFFFF' }]}>
+              Cancel
+            </Text>
+          </TouchableOpacity>
+        </>
       )}
 
-      <TouchableOpacity
-        style={[styles.closeButton, { backgroundColor: '#475569' }]}
-        onPress={onClose}
-      >
-        <Text style={[styles.closeButtonText, { color: '#FFFFFF' }]}>
-          Close
-        </Text>
-      </TouchableOpacity>
+      {showRequirementsNotMet && (
+        <View style={styles.requirementsNotMetOverlay}>
+          <View style={[styles.requirementsNotMetPopup, { backgroundColor: colors.error }]}>
+            <Text style={styles.requirementsNotMetText}>Requirements Not Met</Text>
+            {requirementsNotMetList.map((item, i) => (
+              <Text key={i} style={styles.requirementsNotMetItem}>{item}</Text>
+            ))}
+          </View>
+        </View>
+      )}
     </View>
   );
 
@@ -477,6 +643,10 @@ const styles = StyleSheet.create({
     fontSize: SIZING.font.body,
     fontWeight: '600',
   },
+  requirementValueWrap: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
   researchInfoContainer: {
     width: '100%',
     marginBottom: SIZING.spacing.lg,
@@ -494,12 +664,33 @@ const styles = StyleSheet.create({
     fontSize: SIZING.font.body,
     fontWeight: '600',
   },
+  buttonRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: SIZING.spacing.xs,
+    gap: SIZING.spacing.sm,
+    marginTop: SIZING.spacing.sm,
+    marginBottom: SIZING.spacing.xs,
+  },
+  modalActionButton: {
+    flex: 1,
+    paddingVertical: SIZING.spacing.md,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  modalActionButtonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
+  },
   researchButton: {
     paddingHorizontal: SIZING.spacing.lg,
     paddingVertical: SIZING.spacing.md,
     borderRadius: 8,
-    marginBottom: SIZING.spacing.md,
-    minWidth: 200,
+    minWidth: 120,
     alignItems: 'center',
   },
   researchButtonText: {
@@ -585,7 +776,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     minWidth: 100,
     alignItems: 'center',
-    marginTop: SIZING.spacing.xs,
   },
   closeButtonText: {
     fontSize: SIZING.font.body,
@@ -611,5 +801,37 @@ const styles = StyleSheet.create({
   comingSoonText: {
     fontSize: SIZING.font.h2,
     fontWeight: 'bold',
+  },
+  requirementsNotMetOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  requirementsNotMetPopup: {
+    paddingHorizontal: SIZING.spacing.md,
+    paddingVertical: SIZING.spacing.sm,
+    borderRadius: 6,
+    alignItems: 'center',
+    minWidth: 200,
+    maxWidth: 300,
+  },
+  requirementsNotMetText: {
+    color: '#FFFFFF',
+    fontSize: SIZING.font.h2,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: SIZING.spacing.xs,
+  },
+  requirementsNotMetItem: {
+    color: '#FFFFFF',
+    fontSize: SIZING.font.small,
+    textAlign: 'center',
+    marginTop: 2,
   },
 });

@@ -198,7 +198,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
       const addBattalionCFeature = await UserResearchFeature.findOne({
         userId,
         categoryId: 'hack-ability',
-        featureId: 'battalions-per-battle'
+        featureId: 'add-battalion-c'
       });
 
       if (addBattalionCFeature && addBattalionCFeature.isUnlocked) {
@@ -228,7 +228,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
       const battalionSizeFeature = await UserResearchFeature.findOne({
         userId,
         categoryId: 'hack-ability',
-        featureId: 'increase-battalion-size'
+        featureId: 'battalion-size-250'
       });
 
       if (battalionSizeFeature && battalionSizeFeature.isUnlocked) {
