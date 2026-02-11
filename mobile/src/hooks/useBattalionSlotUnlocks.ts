@@ -14,7 +14,7 @@ interface FeatureWithResearch {
  * Matches server-side isBattalionSlotUnlocked: requires a valid researchCompletesAt before
  * treating "researching" as complete; missing timestamp is not treated as epoch (unlocked).
  */
-export function isResearchFeatureEffectivelyUnlocked(feature: FeatureWithResearch | null | undefined): boolean {
+function isResearchFeatureEffectivelyUnlocked(feature: FeatureWithResearch | null | undefined): boolean {
   if (!feature) return false;
   if (feature.isUnlocked) return true;
   const researchCompletesAtMs = feature.researchCompletesAt

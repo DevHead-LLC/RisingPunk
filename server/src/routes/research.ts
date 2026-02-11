@@ -35,11 +35,14 @@ async function syncCashFlowResearchCompletion(
   const { UserResearchFeature } = await import('../models/UserResearchFeature');
   const user = existingUser ?? await User.findById(userId);
   if (!user) return null;
-  // Legacy-aware lookup: doc may be stored under legacy ID (e.g. reduce-insurance-expense, reduce-expenses) when completed under new ID (Bugbot).
+  // Legacy-aware filter can match multiple docs; use most recent unlockedAt so balance accrual is correct (Bugbot).
   const researchFeature = await UserResearchFeature.findOne({
     userId,
     ...ResearchFeatureService.getFeatureIdFindFilter('cash-flow', featureId),
-  }).select('unlockedAt').lean();
+  })
+    .select('unlockedAt')
+    .sort({ unlockedAt: -1 })
+    .lean();
   const unlockTime = researchFeature?.unlockedAt || new Date();
   const secondsElapsed = (unlockTime.getTime() - user.balance.lastUpdated.getTime()) / 1000;
   if (secondsElapsed > 0) {
