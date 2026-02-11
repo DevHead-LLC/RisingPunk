@@ -181,15 +181,13 @@ export class ResearchFeatureService {
           missingRequirements.balance = true;
         }
 
-        // Check Research Center level requirement (per-feature)
+        // Check Research Center level requirement (per-feature); accumulate like level/balance so all reasons are returned (Bugbot).
         const rcLevelReq = (feature as any).researchCenterLevelRequirement;
         if (rcLevelReq != null) {
           const effectiveRcLevel = user.researchCenterLevel ?? (user.unlockedFeatures?.researchCenter ? 3 : 0);
           if (effectiveRcLevel < rcLevelReq) {
-            return {
-              success: false,
-              message: `Research Center level ${rcLevelReq} required (current: ${effectiveRcLevel})`
-            };
+            reasons.push(`Research Center level ${rcLevelReq} required (current: ${effectiveRcLevel})`);
+            missingRequirements.researchCenterLevel = true;
           }
         }
 
