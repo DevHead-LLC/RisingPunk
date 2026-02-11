@@ -303,6 +303,7 @@ export class ResearchFeatureService {
     const legacyMap: Record<string, string[]> = {
       'add-battalion-c': ['add-battalion-c', 'battalions-per-battle'],
       'battalion-size-250': ['battalion-size-250', 'increase-battalion-size'],
+      'reduce-insurance-01': ['reduce-insurance-01', 'reduce-insurance-expense'],
       'reduce-insurance-02': ['reduce-insurance-02', 'reduce-insurance-expense'],
       'rental-profit-01': ['rental-profit-01', 'rental-profit-increase'],
       'increase-income-01': ['increase-income-01', 'increase-income-rate'],
@@ -312,7 +313,7 @@ export class ResearchFeatureService {
     const legacyIds = legacyMap[featureId];
     if (legacyIds) {
       const categoryMatch =
-        (categoryId === 'cash-flow' && featureId === 'reduce-insurance-02') ||
+        (categoryId === 'cash-flow' && (featureId === 'reduce-insurance-01' || featureId === 'reduce-insurance-02')) ||
         (categoryId === 'hack-ability' && (featureId === 'add-battalion-c' || featureId === 'battalion-size-250')) ||
         (categoryId === 'investments' && featureId === 'rental-profit-01') ||
         (categoryId === 'cash-flow' && (featureId === 'increase-income-01' || featureId === 'increase-income-02' || featureId === 'increase-income-025'));
@@ -487,6 +488,7 @@ export class ResearchFeatureService {
         'add-battalion-c': ['battalions-per-battle'],
         'battalion-size-250': ['increase-battalion-size'],
         'crew-system-unlock': [],
+        'reduce-insurance-01': ['reduce-insurance-expense'],
         'reduce-insurance-02': ['reduce-insurance-expense'],
         'rental-profit-01': ['rental-profit-increase'],
         'increase-income-01': ['increase-income-rate'],
