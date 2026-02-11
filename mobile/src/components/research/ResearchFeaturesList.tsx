@@ -100,31 +100,10 @@ export function ResearchFeaturesList({
     );
   };
 
-  // Filter features based on category
+  // Show all features per category (spec 18); temporarily hide some until future development
   const visibleFeatures = features.filter(feature => {
-    // Filter out bot-trap for App Store submission - only show Antivirus
     if (feature.id === 'bot-trap') return false;
-    
-    // For hack-ability, show "battalions-per-battle" and "increase-battalion-size"
-    if (categoryId === 'hack-ability') {
-      return feature.id === 'battalions-per-battle' || feature.id === 'increase-battalion-size';
-    }
-    
-    // For hack-crew, only show "crew-system-unlock"
-    if (categoryId === 'hack-crew') {
-      return feature.id === 'crew-system-unlock';
-    }
-    
-    // For cash-flow, show "increase-income-rate" and "reduce-insurance-expense"
-    if (categoryId === 'cash-flow') {
-      return feature.id === 'increase-income-rate' || feature.id === 'reduce-insurance-expense';
-    }
-    
-    // For investments, only show "rental-profit-increase"
-    if (categoryId === 'investments') {
-      return feature.id === 'rental-profit-increase';
-    }
-    
+    if (feature.id === 'probe') return false; // TODO: re-enable when Probe ability development is done
     return true;
   });
 

@@ -64,7 +64,7 @@ jobs:
           
           echo "Waiting for Cursor bot to appear and complete on PR #$PR_NUMBER before proceeding..."
           
-          MAX_WAIT=1200
+          MAX_WAIT=1800
           WAIT_INTERVAL=10
           LOG_INTERVAL=60
           ELAPSED=0
@@ -115,10 +115,13 @@ jobs:
                     if [ -n "$CURSOR_CHECK_ID" ]; then
                       CHECK_OUTPUT=$(gh api repos/${{ github.repository }}/check-runs/$CURSOR_CHECK_ID 2>/dev/null || echo "{}")
                       CHECK_TEXT=$(echo "$CHECK_OUTPUT" | jq -r '.output.summary // .output.text // ""' 2>/dev/null || echo "")
-                      if echo "$CHECK_TEXT" | grep -qiE "(posted analysis results.*[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported|[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported)"; then
+                      if echo "$CHECK_TEXT" | grep -qiE "(posted analysis results.*[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported|[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported|found[[:space:]]+[0-9]+[[:space:]]+potential[[:space:]]+issues?)"; then
                         BUGS_REPORTED=$(echo "$CHECK_TEXT" | grep -oE "([0-9]+)[[:space:]]+bug(s?)[[:space:]]+reported" | head -1 | grep -oE "[0-9]+" || echo "0")
                         if [ "$BUGS_REPORTED" = "0" ]; then
                           BUGS_REPORTED=$(echo "$CHECK_TEXT" | grep -oE "posted analysis results.*([0-9]+)[[:space:]]+bug" | grep -oE "[0-9]+" | head -1 || echo "0")
+                        fi
+                        if [ -z "$BUGS_REPORTED" ] || [ "$BUGS_REPORTED" = "0" ]; then
+                          BUGS_REPORTED=$(echo "$CHECK_TEXT" | grep -oE "found[[:space:]]+[0-9]+[[:space:]]+potential[[:space:]]+issues?" | grep -oE "[0-9]+" | head -1 || echo "0")
                         fi
                       fi
                     fi
@@ -127,10 +130,13 @@ jobs:
                     CURSOR_COMMENTS=$(echo "$ISSUE_COMMENTS" | jq -r '.[] | select(.user.login | ascii_downcase | contains("cursor")) | .body' 2>/dev/null || echo "")
                     if [ -z "$BUGS_REPORTED" ] || [ "$BUGS_REPORTED" = "0" ]; then
                       if [ -n "$CURSOR_COMMENTS" ]; then
-                        if echo "$CURSOR_COMMENTS" | grep -qiE "(posted analysis results.*[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported|[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported)"; then
+                        if echo "$CURSOR_COMMENTS" | grep -qiE "(posted analysis results.*[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported|[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported|found[[:space:]]+[0-9]+[[:space:]]+potential[[:space:]]+issues?)"; then
                           BUGS_REPORTED=$(echo "$CURSOR_COMMENTS" | grep -oE "([0-9]+)[[:space:]]+bug(s?)[[:space:]]+reported" | head -1 | grep -oE "[0-9]+" || echo "0")
                           if [ "$BUGS_REPORTED" = "0" ]; then
                             BUGS_REPORTED=$(echo "$CURSOR_COMMENTS" | grep -oE "posted analysis results.*([0-9]+)[[:space:]]+bug" | grep -oE "[0-9]+" | head -1 || echo "0")
+                          fi
+                          if [ -z "$BUGS_REPORTED" ] || [ "$BUGS_REPORTED" = "0" ]; then
+                            BUGS_REPORTED=$(echo "$CURSOR_COMMENTS" | grep -oE "found[[:space:]]+[0-9]+[[:space:]]+potential[[:space:]]+issues?" | grep -oE "[0-9]+" | head -1 || echo "0")
                           fi
                         fi
                       fi
@@ -139,10 +145,13 @@ jobs:
                     ISSUE_COMMENTS=$(gh api repos/${{ github.repository }}/issues/$PR_NUMBER/comments 2>/dev/null || echo "[]")
                     CURSOR_COMMENTS=$(echo "$ISSUE_COMMENTS" | grep -i "cursor" -A 20 | grep -oE '"body"[[:space:]]*:[[:space:]]*"[^"]+"' | sed -E 's/.*"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' || echo "")
                     if [ -n "$CURSOR_COMMENTS" ]; then
-                      if echo "$CURSOR_COMMENTS" | grep -qiE "(posted analysis results.*[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported|[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported)"; then
+                      if echo "$CURSOR_COMMENTS" | grep -qiE "(posted analysis results.*[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported|[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported|found[[:space:]]+[0-9]+[[:space:]]+potential[[:space:]]+issues?)"; then
                         BUGS_REPORTED=$(echo "$CURSOR_COMMENTS" | grep -oE "([0-9]+)[[:space:]]+bug(s?)[[:space:]]+reported" | head -1 | grep -oE "[0-9]+" || echo "0")
                         if [ "$BUGS_REPORTED" = "0" ]; then
                           BUGS_REPORTED=$(echo "$CURSOR_COMMENTS" | grep -oE "posted analysis results.*([0-9]+)[[:space:]]+bug" | grep -oE "[0-9]+" | head -1 || echo "0")
+                        fi
+                        if [ -z "$BUGS_REPORTED" ] || [ "$BUGS_REPORTED" = "0" ]; then
+                          BUGS_REPORTED=$(echo "$CURSOR_COMMENTS" | grep -oE "found[[:space:]]+[0-9]+[[:space:]]+potential[[:space:]]+issues?" | grep -oE "[0-9]+" | head -1 || echo "0")
                         fi
                       fi
                     fi
@@ -157,7 +166,7 @@ jobs:
                     CURSOR_CHECK_FAILED=true
                     break
                   else
-                    echo "✅ No bugs reported (checked for 'X bug(s) reported' pattern)"
+                    echo "✅ No bugs reported (checked for 'X bug(s) reported' and 'found X potential issues' patterns)"
                     echo "✅ Proceeding with promotion."
                     CURSOR_CHECK_PASSED=true
                     break
