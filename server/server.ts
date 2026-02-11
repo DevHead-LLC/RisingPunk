@@ -21,6 +21,7 @@ import healthRoute from './src/routes/health';
 import researchRoutes from './src/routes/research';
 import documentsRoutes from './src/routes/documents';
 import { deleteAccountHandler } from './src/routes/documents';
+import type { PerformSyncResult } from './src/services/RentalHousingSyncService';
 import testRoutes from './src/routes/test';
 import botsRoutes from './src/routes/bots';
 import crewRoutes from './src/routes/crew';
@@ -274,9 +275,9 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
       await user.save();
     }
 
-    // THEN check and sync rental housing income if needed
+    // THEN check and sync rental housing income if needed (returns expense modifiers to avoid duplicate DB queries)
     const { RentalHousingSyncService } = await import('./src/services/RentalHousingSyncService');
-    await RentalHousingSyncService.performSync(user);
+    const syncResult: PerformSyncResult = await RentalHousingSyncService.performSync(user);
 
     // Check and update lifetime high net worth
     const { LifetimeHighNetWorthService } = await import('./src/services/LifetimeHighNetWorthService');
@@ -287,6 +288,10 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
       await user.save();
     }
 
+    // Expense modifiers from performSync (single source of truth for Financial Statements screen; no duplicate queries)
+    const insuranceReduction = syncResult.insuranceReduction;
+    const taxReduction = syncResult.taxReduction;
+
     // Return updated balance (ratePerSecond already includes rental housing income)
     const currentBalance = {
       total: user.balance.total,
@@ -294,7 +299,9 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
       lastUpdated: user.balance.lastUpdated,
       fractionalRemainder: user.balance.fractionalRemainder || 0,
       lifetimeHighNetWorth: user.lifetimeHighNetWorth || 0,
-      lifetimeHighUpdated: lifetimeHighUpdated
+      lifetimeHighUpdated: lifetimeHighUpdated,
+      insuranceReduction,
+      taxReduction
     };
 
     res.json(currentBalance);
