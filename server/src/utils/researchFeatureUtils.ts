@@ -28,7 +28,7 @@ export const RENTAL_PROFIT_FEATURES: { featureId: string; value: number; categor
 
 /**
  * Total base income rate bonus from all unlocked cash-flow income features (spec 18).
- * Legacy: if no new IDs are unlocked, check increase-income-rate (cash-flow) and add $0.05/sec so pre-migration users get correct rate.
+ * Legacy: add $0.05/sec when increase-income-rate (cash-flow) is unlocked so pre-migration users keep credit after unlocking new tiers (Bugbot).
  */
 export async function getBaseIncomeRateBonus(userId: string): Promise<number> {
   let total = 0;
@@ -36,16 +36,14 @@ export async function getBaseIncomeRateBonus(userId: string): Promise<number> {
     const unlocked = await isResearchFeatureUnlocked(userId, 'cash-flow', featureId);
     if (unlocked) total += value;
   }
-  if (total === 0) {
-    const legacyUnlocked = await isResearchFeatureUnlocked(userId, 'cash-flow', 'increase-income-rate');
-    if (legacyUnlocked) total = 0.05;
-  }
+  const legacyUnlocked = await isResearchFeatureUnlocked(userId, 'cash-flow', 'increase-income-rate');
+  if (legacyUnlocked) total += 0.05;
   return total;
 }
 
 /**
  * Total insurance expense reduction from all unlocked cash-flow features (spec 18).
- * Legacy: if no new IDs are unlocked, check reduce-insurance-expense (cash-flow) and add $0.02 so pre-migration users get correct reduction.
+ * Legacy: add $0.02 when reduce-insurance-expense (cash-flow) is unlocked so pre-migration users keep credit after unlocking new tiers (Bugbot).
  */
 export async function getInsuranceReductionBonus(userId: string): Promise<number> {
   let total = 0;
@@ -53,10 +51,8 @@ export async function getInsuranceReductionBonus(userId: string): Promise<number
     const unlocked = await isResearchFeatureUnlocked(userId, 'cash-flow', featureId);
     if (unlocked) total += value;
   }
-  if (total === 0) {
-    const legacyUnlocked = await isResearchFeatureUnlocked(userId, 'cash-flow', 'reduce-insurance-expense');
-    if (legacyUnlocked) total = 0.02;
-  }
+  const legacyUnlocked = await isResearchFeatureUnlocked(userId, 'cash-flow', 'reduce-insurance-expense');
+  if (legacyUnlocked) total += 0.02;
   return total;
 }
 
@@ -78,7 +74,7 @@ export async function getTaxReductionBonus(userId: string): Promise<number> {
 
 /**
  * Total rental profit bonus per room per second from all unlocked investments features (spec 18).
- * Legacy: if no new IDs are unlocked, check rental-profit-increase (investments) and add $0.01 so pre-migration users get correct bonus.
+ * Legacy: add $0.01 when rental-profit-increase (investments) is unlocked so pre-migration users keep credit after unlocking new tiers (Bugbot).
  */
 export async function getRentalProfitBonusPerRoom(userId: string): Promise<number> {
   let total = 0;
@@ -86,16 +82,14 @@ export async function getRentalProfitBonusPerRoom(userId: string): Promise<numbe
     const unlocked = await isResearchFeatureUnlocked(userId, categoryId, featureId);
     if (unlocked) total += value;
   }
-  if (total === 0) {
-    const legacyUnlocked = await isResearchFeatureUnlocked(userId, 'investments', 'rental-profit-increase');
-    if (legacyUnlocked) total = 0.01;
-  }
+  const legacyUnlocked = await isResearchFeatureUnlocked(userId, 'investments', 'rental-profit-increase');
+  if (legacyUnlocked) total += 0.01;
   return total;
 }
 
 /**
  * Rental profit bonus per room as of a given time (for historical income).
- * Sums only features unlocked at or before asOfTime. Legacy: if no new IDs unlocked by then, check rental-profit-increase (investments).
+ * Sums only features unlocked at or before asOfTime. Legacy: add $0.01 when rental-profit-increase (investments) unlocked by then (Bugbot).
  */
 export async function getRentalProfitBonusPerRoomAsOf(userId: string, asOfTime: Date): Promise<number> {
   const asOfMs = asOfTime.getTime();
@@ -104,10 +98,8 @@ export async function getRentalProfitBonusPerRoomAsOf(userId: string, asOfTime: 
     const unlockedAt = await getResearchFeatureUnlockTime(userId, categoryId, featureId);
     if (unlockedAt && unlockedAt.getTime() <= asOfMs) total += value;
   }
-  if (total === 0) {
-    const legacyUnlockedAt = await getResearchFeatureUnlockTime(userId, 'investments', 'rental-profit-increase');
-    if (legacyUnlockedAt && legacyUnlockedAt.getTime() <= asOfMs) total = 0.01;
-  }
+  const legacyUnlockedAt = await getResearchFeatureUnlockTime(userId, 'investments', 'rental-profit-increase');
+  if (legacyUnlockedAt && legacyUnlockedAt.getTime() <= asOfMs) total += 0.01;
   return total;
 }
 
