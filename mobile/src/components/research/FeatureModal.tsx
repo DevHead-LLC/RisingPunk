@@ -87,8 +87,8 @@ export function FeatureModal({
     if (refs.length === 0) return [];
     return refs.filter(ref => {
       const list = featuresByCategory[ref.categoryId];
-      // Don't treat refs in non-fetched categories as missing (would block canStartResearch incorrectly). Server validates (Bugbot).
-      if (!list) return false;
+      // Don't treat as missing when category not fetched or still loading (empty list). Server validates (Bugbot).
+      if (!list || list.length === 0) return false;
       const f = list.find((x: any) => (x.id || x.featureId) === ref.featureId);
       return !f?.isUnlocked;
     });
