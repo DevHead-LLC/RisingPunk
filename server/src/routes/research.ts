@@ -516,11 +516,9 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
 
     // Get the research feature to check if research is in progress (legacy: reduce-expenses → reduce-tax-expense-02)
     const { UserResearchFeature } = await import('../models/UserResearchFeature');
-    const featureIdFilter = ResearchFeatureService.getFeatureIdFindFilter(categoryId, featureId);
     const userResearchFeature = await UserResearchFeature.findOne({
       userId,
-      categoryId,
-      ...featureIdFilter
+      ...ResearchFeatureService.getFeatureIdFindFilter(categoryId, featureId),
     });
 
     if (!userResearchFeature) {
@@ -554,11 +552,9 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
     try {
       await session.withTransaction(async () => {
         // First, verify the research is still in progress (double-check to prevent race conditions; legacy: reduce-expenses)
-        const featureIdFilterTx = ResearchFeatureService.getFeatureIdFindFilter(categoryId, featureId);
         const currentResearch = await UserResearchFeature.findOne({
           userId,
-          categoryId,
-          ...featureIdFilterTx
+          ...ResearchFeatureService.getFeatureIdFindFilter(categoryId, featureId),
         }).session(session);
 
         if (!currentResearch) {

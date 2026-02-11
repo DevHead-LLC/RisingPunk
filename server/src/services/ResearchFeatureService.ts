@@ -81,11 +81,9 @@ export class ResearchFeatureService {
       }
 
       // Check if already unlocked (use legacy filter so reduce-expenses counts for reduce-tax-expense-02)
-      const featureIdFilter = ResearchFeatureService.getFeatureIdFindFilter(categoryId, featureId);
       const existingFeature = await UserResearchFeature.findOne({
         userId,
-        categoryId,
-        ...featureIdFilter
+        ...ResearchFeatureService.getFeatureIdFindFilter(categoryId, featureId),
       });
 
       if (existingFeature?.isUnlocked) {
@@ -180,11 +178,9 @@ export class ResearchFeatureService {
 
         // Check if already unlocked or researching (using transaction session).
         // Use legacy filter so reduce-expenses counts for reduce-tax-expense-02 and we don't create duplicates or double-charge.
-        const featureIdFilter = ResearchFeatureService.getFeatureIdFindFilter(categoryId, featureId);
         const existingFeature = await UserResearchFeature.findOne({
           userId,
-          categoryId,
-          ...featureIdFilter
+          ...ResearchFeatureService.getFeatureIdFindFilter(categoryId, featureId),
         }).session(session);
 
         if (existingFeature?.isUnlocked) {
@@ -273,13 +269,22 @@ export class ResearchFeatureService {
   }
 
   /**
-   * Find filter for featureId when looking up UserResearchFeature.
-   * Legacy: when request uses new spec ID, completion/speedup/validation must find doc that might be stored under old ID (same category).
-   * financial/reduce-expenses → cash-flow/reduce-tax-expense-02 is handled by migration creating the cash-flow doc.
+   * Find filter for UserResearchFeature lookups. Use with findOne({ userId, ...getFeatureIdFindFilter(categoryId, featureId) }).
+   * Legacy: same-category old IDs use featureId $in; reduce-expenses is cross-category (financial) so we use $or to match either doc.
    */
-  static getFeatureIdFindFilter(categoryId: string, featureId: string): { featureId: string } | { featureId: { $in: string[] } } {
+  static getFeatureIdFindFilter(
+    categoryId: string,
+    featureId: string
+  ): { categoryId: string; featureId: string } | { categoryId: string; featureId: { $in: string[] } } | { $or: Array<{ categoryId: string; featureId: string }> } {
+    if (categoryId === 'cash-flow' && featureId === 'reduce-tax-expense-02') {
+      return {
+        $or: [
+          { categoryId: 'cash-flow', featureId: 'reduce-tax-expense-02' },
+          { categoryId: 'financial', featureId: 'reduce-expenses' },
+        ],
+      };
+    }
     const legacyMap: Record<string, string[]> = {
-      'reduce-tax-expense-02': ['reduce-tax-expense-02', 'reduce-expenses'],
       'add-battalion-c': ['add-battalion-c', 'battalions-per-battle'],
       'battalion-size-250': ['battalion-size-250', 'increase-battalion-size'],
       'reduce-insurance-02': ['reduce-insurance-02', 'reduce-insurance-expense'],
@@ -288,14 +293,14 @@ export class ResearchFeatureService {
     const legacyIds = legacyMap[featureId];
     if (legacyIds) {
       const categoryMatch =
-        (categoryId === 'cash-flow' && (featureId === 'reduce-tax-expense-02' || featureId === 'reduce-insurance-02')) ||
+        (categoryId === 'cash-flow' && featureId === 'reduce-insurance-02') ||
         (categoryId === 'hack-ability' && (featureId === 'add-battalion-c' || featureId === 'battalion-size-250')) ||
         (categoryId === 'investments' && featureId === 'rental-profit-01');
       if (categoryMatch) {
-        return { featureId: { $in: legacyIds } };
+        return { categoryId, featureId: { $in: legacyIds } };
       }
     }
-    return { featureId };
+    return { categoryId, featureId };
   }
 
   static async completeResearch(
@@ -307,11 +312,9 @@ export class ResearchFeatureService {
     
     try {
       return await session.withTransaction(async () => {
-        const featureIdFilter = ResearchFeatureService.getFeatureIdFindFilter(categoryId, featureId);
         const userResearchFeature = await UserResearchFeature.findOne({
           userId,
-          categoryId,
-          ...featureIdFilter
+          ...ResearchFeatureService.getFeatureIdFindFilter(categoryId, featureId),
         }).session(session);
 
         if (!userResearchFeature) {

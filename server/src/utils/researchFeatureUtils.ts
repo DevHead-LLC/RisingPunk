@@ -1,6 +1,6 @@
 import { UserResearchFeature } from '../models/UserResearchFeature';
 
-/** Cash-flow feature IDs that add to base income rate (spec 18). Bugbot: no legacy IDs (e.g. increase-income-rate) — never used in this project; only reduce-expenses is legacy (see TAX_REDUCTION_FEATURES). */
+/** Cash-flow feature IDs that add to base income rate (spec 18). Bugbot: no legacy IDs in DB — only reduce-expenses is legacy (TAX_REDUCTION_FEATURES). Grandfather migration for increase-income-rate intentionally grants 01+02+025 ($0.055/sec), slightly more than old $0.05/sec. */
 const INCOME_RATE_FEATURES: { featureId: string; value: number }[] = [
   { featureId: 'increase-income-01', value: 0.01 },
   { featureId: 'increase-income-02', value: 0.02 },

@@ -28,6 +28,7 @@ const LEGACY_MAPPINGS: {
   { oldCategoryId: 'financial', oldFeatureId: 'reduce-expenses', newEntries: [{ categoryId: 'cash-flow', featureId: 'reduce-tax-expense-02' }] },
   { oldCategoryId: 'hack-ability', oldFeatureId: 'battalions-per-battle', newEntries: [{ categoryId: 'hack-ability', featureId: 'add-battalion-c' }] },
   { oldCategoryId: 'hack-ability', oldFeatureId: 'increase-battalion-size', newEntries: [{ categoryId: 'hack-ability', featureId: 'battalion-size-250' }] },
+  // Bugbot: migration grants 01+02+025 ($0.055/sec) for old increase-income-rate ($0.05/sec). Extra $0.005/sec is intentional (grandfather bonus).
   { oldCategoryId: 'cash-flow', oldFeatureId: 'increase-income-rate', newEntries: [
     { categoryId: 'cash-flow', featureId: 'increase-income-01' },
     { categoryId: 'cash-flow', featureId: 'increase-income-02' },
