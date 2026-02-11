@@ -67,11 +67,11 @@ export function FeatureModal({
 
   const refs = feature.requiredFeatureRefs ?? [];
   const refCategories = useMemo(() => [...new Set(refs.map(r => r.categoryId))], [refs]);
-  const { data: homeDefFeatures } = useGetUserFeaturesQuery('home-defense', { skip: !visible || !refCategories.includes('home-defense') });
-  const { data: cashFlowFeatures } = useGetUserFeaturesQuery('cash-flow', { skip: !visible || !refCategories.includes('cash-flow') });
-  const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability', { skip: !visible || !refCategories.includes('hack-ability') });
-  const { data: hackCrewFeatures } = useGetUserFeaturesQuery('hack-crew', { skip: !visible || !refCategories.includes('hack-crew') });
-  const { data: investmentsFeatures } = useGetUserFeaturesQuery('investments', { skip: !visible || !refCategories.includes('investments') });
+  const { data: homeDefFeatures, isLoading: homeDefLoading } = useGetUserFeaturesQuery('home-defense', { skip: !visible || !refCategories.includes('home-defense') });
+  const { data: cashFlowFeatures, isLoading: cashFlowLoading } = useGetUserFeaturesQuery('cash-flow', { skip: !visible || !refCategories.includes('cash-flow') });
+  const { data: hackAbilityFeatures, isLoading: hackAbilityLoading } = useGetUserFeaturesQuery('hack-ability', { skip: !visible || !refCategories.includes('hack-ability') });
+  const { data: hackCrewFeatures, isLoading: hackCrewLoading } = useGetUserFeaturesQuery('hack-crew', { skip: !visible || !refCategories.includes('hack-crew') });
+  const { data: investmentsFeatures, isLoading: investmentsLoading } = useGetUserFeaturesQuery('investments', { skip: !visible || !refCategories.includes('investments') });
   const { data: researchCenterStatus } = useGetResearchCenterStatusQuery(undefined, { skip: !visible });
   const currentResearchCenterLevel = researchCenterStatus?.level ?? 0;
 
@@ -83,16 +83,27 @@ export function FeatureModal({
     'investments': investmentsFeatures?.features ?? [],
   }), [homeDefFeatures, cashFlowFeatures, hackAbilityFeatures, hackCrewFeatures, investmentsFeatures]);
 
+  const loadingByCategory = useMemo(() => ({
+    'home-defense': homeDefLoading,
+    'cash-flow': cashFlowLoading,
+    'hack-ability': hackAbilityLoading,
+    'hack-crew': hackCrewLoading,
+    'investments': investmentsLoading,
+  }), [homeDefLoading, cashFlowLoading, hackAbilityLoading, hackCrewLoading, investmentsLoading]);
+
   const missingRequiredRefs = useMemo(() => {
     if (refs.length === 0) return [];
     return refs.filter(ref => {
       const list = featuresByCategory[ref.categoryId];
-      // Don't treat as missing when category not fetched or still loading (empty list). Server validates (Bugbot).
-      if (!list || list.length === 0) return false;
+      const isLoading = loadingByCategory[ref.categoryId];
+      // Don't treat refs as missing while category is still loading (would block canStartResearch incorrectly). Server validates (Bugbot).
+      if (isLoading) return false;
+      // Loaded but no list or empty list: ref not in response → treat as missing so we don't allow start and get server rejection.
+      if (!list || list.length === 0) return true;
       const f = list.find((x: any) => (x.id || x.featureId) === ref.featureId);
       return !f?.isUnlocked;
     });
-  }, [refs, featuresByCategory]);
+  }, [refs, featuresByCategory, loadingByCategory]);
 
   const missingRequiredDisplay = useMemo(() => {
     return missingRequiredRefs.map(ref => {
