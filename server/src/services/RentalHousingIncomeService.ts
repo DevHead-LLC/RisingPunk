@@ -1,5 +1,5 @@
 import { IUser } from '../models/User';
-import { isResearchFeatureUnlocked, getResearchFeatureUnlockTime } from '../utils/researchFeatureUtils';
+import { getRentalProfitBonusPerRoom, getResearchFeatureUnlockTime, RENTAL_PROFIT_FEATURES } from '../utils/researchFeatureUtils';
 import {
   PROPERTY_BASE_RATES,
   ROOM_REMODEL_ADD_SMALL,
@@ -31,8 +31,6 @@ export interface RentalHousingIncome {
 }
 
 export class RentalHousingIncomeService {
-  private static readonly RESEARCH_BONUS_PER_ROOM = 0.01;
-
   /** Effective property level (1-5). Uses rentalHousingLevels; if legacy unlocked with no level, returns 1. */
   static getPropertyLevel(user: IUser, propertyId: number): number {
     const levels = user.rentalHousingLevels;
@@ -75,19 +73,37 @@ export class RentalHousingIncomeService {
     return rate;
   }
 
-  static async isRentalProfitResearchUnlocked(userId: string): Promise<boolean> {
-    return isResearchFeatureUnlocked(userId, 'investments', 'rental-profit-increase');
+  static async getRentalProfitBonusPerRoom(userId: string): Promise<number> {
+    return getRentalProfitBonusPerRoom(userId);
   }
 
+  /** Earliest unlock time among rental-profit features (for historical income split). */
   static async getRentalProfitResearchUnlockTime(userId: string): Promise<Date | null> {
-    return getResearchFeatureUnlockTime(userId, 'investments', 'rental-profit-increase');
+    let earliest: Date | null = null;
+    for (const { featureId, categoryId } of RENTAL_PROFIT_FEATURES) {
+      const t = await getResearchFeatureUnlockTime(userId, categoryId, featureId);
+      if (t && (!earliest || t < earliest)) earliest = t;
+    }
+    return earliest;
+  }
+
+  /** Sorted unlock times for each rental-profit tier (for historical income segments). Includes legacy rental-profit-increase so pre-migration unlock creates a boundary. */
+  static async getRentalProfitUnlockTimes(userId: string): Promise<Date[]> {
+    const times: Date[] = [];
+    for (const { featureId, categoryId } of RENTAL_PROFIT_FEATURES) {
+      const t = await getResearchFeatureUnlockTime(userId, categoryId, featureId);
+      if (t) times.push(t);
+    }
+    const legacyT = await getResearchFeatureUnlockTime(userId, 'investments', 'rental-profit-increase');
+    if (legacyT) times.push(legacyT);
+    return times.sort((a, b) => a.getTime() - b.getTime());
   }
 
   static getRoomValuesWithResearch(
     baseRoomValues: { bathroom: number; kitchen: number; bedroom: number; livingRoom: number },
-    isResearchUnlocked: boolean
+    bonusPerRoom: number
   ): { bathroom: number; kitchen: number; bedroom: number; livingRoom: number } {
-    const bonus = isResearchUnlocked ? this.RESEARCH_BONUS_PER_ROOM : 0;
+    const bonus = bonusPerRoom;
     return {
       bathroom: baseRoomValues.bathroom + bonus,
       kitchen: baseRoomValues.kitchen + bonus,
@@ -98,12 +114,17 @@ export class RentalHousingIncomeService {
 
   static async calculateRentalHousingIncome(
     user: IUser,
-    options?: { includeResearchBonus?: boolean }
+    options?: { includeResearchBonus?: boolean; rentalProfitBonusPerRoom?: number }
   ): Promise<RentalHousingIncome> {
     const propertyBreakdown: RentalHousingIncome['propertyBreakdown'] = [];
     let totalIncomePerSecond = 0;
-    const includeResearch = options?.includeResearchBonus !== false;
-    const isResearchUnlocked = includeResearch && (await this.isRentalProfitResearchUnlocked(String(user._id)));
+    const explicitBonus = options?.rentalProfitBonusPerRoom;
+    const bonusPerRoom =
+      typeof explicitBonus === 'number'
+        ? explicitBonus
+        : options?.includeResearchBonus !== false
+          ? await this.getRentalProfitBonusPerRoom(String(user._id))
+          : 0;
 
     for (let propertyId = 1; propertyId <= 4; propertyId++) {
       const propertyLevel = this.getPropertyLevel(user, propertyId);
@@ -121,7 +142,7 @@ export class RentalHousingIncomeService {
         bedroom: bedroomRate,
         livingRoom: livingRoomRate,
       };
-      const roomValues = this.getRoomValuesWithResearch(baseRoomValues, isResearchUnlocked);
+      const roomValues = this.getRoomValuesWithResearch(baseRoomValues, bonusPerRoom);
       const incomePerSecond = isUnlocked
         ? roomValues.bathroom + roomValues.kitchen + roomValues.bedroom + roomValues.livingRoom
         : 0;

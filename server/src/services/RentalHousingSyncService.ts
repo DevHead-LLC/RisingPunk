@@ -1,6 +1,6 @@
 import { IUser } from '../models/User';
 import { RentalHousingIncomeService } from './RentalHousingIncomeService';
-import { isResearchFeatureUnlocked, getResearchFeatureUnlockTime } from '../utils/researchFeatureUtils';
+import { getBaseIncomeRateBonus, getInsuranceReductionBonus, getTaxReductionBonus, getRentalProfitBonusPerRoomAsOf } from '../utils/researchFeatureUtils';
 
 export interface RentalHousingSyncResult {
   needsSync: boolean;
@@ -9,9 +9,16 @@ export interface RentalHousingSyncResult {
   syncTimestamp: Date;
 }
 
+export interface PerformSyncResult {
+  success: boolean;
+  syncedAmount: number;
+  newBalance: number;
+  insuranceReduction: number;
+  taxReduction: number;
+}
+
 export class RentalHousingSyncService {
-  private static readonly BASE_INCOME_RATE_BONUS = 0.05; // $0.05 per second bonus when income rate research unlocked
-  private static readonly INSURANCE_REDUCTION_BONUS = 0.02; // $0.02 per second when reduce insurance expense research unlocked
+  // Income/insurance bonuses are now multi-tier per spec 18; see researchFeatureUtils getBaseIncomeRateBonus, getInsuranceReductionBonus
   /** Pre-level-system flat rate per property per second; use for historical income when user is legacy (would be grandfathered). */
   private static readonly LEGACY_FLAT_RATE_PER_PROPERTY = 0.06;
   private static readonly LEGACY_RESEARCH_BONUS_PER_PROPERTY = 0.04; // 4 rooms × 0.01
@@ -78,53 +85,35 @@ export class RentalHousingSyncService {
     return user.balance.rentalHousingIncomeLastSynced < oneHourAgo;
   }
 
-  static async isIncomeRateResearchUnlocked(userId: string): Promise<boolean> {
-    return isResearchFeatureUnlocked(userId, 'cash-flow', 'increase-income-rate');
-  }
-
-  static async isInsuranceReductionResearchUnlocked(userId: string): Promise<boolean> {
-    return isResearchFeatureUnlocked(userId, 'cash-flow', 'reduce-insurance-expense');
-  }
-
-  static async getIncomeRateResearchUnlockTime(userId: string): Promise<Date | null> {
-    return getResearchFeatureUnlockTime(userId, 'cash-flow', 'increase-income-rate');
-  }
-
   private static async calculateHistoricalIncome(user: IUser, now: Date): Promise<number> {
     const unlockedProperties = this.getUnlockedProperties(user);
     if (unlockedProperties.length === 0) {
       return 0;
     }
 
-    // Calculate income from when balance was last updated
     const lastUpdated = user.balance.lastUpdated;
-    
-    // Get research unlock time to prevent retroactive bonus application
-    const researchUnlockTime = await RentalHousingIncomeService.getRentalProfitResearchUnlockTime(String(user._id));
-    
+    const userId = String(user._id);
+    const lastMs = lastUpdated.getTime();
+    const nowMs = now.getTime();
+
+    // Segment by each rental-profit tier unlock time so we don't apply combined bonus retroactively.
+    const unlockTimes = await RentalHousingIncomeService.getRentalProfitUnlockTimes(userId);
+    const boundariesInRange = unlockTimes.filter(t => {
+      const ms = t.getTime();
+      return ms > lastMs && ms <= nowMs;
+    });
+    const boundaries = [lastUpdated, ...boundariesInRange, now];
+
     let historicalIncome = 0;
-    
-    if (researchUnlockTime && researchUnlockTime > lastUpdated && researchUnlockTime <= now) {
-      // Research was unlocked during the historical period - split calculation
-      // Calculate income BEFORE research unlock (old rate)
-      const secondsBeforeUnlock = (researchUnlockTime.getTime() - lastUpdated.getTime()) / 1000;
-      const incomeBeforeUnlock = await this.calculateIncomeForPeriod(user, unlockedProperties.length, false);
-      const incomeBefore = Math.floor(secondsBeforeUnlock * incomeBeforeUnlock);
-      
-      // Calculate income AFTER research unlock (new rate)
-      const secondsAfterUnlock = (now.getTime() - researchUnlockTime.getTime()) / 1000;
-      const incomeAfterUnlock = await this.calculateIncomeForPeriod(user, unlockedProperties.length, true);
-      const incomeAfter = Math.floor(secondsAfterUnlock * incomeAfterUnlock);
-      
-      historicalIncome = incomeBefore + incomeAfter;
-    } else {
-      // Research was unlocked before lastUpdated or not unlocked yet - use single rate
-      const secondsElapsed = (now.getTime() - lastUpdated.getTime()) / 1000;
-      const isResearchUnlocked = !!researchUnlockTime && researchUnlockTime <= lastUpdated;
-      const incomePerSecond = await this.calculateIncomeForPeriod(user, unlockedProperties.length, isResearchUnlocked);
-      historicalIncome = Math.floor(secondsElapsed * incomePerSecond);
+    for (let i = 0; i < boundaries.length - 1; i++) {
+      const segmentStart = boundaries[i];
+      const segmentEnd = boundaries[i + 1];
+      const secondsInSegment = (segmentEnd.getTime() - segmentStart.getTime()) / 1000;
+      const bonusPerRoom = await getRentalProfitBonusPerRoomAsOf(userId, segmentStart);
+      const incomePerSecond = await this.calculateIncomeForPeriod(user, unlockedProperties.length, bonusPerRoom);
+      historicalIncome += Math.floor(secondsInSegment * incomePerSecond);
     }
-    
+
     return historicalIncome;
   }
 
@@ -143,12 +132,13 @@ export class RentalHousingSyncService {
     return true;
   }
 
-  private static async calculateIncomeForPeriod(user: IUser, propertyCount: number, isResearchUnlocked: boolean): Promise<number> {
+  /** researchBonusPerRoom: 0 = no bonus; for legacy users any positive value uses LEGACY_RESEARCH_BONUS_PER_PROPERTY. */
+  private static async calculateIncomeForPeriod(user: IUser, propertyCount: number, researchBonusPerRoom: number): Promise<number> {
     if (this.isFullyLegacyForHistoricalIncome(user)) {
-      return propertyCount * (this.LEGACY_FLAT_RATE_PER_PROPERTY + (isResearchUnlocked ? this.LEGACY_RESEARCH_BONUS_PER_PROPERTY : 0));
+      return propertyCount * (this.LEGACY_FLAT_RATE_PER_PROPERTY + (researchBonusPerRoom > 0 ? this.LEGACY_RESEARCH_BONUS_PER_PROPERTY : 0));
     }
     const income = await RentalHousingIncomeService.calculateRentalHousingIncome(user, {
-      includeResearchBonus: isResearchUnlocked,
+      rentalProfitBonusPerRoom: researchBonusPerRoom,
     });
     return income.totalIncomePerSecond;
   }
@@ -178,19 +168,19 @@ export class RentalHousingSyncService {
     return updated;
   }
 
-  static async performSync(user: IUser): Promise<{ success: boolean; syncedAmount: number; newBalance: number }> {
+  static async performSync(user: IUser): Promise<PerformSyncResult> {
     // Historical income must use pre-grandfather rates (legacy users at level 1), so run sync check first.
     const syncResult = await this.checkAndSyncRentalHousingIncome(user);
     await this.ensureLegacyRentalLevels(user);
     
     // CRITICAL: Always calculate and update ratePerSecond, even if no rental properties exist
-    // This ensures income rate and insurance reduction research bonuses are applied for all users
-    // Base rate is $1.00 + income rate bonus ($0.05) + insurance reduction bonus ($0.02) when unlocked, plus passive income
-    const isIncomeRateUnlocked = await this.isIncomeRateResearchUnlocked(String(user._id));
-    const isInsuranceReductionUnlocked = await this.isInsuranceReductionResearchUnlocked(String(user._id));
-    const baseRate = 1.0
-      + (isIncomeRateUnlocked ? this.BASE_INCOME_RATE_BONUS : 0)
-      + (isInsuranceReductionUnlocked ? this.INSURANCE_REDUCTION_BONUS : 0);
+    // Base rate is $1.00 + income rate bonus (sum of increase-income-* per spec 18) + insurance reduction (sum of reduce-insurance-*) + tax reduction (reduce-tax-expense-02), plus passive income
+    const [incomeBonus, insuranceBonus, taxBonus] = await Promise.all([
+      getBaseIncomeRateBonus(String(user._id)),
+      getInsuranceReductionBonus(String(user._id)),
+      getTaxReductionBonus(String(user._id)),
+    ]);
+    const baseRate = 1.0 + incomeBonus + insuranceBonus + taxBonus;
     
     if (baseRate < 0) {
       console.error('[INCOME RATE] Invalid baseRate calculated:', baseRate);
@@ -232,7 +222,9 @@ export class RentalHousingSyncService {
     return {
       success: true,
       syncedAmount: syncResult.syncedAmount,
-      newBalance: user.balance.total
+      newBalance: user.balance.total,
+      insuranceReduction: insuranceBonus,
+      taxReduction: taxBonus,
     };
   }
 }

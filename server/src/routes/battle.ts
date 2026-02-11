@@ -4,7 +4,7 @@ import auth from '../middleware/auth';
 import { Battle } from '../models/Battle';
 import { UserTaskProgress } from '../models/UserTaskProgress';
 import { NPCService } from '../services/NPCService';
-import { UserResearchFeature } from '../models/UserResearchFeature';
+import { isBattalionSlotUnlocked } from '../utils/researchFeatureUtils';
 
 interface StartBattleRequest extends Request {
   body: {
@@ -55,41 +55,41 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
         return;
       }
       
-      const MAX_USER_BATTALIONS = 3;
+      // Max 5 until Add Battalion F exists (A–E per research spec).
+      const MAX_USER_BATTALIONS = 5;
       if (userBattalions.length > MAX_USER_BATTALIONS) {
         res.status(400).json({ success: false, error: `Maximum ${MAX_USER_BATTALIONS} battalions allowed` });
         return;
       }
-      
+
       if (userBattalions.length > 2) {
-        const battalionCFeature = await UserResearchFeature.findOne({
-          userId: req.user._id,
-          categoryId: 'hack-ability',
-          featureId: 'battalions-per-battle'
-        })
-        .select('isUnlocked isResearching researchCompletesAt')
-        .lean();
-        
-        if (!battalionCFeature) {
-          res.status(403).json({ 
-            success: false, 
-            error: 'Battalion C is locked. Complete the "Add Battalion C" research feature to unlock it.' 
+        const unlockedC = await isBattalionSlotUnlocked(String(req.user._id), 'C');
+        if (!unlockedC) {
+          res.status(403).json({
+            success: false,
+            error: 'Battalion C is locked. Complete the "Add Battalion C" research feature to unlock it.'
           });
           return;
         }
-        
-        const now = new Date().getTime();
-        const researchCompletesAt = battalionCFeature.researchCompletesAt 
-          ? new Date(battalionCFeature.researchCompletesAt).getTime() 
-          : null;
-        const remaining = researchCompletesAt !== null ? Math.max(0, researchCompletesAt - now) : null;
-        const isActuallyUnlocked = battalionCFeature.isUnlocked || 
-          (battalionCFeature.isResearching && researchCompletesAt !== null && remaining === 0);
-        
-        if (!isActuallyUnlocked) {
-          res.status(403).json({ 
-            success: false, 
-            error: 'Battalion C is locked. Complete the "Add Battalion C" research feature to unlock it.' 
+      }
+
+      if (userBattalions.length > 3) {
+        const unlockedD = await isBattalionSlotUnlocked(String(req.user._id), 'D');
+        if (!unlockedD) {
+          res.status(403).json({
+            success: false,
+            error: 'Battalion D is locked. Complete the "Add Battalion D" research feature to unlock it.'
+          });
+          return;
+        }
+      }
+
+      if (userBattalions.length > 4) {
+        const unlockedE = await isBattalionSlotUnlocked(String(req.user._id), 'E');
+        if (!unlockedE) {
+          res.status(403).json({
+            success: false,
+            error: 'Battalion E is locked. Complete the "Add Battalion E" research feature to unlock it.'
           });
           return;
         }
