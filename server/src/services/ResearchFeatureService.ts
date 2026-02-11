@@ -269,6 +269,17 @@ export class ResearchFeatureService {
     }
   }
 
+  /**
+   * Find filter for featureId when looking up UserResearchFeature.
+   * Legacy: reduce-tax-expense-02 maps from DB reduce-expenses; completion/speedup must find either.
+   */
+  static getFeatureIdFindFilter(categoryId: string, featureId: string): { featureId: string } | { featureId: { $in: string[] } } {
+    if (categoryId === 'cash-flow' && featureId === 'reduce-tax-expense-02') {
+      return { featureId: { $in: ['reduce-tax-expense-02', 'reduce-expenses'] } };
+    }
+    return { featureId };
+  }
+
   static async completeResearch(
     userId: string,
     categoryId: string,
@@ -278,10 +289,11 @@ export class ResearchFeatureService {
     
     try {
       return await session.withTransaction(async () => {
+        const featureIdFilter = ResearchFeatureService.getFeatureIdFindFilter(categoryId, featureId);
         const userResearchFeature = await UserResearchFeature.findOne({
           userId,
           categoryId,
-          featureId
+          ...featureIdFilter
         }).session(session);
 
         if (!userResearchFeature) {

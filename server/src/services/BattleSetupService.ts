@@ -35,7 +35,8 @@ export class BattleSetupService {
       throw new Error('userBattalions is required and must contain at least one battalion');
     }
     
-    const MAX_USER_BATTALIONS = 6;
+    // Max 5 until Add Battalion F exists (A–E per research spec).
+    const MAX_USER_BATTALIONS = 5;
     if (userBattalions.length > MAX_USER_BATTALIONS) {
       throw new Error(`Maximum ${MAX_USER_BATTALIONS} battalions allowed`);
     }

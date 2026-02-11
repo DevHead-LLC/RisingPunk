@@ -55,7 +55,8 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
         return;
       }
       
-      const MAX_USER_BATTALIONS = 6;
+      // Max 5 until Add Battalion F exists (A–E per research spec).
+      const MAX_USER_BATTALIONS = 5;
       if (userBattalions.length > MAX_USER_BATTALIONS) {
         res.status(400).json({ success: false, error: `Maximum ${MAX_USER_BATTALIONS} battalions allowed` });
         return;
