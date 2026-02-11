@@ -105,9 +105,7 @@ export const researchFeaturesApi = createApi({
           await queryFulfilled;
           // Invalidate UserTaskProgress to update task guide when research completes
           dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
-          if (arg.categoryId === 'cash-flow') {
-            dispatch(researchFeaturesApi.util.invalidateTags(['ExpenseModifiers']));
-          }
+          // ExpenseModifiers already invalidated declaratively via invalidatesTags for cash-flow
           // If rental profit research completed (spec 18), invalidate balance and rental housing income cache
           if (arg.categoryId === 'investments' && (arg.featureId === 'rental-profit-01' || arg.featureId === 'rental-profit-015')) {
             const { balanceApi } = await import('./balanceApi');

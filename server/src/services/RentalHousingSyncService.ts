@@ -1,6 +1,6 @@
 import { IUser } from '../models/User';
 import { RentalHousingIncomeService } from './RentalHousingIncomeService';
-import { getBaseIncomeRateBonus, getInsuranceReductionBonus, getTaxReductionBonus, getResearchFeatureUnlockTime } from '../utils/researchFeatureUtils';
+import { getBaseIncomeRateBonus, getInsuranceReductionBonus, getTaxReductionBonus } from '../utils/researchFeatureUtils';
 
 export interface RentalHousingSyncResult {
   needsSync: boolean;
@@ -75,10 +75,6 @@ export class RentalHousingSyncService {
     // This ensures we don't miss significant ratePerSecond changes
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
     return user.balance.rentalHousingIncomeLastSynced < oneHourAgo;
-  }
-
-  static async getIncomeRateResearchUnlockTime(userId: string, featureId: string): Promise<Date | null> {
-    return getResearchFeatureUnlockTime(userId, 'cash-flow', featureId);
   }
 
   private static async calculateHistoricalIncome(user: IUser, now: Date): Promise<number> {

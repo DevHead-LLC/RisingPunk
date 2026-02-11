@@ -80,11 +80,12 @@ export class ResearchFeatureService {
         }
       }
 
-      // Check if already unlocked
+      // Check if already unlocked (use legacy filter so reduce-expenses counts for reduce-tax-expense-02)
+      const featureIdFilter = ResearchFeatureService.getFeatureIdFindFilter(categoryId, featureId);
       const existingFeature = await UserResearchFeature.findOne({
         userId,
         categoryId,
-        featureId
+        ...featureIdFilter
       });
 
       if (existingFeature?.isUnlocked) {
@@ -177,11 +178,13 @@ export class ResearchFeatureService {
           }
         }
 
-        // Check if already unlocked or researching (using transaction session)
+        // Check if already unlocked or researching (using transaction session).
+        // Use legacy filter so reduce-expenses counts for reduce-tax-expense-02 and we don't create duplicates or double-charge.
+        const featureIdFilter = ResearchFeatureService.getFeatureIdFindFilter(categoryId, featureId);
         const existingFeature = await UserResearchFeature.findOne({
           userId,
           categoryId,
-          featureId
+          ...featureIdFilter
         }).session(session);
 
         if (existingFeature?.isUnlocked) {
