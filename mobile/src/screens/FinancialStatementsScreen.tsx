@@ -7,7 +7,7 @@ import { getCurrentBalance } from '../store/slices/balanceSlice';
 import { useFetchFinanceTemplatesQuery, useFetchUserFinanceTiersQuery } from '../store/api/userFinanceApi';
 import { useGetRentalHousingIncomeQuery } from '../store/api/rentalHousingApi';
 import { useFetchBalanceQuery } from '../store/api/balanceApi';
-import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
+import { useGetUserFeaturesQuery, useGetExpenseModifiersQuery } from '../store/api/researchFeaturesApi';
 import { useTrackFinancialStatementViewMutation } from '../store/api/userGuideApi';
 import { useTheme } from '../context/ThemeContext';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -42,13 +42,35 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
   const { data: templatesData } = useFetchFinanceTemplatesQuery();
   const { data: userTiersData } = useFetchUserFinanceTiersQuery();
   const { data: rentalHousingData, error: rentalHousingError, isLoading: rentalHousingLoading } = useGetRentalHousingIncomeQuery();
-  const { data: balanceData } = useFetchBalanceQuery();
+  const { data: balanceData } = useFetchBalanceQuery(undefined, { refetchOnFocus: true });
+  const { data: expenseModifiers } = useGetExpenseModifiersQuery(undefined, { refetchOnFocus: true });
   const { data: cashFlowFeatures } = useGetUserFeaturesQuery('cash-flow');
   const currentCash = useAppSelector(getCurrentBalance);
   const ratePerSecondFromState = useAppSelector(state => state.balance.ratePerSecond);
   // Use balanceData from query if available (fresh data), otherwise fall back to Redux state
   const ratePerSecond = balanceData?.ratePerSecond ?? ratePerSecondFromState;
-  const insuranceReductionUnlocked = Boolean(cashFlowFeatures?.find(f => f.id === 'reduce-insurance-expense' && f.isUnlocked));
+  // Expense reductions: prefer expense-modifiers API, then balance, then server value from cash-flow user-features (Bugbot: legacy insurance $0.02 not $0.03), then naive feature sum.
+  const insuranceReductionTotal = useMemo(() => {
+    if (typeof expenseModifiers?.insuranceReduction === 'number') return expenseModifiers.insuranceReduction;
+    if (typeof balanceData?.insuranceReduction === 'number') return balanceData.insuranceReduction;
+    if (typeof cashFlowFeatures?.insuranceReduction === 'number') return cashFlowFeatures.insuranceReduction;
+    const features = cashFlowFeatures?.features;
+    if (!features?.length) return 0;
+    let total = 0;
+    if (features.some((f: any) => f.id === 'reduce-insurance-01' && f.isUnlocked)) total += 0.01;
+    if (features.some((f: any) => f.id === 'reduce-insurance-02' && f.isUnlocked)) total += 0.02;
+    return total;
+  }, [expenseModifiers?.insuranceReduction, balanceData?.insuranceReduction, cashFlowFeatures]);
+  const taxReductionTotal = useMemo(() => {
+    if (typeof expenseModifiers?.taxReduction === 'number') return expenseModifiers.taxReduction;
+    if (typeof balanceData?.taxReduction === 'number') return balanceData.taxReduction;
+    if (typeof cashFlowFeatures?.taxReduction === 'number') return cashFlowFeatures.taxReduction;
+    const features = cashFlowFeatures?.features;
+    if (!features?.length) return 0;
+    // Server maps legacy financial/reduce-expenses onto cash-flow reduce-tax-expense-02 (Bugbot: reduce-expenses is financial, not in cashFlowFeatures).
+    if (features.some((f: any) => f.id === 'reduce-tax-expense-02' && f.isUnlocked)) return 0.02;
+    return 0;
+  }, [expenseModifiers?.taxReduction, balanceData?.taxReduction, cashFlowFeatures]);
   const { themeMode } = useTheme();
   const colors = useThemeColors();
   
@@ -80,28 +102,35 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
   const financialCalculations = useMemo(() => {
     if (!merged) return null;
     
-    // Apply insurance reduction research only when template has Insurance: $0.50 -> $0.48 when research unlocked
+    // Insurance: base $0.50/sec; subtract unlocked reduction research (reduce-insurance-01 = $0.01, reduce-insurance-02 = $0.02)
     const baseIncomeStatement = merged.incomeStatement || {};
     const effectiveIncomeStatement = { ...baseIncomeStatement };
     const hasInsuranceInTemplate = 'Insurance' in baseIncomeStatement;
     if (hasInsuranceInTemplate) {
       const insuranceBase = baseIncomeStatement['Insurance'] ?? -0.50;
-      effectiveIncomeStatement['Insurance'] = insuranceBase + (insuranceReductionUnlocked ? 0.02 : 0);
+      effectiveIncomeStatement['Insurance'] = insuranceBase + insuranceReductionTotal;
     }
-    
+    // Tax reduction applied once to the first expense line containing "tax" (below). hasTaxInTemplate uses same /tax/ check so gross-income deduction matches.
+    const hasTaxInTemplate = Object.keys(baseIncomeStatement).some(
+      k => /tax/.test(String(k).trim().toLowerCase())
+    );
+
     const incomeStatementEntries = Object.entries(effectiveIncomeStatement);
     
-    // Gross Income: only subtract insurance bonus from display when template has Insurance,
-    // so we don't double-count (savings shown as reduced expense). If template lacks Insurance,
-    // show full incomeRateBonus so the $0.02 doesn't vanish from the statement.
-    const effectiveIncomeRateBonus = hasInsuranceInTemplate && insuranceReductionUnlocked
-      ? Math.max(0, incomeRateBonus - 0.02)
-      : incomeRateBonus;
+    // Gross Income: subtract insurance and tax reduction from display when template has those lines,
+    // so we don't double-count (savings shown as reduced expense). If template lacks them, show full incomeRateBonus.
+    let effectiveIncomeRateBonus = incomeRateBonus;
+    if (hasInsuranceInTemplate && insuranceReductionTotal > 0) {
+      effectiveIncomeRateBonus = Math.max(0, effectiveIncomeRateBonus - insuranceReductionTotal);
+    }
+    if (hasTaxInTemplate && taxReductionTotal > 0) {
+      effectiveIncomeRateBonus = Math.max(0, effectiveIncomeRateBonus - taxReductionTotal);
+    }
     const baseGrossIncome = 12.00;
     const grossIncome = baseGrossIncome + effectiveIncomeRateBonus;
     
     // Calculate expenses (negative values only, excluding totals)
-    const expenseEntries = incomeStatementEntries.filter(([k, v]) => {
+    const rawExpenseEntries = incomeStatementEntries.filter(([k, v]) => {
       const num = Number(v);
       const keyLower = k.toLowerCase().trim();
       if (k === 'Gross Income' || k === 'Gross income' || k === 'gross income' ||
@@ -111,6 +140,16 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
         return false;
       }
       return num < 0;
+    });
+    // Apply tax reduction to the first expense line whose label contains "tax" only (so gross-income offset matches; Bugbot: avoid N× reduction with 1× offset when multiple "tax" lines exist).
+    let taxReductionApplied = false;
+    const expenseEntries = rawExpenseEntries.map(([k, v]) => {
+      const num = Number(v);
+      if (num < 0 && /tax/.test(String(k).trim().toLowerCase()) && !taxReductionApplied) {
+        taxReductionApplied = true;
+        return [k, num + taxReductionTotal] as [string, number];
+      }
+      return [k, v] as [string, number];
     });
     
     const totalExpenses = expenseEntries.reduce((sum, [, v]) => {
@@ -136,7 +175,7 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
       passiveIncome,
       netCashFlow
     };
-  }, [merged, incomeRateBonus, insuranceReductionUnlocked, rentalHousingData?.totalIncomePerSecond]);
+  }, [merged, incomeRateBonus, insuranceReductionTotal, taxReductionTotal, rentalHousingData?.totalIncomePerSecond]);
 
   const getStyles = () => ({
     container: {

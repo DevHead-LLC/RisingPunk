@@ -44,6 +44,9 @@ export interface BalanceResponse {
   fractionalRemainder: number;
   lifetimeHighNetWorth?: number;
   lifetimeHighUpdated?: boolean;
+  /** Research-based expense reduction per second (for Financial Statements). Server source of truth. */
+  insuranceReduction?: number;
+  taxReduction?: number;
 }
 
 export const balanceApi = createApi({

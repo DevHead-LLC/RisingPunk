@@ -15,6 +15,7 @@ import { useStartBattleMutation } from '../store/api/battleApi';
 import { trackFirstBattle } from '../services/analyticsService';
 import { useGetShieldStatusQuery, useDeactivateShieldMutation } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
+import { useBattalionSlotUnlocks } from '../hooks/useBattalionSlotUnlocks';
 import { API_URL } from '../config';
 import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
 import { TaskGuideHighlightOverlay } from '../components/turf/TaskGuideHighlightOverlay';
@@ -98,7 +99,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
   const { data: researchFeatures } = useGetUserFeaturesQuery('home-defense');
   
   // Find the antivirus feature from the research features
-  const antivirusFeature = researchFeatures?.find(f => f.id === 'antivirus');
+  const antivirusFeature = researchFeatures?.features?.find(f => f.id === 'antivirus');
   
   // Use local timer logic to determine if actually unlocked (same as other components)
   const isActuallyUnlocked = useMemo(() => {
@@ -109,26 +110,8 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       (antivirusFeature?.isResearching && remaining === 0);
   }, [antivirusFeature?.isUnlocked, antivirusFeature?.isResearching, antivirusFeature?.researchCompletesAt]);
 
-  // Get hack-ability research features for Battalion C unlock check
-  const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability');
-  
-  // Find and memoize the Battalion C feature
-  const battalionCFeature = useMemo(() => {
-    return hackAbilityFeatures?.find(f => f.id === 'battalions-per-battle');
-  }, [hackAbilityFeatures]);
-  
-  // Check if Battalion C is unlocked (same pattern as antivirus)
-  const isBattalionCUnlocked = useMemo(() => {
-    if (!battalionCFeature) return false;
-    
-    const now = new Date().getTime();
-    const researchCompletesAt = battalionCFeature.researchCompletesAt 
-      ? new Date(battalionCFeature.researchCompletesAt).getTime() 
-      : 0;
-    const remaining = Math.max(0, researchCompletesAt - now);
-    return battalionCFeature.isUnlocked || 
-      (battalionCFeature.isResearching && remaining === 0);
-  }, [battalionCFeature?.isUnlocked, battalionCFeature?.isResearching, battalionCFeature?.researchCompletesAt]);
+  // Battalion C/D/E unlock state (shared logic with server isBattalionSlotUnlocked)
+  const { isBattalionCUnlocked, isBattalionDUnlocked, isBattalionEUnlocked } = useBattalionSlotUnlocks();
 
   // Memoize available battalions array (A and B always available)
   const availableBattalions = useMemo(() => {
@@ -227,11 +210,17 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       if (isBattalionCUnlocked) {
         resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'C' }));
       }
+      if (isBattalionDUnlocked) {
+        resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'D' }));
+      }
+      if (isBattalionEUnlocked) {
+        resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'E' }));
+      }
       await Promise.all(resetPromises);
     } catch (error) {
       console.error('Failed to reset battalions:', error);
     }
-  }, [assignToBattalion, isBattalionCUnlocked]);
+  }, [assignToBattalion, isBattalionCUnlocked, isBattalionDUnlocked, isBattalionEUnlocked]);
 
   // Convert assignments to battalion data format
   const convertAssignmentsToBattalionData = React.useCallback((assignments: Record<string, BattalionAssignment>) => {
@@ -441,8 +430,33 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
               <Text style={[styles.swipeText, { color: colors.text.accent }]}>ENEMY FORCES</Text>
             </Animated.View>
             <View style={[styles.battalionsContainer, isBattalionAHighlight && { zIndex: 1001, elevation: 1001 }]}>
-              {renderBattalionSlots(['E', 'F'], false, true)}
-              {isBattalionCUnlocked ? (
+              {!isBattalionEUnlocked ? (
+                renderBattalionSlots(['E', 'F'], false, true)
+              ) : (
+                <View style={styles.battalionColumn}>
+                  <BattalionSlot
+                    name="E"
+                    isEnemy={false}
+                    isLocked={false}
+                    onPress={() => handleBattalionPress('E')}
+                    assignment={assignments['E']}
+                    isHighlighted={false}
+                    disabled={isBattalionAHighlight}
+                  />
+                  <BattalionSlot
+                    name="F"
+                    isEnemy={false}
+                    isLocked={true}
+                    onPress={undefined}
+                    assignment={undefined}
+                    isHighlighted={false}
+                    disabled={isBattalionAHighlight}
+                  />
+                </View>
+              )}
+              {!isBattalionCUnlocked ? (
+                renderBattalionSlots(['C', 'D'], false, true)
+              ) : (
                 <View style={styles.battalionColumn}>
                   <BattalionSlot
                     name="C"
@@ -456,15 +470,13 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
                   <BattalionSlot
                     name="D"
                     isEnemy={false}
-                    isLocked={true}
-                    onPress={undefined}
-                    assignment={undefined}
+                    isLocked={!isBattalionDUnlocked}
+                    onPress={isBattalionDUnlocked ? () => handleBattalionPress('D') : undefined}
+                    assignment={isBattalionDUnlocked ? assignments['D'] : undefined}
                     isHighlighted={false}
-                    disabled={false}
+                    disabled={isBattalionAHighlight}
                   />
                 </View>
-              ) : (
-                renderBattalionSlots(['C', 'D'], false, true)
               )}
               {renderBattalionSlots(availableBattalions)}
               {renderCircleSlots(3)}

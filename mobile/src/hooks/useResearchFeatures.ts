@@ -3,13 +3,14 @@ import { ResearchFeature } from '../components/research/ResearchFeaturesList';
 
 export function useResearchFeatures(categoryId: string | null) {
   const { 
-    data: features = [], 
+    data, 
     isLoading: loading, 
     error: queryError,
     refetch
   } = useGetUserFeaturesQuery(categoryId || '', {
     skip: !categoryId || categoryId === ''
   });
+  const features = data?.features ?? [];
 
   // Convert RTK Query error to string
   const error = queryError ? 

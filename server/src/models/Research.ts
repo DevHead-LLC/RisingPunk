@@ -11,7 +11,12 @@ export interface IResearchFeature {
   isResearching?: boolean;
   researchStartedAt?: Date;
   researchCompletesAt?: Date;
+  /** Duration in hours (fractional allowed, e.g. 5/60 for 5 minutes). */
   researchTimeHours?: number;
+  /** Feature(s) that must be unlocked before this feature can be started (AND). */
+  requiredFeatureRefs?: IResearchFeatureRef[];
+  /** Required Research Center building level (1–4). User must have at least this level to start research. */
+  researchCenterLevelRequirement?: number;
   effect: {
     type: 'unlock' | 'improvement' | 'reduction' | 'special';
     value: number | string;
@@ -90,6 +95,10 @@ const researchFeatureSchema = new Schema({
     type: Number,
     default: 4
   },
+  requiredFeatureRefs: [{
+    categoryId: { type: String, required: true },
+    featureId: { type: String, required: true }
+  }],
   effect: {
     type: {
       type: String,

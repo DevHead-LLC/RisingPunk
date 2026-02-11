@@ -10,7 +10,9 @@ export interface ResearchFeatureValidation {
   missingRequirements: {
     level?: boolean;
     balance?: boolean;
+    researchCenterLevel?: boolean;
     dependencies?: string[];
+    requiredFeatures?: string[];
   };
 }
 
@@ -33,8 +35,11 @@ export interface CompleteResearchResult {
 export class ResearchFeatureService {
   private static isValidResearchTimeHours(hours: number | null | undefined): boolean {
     if (hours == null) return false;
-    return hours >= 0.1;
+    return hours > 0;
   }
+
+  /** Deprecated: financial/reduce-expenses was replaced by cash-flow/reduce-tax-expense-02; block new starts to prevent cheap tax-reduction bypass. */
+  private static readonly DEPRECATED_TAX_FEATURE = { categoryId: 'financial' as const, featureId: 'reduce-expenses' as const };
 
   static async validateFeatureRequirements(
     userId: string,
@@ -42,6 +47,14 @@ export class ResearchFeatureService {
     featureId: string
   ): Promise<ResearchFeatureValidation> {
     try {
+      if (categoryId === this.DEPRECATED_TAX_FEATURE.categoryId && featureId === this.DEPRECATED_TAX_FEATURE.featureId) {
+        return {
+          canResearch: false,
+          reasons: ['This feature has been replaced. Unlock Cash Flow and research "Reduce Tax Expense $0.02" for tax reduction.'],
+          missingRequirements: {}
+        };
+      }
+
       const user = await User.findById(userId);
       const feature = getFeatureById(categoryId, featureId);
       
@@ -68,11 +81,20 @@ export class ResearchFeatureService {
         missingRequirements.balance = true;
       }
 
-      // Check if already unlocked
+      // Check Research Center level requirement (per-feature)
+      const rcLevelReq = (feature as any).researchCenterLevelRequirement;
+      if (rcLevelReq != null) {
+        const effectiveRcLevel = user.researchCenterLevel ?? (user.unlockedFeatures?.researchCenter ? 3 : 0);
+        if (effectiveRcLevel < rcLevelReq) {
+          reasons.push(`Research Center level ${rcLevelReq} required (current: ${effectiveRcLevel})`);
+          missingRequirements.researchCenterLevel = true;
+        }
+      }
+
+      // Check if already unlocked (use legacy filter so reduce-expenses counts for reduce-tax-expense-02)
       const existingFeature = await UserResearchFeature.findOne({
         userId,
-        categoryId,
-        featureId
+        ...ResearchFeatureService.getFeatureIdFindFilter(categoryId, featureId),
       });
 
       if (existingFeature?.isUnlocked) {
@@ -81,6 +103,23 @@ export class ResearchFeatureService {
 
       if (existingFeature?.isResearching) {
         reasons.push('Research already in progress');
+      }
+
+      // Check feature-level prerequisites (requiredFeatureRefs); use legacy filter so e.g. battalions-per-battle counts for add-battalion-c
+      const refs = feature.requiredFeatureRefs;
+      if (refs?.length) {
+        for (const ref of refs) {
+          const prereq = await UserResearchFeature.findOne({
+            userId,
+            ...ResearchFeatureService.getFeatureIdFindFilter(ref.categoryId, ref.featureId),
+          }).select('isUnlocked').lean();
+          if (!prereq?.isUnlocked) {
+            const label = `${ref.categoryId}:${ref.featureId}`;
+            reasons.push(`Requires research: ${label}`);
+            if (!missingRequirements.requiredFeatures) missingRequirements.requiredFeatures = [];
+            missingRequirements.requiredFeatures.push(label);
+          }
+        }
       }
 
       const canResearch = reasons.length === 0;
@@ -105,6 +144,13 @@ export class ResearchFeatureService {
     categoryId: string,
     featureId: string
   ): Promise<StartResearchResult> {
+    if (categoryId === ResearchFeatureService.DEPRECATED_TAX_FEATURE.categoryId && featureId === ResearchFeatureService.DEPRECATED_TAX_FEATURE.featureId) {
+      return {
+        success: false,
+        message: 'This feature has been replaced. Unlock Cash Flow and research "Reduce Tax Expense $0.02" for tax reduction.'
+      };
+    }
+
     const session = await mongoose.startSession();
     
     try {
@@ -135,11 +181,21 @@ export class ResearchFeatureService {
           missingRequirements.balance = true;
         }
 
-        // Check if already unlocked or researching (using transaction session)
+        // Check Research Center level requirement (per-feature); accumulate like level/balance so all reasons are returned (Bugbot).
+        const rcLevelReq = (feature as any).researchCenterLevelRequirement;
+        if (rcLevelReq != null) {
+          const effectiveRcLevel = user.researchCenterLevel ?? (user.unlockedFeatures?.researchCenter ? 3 : 0);
+          if (effectiveRcLevel < rcLevelReq) {
+            reasons.push(`Research Center level ${rcLevelReq} required (current: ${effectiveRcLevel})`);
+            missingRequirements.researchCenterLevel = true;
+          }
+        }
+
+        // Check if already unlocked or researching (using transaction session).
+        // Use legacy filter so reduce-expenses counts for reduce-tax-expense-02 and we don't create duplicates or double-charge.
         const existingFeature = await UserResearchFeature.findOne({
           userId,
-          categoryId,
-          featureId
+          ...ResearchFeatureService.getFeatureIdFindFilter(categoryId, featureId),
         }).session(session);
 
         if (existingFeature?.isUnlocked) {
@@ -148,6 +204,20 @@ export class ResearchFeatureService {
 
         if (existingFeature?.isResearching) {
           reasons.push('Research already in progress');
+        }
+
+        // Check feature-level prerequisites (requiredFeatureRefs); use legacy filter so e.g. battalions-per-battle counts for add-battalion-c
+        const refs = feature.requiredFeatureRefs;
+        if (refs?.length) {
+          for (const ref of refs) {
+            const prereq = await UserResearchFeature.findOne({
+              userId,
+              ...ResearchFeatureService.getFeatureIdFindFilter(ref.categoryId, ref.featureId),
+            }).session(session).select('isUnlocked').lean();
+            if (!prereq?.isUnlocked) {
+              reasons.push(`Requires research: ${ref.categoryId}:${ref.featureId}`);
+            }
+          }
         }
 
         if (reasons.length > 0) {
@@ -170,9 +240,9 @@ export class ResearchFeatureService {
           { session }
         );
 
-        // Create or update user research feature record
+        // Create or update by exact (categoryId, featureId) only so we never match and overwrite a shared legacy doc (Bugbot).
         await UserResearchFeature.findOneAndUpdate(
-          { userId, categoryId, featureId },
+          { userId, ...ResearchFeatureService.getExactFeatureIdFilter(categoryId, featureId) },
           {
             userId,
             categoryId,
@@ -212,6 +282,54 @@ export class ResearchFeatureService {
     }
   }
 
+  /**
+   * Exact (categoryId, featureId) filter for writes. Use in startResearch findOneAndUpdate so we never match a shared legacy doc
+   * and overwrite it (Bugbot: reduce-insurance-01 and -02 both include reduce-insurance-expense; updating would consume the doc).
+   */
+  static getExactFeatureIdFilter(categoryId: string, featureId: string): { categoryId: string; featureId: string } {
+    return { categoryId, featureId };
+  }
+
+  /**
+   * Find filter for UserResearchFeature lookups. Use with findOne({ userId, ...getFeatureIdFindFilter(categoryId, featureId) }).
+   * Legacy: same-category old IDs use featureId $in; reduce-expenses is cross-category (financial) so we use $or to match either doc.
+   */
+  static getFeatureIdFindFilter(
+    categoryId: string,
+    featureId: string
+  ): { categoryId: string; featureId: string } | { categoryId: string; featureId: { $in: string[] } } | { $or: Array<{ categoryId: string; featureId: string }> } {
+    if (categoryId === 'cash-flow' && featureId === 'reduce-tax-expense-02') {
+      return {
+        $or: [
+          { categoryId: 'cash-flow', featureId: 'reduce-tax-expense-02' },
+          { categoryId: 'financial', featureId: 'reduce-expenses' },
+        ],
+      };
+    }
+    const legacyMap: Record<string, string[]> = {
+      'add-battalion-c': ['add-battalion-c', 'battalions-per-battle'],
+      'battalion-size-250': ['battalion-size-250', 'increase-battalion-size'],
+      'reduce-insurance-01': ['reduce-insurance-01', 'reduce-insurance-expense'],
+      'reduce-insurance-02': ['reduce-insurance-02', 'reduce-insurance-expense'],
+      'rental-profit-01': ['rental-profit-01', 'rental-profit-increase'],
+      'increase-income-01': ['increase-income-01', 'increase-income-rate'],
+      'increase-income-02': ['increase-income-02', 'increase-income-rate'],
+      'increase-income-025': ['increase-income-025', 'increase-income-rate'],
+    };
+    const legacyIds = legacyMap[featureId];
+    if (legacyIds) {
+      const categoryMatch =
+        (categoryId === 'cash-flow' && (featureId === 'reduce-insurance-01' || featureId === 'reduce-insurance-02')) ||
+        (categoryId === 'hack-ability' && (featureId === 'add-battalion-c' || featureId === 'battalion-size-250')) ||
+        (categoryId === 'investments' && featureId === 'rental-profit-01') ||
+        (categoryId === 'cash-flow' && (featureId === 'increase-income-01' || featureId === 'increase-income-02' || featureId === 'increase-income-025'));
+      if (categoryMatch) {
+        return { categoryId, featureId: { $in: legacyIds } };
+      }
+    }
+    return { categoryId, featureId };
+  }
+
   static async completeResearch(
     userId: string,
     categoryId: string,
@@ -223,8 +341,7 @@ export class ResearchFeatureService {
       return await session.withTransaction(async () => {
         const userResearchFeature = await UserResearchFeature.findOne({
           userId,
-          categoryId,
-          featureId
+          ...ResearchFeatureService.getFeatureIdFindFilter(categoryId, featureId),
         }).session(session);
 
         if (!userResearchFeature) {
@@ -271,24 +388,39 @@ export class ResearchFeatureService {
           { session }
         );
 
-        if (categoryId === 'hack-ability' && featureId === 'battalions-per-battle') {
+        if (categoryId === 'hack-ability' && featureId === 'add-battalion-c') {
           console.log(`[AUDIT] User ${userId} unlocked Battalion C at ${unlockedAt.toISOString()}`);
         }
-
-        if (categoryId === 'hack-ability' && featureId === 'increase-battalion-size') {
-          console.log(`[AUDIT] User ${userId} unlocked Battalion Size +250 at ${unlockedAt.toISOString()}`);
+        if (categoryId === 'hack-ability' && featureId === 'add-battalion-d') {
+          console.log(`[AUDIT] User ${userId} unlocked Battalion D at ${unlockedAt.toISOString()}`);
+        }
+        if (categoryId === 'hack-ability' && featureId === 'add-battalion-e') {
+          console.log(`[AUDIT] User ${userId} unlocked Battalion E at ${unlockedAt.toISOString()}`);
         }
 
-        if (categoryId === 'investments' && featureId === 'rental-profit-increase') {
-          console.log(`[AUDIT] User ${userId} unlocked Rental Profit +$0.01/Room at ${unlockedAt.toISOString()}`);
-          
+        if (categoryId === 'hack-ability' && featureId === 'battalion-size-250') {
+          console.log(`[AUDIT] User ${userId} unlocked Battalion Size +250 at ${unlockedAt.toISOString()}`);
+        }
+        if (categoryId === 'hack-ability' && featureId === 'battalion-size-500') {
+          console.log(`[AUDIT] User ${userId} unlocked Battalion Size +500 at ${unlockedAt.toISOString()}`);
+        }
+        if (categoryId === 'hack-ability' && featureId === 'battalion-size-1000') {
+          console.log(`[AUDIT] User ${userId} unlocked Battalion Size +1,000 at ${unlockedAt.toISOString()}`);
+        }
+
+        if (categoryId === 'cash-flow' && (featureId === 'increase-income-01' || featureId === 'increase-income-02' || featureId === 'increase-income-025' || featureId === 'increase-income-03')) {
+          console.log(`[AUDIT] User ${userId} unlocked ${featureId} at ${unlockedAt.toISOString()}`);
+        }
+        if (categoryId === 'cash-flow' && featureId === 'reduce-tax-expense-02') {
+          console.log(`[AUDIT] User ${userId} unlocked Reduce Tax Expense $0.02 at ${unlockedAt.toISOString()}`);
+        }
+
+        if (categoryId === 'investments' && (featureId === 'rental-profit-01' || featureId === 'rental-profit-015')) {
+          console.log(`[AUDIT] User ${userId} unlocked ${featureId} at ${unlockedAt.toISOString()}`);
           const { RentalHousingSyncService } = await import('./RentalHousingSyncService');
           const { User } = await import('../models/User');
-          
-          // Reload user to ensure we have latest state including unlocked research
           const updatedUser = await User.findById(userId).session(session);
           if (updatedUser) {
-            // Reset sync timestamp to force immediate recalculation
             updatedUser.balance.rentalHousingIncomeLastSynced = null;
             await updatedUser.save({ session });
           }
@@ -328,9 +460,74 @@ export class ResearchFeatureService {
       .select('featureId isUnlocked unlockedAt isResearching researchStartedAt researchCompletesAt researchTimeHours')
       .lean();
 
-      // Merge base features with user progress from UserResearchFeature collection
+      // Legacy cross-category: financial/reduce-expenses counts as cash-flow/reduce-tax-expense-02 (only when loading cash-flow). Fetch full state so in-progress shows in UI (Bugbot: avoid invisible "Research already in progress").
+      let legacyFinancialReduceExpenses: {
+        isUnlocked: boolean;
+        unlockedAt: Date | null;
+        isResearching: boolean;
+        researchStartedAt: Date | null;
+        researchCompletesAt: Date | null;
+        researchTimeHours: number | null | undefined;
+      } | null = null;
+      if (categoryId === 'cash-flow') {
+        const legacy = await UserResearchFeature.findOne({
+          userId,
+          categoryId: 'financial',
+          featureId: 'reduce-expenses'
+        }).select('isUnlocked unlockedAt isResearching researchStartedAt researchCompletesAt researchTimeHours').lean();
+        if (legacy) {
+          legacyFinancialReduceExpenses = {
+            isUnlocked: !!legacy.isUnlocked,
+            unlockedAt: legacy.unlockedAt ?? null,
+            isResearching: !!legacy.isResearching,
+            researchStartedAt: legacy.researchStartedAt ?? null,
+            researchCompletesAt: legacy.researchCompletesAt ?? null,
+            researchTimeHours: legacy.researchTimeHours
+          };
+        }
+      }
+
+      // Merge base features with user progress from UserResearchFeature collection.
+      // Legacy: treat completed old feature IDs as unlocked for corresponding new spec IDs (grandfathering + read-time before/after migration).
+      const legacyUnlockMap: Record<string, string[]> = {
+        'reduce-tax-expense-02': ['reduce-expenses'],
+        'add-battalion-c': ['battalions-per-battle'],
+        'battalion-size-250': ['increase-battalion-size'],
+        'crew-system-unlock': [],
+        'reduce-insurance-01': ['reduce-insurance-expense'],
+        'reduce-insurance-02': ['reduce-insurance-expense'],
+        'rental-profit-01': ['rental-profit-increase'],
+        'increase-income-01': ['increase-income-rate'],
+        'increase-income-02': ['increase-income-rate'],
+        'increase-income-025': ['increase-income-rate'],
+      };
+      // When one legacy doc maps to multiple new features (e.g. increase-income-rate → 01, 02, 025), show "researching" on only the first so we don't show three identical timers (Bugbot).
+      const legacyDocUsedForResearching = new Set<string>();
       const featuresWithStatus = baseFeatures.map(feature => {
-        const userFeature = userFeatures.find(uf => uf.featureId === feature.id);
+        const legacyIds = legacyUnlockMap[feature.id];
+        let userFeature = userFeatures.find(uf =>
+          uf.featureId === feature.id ||
+          (legacyIds?.length && legacyIds.includes(uf.featureId))
+        );
+        if (!userFeature && feature.id === 'reduce-tax-expense-02' && legacyFinancialReduceExpenses) {
+          userFeature = {
+            featureId: 'reduce-expenses',
+            ...legacyFinancialReduceExpenses
+          } as any;
+        }
+
+        // Dedupe: if this user doc is already shown as "researching" for an earlier feature, show this feature as not researching (unlocked state still from doc).
+        if (userFeature?.isResearching && legacyDocUsedForResearching.has(userFeature.featureId)) {
+          userFeature = {
+            ...userFeature,
+            isResearching: false,
+            researchStartedAt: null,
+            researchCompletesAt: null,
+            researchTimeHours: 0
+          };
+        } else if (userFeature?.isResearching) {
+          legacyDocUsedForResearching.add(userFeature.featureId);
+        }
 
         const userResearchTimeHours = userFeature?.researchTimeHours;
         const validUserResearchTime = ResearchFeatureService.isValidResearchTimeHours(userResearchTimeHours) 

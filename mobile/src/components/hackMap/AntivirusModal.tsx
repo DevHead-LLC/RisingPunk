@@ -82,7 +82,7 @@ export const AntivirusModal: React.FC<AntivirusModalProps> = ({
   // Get research features data (same as HackMapScreen and ResearchFeaturesList)
   const { data: researchFeatures } = useGetUserFeaturesQuery('home-defense');
   
-  const antivirusFeature = researchFeatures?.find(f => f.id === 'antivirus');
+  const antivirusFeature = researchFeatures?.features?.find(f => f.id === 'antivirus');
   
   const now = new Date().getTime();
   const researchCompletesAt = antivirusFeature?.researchCompletesAt ? new Date(antivirusFeature.researchCompletesAt).getTime() : 0;

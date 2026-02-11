@@ -3,7 +3,7 @@ const Bot = require('../models/Bot');
 import auth from '../middleware/auth';
 import { User } from '../models/User';
 import mongoose from 'mongoose';
-import { UserResearchFeature } from '../models/UserResearchFeature';
+import { getMaxBattalionSize, isBattalionSlotUnlocked } from '../utils/researchFeatureUtils';
 
 const router = express.Router();
 
@@ -421,55 +421,31 @@ router.post('/assign', auth, async (req, res) => {
       return;
     }
 
-    const battalionSizeFeature = await UserResearchFeature.findOne({
-      userId: req.user._id,
-      categoryId: 'hack-ability',
-      featureId: 'increase-battalion-size'
-    })
-    .select('isUnlocked isResearching researchCompletesAt')
-    .lean();
-
     const now = Date.now();
-    const researchCompletesAt = battalionSizeFeature?.researchCompletesAt 
-      ? new Date(battalionSizeFeature.researchCompletesAt).getTime() 
-      : null;
-    const remaining = researchCompletesAt !== null ? Math.max(0, researchCompletesAt - now) : null;
-    const isActuallyUnlocked = battalionSizeFeature?.isUnlocked || 
-      (battalionSizeFeature?.isResearching && researchCompletesAt !== null && remaining === 0);
-
-    const maxLimit = isActuallyUnlocked ? 500 : 250;
+    const maxLimit = await getMaxBattalionSize(userId, new Date(now));
 
     if (quantity > maxLimit) {
-      const errorMessage = isActuallyUnlocked 
-        ? 'Maximum troops per battalion is 500.'
-        : 'Maximum troops per battalion is 250. Complete "Battalion Size +250" research to increase to 500.';
+      const nextStep =
+        maxLimit === 250
+          ? 'Complete "Battalion Size +250" research to increase to 500.'
+          : maxLimit === 500
+            ? 'Complete "Battalion Size +500" research to increase to 1,000.'
+            : maxLimit === 1000
+              ? 'Complete "Battalion Size +1,000" research to increase to 2,000.'
+              : null;
+      const errorMessage = nextStep
+        ? `Maximum troops per battalion is ${maxLimit.toLocaleString()}. ${nextStep}`
+        : `Maximum troops per battalion is ${maxLimit.toLocaleString()}.`;
       res.status(400).json({ error: errorMessage });
       return;
     }
     
-    if (battalionId === 'C') {
-      const battalionCFeature = await UserResearchFeature.findOne({
-        userId: req.user._id,
-        categoryId: 'hack-ability',
-        featureId: 'battalions-per-battle'
-      })
-      .select('isUnlocked isResearching researchCompletesAt')
-      .lean();
-      
-      if (!battalionCFeature) {
-        res.status(403).json({ error: 'Battalion C is locked. Complete the "Add Battalion C" research feature to unlock it.' });
-        return;
-      }
-      
-      const researchCompletesAtC = battalionCFeature.researchCompletesAt 
-        ? new Date(battalionCFeature.researchCompletesAt).getTime() 
-        : null;
-      const remainingC = researchCompletesAtC !== null ? Math.max(0, researchCompletesAtC - now) : null;
-      const isActuallyUnlockedC = battalionCFeature.isUnlocked || 
-        (battalionCFeature.isResearching && researchCompletesAtC !== null && remainingC === 0);
-      
-      if (!isActuallyUnlockedC) {
-        res.status(403).json({ error: 'Battalion C is locked. Complete the "Add Battalion C" research feature to unlock it.' });
+    if (battalionId === 'C' || battalionId === 'D' || battalionId === 'E') {
+      const unlocked = await isBattalionSlotUnlocked(userId, battalionId as 'C' | 'D' | 'E');
+      if (!unlocked) {
+        res.status(403).json({
+          error: `Battalion ${battalionId} is locked. Complete the "Add Battalion ${battalionId}" research feature to unlock it.`
+        });
         return;
       }
     }
@@ -611,6 +587,12 @@ router.post('/assign', auth, async (req, res) => {
 
         if (battalionId === 'C') {
           console.log(`[AUDIT] User ${userId} assigned ${quantity} ${botType} to Battalion C`);
+        }
+        if (battalionId === 'D') {
+          console.log(`[AUDIT] User ${userId} assigned ${quantity} ${botType} to Battalion D`);
+        }
+        if (battalionId === 'E') {
+          console.log(`[AUDIT] User ${userId} assigned ${quantity} ${botType} to Battalion E`);
         }
 
         res.json({ 

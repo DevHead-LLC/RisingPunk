@@ -23,16 +23,16 @@ export interface UnlockCosts {
 
 export class ResearchUnlockService {
   private static readonly UNLOCK_COSTS: UnlockCosts = {
-    'home-defense': 10000,
-    'hack-ability': 50000,
+    'home-defense': 5000,
+    'hack-ability': 30000,
     'financial': 20000,
-    'hack-crew': 100000,
+    'hack-crew': 50000,
     'npc': 50000,
-    'cash-flow': 50000,
+    'cash-flow': 15000,
     'construction': 50000,
     'battle-mechanics': 150000,
     'gear': 400000,
-    'investments': 250000
+    'investments': 75000
   };
 
   static async validateUnlockRequirements(
@@ -92,12 +92,6 @@ export class ResearchUnlockService {
           reasons.push(`Required features not completed: ${refLabels.join(', ')}`);
           missingRequirements.requiredFeatures = refLabels;
         }
-      } else if (categoryId === 'hack-crew') {
-        const hasAntivirus = await this.checkAntivirusFeature(userId);
-        if (!hasAntivirus) {
-          reasons.push('Antivirus feature must be unlocked');
-          missingRequirements.antivirus = true;
-        }
       }
 
       const canUnlock = reasons.length === 0;
@@ -142,30 +136,6 @@ export class ResearchUnlockService {
   private static async getResearchIdsByCategoryIds(categoryIds: string[]): Promise<mongoose.Types.ObjectId[]> {
     const research = await Research.find({ categoryId: { $in: categoryIds } }, { _id: 1 });
     return research.map(r => r._id as mongoose.Types.ObjectId);
-  }
-
-  private static async checkAntivirusFeature(userId: string): Promise<boolean> {
-    const antivirusFeature = await UserResearchFeature.findOne({
-      userId,
-      categoryId: 'home-defense',
-      featureId: 'antivirus'
-    });
-    
-    if (!antivirusFeature) {
-      return false;
-    }
-
-    if (antivirusFeature.isUnlocked) {
-      return true;
-    }
-
-    if (antivirusFeature.isResearching && antivirusFeature.researchCompletesAt) {
-      const now = new Date();
-      const completesAt = antivirusFeature.researchCompletesAt;
-      return now >= completesAt;
-    }
-
-    return false;
   }
 
   /** Returns refs that are not yet unlocked (or completed). */
@@ -254,7 +224,7 @@ export class ResearchUnlockService {
           }
         }
 
-        // Required features (requiredFeatureRefs)
+        // Required features (requiredFeatureRefs); same source as validateUnlockRequirements and getUserResearchStatus
         const refs = (research as any).requiredFeatureRefs as { categoryId: string; featureId: string }[] | undefined;
         if (refs?.length) {
           const missingRefs = await this.checkRequiredFeatureRefs(userId, refs);
@@ -263,14 +233,6 @@ export class ResearchUnlockService {
             return {
               success: false,
               message: `Required features not completed: ${refLabels}`
-            };
-          }
-        } else if (categoryId === 'hack-crew') {
-          const hasAntivirus = await this.checkAntivirusFeature(userId);
-          if (!hasAntivirus) {
-            return {
-              success: false,
-              message: 'Antivirus feature must be unlocked'
             };
           }
         }
@@ -383,8 +345,6 @@ export class ResearchUnlockService {
       if (refs?.length) {
         result.requiredFeatures = refs.map((r: { featureId: string }) => r.featureId);
         result.requiredFeatureRefs = refs;
-      } else if (research.categoryId === 'hack-crew') {
-        result.requiredFeatures = ['antivirus'];
       }
 
       return result;
