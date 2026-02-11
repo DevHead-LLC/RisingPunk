@@ -56,9 +56,12 @@ export const RENTAL_PROFIT_FEATURES: { featureId: string; value: number; categor
   { featureId: 'rental-profit-015', value: 0.015, categoryId: 'investments' }
 ];
 
+/** Migration replacement set for increase-income-rate (grandfather creates 01+02+025). Add legacy only when user doesn't have all of these (Bugbot). */
+const INCOME_RATE_LEGACY_REPLACEMENT_IDS = ['increase-income-01', 'increase-income-02', 'increase-income-025'];
+
 /**
  * Total base income rate bonus from all unlocked cash-flow income features (spec 18).
- * Legacy: add $0.05/sec only when no new-tier unlocks (so pre-migration users get credit; avoids double-count if migration left old doc; Bugbot).
+ * Legacy: add $0.05/sec when increase-income-rate is unlocked and user does not have the full migration replacement set (01+02+025), so pre-migration users keep legacy+new; avoids double-count when migrated (Bugbot).
  * Pass prefetch from getResearchFeaturesForBonusSync to avoid N+1 queries (Bugbot).
  */
 export async function getBaseIncomeRateBonus(userId: string, prefetch?: BonusPrefetch): Promise<number> {
@@ -69,14 +72,17 @@ export async function getBaseIncomeRateBonus(userId: string, prefetch?: BonusPre
   for (const { featureId, value } of INCOME_RATE_FEATURES) {
     if (await check('cash-flow', featureId)) total += value;
   }
-  // Only add legacy when no new-tier unlocks (avoids double-count if migration created new docs but old doc remains; Bugbot).
-  if (total === 0 && (await check('cash-flow', 'increase-income-rate'))) total += 0.05;
+  const hasFullReplacement = (await Promise.all(INCOME_RATE_LEGACY_REPLACEMENT_IDS.map(id => check('cash-flow', id)))).every(Boolean);
+  if (!hasFullReplacement && (await check('cash-flow', 'increase-income-rate'))) total += 0.05;
   return total;
 }
 
+/** Migration replacement for reduce-insurance-expense is reduce-insurance-02. Add legacy only when user doesn't have it (Bugbot). */
+const INSURANCE_LEGACY_REPLACEMENT_ID = 'reduce-insurance-02';
+
 /**
  * Total insurance expense reduction from all unlocked cash-flow features (spec 18).
- * Legacy: add $0.02 only when no new-tier unlocks (avoids double-count if migration left old doc; Bugbot).
+ * Legacy: add $0.02 when reduce-insurance-expense is unlocked and user does not have the migration replacement (reduce-insurance-02), so pre-migration users keep legacy+new (Bugbot).
  * Pass prefetch to avoid N+1 queries (Bugbot).
  */
 export async function getInsuranceReductionBonus(userId: string, prefetch?: BonusPrefetch): Promise<number> {
@@ -87,8 +93,8 @@ export async function getInsuranceReductionBonus(userId: string, prefetch?: Bonu
   for (const { featureId, value } of INSURANCE_REDUCTION_FEATURES) {
     if (await check('cash-flow', featureId)) total += value;
   }
-  // Only add legacy when no new-tier unlocks (avoids double-count if migration left old doc; Bugbot).
-  if (total === 0 && (await check('cash-flow', 'reduce-insurance-expense'))) total += 0.02;
+  const hasReplacement = await check('cash-flow', INSURANCE_LEGACY_REPLACEMENT_ID);
+  if (!hasReplacement && (await check('cash-flow', 'reduce-insurance-expense'))) total += 0.02;
   return total;
 }
 
@@ -111,9 +117,12 @@ export async function getTaxReductionBonus(userId: string, prefetch?: BonusPrefe
   return total;
 }
 
+/** Migration replacement for rental-profit-increase is rental-profit-01. Add legacy only when user doesn't have it (Bugbot). */
+const RENTAL_LEGACY_REPLACEMENT_ID = 'rental-profit-01';
+
 /**
  * Total rental profit bonus per room per second from all unlocked investments features (spec 18).
- * Legacy: add $0.01 only when no new-tier unlocks (avoids double-count if migration left old doc; Bugbot).
+ * Legacy: add $0.01 when rental-profit-increase is unlocked and user does not have the migration replacement (rental-profit-01), so pre-migration users keep legacy+new (Bugbot).
  * Pass prefetch to avoid N+1 queries (Bugbot).
  */
 export async function getRentalProfitBonusPerRoom(userId: string, prefetch?: BonusPrefetch): Promise<number> {
@@ -124,14 +133,14 @@ export async function getRentalProfitBonusPerRoom(userId: string, prefetch?: Bon
   for (const { featureId, value, categoryId } of RENTAL_PROFIT_FEATURES) {
     if (await check(categoryId, featureId)) total += value;
   }
-  // Only add legacy when no new-tier unlocks (avoids double-count if migration left old doc; Bugbot).
-  if (total === 0 && (await check('investments', 'rental-profit-increase'))) total += 0.01;
+  const hasReplacement = await check('investments', RENTAL_LEGACY_REPLACEMENT_ID);
+  if (!hasReplacement && (await check('investments', 'rental-profit-increase'))) total += 0.01;
   return total;
 }
 
 /**
  * Rental profit bonus per room as of a given time (for historical income).
- * Sums only features unlocked at or before asOfTime. Legacy: add $0.01 only when no new-tier unlocks by then (Bugbot).
+ * Legacy: add $0.01 when rental-profit-increase unlocked by asOfTime and replacement (rental-profit-01) not unlocked by then (Bugbot).
  * Pass prefetch to avoid N+1 queries (Bugbot).
  */
 export async function getRentalProfitBonusPerRoomAsOf(userId: string, asOfTime: Date, prefetch?: BonusPrefetch): Promise<number> {
@@ -144,9 +153,10 @@ export async function getRentalProfitBonusPerRoomAsOf(userId: string, asOfTime: 
     const unlockedAt = await getTime(categoryId, featureId);
     if (unlockedAt && unlockedAt.getTime() <= asOfMs) total += value;
   }
-  // Only add legacy when no new-tier unlocks by asOfTime (avoids double-count; Bugbot).
+  const replacementUnlockedAt = await getTime('investments', RENTAL_LEGACY_REPLACEMENT_ID);
+  const hasReplacementByThen = replacementUnlockedAt && replacementUnlockedAt.getTime() <= asOfMs;
   const legacyUnlockedAt = await getTime('investments', 'rental-profit-increase');
-  if (total === 0 && legacyUnlockedAt && legacyUnlockedAt.getTime() <= asOfMs) total += 0.01;
+  if (!hasReplacementByThen && legacyUnlockedAt && legacyUnlockedAt.getTime() <= asOfMs) total += 0.01;
   return total;
 }
 
