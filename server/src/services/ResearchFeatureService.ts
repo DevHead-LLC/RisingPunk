@@ -94,14 +94,13 @@ export class ResearchFeatureService {
         reasons.push('Research already in progress');
       }
 
-      // Check feature-level prerequisites (requiredFeatureRefs)
+      // Check feature-level prerequisites (requiredFeatureRefs); use legacy filter so e.g. battalions-per-battle counts for add-battalion-c
       const refs = feature.requiredFeatureRefs;
       if (refs?.length) {
         for (const ref of refs) {
           const prereq = await UserResearchFeature.findOne({
             userId,
-            categoryId: ref.categoryId,
-            featureId: ref.featureId
+            ...ResearchFeatureService.getFeatureIdFindFilter(ref.categoryId, ref.featureId),
           }).select('isUnlocked').lean();
           if (!prereq?.isUnlocked) {
             const label = `${ref.categoryId}:${ref.featureId}`;
@@ -191,14 +190,13 @@ export class ResearchFeatureService {
           reasons.push('Research already in progress');
         }
 
-        // Check feature-level prerequisites (requiredFeatureRefs)
+        // Check feature-level prerequisites (requiredFeatureRefs); use legacy filter so e.g. battalions-per-battle counts for add-battalion-c
         const refs = feature.requiredFeatureRefs;
         if (refs?.length) {
           for (const ref of refs) {
             const prereq = await UserResearchFeature.findOne({
               userId,
-              categoryId: ref.categoryId,
-              featureId: ref.featureId
+              ...ResearchFeatureService.getFeatureIdFindFilter(ref.categoryId, ref.featureId),
             }).session(session).select('isUnlocked').lean();
             if (!prereq?.isUnlocked) {
               reasons.push(`Requires research: ${ref.categoryId}:${ref.featureId}`);

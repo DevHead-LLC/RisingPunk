@@ -87,13 +87,15 @@ export class RentalHousingIncomeService {
     return earliest;
   }
 
-  /** Sorted unlock times for each rental-profit tier (for historical income segments). */
+  /** Sorted unlock times for each rental-profit tier (for historical income segments). Includes legacy rental-profit-increase so pre-migration unlock creates a boundary. */
   static async getRentalProfitUnlockTimes(userId: string): Promise<Date[]> {
     const times: Date[] = [];
     for (const { featureId, categoryId } of RENTAL_PROFIT_FEATURES) {
       const t = await getResearchFeatureUnlockTime(userId, categoryId, featureId);
       if (t) times.push(t);
     }
+    const legacyT = await getResearchFeatureUnlockTime(userId, 'investments', 'rental-profit-increase');
+    if (legacyT) times.push(legacyT);
     return times.sort((a, b) => a.getTime() - b.getTime());
   }
 
