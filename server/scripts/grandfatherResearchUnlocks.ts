@@ -35,6 +35,7 @@ const LEGACY_MAPPINGS: {
     { categoryId: 'cash-flow', featureId: 'increase-income-025' },
   ]},
   // Grant 01+02 so prerequisite order is satisfied (02 requires 01; crew-system-unlock requires 01). Bugbot: omit 01 caused inverted state.
+  // Granting both yields $0.03/sec (01+02) vs old $0.02 — extra $0.01/sec is intentional grandfather bonus, like income (Bugbot).
   { oldCategoryId: 'cash-flow', oldFeatureId: 'reduce-insurance-expense', newEntries: [
     { categoryId: 'cash-flow', featureId: 'reduce-insurance-01' },
     { categoryId: 'cash-flow', featureId: 'reduce-insurance-02' },

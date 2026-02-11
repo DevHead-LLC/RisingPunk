@@ -49,7 +49,8 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
   const ratePerSecondFromState = useAppSelector(state => state.balance.ratePerSecond);
   // Use balanceData from query if available (fresh data), otherwise fall back to Redux state
   const ratePerSecond = balanceData?.ratePerSecond ?? ratePerSecondFromState;
-  // Expense reductions: prefer expense-modifiers API, then balance, then server value from cash-flow user-features (Bugbot: legacy insurance $0.02 not $0.03), then naive feature sum.
+  // Expense reductions: prefer dedicated expense-modifiers API (single source of truth). Fall back to balance, then research features.
+  // Fallback: sum 01 + 02 so migrated users with both tiers see 0.03. Legacy-only (one doc shows as both) may briefly show 0.03 until expenseModifiers loads (Bugbot tradeoff).
   const insuranceReductionTotal = useMemo(() => {
     if (typeof expenseModifiers?.insuranceReduction === 'number') return expenseModifiers.insuranceReduction;
     if (typeof balanceData?.insuranceReduction === 'number') return balanceData.insuranceReduction;
