@@ -453,15 +453,31 @@ export class ResearchFeatureService {
       .select('featureId isUnlocked unlockedAt isResearching researchStartedAt researchCompletesAt researchTimeHours')
       .lean();
 
-      // Legacy cross-category: financial/reduce-expenses counts as cash-flow/reduce-tax-expense-02 (only when loading cash-flow)
-      let legacyFinancialReduceExpenses: { isUnlocked: boolean; unlockedAt: Date | null } | null = null;
+      // Legacy cross-category: financial/reduce-expenses counts as cash-flow/reduce-tax-expense-02 (only when loading cash-flow). Fetch full state so in-progress shows in UI (Bugbot: avoid invisible "Research already in progress").
+      let legacyFinancialReduceExpenses: {
+        isUnlocked: boolean;
+        unlockedAt: Date | null;
+        isResearching: boolean;
+        researchStartedAt: Date | null;
+        researchCompletesAt: Date | null;
+        researchTimeHours: number | null | undefined;
+      } | null = null;
       if (categoryId === 'cash-flow') {
         const legacy = await UserResearchFeature.findOne({
           userId,
           categoryId: 'financial',
           featureId: 'reduce-expenses'
-        }).select('isUnlocked unlockedAt').lean();
-        if (legacy) legacyFinancialReduceExpenses = { isUnlocked: !!legacy.isUnlocked, unlockedAt: legacy.unlockedAt ?? null };
+        }).select('isUnlocked unlockedAt isResearching researchStartedAt researchCompletesAt researchTimeHours').lean();
+        if (legacy) {
+          legacyFinancialReduceExpenses = {
+            isUnlocked: !!legacy.isUnlocked,
+            unlockedAt: legacy.unlockedAt ?? null,
+            isResearching: !!legacy.isResearching,
+            researchStartedAt: legacy.researchStartedAt ?? null,
+            researchCompletesAt: legacy.researchCompletesAt ?? null,
+            researchTimeHours: legacy.researchTimeHours
+          };
+        }
       }
 
       // Merge base features with user progress from UserResearchFeature collection.
@@ -477,14 +493,32 @@ export class ResearchFeatureService {
         'increase-income-02': ['increase-income-rate'],
         'increase-income-025': ['increase-income-rate'],
       };
+      // When one legacy doc maps to multiple new features (e.g. increase-income-rate → 01, 02, 025), show "researching" on only the first so we don't show three identical timers (Bugbot).
+      const legacyDocUsedForResearching = new Set<string>();
       const featuresWithStatus = baseFeatures.map(feature => {
         const legacyIds = legacyUnlockMap[feature.id];
         let userFeature = userFeatures.find(uf =>
           uf.featureId === feature.id ||
           (legacyIds?.length && legacyIds.includes(uf.featureId))
         );
-        if (!userFeature && feature.id === 'reduce-tax-expense-02' && legacyFinancialReduceExpenses?.isUnlocked) {
-          userFeature = { ...legacyFinancialReduceExpenses, featureId: 'reduce-expenses', isResearching: false, researchStartedAt: null, researchCompletesAt: null, researchTimeHours: 0 } as any;
+        if (!userFeature && feature.id === 'reduce-tax-expense-02' && legacyFinancialReduceExpenses) {
+          userFeature = {
+            featureId: 'reduce-expenses',
+            ...legacyFinancialReduceExpenses
+          } as any;
+        }
+
+        // Dedupe: if this user doc is already shown as "researching" for an earlier feature, show this feature as not researching (unlocked state still from doc).
+        if (userFeature?.isResearching && legacyDocUsedForResearching.has(userFeature.featureId)) {
+          userFeature = {
+            ...userFeature,
+            isResearching: false,
+            researchStartedAt: null,
+            researchCompletesAt: null,
+            researchTimeHours: 0
+          };
+        } else if (userFeature?.isResearching) {
+          legacyDocUsedForResearching.add(userFeature.featureId);
         }
 
         const userResearchTimeHours = userFeature?.researchTimeHours;

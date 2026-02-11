@@ -32,6 +32,9 @@ export interface SpeedupFeatureResearchResponse {
   newBalance: number;
 }
 
+/** Cash-flow feature IDs (spec 18) that affect balance/expense modifiers; used to invalidate balance cache on complete/speedup. Excludes legacy financial/reduce-expenses (categoryId is always cash-flow in these mutations). */
+const CASH_FLOW_SYNC_FEATURE_IDS: readonly string[] = ['increase-income-01', 'increase-income-02', 'increase-income-025', 'increase-income-03', 'reduce-insurance-01', 'reduce-insurance-02', 'reduce-tax-expense-02'];
+
 export const researchFeaturesApi = createApi({
   reducerPath: 'researchFeaturesApi',
   baseQuery: fetchBaseQuery({
@@ -114,8 +117,7 @@ export const researchFeaturesApi = createApi({
             dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
           }
           // If cash-flow income/insurance/tax research completed (spec 18), invalidate balance cache
-          const cashFlowSyncIds = ['increase-income-01', 'increase-income-02', 'increase-income-025', 'increase-income-03', 'reduce-insurance-01', 'reduce-insurance-02', 'reduce-tax-expense-02', 'reduce-expenses'];
-          if (arg.categoryId === 'cash-flow' && cashFlowSyncIds.includes(arg.featureId)) {
+          if (arg.categoryId === 'cash-flow' && CASH_FLOW_SYNC_FEATURE_IDS.includes(arg.featureId)) {
             const { balanceApi } = await import('./balanceApi');
             dispatch(balanceApi.util.invalidateTags(['Balance']));
           }
@@ -154,8 +156,7 @@ export const researchFeaturesApi = createApi({
             dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
           }
           // If cash-flow income/insurance/tax research was speeded up (spec 18), invalidate balance cache
-          const cashFlowSyncIds = ['increase-income-01', 'increase-income-02', 'increase-income-025', 'increase-income-03', 'reduce-insurance-01', 'reduce-insurance-02', 'reduce-tax-expense-02'];
-          if (arg.categoryId === 'cash-flow' && cashFlowSyncIds.includes(arg.featureId)) {
+          if (arg.categoryId === 'cash-flow' && CASH_FLOW_SYNC_FEATURE_IDS.includes(arg.featureId)) {
             dispatch(balanceApi.util.invalidateTags(['Balance']));
           }
         } catch {
