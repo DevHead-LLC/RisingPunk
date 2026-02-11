@@ -16,7 +16,16 @@ const researchCompletionAttempts = new Map<string, { count: number; resetAt: num
 const RATE_LIMIT_WINDOW = 60000;
 const MAX_RESEARCH_COMPLETION_ATTEMPTS = 10;
 
-/** Shared sync for cash-flow research completion/speedup (e.g. increase-income-rate, reduce-insurance-expense). */
+/** Cash-flow feature IDs that affect base rate, insurance, or tax (spec 18). Triggers sync on completion/speedup. */
+const CASH_FLOW_SYNC_FEATURE_IDS = new Set([
+  'increase-income-01', 'increase-income-02', 'increase-income-025', 'increase-income-03',
+  'reduce-insurance-01', 'reduce-insurance-02', 'reduce-tax-expense-02'
+]);
+
+/** Investments feature IDs that affect rental income (spec 18). */
+const INVESTMENTS_SYNC_FEATURE_IDS = new Set(['rental-profit-01', 'rental-profit-015']);
+
+/** Shared sync for cash-flow research completion/speedup (income/insurance features per spec 18). */
 async function syncCashFlowResearchCompletion(
   userId: string,
   featureId: string,
@@ -26,11 +35,14 @@ async function syncCashFlowResearchCompletion(
   const { UserResearchFeature } = await import('../models/UserResearchFeature');
   const user = existingUser ?? await User.findById(userId);
   if (!user) return null;
+  // Legacy-aware filter can match multiple docs; use most recent unlockedAt so balance accrual is correct (Bugbot).
   const researchFeature = await UserResearchFeature.findOne({
     userId,
-    categoryId: 'cash-flow',
-    featureId
-  }).select('unlockedAt').lean();
+    ...ResearchFeatureService.getFeatureIdFindFilter('cash-flow', featureId),
+  })
+    .select('unlockedAt')
+    .sort({ unlockedAt: -1 })
+    .lean();
   const unlockTime = researchFeature?.unlockedAt || new Date();
   const secondsElapsed = (unlockTime.getTime() - user.balance.lastUpdated.getTime()) / 1000;
   if (secondsElapsed > 0) {
@@ -244,6 +256,22 @@ router.post('/fix-user-research', auth, async (req: Request, res: Response): Pro
 // NEW ENDPOINTS FOR INDIVIDUAL FEATURE MANAGEMENT
 // These use the new UserResearchFeature collection and don't interfere with category unlocking
 
+// Expense modifiers for Financial Statements (single source of truth; same logic as balance rate)
+router.get('/expense-modifiers', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = String((req as any).user._id);
+    const { getInsuranceReductionBonus, getTaxReductionBonus } = await import('../utils/researchFeatureUtils');
+    const [insuranceReduction, taxReduction] = await Promise.all([
+      getInsuranceReductionBonus(userId),
+      getTaxReductionBonus(userId)
+    ]);
+    res.json({ insuranceReduction, taxReduction });
+  } catch (error) {
+    console.error('Error fetching expense modifiers:', error);
+    res.status(500).json({ insuranceReduction: 0, taxReduction: 0 });
+  }
+});
+
 // Get user's individual feature status for a category
 router.get('/user-features/:categoryId', auth, async (req: Request, res: Response) => {
   try {
@@ -353,8 +381,8 @@ router.post('/complete-feature-research', auth, async (req: Request, res: Respon
     const result = await ResearchFeatureService.completeResearch(userId, categoryId, featureId);
     
     if (result.success) {
-      // If rental profit research completed, trigger sync to update income rate
-      if (categoryId === 'investments' && featureId === 'rental-profit-increase') {
+      // If rental profit research completed, trigger sync to update income rate (spec 18 IDs)
+      if (categoryId === 'investments' && INVESTMENTS_SYNC_FEATURE_IDS.has(featureId)) {
         try {
           const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
           const user = await User.findById(userId);
@@ -370,8 +398,8 @@ router.post('/complete-feature-research', auth, async (req: Request, res: Respon
         }
       }
       
-      // If cash-flow research completed (income rate or insurance reduction), trigger sync
-      if (categoryId === 'cash-flow' && (featureId === 'increase-income-rate' || featureId === 'reduce-insurance-expense')) {
+      // If cash-flow research completed (income/insurance per spec 18), trigger sync
+      if (categoryId === 'cash-flow' && CASH_FLOW_SYNC_FEATURE_IDS.has(featureId)) {
         try {
           await syncCashFlowResearchCompletion(userId, featureId);
         } catch (error) {
@@ -489,12 +517,11 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
       return;
     }
 
-    // Get the research feature to check if research is in progress
+    // Get the research feature to check if research is in progress (legacy: reduce-expenses → reduce-tax-expense-02)
     const { UserResearchFeature } = await import('../models/UserResearchFeature');
     const userResearchFeature = await UserResearchFeature.findOne({
       userId,
-      categoryId,
-      featureId
+      ...ResearchFeatureService.getFeatureIdFindFilter(categoryId, featureId),
     });
 
     if (!userResearchFeature) {
@@ -527,11 +554,10 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
     
     try {
       await session.withTransaction(async () => {
-        // First, verify the research is still in progress (double-check to prevent race conditions)
+        // First, verify the research is still in progress (double-check to prevent race conditions; legacy: reduce-expenses)
         const currentResearch = await UserResearchFeature.findOne({
           userId,
-          categoryId,
-          featureId
+          ...ResearchFeatureService.getFeatureIdFindFilter(categoryId, featureId),
         }).session(session);
 
         if (!currentResearch) {
@@ -652,8 +678,8 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
     // Reload user to get updated balance
     let updatedUser = await User.findById(userId);
     
-    // If rental profit research was speeded up, trigger sync to update income rate
-    if (categoryId === 'investments' && featureId === 'rental-profit-increase') {
+    // If rental profit research was speeded up, trigger sync (spec 18 IDs)
+    if (categoryId === 'investments' && INVESTMENTS_SYNC_FEATURE_IDS.has(featureId)) {
       try {
         const { RentalHousingSyncService } = await import('../services/RentalHousingSyncService');
         if (updatedUser) {
@@ -668,8 +694,8 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
       }
     }
     
-    // If cash-flow research was speeded up (income rate or insurance reduction), trigger sync
-    if (categoryId === 'cash-flow' && (featureId === 'increase-income-rate' || featureId === 'reduce-insurance-expense')) {
+    // If cash-flow research was speeded up (income/insurance per spec 18), trigger sync
+    if (categoryId === 'cash-flow' && CASH_FLOW_SYNC_FEATURE_IDS.has(featureId)) {
       try {
         const reloaded = await syncCashFlowResearchCompletion(userId, featureId, updatedUser ?? undefined);
         if (reloaded) updatedUser = reloaded;

@@ -35,8 +35,9 @@ const ALL_RESEARCH_CARDS: ResearchCard[] = [
   { id: 'cash-flow', name: 'Cash Flow', image: require('../assets/images/cashFlowResearch.png') },
 ];
 
-// Show Home Defense, Hack Crew, Hack Ability, Cash Flow, and Investments categories
-const RESEARCH_CARDS: ResearchCard[] = ALL_RESEARCH_CARDS.filter(card => card.id === 'home-defense' || card.id === 'hack-crew' || card.id === 'hack-ability' || card.id === 'cash-flow' || card.id === 'investments');
+// Display order: Home Defense → Cash Flow → Hack Ability → Hack Crew → Investments (matches category-structure.md)
+const RESEARCH_CARD_IDS = ['home-defense', 'cash-flow', 'hack-ability', 'hack-crew', 'investments'] as const;
+const RESEARCH_CARDS: ResearchCard[] = RESEARCH_CARD_IDS.map(id => ALL_RESEARCH_CARDS.find(card => card.id === id)).filter((c): c is ResearchCard => c != null);
 
 const { width: screenWidth } = Dimensions.get('window');
 const cardSize = Math.min((screenWidth - SIZING.spacing.md * 3) / 2, 160);

@@ -7,6 +7,7 @@ import { ResearchUser } from '../models/ResearchUser';
 import { CrewStatus } from '../models/CrewStatus';
 import { CrewChatMessage } from '../models/CrewChatMessage';
 import { getTaskList } from '../config/taskListData';
+import { ResearchFeatureService } from '../services/ResearchFeatureService';
 import mongoose from 'mongoose';
 
 const router = express.Router();
@@ -197,8 +198,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
       const { UserResearchFeature } = await import('../models/UserResearchFeature');
       const addBattalionCFeature = await UserResearchFeature.findOne({
         userId,
-        categoryId: 'hack-ability',
-        featureId: 'battalions-per-battle'
+        ...ResearchFeatureService.getFeatureIdFindFilter('hack-ability', 'add-battalion-c')
       });
 
       if (addBattalionCFeature && addBattalionCFeature.isUnlocked) {
@@ -227,8 +227,7 @@ router.get('/current-task', auth, async (req: Request, res: Response) => {
       const { UserResearchFeature } = await import('../models/UserResearchFeature');
       const battalionSizeFeature = await UserResearchFeature.findOne({
         userId,
-        categoryId: 'hack-ability',
-        featureId: 'increase-battalion-size'
+        ...ResearchFeatureService.getFeatureIdFindFilter('hack-ability', 'battalion-size-250')
       });
 
       if (battalionSizeFeature && battalionSizeFeature.isUnlocked) {
