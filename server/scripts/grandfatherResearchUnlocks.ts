@@ -34,7 +34,11 @@ const LEGACY_MAPPINGS: {
     { categoryId: 'cash-flow', featureId: 'increase-income-02' },
     { categoryId: 'cash-flow', featureId: 'increase-income-025' },
   ]},
-  { oldCategoryId: 'cash-flow', oldFeatureId: 'reduce-insurance-expense', newEntries: [{ categoryId: 'cash-flow', featureId: 'reduce-insurance-02' }] },
+  // Grant 01+02 so prerequisite order is satisfied (02 requires 01; crew-system-unlock requires 01). Bugbot: omit 01 caused inverted state.
+  { oldCategoryId: 'cash-flow', oldFeatureId: 'reduce-insurance-expense', newEntries: [
+    { categoryId: 'cash-flow', featureId: 'reduce-insurance-01' },
+    { categoryId: 'cash-flow', featureId: 'reduce-insurance-02' },
+  ]},
   { oldCategoryId: 'investments', oldFeatureId: 'rental-profit-increase', newEntries: [{ categoryId: 'investments', featureId: 'rental-profit-01' }] },
   // home-defense/antivirus and hack-crew/crew-system-unlock: same ID on dev and spec; no mapping needed unless you have another legacy ID
 ];
