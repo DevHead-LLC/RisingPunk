@@ -14,10 +14,10 @@ const INSURANCE_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
   { featureId: 'reduce-insurance-02', value: 0.02 }
 ];
 
-/** Cash-flow feature IDs that reduce tax expense (spec 18). Includes legacy 'reduce-expenses' for backwards compatibility. */
-const TAX_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
-  { featureId: 'reduce-tax-expense-02', value: 0.02 },
-  { featureId: 'reduce-expenses', value: 0.02 }
+/** Tax reduction: current spec (cash-flow) and legacy (financial/reduce-expenses). Check correct category per feature. */
+const TAX_REDUCTION_FEATURES: { featureId: string; value: number; categoryId: string }[] = [
+  { featureId: 'reduce-tax-expense-02', value: 0.02, categoryId: 'cash-flow' },
+  { featureId: 'reduce-expenses', value: 0.02, categoryId: 'financial' }
 ];
 
 /** Rental profit per room features (spec 18). Both tiers in investments. Bugbot: no legacy IDs (e.g. rental-profit-increase) — never used in this project. */
@@ -51,13 +51,13 @@ export async function getInsuranceReductionBonus(userId: string): Promise<number
 }
 
 /**
- * Total tax expense reduction from all unlocked cash-flow features (spec 18).
- * Only one of reduce-tax-expense-02 or legacy reduce-expenses should be unlocked; both grant $0.02.
+ * Total tax expense reduction from unlocked tax features (spec 18 + legacy).
+ * reduce-tax-expense-02 is cash-flow; legacy reduce-expenses is financial. Only one applies; both grant $0.02.
  */
 export async function getTaxReductionBonus(userId: string): Promise<number> {
   let total = 0;
-  for (const { featureId, value } of TAX_REDUCTION_FEATURES) {
-    const unlocked = await isResearchFeatureUnlocked(userId, 'cash-flow', featureId);
+  for (const { featureId, value, categoryId } of TAX_REDUCTION_FEATURES) {
+    const unlocked = await isResearchFeatureUnlocked(userId, categoryId, featureId);
     if (unlocked) {
       total += value;
       break; // Only one tax reduction feature (current or legacy) per user

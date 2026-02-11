@@ -11,19 +11,17 @@ interface FeatureWithResearch {
 
 /**
  * Whether a research feature is effectively unlocked (unlocked or research just completed).
- * Matches server-side isBattalionSlotUnlocked logic for UI consistency.
+ * Matches server-side isBattalionSlotUnlocked: requires a valid researchCompletesAt before
+ * treating "researching" as complete; missing timestamp is not treated as epoch (unlocked).
  */
 export function isResearchFeatureEffectivelyUnlocked(feature: FeatureWithResearch | null | undefined): boolean {
   if (!feature) return false;
-  const now = Date.now();
-  const researchCompletesAt = feature.researchCompletesAt
+  if (feature.isUnlocked) return true;
+  const researchCompletesAtMs = feature.researchCompletesAt
     ? new Date(feature.researchCompletesAt).getTime()
-    : 0;
-  const remaining = Math.max(0, researchCompletesAt - now);
-  return !!(
-    feature.isUnlocked ||
-    (feature.isResearching && remaining === 0)
-  );
+    : null;
+  if (researchCompletesAtMs === null) return false;
+  return !!(feature.isResearching && researchCompletesAtMs <= Date.now());
 }
 
 /**
