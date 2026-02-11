@@ -15,6 +15,7 @@ import { useStartBattleMutation } from '../store/api/battleApi';
 import { trackFirstBattle } from '../services/analyticsService';
 import { useGetShieldStatusQuery, useDeactivateShieldMutation } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
+import { useBattalionSlotUnlocks } from '../hooks/useBattalionSlotUnlocks';
 import { API_URL } from '../config';
 import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
 import { TaskGuideHighlightOverlay } from '../components/turf/TaskGuideHighlightOverlay';
@@ -109,62 +110,8 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       (antivirusFeature?.isResearching && remaining === 0);
   }, [antivirusFeature?.isUnlocked, antivirusFeature?.isResearching, antivirusFeature?.researchCompletesAt]);
 
-  // Get hack-ability research features for Battalion C unlock check
-  const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability');
-  
-  // Find and memoize the Battalion C feature
-  const battalionCFeature = useMemo(() => {
-    return hackAbilityFeatures?.find(f => f.id === 'add-battalion-c');
-  }, [hackAbilityFeatures]);
-  
-  // Check if Battalion C is unlocked (same pattern as antivirus)
-  const isBattalionCUnlocked = useMemo(() => {
-    if (!battalionCFeature) return false;
-    
-    const now = new Date().getTime();
-    const researchCompletesAt = battalionCFeature.researchCompletesAt 
-      ? new Date(battalionCFeature.researchCompletesAt).getTime() 
-      : 0;
-    const remaining = Math.max(0, researchCompletesAt - now);
-    return battalionCFeature.isUnlocked || 
-      (battalionCFeature.isResearching && remaining === 0);
-  }, [battalionCFeature?.isUnlocked, battalionCFeature?.isResearching, battalionCFeature?.researchCompletesAt]);
-
-  // Find and memoize the Battalion D feature
-  const battalionDFeature = useMemo(() => {
-    return hackAbilityFeatures?.find(f => f.id === 'add-battalion-d');
-  }, [hackAbilityFeatures]);
-
-  // Check if Battalion D is unlocked (same pattern as C)
-  const isBattalionDUnlocked = useMemo(() => {
-    if (!battalionDFeature) return false;
-
-    const now = new Date().getTime();
-    const researchCompletesAt = battalionDFeature.researchCompletesAt
-      ? new Date(battalionDFeature.researchCompletesAt).getTime()
-      : 0;
-    const remaining = Math.max(0, researchCompletesAt - now);
-    return battalionDFeature.isUnlocked ||
-      (battalionDFeature.isResearching && remaining === 0);
-  }, [battalionDFeature?.isUnlocked, battalionDFeature?.isResearching, battalionDFeature?.researchCompletesAt]);
-
-  // Find and memoize the Battalion E feature
-  const battalionEFeature = useMemo(() => {
-    return hackAbilityFeatures?.find(f => f.id === 'add-battalion-e');
-  }, [hackAbilityFeatures]);
-
-  // Check if Battalion E is unlocked (same pattern as D)
-  const isBattalionEUnlocked = useMemo(() => {
-    if (!battalionEFeature) return false;
-
-    const now = new Date().getTime();
-    const researchCompletesAt = battalionEFeature.researchCompletesAt
-      ? new Date(battalionEFeature.researchCompletesAt).getTime()
-      : 0;
-    const remaining = Math.max(0, researchCompletesAt - now);
-    return battalionEFeature.isUnlocked ||
-      (battalionEFeature.isResearching && remaining === 0);
-  }, [battalionEFeature?.isUnlocked, battalionEFeature?.isResearching, battalionEFeature?.researchCompletesAt]);
+  // Battalion C/D/E unlock state (shared logic with server isBattalionSlotUnlocked)
+  const { isBattalionCUnlocked, isBattalionDUnlocked, isBattalionEUnlocked } = useBattalionSlotUnlocks();
 
   // Memoize available battalions array (A and B always available)
   const availableBattalions = useMemo(() => {

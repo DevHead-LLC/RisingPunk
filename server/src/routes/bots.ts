@@ -3,8 +3,7 @@ const Bot = require('../models/Bot');
 import auth from '../middleware/auth';
 import { User } from '../models/User';
 import mongoose from 'mongoose';
-import { UserResearchFeature } from '../models/UserResearchFeature';
-import { getMaxBattalionSize } from '../utils/researchFeatureUtils';
+import { getMaxBattalionSize, isBattalionSlotUnlocked } from '../utils/researchFeatureUtils';
 
 const router = express.Router();
 
@@ -441,83 +440,12 @@ router.post('/assign', auth, async (req, res) => {
       return;
     }
     
-    if (battalionId === 'C') {
-      const battalionCFeature = await UserResearchFeature.findOne({
-        userId: req.user._id,
-        categoryId: 'hack-ability',
-        featureId: 'add-battalion-c'
-      })
-      .select('isUnlocked isResearching researchCompletesAt')
-      .lean();
-      
-      if (!battalionCFeature) {
-        res.status(403).json({ error: 'Battalion C is locked. Complete the "Add Battalion C" research feature to unlock it.' });
-        return;
-      }
-      
-      const researchCompletesAtC = battalionCFeature.researchCompletesAt 
-        ? new Date(battalionCFeature.researchCompletesAt).getTime() 
-        : null;
-      const remainingC = researchCompletesAtC !== null ? Math.max(0, researchCompletesAtC - now) : null;
-      const isActuallyUnlockedC = battalionCFeature.isUnlocked || 
-        (battalionCFeature.isResearching && researchCompletesAtC !== null && remainingC === 0);
-      
-      if (!isActuallyUnlockedC) {
-        res.status(403).json({ error: 'Battalion C is locked. Complete the "Add Battalion C" research feature to unlock it.' });
-        return;
-      }
-    }
-
-    if (battalionId === 'D') {
-      const battalionDFeature = await UserResearchFeature.findOne({
-        userId: req.user._id,
-        categoryId: 'hack-ability',
-        featureId: 'add-battalion-d'
-      })
-      .select('isUnlocked isResearching researchCompletesAt')
-      .lean();
-
-      if (!battalionDFeature) {
-        res.status(403).json({ error: 'Battalion D is locked. Complete the "Add Battalion D" research feature to unlock it.' });
-        return;
-      }
-
-      const researchCompletesAtD = battalionDFeature.researchCompletesAt
-        ? new Date(battalionDFeature.researchCompletesAt).getTime()
-        : null;
-      const remainingD = researchCompletesAtD !== null ? Math.max(0, researchCompletesAtD - now) : null;
-      const isActuallyUnlockedD = battalionDFeature.isUnlocked ||
-        (battalionDFeature.isResearching && researchCompletesAtD !== null && remainingD === 0);
-
-      if (!isActuallyUnlockedD) {
-        res.status(403).json({ error: 'Battalion D is locked. Complete the "Add Battalion D" research feature to unlock it.' });
-        return;
-      }
-    }
-
-    if (battalionId === 'E') {
-      const battalionEFeature = await UserResearchFeature.findOne({
-        userId: req.user._id,
-        categoryId: 'hack-ability',
-        featureId: 'add-battalion-e'
-      })
-      .select('isUnlocked isResearching researchCompletesAt')
-      .lean();
-
-      if (!battalionEFeature) {
-        res.status(403).json({ error: 'Battalion E is locked. Complete the "Add Battalion E" research feature to unlock it.' });
-        return;
-      }
-
-      const researchCompletesAtE = battalionEFeature.researchCompletesAt
-        ? new Date(battalionEFeature.researchCompletesAt).getTime()
-        : null;
-      const remainingE = researchCompletesAtE !== null ? Math.max(0, researchCompletesAtE - now) : null;
-      const isActuallyUnlockedE = battalionEFeature.isUnlocked ||
-        (battalionEFeature.isResearching && researchCompletesAtE !== null && remainingE === 0);
-
-      if (!isActuallyUnlockedE) {
-        res.status(403).json({ error: 'Battalion E is locked. Complete the "Add Battalion E" research feature to unlock it.' });
+    if (battalionId === 'C' || battalionId === 'D' || battalionId === 'E') {
+      const unlocked = await isBattalionSlotUnlocked(userId, battalionId as 'C' | 'D' | 'E');
+      if (!unlocked) {
+        res.status(403).json({
+          error: `Battalion ${battalionId} is locked. Complete the "Add Battalion ${battalionId}" research feature to unlock it.`
+        });
         return;
       }
     }

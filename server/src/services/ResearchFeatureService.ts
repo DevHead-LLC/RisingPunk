@@ -274,11 +274,26 @@ export class ResearchFeatureService {
 
   /**
    * Find filter for featureId when looking up UserResearchFeature.
-   * Legacy: reduce-tax-expense-02 maps from DB reduce-expenses; completion/speedup must find either.
+   * Legacy: when request uses new spec ID, completion/speedup/validation must find doc that might be stored under old ID (same category).
+   * financial/reduce-expenses → cash-flow/reduce-tax-expense-02 is handled by migration creating the cash-flow doc.
    */
   static getFeatureIdFindFilter(categoryId: string, featureId: string): { featureId: string } | { featureId: { $in: string[] } } {
-    if (categoryId === 'cash-flow' && featureId === 'reduce-tax-expense-02') {
-      return { featureId: { $in: ['reduce-tax-expense-02', 'reduce-expenses'] } };
+    const legacyMap: Record<string, string[]> = {
+      'reduce-tax-expense-02': ['reduce-tax-expense-02', 'reduce-expenses'],
+      'add-battalion-c': ['add-battalion-c', 'battalions-per-battle'],
+      'battalion-size-250': ['battalion-size-250', 'increase-battalion-size'],
+      'reduce-insurance-02': ['reduce-insurance-02', 'reduce-insurance-expense'],
+      'rental-profit-01': ['rental-profit-01', 'rental-profit-increase'],
+    };
+    const legacyIds = legacyMap[featureId];
+    if (legacyIds) {
+      const categoryMatch =
+        (categoryId === 'cash-flow' && (featureId === 'reduce-tax-expense-02' || featureId === 'reduce-insurance-02')) ||
+        (categoryId === 'hack-ability' && (featureId === 'add-battalion-c' || featureId === 'battalion-size-250')) ||
+        (categoryId === 'investments' && featureId === 'rental-profit-01');
+      if (categoryMatch) {
+        return { featureId: { $in: legacyIds } };
+      }
     }
     return { featureId };
   }
@@ -415,14 +430,39 @@ export class ResearchFeatureService {
       .select('featureId isUnlocked unlockedAt isResearching researchStartedAt researchCompletesAt researchTimeHours')
       .lean();
 
+      // Legacy cross-category: financial/reduce-expenses counts as cash-flow/reduce-tax-expense-02 (only when loading cash-flow)
+      let legacyFinancialReduceExpenses: { isUnlocked: boolean; unlockedAt: Date | null } | null = null;
+      if (categoryId === 'cash-flow') {
+        const legacy = await UserResearchFeature.findOne({
+          userId,
+          categoryId: 'financial',
+          featureId: 'reduce-expenses'
+        }).select('isUnlocked unlockedAt').lean();
+        if (legacy) legacyFinancialReduceExpenses = { isUnlocked: !!legacy.isUnlocked, unlockedAt: legacy.unlockedAt ?? null };
+      }
+
       // Merge base features with user progress from UserResearchFeature collection.
-      // Legacy: treat completed 'reduce-expenses' as unlocked for 'reduce-tax-expense-02'.
-      // Bugbot: no other legacy feature-id mapping — cited IDs (e.g. increase-income-rate, rental-profit-increase) were never used in this project; only reduce-expenses had legacy compat.
+      // Legacy: treat completed old feature IDs as unlocked for corresponding new spec IDs (grandfathering + read-time before/after migration).
+      const legacyUnlockMap: Record<string, string[]> = {
+        'reduce-tax-expense-02': ['reduce-expenses'],
+        'add-battalion-c': ['battalions-per-battle'],
+        'battalion-size-250': ['increase-battalion-size'],
+        'crew-system-unlock': [],
+        'reduce-insurance-02': ['reduce-insurance-expense'],
+        'rental-profit-01': ['rental-profit-increase'],
+        'increase-income-01': ['increase-income-rate'],
+        'increase-income-02': ['increase-income-rate'],
+        'increase-income-025': ['increase-income-rate'],
+      };
       const featuresWithStatus = baseFeatures.map(feature => {
-        const userFeature = userFeatures.find(uf =>
+        const legacyIds = legacyUnlockMap[feature.id];
+        let userFeature = userFeatures.find(uf =>
           uf.featureId === feature.id ||
-          (feature.id === 'reduce-tax-expense-02' && uf.featureId === 'reduce-expenses')
+          (legacyIds?.length && legacyIds.includes(uf.featureId))
         );
+        if (!userFeature && feature.id === 'reduce-tax-expense-02' && legacyFinancialReduceExpenses?.isUnlocked) {
+          userFeature = { ...legacyFinancialReduceExpenses, featureId: 'reduce-expenses', isResearching: false, researchStartedAt: null, researchCompletesAt: null, researchTimeHours: 0 } as any;
+        }
 
         const userResearchTimeHours = userFeature?.researchTimeHours;
         const validUserResearchTime = ResearchFeatureService.isValidResearchTimeHours(userResearchTimeHours) 

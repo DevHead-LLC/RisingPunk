@@ -79,6 +79,20 @@ export async function getRentalProfitBonusPerRoom(userId: string): Promise<numbe
 }
 
 /**
+ * Rental profit bonus per room as of a given time (for historical income).
+ * Sums only features unlocked at or before asOfTime to avoid retroactive combined bonus.
+ */
+export async function getRentalProfitBonusPerRoomAsOf(userId: string, asOfTime: Date): Promise<number> {
+  const asOfMs = asOfTime.getTime();
+  let total = 0;
+  for (const { featureId, value, categoryId } of RENTAL_PROFIT_FEATURES) {
+    const unlockedAt = await getResearchFeatureUnlockTime(userId, categoryId, featureId);
+    if (unlockedAt && unlockedAt.getTime() <= asOfMs) total += value;
+  }
+  return total;
+}
+
+/**
  * Check whether a research feature is unlocked for a user.
  * Single source of truth for research unlock checks used by rental/balance services.
  */
@@ -139,6 +153,38 @@ export async function getMaxBattalionSize(userId: string, asOfTime?: Date): Prom
     else break;
   }
   return max;
+}
+
+const BATTALION_SLOT_FEATURE_IDS: Record<'C' | 'D' | 'E', string> = {
+  C: 'add-battalion-c',
+  D: 'add-battalion-d',
+  E: 'add-battalion-e',
+};
+
+/**
+ * Whether the add-battalion-X research is effectively unlocked for a user (unlocked or research just completed at asOfTime).
+ * Shared by battle and bots routes to avoid duplicating the same check.
+ */
+export async function isBattalionSlotUnlocked(
+  userId: string,
+  battalionId: 'C' | 'D' | 'E',
+  asOfTime?: Date
+): Promise<boolean> {
+  const featureId = BATTALION_SLOT_FEATURE_IDS[battalionId];
+  const doc = await UserResearchFeature.findOne({
+    userId,
+    categoryId: 'hack-ability',
+    featureId,
+  })
+    .select('isUnlocked isResearching researchCompletesAt')
+    .lean();
+  if (!doc) return false;
+  const now = (asOfTime ?? new Date()).getTime();
+  const researchCompletesAt = doc.researchCompletesAt ? new Date(doc.researchCompletesAt).getTime() : null;
+  return !!(
+    doc.isUnlocked ||
+    (doc.isResearching && researchCompletesAt !== null && researchCompletesAt <= now)
+  );
 }
 
 /**

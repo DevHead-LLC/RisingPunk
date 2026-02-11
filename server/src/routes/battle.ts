@@ -4,7 +4,7 @@ import auth from '../middleware/auth';
 import { Battle } from '../models/Battle';
 import { UserTaskProgress } from '../models/UserTaskProgress';
 import { NPCService } from '../services/NPCService';
-import { UserResearchFeature } from '../models/UserResearchFeature';
+import { isBattalionSlotUnlocked } from '../utils/researchFeatureUtils';
 
 interface StartBattleRequest extends Request {
   body: {
@@ -62,33 +62,9 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
         return;
       }
 
-      const now = new Date().getTime();
-
       if (userBattalions.length > 2) {
-        const battalionCFeature = await UserResearchFeature.findOne({
-          userId: req.user._id,
-          categoryId: 'hack-ability',
-          featureId: 'add-battalion-c'
-        })
-        .select('isUnlocked isResearching researchCompletesAt')
-        .lean();
-
-        if (!battalionCFeature) {
-          res.status(403).json({
-            success: false,
-            error: 'Battalion C is locked. Complete the "Add Battalion C" research feature to unlock it.'
-          });
-          return;
-        }
-
-        const researchCompletesAtC = battalionCFeature.researchCompletesAt
-          ? new Date(battalionCFeature.researchCompletesAt).getTime()
-          : null;
-        const remainingC = researchCompletesAtC !== null ? Math.max(0, researchCompletesAtC - now) : null;
-        const isActuallyUnlockedC = battalionCFeature.isUnlocked ||
-          (battalionCFeature.isResearching && researchCompletesAtC !== null && remainingC === 0);
-
-        if (!isActuallyUnlockedC) {
+        const unlockedC = await isBattalionSlotUnlocked(String(req.user._id), 'C');
+        if (!unlockedC) {
           res.status(403).json({
             success: false,
             error: 'Battalion C is locked. Complete the "Add Battalion C" research feature to unlock it.'
@@ -98,30 +74,8 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
       }
 
       if (userBattalions.length > 3) {
-        const battalionDFeature = await UserResearchFeature.findOne({
-          userId: req.user._id,
-          categoryId: 'hack-ability',
-          featureId: 'add-battalion-d'
-        })
-        .select('isUnlocked isResearching researchCompletesAt')
-        .lean();
-
-        if (!battalionDFeature) {
-          res.status(403).json({
-            success: false,
-            error: 'Battalion D is locked. Complete the "Add Battalion D" research feature to unlock it.'
-          });
-          return;
-        }
-
-        const researchCompletesAtD = battalionDFeature.researchCompletesAt
-          ? new Date(battalionDFeature.researchCompletesAt).getTime()
-          : null;
-        const remainingD = researchCompletesAtD !== null ? Math.max(0, researchCompletesAtD - now) : null;
-        const isActuallyUnlockedD = battalionDFeature.isUnlocked ||
-          (battalionDFeature.isResearching && researchCompletesAtD !== null && remainingD === 0);
-
-        if (!isActuallyUnlockedD) {
+        const unlockedD = await isBattalionSlotUnlocked(String(req.user._id), 'D');
+        if (!unlockedD) {
           res.status(403).json({
             success: false,
             error: 'Battalion D is locked. Complete the "Add Battalion D" research feature to unlock it.'
@@ -131,30 +85,8 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
       }
 
       if (userBattalions.length > 4) {
-        const battalionEFeature = await UserResearchFeature.findOne({
-          userId: req.user._id,
-          categoryId: 'hack-ability',
-          featureId: 'add-battalion-e'
-        })
-        .select('isUnlocked isResearching researchCompletesAt')
-        .lean();
-
-        if (!battalionEFeature) {
-          res.status(403).json({
-            success: false,
-            error: 'Battalion E is locked. Complete the "Add Battalion E" research feature to unlock it.'
-          });
-          return;
-        }
-
-        const researchCompletesAtE = battalionEFeature.researchCompletesAt
-          ? new Date(battalionEFeature.researchCompletesAt).getTime()
-          : null;
-        const remainingE = researchCompletesAtE !== null ? Math.max(0, researchCompletesAtE - now) : null;
-        const isActuallyUnlockedE = battalionEFeature.isUnlocked ||
-          (battalionEFeature.isResearching && researchCompletesAtE !== null && remainingE === 0);
-
-        if (!isActuallyUnlockedE) {
+        const unlockedE = await isBattalionSlotUnlocked(String(req.user._id), 'E');
+        if (!unlockedE) {
           res.status(403).json({
             success: false,
             error: 'Battalion E is locked. Complete the "Add Battalion E" research feature to unlock it.'

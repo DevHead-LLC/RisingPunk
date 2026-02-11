@@ -1,6 +1,6 @@
 import { IUser } from '../models/User';
 import { RentalHousingIncomeService } from './RentalHousingIncomeService';
-import { getBaseIncomeRateBonus, getInsuranceReductionBonus, getTaxReductionBonus } from '../utils/researchFeatureUtils';
+import { getBaseIncomeRateBonus, getInsuranceReductionBonus, getTaxReductionBonus, getRentalProfitBonusPerRoomAsOf } from '../utils/researchFeatureUtils';
 
 export interface RentalHousingSyncResult {
   needsSync: boolean;
@@ -83,35 +83,29 @@ export class RentalHousingSyncService {
       return 0;
     }
 
-    // Calculate income from when balance was last updated
     const lastUpdated = user.balance.lastUpdated;
-    
-    // Get research unlock time to prevent retroactive bonus application
-    const researchUnlockTime = await RentalHousingIncomeService.getRentalProfitResearchUnlockTime(String(user._id));
-    
+    const userId = String(user._id);
+    const lastMs = lastUpdated.getTime();
+    const nowMs = now.getTime();
+
+    // Segment by each rental-profit tier unlock time so we don't apply combined bonus retroactively.
+    const unlockTimes = await RentalHousingIncomeService.getRentalProfitUnlockTimes(userId);
+    const boundariesInRange = unlockTimes.filter(t => {
+      const ms = t.getTime();
+      return ms > lastMs && ms <= nowMs;
+    });
+    const boundaries = [lastUpdated, ...boundariesInRange, now];
+
     let historicalIncome = 0;
-    
-    if (researchUnlockTime && researchUnlockTime > lastUpdated && researchUnlockTime <= now) {
-      // Research was unlocked during the historical period - split calculation
-      // Calculate income BEFORE research unlock (old rate)
-      const secondsBeforeUnlock = (researchUnlockTime.getTime() - lastUpdated.getTime()) / 1000;
-      const incomeBeforeUnlock = await this.calculateIncomeForPeriod(user, unlockedProperties.length, false);
-      const incomeBefore = Math.floor(secondsBeforeUnlock * incomeBeforeUnlock);
-      
-      // Calculate income AFTER research unlock (new rate)
-      const secondsAfterUnlock = (now.getTime() - researchUnlockTime.getTime()) / 1000;
-      const incomeAfterUnlock = await this.calculateIncomeForPeriod(user, unlockedProperties.length, true);
-      const incomeAfter = Math.floor(secondsAfterUnlock * incomeAfterUnlock);
-      
-      historicalIncome = incomeBefore + incomeAfter;
-    } else {
-      // Research was unlocked before lastUpdated or not unlocked yet - use single rate
-      const secondsElapsed = (now.getTime() - lastUpdated.getTime()) / 1000;
-      const isResearchUnlocked = !!researchUnlockTime && researchUnlockTime <= lastUpdated;
-      const incomePerSecond = await this.calculateIncomeForPeriod(user, unlockedProperties.length, isResearchUnlocked);
-      historicalIncome = Math.floor(secondsElapsed * incomePerSecond);
+    for (let i = 0; i < boundaries.length - 1; i++) {
+      const segmentStart = boundaries[i];
+      const segmentEnd = boundaries[i + 1];
+      const secondsInSegment = (segmentEnd.getTime() - segmentStart.getTime()) / 1000;
+      const bonusPerRoom = await getRentalProfitBonusPerRoomAsOf(userId, segmentStart);
+      const incomePerSecond = await this.calculateIncomeForPeriod(user, unlockedProperties.length, bonusPerRoom);
+      historicalIncome += Math.floor(secondsInSegment * incomePerSecond);
     }
-    
+
     return historicalIncome;
   }
 
@@ -130,12 +124,13 @@ export class RentalHousingSyncService {
     return true;
   }
 
-  private static async calculateIncomeForPeriod(user: IUser, propertyCount: number, isResearchUnlocked: boolean): Promise<number> {
+  /** researchBonusPerRoom: 0 = no bonus; for legacy users any positive value uses LEGACY_RESEARCH_BONUS_PER_PROPERTY. */
+  private static async calculateIncomeForPeriod(user: IUser, propertyCount: number, researchBonusPerRoom: number): Promise<number> {
     if (this.isFullyLegacyForHistoricalIncome(user)) {
-      return propertyCount * (this.LEGACY_FLAT_RATE_PER_PROPERTY + (isResearchUnlocked ? this.LEGACY_RESEARCH_BONUS_PER_PROPERTY : 0));
+      return propertyCount * (this.LEGACY_FLAT_RATE_PER_PROPERTY + (researchBonusPerRoom > 0 ? this.LEGACY_RESEARCH_BONUS_PER_PROPERTY : 0));
     }
     const income = await RentalHousingIncomeService.calculateRentalHousingIncome(user, {
-      includeResearchBonus: isResearchUnlocked,
+      rentalProfitBonusPerRoom: researchBonusPerRoom,
     });
     return income.totalIncomePerSecond;
   }

@@ -87,6 +87,16 @@ export class RentalHousingIncomeService {
     return earliest;
   }
 
+  /** Sorted unlock times for each rental-profit tier (for historical income segments). */
+  static async getRentalProfitUnlockTimes(userId: string): Promise<Date[]> {
+    const times: Date[] = [];
+    for (const { featureId, categoryId } of RENTAL_PROFIT_FEATURES) {
+      const t = await getResearchFeatureUnlockTime(userId, categoryId, featureId);
+      if (t) times.push(t);
+    }
+    return times.sort((a, b) => a.getTime() - b.getTime());
+  }
+
   static getRoomValuesWithResearch(
     baseRoomValues: { bathroom: number; kitchen: number; bedroom: number; livingRoom: number },
     bonusPerRoom: number
@@ -102,12 +112,17 @@ export class RentalHousingIncomeService {
 
   static async calculateRentalHousingIncome(
     user: IUser,
-    options?: { includeResearchBonus?: boolean }
+    options?: { includeResearchBonus?: boolean; rentalProfitBonusPerRoom?: number }
   ): Promise<RentalHousingIncome> {
     const propertyBreakdown: RentalHousingIncome['propertyBreakdown'] = [];
     let totalIncomePerSecond = 0;
-    const includeResearch = options?.includeResearchBonus !== false;
-    const bonusPerRoom = includeResearch ? await this.getRentalProfitBonusPerRoom(String(user._id)) : 0;
+    const explicitBonus = options?.rentalProfitBonusPerRoom;
+    const bonusPerRoom =
+      typeof explicitBonus === 'number'
+        ? explicitBonus
+        : options?.includeResearchBonus !== false
+          ? await this.getRentalProfitBonusPerRoom(String(user._id))
+          : 0;
 
     for (let propertyId = 1; propertyId <= 4; propertyId++) {
       const propertyLevel = this.getPropertyLevel(user, propertyId);
