@@ -1,6 +1,6 @@
 import { IUser } from '../models/User';
 import { RentalHousingIncomeService } from './RentalHousingIncomeService';
-import { getBaseIncomeRateBonus, getInsuranceReductionBonus, getTaxReductionBonus, getRentalProfitBonusPerRoomAsOf } from '../utils/researchFeatureUtils';
+import { getBaseIncomeRateBonus, getInsuranceReductionBonus, getTaxReductionBonus, getRentalProfitBonusPerRoom, getRentalProfitBonusPerRoomAsOf, getResearchFeaturesForBonusSync, type BonusPrefetch } from '../utils/researchFeatureUtils';
 
 export interface RentalHousingSyncResult {
   needsSync: boolean;
@@ -23,7 +23,7 @@ export class RentalHousingSyncService {
   private static readonly LEGACY_FLAT_RATE_PER_PROPERTY = 0.06;
   private static readonly LEGACY_RESEARCH_BONUS_PER_PROPERTY = 0.04; // 4 rooms × 0.01
 
-  static async checkAndSyncRentalHousingIncome(user: IUser): Promise<RentalHousingSyncResult> {
+  static async checkAndSyncRentalHousingIncome(user: IUser, bonusPrefetch?: BonusPrefetch): Promise<RentalHousingSyncResult> {
     const now = new Date();
     
     // Check if user has any unlocked rental properties
@@ -53,7 +53,7 @@ export class RentalHousingSyncService {
     }
 
     // Calculate historical income that should have been earned
-    const syncedAmount = await this.calculateHistoricalIncome(user, now);
+    const syncedAmount = await this.calculateHistoricalIncome(user, now, bonusPrefetch);
     
     return {
       needsSync: true,
@@ -85,7 +85,7 @@ export class RentalHousingSyncService {
     return user.balance.rentalHousingIncomeLastSynced < oneHourAgo;
   }
 
-  private static async calculateHistoricalIncome(user: IUser, now: Date): Promise<number> {
+  private static async calculateHistoricalIncome(user: IUser, now: Date, bonusPrefetch?: BonusPrefetch): Promise<number> {
     const unlockedProperties = this.getUnlockedProperties(user);
     if (unlockedProperties.length === 0) {
       return 0;
@@ -97,7 +97,7 @@ export class RentalHousingSyncService {
     const nowMs = now.getTime();
 
     // Segment by each rental-profit tier unlock time so we don't apply combined bonus retroactively.
-    const unlockTimes = await RentalHousingIncomeService.getRentalProfitUnlockTimes(userId);
+    const unlockTimes = await RentalHousingIncomeService.getRentalProfitUnlockTimes(userId, bonusPrefetch);
     const boundariesInRange = unlockTimes.filter(t => {
       const ms = t.getTime();
       return ms > lastMs && ms <= nowMs;
@@ -109,7 +109,7 @@ export class RentalHousingSyncService {
       const segmentStart = boundaries[i];
       const segmentEnd = boundaries[i + 1];
       const secondsInSegment = (segmentEnd.getTime() - segmentStart.getTime()) / 1000;
-      const bonusPerRoom = await getRentalProfitBonusPerRoomAsOf(userId, segmentStart);
+      const bonusPerRoom = await getRentalProfitBonusPerRoomAsOf(userId, segmentStart, bonusPrefetch);
       const incomePerSecond = await this.calculateIncomeForPeriod(user, unlockedProperties.length, bonusPerRoom);
       historicalIncome += Math.floor(secondsInSegment * incomePerSecond);
     }
@@ -169,25 +169,30 @@ export class RentalHousingSyncService {
   }
 
   static async performSync(user: IUser): Promise<PerformSyncResult> {
+    const userId = String(user._id);
+    // One batch query for bonus-related research features; pass to all bonus getters to avoid N+1 (Bugbot).
+    const bonusPrefetch = await getResearchFeaturesForBonusSync(userId);
+
     // Historical income must use pre-grandfather rates (legacy users at level 1), so run sync check first.
-    const syncResult = await this.checkAndSyncRentalHousingIncome(user);
+    const syncResult = await this.checkAndSyncRentalHousingIncome(user, bonusPrefetch);
     await this.ensureLegacyRentalLevels(user);
-    
+
     // CRITICAL: Always calculate and update ratePerSecond, even if no rental properties exist
     // Base rate is $1.00 + income rate bonus (sum of increase-income-* per spec 18) + insurance reduction (sum of reduce-insurance-*) + tax reduction (reduce-tax-expense-02), plus passive income
     const [incomeBonus, insuranceBonus, taxBonus] = await Promise.all([
-      getBaseIncomeRateBonus(String(user._id)),
-      getInsuranceReductionBonus(String(user._id)),
-      getTaxReductionBonus(String(user._id)),
+      getBaseIncomeRateBonus(userId, bonusPrefetch),
+      getInsuranceReductionBonus(userId, bonusPrefetch),
+      getTaxReductionBonus(userId, bonusPrefetch),
     ]);
     const baseRate = 1.0 + incomeBonus + insuranceBonus + taxBonus;
-    
+
     if (baseRate < 0) {
       console.error('[INCOME RATE] Invalid baseRate calculated:', baseRate);
       throw new Error('Invalid base rate calculation');
     }
-    
-    const rentalIncome = await RentalHousingIncomeService.calculateRentalHousingIncome(user);
+
+    const rentalBonusPerRoom = await getRentalProfitBonusPerRoom(userId, bonusPrefetch);
+    const rentalIncome = await RentalHousingIncomeService.calculateRentalHousingIncome(user, { rentalProfitBonusPerRoom: rentalBonusPerRoom });
     const rentalIncomePerSecond = rentalIncome.totalIncomePerSecond;
     const totalEffectiveRate = baseRate + rentalIncomePerSecond;
     
