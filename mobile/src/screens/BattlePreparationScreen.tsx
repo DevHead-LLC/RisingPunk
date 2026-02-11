@@ -99,7 +99,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
   const { data: researchFeatures } = useGetUserFeaturesQuery('home-defense');
   
   // Find the antivirus feature from the research features
-  const antivirusFeature = researchFeatures?.find(f => f.id === 'antivirus');
+  const antivirusFeature = researchFeatures?.features?.find(f => f.id === 'antivirus');
   
   // Use local timer logic to determine if actually unlocked (same as other components)
   const isActuallyUnlocked = useMemo(() => {

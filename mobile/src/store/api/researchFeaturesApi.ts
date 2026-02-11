@@ -63,9 +63,14 @@ export const researchFeaturesApi = createApi({
       transformResponse: (response: { success: boolean; data: any[] }) => response.data,
       providesTags: (result, error, categoryId) => [{ type: 'ResearchFeatures', id: categoryId }],
     }),
-    getUserFeatures: builder.query<any[], string>({
+    /** Returns { features, insuranceReduction?, taxReduction? }. cash-flow includes server-computed modifiers so client fallback matches server (Bugbot: legacy insurance). */
+    getUserFeatures: builder.query<{ features: any[]; insuranceReduction?: number; taxReduction?: number }, string>({
       query: (categoryId) => `/user-features/${categoryId}`,
-      transformResponse: (response: { success: boolean; data: any[] }) => response.data,
+      transformResponse: (response: { success: boolean; data: any[]; insuranceReduction?: number; taxReduction?: number }) => ({
+        features: response.data,
+        ...(typeof response.insuranceReduction === 'number' && { insuranceReduction: response.insuranceReduction }),
+        ...(typeof response.taxReduction === 'number' && { taxReduction: response.taxReduction }),
+      }),
       providesTags: (result, error, categoryId) => [{ type: 'ResearchFeatures', id: categoryId }],
       keepUnusedDataFor: 300,
     }),

@@ -270,13 +270,30 @@ router.get('/expense-modifiers', auth, async (req: Request, res: Response) => {
 });
 
 // Get user's individual feature status for a category
+// For cash-flow, also return server-computed insuranceReduction and taxReduction so client fallback matches server (Bugbot: legacy reduce-insurance-expense).
 router.get('/user-features/:categoryId', auth, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user._id;
+    const userId = String((req as any).user._id);
     const { categoryId } = req.params;
-    
+
     const featuresWithStatus = await ResearchFeatureService.getUserFeatures(userId, categoryId);
-    
+
+    if (categoryId === 'cash-flow') {
+      const { getResearchFeaturesForBonusSync, getInsuranceReductionBonus, getTaxReductionBonus } = await import('../utils/researchFeatureUtils');
+      const prefetch = await getResearchFeaturesForBonusSync(userId);
+      const [insuranceReduction, taxReduction] = await Promise.all([
+        getInsuranceReductionBonus(userId, prefetch),
+        getTaxReductionBonus(userId, prefetch)
+      ]);
+      res.json({
+        success: true,
+        data: featuresWithStatus,
+        insuranceReduction,
+        taxReduction
+      });
+      return;
+    }
+
     res.json({
       success: true,
       data: featuresWithStatus

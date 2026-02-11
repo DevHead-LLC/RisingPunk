@@ -33,7 +33,7 @@ function CategoryFeatureFetcher({
 }) {
   const { data, isLoading } = useGetUserFeaturesQuery(categoryId, { skip });
   useEffect(() => {
-    onData(data);
+    onData(data?.features);
   }, [data, onData]);
   useEffect(() => {
     onLoading(isLoading);

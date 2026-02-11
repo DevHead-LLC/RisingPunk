@@ -36,9 +36,9 @@ export function useBattalionSlotUnlocks(): {
   const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability');
 
   return useMemo(() => {
-    const battalionC = hackAbilityFeatures?.find((f: { id?: string }) => f.id === 'add-battalion-c');
-    const battalionD = hackAbilityFeatures?.find((f: { id?: string }) => f.id === 'add-battalion-d');
-    const battalionE = hackAbilityFeatures?.find((f: { id?: string }) => f.id === 'add-battalion-e');
+    const battalionC = hackAbilityFeatures?.features?.find((f: { id?: string }) => f.id === 'add-battalion-c');
+    const battalionD = hackAbilityFeatures?.features?.find((f: { id?: string }) => f.id === 'add-battalion-d');
+    const battalionE = hackAbilityFeatures?.features?.find((f: { id?: string }) => f.id === 'add-battalion-e');
     return {
       isBattalionCUnlocked: isResearchFeatureEffectivelyUnlocked(battalionC),
       isBattalionDUnlocked: isResearchFeatureEffectivelyUnlocked(battalionD),

@@ -76,11 +76,11 @@ export function FeatureModal({
   const currentResearchCenterLevel = researchCenterStatus?.level ?? 0;
 
   const featuresByCategory = useMemo(() => ({
-    'home-defense': homeDefFeatures ?? [],
-    'cash-flow': cashFlowFeatures ?? [],
-    'hack-ability': hackAbilityFeatures ?? [],
-    'hack-crew': hackCrewFeatures ?? [],
-    'investments': investmentsFeatures ?? [],
+    'home-defense': homeDefFeatures?.features ?? [],
+    'cash-flow': cashFlowFeatures?.features ?? [],
+    'hack-ability': hackAbilityFeatures?.features ?? [],
+    'hack-crew': hackCrewFeatures?.features ?? [],
+    'investments': investmentsFeatures?.features ?? [],
   }), [homeDefFeatures, cashFlowFeatures, hackAbilityFeatures, hackCrewFeatures, investmentsFeatures]);
 
   const missingRequiredRefs = useMemo(() => {

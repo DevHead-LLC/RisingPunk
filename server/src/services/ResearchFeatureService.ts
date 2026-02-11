@@ -242,9 +242,9 @@ export class ResearchFeatureService {
           { session }
         );
 
-        // Create or update user research feature record (use legacy filter so we update existing legacy doc instead of creating duplicate)
+        // Create or update by exact (categoryId, featureId) only so we never match and overwrite a shared legacy doc (Bugbot).
         await UserResearchFeature.findOneAndUpdate(
-          { userId, ...ResearchFeatureService.getFeatureIdFindFilter(categoryId, featureId) },
+          { userId, ...ResearchFeatureService.getExactFeatureIdFilter(categoryId, featureId) },
           {
             userId,
             categoryId,
@@ -282,6 +282,14 @@ export class ResearchFeatureService {
     } finally {
       await session.endSession();
     }
+  }
+
+  /**
+   * Exact (categoryId, featureId) filter for writes. Use in startResearch findOneAndUpdate so we never match a shared legacy doc
+   * and overwrite it (Bugbot: reduce-insurance-01 and -02 both include reduce-insurance-expense; updating would consume the doc).
+   */
+  static getExactFeatureIdFilter(categoryId: string, featureId: string): { categoryId: string; featureId: string } {
+    return { categoryId, featureId };
   }
 
   /**

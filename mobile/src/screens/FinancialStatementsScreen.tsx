@@ -49,22 +49,26 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
   const ratePerSecondFromState = useAppSelector(state => state.balance.ratePerSecond);
   // Use balanceData from query if available (fresh data), otherwise fall back to Redux state
   const ratePerSecond = balanceData?.ratePerSecond ?? ratePerSecondFromState;
-  // Expense reductions: prefer dedicated expense-modifiers API (single source of truth). Fall back to balance, then research features.
+  // Expense reductions: prefer expense-modifiers API, then balance, then server value from cash-flow user-features (Bugbot: legacy insurance $0.02 not $0.03), then naive feature sum.
   const insuranceReductionTotal = useMemo(() => {
     if (typeof expenseModifiers?.insuranceReduction === 'number') return expenseModifiers.insuranceReduction;
     if (typeof balanceData?.insuranceReduction === 'number') return balanceData.insuranceReduction;
-    if (!cashFlowFeatures) return 0;
+    if (typeof cashFlowFeatures?.insuranceReduction === 'number') return cashFlowFeatures.insuranceReduction;
+    const features = cashFlowFeatures?.features;
+    if (!features?.length) return 0;
     let total = 0;
-    if (cashFlowFeatures.some((f: any) => (f.id === 'reduce-insurance-01') && f.isUnlocked)) total += 0.01;
-    if (cashFlowFeatures.some((f: any) => (f.id === 'reduce-insurance-02') && f.isUnlocked)) total += 0.02;
+    if (features.some((f: any) => f.id === 'reduce-insurance-01' && f.isUnlocked)) total += 0.01;
+    if (features.some((f: any) => f.id === 'reduce-insurance-02' && f.isUnlocked)) total += 0.02;
     return total;
   }, [expenseModifiers?.insuranceReduction, balanceData?.insuranceReduction, cashFlowFeatures]);
   const taxReductionTotal = useMemo(() => {
     if (typeof expenseModifiers?.taxReduction === 'number') return expenseModifiers.taxReduction;
     if (typeof balanceData?.taxReduction === 'number') return balanceData.taxReduction;
-    if (!cashFlowFeatures) return 0;
-    // Server maps legacy financial/reduce-expenses onto cash-flow reduce-tax-expense-02, so this id alone covers both (Bugbot: reduce-expenses is financial, not in cashFlowFeatures).
-    if (cashFlowFeatures.some((f: any) => f.id === 'reduce-tax-expense-02' && f.isUnlocked)) return 0.02;
+    if (typeof cashFlowFeatures?.taxReduction === 'number') return cashFlowFeatures.taxReduction;
+    const features = cashFlowFeatures?.features;
+    if (!features?.length) return 0;
+    // Server maps legacy financial/reduce-expenses onto cash-flow reduce-tax-expense-02 (Bugbot: reduce-expenses is financial, not in cashFlowFeatures).
+    if (features.some((f: any) => f.id === 'reduce-tax-expense-02' && f.isUnlocked)) return 0.02;
     return 0;
   }, [expenseModifiers?.taxReduction, balanceData?.taxReduction, cashFlowFeatures]);
   const { themeMode } = useTheme();

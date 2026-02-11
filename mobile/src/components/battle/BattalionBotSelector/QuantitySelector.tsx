@@ -23,7 +23,7 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
 
   React.useEffect(() => {
     const anyResearching = BATTALION_SIZE_FEATURE_IDS.some(id => {
-      const f = hackAbilityFeatures?.find(feature => feature.id === id);
+      const f = hackAbilityFeatures?.features?.find(feature => feature.id === id);
       return f?.isResearching && f?.researchCompletesAt;
     });
     if (anyResearching) {
@@ -36,7 +36,7 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
     const now = currentTime;
     let max = 250;
     for (const id of BATTALION_SIZE_FEATURE_IDS) {
-      const f = hackAbilityFeatures?.find(feature => feature.id === id);
+      const f = hackAbilityFeatures?.features?.find(feature => feature.id === id);
       if (!f) break;
       const researchCompletesAt = f.researchCompletesAt ? new Date(f.researchCompletesAt).getTime() : null;
       const effectivelyUnlocked =

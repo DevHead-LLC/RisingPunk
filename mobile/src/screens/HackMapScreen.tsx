@@ -1463,10 +1463,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   }, [selectedCell, currentUserHandle, crewStatus, isLoadingCrewStatus, isLoadingCrewDetails, isLoadingSelectedUserCrewStatus, crewMemberUserIds, isSameCrewMember, selectedUserCrewStatus]);
   
   // Find the antivirus feature from the research features
-  const antivirusFeature = researchFeatures?.find(f => f.id === 'antivirus');
+  const antivirusFeature = researchFeatures?.features?.find(f => f.id === 'antivirus');
   
   // Find the crew-system-unlock feature from hack-crew features
-  const hackCrewFeature = hackCrewFeatures?.find(f => f.id === 'crew-system-unlock');
+  const hackCrewFeature = hackCrewFeatures?.features?.find(f => f.id === 'crew-system-unlock');
   
   // Use local timer logic to determine if actually unlocked (same as ResearchFeaturesList)
   // Calculate remaining time to match ResearchFeaturesList logic
