@@ -1,6 +1,6 @@
 import { UserResearchFeature } from '../models/UserResearchFeature';
 
-/** Cash-flow feature IDs that add to base income rate (spec 18). */
+/** Cash-flow feature IDs that add to base income rate (spec 18). Bugbot: no legacy IDs (e.g. increase-income-rate) — never used in this project; only reduce-expenses is legacy (see TAX_REDUCTION_FEATURES). */
 const INCOME_RATE_FEATURES: { featureId: string; value: number }[] = [
   { featureId: 'increase-income-01', value: 0.01 },
   { featureId: 'increase-income-02', value: 0.02 },
@@ -8,7 +8,7 @@ const INCOME_RATE_FEATURES: { featureId: string; value: number }[] = [
   { featureId: 'increase-income-03', value: 0.03 }
 ];
 
-/** Cash-flow feature IDs that reduce insurance expense (spec 18). */
+/** Cash-flow feature IDs that reduce insurance expense (spec 18). Bugbot: no legacy IDs (e.g. reduce-insurance-expense) — never used in this project. */
 const INSURANCE_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
   { featureId: 'reduce-insurance-01', value: 0.01 },
   { featureId: 'reduce-insurance-02', value: 0.02 }
@@ -20,7 +20,7 @@ const TAX_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
   { featureId: 'reduce-expenses', value: 0.02 }
 ];
 
-/** Rental profit per room features (spec 18). Both tiers in investments. */
+/** Rental profit per room features (spec 18). Both tiers in investments. Bugbot: no legacy IDs (e.g. rental-profit-increase) — never used in this project. */
 export const RENTAL_PROFIT_FEATURES: { featureId: string; value: number; categoryId: string }[] = [
   { featureId: 'rental-profit-01', value: 0.01, categoryId: 'investments' },
   { featureId: 'rental-profit-015', value: 0.015, categoryId: 'investments' }
@@ -107,7 +107,7 @@ export async function isResearchFeatureUnlocked(
   }
 }
 
-/** Hack-ability battalion-size feature IDs in prereq order (spec 18). Value is the additive increase. */
+/** Hack-ability battalion-size feature IDs in prereq order (spec 18). Value is the additive increase. Bugbot: no legacy IDs (e.g. battalions-per-battle, increase-battalion-size) — never used in this project. */
 const BATTALION_SIZE_FEATURES: { featureId: string; add: number }[] = [
   { featureId: 'battalion-size-250', add: 250 },
   { featureId: 'battalion-size-500', add: 500 },

@@ -402,6 +402,7 @@ export class ResearchFeatureService {
 
       // Merge base features with user progress from UserResearchFeature collection.
       // Legacy: treat completed 'reduce-expenses' as unlocked for 'reduce-tax-expense-02'.
+      // Bugbot: no other legacy feature-id mapping — cited IDs (e.g. increase-income-rate, rental-profit-increase) were never used in this project; only reduce-expenses had legacy compat.
       const featuresWithStatus = baseFeatures.map(feature => {
         const userFeature = userFeatures.find(uf =>
           uf.featureId === feature.id ||

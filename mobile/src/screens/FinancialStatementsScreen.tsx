@@ -105,16 +105,11 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
       const insuranceBase = baseIncomeStatement['Insurance'] ?? -0.50;
       effectiveIncomeStatement['Insurance'] = insuranceBase + insuranceReductionTotal;
     }
-    // Tax/Taxes: apply unlocked reduction research (reduce-tax-expense-02 = $0.02). Match template key case-insensitively.
-    const taxKey = Object.keys(baseIncomeStatement).find(
+    // Tax reduction applied once below when building expenseEntries (any label containing "tax"). Bugbot: no double-apply; gross-income deduction guarded by hasTaxInTemplate (see lines 121–122).
+    const hasTaxInTemplate = Object.keys(baseIncomeStatement).some(
       k => k.trim().toLowerCase() === 'taxes' || k.trim().toLowerCase() === 'tax'
-    ) ?? null;
-    const hasTaxInTemplate = taxKey !== null;
-    if (hasTaxInTemplate && taxKey) {
-      const taxBase = baseIncomeStatement[taxKey] ?? -0.60;
-      effectiveIncomeStatement[taxKey] = taxBase + taxReductionTotal;
-    }
-    
+    );
+
     const incomeStatementEntries = Object.entries(effectiveIncomeStatement);
     
     // Gross Income: subtract insurance and tax reduction from display when template has those lines,
@@ -123,7 +118,7 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
     if (hasInsuranceInTemplate && insuranceReductionTotal > 0) {
       effectiveIncomeRateBonus = Math.max(0, effectiveIncomeRateBonus - insuranceReductionTotal);
     }
-    if (taxReductionTotal > 0) {
+    if (hasTaxInTemplate && taxReductionTotal > 0) {
       effectiveIncomeRateBonus = Math.max(0, effectiveIncomeRateBonus - taxReductionTotal);
     }
     const baseGrossIncome = 12.00;
