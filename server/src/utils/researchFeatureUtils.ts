@@ -14,7 +14,7 @@ const INSURANCE_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
   { featureId: 'reduce-insurance-02', value: 0.02 }
 ];
 
-/** Tax reduction: current spec (cash-flow) and legacy (financial/reduce-expenses). Check correct category per feature. */
+/** Tax reduction: current spec (cash-flow) and legacy (financial/reduce-expenses). Check correct category per feature. Bugbot: new starts of financial/reduce-expenses are blocked in ResearchFeatureService to prevent cheap tax-reduction bypass. */
 const TAX_REDUCTION_FEATURES: { featureId: string; value: number; categoryId: string }[] = [
   { featureId: 'reduce-tax-expense-02', value: 0.02, categoryId: 'cash-flow' },
   { featureId: 'reduce-expenses', value: 0.02, categoryId: 'financial' }

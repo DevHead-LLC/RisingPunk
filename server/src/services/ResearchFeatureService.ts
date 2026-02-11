@@ -38,12 +38,23 @@ export class ResearchFeatureService {
     return hours > 0;
   }
 
+  /** Deprecated: financial/reduce-expenses was replaced by cash-flow/reduce-tax-expense-02; block new starts to prevent cheap tax-reduction bypass. */
+  private static readonly DEPRECATED_TAX_FEATURE = { categoryId: 'financial' as const, featureId: 'reduce-expenses' as const };
+
   static async validateFeatureRequirements(
     userId: string,
     categoryId: string,
     featureId: string
   ): Promise<ResearchFeatureValidation> {
     try {
+      if (categoryId === this.DEPRECATED_TAX_FEATURE.categoryId && featureId === this.DEPRECATED_TAX_FEATURE.featureId) {
+        return {
+          canResearch: false,
+          reasons: ['This feature has been replaced. Unlock Cash Flow and research "Reduce Tax Expense $0.02" for tax reduction.'],
+          missingRequirements: {}
+        };
+      }
+
       const user = await User.findById(userId);
       const feature = getFeatureById(categoryId, featureId);
       
@@ -133,6 +144,13 @@ export class ResearchFeatureService {
     categoryId: string,
     featureId: string
   ): Promise<StartResearchResult> {
+    if (categoryId === ResearchFeatureService.DEPRECATED_TAX_FEATURE.categoryId && featureId === ResearchFeatureService.DEPRECATED_TAX_FEATURE.featureId) {
+      return {
+        success: false,
+        message: 'This feature has been replaced. Unlock Cash Flow and research "Reduce Tax Expense $0.02" for tax reduction.'
+      };
+    }
+
     const session = await mongoose.startSession();
     
     try {
