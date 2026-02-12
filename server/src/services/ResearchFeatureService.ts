@@ -319,12 +319,13 @@ export class ResearchFeatureService {
   }
 
   /**
-   * Find filter for "is this feature (the one being started/completed) already unlocked or in progress?".
-   * Do NOT include reduce-insurance-02 for reduce-insurance-01 (different tier; would wrongly block purchase of 01).
+   * Find filter for UserResearchFeature lookups. Single implementation to avoid divergence.
+   * @param forPrereq When true, reduce-insurance-01 is satisfied by 02 (or legacy) so e.g. crew-system-unlock allows users with only 02. When false, 01 and 02 are distinct so purchasing 01 is not blocked by having 02.
    */
-  static getFeatureIdFindFilter(
+  private static getFeatureIdFindFilterImpl(
     categoryId: string,
-    featureId: string
+    featureId: string,
+    forPrereq: boolean
   ): { categoryId: string; featureId: string } | { categoryId: string; featureId: { $in: string[] } } | { $or: Array<{ categoryId: string; featureId: string }> } {
     if (categoryId === 'cash-flow' && featureId === 'reduce-tax-expense-02') {
       return {
@@ -334,17 +335,17 @@ export class ResearchFeatureService {
         ],
       };
     }
-    const selfLegacyMap: Record<string, string[]> = {
+    const legacyMap: Record<string, string[]> = {
       'add-battalion-c': ['add-battalion-c', 'battalions-per-battle'],
       'battalion-size-250': ['battalion-size-250', 'increase-battalion-size'],
-      'reduce-insurance-01': ['reduce-insurance-01', 'reduce-insurance-expense'],
+      'reduce-insurance-01': forPrereq ? ['reduce-insurance-01', 'reduce-insurance-expense', 'reduce-insurance-02'] : ['reduce-insurance-01', 'reduce-insurance-expense'],
       'reduce-insurance-02': ['reduce-insurance-02', 'reduce-insurance-expense'],
       'rental-profit-01': ['rental-profit-01', 'rental-profit-increase'],
       'increase-income-01': ['increase-income-01', 'increase-income-rate'],
       'increase-income-02': ['increase-income-02', 'increase-income-rate'],
       'increase-income-025': ['increase-income-025', 'increase-income-rate'],
     };
-    const legacyIds = selfLegacyMap[featureId];
+    const legacyIds = legacyMap[featureId];
     if (legacyIds) {
       const categoryMatch =
         (categoryId === 'cash-flow' && (featureId === 'reduce-insurance-01' || featureId === 'reduce-insurance-02')) ||
@@ -358,44 +359,20 @@ export class ResearchFeatureService {
     return { categoryId, featureId };
   }
 
-  /**
-   * Find filter for "does user satisfy this prerequisite?". Used only when checking requiredFeatureRefs.
-   * For reduce-insurance-01, having reduce-insurance-02 (or legacy) also satisfies the prereq (e.g. crew-system-unlock).
-   */
+  /** Find filter for "is this feature already unlocked or in progress?" (self). Do not use for prerequisite checks. */
+  static getFeatureIdFindFilter(
+    categoryId: string,
+    featureId: string
+  ): { categoryId: string; featureId: string } | { categoryId: string; featureId: { $in: string[] } } | { $or: Array<{ categoryId: string; featureId: string }> } {
+    return ResearchFeatureService.getFeatureIdFindFilterImpl(categoryId, featureId, false);
+  }
+
+  /** Find filter for "does user satisfy this prerequisite?" (requiredFeatureRefs). E.g. reduce-insurance-02 satisfies reduce-insurance-01 for crew-system-unlock. */
   static getFeatureIdFindFilterForPrereq(
     categoryId: string,
     featureId: string
   ): { categoryId: string; featureId: string } | { categoryId: string; featureId: { $in: string[] } } | { $or: Array<{ categoryId: string; featureId: string }> } {
-    if (categoryId === 'cash-flow' && featureId === 'reduce-tax-expense-02') {
-      return {
-        $or: [
-          { categoryId: 'cash-flow', featureId: 'reduce-tax-expense-02' },
-          { categoryId: 'financial', featureId: 'reduce-expenses' },
-        ],
-      };
-    }
-    const prereqLegacyMap: Record<string, string[]> = {
-      'add-battalion-c': ['add-battalion-c', 'battalions-per-battle'],
-      'battalion-size-250': ['battalion-size-250', 'increase-battalion-size'],
-      'reduce-insurance-01': ['reduce-insurance-01', 'reduce-insurance-expense', 'reduce-insurance-02'],
-      'reduce-insurance-02': ['reduce-insurance-02', 'reduce-insurance-expense'],
-      'rental-profit-01': ['rental-profit-01', 'rental-profit-increase'],
-      'increase-income-01': ['increase-income-01', 'increase-income-rate'],
-      'increase-income-02': ['increase-income-02', 'increase-income-rate'],
-      'increase-income-025': ['increase-income-025', 'increase-income-rate'],
-    };
-    const legacyIds = prereqLegacyMap[featureId];
-    if (legacyIds) {
-      const categoryMatch =
-        (categoryId === 'cash-flow' && (featureId === 'reduce-insurance-01' || featureId === 'reduce-insurance-02')) ||
-        (categoryId === 'hack-ability' && (featureId === 'add-battalion-c' || featureId === 'battalion-size-250')) ||
-        (categoryId === 'investments' && featureId === 'rental-profit-01') ||
-        (categoryId === 'cash-flow' && (featureId === 'increase-income-01' || featureId === 'increase-income-02' || featureId === 'increase-income-025'));
-      if (categoryMatch) {
-        return { categoryId, featureId: { $in: legacyIds } };
-      }
-    }
-    return { categoryId, featureId };
+    return ResearchFeatureService.getFeatureIdFindFilterImpl(categoryId, featureId, true);
   }
 
   static async completeResearch(
