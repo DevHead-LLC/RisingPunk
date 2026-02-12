@@ -7,7 +7,7 @@ import { getCurrentBalance } from '../store/slices/balanceSlice';
 import { useFetchFinanceTemplatesQuery, useFetchUserFinanceTiersQuery } from '../store/api/userFinanceApi';
 import { useGetRentalHousingIncomeQuery } from '../store/api/rentalHousingApi';
 import { useFetchBalanceQuery } from '../store/api/balanceApi';
-import { useGetUserFeaturesQuery, useGetExpenseModifiersQuery } from '../store/api/researchFeaturesApi';
+import { useGetExpenseModifiersQuery } from '../store/api/researchFeaturesApi';
 import { useTrackFinancialStatementViewMutation } from '../store/api/userGuideApi';
 import { useTheme } from '../context/ThemeContext';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -44,34 +44,21 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
   const { data: rentalHousingData, error: rentalHousingError, isLoading: rentalHousingLoading } = useGetRentalHousingIncomeQuery();
   const { data: balanceData } = useFetchBalanceQuery(undefined, { refetchOnFocus: true });
   const { data: expenseModifiers } = useGetExpenseModifiersQuery(undefined, { refetchOnFocus: true });
-  const { data: cashFlowFeatures } = useGetUserFeaturesQuery('cash-flow');
   const currentCash = useAppSelector(getCurrentBalance);
   const ratePerSecondFromState = useAppSelector(state => state.balance.ratePerSecond);
   // Use balanceData from query if available (fresh data), otherwise fall back to Redux state
   const ratePerSecond = balanceData?.ratePerSecond ?? ratePerSecondFromState;
-  // Expense reductions: prefer dedicated expense-modifiers API (single source of truth). Fall back to balance, then research features.
-  // Fallback: sum 01 + 02 so migrated users with both tiers see 0.03. Legacy-only (one doc shows as both) may briefly show 0.03 until expenseModifiers loads (Bugbot tradeoff).
+  // Expense reductions: single source of truth is server (expense-modifiers or balance). No client-side sum so legacy users (one doc = $0.02) never see wrong 0.03.
   const insuranceReductionTotal = useMemo(() => {
     if (typeof expenseModifiers?.insuranceReduction === 'number') return expenseModifiers.insuranceReduction;
     if (typeof balanceData?.insuranceReduction === 'number') return balanceData.insuranceReduction;
-    if (typeof cashFlowFeatures?.insuranceReduction === 'number') return cashFlowFeatures.insuranceReduction;
-    const features = cashFlowFeatures?.features;
-    if (!features?.length) return 0;
-    let total = 0;
-    if (features.some((f: any) => f.id === 'reduce-insurance-01' && f.isUnlocked)) total += 0.01;
-    if (features.some((f: any) => f.id === 'reduce-insurance-02' && f.isUnlocked)) total += 0.02;
-    return total;
-  }, [expenseModifiers?.insuranceReduction, balanceData?.insuranceReduction, cashFlowFeatures]);
+    return 0;
+  }, [expenseModifiers?.insuranceReduction, balanceData?.insuranceReduction]);
   const taxReductionTotal = useMemo(() => {
     if (typeof expenseModifiers?.taxReduction === 'number') return expenseModifiers.taxReduction;
     if (typeof balanceData?.taxReduction === 'number') return balanceData.taxReduction;
-    if (typeof cashFlowFeatures?.taxReduction === 'number') return cashFlowFeatures.taxReduction;
-    const features = cashFlowFeatures?.features;
-    if (!features?.length) return 0;
-    // Server maps legacy financial/reduce-expenses onto cash-flow reduce-tax-expense-02 (Bugbot: reduce-expenses is financial, not in cashFlowFeatures).
-    if (features.some((f: any) => f.id === 'reduce-tax-expense-02' && f.isUnlocked)) return 0.02;
     return 0;
-  }, [expenseModifiers?.taxReduction, balanceData?.taxReduction, cashFlowFeatures]);
+  }, [expenseModifiers?.taxReduction, balanceData?.taxReduction]);
   const { themeMode } = useTheme();
   const colors = useThemeColors();
   

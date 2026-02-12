@@ -276,6 +276,73 @@ After completing conflict resolution and pushing `android_mergeDev`, run through
 
 ---
 
+## Session: 2025-02-12 (merge dev → android_mergeDev)
+
+**Branch context:** Merging origin/dev into android_mergeDev (from androidStaging). Three conflicts: FinancialStatementsScreen (expense reduction fallback), research.ts route (legacy API + cash-flow expense modifiers), ResearchFeatureService (filter method + comments).
+
+### 1. `mobile/src/screens/FinancialStatementsScreen.tsx`
+
+**Conflict:** Expense reduction fallback logic in useMemo.
+
+| Side | Content |
+|------|--------|
+| HEAD | Fallback to `cashFlowFeatures?.insuranceReduction`, then manual sum via `features.some((f: any) => f.id === '...')` for both insurance and tax. |
+| dev  | Simple `return 0` fallback; no cashFlowFeatures query. |
+
+**Resolution:** Accepted **dev**. Final state: insurance and tax reduction come from expense-modifiers or balance only; no client-side fallback sum.
+
+**Rationale:** HEAD's `cashFlowFeatures` is undefined in this component's scope (would cause runtime error). Dev is correct: expense-modifiers endpoint is the single source of truth. Not Android deployment–specific.
+
+**Rejected from HEAD:** Fallback to cashFlowFeatures (undefined variable) and manual feature sum (creates 0.03 display bug for legacy users with single $0.02 doc).
+
+**Failure-mode hints for later:** If insurance/tax reduction shows 0 when it should have a value, verify the expense-modifiers API returns correct values and client calls it.
+
+---
+
+### 2. `server/src/routes/research.ts`
+
+**Conflict:** `/user-features/:categoryId` route – legacy API support vs cash-flow expense modifiers.
+
+| Side | Content |
+|------|--------|
+| HEAD | Comment about cash-flow returning insuranceReduction/taxReduction; getUserFeatures only; if cash-flow, compute and return expense modifiers. |
+| dev  | Comment about legacy API; check x-research-api-version header; use getUserFeaturesLegacy for old App Store app; no expense modifiers. |
+
+**Resolution:** Combined **both**. Final state: check x-research-api-version header for legacy support (dev) AND return insuranceReduction/taxReduction for cash-flow (HEAD).
+
+**Rationale:** Both changes are needed. Dev's legacy API support ensures old App Store apps work. HEAD's cash-flow expense modifiers ensure client fallback matches server (Bugbot). Combined for full compatibility.
+
+**Rejected content:** None—both sides merged.
+
+**Failure-mode hints for later:**
+- If old App Store app crashes on Research screen, confirm x-research-api-version header check and getUserFeaturesLegacy are present.
+- If client expense reduction doesn't match server for cash-flow, confirm insuranceReduction/taxReduction are returned.
+
+---
+
+### 3. `server/src/services/ResearchFeatureService.ts`
+
+**Conflict:** Comments and getExactFeatureIdFilter method.
+
+| Side | Content |
+|------|--------|
+| HEAD | `getExactFeatureIdFilter` method for write filters; comment about legacy same-category old IDs. |
+| dev  | No getExactFeatureIdFilter; cleaner JSDoc with @param forPrereq explanation. |
+
+**Resolution:** Kept **HEAD's method** and combined **dev's comment**. Final state: getExactFeatureIdFilter method retained (used in startResearch); JSDoc includes both legacy explanation and forPrereq parameter.
+
+**Rationale:** getExactFeatureIdFilter is used in startResearch (line 279) to prevent overwriting shared legacy docs. Dev's cleaner @param documentation improves readability. Both needed.
+
+**Rejected from dev:** Omission of getExactFeatureIdFilter method.
+
+**Failure-mode hints for later:** If startResearch overwrites a shared legacy doc (e.g. reduce-insurance-expense consumed by 01 or 02), confirm getExactFeatureIdFilter is used in findOneAndUpdate.
+
+---
+
+**Post-merge checklist:** HandleSelectionModal – Android branch verified. Android path uses plain `View style={styles.inputContainer} pointerEvents="box-none"` and TextInput with `onTouchEnd` calling `textInputRef.current?.focus()`. No Pressable or TouchableWithoutFeedback wrapping the handle input. No regression.
+
+---
+
 ## Related docs
 
 - `taskItems/android/appWide/network-security-config.md` – overall network security config design.
