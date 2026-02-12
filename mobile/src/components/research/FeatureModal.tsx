@@ -90,7 +90,13 @@ export function FeatureModal({
       // Don't treat as missing when category not fetched or still loading (empty list). Server validates (Bugbot).
       if (!list || list.length === 0) return false;
       const f = list.find((x: any) => (x.id || x.featureId) === ref.featureId);
-      return !f?.isUnlocked;
+      if (f?.isUnlocked) return false;
+      // Server treats reduce-insurance-02 (or legacy) as satisfying reduce-insurance-01 for crew-system-unlock. Align client so migrated users can start Crew System.
+      if (ref.categoryId === 'cash-flow' && ref.featureId === 'reduce-insurance-01') {
+        const has02 = list.some((x: any) => ((x.id || x.featureId) === 'reduce-insurance-02' || (x.id || x.featureId) === 'reduce-insurance-expense') && x.isUnlocked);
+        if (has02) return false;
+      }
+      return true;
     });
   }, [refs, featuresByCategory]);
 

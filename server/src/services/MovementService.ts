@@ -242,10 +242,8 @@ export class MovementService {
             const { CombatService } = this.getCachedService('CombatService');
             const { BattalionService } = this.getCachedService('BattalionService');
             
-            if (!AttackService.isAttacking(battalion.id)) {
+            if (!AttackService.isAttacking(battleId, battalion.id)) {
               const targetingResult = BattalionService.getTargetingResultForBattalion(battalion.id, battleId);
-              
-              // Add detailed logging for the condition
               
               if (targetingResult && targetingResult.targetType === 'enemy_battalion') {
                 let enemyBattalion: IBattalion | undefined;
@@ -262,14 +260,14 @@ export class MovementService {
                 }
                 
                 if (enemyBattalion) {
-                  AttackService.startAttack(battalion, 'battalion', enemyBattalion.id);
+                  AttackService.startAttack(battleId, battalion, 'battalion', enemyBattalion.id);
                 } else {
                   AttackService.queueMissingTargetRetargeting(battle.battleId, battalion.id);
                 }
               } else {
                 const targetNode = battle.nodes.find((n: any) => n.index === updatedMovementState.targetPosition.nodeIndex);
                 if (targetNode && CombatService.canTargetNode(targetNode)) {
-                  AttackService.startAttack(battalion, 'node', targetNode.index);
+                  AttackService.startAttack(battleId, battalion, 'node', targetNode.index);
                 }
               }
             }
