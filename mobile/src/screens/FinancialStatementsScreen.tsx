@@ -7,7 +7,7 @@ import { getCurrentBalance } from '../store/slices/balanceSlice';
 import { useFetchFinanceTemplatesQuery, useFetchUserFinanceTiersQuery } from '../store/api/userFinanceApi';
 import { useGetRentalHousingIncomeQuery } from '../store/api/rentalHousingApi';
 import { useFetchBalanceQuery } from '../store/api/balanceApi';
-import { useGetUserFeaturesQuery, useGetExpenseModifiersQuery } from '../store/api/researchFeaturesApi';
+import { useGetExpenseModifiersQuery } from '../store/api/researchFeaturesApi';
 import { useTrackFinancialStatementViewMutation } from '../store/api/userGuideApi';
 import { useTheme } from '../context/ThemeContext';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -44,12 +44,11 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
   const { data: rentalHousingData, error: rentalHousingError, isLoading: rentalHousingLoading } = useGetRentalHousingIncomeQuery();
   const { data: balanceData } = useFetchBalanceQuery(undefined, { refetchOnFocus: true });
   const { data: expenseModifiers } = useGetExpenseModifiersQuery(undefined, { refetchOnFocus: true });
-  const { data: cashFlowFeatures } = useGetUserFeaturesQuery('cash-flow');
   const currentCash = useAppSelector(getCurrentBalance);
   const ratePerSecondFromState = useAppSelector(state => state.balance.ratePerSecond);
   // Use balanceData from query if available (fresh data), otherwise fall back to Redux state
   const ratePerSecond = balanceData?.ratePerSecond ?? ratePerSecondFromState;
-  // Expense reductions: single source of truth is server (expense-modifiers or balance). No client-side sum from cashFlowFeatures so legacy users (one doc = $0.02) never see wrong 0.03.
+  // Expense reductions: single source of truth is server (expense-modifiers or balance). No client-side sum so legacy users (one doc = $0.02) never see wrong 0.03.
   const insuranceReductionTotal = useMemo(() => {
     if (typeof expenseModifiers?.insuranceReduction === 'number') return expenseModifiers.insuranceReduction;
     if (typeof balanceData?.insuranceReduction === 'number') return balanceData.insuranceReduction;
