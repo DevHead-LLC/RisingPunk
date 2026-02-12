@@ -133,7 +133,10 @@ export class AttackService {
     return attackers;
   }
 
-  /** Returns attack states for a single battle only (used by processActiveAttacks). */
+  /**
+   * Returns attack states for a single battle only (used by processActiveAttacks).
+   * Map keys are battalion IDs (not composite); values are AttackState for that battle.
+   */
   static getActiveAttacksForBattle(battleId: string): Map<string, AttackState> {
     const prefix = battleId + ':';
     const result = new Map<string, AttackState>();
@@ -143,10 +146,6 @@ export class AttackService {
       }
     }
     return result;
-  }
-
-  static getActiveAttacks(): Map<string, AttackState> {
-    return new Map(this.attackStates);
   }
 
   static isAttacking(battleId: string, battalionId: string): boolean {
@@ -166,10 +165,6 @@ export class AttackService {
         this.attackStates.delete(key);
       }
     }
-  }
-
-  static clearAllAttacks(): void {
-    this.attackStates.clear();
   }
 
   static clearRetargetingQueueForBattle(battleId: string): void {
