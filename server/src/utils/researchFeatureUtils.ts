@@ -82,8 +82,8 @@ const INSURANCE_LEGACY_REPLACEMENT_ID = 'reduce-insurance-02';
 
 /**
  * Total insurance expense reduction from all unlocked cash-flow features (spec 18).
- * Legacy: add $0.02 when reduce-insurance-expense is unlocked and user does not have the migration replacement (reduce-insurance-02), so pre-migration users keep legacy+new (Bugbot).
- * Migration grants 01+02 ($0.03/sec) for old reduce-insurance-expense ($0.02) — extra $0.01/sec is intentional grandfather bonus (Bugbot).
+ * Legacy: add $0.02 when reduce-insurance-expense is unlocked and user does not have the migration replacement (reduce-insurance-02).
+ * Migration grants only reduce-insurance-02 ($0.02/sec) for old reduce-insurance-expense so legacy users see one tier and correct balance.
  * Pass prefetch to avoid N+1 queries (Bugbot).
  */
 export async function getInsuranceReductionBonus(userId: string, prefetch?: BonusPrefetch): Promise<number> {
