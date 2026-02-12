@@ -69,7 +69,7 @@ export class BattleService {
     const updatedBattle = await battle.save();
     
     BattalionService.clearTargetingResults(battleId);
-    AttackService.clearAllAttacks();
+    AttackService.clearBattleAttacks(battleId);
     AttackService.clearRetargetingQueueForBattle(battleId);
     ScreenDimensionService.clearBattleScreenDimensions(battleId);
     

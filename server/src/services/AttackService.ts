@@ -11,6 +11,7 @@ import { Battle } from '../models/Battle';
 import { MovementService } from './MovementService';
 
 interface AttackState {
+  battleId: string;
   battalionId: string;
   targetNodeIndex: number;
   lastAttackTime: number;
@@ -18,6 +19,11 @@ interface AttackState {
   isAttacking: boolean;
   targetType?: 'node' | 'battalion';
   targetId?: string;
+}
+
+/** Composite key for attack state: battleId:battalionId (battalion IDs are not unique across battles). */
+function attackStateKey(battleId: string, battalionId: string): string {
+  return `${battleId}:${battalionId}`;
 }
 
 interface RetargetingTask {
@@ -56,17 +62,19 @@ export class AttackService {
   }
   
   static startAttack(
-    battalion: IBattalion, 
+    battleId: string,
+    battalion: IBattalion,
     targetType: 'node' | 'battalion',
     target: number | string
   ): void {
-    if (this.isAttacking(battalion.id)) {
+    if (this.isAttacking(battleId, battalion.id)) {
       return;
     }
     
     const attackInterval = this.calculateAttackInterval(battalion.stats.speed);
     
     const attackState: AttackState = {
+      battleId,
       battalionId: battalion.id,
       targetNodeIndex: targetType === 'node' ? target as number : -1,
       lastAttackTime: Date.now(),
@@ -76,7 +84,7 @@ export class AttackService {
       targetId: targetType === 'battalion' ? target as string : undefined
     };
     
-    this.attackStates.set(battalion.id, attackState);
+    this.attackStates.set(attackStateKey(battleId, battalion.id), attackState);
   }
 
 
@@ -93,11 +101,12 @@ export class AttackService {
     return destroyed;
   }
   
-  static stopAttacking(battalionId: string): void {
-    const attackState = this.attackStates.get(battalionId);
+  static stopAttacking(battleId: string, battalionId: string): void {
+    const key = attackStateKey(battleId, battalionId);
+    const attackState = this.attackStates.get(key);
     if (attackState) {
       attackState.isAttacking = false;
-      this.attackStates.delete(battalionId);
+      this.attackStates.delete(key);
     }
   }
   
@@ -113,32 +122,52 @@ export class AttackService {
     return captured;
   }
   
-  static getBattalionsAttackingSpecificNode(nodeIndex: number): string[] {
-
+  static getBattalionsAttackingSpecificNode(battleId: string, nodeIndex: number): string[] {
     const attackers: string[] = [];
-    // Use direct iteration instead of creating intermediate arrays
-    for (const [battalionId, attackState] of this.attackStates) {
-      if (attackState.isAttacking && attackState.targetNodeIndex === nodeIndex) {
-        attackers.push(battalionId);
+    const prefix = battleId + ':';
+    for (const [key, attackState] of this.attackStates) {
+      if (key.startsWith(prefix) && attackState.isAttacking && attackState.targetNodeIndex === nodeIndex) {
+        attackers.push(attackState.battalionId);
       }
     }
-
     return attackers;
   }
-  
+
+  /** Returns attack states for a single battle only (used by processActiveAttacks). */
+  static getActiveAttacksForBattle(battleId: string): Map<string, AttackState> {
+    const prefix = battleId + ':';
+    const result = new Map<string, AttackState>();
+    for (const [key, attackState] of this.attackStates) {
+      if (key.startsWith(prefix)) {
+        result.set(attackState.battalionId, attackState);
+      }
+    }
+    return result;
+  }
+
   static getActiveAttacks(): Map<string, AttackState> {
     return new Map(this.attackStates);
   }
-  
-  static isAttacking(battalionId: string): boolean {
-    const attackState = this.attackStates.get(battalionId);
+
+  static isAttacking(battleId: string, battalionId: string): boolean {
+    const attackState = this.attackStates.get(attackStateKey(battleId, battalionId));
     return attackState?.isAttacking || false;
   }
-  
-  static getAttackState(battalionId: string): AttackState | undefined {
-    return this.attackStates.get(battalionId);
+
+  static getAttackState(battleId: string, battalionId: string): AttackState | undefined {
+    return this.attackStates.get(attackStateKey(battleId, battalionId));
   }
-  
+
+  /** Clears attack state for a single battle (call when battle ends). */
+  static clearBattleAttacks(battleId: string): void {
+    const prefix = battleId + ':';
+    for (const key of Array.from(this.attackStates.keys())) {
+      if (key.startsWith(prefix)) {
+        this.attackStates.delete(key);
+      }
+    }
+  }
+
   static clearAllAttacks(): void {
     this.attackStates.clear();
   }
@@ -147,8 +176,8 @@ export class AttackService {
     this.retargetingQueue = this.retargetingQueue.filter(task => task.battleId !== battleId);
   }
 
-  static clearBattalionAttacks(battalionId: string): void {
-    this.attackStates.delete(battalionId);
+  static clearBattalionAttacks(battleId: string, battalionId: string): void {
+    this.attackStates.delete(attackStateKey(battleId, battalionId));
   }
 
   // ============================================================================
@@ -193,15 +222,14 @@ export class AttackService {
   }
 
   static queueBattalionDestructionRetargeting(battleId: string, destroyedBattalionId: string): void {
-    this.clearBattalionAttacks(destroyedBattalionId);
+    this.clearBattalionAttacks(battleId, destroyedBattalionId);
     
     const affectedBattalions: string[] = [];
-    
-    // Use direct iteration and early collection to avoid multiple Map operations
-    for (const [battalionId, attackState] of this.attackStates) {
-      if (attackState.targetType === 'battalion' && attackState.targetId === destroyedBattalionId) {
-        affectedBattalions.push(battalionId);
-        this.stopAttacking(battalionId);
+    const prefix = battleId + ':';
+    for (const [key, attackState] of this.attackStates) {
+      if (key.startsWith(prefix) && attackState.targetType === 'battalion' && attackState.targetId === destroyedBattalionId) {
+        affectedBattalions.push(attackState.battalionId);
+        this.stopAttacking(battleId, attackState.battalionId);
       }
     }
     
@@ -445,17 +473,18 @@ export class AttackService {
       return;
     }
 
-    for (const [battalionId, attackState] of this.getActiveAttacks()) {
+    const battleId = battle.battleId;
+    for (const [battalionId, attackState] of this.getActiveAttacksForBattle(battleId)) {
       if (Date.now() - attackState.lastAttackTime >= attackState.attackInterval) {
         const battalion = battle.battalions.find((b: IBattalion) => b.id === battalionId);
         
         if (!battalion) {
-          this.stopAttacking(battalionId);
+          this.stopAttacking(battleId, battalionId);
           continue;
         }
         
         if (battalion.isDestroyed || battalion.quantity <= 0 || battalion.currentHealth <= 0) {
-          this.stopAttacking(battalionId);
+          this.stopAttacking(battleId, battalionId);
           continue;
         }
         
@@ -476,7 +505,7 @@ export class AttackService {
             } else if (defender.isDestroyed) {
               this.queueMissingTargetRetargeting(battle.battleId, battalionId);
             }
-            this.stopAttacking(battalionId);
+            this.stopAttacking(battleId, battalionId);
           }
           
         } else {
@@ -487,14 +516,12 @@ export class AttackService {
             attackState.lastAttackTime = Date.now();
             
             if (captured) {
-              const affectedAttackers = this.getBattalionsAttackingSpecificNode(node.index);
-              affectedAttackers.forEach(id => this.stopAttacking(id));
-              
-              
+              const affectedAttackers = this.getBattalionsAttackingSpecificNode(battleId, node.index);
+              affectedAttackers.forEach(id => this.stopAttacking(battleId, id));
               this.queueRetargetingTask(battle.battleId, node.index, affectedAttackers);
             }
           } else {
-            this.stopAttacking(battalionId);
+            this.stopAttacking(battleId, battalionId);
           }
         }
         
