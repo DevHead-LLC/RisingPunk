@@ -32,6 +32,40 @@ export interface CompleteResearchResult {
   unlockedAt?: Date;
 }
 
+/** Legacy feature list for old App Store app when server returns research user-features without X-Research-API-Version: 2. Old app expects these IDs; no Probe. */
+const LEGACY_FEATURES_BY_CATEGORY: Record<string, Array<{ id: string; name: string; description: string; unlockCost: number; levelRequirement: number; researchTimeHours: number; effect: { type: string; value: number | string; target?: string } }>> = {
+  'home-defense': [
+    { id: 'antivirus', name: 'Antivirus', description: 'Deploy a protective shield that prevents other players from attacking you for a limited time.', unlockCost: 25000, levelRequirement: 2, researchTimeHours: 0, effect: { type: 'unlock', value: 'antivirus', target: 'system-protection' } },
+    { id: 'bot-trap', name: 'Bot Trap 1', description: 'Instantly destroy 100 enemy bots in battle', unlockCost: 250000, levelRequirement: 5, researchTimeHours: 0, effect: { type: 'special', value: 100, target: 'bot-destruction' } },
+  ],
+  'hack-ability': [
+    { id: 'battalions-per-battle', name: 'Add Battalion C', description: 'Unlock a third battalion (Battalion C) to deploy in attacking battles', unlockCost: 50000, levelRequirement: 5, researchTimeHours: 5, effect: { type: 'improvement', value: 1, target: 'battalion-capacity' } },
+    { id: 'increase-battalion-size', name: 'Battalion Size +250', description: 'Increase maximum troops per battalion from 250 to 500', unlockCost: 100000, levelRequirement: 6, researchTimeHours: 6, effect: { type: 'improvement', value: 250, target: 'battalion-size' } },
+  ],
+  'cash-flow': [
+    { id: 'increase-income-rate', name: 'Increase Income Rate +$0.05/sec', description: 'Increase your base income rate by $0.05 per second', unlockCost: 12000, levelRequirement: 4, researchTimeHours: 4, effect: { type: 'improvement', value: 0.05, target: 'base-income-rate' } },
+    { id: 'reduce-insurance-expense', name: 'Reduce Insurance Expense $0.02', description: 'Reduce your insurance expense by $0.02 per second', unlockCost: 75000, levelRequirement: 6, researchTimeHours: 1.5, effect: { type: 'reduction', value: 0.02, target: 'insurance-expense' } },
+  ],
+  'investments': [
+    { id: 'rental-profit-increase', name: 'Rental Profit +$0.01/Room', description: 'Increase rental income by $0.01 per room per second for all rental properties', unlockCost: 150000, levelRequirement: 7, researchTimeHours: 2.5, effect: { type: 'improvement', value: 0.01, target: 'rental-room-income' } },
+  ],
+  'hack-crew': [
+    { id: 'crew-system-unlock', name: 'Crew System', description: 'Unlock the ability to form, join, and manage hack crews', unlockCost: 250000, levelRequirement: 5, researchTimeHours: 7, effect: { type: 'unlock', value: 'hack-crew-system', target: 'crew-management' } },
+  ],
+};
+
+/** For legacy API: which UserResearchFeature featureIds count as "unlocked" for this legacy feature. */
+const LEGACY_FEATURE_ID_LOOKUP: Record<string, string[]> = {
+  'antivirus': ['antivirus'],
+  'bot-trap': ['bot-trap'],
+  'battalions-per-battle': ['battalions-per-battle', 'add-battalion-c'],
+  'increase-battalion-size': ['increase-battalion-size', 'battalion-size-250'],
+  'increase-income-rate': ['increase-income-rate', 'increase-income-01', 'increase-income-02', 'increase-income-025'],
+  'reduce-insurance-expense': ['reduce-insurance-expense', 'reduce-insurance-02'],
+  'rental-profit-increase': ['rental-profit-increase', 'rental-profit-01'],
+  'crew-system-unlock': ['crew-system-unlock'],
+};
+
 export class ResearchFeatureService {
   private static isValidResearchTimeHours(hours: number | null | undefined): boolean {
     if (hours == null) return false;
@@ -303,7 +337,7 @@ export class ResearchFeatureService {
     const legacyMap: Record<string, string[]> = {
       'add-battalion-c': ['add-battalion-c', 'battalions-per-battle'],
       'battalion-size-250': ['battalion-size-250', 'increase-battalion-size'],
-      'reduce-insurance-01': ['reduce-insurance-01', 'reduce-insurance-expense'],
+      'reduce-insurance-01': ['reduce-insurance-01', 'reduce-insurance-expense', 'reduce-insurance-02'],
       'reduce-insurance-02': ['reduce-insurance-02', 'reduce-insurance-expense'],
       'rental-profit-01': ['rental-profit-01', 'rental-profit-increase'],
       'increase-income-01': ['increase-income-01', 'increase-income-rate'],
@@ -438,6 +472,44 @@ export class ResearchFeatureService {
     }
   }
 
+  /**
+   * Returns user features in LEGACY format (old feature IDs, no Probe) for the old App Store app.
+   * Use when request does not include X-Research-API-Version: 2.
+   */
+  static async getUserFeaturesLegacy(userId: string, categoryId: string): Promise<any[]> {
+    const legacyFeatures = LEGACY_FEATURES_BY_CATEGORY[categoryId];
+    if (!legacyFeatures?.length) {
+      return ResearchFeatureService.getUserFeatures(userId, categoryId);
+    }
+    const allLookupIds = new Set<string>();
+    for (const f of legacyFeatures) {
+      const ids = LEGACY_FEATURE_ID_LOOKUP[f.id];
+      if (ids) ids.forEach(id => allLookupIds.add(id));
+    }
+    const userDocs = await UserResearchFeature.find({
+      userId,
+      categoryId,
+      featureId: { $in: Array.from(allLookupIds) },
+    })
+      .select('featureId isUnlocked unlockedAt isResearching researchStartedAt researchCompletesAt researchTimeHours')
+      .lean();
+    return legacyFeatures.map(feature => {
+      const lookupIds = LEGACY_FEATURE_ID_LOOKUP[feature.id] || [feature.id];
+      const useDoc = userDocs.find((d: any) => lookupIds.includes(d.featureId));
+      const researchTimeHours = useDoc?.researchTimeHours;
+      const validTime = ResearchFeatureService.isValidResearchTimeHours(researchTimeHours) ? researchTimeHours : feature.researchTimeHours ?? 4;
+      return {
+        ...feature,
+        isUnlocked: !!useDoc?.isUnlocked,
+        unlockedAt: useDoc?.unlockedAt ?? null,
+        isResearching: !!useDoc?.isResearching,
+        researchStartedAt: useDoc?.researchStartedAt ?? null,
+        researchCompletesAt: useDoc?.researchCompletesAt ?? null,
+        researchTimeHours: validTime,
+      };
+    });
+  }
+
   static async getUserFeatures(
     userId: string,
     categoryId: string
@@ -483,13 +555,14 @@ export class ResearchFeatureService {
 
       // Merge base features with user progress from UserResearchFeature collection.
       // Legacy: treat completed old feature IDs as unlocked for corresponding new spec IDs (grandfathering + read-time before/after migration).
+      // reduce-insurance-01: only show unlocked when user has doc reduce-insurance-01 (not legacy). Legacy reduce-insurance-expense = $0.02 only → show only 02 unlocked so UI matches server 0.02.
       const legacyUnlockMap: Record<string, string[]> = {
         'reduce-tax-expense-02': ['reduce-expenses'],
         'add-battalion-c': ['battalions-per-battle'],
         'battalion-size-250': ['increase-battalion-size'],
         'crew-system-unlock': [],
-        'reduce-insurance-01': ['reduce-insurance-expense'],
-        'reduce-insurance-02': ['reduce-insurance-expense'],
+        'reduce-insurance-01': ['reduce-insurance-01'],
+        'reduce-insurance-02': ['reduce-insurance-02', 'reduce-insurance-expense'],
         'rental-profit-01': ['rental-profit-increase'],
         'increase-income-01': ['increase-income-rate'],
         'increase-income-02': ['increase-income-rate'],

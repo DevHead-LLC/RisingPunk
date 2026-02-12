@@ -39,10 +39,13 @@ export const researchFeaturesApi = createApi({
   reducerPath: 'researchFeaturesApi',
   baseQuery: fetchBaseQuery({
     baseUrl: `${API_URL}/api/research`,
-    prepareHeaders: (headers, { getState }) => {
+    prepareHeaders: (headers, { getState, endpoint }) => {
       const token = (getState() as RootState).auth.token;
       if (token) {
         headers.set('authorization', `Bearer ${token}`);
+      }
+      if (endpoint === 'getUserFeatures') {
+        headers.set('X-Research-API-Version', '2');
       }
       return headers;
     },

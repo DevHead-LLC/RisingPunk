@@ -273,13 +273,17 @@ router.get('/expense-modifiers', auth, async (req: Request, res: Response) => {
 });
 
 // Get user's individual feature status for a category
+// Legacy: when client does not send X-Research-API-Version: 2 (old App Store app), return legacy feature list (old IDs, no Probe) so Research screen works.
 router.get('/user-features/:categoryId', auth, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user._id;
     const { categoryId } = req.params;
-    
-    const featuresWithStatus = await ResearchFeatureService.getUserFeatures(userId, categoryId);
-    
+    const useLegacy = req.get('x-research-api-version') !== '2';
+
+    const featuresWithStatus = useLegacy
+      ? await ResearchFeatureService.getUserFeaturesLegacy(userId, categoryId)
+      : await ResearchFeatureService.getUserFeatures(userId, categoryId);
+
     res.json({
       success: true,
       data: featuresWithStatus
