@@ -34,10 +34,8 @@ const LEGACY_MAPPINGS: {
     { categoryId: 'cash-flow', featureId: 'increase-income-02' },
     { categoryId: 'cash-flow', featureId: 'increase-income-025' },
   ]},
-  // Grant 01+02 so prerequisite order is satisfied (02 requires 01; crew-system-unlock requires 01). Bugbot: omit 01 caused inverted state.
-  // Granting both yields $0.03/sec (01+02) vs old $0.02 — extra $0.01/sec is intentional grandfather bonus, like income (Bugbot).
+  // Grant only 02 so legacy $0.02 research maps to one tier. Older users should not see $0.01 tier unlocked; crew-system-unlock prereq (01) is satisfied by granting 02 (server treats 02 as full replacement).
   { oldCategoryId: 'cash-flow', oldFeatureId: 'reduce-insurance-expense', newEntries: [
-    { categoryId: 'cash-flow', featureId: 'reduce-insurance-01' },
     { categoryId: 'cash-flow', featureId: 'reduce-insurance-02' },
   ]},
   { oldCategoryId: 'investments', oldFeatureId: 'rental-profit-increase', newEntries: [{ categoryId: 'investments', featureId: 'rental-profit-01' }] },

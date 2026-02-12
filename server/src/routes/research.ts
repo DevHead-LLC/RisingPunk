@@ -273,13 +273,17 @@ router.get('/expense-modifiers', auth, async (req: Request, res: Response) => {
 });
 
 // Get user's individual feature status for a category
+// Legacy: when client does not send X-Research-API-Version: 2 (old App Store app), return legacy feature list (old IDs, no Probe) so Research screen works.
 // For cash-flow, also return server-computed insuranceReduction and taxReduction so client fallback matches server (Bugbot: legacy reduce-insurance-expense).
 router.get('/user-features/:categoryId', auth, async (req: Request, res: Response) => {
   try {
     const userId = String((req as any).user._id);
     const { categoryId } = req.params;
+    const useLegacy = req.get('x-research-api-version') !== '2';
 
-    const featuresWithStatus = await ResearchFeatureService.getUserFeatures(userId, categoryId);
+    const featuresWithStatus = useLegacy
+      ? await ResearchFeatureService.getUserFeaturesLegacy(userId, categoryId)
+      : await ResearchFeatureService.getUserFeatures(userId, categoryId);
 
     if (categoryId === 'cash-flow') {
       const { getResearchFeaturesForBonusSync, getInsuranceReductionBonus, getTaxReductionBonus } = await import('../utils/researchFeatureUtils');
