@@ -343,6 +343,35 @@ After completing conflict resolution and pushing `android_mergeDev`, run through
 
 ---
 
+## Session: 2025-02-12 (merge dev → android_mergeDev, package.json only)
+
+**Branch context:** Merging origin/dev into android_mergeDev (from androidStaging). Single conflict: react-native-reanimated version in mobile/package.json.
+
+### 1. `mobile/package.json`
+
+**Conflict:** react-native-reanimated dependency version.
+
+| Side | Content |
+|------|--------|
+| HEAD | `"react-native-reanimated": "^3.17.5"` |
+| dev  | `"react-native-reanimated": "^4.2.1"` |
+
+**Resolution:** Accepted **HEAD**. Final state: `"react-native-reanimated": "^3.17.5"`.
+
+**Rationale:** Android first. The Android branch is validated for Play Console/internal testing with 3.17.5. Reanimated 4.x may introduce native or runtime changes; keeping 3.17.5 avoids risking build or runtime regressions on Android until we explicitly test and adopt 4.x.
+
+**Rejected from dev:** Bump to ^4.2.1 (can be done in a later, controlled upgrade after Android verification).
+
+**Failure-mode hints for later:**
+- If we want **reanimated 4.x** (e.g. new APIs or fixes), upgrade in a dedicated change: bump version, run Android build and device tests, then commit. Do not accept dev’s version in a merge without verifying Android.
+- If **animation or gesture issues** appear after a future merge, check whether reanimated was bumped and consider reverting to 3.17.5.
+
+---
+
+**Post-merge checklist:** HandleSelectionModal – (run after push if needed; no changes to that file in this merge.)
+
+---
+
 ## Related docs
 
 - `taskItems/android/appWide/network-security-config.md` – overall network security config design.
