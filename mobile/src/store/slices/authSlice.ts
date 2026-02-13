@@ -768,30 +768,23 @@ export const fetchInitialData = createAsyncThunk(
   }
 );
 
+// Shared fetch for user profile — single source of truth for refreshUserData and refreshUserDataSilent (Bugbot: avoid duplicated thunk/reducer logic).
+async function fetchUserProfile(token: string): Promise<Record<string, unknown>> {
+  const response = await fetch(`${API_URL}/api/users/profile`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to fetch user profile');
+  return response.json();
+}
+
 export const refreshUserData = createAsyncThunk(
   'auth/refreshUserData',
   async (_, { getState, rejectWithValue }) => {
     try {
       const state = getState() as { auth: AuthState };
       const { token } = state.auth;
-
-      if (!token) {
-        return rejectWithValue('No authentication token');
-      }
-
-      // Fetch updated user profile
-      const response = await fetch(`${API_URL}/api/users/profile`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch user profile');
-      }
-
-      const userData = await response.json();
-      return userData;
+      if (!token) return rejectWithValue('No authentication token');
+      return await fetchUserProfile(token);
     } catch (error) {
       console.error('Error refreshing user data:', error);
       return rejectWithValue('Failed to refresh user data');
@@ -806,23 +799,8 @@ export const refreshUserDataSilent = createAsyncThunk(
     try {
       const state = getState() as { auth: AuthState };
       const { token } = state.auth;
-
-      if (!token) {
-        return rejectWithValue('No authentication token');
-      }
-
-      const response = await fetch(`${API_URL}/api/users/profile`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch user profile');
-      }
-
-      const userData = await response.json();
-      return userData;
+      if (!token) return rejectWithValue('No authentication token');
+      return await fetchUserProfile(token);
     } catch (error) {
       console.error('Error refreshing user data (silent):', error);
       return rejectWithValue('Failed to refresh user data');
@@ -887,6 +865,26 @@ const initialState: AuthState = {
   showAccountSwitched: false,
   showAccountSwitchedBanner: false,
 };
+
+// Shared state update for user profile payload — single source of truth for refreshUserData and refreshUserDataSilent .fulfilled (Bugbot: avoid duplicated reducer logic).
+function applyUserProfilePayload(
+  state: AuthState,
+  payload: Record<string, unknown> | null | undefined
+): void {
+  if (!state.user || !payload) return;
+  if (typeof payload.email === 'string') state.user.email = payload.email;
+  state.user.emailVerified = payload.emailVerified === true;
+  state.user.handle = (payload.handle as string) ?? state.user.handle;
+  state.user.level = typeof payload.level === 'number' ? payload.level : state.user.level;
+  state.user.unlockedFeatures = (payload.unlockedFeatures as User['unlockedFeatures']) ?? state.user.unlockedFeatures;
+  state.user.profileGender = (payload.profileGender as User['profileGender']) ?? state.user.profileGender;
+  state.user.onboardingCompleted = payload.onboardingCompleted === true;
+  state.user.needsHandleSelection = payload.needsHandleSelection === true;
+  state.user.totalGuardiansBuilt = typeof payload.totalGuardiansBuilt === 'number' ? payload.totalGuardiansBuilt : (state.user.totalGuardiansBuilt ?? 0);
+  if (typeof payload.isGuest === 'boolean') state.user.isGuest = payload.isGuest;
+  if (typeof payload.hasPassword === 'boolean') state.user.hasPassword = payload.hasPassword;
+  if (payload.emailVerified === true) state.emailVerificationPromptedUserId = null;
+}
 
 // Slice
 export const authSlice = createSlice({
@@ -1273,59 +1271,14 @@ export const authSlice = createSlice({
       .addCase(refreshUserData.fulfilled, (state, action) => {
         state.isLoading = false;
         state.error = null;
-        if (state.user && action.payload) {
-          // Update user data with fresh data from server (e.g. after link-account, email is now set)
-          if (typeof action.payload.email === 'string') {
-            state.user.email = action.payload.email;
-          }
-          state.user.emailVerified = action.payload.emailVerified || false;
-          state.user.handle = action.payload.handle;
-          state.user.level = action.payload.level;
-          state.user.unlockedFeatures = action.payload.unlockedFeatures;
-          state.user.profileGender = action.payload.profileGender;
-          state.user.onboardingCompleted = action.payload.onboardingCompleted;
-          state.user.needsHandleSelection = action.payload.needsHandleSelection;
-          state.user.totalGuardiansBuilt = action.payload.totalGuardiansBuilt || 0;
-          if (typeof action.payload.isGuest === 'boolean') {
-            state.user.isGuest = action.payload.isGuest;
-          }
-          if (typeof action.payload.hasPassword === 'boolean') {
-            state.user.hasPassword = action.payload.hasPassword;
-          }
-          
-          // Reset email verification prompted flag if email is now verified
-          if (action.payload.emailVerified) {
-            state.emailVerificationPromptedUserId = null;
-          }
-        }
+        applyUserProfilePayload(state, action.payload as Record<string, unknown> | null);
       })
       .addCase(refreshUserData.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       })
       .addCase(refreshUserDataSilent.fulfilled, (state, action) => {
-        if (state.user && action.payload) {
-          if (typeof action.payload.email === 'string') {
-            state.user.email = action.payload.email;
-          }
-          state.user.emailVerified = action.payload.emailVerified || false;
-          state.user.handle = action.payload.handle;
-          state.user.level = action.payload.level;
-          state.user.unlockedFeatures = action.payload.unlockedFeatures;
-          state.user.profileGender = action.payload.profileGender;
-          state.user.onboardingCompleted = action.payload.onboardingCompleted;
-          state.user.needsHandleSelection = action.payload.needsHandleSelection;
-          state.user.totalGuardiansBuilt = action.payload.totalGuardiansBuilt || 0;
-          if (typeof action.payload.isGuest === 'boolean') {
-            state.user.isGuest = action.payload.isGuest;
-          }
-          if (typeof action.payload.hasPassword === 'boolean') {
-            state.user.hasPassword = action.payload.hasPassword;
-          }
-          if (action.payload.emailVerified) {
-            state.emailVerificationPromptedUserId = null;
-          }
-        }
+        applyUserProfilePayload(state, action.payload as Record<string, unknown> | null);
       });
 
     // Force Refresh All Data
