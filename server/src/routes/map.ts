@@ -13,6 +13,7 @@ const router: Router = express.Router();
 const mapService = new MapService();
 
 // Rate limit for map chat POST: per user per map, max 10 messages per 60s to prevent spam/abuse (Bugbot).
+// Evict expired-window entries so the Map does not grow unbounded (Bugbot: in-memory leak).
 const MAP_CHAT_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const MAP_CHAT_RATE_LIMIT_MAX = 10;
 const mapChatRateLimit = new Map<string, { count: number; windowStartMs: number }>();
@@ -130,17 +131,21 @@ router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageReque
     const entry = mapChatRateLimit.get(rateLimitKey);
     if (entry) {
       if (nowMs - entry.windowStartMs >= MAP_CHAT_RATE_LIMIT_WINDOW_MS) {
-        entry.count = 0;
-        entry.windowStartMs = nowMs;
-      }
-      if (entry.count >= MAP_CHAT_RATE_LIMIT_MAX) {
+        mapChatRateLimit.delete(rateLimitKey);
+      } else if (entry.count >= MAP_CHAT_RATE_LIMIT_MAX) {
         res.status(429).json({
           error: 'Too many messages. Please wait a moment before sending again.',
         });
         return;
       }
+    }
+
+    // Reserve slot before any await so concurrent requests cannot bypass the limit (Bugbot).
+    const entryToIncrement = mapChatRateLimit.get(rateLimitKey);
+    if (!entryToIncrement) {
+      mapChatRateLimit.set(rateLimitKey, { count: 1, windowStartMs: nowMs });
     } else {
-      mapChatRateLimit.set(rateLimitKey, { count: 0, windowStartMs: nowMs });
+      entryToIncrement.count += 1;
     }
 
     const filteredMessage = filterBadWords(trimmedMessage);
@@ -154,9 +159,6 @@ router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageReque
     });
 
     await chatMessage.save();
-
-    const currentEntry = mapChatRateLimit.get(rateLimitKey);
-    if (currentEntry) currentEntry.count += 1;
 
     const totalMessages = await MapChatMessage.countDocuments({ mapName: normalizedMapName });
     if (totalMessages > 100) {
