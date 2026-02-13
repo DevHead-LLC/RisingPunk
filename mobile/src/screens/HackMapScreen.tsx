@@ -10,7 +10,10 @@ import { CrewOnboardingModal } from '../components/hackMap/CrewOnboardingModal';
 import { CrewModal } from '../components/hackMap/CrewModal';
 import { VisitingProfileModal } from '../components/hackMap/VisitingProfileModal';
 import { VisitCrewModal } from '../components/hackMap/VisitCrewModal';
+import { WorldChatIconButton } from '../components/hackMap/WorldChatIconButton';
+import { WorldChatModal } from '../components/hackMap/WorldChatModal';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
+import { refreshUserDataSilent } from '../store/slices/authSlice';
 import { setGrid, setLoading, clearPlayerCellsByUserIds } from '../store/slices/mapSlice';
 import { useFetchMapQuery, useFetchMapViewportQuery } from '../store/api/mapApi';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
@@ -416,6 +419,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const currentUserHandle = useAppSelector((state) => state.auth.user?.handle);
   const currentUserId = useAppSelector((state) => state.auth.user?._id);
   const token = useAppSelector((state) => state.auth.token);
+  const hackRigUnlocked = useAppSelector((state) => state.auth.user?.unlockedFeatures?.hackRig === true);
   const colors = useThemeColors();
   const { themeMode } = useTheme();
 
@@ -425,6 +429,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       trackHackmapVisited(currentUserId);
     }
   }, [currentUserId]);
+
+  // Refetch user silently on mount so World Chat icon (gated by hackRig) shows without app refresh after unlock
+  useEffect(() => {
+    dispatch(refreshUserDataSilent());
+  }, [dispatch]);
 
   // Memoize the styles object to prevent unnecessary re-renders
   const memoizedStyles = useMemo(() => getStyles(colors, themeMode), [colors, themeMode]);
@@ -730,6 +739,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [visitCrewId, setVisitCrewId] = useState<string | null>(null);
   const [visitCrewName, setVisitCrewName] = useState<string | null>(null);
   const [showCrewModalFromUser, setShowCrewModalFromUser] = useState(false);
+  const [showWorldChatModal, setShowWorldChatModal] = useState(false);
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
   const startX = useSharedValue(0);
@@ -3151,6 +3161,15 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   return (
     <View style={styles.container} onLayout={onContainerLayout}>
       <CloseButton onPress={onClose} />
+
+      {hackRigUnlocked && (
+        <WorldChatIconButton onPress={() => setShowWorldChatModal(true)} />
+      )}
+      <WorldChatModal
+        visible={showWorldChatModal}
+        onClose={() => setShowWorldChatModal(false)}
+        mapName="main"
+      />
 
       <Pressable style={styles.navigationButton} onPress={centerOnUserHome}>
         <Image source={require('../assets/images/navigationIcon.png')} style={styles.navigationIcon} resizeMode="contain" />

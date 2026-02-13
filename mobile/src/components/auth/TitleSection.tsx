@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { SIZING, styleGuide } from '../../styles/theme';
 import { LightModeToggle } from './LightModeToggle';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { APP_VERSION } from '../../appVersion';
 
 export function TitleSection(): React.JSX.Element {
   const colors = useThemeColors();
@@ -23,7 +24,7 @@ export function TitleSection(): React.JSX.Element {
         </View>
       </View>
       <View style={styles.bottomRow}>
-        <Text style={[styles.versionText, { color: colors.text.secondary }]}>v2.4.0</Text>
+        <Text style={[styles.versionText, { color: colors.text.secondary }]}>v{APP_VERSION}</Text>
         <LightModeToggle />
       </View>
     </View>
