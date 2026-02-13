@@ -164,14 +164,10 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
 
   const styles = createStyles(colors);
 
-  if (!visible) {
-    return null;
-  }
-
   return (
     <>
       <Modal
-        visible
+        visible={visible}
         transparent
         animationType="fade"
         onRequestClose={handleClose}

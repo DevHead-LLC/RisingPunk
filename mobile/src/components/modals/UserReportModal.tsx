@@ -114,6 +114,7 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
     
     switch (context) {
       case 'chat-message':
+      case 'map-chat-message':
         return contextData.message || '';
       case 'internal-message-board':
       case 'external-message-board':
