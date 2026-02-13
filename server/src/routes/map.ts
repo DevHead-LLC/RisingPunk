@@ -48,12 +48,9 @@ const mapBootstrapChains = new Map<string, Promise<void>>();
 
 async function ensureMapExistsForChat(mapName: string): Promise<void> {
   const run = async (): Promise<void> => {
-    try {
-      const exists = await MapModel.exists({ name: mapName });
-      if (!exists) await mapService.generateMap(mapName);
-    } catch {
-      // Caller will recheck exists(); duplicate or other error is handled there.
-    }
+    const exists = await MapModel.exists({ name: mapName });
+    if (!exists) await mapService.generateMap(mapName);
+    // Do not swallow errors: bootstrap failures must surface as 500, not 400 Invalid map name (Bugbot).
   };
   let chain = mapBootstrapChains.get(mapName);
   if (!chain) {
