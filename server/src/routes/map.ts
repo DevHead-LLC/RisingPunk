@@ -208,17 +208,28 @@ router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageReque
       entryToIncrement.count += 1;
     }
 
-    const filteredMessage = filterBadWords(trimmedMessage);
+    let chatMessage: InstanceType<typeof MapChatMessage>;
+    try {
+      const filteredMessage = filterBadWords(trimmedMessage);
 
-    const chatMessage = new MapChatMessage({
-      mapName: normalizedMapName,
-      userId,
-      username: user.handle || 'Unknown',
-      message: filteredMessage,
-      originalMessage: trimmedMessage,
-    });
+      chatMessage = new MapChatMessage({
+        mapName: normalizedMapName,
+        userId,
+        username: user.handle || 'Unknown',
+        message: filteredMessage,
+        originalMessage: trimmedMessage,
+      });
 
-    await chatMessage.save();
+      await chatMessage.save();
+    } catch (saveError: any) {
+      // Refund only when save (or pre-save) failed; do not refund if save succeeded and post-save steps fail (Bugbot).
+      const entry = mapChatRateLimit.get(rateLimitKey);
+      if (entry) {
+        entry.count -= 1;
+        if (entry.count <= 0) mapChatRateLimit.delete(rateLimitKey);
+      }
+      throw saveError;
+    }
 
     const totalMessages = await MapChatMessage.countDocuments({ mapName: normalizedMapName });
     if (totalMessages > 100) {
