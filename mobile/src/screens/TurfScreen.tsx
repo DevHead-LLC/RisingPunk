@@ -633,8 +633,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     if (screen !== 'turf') {
       setShowWorldChatModal(false);
     }
-    // Refetch user silently when entering turf or map so World Chat icon (gated by hackRig) updates without app refresh or loading state
-    if (screen === 'turf' || screen === 'map') {
+    // Refetch user silently when entering turf so World Chat icon (gated by hackRig) updates without app refresh. Map refetch is done in HackMapScreen on mount to avoid duplicate request (Bugbot).
+    if (screen === 'turf') {
       dispatch(refreshUserDataSilent());
     }
     
