@@ -204,46 +204,56 @@ router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageReque
       entryToIncrement.count += 1;
     }
 
-    const filteredMessage = filterBadWords(trimmedMessage);
+    try {
+      const filteredMessage = filterBadWords(trimmedMessage);
 
-    const chatMessage = new MapChatMessage({
-      mapName: normalizedMapName,
-      userId,
-      username: user.handle || 'Unknown',
-      message: filteredMessage,
-      originalMessage: trimmedMessage,
-    });
+      const chatMessage = new MapChatMessage({
+        mapName: normalizedMapName,
+        userId,
+        username: user.handle || 'Unknown',
+        message: filteredMessage,
+        originalMessage: trimmedMessage,
+      });
 
-    await chatMessage.save();
+      await chatMessage.save();
 
-    const totalMessages = await MapChatMessage.countDocuments({ mapName: normalizedMapName });
-    if (totalMessages > 100) {
-      const cutoff = await MapChatMessage.findOne(
-        { mapName: normalizedMapName },
-        { createdAt: 1, _id: 1 },
-        { sort: { createdAt: -1, _id: -1 }, skip: 99, lean: true }
-      );
-      if (cutoff) {
-        await MapChatMessage.deleteMany({
-          mapName: normalizedMapName,
-          $or: [
-            { createdAt: { $lt: cutoff.createdAt } },
-            { createdAt: cutoff.createdAt, _id: { $lt: cutoff._id } },
-          ],
-        });
+      const totalMessages = await MapChatMessage.countDocuments({ mapName: normalizedMapName });
+      if (totalMessages > 100) {
+        const cutoff = await MapChatMessage.findOne(
+          { mapName: normalizedMapName },
+          { createdAt: 1, _id: 1 },
+          { sort: { createdAt: -1, _id: -1 }, skip: 99, lean: true }
+        );
+        if (cutoff) {
+          await MapChatMessage.deleteMany({
+            mapName: normalizedMapName,
+            $or: [
+              { createdAt: { $lt: cutoff.createdAt } },
+              { createdAt: cutoff.createdAt, _id: { $lt: cutoff._id } },
+            ],
+          });
+        }
       }
-    }
 
-    res.json({
-      success: true,
-      message: {
-        id: (chatMessage._id as mongoose.Types.ObjectId).toString(),
-        userId: (chatMessage.userId as mongoose.Types.ObjectId).toString(),
-        username: chatMessage.username,
-        message: chatMessage.message,
-        timestamp: chatMessage.createdAt,
-      },
-    });
+      res.json({
+        success: true,
+        message: {
+          id: (chatMessage._id as mongoose.Types.ObjectId).toString(),
+          userId: (chatMessage.userId as mongoose.Types.ObjectId).toString(),
+          username: chatMessage.username,
+          message: chatMessage.message,
+          timestamp: chatMessage.createdAt,
+        },
+      });
+    } catch (saveOrDownstreamError: any) {
+      // Failed sends must not consume rate limit; undo increment so user doesn't hit 429 after transient errors (Bugbot).
+      const entry = mapChatRateLimit.get(rateLimitKey);
+      if (entry) {
+        entry.count -= 1;
+        if (entry.count <= 0) mapChatRateLimit.delete(rateLimitKey);
+      }
+      throw saveOrDownstreamError;
+    }
   } catch (error: any) {
     console.error('Error sending map chat message:', error);
     res.status(500).json({ error: 'Internal server error' });
