@@ -11,6 +11,11 @@ const config = {
     // Disable package exports to fix EventEmitter parsing issues in RN 0.76+
     unstable_enablePackageExports: false,
   },
+  transformer: {
+    // Use Babel to parse so Flow (including const type params in RN source) is stripped.
+    // Hermes parser doesn't support Flow syntax and can throw on ViewConfigIgnore.js etc.
+    hermesParser: false,
+  },
   // Spurious reloads: watchman uses .watchmanconfig ignore_dirs. If the blue
   // "Refreshing..." bar keeps showing and images struggle, try:
   // watchman watch-del-all && npx react-native start --reset-cache
