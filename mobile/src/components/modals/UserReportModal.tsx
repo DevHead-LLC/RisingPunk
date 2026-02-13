@@ -51,6 +51,7 @@ const CONTEXT_LABELS: Record<ReportContext, string> = {
   'external-message-board': 'External Message Board',
   'crew-rules': 'Crew Rules',
   'chat-message': 'Chat Message',
+  'map-chat-message': 'Map Chat Message',
 };
 
 export const UserReportModal: React.FC<UserReportModalProps> = ({

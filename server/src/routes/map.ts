@@ -1,10 +1,13 @@
 import express, { Request, Response, Router } from 'express';
+import mongoose from 'mongoose';
 import auth from '../middleware/auth';
 import { MapService } from '../services/MapService';
 import { ShieldService } from '../services/ShieldService';
 import { Map as MapModel } from '../models/Map';
 import { User } from '../models/User';
 import { NPCService } from '../services/NPCService';
+import { MapChatMessage } from '../models/MapChatMessage';
+import { filterBadWords } from '../utils/contentModeration';
 
 const router: Router = express.Router();
 const mapService = new MapService();
@@ -22,6 +25,144 @@ function getDisplayLevel(userLevelAssociation: number): number {
   };
   return mapping[userLevelAssociation] || 1;
 }
+
+// Map chat (world chat) - MUST be before /:name to avoid route conflict
+// Visibility is gated by user.unlockedFeatures.hackRig; only users who have unlocked the hack rig can read/send.
+router.get('/:mapName/chat-messages', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const { mapName } = req.params;
+    if (!mapName || typeof mapName !== 'string' || mapName.trim().length === 0) {
+      res.status(400).json({ error: 'Valid map name is required' });
+      return;
+    }
+
+    const user = await User.findById(userId).select('unlockedFeatures').lean();
+    if (!user?.unlockedFeatures?.hackRig) {
+      res.status(403).json({ error: 'Hack rig must be unlocked to access world chat' });
+      return;
+    }
+
+    const messages = await MapChatMessage.find({ mapName: mapName.trim() })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+
+    messages.reverse();
+
+    const formattedMessages = messages.map((msg: any) => ({
+      id: String(msg._id),
+      userId: String(msg.userId),
+      username: msg.username,
+      message: msg.message,
+      timestamp: msg.createdAt,
+    }));
+
+    res.json({
+      success: true,
+      messages: formattedMessages,
+    });
+  } catch (error: any) {
+    console.error('Error fetching map chat messages:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+interface SendMapChatMessageRequest extends Request {
+  body: {
+    message: string;
+  };
+}
+
+router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageRequest, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const { mapName } = req.params;
+    if (!mapName || typeof mapName !== 'string' || mapName.trim().length === 0) {
+      res.status(400).json({ error: 'Valid map name is required' });
+      return;
+    }
+
+    const user = await User.findById(userId).select('handle unlockedFeatures').lean();
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    if (!user.unlockedFeatures?.hackRig) {
+      res.status(403).json({ error: 'Hack rig must be unlocked to send world chat messages' });
+      return;
+    }
+
+    const { message } = req.body;
+    if (!message || typeof message !== 'string') {
+      res.status(400).json({ error: 'Message is required' });
+      return;
+    }
+
+    const trimmedMessage = message.trim();
+    if (trimmedMessage.length === 0) {
+      res.status(400).json({ error: 'Message cannot be empty' });
+      return;
+    }
+    if (trimmedMessage.length > 500) {
+      res.status(400).json({ error: 'Message must be 500 characters or less' });
+      return;
+    }
+
+    const filteredMessage = filterBadWords(trimmedMessage);
+    const normalizedMapName = mapName.trim();
+
+    const chatMessage = new MapChatMessage({
+      mapName: normalizedMapName,
+      userId,
+      username: user.handle || 'Unknown',
+      message: filteredMessage,
+      originalMessage: trimmedMessage,
+    });
+
+    await chatMessage.save();
+
+    const totalMessages = await MapChatMessage.countDocuments({ mapName: normalizedMapName });
+    if (totalMessages > 100) {
+      const messages = await MapChatMessage.find({ mapName: normalizedMapName })
+        .sort({ createdAt: -1 })
+        .limit(100)
+        .select('createdAt')
+        .lean();
+      if (messages.length > 0) {
+        const oldestKeptTimestamp = messages[messages.length - 1].createdAt;
+        await MapChatMessage.deleteMany({
+          mapName: normalizedMapName,
+          createdAt: { $lt: oldestKeptTimestamp },
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: {
+        id: (chatMessage._id as mongoose.Types.ObjectId).toString(),
+        userId: (chatMessage.userId as mongoose.Types.ObjectId).toString(),
+        username: chatMessage.username,
+        message: chatMessage.message,
+        timestamp: chatMessage.createdAt,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error sending map chat message:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 router.get('/:name', async (req: Request, res: Response) => {
   try {

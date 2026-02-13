@@ -799,6 +799,37 @@ export const refreshUserData = createAsyncThunk(
   }
 );
 
+/** Same fetch as refreshUserData but does not set auth.isLoading. Use when updating user (e.g. unlockedFeatures) without showing app-level loading or unmounting the UI. */
+export const refreshUserDataSilent = createAsyncThunk(
+  'auth/refreshUserDataSilent',
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      const state = getState() as { auth: AuthState };
+      const { token } = state.auth;
+
+      if (!token) {
+        return rejectWithValue('No authentication token');
+      }
+
+      const response = await fetch(`${API_URL}/api/users/profile`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch user profile');
+      }
+
+      const userData = await response.json();
+      return userData;
+    } catch (error) {
+      console.error('Error refreshing user data (silent):', error);
+      return rejectWithValue('Failed to refresh user data');
+    }
+  }
+);
+
 export const forceRefreshAllData = createAsyncThunk(
   'auth/forceRefreshAllData',
   async (_, { getState, dispatch, rejectWithValue }) => {
@@ -1271,6 +1302,30 @@ export const authSlice = createSlice({
       .addCase(refreshUserData.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
+      })
+      .addCase(refreshUserDataSilent.fulfilled, (state, action) => {
+        if (state.user && action.payload) {
+          if (typeof action.payload.email === 'string') {
+            state.user.email = action.payload.email;
+          }
+          state.user.emailVerified = action.payload.emailVerified || false;
+          state.user.handle = action.payload.handle;
+          state.user.level = action.payload.level;
+          state.user.unlockedFeatures = action.payload.unlockedFeatures;
+          state.user.profileGender = action.payload.profileGender;
+          state.user.onboardingCompleted = action.payload.onboardingCompleted;
+          state.user.needsHandleSelection = action.payload.needsHandleSelection;
+          state.user.totalGuardiansBuilt = action.payload.totalGuardiansBuilt || 0;
+          if (typeof action.payload.isGuest === 'boolean') {
+            state.user.isGuest = action.payload.isGuest;
+          }
+          if (typeof action.payload.hasPassword === 'boolean') {
+            state.user.hasPassword = action.payload.hasPassword;
+          }
+          if (action.payload.emailVerified) {
+            state.emailVerificationPromptedUserId = null;
+          }
+        }
       });
 
     // Force Refresh All Data
