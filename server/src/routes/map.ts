@@ -97,6 +97,18 @@ router.get('/:mapName/chat-messages', auth, async (req: Request, res: Response) 
       return;
     }
 
+    let mapExists = await MapModel.exists({ name: normalizedMapName });
+    if (!mapExists) {
+      if (normalizedMapName === MAP_CHAT_ALLOWED_AUTO_CREATE_NAME) {
+        await ensureMapExistsForChat(normalizedMapName);
+        mapExists = await MapModel.exists({ name: normalizedMapName });
+      }
+      if (!mapExists) {
+        res.status(400).json({ error: 'Invalid map name' });
+        return;
+      }
+    }
+
     const messages = await MapChatMessage.find({ mapName: normalizedMapName })
       .sort({ createdAt: -1 })
       .limit(100)
@@ -163,6 +175,18 @@ router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageReque
     if (!user.unlockedFeatures?.hackRig) {
       res.status(403).json({ error: 'Hack rig must be unlocked to send world chat messages' });
       return;
+    }
+
+    let mapExists = await MapModel.exists({ name: normalizedMapName });
+    if (!mapExists) {
+      if (normalizedMapName === MAP_CHAT_ALLOWED_AUTO_CREATE_NAME) {
+        await ensureMapExistsForChat(normalizedMapName);
+        mapExists = await MapModel.exists({ name: normalizedMapName });
+      }
+      if (!mapExists) {
+        res.status(400).json({ error: 'Invalid map name' });
+        return;
+      }
     }
 
     const { message } = req.body;
