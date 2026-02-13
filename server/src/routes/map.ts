@@ -40,9 +40,12 @@ function getDisplayLevel(userLevelAssociation: number): number {
   return mapping[userLevelAssociation] || 1;
 }
 
+// Map name used by World Chat; only this name may be auto-created if missing so chat works on fresh environments (Bugbot).
+const MAP_CHAT_ALLOWED_AUTO_CREATE_NAME = 'main';
+
 // Map chat (world chat) - MUST be before /:name to avoid route conflict
 // Visibility is gated by user.unlockedFeatures.hackRig; only users who have unlocked the hack rig can read/send.
-// Restrict mapName to maps that exist to prevent storage abuse via arbitrary names (Bugbot).
+// Restrict mapName to existing maps (or main: create on first use) to prevent storage abuse via arbitrary names (Bugbot).
 router.get('/:mapName/chat-messages', auth, async (req: Request, res: Response) => {
   try {
     const userId = req.user?._id;
@@ -57,10 +60,16 @@ router.get('/:mapName/chat-messages', auth, async (req: Request, res: Response) 
       return;
     }
     const normalizedMapName = mapName.trim();
-    const mapExists = await MapModel.exists({ name: normalizedMapName });
+    let mapExists = await MapModel.exists({ name: normalizedMapName });
     if (!mapExists) {
-      res.status(400).json({ error: 'Invalid map name' });
-      return;
+      if (normalizedMapName === MAP_CHAT_ALLOWED_AUTO_CREATE_NAME) {
+        await mapService.generateMap(normalizedMapName);
+        mapExists = await MapModel.exists({ name: normalizedMapName });
+      }
+      if (!mapExists) {
+        res.status(400).json({ error: 'Invalid map name' });
+        return;
+      }
     }
 
     const user = await User.findById(userId).select('unlockedFeatures').lean();
@@ -100,7 +109,7 @@ interface SendMapChatMessageRequest extends Request {
   };
 }
 
-// Restrict mapName to maps that exist to prevent storage abuse via arbitrary names (Bugbot).
+// Same map validation as GET: existing map or auto-create main only (Bugbot).
 router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageRequest, res: Response) => {
   try {
     const userId = req.user?._id;
@@ -115,10 +124,16 @@ router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageReque
       return;
     }
     const normalizedMapName = mapName.trim();
-    const mapExists = await MapModel.exists({ name: normalizedMapName });
+    let mapExists = await MapModel.exists({ name: normalizedMapName });
     if (!mapExists) {
-      res.status(400).json({ error: 'Invalid map name' });
-      return;
+      if (normalizedMapName === MAP_CHAT_ALLOWED_AUTO_CREATE_NAME) {
+        await mapService.generateMap(normalizedMapName);
+        mapExists = await MapModel.exists({ name: normalizedMapName });
+      }
+      if (!mapExists) {
+        res.status(400).json({ error: 'Invalid map name' });
+        return;
+      }
     }
 
     const user = await User.findById(userId).select('handle unlockedFeatures').lean();
